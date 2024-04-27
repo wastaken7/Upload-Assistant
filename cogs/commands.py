@@ -8,6 +8,7 @@ from src.trackers.BHD import BHD
 from src.trackers.AITHER import AITHER
 from src.trackers.STC import STC
 from src.trackers.LCD import LCD
+from src.trackers.CBR import CBR
 from data.config import config
 
 import discord
@@ -419,7 +420,10 @@ class Commands(commands.Cog):
                 await asyncio.sleep(0.3)
             if "LCD" in each.replace(' ', ''):
                 await message.add_reaction(config['DISCORD']['discord_emojis']['LCD'])
-                await asyncio.sleep(0.3)                
+                await asyncio.sleep(0.3)
+            if "CBR" in each.replace(' ', ''):
+                await message.add_reaction(config['DISCORD']['discord_emojis']['CBR'])
+                await asyncio.sleep(0.3)                 
         await message.add_reaction(config['DISCORD']['discord_emojis']['MANUAL'])
         await asyncio.sleep(0.3)
         await message.add_reaction(config['DISCORD']['discord_emojis']['CANCEL'])
@@ -511,7 +515,10 @@ class Commands(commands.Cog):
                         await stc.edit_desc(meta) 
                     if manual_tracker.upper() == "LCD":
                         lcd = LCD(config=config)
-                        await lcd.edit_desc(meta)                         
+                        await lcd.edit_desc(meta)
+                    if manual_tracker.upper() == "CBR":
+                        cbr = CBR(config=config)
+                        await cbr.edit_desc(meta)                        
                 archive_url = await prep.package(meta)
                 upload_embed_description = upload_embed_description.replace('MANUAL', '~~MANUAL~~')
                 if archive_url == False:
@@ -571,7 +578,17 @@ class Commands(commands.Cog):
                     await client.add_to_client(meta, "LCD")
                     upload_embed_description = upload_embed_description.replace('LCD', '~~LCD~~')
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    await msg.edit(embed=upload_embed)                     
+                    await msg.edit(embed=upload_embed)
+            if "CBR" in tracker_list:
+                cbr = CBR(config=config)
+                dupes = await cbr.search_existing(meta)
+                meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
+                if meta['upload'] == True:
+                    await cbr.upload(meta)
+                    await client.add_to_client(meta, "CBR")
+                    upload_embed_description = upload_embed_description.replace('CBR', '~~CBR~~')
+                    upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
+                    await msg.edit(embed=upload_embed)                    
             return None
     
     

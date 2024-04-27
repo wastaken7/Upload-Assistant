@@ -34,7 +34,7 @@ config = {
 
     "TRACKERS" : {
         # Which trackers do you want to upload to?
-        "default_trackers" : "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV",
+        "default_trackers" : "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR",
 
         "BLU" : {
             "useAPI" : False, # Set to True if using BLU
@@ -139,6 +139,11 @@ config = {
             "announce_url" : "https://locadora.cc/announce/customannounceurl",
             # "anon" : False
         },
+        "CBR" : {
+            "api_key" : "CBR api key",
+            "announce_url" : "https://capybarabr.com/announce/customannounceurl",
+            # "anon" : False
+        },        
         "LST" : {
             "api_key" : "LST api key",
             "announce_url" : "https://lst.gg/announce/customannounceurl",
