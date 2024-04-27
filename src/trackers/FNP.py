@@ -31,7 +31,7 @@ class FNP():
         self.source_flag = 'FnP'
         self.upload_url = 'https://fearnopeer.com/api/torrents/upload'
         self.search_url = 'https://fearnopeer.com/api/torrents/filter'
-        self.signature = f"\n[center][url=https://blutopia.cc/forums/topics/3087]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = f"\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
     
