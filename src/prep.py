@@ -997,10 +997,10 @@ class Prep():
                     pyver = platform.python_version_tuple()
                     if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
                         import oxipng 
-                    if os.path.getsize(image) >= 31000000:
+                    if os.path.getsize(image) >= 16000000:
                         oxipng.optimize(image, level=6)
                     else:
-                        oxipng.optimize(image, level=1)
+                        oxipng.optimize(image, level=3)
                 except:
                     pass
         return
