@@ -1,3 +1,5 @@
+[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)
+
 # L4G's Upload Assistant
 
 A simple tool to take the work out of uploading.
