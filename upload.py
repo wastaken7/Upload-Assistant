@@ -573,4 +573,3 @@ if __name__ == '__main__':
             loop.run_until_complete(do_the_thing(base_dir))
         else:
             asyncio.run(do_the_thing(base_dir))
-        
