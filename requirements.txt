@@ -19,4 +19,3 @@ pyoxipng
 rich
 Jinja2
 pyotp
-str2bool
