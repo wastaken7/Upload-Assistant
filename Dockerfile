@@ -1,17 +1,24 @@
-FROM alpine:latest
+FROM python:3.11
 
-# Add mono repository and install mono
-RUN apk add --no-cache mono --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing
-
-# Install system dependencies including Python 3.11 and tools
-RUN apk add --no-cache --upgrade ffmpeg mediainfo python3=3.11.5-r0 git py3-pip python3-dev=3.11.5-r0 g++ cargo mktorrent rust
+# Update the package list and install system dependencies including mono
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    mediainfo \
+    git \
+    g++ \
+    cargo \
+    mktorrent \
+    rustc \
+    mono-complete && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set up a virtual environment to isolate our Python dependencies
-RUN python3 -m venv /venv
+RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
 # Install wheel and other Python dependencies
-RUN pip install wheel
+RUN pip install --upgrade pip wheel
 
 # Set the working directory in the container
 WORKDIR /Upload-Assistant
@@ -24,4 +31,4 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Set the entry point for the container
-ENTRYPOINT ["python3", "/Upload-Assistant/upload.py"]
+ENTRYPOINT ["python", "/Upload-Assistant/upload.py"]
