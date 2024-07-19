@@ -133,6 +133,7 @@ class HUNO():
         # It was much easier to build the name from scratch than to alter the existing name.
 
         basename = self.get_basename(meta)
+        hc = meta.get('hardcoded-subs')
         type = meta.get('type', "")
         title = meta.get('title',"")
         alt_title = meta.get('aka', "")
@@ -206,6 +207,8 @@ class HUNO():
             elif type == "HDTV": #HDTV
                 name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
 
+        if hc:
+            name = re.sub(r'((\([0-9]{4}\)))', r'\1 Ensubbed', name)
         return ' '.join(name.split()).replace(": ", " - ")
 
 
