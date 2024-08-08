@@ -121,7 +121,8 @@ class HUNO():
         elif 'mediainfo' in meta:
             language = next(x for x in meta["mediainfo"]["media"]["track"] if x["@type"] == "Audio").get('Language_String', "English")
             language = re.sub(r'\(.+\)', '', language)
-
+        if language == "zxx":
+            language = "Silent"
         return f'{codec} {channels} {language}'
     
     def get_basename(self, meta):
