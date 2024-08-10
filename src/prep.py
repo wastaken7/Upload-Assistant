@@ -1866,61 +1866,61 @@ class Prep():
     def get_edition(self, video, bdinfo, filelist, manual_edition):
         if video.lower().startswith('dc'):
             video = video.replace('dc', '', 1)
+            
         guess = guessit(video)
         tag = guess.get('release_group', 'NOGROUP')
         repack = ""
         edition = ""
-        if bdinfo != None:
+        
+        if bdinfo is not None:
             try:
                 edition = guessit(bdinfo['label'])['edition']
-            except:
+            except Exception as e:
+                print(f"BDInfo Edition Guess Error: {e}")
                 edition = ""
         else:
             try:
-                edition = guess['edition']
-            except:
+                edition = guess.get('edition', "")
+            except Exception as e:
+                print(f"Video Edition Guess Error: {e}")
                 edition = ""
+                
         if isinstance(edition, list):
-            # time.sleep(2)
             edition = " ".join(edition)
+            
         if len(filelist) == 1:
             video = os.path.basename(video)
 
-        video = video.upper().replace('.', ' ').replace(tag, '').replace('-', '')
+        video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
 
         if "OPEN MATTE" in video:
-            edition = edition + "Open Matte"
+            edition = edition + " Open Matte"
 
-        if manual_edition != None:
-            if isinstance(manual_edition, list):
-                manual_edition = " ".join(manual_edition)
+        if manual_edition:
             edition = str(manual_edition)
-            
-        if " REPACK " in (video or edition) or "V2" in video:
+        
+        print(f"Edition After Manual Edition: {edition}")
+        
+        if "REPACK" in edition.upper() or "V2" in video:
             repack = "REPACK"
-        if " REPACK2 " in (video or edition) or "V3" in video:
+        if "REPACK2" in edition.upper() or "V3" in video:
             repack = "REPACK2"
-        if " REPACK3 " in (video or edition) or "V4" in video:
+        if "REPACK3" in edition.upper() or "V4" in video:
             repack = "REPACK3"
-        if " PROPER " in (video or edition):
+        if "PROPER" in edition.upper():
             repack = "PROPER"
-        if " RERIP " in (video.upper() or edition):
+        if "RERIP" in edition.upper():
             repack = "RERIP"
-        # if "HYBRID" in video.upper() and "HYBRID" not in title.upper():
-        #     edition = "Hybrid " + edition
-        edition = re.sub("(REPACK\d?)?(RERIP)?(PROPER)?", "", edition, flags=re.IGNORECASE).strip()
+            
+        print(f"Repack after Checks: {repack}")
+            
+        # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
+        edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
         bad = ['internal', 'limited', 'retail']
 
         if edition.lower() in bad:
             edition = ""
-        # try:
-        #     other = guess['other']
-        # except:
-        #     other = ""
-        # if " 3D " in other:
-        #     edition = edition + " 3D "
-        # if edition == None or edition == None:
-        #     edition = ""
+        
         return edition, repack
 
 
