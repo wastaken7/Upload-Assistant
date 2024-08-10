@@ -121,7 +121,8 @@ class HUNO():
         elif 'mediainfo' in meta:
             language = next(x for x in meta["mediainfo"]["media"]["track"] if x["@type"] == "Audio").get('Language_String', "English")
             language = re.sub(r'\(.+\)', '', language)
-
+        if language == "zxx":
+            language = "Silent"
         return f'{codec} {channels} {language}'
     
     def get_basename(self, meta):
@@ -133,6 +134,7 @@ class HUNO():
         # It was much easier to build the name from scratch than to alter the existing name.
 
         basename = self.get_basename(meta)
+        hc = meta.get('hardcoded-subs')
         type = meta.get('type', "")
         title = meta.get('title',"")
         alt_title = meta.get('aka', "")
@@ -206,6 +208,8 @@ class HUNO():
             elif type == "HDTV": #HDTV
                 name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
 
+        if hc:
+            name = re.sub(r'((\([0-9]{4}\)))', r'\1 Ensubbed', name)
         return ' '.join(name.split()).replace(": ", " - ")
 
 
