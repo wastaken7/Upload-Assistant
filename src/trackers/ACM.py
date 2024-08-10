@@ -29,8 +29,8 @@ class ACM():
         self.config = config
         self.tracker = 'ACM'
         self.source_flag = 'AsianCinema'
-        self.upload_url = 'https://asiancinema.me/api/torrents/upload'
-        self.search_url = 'https://asiancinema.me/api/torrents/filter'
+        self.upload_url = 'https://eiga.moi/api/torrents/upload'
+        self.search_url = 'https://eiga.moi/api/torrents/filter'
         self.signature = None
         self.banned_groups = [""]
         pass
