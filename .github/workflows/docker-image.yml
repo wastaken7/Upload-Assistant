@@ -1,8 +1,11 @@
-name: Create and publish a Docker image
+name: Create and publish Docker images
 
 on:
   push:
-    branches: ['master']
+    branches:
+      - master
+      - develop
+      - qbit-torrent-check
 
 env:
   REGISTRY: ghcr.io
@@ -45,13 +48,25 @@ jobs:
         id: get_short_commit_id
         run: |
           echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Set image name based on branch
+        id: set_image_name
+        run: |
+          if [ "${{ github.ref_name }}" == "master" ]; then
+            IMAGE_TAG="latest"
+          elif [ "${{ github.ref_name }}" == "develop" ]; then
+            IMAGE_TAG="develop"
+          else
+            IMAGE_TAG="${{ github.ref_name }}"
+          fi
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
           
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}, ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.SHA_SHORT }}
+          tags: ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.IMAGE_TAG }}, ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
