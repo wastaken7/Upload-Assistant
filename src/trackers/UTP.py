@@ -24,7 +24,7 @@ class UTP():
         self.search_url = 'https://utp.to/api/torrents/filter'
         self.torrent_url = 'https://utp.to/api/torrents/'
         self.upload_url = 'https://utp.to/api/torrents/upload'
-        self.signature = f"\n[center][url=https://utp.to/forums/topics/76]Created by UTOPIA Upload Assistant[/url][/center]"
+        self.signature = f"\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = []
         pass
 
