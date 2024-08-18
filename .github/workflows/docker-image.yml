@@ -53,7 +53,7 @@ jobs:
         id: set_image_name
         run: |
           if [ "${{ github.ref_name }}" == "master" ]; then
-            IMAGE_TAG="latest"
+            IMAGE_TAG="master"
           elif [ "${{ github.ref_name }}" == "develop" ]; then
             IMAGE_TAG="develop"
           else
