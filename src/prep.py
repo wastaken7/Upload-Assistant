@@ -476,26 +476,153 @@ class Prep():
     Get and parse mediainfo
     """
     def exportInfo(self, video, isdir, folder_id, base_dir, export_text):
-        if os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") == False and export_text != False:
+        def filter_mediainfo(data):
+            filtered = {
+                "creatingLibrary": data.get("creatingLibrary"),
+                "media": {
+                    "@ref": data["media"]["@ref"],
+                    "track": []
+                }
+            }
+            
+            for track in data["media"]["track"]:
+                if track["@type"] == "General":
+                    filtered["media"]["track"].append({
+                        "@type": track["@type"],
+                        "VideoCount": track.get("VideoCount"),
+                        "AudioCount": track.get("AudioCount"),
+                        "MenuCount": track.get("MenuCount"),
+                        "FileExtension": track.get("FileExtension"),
+                        "Format": track.get("Format"),
+                        "Format_Version": track.get("Format_Version"),
+                        "FileSize": track.get("FileSize"),
+                        "Duration": track.get("Duration"),
+                        "OverallBitRate": track.get("OverallBitRate"),
+                        "FrameRate": track.get("FrameRate"),
+                        "FrameCount": track.get("FrameCount"),
+                        "StreamSize": track.get("StreamSize"),
+                        "IsStreamable": track.get("IsStreamable"),
+                        "File_Created_Date": track.get("File_Created_Date"),
+                        "File_Created_Date_Local": track.get("File_Created_Date_Local"),
+                        "File_Modified_Date": track.get("File_Modified_Date"),
+                        "File_Modified_Date_Local": track.get("File_Modified_Date_Local"),
+                        "Encoded_Application": track.get("Encoded_Application"),
+                        "Encoded_Library": track.get("Encoded_Library"),
+                    })
+                elif track["@type"] == "Video":
+                    filtered["media"]["track"].append({
+                        "@type": track["@type"],
+                        "StreamOrder": track.get("StreamOrder"),
+                        "ID": track.get("ID"),
+                        "UniqueID": track.get("UniqueID"),
+                        "Format": track.get("Format"),
+                        "Format_Profile": track.get("Format_Profile"),
+                        "Format_Level": track.get("Format_Level"),
+                        "Format_Settings_CABAC": track.get("Format_Settings_CABAC"),
+                        "Format_Settings_RefFrames": track.get("Format_Settings_RefFrames"),
+                        "CodecID": track.get("CodecID"),
+                        "Duration": track.get("Duration"),
+                        "BitRate": track.get("BitRate"),
+                        "Width": track.get("Width"),
+                        "Height": track.get("Height"),
+                        "Sampled_Width": track.get("Sampled_Width"),
+                        "Sampled_Height": track.get("Sampled_Height"),
+                        "PixelAspectRatio": track.get("PixelAspectRatio"),
+                        "DisplayAspectRatio": track.get("DisplayAspectRatio"),
+                        "FrameRate_Mode": track.get("FrameRate_Mode"),
+                        "FrameRate": track.get("FrameRate"),
+                        "FrameCount": track.get("FrameCount"),
+                        "ColorSpace": track.get("ColorSpace"),
+                        "ChromaSubsampling": track.get("ChromaSubsampling"),
+                        "BitDepth": track.get("BitDepth"),
+                        "ScanType": track.get("ScanType"),
+                        "Delay": track.get("Delay"),
+                        "Delay_Source": track.get("Delay_Source"),
+                        "StreamSize": track.get("StreamSize"),
+                        "Encoded_Library": track.get("Encoded_Library"),
+                        "Encoded_Library_Name": track.get("Encoded_Library_Name"),
+                        "Encoded_Library_Version": track.get("Encoded_Library_Version"),
+                        "Encoded_Library_Settings": track.get("Encoded_Library_Settings"),
+                        "Language": track.get("Language"),
+                        "Default": track.get("Default"),
+                        "Forced": track.get("Forced"),
+                    })
+                elif track["@type"] == "Audio":
+                    filtered["media"]["track"].append({
+                        "@type": track["@type"],
+                        "StreamOrder": track.get("StreamOrder"),
+                        "ID": track.get("ID"),
+                        "UniqueID": track.get("UniqueID"),
+                        "Format": track.get("Format"),
+                        "Format_Settings_Mode": track.get("Format_Settings_Mode"),
+                        "Format_Settings_Endianness": track.get("Format_Settings_Endianness"),
+                        "CodecID": track.get("CodecID"),
+                        "Duration": track.get("Duration"),
+                        "BitRate_Mode": track.get("BitRate_Mode"),
+                        "BitRate": track.get("BitRate"),
+                        "Channels": track.get("Channels"),
+                        "ChannelPositions": track.get("ChannelPositions"),
+                        "ChannelLayout": track.get("ChannelLayout"),
+                        "SamplesPerFrame": track.get("SamplesPerFrame"),
+                        "SamplingRate": track.get("SamplingRate"),
+                        "SamplingCount": track.get("SamplingCount"),
+                        "FrameRate": track.get("FrameRate"),
+                        "BitDepth": track.get("BitDepth"),
+                        "Compression_Mode": track.get("Compression_Mode"),
+                        "Delay": track.get("Delay"),
+                        "Delay_Source": track.get("Delay_Source"),
+                        "Video_Delay": track.get("Video_Delay"),
+                        "StreamSize": track.get("StreamSize"),
+                        "Language": track.get("Language"),
+                        "Default": track.get("Default"),
+                        "Forced": track.get("Forced"),
+                    })
+                elif track["@type"] == "Text":
+                    filtered["media"]["track"].append({
+                        "@type": track["@type"],
+                        "@typeorder": track.get("@typeorder"),
+                        "StreamOrder": track.get("StreamOrder"),
+                        "ID": track.get("ID"),
+                        "UniqueID": track.get("UniqueID"),
+                        "Format": track.get("Format"),
+                        "CodecID": track.get("CodecID"),
+                        "Duration": track.get("Duration"),
+                        "BitRate": track.get("BitRate"),
+                        "FrameRate": track.get("FrameRate"),
+                        "FrameCount": track.get("FrameCount"),
+                        "ElementCount": track.get("ElementCount"),
+                        "StreamSize": track.get("StreamSize"),
+                        "Title": track.get("Title"),
+                        "Language": track.get("Language"),
+                        "Default": track.get("Default"),
+                        "Forced": track.get("Forced"),
+                    })
+                elif track["@type"] == "Menu":
+                    filtered["media"]["track"].append({
+                        "@type": track["@type"],
+                        "extra": track.get("extra"),
+                    })
+            
+            return filtered
+
+        if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") and export_text:
             console.print("[bold yellow]Exporting MediaInfo...")
-            #MediaInfo to text
-            if isdir == False:
+            if not isdir:
                 os.chdir(os.path.dirname(video))
-            media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version' : '1'})
+            media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
             with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
                 export.write(media_info)
-                export.close()
             with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8') as export_cleanpath:
                 export_cleanpath.write(media_info.replace(video, os.path.basename(video)))
-                export_cleanpath.close()
             console.print("[bold green]MediaInfo Exported.")
 
-        if os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt") == False:
-            #MediaInfo to JSON
-            media_info = MediaInfo.parse(video, output="JSON", mediainfo_options={'inform_version' : '1'})
-            export = open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'w', encoding='utf-8')
-            export.write(media_info)
-            export.close()
+        if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt"):
+            media_info_json = MediaInfo.parse(video, output="JSON", mediainfo_options={'inform_version': '1'})
+            media_info_dict = json.loads(media_info_json)
+            filtered_info = filter_mediainfo(media_info_dict)
+            with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'w', encoding='utf-8') as export:
+                json.dump(filtered_info, export, indent=4)
+
         with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'r', encoding='utf-8') as f:
             mi = json.load(f)
         
