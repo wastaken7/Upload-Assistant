@@ -1480,8 +1480,8 @@ class Prep():
                             # Check for original Language Track
                             if audio_language == meta['original_language'] and "commentary" not in t.get('Title', '').lower():
                                 orig = True
-                            # Catch Chinese / Norwegian variants
-                            variants = ['zh', 'cn', 'cmn', 'no', 'nb']
+                            # Catch Chinese / Norwegian / Spanish variants
+                            variants = ['zh', 'cn', 'cmn', 'no', 'nb', 'es-419', 'es-ES', 'es']
                             if audio_language in variants and meta['original_language'] in variants:
                                 orig = True
                             # Check for additional, bloated Tracks
