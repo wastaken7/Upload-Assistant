@@ -467,7 +467,14 @@ def get_confirmation(meta):
     if meta.get('unattended', False) == False:
         get_missing(meta)
         ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) == True else "" # \a rings the bell
-        cli_ui.info_section(cli_ui.yellow, f"Is this correct?{ring_the_bell}") 
+        cli_ui.info(ring_the_bell)
+        if meta['isdir'] and meta['keep_folder']:
+            cli_ui.info_section(cli_ui.yellow, f"Uploading with --keep-folder")
+            kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
+            if not kf_confirm:
+                cli_ui.info('Aborting...')
+                exit()
+        cli_ui.info_section(cli_ui.yellow, f"Is this correct?")
         cli_ui.info(f"Name: {meta['name']}")
         confirm = cli_ui.ask_yes_no("Correct?", default=False)
     else:

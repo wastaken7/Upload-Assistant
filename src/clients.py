@@ -118,8 +118,8 @@ class Clients():
             console.log(torrent_path)
         if os.path.exists(torrent_path):
             torrent = Torrent.read(torrent_path)
-            # Reuse if disc and basename matches
-            if meta.get('is_disc', None) != None:
+            # Reuse if disc and basename matches or --keep-folder was specified
+            if meta.get('is_disc', None) != None or (meta['keep_folder'] and meta['isdir']):
                 torrent_filepath = os.path.commonpath(torrent.files)
                 if os.path.basename(meta['path']) in torrent_filepath:
                     valid = True
