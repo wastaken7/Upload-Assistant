@@ -110,19 +110,23 @@ class ANT():
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
-        if meta['debug'] is False:
-            response = requests.post(url=self.upload_url, files=files, data=data, headers=headers)
-            if response.status_code in [200, 201]:
-                response = response.json()
-            try:
-                console.print(response)
-            except Exception:
-                console.print("It may have uploaded, go check")
-                return
-        else:
-            console.print("[cyan]Request Data:")
-            console.print(data)
-        open_torrent.close()
+        
+        try:
+            if not meta['debug']:
+                response = requests.post(url=self.upload_url, files=files, data=data, headers=headers)
+                if response.status_code in [200, 201]:
+                    response_data = response.json()
+                else:
+                    response_data = {
+                        "error": f"Unexpected status code: {response.status_code}",
+                        "response_content": response.text  # or use response.json() if JSON is expected
+                    }
+                console.print(response_data)
+            else:
+                console.print("[cyan]Request Data:")
+                console.print(data)
+        finally:
+            open_torrent.close()
 
     async def edit_desc(self, meta):
         return
