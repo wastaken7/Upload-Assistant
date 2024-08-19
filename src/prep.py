@@ -630,28 +630,28 @@ class Prep():
             
             return filtered
 
-    if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") and export_text:
-        console.print("[bold yellow]Exporting MediaInfo...")
-        if not isdir:
-            os.chdir(os.path.dirname(video))
-        media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
-        with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
-            export.write(media_info)
-        with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8') as export_cleanpath:
-            export_cleanpath.write(media_info.replace(video, os.path.basename(video)))
-        console.print("[bold green]MediaInfo Exported.")
+        if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") and export_text:
+            console.print("[bold yellow]Exporting MediaInfo...")
+            if not isdir:
+                os.chdir(os.path.dirname(video))
+            media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+            with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
+                export.write(media_info)
+            with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8') as export_cleanpath:
+                export_cleanpath.write(media_info.replace(video, os.path.basename(video)))
+            console.print("[bold green]MediaInfo Exported.")
 
-    if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt"):
-        media_info_json = MediaInfo.parse(video, output="JSON", mediainfo_options={'inform_version': '1'})
-        media_info_dict = json.loads(media_info_json)
-        filtered_info = filter_mediainfo(media_info_dict)
-        with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'w', encoding='utf-8') as export:
-            json.dump(filtered_info, export, indent=4)
+        if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt"):
+            media_info_json = MediaInfo.parse(video, output="JSON", mediainfo_options={'inform_version': '1'})
+            media_info_dict = json.loads(media_info_json)
+            filtered_info = filter_mediainfo(media_info_dict)
+            with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'w', encoding='utf-8') as export:
+                json.dump(filtered_info, export, indent=4)
 
-    with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'r', encoding='utf-8') as f:
-        mi = json.load(f)
-    
-    return mi
+        with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'r', encoding='utf-8') as f:
+            mi = json.load(f)
+        
+        return mi
 
 
     """
