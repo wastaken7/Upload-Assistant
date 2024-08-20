@@ -39,125 +39,118 @@ class MTV():
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
 
-        torrent_filename = "BASE"
-        if not Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent").piece_size <= 8388608: 
-            console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+        # Initiate the upload with retry logic
+        await self.upload_with_retry(meta, cookiefile, common)
+
+    async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
+        approved_image_hosts = ['ptpimg', 'imgbox']
+        
+        while img_host_index <= len(approved_image_hosts):
+            current_img_host_key = f'img_host_{img_host_index}'
+            current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+
+            if not current_img_host or current_img_host not in approved_image_hosts:
+                console.print("[red]Your preferred image host is not supported at MTV, re-uploading to an allowed image host.")
+                img_host_index += 1
+                continue
+
+            meta['imghost'] = current_img_host
+
+            torrent_filename = "BASE"
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+            torrent = Torrent.read(torrent_path)
+
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-            prep.create_torrent(meta, Path(meta['path']), "MTV", piece_size_max=8)
-            torrent_filename = "MTV"
-            # Hash to f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
-   
-        # getting category HD Episode, HD Movies, SD Season, HD Season, SD Episode, SD Movies
-        cat_id = await self.get_cat_id(meta)
-        # res 480 720 1080 1440 2160 4k 6k Other
-        resolution_id = await self.get_res_id(meta['resolution'])
-        # getting source HDTV SDTV TV Rip DVD DVD Rip VHS BluRay BDRip WebDL WebRip Mixed Unknown
-        source_id = await self.get_source_id(meta)
-        # get Origin Internal Scene P2P User Mixed Other. P2P will be selected if not scene
-        origin_id = await self.get_origin_id(meta)
-        # getting tags
-        des_tags = await self.get_tags(meta)
-        # check for approved imghosts
-        approved_imghosts = ['ptpimg', 'imgbox', 'empornium', 'ibb']
-        if not all(any(x in image['raw_url'] for x in approved_imghosts) for image in meta['image_list']):
-            console.print("[red]Unsupported image host detected, please use one of the approved imagehosts")
-            return
-        # getting description
-        await self.edit_desc(meta)
-        # getting groups des so things like imdb link, tmdb link etc..
-        group_desc = await self.edit_group_desc(meta)
-        #poster is optional so no longer getting it as its a pain with having to use supported image provider
-        # poster = await self.get_poster(meta)
-        
-        #edit name to match MTV standards
-        mtv_name = await self.edit_name(meta)
 
-        # anon
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) == False:
-            anon = 0
-        else:
-            anon = 1
+            if torrent.piece_size > 8388608:
+                console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+                prep.create_torrent(meta, Path(meta['path']), "MTV", piece_size_max=8)
+                torrent_filename = "MTV"
 
-        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r').read()
+            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
 
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb') as f:
-            tfile = f.read()
-            f.close()
+            cat_id = await self.get_cat_id(meta)
+            resolution_id = await self.get_res_id(meta['resolution'])
+            source_id = await self.get_source_id(meta)
+            origin_id = await self.get_origin_id(meta)
+            des_tags = await self.get_tags(meta)
 
-        ## todo need to check the torrent and make sure its not more than 8MB
+            # Screenshot and upload process
+            prep.screenshots(Path(meta['path']), meta['name'], meta['uuid'], meta['base_dir'], meta)
+            return_dict = {}
+            prep.upload_screens(meta, screens=meta['screens'], img_host_num=img_host_index, i=0, total_screens=meta['screens'], custom_img_list=[], return_dict=return_dict, retry_mode=True)
+            
+            # Update meta['image_list'] with uploaded images
+            meta['image_list'] = return_dict.get('image_list', [])
 
-        # need to pass the name of the file along with the torrent
-        files = {
-            'file_input': (f"{meta['name']}.torrent", tfile)
-        }
+            # Ensure images are from approved hosts
+            if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta['image_list']):
+                console.print("[red]Unsupported image host detected, please use one of the approved imagehosts")
+                img_host_index += 1
+                continue
 
-        data = {
-            # 'image': poster,
-            'image': '',
-            'title': mtv_name,
-            'category': cat_id,
-            'Resolution': resolution_id,
-            'source': source_id,
-            'origin': origin_id,
-            'taglist': des_tags,
-            'desc': desc,
-            'groupDesc': group_desc,
-            'ignoredupes': '1',
-            'genre_tags': '---',
-            'autocomplete_toggle': 'on',
-            'fontfont': '-1',
-            'fontsize': '-1',
-            'auth': await self.get_auth(cookiefile),
-            'anonymous': anon,
-            'submit': 'true',
-        }
+            # Edit description and other details
+            await self.edit_desc(meta)
+            group_desc = await self.edit_group_desc(meta)
+            mtv_name = await self.edit_name(meta)
 
-        # cookie = {'sid': self.config['TRACKERS'][self.tracker].get('sid'), 'cid': self.config['TRACKERS'][self.tracker].get('cid')}
+            anon = 1 if meta['anon'] != 0 or bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) else 0
 
-        param = {
-        }
+            desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+            desc = open(desc_path, 'r').read()
 
-        if meta['imdb_id'] not in ("0", "", None):
-            param['imdbID'] = "tt" + meta['imdb_id']
-        if meta['tmdb'] != 0:
-            param['tmdbID'] = meta['tmdb']
-        if meta['tvdb_id'] != 0:
-            param['thetvdbID'] = meta['tvdb_id']
-        if meta['tvmaze_id'] != 0:
-            param['tvmazeID'] = meta['tvmaze_id']
-        # if meta['mal_id'] != 0:
-        #     param['malid'] = meta['mal_id']
+            torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+            with open(torrent_file_path, 'rb') as f:
+                tfile = f.read()
 
+            files = {
+                'file_input': (f"{meta['name']}.torrent", tfile)
+            }
 
-        if meta['debug'] == False:
-            with requests.Session() as session:
-                with open(cookiefile, 'rb') as cf:
-                    session.cookies.update(pickle.load(cf))
-                response = session.post(url=self.upload_url, data=data, files=files)
-                try:
-                    if "torrents.php" in response.url:
-                        console.print(response.url)
-                    else:
-                        if "authkey.php" in response.url:
-                            console.print(f"[red]No DL link in response, So unable to download torrent but It may have uploaded, go check")
-                            print(response.content)
-                            console.print(f"[red]Got response code = {response.status_code}")
-                            print(data)
+            data = {
+                'image': '',
+                'title': mtv_name,
+                'category': cat_id,
+                'Resolution': resolution_id,
+                'source': source_id,
+                'origin': origin_id,
+                'taglist': des_tags,
+                'desc': desc,
+                'groupDesc': group_desc,
+                'ignoredupes': '1',
+                'genre_tags': '---',
+                'autocomplete_toggle': 'on',
+                'fontfont': '-1',
+                'fontsize': '-1',
+                'auth': await self.get_auth(cookiefile),
+                'anonymous': anon,
+                'submit': 'true',
+            }
+
+            if not meta['debug']:
+                with requests.Session() as session:
+                    with open(cookiefile, 'rb') as cf:
+                        session.cookies.update(pickle.load(cf))
+                    response = session.post(url=self.upload_url, data=data, files=files)
+                    try:
+                        if "torrents.php" in response.url:
+                            console.print(response.url)
                         else:
-                            console.print(f"[red]Upload Failed, Doesnt look like you are logged in")
-                            print(response.content)
-                            print(data)
-                except:
-                    console.print(f"[red]It may have uploaded, go check")
-                    console.print(data)
-                    print(traceback.print_exc())
-        else:
-            console.print(f"[cyan]Request Data:")
-            console.print(data)
-        return
+                            if "authkey.php" in response.url:
+                                console.print(f"[red]No DL link in response, It may have uploaded, check manually.")
+                            else:
+                                console.print(f"[red]Upload Failed. It doesn't look like you are logged in.")
+                    except:
+                        console.print(f"[red]It may have uploaded, check manually.")
+                        print(traceback.print_exc())
+            else:
+                console.print(f"[cyan]Request Data:")
+                console.print(data)
+            return
 
+        console.print("[red]All image hosts failed. Please check your configuration.")
+        return
 
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
