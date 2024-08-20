@@ -6,6 +6,8 @@ import argparse
 from typing import Union, List
 from pathlib import Path
 import os, sys
+import platform
+import multiprocessing
 from functools import partial
 
 def CustomFrameInfo(clip, text):
@@ -18,7 +20,26 @@ def CustomFrameInfo(clip, text):
     # Apply FrameProps to each frame
     return core.std.FrameEval(clip, partial(FrameProps, clip=clip), prop_src=clip)
 
-def vs_screengn(source, encode=None, filter_b_frames=False, num=5, dir="."):
+def optimize_images(image, config):
+    import platform  # Ensure platform is imported here
+    if config.get('optimize_images', True):
+        if os.path.exists(image):
+            try:
+                pyver = platform.python_version_tuple()
+                if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
+                    import oxipng 
+                if os.path.getsize(image) >= 16000000:
+                    oxipng.optimize(image, level=6)
+                else:
+                    oxipng.optimize(image, level=3)
+            except Exception as e:
+                print(f"Image optimization failed: {e}")
+    return
+
+def vs_screengn(source, encode=None, filter_b_frames=False, num=5, dir=".", config=None):
+    if config is None:
+        config = {'optimize_images': True}  # Default configuration
+
     screens_file = os.path.join(dir, "screens.txt")
 
     # Check if screens.txt already exists and use it if valid
@@ -105,3 +126,8 @@ def vs_screengn(source, encode=None, filter_b_frames=False, num=5, dir="."):
     if encode:
         enc = CustomFrameInfo(enc, "Encode (Tonemapped)")
         ScreenGen(enc, dir, "b")
+
+    # Optimize images
+    for i in range(1, num + 1):
+        image_path = os.path.join(dir, f"{str(i).zfill(2)}a.png")
+        optimize_images(image_path, config)
