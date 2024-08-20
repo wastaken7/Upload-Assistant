@@ -53,9 +53,11 @@ class MTV():
             if not current_img_host or current_img_host not in approved_image_hosts:
                 console.print("[red]Your preferred image host is not supported at MTV, re-uploading to an allowed image host.")
                 img_host_index += 1
+                retry_mode = True  # Set retry_mode to True if switching to an approved host
                 continue
 
             meta['imghost'] = current_img_host
+            retry_mode = False  # No retry unless switching to another host
 
             torrent_filename = "BASE"
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
@@ -80,14 +82,25 @@ class MTV():
             # Screenshot and upload process
             prep.screenshots(Path(meta['path']), meta['name'], meta['uuid'], meta['base_dir'], meta)
             return_dict = {}
-            prep.upload_screens(meta, screens=meta['screens'], img_host_num=img_host_index, i=0, total_screens=meta['screens'], custom_img_list=[], return_dict=return_dict, retry_mode=True)
-            
+
+            # Only enable retry_mode if switching to an approved image host
+            prep.upload_screens(
+                meta, 
+                screens=meta['screens'], 
+                img_host_num=img_host_index, 
+                i=0, 
+                total_screens=meta['screens'], 
+                custom_img_list=[], 
+                return_dict=return_dict, 
+                retry_mode=retry_mode
+            )
+
             # Update meta['image_list'] with uploaded images
             meta['image_list'] = return_dict.get('image_list', [])
 
             # Ensure images are from approved hosts
             if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta['image_list']):
-                console.print("[red]Unsupported image host detected, please use one of the approved imagehosts")
+                console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
                 img_host_index += 1
                 continue
 
