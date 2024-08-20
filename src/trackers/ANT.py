@@ -6,6 +6,9 @@ import requests
 import platform
 from str2bool import str2bool
 from pymediainfo import MediaInfo
+import math
+from torf import Torrent
+from pathlib import Path
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -70,7 +73,19 @@ class ANT():
 
     async def upload(self, meta):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        torrent_filename = "BASE"
+        torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        total_size = sum(file.size for file in torrent.files)
+        piece_size = math.ceil(total_size / 999)
+        piece_size = max(131072, min(piece_size, 16777216))
+        if torrent.pieces > 1000:
+            console.print("[red]Torrent has more than 1000 pieces. Generating a new .torrent")
+            from src.prep import Prep
+            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+            prep.create_torrent(meta, Path(meta['path']), "ANT", piece_size_max=piece_size)
+            torrent_filename = "ANT"
+
+        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
         flags = await self.get_flags(meta)
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
