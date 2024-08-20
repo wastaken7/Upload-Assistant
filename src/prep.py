@@ -1606,7 +1606,9 @@ class Prep():
                     channel_layout = mi['media']['track'][track_num]['ChannelLayout_Original']
                 except:
                     channel_layout = ""
-            if "LFE" in channel_layout:
+
+            # Ensure channel_layout is not None or an empty string before iterating
+            if channel_layout and "LFE" in channel_layout:
                 chan = f"{int(channels) - 1}.1"
             elif channel_layout == "":
                 if int(channels) <= 2:
