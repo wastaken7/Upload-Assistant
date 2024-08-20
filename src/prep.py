@@ -1557,43 +1557,38 @@ class Prep():
     def get_audio_v2(self, mi, meta, bdinfo):
         extra = dual = ""
         has_commentary = False
-        #Get formats
-        if bdinfo != None: #Disks
+
+        # Get formats
+        if bdinfo is not None:  # Disks
             format_settings = ""
-            format = bdinfo['audio'][0]['codec']
+            format = bdinfo.get('audio', [{}])[0].get('codec', '')
             commercial = format
-            try:
-                additional = bdinfo['audio'][0]['atmos_why_you_be_like_this']
-            except:
-                additional = ""
-            #Channels
-            chan = bdinfo['audio'][0]['channels']
+            additional = bdinfo.get('audio', [{}])[0].get('atmos_why_you_be_like_this', '')
 
-
-        else: 
+            # Channels
+            chan = bdinfo.get('audio', [{}])[0].get('channels', '')
+        else:
             track_num = 2
-            for i in range(len(mi['media']['track'])):
-                t = mi['media']['track'][i]
-                if t['@type'] != "Audio":
-                    pass
-                else: 
-                    if t.get('Language', "") == meta['original_language'] and "commentary" not in t.get('Title', '').lower():
-                        track_num = i
-                        break
-            format = mi['media']['track'][track_num]['Format']
-            commercial = mi['media']['track'][track_num].get('Format_Commercial', '')
-            if mi['media']['track'][track_num].get('Language', '') == "zxx":
+            tracks = mi.get('media', {}).get('track', [])
+
+            for i, t in enumerate(tracks):
+                if t.get('@type') != "Audio":
+                    continue
+                if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in t.get('Title', '').lower():
+                    track_num = i
+                    break
+
+            track = tracks[track_num] if len(tracks) > track_num else {}
+            format = track.get('Format', '')
+            commercial = track.get('Format_Commercial', '')
+            
+            if track.get('Language', '') == "zxx":
                 meta['silent'] = True
-            try:
-                additional = mi['media']['track'][track_num]['Format_AdditionalFeatures']
-                # format = f"{format} {additional}"
-            except:
-                additional = ""
-            try:
-                format_settings = mi['media']['track'][track_num]['Format_Settings']
-                if format_settings in ['Explicit']:
-                    format_settings = ""
-            except:
+
+            additional = track.get('Format_AdditionalFeatures', '')
+
+            format_settings = track.get('Format_Settings', '')
+            if format_settings in ['Explicit']:
                 format_settings = ""
             #Channels
             channels = mi['media']['track'][track_num].get('Channels_Original', mi['media']['track'][track_num]['Channels'])
@@ -1618,46 +1613,49 @@ class Prep():
             else:
                 chan = f"{channels}.0"
             
-            if meta['original_language'] != 'en':
+            if meta.get('original_language', '') != 'en':
                 eng, orig = False, False
                 try:
-                    for t in mi['media']['track']:
-                        if t['@type'] != "Audio":
-                            pass
-                        else: 
-                            audio_language = t.get('Language', '')
-                            # Check for English Language Track
-                            if audio_language == "en" and "commentary" not in t.get('Title', '').lower():
-                                eng = True
-                            # Check for original Language Track
-                            if audio_language == meta['original_language'] and "commentary" not in t.get('Title', '').lower():
-                                orig = True
-                            # Catch Chinese / Norwegian / Spanish variants
-                            variants = ['zh', 'cn', 'cmn', 'no', 'nb', 'es-419', 'es-ES', 'es']
-                            if audio_language in variants and meta['original_language'] in variants:
-                                orig = True
-                            # Check for additional, bloated Tracks
-                            if audio_language != meta['original_language'] and audio_language != "en":
-                                if meta['original_language'] not in variants and audio_language not in variants:
-                                    audio_language = "und" if audio_language == "" else audio_language
-                                    console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
-                                    time.sleep(5)
-                    if eng and orig == True:
+                    for t in mi.get('media', {}).get('track', []):
+                        if t.get('@type') != "Audio":
+                            continue
+
+                        audio_language = t.get('Language', '')
+
+                        # Check for English Language Track
+                        if audio_language == "en" and "commentary" not in t.get('Title', '').lower():
+                            eng = True
+
+                        # Check for original Language Track
+                        if audio_language == meta['original_language'] and "commentary" not in t.get('Title', '').lower():
+                            orig = True
+
+                        # Catch Chinese / Norwegian / Spanish variants
+                        variants = ['zh', 'cn', 'cmn', 'no', 'nb', 'es-419', 'es-ES', 'es']
+                        if audio_language in variants and meta['original_language'] in variants:
+                            orig = True
+
+                        # Check for additional, bloated Tracks
+                        if audio_language != meta['original_language'] and audio_language != "en":
+                            if meta['original_language'] not in variants and audio_language not in variants:
+                                audio_language = "und" if audio_language == "" else audio_language
+                                console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
+                                time.sleep(5)
+
+                    if eng and orig:
                         dual = "Dual-Audio"
-                    elif eng == True and orig == False and meta['original_language'] not in ['zxx', 'xx', None] and meta.get('no_dub', False) == False:
+                    elif eng and not orig and meta['original_language'] not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
                         dual = "Dubbed"
-                except Exception:
-                    console.print(traceback.print_exc())
+                except Exception as e:
+                    console.print(traceback.format_exc())
                     pass
-        
-            
-            for t in mi['media']['track']:
-                if t['@type'] != "Audio":
-                    pass
-                else: 
-                    if "commentary" in t.get('Title', '').lower():
-                        has_commentary = True
-        
+
+            for t in mi.get('media', {}).get('track', []):
+                if t.get('@type') != "Audio":
+                    continue
+
+                if "commentary" in t.get('Title', '').lower():
+                    has_commentary = True
         
         #Convert commercial name to naming conventions
         audio = {
@@ -1710,34 +1708,40 @@ class Prep():
 
         
         search_format = True
-        for key, value in commercial_names.items():
-            if key in commercial:
-                codec = value
-                search_format = False
-            if "Atmos" in commercial or format_extra.get(additional, "") == " Atmos":
-                extra = " Atmos"
+        # Ensure commercial and additional are not None before iterating
+        if commercial:
+            for key, value in commercial_names.items():
+                if key in commercial:
+                    codec = value
+                    search_format = False
+                if "Atmos" in commercial or format_extra.get(additional, "") == " Atmos":
+                    extra = " Atmos"
+
         if search_format:
             codec = audio.get(format, "") + audio_extra.get(additional, "")
             extra = format_extra.get(additional, "")
+
+        # Ensure format_settings is not None before looking it up
         format_settings = format_settings_extra.get(format_settings, "")
         if format_settings == "EX" and chan == "5.1":
             format_settings = "EX"
         else:
             format_settings = ""
 
+        # Ensure codec is not left empty
         if codec == "":
             codec = format
-        
+
+        # Ensure additional and channels are not None before using them
         if format.startswith("DTS"):
-            if additional.endswith("X"):
+            if additional and additional.endswith("X"):
                 codec = "DTS:X"
                 chan = f"{int(channels) - 1}.1"
         if format == "MPEG Audio":
             codec = mi['media']['track'][2].get('CodecID_Hint', '')
 
-        
-
-        audio = f"{dual} {codec} {format_settings} {chan}{extra}"
+        # Ensure audio is constructed properly even with potential None values
+        audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
         audio = ' '.join(audio.split())
         return audio, chan, has_commentary
 
