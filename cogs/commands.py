@@ -601,7 +601,7 @@ class Commands(commands.Cog):
         else:
             dupe_text = "\n\n•".join(dupes)
             dupe_text = f"```•{dupe_text}```"
-            embed = discord.Embed(title="Are these dupes?", description=dupe_text, color=0xff0000)
+            embed = discord.Embed(title="Check if these are actually dupes!", description=dupe_text, color=0xff0000)
             embed.set_footer(text=f"{emojis['CANCEL']} to abort upload | {emojis['UPLOAD']} to upload anyways") 
             message = await channel.send(embed=embed)
             await message.add_reaction(emojis['CANCEL'])

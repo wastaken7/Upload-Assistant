@@ -491,7 +491,7 @@ def dupe_check(dupes, meta):
         console.print()    
         dupe_text = "\n".join(dupes)
         console.print()
-        cli_ui.info_section(cli_ui.bold, "Are these dupes?")
+        cli_ui.info_section(cli_ui.bold, "Check if these are actually dupes!")
         cli_ui.info(dupe_text)
         if meta['unattended']:
             if meta.get('dupe', False) == False:
