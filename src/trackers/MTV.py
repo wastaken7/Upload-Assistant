@@ -8,6 +8,7 @@ import os
 import cli_ui
 import pickle
 import re
+import traceback
 from pathlib import Path
 from str2bool import str2bool
 from src.trackers.COMMON import COMMON
