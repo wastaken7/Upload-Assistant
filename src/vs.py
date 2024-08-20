@@ -8,56 +8,75 @@ from pathlib import Path
 import os, sys
 from functools import partial
 
-# Modified version of https://git.concertos.live/AHD/ahd_utils/src/branch/master/screengn.py
-def vs_screengn(source, encode, filter_b_frames, num, dir):
-    # prefer ffms2, fallback to lsmash for m2ts
+def CustomFrameInfo(clip, text):
+    def FrameProps(n, f, clip):
+        # Modify the frame properties extraction here to avoid the decode issue
+        info = f"Frame {n} of {clip.num_frames}\nPicture type: {f.props['_PictType']}"
+        # Adding the frame information as text to the clip
+        return core.text.Text(clip, info)
+
+    # Apply FrameProps to each frame
+    return core.std.FrameEval(clip, partial(FrameProps, clip=clip), prop_src=clip)
+
+def vs_screengn(source, encode=None, filter_b_frames=False, num=5, dir="."):
+    screens_file = os.path.join(dir, "screens.txt")
+
+    # Check if screens.txt already exists and use it if valid
+    if os.path.exists(screens_file):
+        with open(screens_file, "r") as txt:
+            frames = [int(line.strip()) for line in txt.readlines()]
+        if len(frames) == num and all(isinstance(f, int) and 0 <= f for f in frames):
+            print(f"Using existing frame numbers from {screens_file}")
+        else:
+            frames = []
+    else:
+        frames = []
+
+    # Indexing the source using ffms2 or lsmash for m2ts files
     if str(source).endswith(".m2ts"):
+        print(f"Indexing {source} with LSMASHSource... This may take a while.")
         src = core.lsmas.LWLibavSource(source)
     else:
-        src = core.ffms2.Source(source, cachefile=f"{os.path.abspath(dir)}{os.sep}ffms2.ffms2")
+        cachefile = f"{os.path.abspath(dir)}{os.sep}ffms2.ffms2"
+        if not os.path.exists(cachefile):
+            print(f"Indexing {source} with ffms2... This may take a while.")
+        try:
+            src = core.ffms2.Source(source, cachefile=cachefile)
+        except vs.Error as e:
+            print(f"Error during indexing: {str(e)}")
+            raise
+        if os.path.exists(cachefile):
+            print(f"Indexing completed and cached at: {cachefile}")
+        else:
+            print("Indexing did not complete as expected.")
 
-    # we don't allow encodes in non-mkv containers anyway
+    # Check if encode is provided
     if encode:
-        enc = core.ffms2.Source(encode)
+        if not os.path.exists(encode):
+            print(f"Encode file {encode} not found. Skipping encode processing.")
+            encode = None
+        else:
+            enc = core.ffms2.Source(encode)
 
-    # since encodes are optional we use source length
+    # Use source length if encode is not provided
     num_frames = len(src)
-    # these values don't really matter, they're just to cut off intros/credits
     start, end = 1000, num_frames - 10000
 
-    # filter b frames function for frameeval
-    def filter_ftype(n, f, clip, frame, frames, ftype="B"):
-        if f.props["_PictType"].decode() == ftype:
-            frames.append(frame)
-        return clip
-
-    # generate random frame numbers, sort, and format for ScreenGen
-    # if filter option is on filter out non-b frames in encode
-    frames = []
-    if filter_b_frames:
-        with open(os.devnull, "wb") as f:
-            i = 0
-            while len(frames) < num:
-                frame = random.randint(start, end)
-                enc_f = enc[frame]
-                enc_f = enc_f.std.FrameEval(partial(filter_ftype, clip=enc_f, frame=frame, frames=frames), enc_f)
-                enc_f.output(f)
-                i += 1
-                if i > num * 10:
-                    raise ValueError("screengn: Encode doesn't seem to contain desired picture type frames.")
-    else:
+    # Generate random frame numbers for screenshots if not using existing ones
+    if not frames:
         for _ in range(num):
             frames.append(random.randint(start, end))
-    frames = sorted(frames)
-    frames = [f"{x}\n" for x in frames]
+        frames = sorted(frames)
+        frames = [f"{x}\n" for x in frames]
 
-    # write to file, we might want to re-use these later
-    with open("screens.txt", "w") as txt:
-        txt.writelines(frames)
+        # Write the frame numbers to a file for reuse
+        with open(screens_file, "w") as txt:
+            txt.writelines(frames)
+        print(f"Generated and saved new frame numbers to {screens_file}")
 
-    # if an encode exists we have to crop and resize
+    # If an encode exists and is provided, crop and resize
     if encode:
-        if src.width != enc.width and src.height != enc.height:
+        if src.width != enc.width or src.height != enc.height:
             ref = zresize(enc, preset=src.height)
             crop = [(src.width - ref.width) / 2, (src.height - ref.height) / 2]
             src = src.std.Crop(left=crop[0], right=crop[0], top=crop[1], bottom=crop[1])
@@ -69,19 +88,20 @@ def vs_screengn(source, encode, filter_b_frames, num, dir):
                 height = enc.height
             src = zresize(src, width=width, height=height)
 
-    # tonemap HDR
+    # Apply tonemapping if the source is HDR
     tonemapped = False
     if src.get_frame(0).props["_Primaries"] == 9:
         tonemapped = True
-        src = DynamicTonemap(src, src_fmt=False, libplacebo=False, adjust_gamma=True)
+        src = DynamicTonemap(src, src_fmt=False, libplacebo=True, adjust_gamma=True)
         if encode:
-            enc = DynamicTonemap(enc, src_fmt=False, libplacebo=False, adjust_gamma=True)
+            enc = DynamicTonemap(enc, src_fmt=False, libplacebo=True, adjust_gamma=True)
 
-    # add FrameInfo
-    if tonemapped == True:
-        src = FrameInfo(src, "Tonemapped")
+    # Use the custom FrameInfo function
+    if tonemapped:
+        src = CustomFrameInfo(src, "Tonemapped")
+
+    # Generate screenshots
     ScreenGen(src, dir, "a")
     if encode:
-        if tonemapped == True:
-            enc = FrameInfo(enc, "Encode (Tonemapped)")
+        enc = CustomFrameInfo(enc, "Encode (Tonemapped)")
         ScreenGen(enc, dir, "b")
