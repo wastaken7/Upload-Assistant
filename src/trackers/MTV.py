@@ -12,6 +12,7 @@ import traceback
 from pathlib import Path
 from str2bool import str2bool
 from src.trackers.COMMON import COMMON
+from datetime import datetime, date
 
 class MTV():
     """
@@ -66,9 +67,32 @@ class MTV():
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
 
-            if torrent.piece_size > 8388608:
+            # Check if the piece size exceeds 8 MiB and regenerate the torrent if needed
+            if torrent.piece_size > 8388608:  # 8 MiB in bytes
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-                prep.create_torrent(meta, Path(meta['path']), "MTV", piece_size_max=8)
+
+                # Create a new torrent with piece size explicitly set to 8 MiB
+                new_torrent = prep.CustomTorrent(
+                    path=Path(meta['path']),
+                    trackers=["https://fake.tracker"],
+                    source="L4G",
+                    private=True,
+                    exclude_globs=["*.*", "*sample.mkv", "!sample*.*"],
+                    include_globs=["*.mkv", "*.mp4", "*.ts"],
+                    creation_date=datetime.now(),
+                    comment="Created by L4G's Upload Assistant",
+                    created_by="L4G's Upload Assistant"
+                )
+                
+                # Explicitly set the piece size and update metainfo
+                new_torrent.piece_size = 8388608  # 8 MiB in bytes
+                new_torrent.metainfo['info']['piece length'] = 8388608  # Ensure 'piece length' is set
+                
+                # Validate and write the new torrent
+                new_torrent.validate_piece_size()
+                new_torrent.generate(callback=prep.torf_cb, interval=5)
+                new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
+                
                 torrent_filename = "MTV"
 
             await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -207,7 +231,6 @@ class MTV():
 
         return description
 
-
     async def edit_name(self, meta):
         mtv_name = meta['uuid']
         # Try to use original filename if possible
@@ -232,47 +255,6 @@ class MTV():
         mtv_name = mtv_name.replace(' ', '.').replace('..', '.')
         return mtv_name
     
-
-    # Not needed as its optional
-    # async def get_poster(self, meta):
-    #     if 'poster_image' in meta:
-    #         return meta['poster_image']
-    #     else:
-    #         if meta['poster'] is not None:
-    #             poster = meta['poster']
-    #         else:
-    #             if 'cover' in meta['imdb_info'] and meta['imdb_info']['cover'] is not None:
-    #                 poster = meta['imdb_info']['cover']
-    #             else:
-    #                 console.print(f'[red]No poster can be found for this EXITING!!')
-    #                 return
-    #         with requests.get(url=poster, stream=True) as r:
-    #             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['clean_name']}-poster.jpg",
-    #                       'wb') as f:
-    #                 shutil.copyfileobj(r.raw, f)
-    #
-    #         url = "https://api.imgbb.com/1/upload"
-    #         data = {
-    #             'key': self.config['DEFAULT']['imgbb_api'],
-    #             'image': base64.b64encode(open(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['clean_name']}-poster.jpg", "rb").read()).decode('utf8')
-    #         }
-    #         try:
-    #             console.print("[yellow]uploading poster to imgbb")
-    #             response = requests.post(url, data=data)
-    #             response = response.json()
-    #             if response.get('success') != True:
-    #                 console.print(response, 'red')
-    #             img_url = response['data'].get('medium', response['data']['image'])['url']
-    #             th_url = response['data']['thumb']['url']
-    #             web_url = response['data']['url_viewer']
-    #             raw_url = response['data']['image']['url']
-    #             meta['poster_image'] = raw_url
-    #             console.print(f'[green]{raw_url} ')
-    #         except Exception:
-    #             console.print("[yellow]imgbb failed to upload cover")
-    #
-    #         return raw_url
-
     async def get_res_id(self, resolution):
         resolution_id = {
             '8640p':'0',
@@ -307,7 +289,6 @@ class MTV():
                 else:
                     return 3
 
-
     async def get_source_id(self, meta):
         if meta['is_disc'] == 'DVD':
             return '1'
@@ -331,7 +312,6 @@ class MTV():
                 }.get(meta['type'], '0')
         return type_id
 
-
     async def get_origin_id(self, meta):
         if meta['personalrelease']:
             return '4'
@@ -340,8 +320,6 @@ class MTV():
         # returning P2P
         else:
             return '3'
-
-
     async def get_tags(self, meta):
         tags = []
         # Genres
@@ -361,8 +339,6 @@ class MTV():
         for each in ['remux', 'WEB.DL', 'WEBRip', 'HDTV', 'BluRay', 'DVD', 'HDDVD']:
             if (each.lower().replace('.', '') in meta['type'].lower()) or (each.lower().replace('-', '') in meta['source']):
                 tags.append(each)
-            
-            
         # series tags
         if meta['category'] == "TV":
             if meta.get('tv_pack', 0) == 0:
@@ -385,8 +361,6 @@ class MTV():
             else:
                 tags.append('hd.movie')
         
-
-
         # Audio tags
         audio_tag = ""
         for each in ['dd', 'ddp', 'aac', 'truehd', 'mp3', 'mp2', 'dts', 'dts.hd', 'dts.x']:
@@ -421,8 +395,6 @@ class MTV():
 
         tags = ' '.join(tags)
         return tags
-
-
 
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")

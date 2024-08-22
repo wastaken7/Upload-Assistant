@@ -34,6 +34,7 @@ try:
     import tmdbsimple as tmdb
     from datetime import datetime, date
     from difflib import SequenceMatcher
+    import torf
     from torf import Torrent
     import base64
     import time
@@ -2079,19 +2080,72 @@ class Prep():
         
         return edition, repack
 
-
-
-
-
     """
     Create Torrent
     """
-    def create_torrent(self, meta, path, output_filename, piece_size_max):
-        piece_size_max = int(piece_size_max) if piece_size_max is not None else 0
-        if meta['isdir'] == True:
+    class CustomTorrent(torf.Torrent):
+        # Ensure the piece size is within the desired limits
+        torf.Torrent.piece_size_min = 16384  # 16 KiB
+        torf.Torrent.piece_size_max = 67108864  # 64 MiB
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Calculate and set the piece size
+            total_size = self._calculate_total_size()
+            piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max)
+            self.piece_size = piece_size
+
+        @property
+        def piece_size(self):
+            return self._piece_size
+
+        @piece_size.setter
+        def piece_size(self, value):
+            if value is None:
+                total_size = self._calculate_total_size()
+                value = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max)
+            self._piece_size = value
+            self.metainfo['info']['piece length'] = value  # Ensure 'piece length' is set
+
+        @classmethod
+        def calculate_piece_size(cls, total_size, min_size, max_size):
+            our_min_size = 16384
+            our_max_size = 67108864
+            # Start with a piece size of 4 MiB
+            piece_size = 4194304  # 4 MiB in bytes
+            num_pieces = math.ceil(total_size / piece_size)
+            torrent_file_size = 20 + (num_pieces * 20)  # Approximate .torrent size: 20 bytes header + 20 bytes per piece
+
+            # Adjust the piece size to fit within the constraints
+            while not (1000 <= num_pieces <= 2000 and torrent_file_size <= 102400):  # 100 KiB .torrent size limit
+                if num_pieces < 1000:
+                    piece_size //= 2
+                    if piece_size < our_min_size:
+                        piece_size = our_min_size
+                        break
+                elif num_pieces > 2000 or torrent_file_size > 102400:
+                    piece_size *= 2
+                    if piece_size > our_max_size:
+                        piece_size = our_max_size
+                        break
+                num_pieces = math.ceil(total_size / piece_size)
+                torrent_file_size = 20 + (num_pieces * 20)
+
+            return piece_size
+
+        def _calculate_total_size(self):
+            return sum(file.size for file in self.files)
+
+        def validate_piece_size(self):
+            if not hasattr(self, '_piece_size') or self._piece_size is None:
+                self.piece_size = self.calculate_piece_size(self._calculate_total_size(), self.piece_size_min, self.piece_size_max)
+            self.metainfo['info']['piece length'] = self.piece_size  # Ensure 'piece length' is set
+
+    def create_torrent(self, meta, path, output_filename):
+        # Handle directories and file inclusion logic
+        if meta['isdir']:
             if meta['keep_folder']:
                 cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
-                path = path
             else:
                 os.chdir(path)
                 globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
@@ -2106,66 +2160,30 @@ class Prep():
         else:
             exclude = ["*.*", "*sample.mkv", "!sample*.*"] 
             include = ["*.mkv", "*.mp4", "*.ts"]
-        torrent = Torrent(path,
-            trackers = ["https://fake.tracker"],
-            source = "L4G",
-            private = True,
-            exclude_globs = exclude or [],
-            include_globs = include or [],
-            creation_date = datetime.now(),
-            comment = "Created by L4G's Upload Assistant",
-            created_by = "L4G's Upload Assistant")
-        file_size = torrent.size
-        if file_size < 268435456: # 256 MiB File / 256 KiB Piece Size
-            piece_size = 18
-            piece_size_text = "256KiB"
-        elif file_size < 1073741824:  # 1 GiB File/512 KiB Piece Size
-            piece_size = 19
-            piece_size_text = "512KiB"
-        elif file_size < 2147483648 or piece_size_max == 1:  # 2 GiB File/1 MiB Piece Size
-            piece_size = 20
-            piece_size_text = "1MiB"
-        elif file_size < 4294967296 or piece_size_max == 2:  # 4 GiB File/2 MiB Piece Size
-            piece_size = 21
-            piece_size_text = "2MiB"
-        elif file_size < 8589934592 or piece_size_max == 4:  # 8 GiB File/4 MiB Piece Size
-            piece_size = 22
-            piece_size_text = "4MiB"
-        elif file_size < 17179869184 or piece_size_max == 8:  # 16 GiB File/8 MiB Piece Size
-            piece_size = 23
-            piece_size_text = "8MiB"
-        else: # 16MiB Piece Size
-            piece_size = 24
-            piece_size_text = "16MiB"
-        console.print(f"[bold yellow]Creating .torrent with a piece size of {piece_size_text}... (No valid --torrenthash was provided to reuse)")
-        if meta.get('torrent_creation') != None:
-            torrent_creation = meta['torrent_creation']
-        else:
-            torrent_creation = self.config['DEFAULT'].get('torrent_creation', 'torf')
-        if torrent_creation == 'torrenttools':
-            args = ['torrenttools', 'create', '-a', 'https://fake.tracker', '--private', 'on', '--piece-size', str(2**piece_size), '--created-by', "L4G's Upload Assistant", '--no-cross-seed','-o', f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"]
-            if not meta['is_disc']:
-                args.extend(['--include', '^.*\.(mkv|mp4|ts)$'])
-            args.append(path)
-            err = subprocess.call(args)
-            if err != 0:
-                args[3] = "OMITTED"
-                console.print(f"[bold red]Process execution {args} returned with error code {err}.") 
-        elif torrent_creation == 'mktorrent':
-            args = ['mktorrent', '-a', 'https://fake.tracker', '-p', f'-l {piece_size}', '-o', f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent", path]
-            err = subprocess.call(args)
-            if err != 0:
-                args[2] = "OMITTED"
-                console.print(f"[bold red]Process execution {args} returned with error code {err}.")
-        else:
-            torrent.piece_size = 2**piece_size
-            torrent.piece_size_max = 16777216
-            torrent.generate(callback=self.torf_cb, interval=5)
-            torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent", overwrite=True)
-            torrent.verify_filesize(path)
+
+        # Create and write the new torrent using the CustomTorrent class
+        torrent = self.CustomTorrent(
+            path=path,
+            trackers=["https://fake.tracker"],
+            source="L4G",
+            private=True,
+            exclude_globs=exclude or [],
+            include_globs=include or [],
+            creation_date=datetime.now(),
+            comment="Created by L4G's Upload Assistant",
+            created_by="L4G's Upload Assistant"
+        )
+
+        # Ensure piece size is validated before writing
+        torrent.validate_piece_size()
+
+        # Generate and write the new torrent
+        torrent.generate(callback=self.torf_cb, interval=5)
+        torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent", overwrite=True)
+        torrent.verify_filesize(path)
+
         console.print("[bold green].torrent created", end="\r")
         return torrent
-
     
     def torf_cb(self, torrent, filepath, pieces_done, pieces_total):
         # print(f'{pieces_done/pieces_total*100:3.0f} % done')
@@ -2195,8 +2213,6 @@ class Prep():
             base_torrent.source = 'L4G'
             base_torrent.private = True
             Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
-
-
 
 
     """
