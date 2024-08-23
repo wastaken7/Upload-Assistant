@@ -13,14 +13,10 @@ import multiprocessing
 import platform
 import pickle
 from pymediainfo import MediaInfo
-
-
 from src.trackers.COMMON import COMMON
 from src.bbcode import BBCODE
 from src.exceptions import *
 from src.console import console
-
-
 
 class PTP():
 
@@ -82,9 +78,6 @@ class PTP():
             ("Ukrainian", "ukr", "uk") : 34,
             ("Vietnamese", "vie", "vi") : 25,
         }
-
-
-
 
     async def get_ptp_id_imdb(self, search_term, search_file_folder):
         imdb_id = ptp_torrent_id = None
@@ -189,8 +182,6 @@ class PTP():
         console.print(f"[bold green]Successfully grabbed description from PTP")
         return desc
     
-
-
     async def get_group_by_imdb(self, imdb):
         params = {
             'imdb' : imdb,
@@ -216,7 +207,6 @@ class PTP():
             console.print("[red]An error has occured trying to find a group ID")
             console.print("[red]Please check that the site is online and your ApiUser/ApiKey values are correct")
             return None
-
 
     async def get_torrent_info(self, imdb, meta):
         params = {
@@ -305,7 +295,6 @@ class PTP():
             console.print("[red]An error has occured trying to find existing releases")
         return existing
 
-
     async def ptpimg_url_rehost(self, image_url):
         payload = {
             'format' : 'json',
@@ -326,7 +315,6 @@ class PTP():
             img_url = image_url
             # img_url = ptpimg_upload(image_url, ptpimg_api)
         return img_url
-
 
     def get_type(self, imdb_info, meta):
         ptpType = None
@@ -419,7 +407,6 @@ class PTP():
             container = containermap.get(ext, 'Other')
         return container
 
-
     def get_source(self, source):
         sources = {
             "Blu-ray" : "Blu-ray",
@@ -434,7 +421,6 @@ class PTP():
         }
         source_id = sources.get(source, "OtherR")
         return source_id
-
 
     def get_subtitles(self, meta):
         sub_lang_map = self.sub_lang_map
@@ -545,7 +531,6 @@ class PTP():
             remaster_title.append('English Dub')
         if meta.get('has_commentary', False) == True:
             remaster_title.append('With Commentary')
-
 
         # HDR10, HDR10+, Dolby Vision, 10-bit, 
         # if "Hi10P" in meta.get('video_encode', ''):
@@ -667,8 +652,6 @@ class PTP():
                             desc.write(f"[img]{raw_url}[/img]\n")
                     desc.write("\n")
 
-        
-
     async def get_AntiCsrfToken(self, meta):
         if not os.path.exists(f"{meta['base_dir']}/data/cookies"):
             Path(f"{meta['base_dir']}/data/cookies").mkdir(parents=True, exist_ok=True)
@@ -766,7 +749,6 @@ class PTP():
         else:
             data["imdb"] = meta["imdb_id"]
 
-
         if groupID == None: # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
             if data["imdb"] == "0":
@@ -808,14 +790,49 @@ class PTP():
         return url, data
 
     async def upload(self, meta, url, data):
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb') as torrentFile:
+        torrent_filename = f"[{self.tracker}]{meta['clean_name']}.torrent"
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}"
+        torrent = Torrent.read(torrent_path)
+
+        # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
+        if torrent.piece_size > 16777216:  # 16 MiB in bytes
+            console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
+
+            # Import Prep and regenerate the torrent with 16 MiB piece size limit
+            from src.prep import Prep
+            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+
+            # Create a new torrent with the piece size explicitly set to 16 MiB
+            new_torrent = prep.CustomTorrent(
+                path=Path(meta['path']),
+                trackers=[self.announce_url],
+                source="L4G",
+                private=True,
+                exclude_globs=["*.*", "*sample.mkv", "!sample*.*"],
+                include_globs=["*.mkv", "*.mp4", "*.ts"],
+                creation_date=datetime.datetime.now(),
+                comment="Created by L4G's Upload Assistant",
+                created_by="L4G's Upload Assistant"
+            )
+            
+            # Explicitly set the piece size and update metainfo
+            new_torrent.piece_size = 16777216  # 16 MiB in bytes
+            new_torrent.metainfo['info']['piece length'] = 16777216  # Ensure 'piece length' is set
+
+            # Validate and write the new torrent
+            new_torrent.validate_piece_size()
+            new_torrent.generate(callback=prep.torf_cb, interval=5)
+            new_torrent.write(torrent_path, overwrite=True)
+
+        # Proceed with the upload process
+        with open(torrent_path, 'rb') as torrentFile:
             files = {
-                "file_input" : ("placeholder.torrent", torrentFile, "application/x-bittorent")
+                "file_input": ("placeholder.torrent", torrentFile, "application/x-bittorent")
             }
             headers = {
                 # 'ApiUser' : self.api_user,
                 # 'ApiKey' : self.api_key,
-                 "User-Agent": self.user_agent
+                "User-Agent": self.user_agent
             }
             if meta['debug']:
                 console.log(url)
@@ -828,10 +845,9 @@ class PTP():
                     response = session.post(url=url, data=data, headers=headers, files=files)
                 console.print(f"[cyan]{response.url}")
                 responsetext = response.text
-                # If the repsonse contains our announce url then we are on the upload page and the upload wasn't successful.
+                # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
                 if responsetext.find(self.announce_url) != -1:
                     # Get the error message.
-                    # <div class="alert alert--error text--center">No torrent file uploaded, or file is empty.</div>
                     errorMessage = ""
                     match = re.search(r"""<div class="alert alert--error.*?>(.+?)</div>""", responsetext)
                     if match is not None:
@@ -839,12 +855,9 @@ class PTP():
 
                     raise UploadException(f"Upload to PTP failed: {errorMessage} ({response.status_code}). (We are still on the upload page.)")
 
-                
                 # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
                 match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", response.url)
                 if match is None:
                     console.print(url)
                     console.print(data)
                     raise UploadException(f"Upload to PTP failed: result URL {response.url} ({response.status_code}) is not the expected one.")
-
-        
