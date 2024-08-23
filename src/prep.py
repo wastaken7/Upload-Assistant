@@ -2221,9 +2221,8 @@ class Prep():
     def upload_screens(self, meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False):
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         initial_img_host = self.config['DEFAULT'][f'img_host_{img_host_num}']
-        img_host = initial_img_host
-        console.print(f"[cyan]Starting image upload with host: {img_host}")
-        
+        img_host = meta['imghost']  # Use the correctly updated image host from meta
+
         image_list = []
         newhost_list = []
 
@@ -2236,11 +2235,12 @@ class Prep():
                 image_glob.remove('POSTER.png')
             existing_images = meta.get('image_list', [])
 
-        # If the images are already uploaded, skip re-uploading unless in retry mode
-        if len(existing_images) >= total_screens and not retry_mode:
+        # Only skip uploading if retry_mode is False and the hosts match
+        if len(existing_images) >= total_screens and not retry_mode and img_host == initial_img_host:
             console.print(f"[yellow]Skipping upload because images are already uploaded to {img_host}. Existing images: {len(existing_images)}, Required: {total_screens}")
             return existing_images, total_screens
 
+        # Proceed with uploading images
         with Progress(
             TextColumn("[bold green]Uploading Screens..."),
             BarColumn(),
@@ -2290,7 +2290,7 @@ class Prep():
                         if response.get('status_code') != 200:
                             console.print("[yellow]PT Screens failed, trying next image host")
                             img_host_num += 1
-                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode)
+                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
                         img_url = response['data']['image']['url']
                         raw_url = img_url
                         web_url = img_url
@@ -2307,7 +2307,7 @@ class Prep():
                         if response.status_code != 200:
                             console.print("[yellow]Pixhost failed, trying next image host")
                             img_host_num += 1
-                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode)
+                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
                         response = response.json()
                         raw_url = response['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
                         img_url = response['th_url']
@@ -2325,19 +2325,19 @@ class Prep():
                         if response.get('status_code') != 200:
                             console.print("[yellow]Lensdump failed, trying next image host")
                             img_host_num += 1
-                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode)
+                            return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
                         img_url = response['data']['image']['url']
                         raw_url = img_url
                         web_url = response['data']['url_viewer']
                     else:
                         console.print(f"[red]Unsupported image host: {img_host}")
                         img_host_num += 1
-                        return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode)
+                        return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
 
                     # Update progress bar and print the result on the same line
                     progress.console.print(f"[cyan]Uploaded image {i+1}/{total_screens}: {raw_url}", end='\r')
 
-                    # If the upload was successful, add the image details
+                    # Add the image details to the list
                     image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
                     image_list.append(image_dict)
                     progress.advance(upload_task)
@@ -2346,7 +2346,7 @@ class Prep():
                 except Exception as e:
                     console.print(f"[yellow]Failed to upload {image} to {img_host}. Exception: {str(e)}")
                     img_host_num += 1
-                    return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode)
+                    return self.upload_screens(meta, screens - i, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
 
                 time.sleep(0.5)
 
