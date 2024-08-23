@@ -2111,8 +2111,8 @@ class Prep():
         def calculate_piece_size(cls, total_size, min_size, max_size):
             our_min_size = 16384
             our_max_size = 67108864
-            # Start with a piece size of 4 MiB
-            piece_size = 4194304  # 4 MiB in bytes
+            # Start with a piece size of 8 MiB
+            piece_size = 8388608
             num_pieces = math.ceil(total_size / piece_size)
             torrent_file_size = 20 + (num_pieces * 20)  # Approximate .torrent size: 20 bytes header + 20 bytes per piece
 
@@ -2123,7 +2123,14 @@ class Prep():
                     if piece_size < our_min_size:
                         piece_size = our_min_size
                         break
-                elif num_pieces > 2000 or torrent_file_size > 102400:
+                elif num_pieces > 2000:
+                    console.warning('Warning: Piece size exceeded 2000 pieces!')
+                    piece_size *= 2
+                    if piece_size > our_max_size:
+                        piece_size = our_max_size
+                        break
+                elif torrent_file_size > 102400:
+                    cli_ui.error('WARNING: .torrent size will exceed 100 KiB!')
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
