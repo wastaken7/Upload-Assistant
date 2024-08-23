@@ -2124,7 +2124,7 @@ class Prep():
                         piece_size = our_min_size
                         break
                 elif num_pieces > 2000:
-                    console.warning('Warning: Piece size exceeded 2000 pieces!')
+                    cli_ui.warning('Warning: Piece size exceeded 2000 pieces!')
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
