@@ -465,18 +465,31 @@ def get_confirmation(meta):
         get_missing(meta)
         ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) == True else "" # \a rings the bell
         cli_ui.info(ring_the_bell)
-        if meta['isdir'] and meta['keep_folder']:
-            cli_ui.info_section(cli_ui.yellow, f"Uploading with --keep-folder")
-            kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
-            if not kf_confirm:
-                cli_ui.info('Aborting...')
-                exit()
+
+        # Handle the 'keep_folder' logic based on 'is disc' and 'isdir'
+        if meta.get('is disc', False):
+            meta['keep_folder'] = False  # Ensure 'keep_folder' is False if 'is disc' is True
+        
+        if meta['isdir']:
+            if 'keep_folder' in meta:  # Check if 'keep_folder' was explicitly set
+                if meta['keep_folder']:  # Proceed only if 'keep_folder' is True
+                    cli_ui.info_section(cli_ui.yellow, f"Uploading with --keep-folder")
+                    kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
+                    if not kf_confirm:
+                        cli_ui.info('Aborting...')
+                        exit()
+            else:
+                # Handle the scenario where 'keep_folder' was not set but 'is disc' is False
+                cli_ui.warning("Warning: 'keep_folder' is not set for this upload. Proceeding without folder preservation.")
+                # Optionally, add logic here to handle this case
+
         cli_ui.info_section(cli_ui.yellow, f"Is this correct?")
         cli_ui.info(f"Name: {meta['name']}")
         confirm = cli_ui.ask_yes_no("Correct?", default=False)
     else:
         cli_ui.info(f"Name: {meta['name']}")
         confirm = True
+
     return confirm
 
 def dupe_check(dupes, meta):
