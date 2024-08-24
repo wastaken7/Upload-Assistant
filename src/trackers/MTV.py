@@ -73,6 +73,14 @@ class MTV():
         if torrent.piece_size > 8388608:  # 8 MiB in bytes
             console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
 
+            # Determine include and exclude patterns based on whether it's a disc or not
+            if meta['is_disc']:
+                include = []  # Adjust as needed for disc-specific inclusions, make sure it's a list
+                exclude = []  # Adjust as needed for disc-specific exclusions, make sure it's a list
+            else:
+                include = ["*.mkv", "*.mp4", "*.ts"]
+                exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+
             # Create a new torrent with piece size explicitly set to 8 MiB
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
@@ -81,8 +89,8 @@ class MTV():
                 trackers=["https://fake.tracker"],
                 source="L4G",
                 private=True,
-                exclude_globs=["*.*", "*sample.mkv", "!sample*.*"],
-                include_globs=["*.mkv", "*.mp4", "*.ts"],
+                exclude_globs=exclude,  # Ensure this is always a list
+                include_globs=include,  # Ensure this is always a list
                 creation_date=datetime.now(),
                 comment="Created by L4G's Upload Assistant",
                 created_by="L4G's Upload Assistant"
