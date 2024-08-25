@@ -12,11 +12,7 @@ import asyncio
 import ssl
 import shutil
 import time
-
-
 from src.console import console 
-
-
 
 class Clients():
     """
@@ -26,7 +22,6 @@ class Clients():
         self.config = config
         pass
     
-
     async def add_to_client(self, meta, tracker):
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{meta['clean_name']}.torrent"
         if meta.get('no_seed', False) == True:
@@ -63,8 +58,6 @@ class Clients():
             shutil.copy(torrent_path, client['watch_folder'])
         return
    
-        
-
     async def find_existing_torrent(self, meta):
         if meta.get('client', None) == None:
             default_torrent_client = self.config['DEFAULT']['default_torrent_client']
@@ -102,7 +95,6 @@ class Clients():
                 return torrent_path
         
         return None
-
 
     async def is_valid_torrent(self, meta, torrent_path, torrenthash, torrent_client, print_err=False):
         valid = False
@@ -165,10 +157,14 @@ class Clients():
             console.print(err_print)
         return valid, torrent_path
 
-
     async def search_qbit_for_torrent(self, meta, client):
         console.print("[green]Searching qbittorrent for an existing .torrent")
         torrent_storage_dir = client.get('torrent_storage_dir', None)
+        if meta['debug']:
+            if torrent_storage_dir:
+                print(f"Torrent storage directory found: {torrent_storage_dir}")
+            else:
+                print("No torrent storage directory found.")
         if torrent_storage_dir == None and client.get("torrent_client", None) != "watch":
             console.print(f"[bold red]Missing torrent_storage_dir for {self.config['DEFAULT']['default_torrent_client']}")
             return None
@@ -188,6 +184,10 @@ class Clients():
         local_path, remote_path = await self.remote_path_map(meta)
         if local_path.lower() in meta['path'].lower() and local_path.lower() != remote_path.lower():
             remote_path_map = True
+            if meta['debug']:
+                print(f"Remote path mapping found!")
+                print(f"Local path: {local_path}")
+                print(f"Remote path: {remote_path}")
 
         torrents = qbt_client.torrents.info()
         for torrent in torrents:
@@ -215,17 +215,6 @@ class Clients():
                     return torrent.hash
         return None
 
-
-
-
-
-
-
-
-
-
-
-
     def rtorrent(self, path, torrent_path, torrent, meta, local_path, remote_path, client):
         rtorrent = xmlrpc.client.Server(client['rtorrent_url'], context=ssl._create_stdlib_context())
         metainfo = bencode.bread(torrent_path)
@@ -234,14 +223,12 @@ class Clients():
         except EnvironmentError as exc:
             console.print("[red]Error making fast-resume data (%s)" % (exc,))
             raise
-        
             
         new_meta = bencode.bencode(fast_resume)
         if new_meta != metainfo:
             fr_file = torrent_path.replace('.torrent', '-resume.torrent')
             console.print("Creating fast resume")
             bencode.bwrite(fast_resume, fr_file)
-
 
         isdir = os.path.isdir(path)
         # if meta['type'] == "DISC":
@@ -258,7 +245,6 @@ class Clients():
         if isdir == False:
             path = os.path.dirname(path)
         
-        
         console.print("[bold yellow]Adding and starting torrent")
         rtorrent.load.start_verbose('', fr_file, f"d.directory_base.set={path}")
         time.sleep(1)
@@ -274,7 +260,6 @@ class Clients():
         if meta['debug']:
             console.print(f"[cyan]Path: {path}")
         return
-
 
     async def qbittorrent(self, path, torrent, local_path, remote_path, client, is_disc, filelist, meta):
         # infohash = torrent.infohash
@@ -323,8 +308,6 @@ class Clients():
             qbt_client.torrents_add_tags(tags=meta.get('qbit_tag'), torrent_hashes=torrent.infohash)
         console.print(f"Added to: {path}")
         
-
-
     def deluge(self, path, torrent_path, torrent, local_path, remote_path, client, meta):
         client = DelugeRPCClient(client['deluge_url'], int(client['deluge_port']), client['deluge_user'], client['deluge_pass'])
         # client = LocalDelugeRPCClient()
@@ -344,9 +327,6 @@ class Clients():
                 console.print(f"[cyan]Path: {path}")
         else:
             console.print("[bold red]Unable to connect to deluge")
-
-
-
 
     def add_fast_resume(self, metainfo, datapath, torrent):
         """ Add fast resume data to a metafile dict.
@@ -392,7 +372,6 @@ class Clients():
 
         return metainfo
 
-
     async def remote_path_map(self, meta):
         if meta.get('client', None) == None:
             torrent_client = self.config['DEFAULT']['default_torrent_client']
@@ -405,7 +384,7 @@ class Clients():
                 if os.path.normpath(local_path[i]).lower() in meta['path'].lower():
                     list_local_path = local_path[i]
                     list_remote_path = remote_path[i]
-            
+
         local_path = os.path.normpath(list_local_path)
         remote_path = os.path.normpath(list_remote_path)
         if local_path.endswith(os.sep):
