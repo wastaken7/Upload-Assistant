@@ -2092,7 +2092,7 @@ class Prep():
             super().__init__(*args, **kwargs)
             # Calculate and set the piece size
             total_size = self._calculate_total_size()
-            piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max)
+            piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files)
             self.piece_size = piece_size
 
         @property
@@ -2103,18 +2103,18 @@ class Prep():
         def piece_size(self, value):
             if value is None:
                 total_size = self._calculate_total_size()
-                value = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max)
+                value = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files)
             self._piece_size = value
             self.metainfo['info']['piece length'] = value  # Ensure 'piece length' is set
 
         @classmethod
-        def calculate_piece_size(cls, total_size, min_size, max_size):
+        def calculate_piece_size(cls, total_size, min_size, max_size, files):
             our_min_size = 16384
             our_max_size = 67108864
             # Start with a piece size of 8 MiB
             piece_size = 8388608
             num_pieces = math.ceil(total_size / piece_size)
-            torrent_file_size = 20 + (num_pieces * 20)  # Approximate .torrent size: 20 bytes header + 20 bytes per piece
+            torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)  # Approximate .torrent size
 
             # Adjust the piece size to fit within the constraints
             while not (1000 <= num_pieces <= 2000 and torrent_file_size <= 102400):  # 100 KiB .torrent size limit
@@ -2124,9 +2124,9 @@ class Prep():
                         piece_size = our_min_size
                         break
                 elif num_pieces > 2000:
-                    cli_ui.warning(f"Warning: Piece size exceeded 2000 pieces! Using ({num_pieces}) pieces.")
                     piece_size *= 2
                     if piece_size > our_max_size:
+                        cli_ui.warning(f"Warning: Piece size exceeded 2000 pieces! Using ({num_pieces}) pieces.")
                         piece_size = our_max_size
                         break
                 elif torrent_file_size > 102400:
@@ -2136,16 +2136,22 @@ class Prep():
                         piece_size = our_max_size
                         break
                 num_pieces = math.ceil(total_size / piece_size)
-                torrent_file_size = 20 + (num_pieces * 20)
+                torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
 
             return piece_size
 
         def _calculate_total_size(self):
             return sum(file.size for file in self.files)
 
+        @classmethod
+        def _calculate_pathname_bytes(cls, files):
+            # Calculate the total bytes consumed by all the pathnames in the torrent
+            total_pathname_bytes = sum(len(str(file).encode('utf-8')) for file in files)
+            return total_pathname_bytes
+
         def validate_piece_size(self):
             if not hasattr(self, '_piece_size') or self._piece_size is None:
-                self.piece_size = self.calculate_piece_size(self._calculate_total_size(), self.piece_size_min, self.piece_size_max)
+                self.piece_size = self.calculate_piece_size(self._calculate_total_size(), self.piece_size_min, self.piece_size_max, self.files)
             self.metainfo['info']['piece length'] = self.piece_size  # Ensure 'piece length' is set
 
     def create_torrent(self, meta, path, output_filename):
