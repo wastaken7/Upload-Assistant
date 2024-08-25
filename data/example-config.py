@@ -37,6 +37,7 @@ config = {
     "TRACKERS" : {
         # Which trackers do you want to upload to?
         # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP
+        # Remove the ones not used to save being asked everytime
         "default_trackers" : "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP",
 
         "BLU" : {
@@ -219,15 +220,20 @@ config = {
         },
     },
 
-
+    # enable_search to true will automatically try and find a suitable hash to save having to rehash when creating torrents
+    # Should use the qbit API, but will also use the torrent_storage_dir to find suitable hashes
     "TORRENT_CLIENTS" : {
-        # Name your torrent clients here, for example, this example is named "Client1"
+        # Name your torrent clients here, for example, this example is named "Client1" and is set as default_torrent_client above
+        # All options relate to the webui, make sure you have the webui secured if it has WAN access
+        # See https://github.com/Audionut/Upload-Assistant/wiki
         "Client1" : {
             "torrent_client" : "qbit",
+            # "enable_search" : True,
             "qbit_url" : "http://127.0.0.1",
             "qbit_port" : "8080",
             "qbit_user" : "username",
             "qbit_pass" : "password",
+            # "torrent_storage_dir" : "path/to/BT_backup folder"
 
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             # "local_path" : "/LocalPath",
@@ -251,9 +257,6 @@ config = {
                 # If using remote path mapping, use remote path
                 # For using multiple paths, use a list ["path1", "path2"] 
             # "automatic_management_paths" : ""
-
-
-
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             # "local_path" : "E:\\downloads\\tv",
             # "remote_path" : "/remote/downloads/tv"
@@ -291,12 +294,6 @@ config = {
         },
 
     },
-
-
-
-
-
-
 
     "DISCORD" :{
         "discord_bot_token" : "discord bot token",
