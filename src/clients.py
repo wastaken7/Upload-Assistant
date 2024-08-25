@@ -162,9 +162,9 @@ class Clients():
         torrent_storage_dir = client.get('torrent_storage_dir', None)
         if meta['debug']:
             if torrent_storage_dir:
-                print(f"Torrent storage directory found: {torrent_storage_dir}")
+                console.print(f"Torrent storage directory found: {torrent_storage_dir}")
             else:
-                print("No torrent storage directory found.")
+                console.print("No torrent storage directory found.")
         if torrent_storage_dir == None and client.get("torrent_client", None) != "watch":
             console.print(f"[bold red]Missing torrent_storage_dir for {self.config['DEFAULT']['default_torrent_client']}")
             return None
@@ -185,9 +185,9 @@ class Clients():
         if local_path.lower() in meta['path'].lower() and local_path.lower() != remote_path.lower():
             remote_path_map = True
             if meta['debug']:
-                print(f"Remote path mapping found!")
-                print(f"Local path: {local_path}")
-                print(f"Remote path: {remote_path}")
+                console.print(f"Remote path mapping found!")
+                console.print(f"Local path: {local_path}")
+                console.print(f"Remote path: {remote_path}")
 
         torrents = qbt_client.torrents.info()
         for torrent in torrents:
