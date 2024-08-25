@@ -47,21 +47,30 @@ class MTV():
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
         approved_image_hosts = ['ptpimg', 'imgbox']
 
-        while img_host_index <= len(approved_image_hosts):
-            # Call handle_image_upload and pass the updated meta with the current image host index
-            image_list, retry_mode = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
+        # Check if the images are already hosted on an approved image host
+        if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
+            console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
+            image_list = meta['image_list']  # Use the existing images
 
-            # If we successfully uploaded images or are already using an approved host, break out of the loop
-            if not retry_mode:
-                break
+        else:
+            # Proceed with the retry logic if images are not hosted on an approved image host
+            while img_host_index <= len(approved_image_hosts):
+                # Call handle_image_upload and pass the updated meta with the current image host index
+                image_list, retry_mode = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
 
-            # If retry_mode is True, switch to the next host
-            console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
-            img_host_index += 1
+                # If retry_mode is True, switch to the next host
+                if retry_mode:
+                    console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
+                    img_host_index += 1
+                    continue
 
-        if not image_list:
-            console.print("[red]All image hosts failed. Please check your configuration.")
-            return
+                # If we successfully uploaded images, break out of the loop
+                if image_list is not None:
+                    break
+
+            if image_list is None:
+                console.print("[red]All image hosts failed. Please check your configuration.")
+                return
 
         # Proceed with the rest of the upload process
         torrent_filename = "BASE"
