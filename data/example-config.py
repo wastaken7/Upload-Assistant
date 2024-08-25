@@ -222,6 +222,7 @@ config = {
 
     # enable_search to true will automatically try and find a suitable hash to save having to rehash when creating torrents
     # Should use the qbit API, but will also use the torrent_storage_dir to find suitable hashes
+    # If you find issue, use the "--debug" command option to print out some related details
     "TORRENT_CLIENTS" : {
         # Name your torrent clients here, for example, this example is named "Client1" and is set as default_torrent_client above
         # All options relate to the webui, make sure you have the webui secured if it has WAN access
