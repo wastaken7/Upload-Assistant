@@ -36,9 +36,9 @@ config = {
 
     "TRACKERS" : {
         # Which trackers do you want to upload to?
-        # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP
+        # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL
         # Remove the ones not used to save being asked everytime
-        "default_trackers" : "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP",
+        "default_trackers" : "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL",
 
         "BLU" : {
             "useAPI" : False, # Set to True if using BLU
@@ -212,6 +212,11 @@ config = {
         "UTP" : {
             "api_key" : "UTP api key",
             "announce_url" : "https://UTP/announce/customannounceurl",
+            # "anon" : False
+        },
+        "AL" : {
+            "api_key" : "AL api key",
+            "announce_url" : "https://animelovers.club/announce/customannounceurl",
             # "anon" : False
         },
         "MANUAL" : {
