@@ -804,15 +804,24 @@ class PTP():
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
 
-            # Create a new torrent with the piece size explicitly set to 16 MiB
+            if meta['is_disc']:
+                include = []
+                exclude = []
+            else:
+                include = ["*.mkv", "*.mp4", "*.ts"]
+                exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+
+            # Create a new torrent with piece size explicitly set to 8 MiB
+            from src.prep import Prep
+            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
             new_torrent = prep.CustomTorrent(
                 path=Path(meta['path']),
-                trackers=[self.announce_url],
+                trackers=["https://fake.tracker"],
                 source="L4G",
                 private=True,
-                exclude_globs=["*.*", "*sample.mkv", "!sample*.*"],
-                include_globs=["*.mkv", "*.mp4", "*.ts"],
-                creation_date=datetime.datetime.now(),
+                exclude_globs=exclude,  # Ensure this is always a list
+                include_globs=include,  # Ensure this is always a list
+                creation_date=datetime.now(),
                 comment="Created by L4G's Upload Assistant",
                 created_by="L4G's Upload Assistant"
             )
