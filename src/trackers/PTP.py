@@ -18,7 +18,7 @@ from src.bbcode import BBCODE
 from src.exceptions import *
 from src.console import console
 from torf import Torrent
-import datetime
+from datetime import datetime, date
 
 class PTP():
 
