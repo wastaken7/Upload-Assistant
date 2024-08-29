@@ -239,23 +239,63 @@ class HDB():
         # Download new .torrent from site
         hdb_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r').read()
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        torrent = Torrent.read(torrent_path)
+
+        # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
+        if torrent.piece_size > 16777216:  # 16 MiB in bytes
+            console.print("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
+
+            # Import Prep and regenerate the torrent with 16 MiB piece size limit
+            from src.prep import Prep
+            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+
+            if meta['filelist'] == 1:
+                include = []
+                exclude = []
+            else:
+                include = ["*.mkv", "*.mp4", "*.ts"]
+                exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+
+            # Create a new torrent with piece size explicitly set to 16 MiB
+            new_torrent = prep.CustomTorrent(
+                path=Path(meta['path']),
+                trackers=["https://fake.tracker"],
+                source="L4G",
+                private=True,
+                exclude_globs=exclude,  # Ensure this is always a list
+                include_globs=include,  # Ensure this is always a list
+                creation_date=datetime.now(),
+                comment="Created by L4G's Upload Assistant",
+                created_by="L4G's Upload Assistant"
+            )
+            
+            # Explicitly set the piece size and update metainfo
+            new_torrent.piece_size = 16777216  # 16 MiB in bytes
+            new_torrent.metainfo['info']['piece length'] = 16777216  # Ensure 'piece length' is set
+
+            # Validate and write the new torrent
+            new_torrent.validate_piece_size()
+            new_torrent.generate(callback=prep.torf_cb, interval=5)
+            new_torrent.write(torrent_path, overwrite=True)
+
+        # Proceed with the upload process
         with open(torrent_path, 'rb') as torrentFile:
             if len(meta['filelist']) == 1:
                 torrentFileName = unidecode(os.path.basename(meta['video']).replace(' ', '.'))
             else:
                 torrentFileName = unidecode(os.path.basename(meta['path']).replace(' ', '.'))
             files = {
-                'file' : (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
+                'file': (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
             }
             data = {
-                'name' : hdb_name,
-                'category' : cat_id,
-                'codec' : codec_id,
-                'medium' : medium_id,
-                'origin' : 0,
-                'descr' : hdb_desc.rstrip(),
-                'techinfo' : '',
-                'tags[]' : hdb_tags,
+                'name': hdb_name,
+                'category': cat_id,
+                'codec': codec_id,
+                'medium': medium_id,
+                'origin': 0,
+                'descr': hdb_desc.rstrip(),
+                'techinfo': '',
+                'tags[]': hdb_tags,
             }
 
             # If internal, set 1
