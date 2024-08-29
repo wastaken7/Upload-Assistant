@@ -816,7 +816,7 @@ class PTP():
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
             new_torrent = prep.CustomTorrent(
                 path=Path(meta['path']),
-                trackers=["https://fake.tracker"],
+                trackers=[self.announce_url],
                 source="L4G",
                 private=True,
                 exclude_globs=exclude,  # Ensure this is always a list

@@ -198,11 +198,6 @@ class HDB():
 
         return hdb_name 
 
-
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
-    ###############################################################
-
     async def upload(self, meta):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
@@ -220,22 +215,6 @@ class HDB():
         if "Dual-Audio" in meta['audio'] and meta['is_disc'] not in ("BDMV", "HDDVD", "DVD"):
             console.print("[bold red]Dual-Audio Encodes are not allowed")
             return
-        # FORM
-            # file : .torent file (needs renaming)
-            # name : name
-            # type_category : get_type_category_id
-            # type_codec : get_type_codec_id
-            # type_medium : get_type_medium_id
-            # type_origin : 0 unless internal (1)
-            # descr : description
-            # techinfo : mediainfo only, no bdinfo
-            # tags[] : get_tags
-            # imdb : imdb link
-            # tvdb_id : tvdb id
-            # season : season number
-            # episode : episode number
-            # anidb_id
-        # POST > upload/upload
 
         # Download new .torrent from site
         hdb_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r').read()
@@ -316,7 +295,6 @@ class HDB():
                 data['tvdb_episode'] = int(meta.get('episode_int', 1))
             # aniDB
 
-
             url = "https://hdbits.org/upload/upload"
             # Submit
             if meta['debug']:
@@ -340,7 +318,6 @@ class HDB():
                         console.print(up.text)
                         raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
         return
-
 
     async def search_existing(self, meta):
         dupes = []
@@ -369,9 +346,6 @@ class HDB():
             await asyncio.sleep(5)
 
         return dupes
-
-    
-
 
     async def validate_credentials(self, meta):
         vapi =  await self.validate_api()
@@ -513,8 +487,6 @@ class HDB():
         r = requests.post(url=url, data=data, files=files)
         image_bbcode = r.text
         return image_bbcode
-
-
 
     async def get_info_from_torrent_id(self, hdb_id):
         hdb_imdb = hdb_name = hdb_torrenthash = None
