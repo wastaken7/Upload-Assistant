@@ -100,61 +100,89 @@ class Clients():
         valid = False
         wrong_file = False
         err_print = ""
+        
+        # Normalize the torrent hash based on the client
         if torrent_client in ('qbit', 'deluge'):
             torrenthash = torrenthash.lower().strip()
             torrent_path = torrent_path.replace(torrenthash.upper(), torrenthash)
         elif torrent_client == 'rtorrent':
             torrenthash = torrenthash.upper().strip()
             torrent_path = torrent_path.replace(torrenthash.upper(), torrenthash)
+        
         if meta['debug']:
-            console.log(torrent_path)
+            console.log(f"[DEBUG] Torrent path after normalization: {torrent_path}")
+        
+        # Check if torrent file exists
         if os.path.exists(torrent_path):
             torrent = Torrent.read(torrent_path)
+            
             # Reuse if disc and basename matches or --keep-folder was specified
             if meta.get('is_disc', None) != None or (meta['keep_folder'] and meta['isdir']):
                 torrent_filepath = os.path.commonpath(torrent.files)
                 if os.path.basename(meta['path']) in torrent_filepath:
                     valid = True
+                if meta['debug']:
+                    console.log(f"[DEBUG] Torrent is valid based on disc/basename or keep-folder: {valid}")
+            
             # If one file, check for folder
             if len(torrent.files) == len(meta['filelist']) == 1:
                 if os.path.basename(torrent.files[0]) == os.path.basename(meta['filelist'][0]):
                     if str(torrent.files[0]) == os.path.basename(torrent.files[0]):
                         valid = True
-                else:
-                    wrong_file = True
+                    else:
+                        wrong_file = True
+                if meta['debug']:
+                    console.log(f"[DEBUG] Single file match status: valid={valid}, wrong_file={wrong_file}")
+            
             # Check if number of files matches number of videos
             elif len(torrent.files) == len(meta['filelist']):
                 torrent_filepath = os.path.commonpath(torrent.files)
                 actual_filepath = os.path.commonpath(meta['filelist'])
                 local_path, remote_path = await self.remote_path_map(meta)
+                
                 if local_path.lower() in meta['path'].lower() and local_path.lower() != remote_path.lower():
                     actual_filepath = torrent_path.replace(local_path, remote_path)
                     actual_filepath = torrent_path.replace(os.sep, '/')
+                
                 if meta['debug']:
-                    console.log(f"torrent_filepath: {torrent_filepath}")
-                    console.log(f"actual_filepath: {actual_filepath}")
+                    console.log(f"[DEBUG] torrent_filepath: {torrent_filepath}")
+                    console.log(f"[DEBUG] actual_filepath: {actual_filepath}")
+                
                 if torrent_filepath in actual_filepath:
                     valid = True
+                if meta['debug']:
+                    console.log(f"[DEBUG] Multiple file match status: valid={valid}")
+            
         else:
             console.print(f'[bold yellow]{torrent_path} was not found')
+        
+        # Additional checks if the torrent is valid so far
         if valid:
             if os.path.exists(torrent_path):
                 reuse_torrent = Torrent.read(torrent_path)
-                if (reuse_torrent.pieces >= 7000 and reuse_torrent.piece_size < 8388608) or (reuse_torrent.pieces >= 4000 and reuse_torrent.piece_size < 4194304): # Allow up to 7k pieces at 8MiB or 4k pieces at 4MiB or less
+                if meta['debug']:
+                    console.log(f"[DEBUG] Checking piece size and count: pieces={reuse_torrent.pieces}, piece_size={reuse_torrent.piece_size}")
+                
+                if (reuse_torrent.pieces >= 7000 and reuse_torrent.piece_size < 8388608) or (reuse_torrent.pieces >= 4000 and reuse_torrent.piece_size < 4194304):
                     err_print = "[bold yellow]Too many pieces exist in current hash. REHASHING"
                     valid = False
                 elif reuse_torrent.piece_size < 32768:
                     err_print = "[bold yellow]Piece size too small to reuse"
                     valid = False
-                elif wrong_file == True:
+                elif wrong_file:
                     err_print = "[bold red] Provided .torrent has files that were not expected"
                     valid = False
                 else:
                     err_print = f'[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}'
+            if meta['debug']:
+                console.log(f"[DEBUG] Final validity after piece checks: valid={valid}")
         else:
             err_print = '[bold yellow]Unwanted Files/Folders Identified'
+        
+        # Print the error message if needed
         if print_err:
             console.print(err_print)
+        
         return valid, torrent_path
 
     async def search_qbit_for_torrent(self, meta, client):
