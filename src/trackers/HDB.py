@@ -13,6 +13,7 @@ from src.bbcode import BBCODE
 from src.exceptions import *
 from src.console import console
 from datetime import datetime, date
+from torf import Torrent
 
 class HDB():
 
