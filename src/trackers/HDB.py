@@ -220,7 +220,7 @@ class HDB():
         # Download new .torrent from site
         hdb_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r').read()
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        torrent = Torrent.read(torrent_path)
+        torrent = torrent.read(torrent_path)
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
