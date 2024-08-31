@@ -122,7 +122,7 @@ class Prep():
                             meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
                         found_match = True
                     else:
-                        console.print(f"[yellow]User skipped the found ID on {tracker_name}, moving to the next site.")
+                        console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.")
                         await self.handle_image_list(meta, tracker_name)
                         return meta, found_match
                 else:
@@ -156,7 +156,7 @@ class Prep():
                             meta['blu_filename'] = blu_filename
                         found_match = True
                     else:
-                        console.print(f"[yellow]User skipped the found ID on {tracker_name}, moving to the next site.")
+                        console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.")
                         await self.handle_image_list(meta, tracker_name)
                         return meta, found_match
                 else:
@@ -191,7 +191,7 @@ class Prep():
                         meta['description'] = None
                         return meta, found_match
             else:
-                console.print(f"[yellow]User skipped the found IMDb ID on {tracker_name}, moving to the next site.")
+                console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.")
                 meta['skip_gen_desc'] = True
                 return meta, found_match
 
@@ -254,7 +254,7 @@ class Prep():
                                 meta['description'] = None
                                 return meta, found_match
                 else:
-                    console.print(f"[yellow]User skipped the found IMDb ID on {tracker_name}, moving to the next site.")
+                    console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.")
                     meta['skip_gen_desc'] = True
                     return meta, found_match
             else:
@@ -2220,12 +2220,23 @@ class Prep():
     Create Torrent
     """
     class CustomTorrent(torf.Torrent):
-        # Ensure the piece size is within the desired limits
+        # Default piece size limits
         torf.Torrent.piece_size_min = 16384  # 16 KiB
         torf.Torrent.piece_size_max = 67108864  # 64 MiB
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, meta, *args, **kwargs):
             super().__init__(*args, **kwargs)
+
+            # Override piece_size_max if meta['max_piece_size'] is specified
+            if 'max_piece_size' in meta and meta['max_piece_size']:
+                try:
+                    max_piece_size_mib = int(meta['max_piece_size']) * 1024 * 1024  # Convert MiB to bytes
+                    self.piece_size_max = min(max_piece_size_mib, torf.Torrent.piece_size_max)
+                except ValueError:
+                    self.piece_size_max = torf.Torrent.piece_size_max  # Fallback to default if conversion fails
+            else:
+                self.piece_size_max = torf.Torrent.piece_size_max
+
             # Calculate and set the piece size
             total_size = self._calculate_total_size()
             piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files)
@@ -2246,9 +2257,8 @@ class Prep():
         @classmethod
         def calculate_piece_size(cls, total_size, min_size, max_size, files):
             our_min_size = 16384
-            our_max_size = 67108864
-            # Start with a piece size of 8 MiB
-            piece_size = 8388608
+            our_max_size = max_size if max_size else 67108864  # Default to 64 MiB if max_size is None
+            piece_size = 8388608  # Start with 8 MiB
             num_pieces = math.ceil(total_size / piece_size)
             torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)  # Approximate .torrent size
 
@@ -2262,7 +2272,7 @@ class Prep():
                 elif num_pieces > 2000:
                     piece_size *= 2
                     if piece_size > our_max_size:
-                        cli_ui.warning(f"Warning: Piece size exceeded 2000 pieces! Using ({num_pieces}) pieces.")
+                        cli_ui.warning(f"Warning: Piece size exceeded 2000 pieces and .torrent will be approximately {torrent_file_size / 1024:.2f} KiB! Using ({num_pieces}) pieces.")
                         piece_size = our_max_size
                         break
                 elif torrent_file_size > 102400:
@@ -2281,7 +2291,6 @@ class Prep():
 
         @classmethod
         def _calculate_pathname_bytes(cls, files):
-            # Calculate the total bytes consumed by all the pathnames in the torrent
             total_pathname_bytes = sum(len(str(file).encode('utf-8')) for file in files)
             return total_pathname_bytes
 
@@ -2312,6 +2321,7 @@ class Prep():
 
         # Create and write the new torrent using the CustomTorrent class
         torrent = self.CustomTorrent(
+            meta=meta,
             path=path,
             trackers=["https://fake.tracker"],
             source="L4G",

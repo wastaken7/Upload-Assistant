@@ -80,6 +80,9 @@ class MTV():
         if torrent.piece_size > 8388608:  # 8 MiB in bytes
             console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
 
+            # Override the max_piece_size to 8 MiB
+            meta['max_piece_size'] = '8'  # 8 MiB, to ensure the new torrent adheres to this limit
+
             # Determine include and exclude patterns based on whether it's a disc or not
             if meta['is_disc']:
                 include = []  # Adjust as needed for disc-specific inclusions, make sure it's a list
@@ -92,6 +95,7 @@ class MTV():
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
             new_torrent = prep.CustomTorrent(
+                meta=meta,
                 path=Path(meta['path']),
                 trackers=["https://fake.tracker"],
                 source="L4G",
@@ -102,10 +106,6 @@ class MTV():
                 comment="Created by L4G's Upload Assistant",
                 created_by="L4G's Upload Assistant"
             )
-
-            # Explicitly set the piece size and update metainfo
-            new_torrent.piece_size = 8388608  # 8 MiB in bytes
-            new_torrent.metainfo['info']['piece length'] = 8388608  # Ensure 'piece length' is set
 
             # Validate and write the new torrent
             new_torrent.validate_piece_size()

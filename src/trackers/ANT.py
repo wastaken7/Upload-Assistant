@@ -101,7 +101,10 @@ class ANT():
                 from src.prep import Prep
                 prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
 
-                # Call create_torrent with the default piece size calculation
+                # Override the max piece size before regenerating the torrent
+                meta['max_piece_size'] = '64'  # 64 MiB, the maximum piece size allowed
+
+                # Call create_torrent with the adjusted piece size
                 prep.create_torrent(meta, Path(meta['path']), "ANT")
                 torrent_filename = "ANT"
             else:
