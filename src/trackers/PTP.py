@@ -10,6 +10,7 @@ import glob
 import multiprocessing
 import platform
 import pickle
+import click
 from pymediainfo import MediaInfo
 from src.trackers.COMMON import COMMON
 from src.bbcode import BBCODE
@@ -184,9 +185,24 @@ class PTP():
         
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
-        
+
         console.print(f"[bold green]Successfully grabbed description from PTP")
         console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:500]}...")  # Show first 500 characters for brevity
+
+        # Allow user to edit or discard the description
+        console.print("[cyan]Do you want to edit or discard the description?[/cyan]")
+        edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
+
+        if edit_choice.lower() == 'e':
+            edited_description = click.edit(desc)
+            if edited_description:
+                desc = edited_description.strip()
+            console.print(f"[green]Final description after editing:[/green] {desc}")
+        elif edit_choice.lower() == 'd':
+            desc = None
+            console.print("[yellow]Description discarded.[/yellow]")
+        else:
+            console.print(f"[green]Keeping the original description.[/green]")
 
         return desc, imagelist
 
