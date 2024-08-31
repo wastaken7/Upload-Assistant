@@ -177,7 +177,6 @@ async def do_the_thing(base_dir):
                 f.close()
         except FileNotFoundError:
             pass
-        console.print("[red]Click package will be required in a future update, install with requirements.txt now to be prepared")
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         if meta['imghost'] is None:
             meta['imghost'] = config['DEFAULT']['img_host_1']

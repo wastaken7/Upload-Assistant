@@ -4,6 +4,7 @@ import os
 import asyncio
 import requests
 import platform
+import cli_ui
 from str2bool import str2bool
 from pymediainfo import MediaInfo
 import math
@@ -66,26 +67,45 @@ class ANT():
         common = COMMON(config=self.config)
         torrent_filename = "BASE"
         torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+
+        # Calculate the total size of all files in the torrent
         total_size = sum(file.size for file in torrent.files)
 
+        # Calculate the total bytes consumed by all the pathnames in the torrent
+        def calculate_pathname_bytes(files):
+            total_pathname_bytes = sum(len(str(file).encode('utf-8')) for file in files)
+            return total_pathname_bytes
+
+        total_pathname_bytes = calculate_pathname_bytes(torrent.files)
+
         # Calculate the number of pieces and the torrent file size based on the current piece size
-        def calculate_pieces_and_file_size(total_size, piece_size):
+        def calculate_pieces_and_file_size(total_size, pathname_bytes, piece_size):
             num_pieces = math.ceil(total_size / piece_size)
-            torrent_file_size = 20 + (num_pieces * 20)  # Approximate size: 20 bytes header + 20 bytes per piece
+            # Approximate size: 20 bytes header + 20 bytes per piece + pathname bytes
+            torrent_file_size = 20 + (num_pieces * 20) + pathname_bytes
             return num_pieces, torrent_file_size
 
         # Check if the existing torrent fits within the constraints
-        num_pieces, torrent_file_size = calculate_pieces_and_file_size(total_size, torrent.piece_size)
+        num_pieces, torrent_file_size = calculate_pieces_and_file_size(total_size, total_pathname_bytes, torrent.piece_size)
 
-        # If the torrent doesn't meet the constraints, regenerate it
+        # Convert torrent file size to KiB for display
+        torrent_file_size_kib = torrent_file_size / 1024
+
+        # If the torrent doesn't meet the constraints, ask the user if they want to regenerate it
         if not (1000 <= num_pieces <= 2000) or torrent_file_size > 102400:
-            console.print("[yellow]Regenerating torrent to fit within 1000-2000 pieces and 100 KiB .torrent size limit needed for ANT.")
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+            console.print(f"[yellow]Existing .torrent is outside of ANT preferred constraints with {num_pieces} pieces and is approximately {torrent_file_size_kib:.2f} KiB.")
+            regenerate = cli_ui.ask_yes_no("Do you wish to regenerate the torrent?", default=True)
 
-            # Call create_torrent with the default piece size calculation
-            prep.create_torrent(meta, Path(meta['path']), "ANT")
-            torrent_filename = "ANT"
+            if regenerate:
+                console.print("[yellow]Regenerating torrent to fit within 1000-2000 pieces and 100 KiB .torrent size limit needed for ANT.")
+                from src.prep import Prep
+                prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+
+                # Call create_torrent with the default piece size calculation
+                prep.create_torrent(meta, Path(meta['path']), "ANT")
+                torrent_filename = "ANT"
+            else:
+                console.print("[green]Using the existing torrent despite not meeting the preferred constraints.")
         else:
             console.print("[green]Existing torrent meets the constraints.")
 
