@@ -230,7 +230,7 @@ class HDB():
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
 
-            if meta['filelist'] == 1:
+            if meta['is_disc'] == 1:
                 include = []
                 exclude = []
             else:
