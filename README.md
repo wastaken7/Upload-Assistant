@@ -20,7 +20,7 @@ A simple tool to take the work out of uploading.
   - ALL WITH MINIMAL INPUT!
   - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs
 
-
+Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
 
 ## Coming Soon:
   - Features
