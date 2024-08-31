@@ -179,6 +179,7 @@ async def do_the_thing(base_dir):
                 f.close()
         except FileNotFoundError:
             pass
+        console.print("[red]Click package will be required in a future update, install with requirements.txt now to be prepared")
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         if meta['imghost'] == None:
             meta['imghost'] = config['DEFAULT']['img_host_1']
@@ -479,7 +480,7 @@ def get_confirmation(meta):
                     if not kf_confirm:
                         cli_ui.info('Aborting...')
                         exit()
-
+        console.print("[red]Click package will be required in a future update, install with requirements.txt now to be prepared")
         cli_ui.info_section(cli_ui.yellow, f"Is this correct?")
         cli_ui.info(f"Name: {meta['name']}")
         confirm = cli_ui.ask_yes_no("Correct?", default=False)
