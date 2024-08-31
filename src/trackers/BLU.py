@@ -2,12 +2,12 @@
 # import discord
 import asyncio
 import requests
-import os
 import platform
 from str2bool import str2bool
 
 from src.trackers.COMMON import COMMON
 from src.console import console
+
 
 class BLU():
     """
@@ -23,21 +23,20 @@ class BLU():
         self.source_flag = 'BLU'
         self.search_url = 'https://blutopia.cc/api/torrents/filter'
         self.torrent_url = 'https://blutopia.cc/api/torrents/'
-        self.upload_url = 'https://blutopia.cc/api/torrents/upload' 
-        self.signature = f"\n[center][url=https://blutopia.cc/forums/topics/3087]Created by L4G's Upload Assistant[/url][/center]"
+        self.upload_url = 'https://blutopia.cc/api/torrents/upload'
+        self.signature = "\n[center][url=https://blutopia.cc/forums/topics/3087/posts/42941]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = [
-            '[Oj]', '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8', 'CrEwSaDe', 'd3g', 'DeadFish', 'DNL', 'ELiTE', 'eSc', 'FaNGDiNG0', 'FGT', 'Flights', 
+            '[Oj]', '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8', 'CrEwSaDe', 'd3g', 'DeadFish', 'DNL', 'ELiTE', 'eSc', 'FaNGDiNG0', 'FGT', 'Flights',
             'FRDS', 'FUM', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'Leffe', 'LEGi0N', 'LOAD', 'MeGusta', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'nikt0', 'NOIVTC', 'OFT',
             'nSD', 'PiRaTeS', 'playBD', 'PlaySD', 'playXD', 'PRODJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi', 'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'Telly', 'TM',
             'TRiToN', 'UPiNSMOKE', 'URANiME', 'WAF', 'x0r', 'xRed', 'XS', 'YIFY', 'ZKBL', 'ZmN', 'ZMNT', 'AOC',
             ['EVO', 'Raw Content Only'], ['TERMiNAL', 'Raw Content Only'], ['ViSION', 'Note the capitalization and characters used'], ['CMRG', 'Raw Content Only']
         ]
-        
+
         pass
-    
+
     async def upload(self, meta):
         common = COMMON(config=self.config)
-        
         blu_name = meta['name']
         desc_header = ""
         if meta.get('webdv', False):
@@ -49,12 +48,12 @@ class BLU():
         resolution_id = await self.get_res_id(meta['resolution'])
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) == False:
+        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
             anon = 1
 
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
@@ -64,34 +63,34 @@ class BLU():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[BLU]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': ("placeholder.torrent", open_torrent, "application/x-bittorrent")}
         data = {
-            'name' : blu_name,
-            'description' : desc,
-            'mediainfo' : mi_dump,
-            'bdinfo' : bd_dump, 
-            'category_id' : cat_id,
-            'type_id' : type_id,
-            'resolution_id' : resolution_id,
-            'tmdb' : meta['tmdb'],
-            'imdb' : meta['imdb_id'].replace('tt', ''),
-            'tvdb' : meta['tvdb_id'],
-            'mal' : meta['mal_id'],
-            'igdb' : 0,
-            'anonymous' : anon,
-            'stream' : meta['stream'],
-            'sd' : meta['sd'],
-            'keywords' : meta['keywords'],
-            'personal_release' : int(meta.get('personalrelease', False)),
-            'internal' : 0,
-            'featured' : 0,
-            'free' : 0,
-            'doubleup' : 0,
-            'sticky' : 0,
+            'name': blu_name,
+            'description': desc,
+            'mediainfo': mi_dump,
+            'bdinfo': bd_dump,
+            'category_id': cat_id,
+            'type_id': type_id,
+            'resolution_id': resolution_id,
+            'tmdb': meta['tmdb'],
+            'imdb': meta['imdb_id'].replace('tt', ''),
+            'tvdb': meta['tvdb_id'],
+            'mal': meta['mal_id'],
+            'igdb': 0,
+            'anonymous': anon,
+            'stream': meta['stream'],
+            'sd': meta['sd'],
+            'keywords': meta['keywords'],
+            'personal_release': int(meta.get('personalrelease', False)),
+            'internal': 0,
+            'featured': 0,
+            'free': 0,
+            'doubleup': 0,
+            'sticky': 0,
         }
         # Internal
-        if self.config['TRACKERS'][self.tracker].get('internal', False) == True:
+        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
-                
+
         if region_id != 0:
             data['region_id'] = region_id
         if distributor_id != 0:
@@ -105,28 +104,24 @@ class BLU():
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
-        
-        if meta['debug'] == False:
+
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
                 console.print(response.json())
-            except:
+            except Exception:
                 console.print("It may have uploaded, go check")
-                
-                return 
+
+                return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
 
-
-
-
-
     async def get_cat_id(self, category_name, edition):
         category_id = {
-            'MOVIE': '1', 
-            'TV': '2', 
+            'MOVIE': '1',
+            'TV': '2',
             'FANRES': '3'
             }.get(category_name, '0')
         if category_name == 'MOVIE' and 'FANRES' in edition:
@@ -135,10 +130,10 @@ class BLU():
 
     async def get_type_id(self, type):
         type_id = {
-            'DISC': '1', 
+            'DISC': '1',
             'REMUX': '3',
-            'WEBDL': '4', 
-            'WEBRIP': '5', 
+            'WEBDL': '4',
+            'WEBRIP': '5',
             'HDTV': '6',
             'ENCODE': '12'
             }.get(type, '0')
@@ -146,16 +141,16 @@ class BLU():
 
     async def get_res_id(self, resolution):
         resolution_id = {
-            '8640p':'10', 
-            '4320p': '11', 
-            '2160p': '1', 
-            '1440p' : '2',
+            '8640p': '10',
+            '4320p': '11',
+            '2160p': '1',
+            '1440p': '2',
             '1080p': '2',
-            '1080i':'3', 
-            '720p': '5',  
-            '576p': '6', 
+            '1080i': '3',
+            '720p': '5',
+            '576p': '6',
             '576i': '7',
-            '480p': '8', 
+            '480p': '8',
             '480i': '9'
             }.get(resolution, '10')
         return resolution_id
@@ -173,12 +168,12 @@ class BLU():
             if cli_ui.ask_yes_no("Is the DV Layer sourced from the same service as the video?"):
                 ask_comp = False
                 desc_header = "[code]This release contains a derived Dolby Vision profile 8 layer. Comparisons not required as DV and HDR are from same provider.[/code]"
-        
+
         if ask_comp:
             while desc_header == "":
                 desc_input = cli_ui.ask_string("Please provide comparisons between HDR masters. (link or bbcode)", default="")
                 desc_header = f"[code]This release contains a derived Dolby Vision profile 8 layer. Comparisons between HDR masters: {desc_input}[/code]"
-        
+
         if "hybrid" not in name.lower():
             if "REPACK" in name:
                 name = name.replace('REPACK', 'Hybrid REPACK')
@@ -186,17 +181,16 @@ class BLU():
                 name = name.replace(meta['resolution'], f"Hybrid {meta['resolution']}")
         return name, desc_header
 
-
     async def search_existing(self, meta):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {
-            'api_token' : self.config['TRACKERS'][self.tracker]['api_key'].strip(),
-            'tmdbId' : meta['tmdb'],
-            'categories[]' : await self.get_cat_id(meta['category'], meta.get('edition', '')),
-            'types[]' : await self.get_type_id(meta['type']),
-            'resolutions[]' : await self.get_res_id(meta['resolution']),
-            'name' : ""
+            'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
+            'tmdbId': meta['tmdb'],
+            'categories[]': await self.get_cat_id(meta['category'], meta.get('edition', '')),
+            'types[]': await self.get_type_id(meta['type']),
+            'resolutions[]': await self.get_res_id(meta['resolution']),
+            'name': ""
         }
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}{meta.get('episode', '')}"
@@ -210,7 +204,7 @@ class BLU():
                 # difference = SequenceMatcher(None, meta['clean_name'], result).ratio()
                 # if difference >= 0.05:
                 dupes.append(result)
-        except:
+        except Exception:
             console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
             await asyncio.sleep(5)
 

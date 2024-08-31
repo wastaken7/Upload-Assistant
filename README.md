@@ -25,7 +25,6 @@ Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-n
 ## Coming Soon:
   - Features
 
-
   
 
 ## **Setup:**

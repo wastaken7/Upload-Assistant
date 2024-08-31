@@ -2,19 +2,18 @@ import requests
 import asyncio
 import re
 import os
-from pathlib import Path
 from str2bool import str2bool
-import json
 import glob
 import pickle
 from unidecode import unidecode
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse
 import cli_ui
 from bs4 import BeautifulSoup
 
 from src.trackers.COMMON import COMMON
 from src.exceptions import *
 from src.console import console
+
 
 class FL():
 
@@ -28,7 +27,6 @@ class FL():
         self.uploader_name = config['TRACKERS'][self.tracker].get('uploader_name')
         self.signature = None
         self.banned_groups = [""]
-    
 
     async def get_category_id(self, meta):
         has_ro_audio, has_ro_sub = await self.get_ro_tracks(meta)
@@ -51,7 +49,7 @@ class FL():
             if has_ro_sub and meta.get('sd', 0) == 0 and meta['resolution'] != '2160p':
                 # 19 = Movie + RO
                 cat_id = 19
-        
+
         if meta['category'] == 'TV':
             # 21 = TV HD
             cat_id = 21
@@ -61,7 +59,7 @@ class FL():
             elif meta.get('sd', 0) == 1:
                 # 23 = TV SD
                 cat_id = 23
-            
+
         if meta['is_disc'] == "DVD":
             # 2 = DVD
             cat_id = 2
@@ -102,7 +100,7 @@ class FL():
         fl_name = fl_name.replace(' ', '.').replace('..', '.')
         return fl_name 
 
-    
+
     ###############################################################
     ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
     ###############################################################
@@ -114,7 +112,7 @@ class FL():
         fl_name = await self.edit_name(meta)
         cat_id = await self.get_category_id(meta)
         has_ro_audio, has_ro_sub = await self.get_ro_tracks(meta)
-        
+
         # Confirm the correct naming order for FL
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.get('unattended', False) == False:
@@ -184,7 +182,7 @@ class FL():
                         session.cookies.update(pickle.load(cf))
                     up = session.post(url=url, data=data, files=files)
                     torrentFile.close()
-                    
+
                     # Match url to verify successful upload
                     match = re.match(r".*?filelist\.io/details\.php\?id=(\d+)&uploaded=(\d+)", up.url)
                     if match:
@@ -197,7 +195,6 @@ class FL():
                         raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
         return
 
-
     async def search_existing(self, meta):
         dupes = []
         with requests.Session() as session:
@@ -208,15 +205,15 @@ class FL():
             search_url = f"https://filelist.io/browse.php"
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
-                    'search' : meta['imdb_id'],
-                    'cat' : await self.get_category_id(meta),
-                    'searchin' : '3'
+                    'search': meta['imdb_id'],
+                    'cat': await self.get_category_id(meta),
+                    'searchin': '3'
                 }
             else:
                 params = {
-                    'search' : meta['title'],
-                    'cat' : await self.get_category_id(meta),
-                    'searchin' : '0'
+                    'search': meta['title'],
+                    'cat': await self.get_category_id(meta),
+                    'searchin': '0'
                 }
             
             r = session.get(search_url, params=params)
@@ -228,9 +225,6 @@ class FL():
                     dupes.append(each['title'])
 
         return dupes
-
-    
-
 
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
@@ -249,8 +243,7 @@ class FL():
             else:
                 return False
         return True
-    
-    
+
     async def validate_cookies(self, meta, cookiefile):
         url = "https://filelist.io/index.php"
         if os.path.exists(cookiefile):
@@ -268,7 +261,7 @@ class FL():
                     return False
         else:
             return False
-    
+
     async def login(self, cookiefile):
         with requests.Session() as session:
             r = session.get("https://filelist.io/login.php")
@@ -276,10 +269,10 @@ class FL():
             soup = BeautifulSoup(r.text, 'html.parser')
             validator = soup.find('input', {'name' : 'validator'}).get('value')
             data = {
-                'validator' : validator,
-                'username' : self.username,
-                'password' : self.password,
-                'unlock' : '1',
+                'validator': validator,
+                'username': self.username,
+                'password': self.password,
+                'unlock': '1',
             }
             response = session.post('https://filelist.io/takelogin.php', data=data)
             await asyncio.sleep(0.5)
@@ -306,14 +299,12 @@ class FL():
             console.print(r.text)
         return
 
-
-
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', newline='') as descfile:
             from src.bbcode import BBCODE
             bbcode = BBCODE()
-            
+
             desc = base
             desc = bbcode.remove_spoiler(desc)
             desc = bbcode.convert_code_to_quote(desc)
@@ -353,7 +344,6 @@ class FL():
             if self.signature != None:
                 descfile.write(self.signature)
             descfile.close()
-
     
     async def get_ro_tracks(self, meta):
         has_ro_audio = has_ro_sub = False

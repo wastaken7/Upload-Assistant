@@ -11,7 +11,7 @@ from torf import Torrent
 from pathlib import Path
 from src.trackers.COMMON import COMMON
 from src.console import console
-from datetime import datetime, date
+
 
 class ANT():
     """
@@ -22,25 +22,21 @@ class ANT():
         Upload
     """
 
-    ###############################################################
-    # #######                    EDIT ME                    ##### #
-    ###############################################################
-
-    # ALSO EDIT CLASS NAME ABOVE
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'ANT'
         self.source_flag = 'ANT'
         self.search_url = 'https://anthelion.me/api.php'
         self.upload_url = 'https://anthelion.me/api.php'
-        self.banned_groups = ['3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8', 
-                            'CrEwSaDe', 'd3g', 'DDR', 'DNL', 'DeadFish', 'ELiTE', 'eSc', 'FaNGDiNG0', 'FGT', 'Flights', 'FRDS', 
-                            'FUM', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'Leffe', 
-                            'LiGaS', 'LOAD', 'MeGusta', 'MkvCage', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'NOIVTC', 'nSD', 'Oj', 'Ozlem', 
-                            'PiRaTeS', 'PRoDJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi', 
-                            'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'TBS', 'Telly', 'TM', 'UPiNSMOKE', 'URANiME', 'WAF', 'xRed', 
-                            'XS', 'YIFY', 'YTS', 'Zeus', 'ZKBL', 'ZmN', 'ZMNT']
+        self.banned_groups = [
+            '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8',
+            'CrEwSaDe', 'd3g', 'DDR', 'DNL', 'DeadFish', 'ELiTE', 'eSc', 'FaNGDiNG0', 'FGT', 'Flights', 'FRDS',
+            'FUM', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'Leffe',
+            'LiGaS', 'LOAD', 'MeGusta', 'MkvCage', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'NOIVTC', 'nSD', 'Oj', 'Ozlem',
+            'PiRaTeS', 'PRoDJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi',
+            'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'TBS', 'Telly', 'TM', 'UPiNSMOKE', 'URANiME', 'WAF', 'xRed',
+            'XS', 'YIFY', 'YTS', 'Zeus', 'ZKBL', 'ZmN', 'ZMNT'
+        ]
         self.signature = None
         pass
 
@@ -66,10 +62,6 @@ class ANT():
             flags.append('Remux')
         return flags
 
-    ###############################################################
-    # ####   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED    ### #
-    ###############################################################
-
     async def upload(self, meta):
         common = COMMON(config=self.config)
         torrent_filename = "BASE"
@@ -90,7 +82,7 @@ class ANT():
             console.print("[yellow]Regenerating torrent to fit within 1000-2000 pieces and 100 KiB .torrent size limit needed for ANT.")
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-            
+
             # Call create_torrent with the default piece size calculation
             prep.create_torrent(meta, Path(meta['path']), "ANT")
             torrent_filename = "ANT"
@@ -137,7 +129,7 @@ class ANT():
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
-        
+
         try:
             if not meta['debug']:
                 response = requests.post(url=self.upload_url, files=files, data=data, headers=headers)

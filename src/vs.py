@@ -1,14 +1,11 @@
 import vapoursynth as vs
-core = vs.core
-from awsmfunc import ScreenGen, DynamicTonemap, FrameInfo, zresize
+from awsmfunc import ScreenGen, DynamicTonemap, zresize
 import random
-import argparse
-from typing import Union, List
-from pathlib import Path
-import os, sys
-import platform
-import multiprocessing
+import os
 from functools import partial
+
+core = vs.core
+
 
 def CustomFrameInfo(clip, text):
     def FrameProps(n, f, clip):
@@ -20,6 +17,7 @@ def CustomFrameInfo(clip, text):
     # Apply FrameProps to each frame
     return core.std.FrameEval(clip, partial(FrameProps, clip=clip), prop_src=clip)
 
+
 def optimize_images(image, config):
     import platform  # Ensure platform is imported here
     if config.get('optimize_images', True):
@@ -27,7 +25,7 @@ def optimize_images(image, config):
             try:
                 pyver = platform.python_version_tuple()
                 if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
-                    import oxipng 
+                    import oxipng
                 if os.path.getsize(image) >= 16000000:
                     oxipng.optimize(image, level=6)
                 else:
@@ -35,6 +33,7 @@ def optimize_images(image, config):
             except Exception as e:
                 print(f"Image optimization failed: {e}")
     return
+
 
 def vs_screengn(source, encode=None, filter_b_frames=False, num=5, dir=".", config=None):
     if config is None:

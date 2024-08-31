@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 # import discord
-import asyncio
-from torf import Torrent
 import requests
 from src.console import console
 from str2bool import str2bool
@@ -11,8 +9,6 @@ import traceback
 from src.trackers.COMMON import COMMON
 from pymediainfo import MediaInfo
 
-
-# from pprint import pprint
 
 class BHDTV():
     """
@@ -27,10 +23,10 @@ class BHDTV():
         self.config = config
         self.tracker = 'BHDTV'
         self.source_flag = 'BIT-HDTV'
-        #search not implemented
-        #self.search_url = 'https://api.bit-hdtv.com/torrent/search/advanced'
+        # search not implemented
+        # self.search_url = 'https://api.bit-hdtv.com/torrent/search/advanced'
         self.upload_url = 'https://www.bit-hdtv.com/takeupload.php'
-        #self.forum_link = 'https://www.bit-hdtv.com/rules.php'
+        # self.forum_link = 'https://www.bit-hdtv.com/rules.php'
         self.banned_groups = []
         pass
 
@@ -48,18 +44,16 @@ class BHDTV():
             # must be TV pack
             sub_cat_id = await self.get_type_tv_pack_id(meta['type'])
 
-
-
         resolution_id = await self.get_res_id(meta['resolution'])
         # region_id = await common.unit3d_region_ids(meta.get('region'))
         # distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(
-                str2bool(self.config['TRACKERS'][self.tracker].get('anon', "False"))) == False:
+                str2bool(self.config['TRACKERS'][self.tracker].get('anon', "False"))) is False:
             anon = 0
         else:
             anon = 1
 
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
@@ -80,32 +74,31 @@ class BHDTV():
         data = {
             'api_key': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'name': meta['name'].replace(' ', '.').replace(':.', '.').replace(':', '.').replace('DD+', 'DDP'),
-            'mediainfo': mi_dump if bd_dump == None else bd_dump,
+            'mediainfo': mi_dump if bd_dump is None else bd_dump,
             'cat': cat_id,
             'subcat': sub_cat_id,
             'resolution': resolution_id,
-            #'anon': anon,
+            # 'anon': anon,
             # admins asked to remove short description.
             'sdescr': " ",
-            'descr': media_info if bd_dump == None else "Disc so Check Mediainfo dump ",
+            'descr': media_info if bd_dump is None else "Disc so Check Mediainfo dump ",
             'screen': desc,
             'url': f"https://www.tvmaze.com/shows/{meta['tvmaze_id']}" if meta['category'] == 'TV' else f"https://www.imdb.com/title/tt{meta['imdb_id']}",
             'format': 'json'
         }
 
-
-        if meta['debug'] == False:
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, data=data, files=files)
             try:
                 # pprint(data)
                 console.print(response.json())
-            except:
-                console.print(f"[cyan]It may have uploaded, go check")
+            except Exception:
+                console.print("[cyan]It may have uploaded, go check")
                 # cprint(f"Request Data:", 'cyan')
                 pprint(data)
                 console.print(traceback.print_exc())
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             pprint(data)
         # # adding my anounce url to torrent.
         if 'view' in response.json()['data']:
@@ -115,7 +108,6 @@ class BHDTV():
                                              self.config['TRACKERS']['BHDTV'].get('my_announce_url'),
                                              "Torrent Did not upload")
         open_torrent.close()
-
 
     async def get_cat_id(self, meta):
         category_id = '0'
@@ -128,7 +120,6 @@ class BHDTV():
             category_id = '10'
         return category_id
 
-
     async def get_type_movie_id(self, meta):
         type_id = '0'
         test = meta['type']
@@ -138,7 +129,7 @@ class BHDTV():
             else:
                 type_id = '2'
         elif meta['type'] == 'REMUX':
-            if str(meta['name']).__contains__('265') :
+            if str(meta['name']).__contains__('265'):
                 type_id = '48'
             elif meta['3D']:
                 type_id = '45'
@@ -147,51 +138,48 @@ class BHDTV():
         elif meta['type'] == 'HDTV':
             type_id = '6'
         elif meta['type'] == 'ENCODE':
-            if str(meta['name']).__contains__('265') :
+            if str(meta['name']).__contains__('265'):
                 type_id = '43'
             elif meta['3D']:
                 type_id = '44'
             else:
                 type_id = '1'
         elif meta['type'] == 'WEBDL' or meta['type'] == 'WEBRIP':
-                type_id = '5'
+            type_id = '5'
 
         return type_id
-
 
     async def get_type_tv_id(self, type):
         type_id = {
             'HDTV': '7',
             'WEBDL': '8',
             'WEBRIP': '8',
-            #'WEBRIP': '55',
-            #'SD': '59',
+            # 'WEBRIP': '55',
+            # 'SD': '59',
             'ENCODE': '10',
             'REMUX': '11',
             'DISC': '12',
         }.get(type, '0')
         return type_id
 
-
     async def get_type_tv_pack_id(self, type):
         type_id = {
             'HDTV': '13',
             'WEBDL': '14',
             'WEBRIP': '8',
-            #'WEBRIP': '55',
-            #'SD': '59',
+            # 'WEBRIP': '55',
+            # 'SD': '59',
             'ENCODE': '16',
             'REMUX': '17',
             'DISC': '18',
         }.get(type, '0')
         return type_id
 
-
     async def get_res_id(self, resolution):
         resolution_id = {
             '2160p': '4',
             '1080p': '3',
-            '1080i':'2',
+            '1080i': '2',
             '720p': '1'
             }.get(resolution, '10')
         return resolution_id
@@ -211,6 +199,6 @@ class BHDTV():
         return
 
     async def search_existing(self, meta):
-        console.print(f"[red]Dupes must be checked Manually")
+        console.print("[red]Dupes must be checked Manually")
         return ['Dupes must be checked Manually']
-        ### hopefully someone else has the time to implement this.
+        # hopefully someone else has the time to implement this.
