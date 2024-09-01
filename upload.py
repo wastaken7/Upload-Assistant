@@ -38,6 +38,7 @@ from src.trackers.FNP import FNP
 from src.trackers.CBR import CBR
 from src.trackers.UTP import UTP
 from src.trackers.AL import AL
+from src.trackers.SHRI import SHRI
 import json
 from pathlib import Path
 import asyncio
@@ -242,14 +243,16 @@ async def do_the_thing(base_dir):
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
 
-        # Upload to Trackers
+        ####################################
+        #######  Upload to Trackers  #######  # noqa #F266
+        ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'LST', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB']
-        http_trackers = ['TTG', 'FL', 'PTER', 'HDT', 'MTV']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'LST', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI']
+        http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
             'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
-            'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL}
+            'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI}
 
         for tracker in trackers:
             if meta['name'].endswith('DUPE?'):

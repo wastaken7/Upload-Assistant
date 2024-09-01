@@ -226,6 +226,11 @@ config = {
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             "anon": False,
         },
+        "SHRI": {
+            "api_key": "SHRI api key",
+            "announce_url": "https://shareisland.org/announce/customannounceurl",
+            # "anon" : "False"
+        },
         "MANUAL": {
             # Uncomment and replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se
             # "filebrowser" : "https://domain.tld/filebrowser/files/Upload-Assistant/"
