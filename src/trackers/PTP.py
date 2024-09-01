@@ -81,7 +81,7 @@ class PTP():
             ("Vietnamese", "vie", "vi"): 25,
         }
 
-    async def get_ptp_id_imdb(self, search_term, search_file_folder):
+    async def get_ptp_id_imdb(self, search_term, search_file_folder, meta):
         imdb_id = ptp_torrent_id = None
         filename = str(os.path.basename(search_term))
         params = {
@@ -96,41 +96,46 @@ class PTP():
         response = requests.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
         console.print(f"[green]Searching PTP for: [bold yellow]{filename}[/bold yellow]")
+        
         try:
             if response.status_code == 200:
                 response = response.json()
+                # console.print(f"[blue]Raw API Response: {response}[/blue]")
+                
                 if int(response['TotalResults']) >= 1:
                     for movie in response['Movies']:
                         if len(movie['Torrents']) >= 1:
                             for torrent in movie['Torrents']:
-                                if search_file_folder == 'file':
-                                    for file in torrent['FileList']:
-                                        if file['Path'] == filename:
-                                            imdb_id = movie['ImdbId']
-                                            ptp_torrent_id = torrent['Id']
-                                            dummy, ptp_torrent_hash = await self.get_imdb_from_torrent_id(ptp_torrent_id)
-                                            console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
-                                            return imdb_id, ptp_torrent_id, ptp_torrent_hash
-                                if search_file_folder == 'folder':
-                                    if str(torrent['FilePath']) == filename:
+                                for file in torrent['FileList']:
+                                    if file['Path'] == filename:
                                         imdb_id = movie['ImdbId']
                                         ptp_torrent_id = torrent['Id']
-                                        dummy, ptp_torrent_hash = await self.get_imdb_from_torrent_id(ptp_torrent_id)
+                                        dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
                                         console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
+                                        
+                                        # Call get_torrent_info and print the results
+                                        tinfo = await self.get_torrent_info(imdb_id, meta)
+                                        console.print(f"[cyan]Torrent Info: {tinfo}[/cyan]")
+                                        
                                         return imdb_id, ptp_torrent_id, ptp_torrent_hash
-                else:
-                    console.print(f'[yellow]Could not find any release matching [bold yellow]{filename}[/bold yellow] on PTP')
-                    return None, None, None
-            elif int(response.status_code) in [400, 401, 403]:
+
+                console.print(f'[yellow]Could not find any release matching [bold yellow]{filename}[/bold yellow] on PTP')
+                return None, None, None
+            
+            elif response.status_code in [400, 401, 403]:
                 console.print(f"[bold red]PTP: {response.text}")
                 return None, None, None
-            elif int(response.status_code) == 503:
+            
+            elif response.status_code == 503:
                 console.print("[bold yellow]PTP Unavailable (503)")
                 return None, None, None
+
             else:
                 return None, None, None
-        except Exception:
-            pass
+        
+        except Exception as e:
+            console.print(f'[red]An error occurred: {str(e)}[/red]')
+        
         console.print(f'[yellow]Could not find any release matching [bold yellow]{filename}[/bold yellow] on PTP')
         return None, None, None
 
@@ -250,6 +255,7 @@ class PTP():
         tinfo = {}
         try:
             response = response.json()
+            # console.print(f"[blue]Raw info API Response: {response}[/blue]")
             # title, plot, art, year, tags, Countries, Languages
             for key, value in response[0].items():
                 if value not in (None, ""):

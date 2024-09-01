@@ -534,7 +534,7 @@ class HDB():
                         "search": bd_summary  # Using the Disc Title for search
                     }
                     console.print(f"[green]Searching HDB for disc title: [bold yellow]{bd_summary}[/bold yellow]")
-                    console.print(f"[yellow]Using this data: {data}")
+                    # console.print(f"[yellow]Using this data: {data}")
                 else:
                     console.print(f"[red]Error: 'Disc Title' not found in {bd_summary_path}[/red]")
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id

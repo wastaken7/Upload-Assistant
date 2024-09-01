@@ -162,20 +162,20 @@ class Prep():
                     console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
 
         elif tracker_name == "PTP":
-            # console.print(f"[blue]Handling PTP tracker[/blue]")
-
+            imdb_id = None  # Ensure imdb_id is defined
+            # Check if the PTP ID is already in meta
             if meta.get('ptp') is None:
-                # console.print(f"[yellow]No PTP ID in meta, searching by search term[/yellow]")
-                imdb, ptp_torrent_id, meta['ext_torrenthash'] = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder)
+                # No PTP ID in meta, search by search term
+                imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
                 if ptp_torrent_id:
                     meta['ptp'] = ptp_torrent_id
-                    meta['imdb'] = str(imdb).zfill(7) if imdb else None
+                    meta['imdb'] = str(imdb_id).zfill(7) if imdb_id else None
             else:
                 ptp_torrent_id = meta['ptp']
                 console.print(f"[cyan]PTP ID found in meta: {ptp_torrent_id}, using it to get IMDb ID[/cyan]")
-                imdb, _, meta['ext_torrenthash'] = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
-                if imdb:
-                    meta['imdb'] = str(imdb).zfill(7)
+                imdb_id, _, meta['ext_torrenthash'] = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
+                if imdb_id:
+                    meta['imdb'] = str(imdb_id).zfill(7)
                     console.print(f"[green]IMDb ID found: tt{meta['imdb']}[/green]")
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
