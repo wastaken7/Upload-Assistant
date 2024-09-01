@@ -150,20 +150,21 @@ class PTP():
             if response.status_code == 200:
                 response = response.json()
                 imdb_id = response['ImdbId']
+                ptp_infohash = None
                 for torrent in response['Torrents']:
                     if torrent.get('Id', 0) == str(ptp_torrent_id):
                         ptp_infohash = torrent.get('InfoHash', None)
-                return imdb_id, ptp_infohash
+                return imdb_id, ptp_infohash, None
             elif int(response.status_code) in [400, 401, 403]:
                 console.print(response.text)
-                return None, None
+                return None, None, None
             elif int(response.status_code) == 503:
                 console.print("[bold yellow]PTP Unavailable (503)")
-                return None, None
+                return None, None, None
             else:
-                return None, None
+                return None, None, None
         except Exception:
-            return None, None
+            return None, None, None
 
     async def get_ptp_description(self, ptp_torrent_id, is_disc):
         params = {
@@ -181,7 +182,7 @@ class PTP():
         await asyncio.sleep(1)
         
         ptp_desc = response.text
-        # console.print(f"[yellow]Raw description received:\n{ptp_desc[:500]}...")  # Show first 500 characters for brevity
+        # console.print(f"[yellow]Raw description received:\n{ptp_desc[:3800]}...")  # Show first 500 characters for brevity
         
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
@@ -190,7 +191,7 @@ class PTP():
         console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:500]}...")  # Show first 500 characters for brevity
 
         # Allow user to edit or discard the description
-        console.print("[cyan]Do you want to edit or discard the description?[/cyan]")
+        console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
         edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
 
         if edit_choice.lower() == 'e':
