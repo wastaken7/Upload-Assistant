@@ -198,6 +198,13 @@ class BBCODE:
                 # Remove the [img] tag and its contents from the description
                 desc = re.sub(rf"\[img[^\]]*\]{re.escape(img_url)}\[/img\]", '', desc, flags=re.IGNORECASE)
 
+        # Filter out bot images from imagelist
+        bot_image_urls = [
+            "https://blutopia.xyz/favicon.ico",  # Example bot image URL
+            # Add any other known bot image URLs here
+        ]
+        imagelist = [img for img in imagelist if img['img_url'] not in bot_image_urls]
+
         # Restore spoiler tags
         if spoiler_placeholders:
             for i, spoiler in enumerate(spoiler_placeholders):
