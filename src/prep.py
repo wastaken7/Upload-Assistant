@@ -249,7 +249,7 @@ class Prep():
                     # console.print(f"[yellow]Could not find a matching release on {tracker_name}.[/yellow]")
                     found_match = False
 
-        console.print(f"[cyan]Finished processing tracker: {tracker_name} with found_match: {found_match}[/cyan]")
+        # console.print(f"[cyan]Finished processing tracker: {tracker_name} with found_match: {found_match}[/cyan]")
         return meta, found_match
 
     async def handle_image_list(self, meta, tracker_name):
@@ -2978,7 +2978,7 @@ class Prep():
 
                 if meta.get('ptp', None) is not None and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true" and desc_source in ['PTP', None]:
                     if meta.get('skip_gen_desc', False):
-                        console.print("[cyan]Skipping description generation as PTP description was retained.")
+                        console.print("[cyan]Something went wrong with PTP description.")
                         return meta
                     ptp = PTP(config=self.config)
                     ptp_desc, imagelist = await ptp.get_ptp_description(meta['ptp'], meta['is_disc'])
@@ -3001,6 +3001,7 @@ class Prep():
                     if template_desc.strip() != "":
                         description.write(template_desc)
                         description.write("\n")
+                        console.print(f"[INFO] Description from template '{meta['desc_template']}' used:\n{template_desc}")
 
             if meta['nfo'] is not False:
                 description.write("[code]")
@@ -3009,6 +3010,7 @@ class Prep():
                 description.write("[/code]")
                 description.write("\n")
                 meta['description'] = "CUSTOM"
+                console.print(f"[INFO] Description from NFO file '{nfo}' used:\n{nfo_content}")
 
             if desclink is not None:
                 parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
@@ -3021,17 +3023,20 @@ class Prep():
                 description.write(requests.get(raw).text)
                 description.write("\n")
                 meta['description'] = "CUSTOM"
+                console.print(f"[INFO] Description from link '{desclink}' used:\n{desclink_content}")
 
             if descfile is not None:
                 if os.path.isfile(descfile):
                     text = open(descfile, 'r').read()
                     description.write(text)
                     meta['description'] = "CUSTOM"
+                    console.print(f"[INFO] Description from file '{descfile}' used:\n{text}")
 
             if meta['desc'] is not None:
                 description.write(meta['desc'])
                 description.write("\n")
                 meta['description'] = "CUSTOM"
+                console.print(f"[INFO] Custom description used:\n{meta['desc']}")
 
             description.write("\n")
         return meta
