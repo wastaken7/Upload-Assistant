@@ -205,7 +205,7 @@ class COMMON():
                         description = None
                         console.print("[yellow]Description discarded.[/yellow]")
                     else:
-                        console.print(f"[green]Keeping the original description.[/green]")
+                        console.print("[green]Keeping the original description.[/green]")
                 else:
                     console.print(f"[yellow]No description found for {tracker}.[/yellow]")
             else:
@@ -243,7 +243,7 @@ class COMMON():
                         description = None
                         console.print("[yellow]Description discarded.[/yellow]")
                     else:
-                        console.print(f"[green]Keeping the original description.[/green]")
+                        console.print("[green]Keeping the original description.[/green]")
                 else:
                     console.print(f"[yellow]No description found for {tracker}.[/yellow]")
 

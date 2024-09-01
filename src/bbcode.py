@@ -38,7 +38,7 @@ class BBCODE:
 
     def clean_ptp_description(self, desc, is_disc):
         # console.print(f"[yellow]Cleaning PTP description...")
-        
+
         # Convert Bullet Points to -
         desc = desc.replace("&bull;", "-")
 
@@ -150,7 +150,7 @@ class BBCODE:
         desc = desc.strip('\n')
 
         if desc.replace('\n', '').strip() == '':
-            console.print(f"[yellow]Description is empty after cleaning.")
+            console.print("[yellow]Description is empty after cleaning.")
             return "", imagelist
 
         return desc, imagelist

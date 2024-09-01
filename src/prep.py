@@ -127,13 +127,13 @@ class Prep():
                         if blu_filename:
                             meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
                         found_match = True
-                        console.print(f"[green]BLU data successfully updated in meta[/green]")
+                        console.print("[green]BLU data successfully updated in meta[/green]")
                     else:
                         console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
                 else:
                     console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             else:
-                console.print(f"[yellow]No ID found in meta for BLU, searching by file name[/yellow]")
+                console.print("[yellow]No ID found in meta for BLU, searching by file name[/yellow]")
                 blu_tmdb, blu_imdb, blu_tvdb, blu_mal, blu_desc, blu_category, meta['ext_torrenthash'], blu_imagelist, blu_filename = await COMMON(self.config).unit3d_torrent_info(
                     "BLU",
                     tracker_instance.torrent_url,
@@ -164,7 +164,7 @@ class Prep():
                         if blu_filename:
                             meta['blu_filename'] = blu_filename
                         found_match = True
-                        console.print(f"[green]BLU data successfully updated in meta[/green]")
+                        console.print("[green]BLU data successfully updated in meta[/green]")
                     else:
                         console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
                 else:
@@ -177,7 +177,7 @@ class Prep():
                 # console.print(f"[yellow]No PTP ID in meta, searching by search term[/yellow]")
                 imdb, ptp_torrent_id, meta['ext_torrenthash'] = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder)
                 if ptp_torrent_id:
-                    meta['ptp'] = ptp_torrent_id 
+                    meta['ptp'] = ptp_torrent_id
                     meta['imdb'] = str(imdb).zfill(7) if imdb else None
             else:
                 ptp_torrent_id = meta['ptp']
@@ -201,13 +201,13 @@ class Prep():
                         if meta.get('image_list'):
                             await self.handle_image_list(meta, tracker_name)
                     meta['skip_gen_desc'] = True
-                    console.print(f"[green]PTP description and images added to metadata.[/green]")
+                    console.print("[green]PTP description and images added to metadata.[/green]")
 
                     if await self.prompt_user_for_confirmation("Do you want to keep the description from PTP?"):
                         meta['skip_gen_desc'] = True
                         found_match = True
                     else:
-                        console.print(f"[yellow]Description discarded from PTP[/yellow]")
+                        console.print("[yellow]Description discarded from PTP[/yellow]")
                         meta['skip_gen_desc'] = True
                         meta['description'] = None
             else:
@@ -218,20 +218,20 @@ class Prep():
             if meta.get('hdb') is not None:
                 meta[manual_key] = meta[tracker_key]
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
-                
+
                 # Use get_info_from_torrent_id function if ID is found in meta
                 imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
-                
+
                 meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
                 meta['hdb_name'] = hdb_name
                 found_match = True
-                
+
             else:
-                console.print(f"[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
-                
+                console.print("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
+
                 # Use search_filename function if ID is not found in meta
                 imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder)
-                
+
                 meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
                 meta['hdb_name'] = hdb_name
                 if tracker_id:
