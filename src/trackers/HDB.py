@@ -514,7 +514,7 @@ class HDB():
         url = "https://hdbits.org/api/torrents"
 
         # Handle disc case
-        if search_file_folder == 'folder' and meta.get('is_disc'):  
+        if search_file_folder == 'folder' and meta.get('is_disc'):
             bd_summary_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], 'BD_SUMMARY_00.txt')
             bd_summary = None
 
