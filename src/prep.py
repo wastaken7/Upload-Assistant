@@ -394,31 +394,33 @@ class Prep():
         if search_term:
             # console.print(f"[blue]Starting search with search_term: {search_term}[/blue]")
             default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
-            found_match = False
 
-            if "PTP" in default_trackers:
+            if "PTP" in default_trackers and not found_match:
                 if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
                     # console.print(f"[blue]Searching PTP for: {search_term}[/blue]")
                     ptp = PTP(config=self.config)
                     meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
-                    found_match = found_match or match
-                    # console.print(f"[blue]PTP search complete, found_match: {found_match}[/blue]")
+                    if match:
+                        found_match = True
+                        # console.print(f"[blue]PTP search complete, found_match: {found_match}[/blue]")
 
-            if "HDB" in default_trackers:
+            if "HDB" in default_trackers and not found_match:
                 if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
                     # console.print(f"[blue]Searching HDB for: {search_term}[/blue]")
                     hdb = HDB(config=self.config)
                     meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                    found_match = found_match or match
-                    # console.print(f"[blue]HDB search complete, found_match: {found_match}[/blue]")
+                    if match:
+                        found_match = True
+                        # console.print(f"[blue]HDB search complete, found_match: {found_match}[/blue]")
 
-            if "BLU" in default_trackers:
+            if "BLU" in default_trackers and not found_match:
                 if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                     # console.print(f"[blue]Searching BLU for: {search_term}[/blue]")
                     blu = BLU(config=self.config)
                     meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
-                    found_match = found_match or match
-                    # console.print(f"[blue]BLU search complete, found_match: {found_match}[/blue]")
+                    if match:
+                        found_match = True
+                        # console.print(f"[blue]BLU search complete, found_match: {found_match}[/blue]")
 
             if not found_match:
                 console.print("[yellow]No matches found on any trackers.[/yellow]")
