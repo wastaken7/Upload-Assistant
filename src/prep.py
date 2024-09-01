@@ -122,7 +122,8 @@ class Prep():
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                             if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
                                 meta['image_list'] = blu_imagelist
-                                await self.handle_image_list(meta, tracker_name)
+                                if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                                    await self.handle_image_list(meta, tracker_name)
                         if blu_filename:
                             meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
                         found_match = True
@@ -155,8 +156,11 @@ class Prep():
                             meta['blu_desc'] = blu_desc
                         if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
                             meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
-                        if not meta.get('image_list'):
-                            meta['image_list'] = blu_imagelist
+                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                            if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
+                                meta['image_list'] = blu_imagelist
+                                if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                                    await self.handle_image_list(meta, tracker_name)
                         if blu_filename:
                             meta['blu_filename'] = blu_filename
                         found_match = True
