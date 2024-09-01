@@ -156,16 +156,16 @@ class BBCODE:
         return desc, imagelist
 
     def clean_unit3d_description(self, desc, site):
-        # Unescape html
+        # Unescape HTML
         desc = html.unescape(desc)
-        # End my suffering
+        # Replace carriage returns with newlines
         desc = desc.replace('\r\n', '\n')
 
         # Remove links to site
         site_netloc = urllib.parse.urlparse(site).netloc
         site_regex = rf"(\[url[\=\]]https?:\/\/{site_netloc}/[^\]]+])([^\[]+)(\[\/url\])?"
         site_url_tags = re.findall(site_regex, desc)
-        if site_url_tags != []:
+        if site_url_tags:
             for site_url_tag in site_url_tags:
                 site_url_tag = ''.join(site_url_tag)
                 url_tag_regex = rf"(\[url[\=\]]https?:\/\/{site_netloc}[^\]]+])"
@@ -184,51 +184,50 @@ class BBCODE:
             desc = desc.replace(spoilers[i], f"SPOILER_PLACEHOLDER-{i} ")
             spoiler_placeholders.append(spoilers[i])
 
-        # Get Images from outside spoilers
+        # Get Images from [img] tags and remove them from the description
         imagelist = []
-        url_tags = re.findall(r"\[url=[\s\S]*?\[\/url\]", desc)
-        if url_tags != []:
-            for tag in url_tags:
-                image = re.findall(r"\[img[\s\S]*?\[\/img\]", tag)
-                if len(image) == 1:
-                    image_dict = {}
-                    img_url = image[0].lower().replace('[img]', '').replace('[/img]', '')
-                    image_dict['img_url'] = image_dict['raw_url'] = re.sub(r"\[img[\s\S]*\]", "", img_url)
-                    url_tag = tag.replace(image[0], '')
-                    image_dict['web_url'] = re.match(r"\[url=[\s\S]*?\]", url_tag, flags=re.IGNORECASE)[0].lower().replace('[url=', '')[:-1]
-                    imagelist.append(image_dict)
-                    desc = desc.replace(tag, '')
+        img_tags = re.findall(r"\[img[^\]]*\](.*?)\[/img\]", desc, re.IGNORECASE)
+        if img_tags:
+            for img_url in img_tags:
+                image_dict = {
+                    'img_url': img_url.strip(),
+                    'raw_url': img_url.strip(),
+                    'web_url': img_url.strip(),
+                }
+                imagelist.append(image_dict)
+                # Remove the [img] tag and its contents from the description
+                desc = re.sub(rf"\[img[^\]]*\]{re.escape(img_url)}\[/img\]", '', desc, flags=re.IGNORECASE)
+
+        # Restore spoiler tags
+        if spoiler_placeholders:
+            for i, spoiler in enumerate(spoiler_placeholders):
+                desc = desc.replace(f"SPOILER_PLACEHOLDER-{i} ", spoiler)
+
+        # Check for and clean up empty [center] tags
+        centers = re.findall(r"\[center[\s\S]*?\[\/center\]", desc)
+        if centers:
+            for center in centers:
+                # If [center] contains only whitespace or empty tags, remove the entire tag
+                cleaned_center = re.sub(r'\[center\]\s*\[\/center\]', '', center)
+                cleaned_center = re.sub(r'\[center\]\s+', '[center]', cleaned_center)
+                cleaned_center = re.sub(r'\s*\[\/center\]', '[/center]', cleaned_center)
+                if cleaned_center == '[center][/center]':
+                    desc = desc.replace(center, '')
+                else:
+                    desc = desc.replace(center, cleaned_center.strip())
 
         # Remove bot signatures
         bot_signature_regex = r"\[center\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[b\]Uploaded Using \[url=https:\/\/github\.com\/HDInnovations\/UNIT3D\]UNIT3D\[\/url\] Auto Uploader\[\/b\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[\/center\]"
         desc = re.sub(bot_signature_regex, "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[center\].*Created by L4G's Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
 
-        # Replace spoiler tags
-        if spoiler_placeholders != []:
-            for i, spoiler in enumerate(spoiler_placeholders):
-                desc = desc.replace(f"SPOILER_PLACEHOLDER-{i} ", spoiler)
+        # Ensure no dangling tags and remove extra blank lines
+        desc = re.sub(r'\n\s*\n', '\n', desc)  # Remove multiple consecutive blank lines
+        desc = re.sub(r'\n\n+', '\n\n', desc)  # Ensure no excessive blank lines
+        desc = desc.strip()  # Final cleanup of trailing newlines and spaces
 
-        # Check for empty [center] tags
-        centers = re.findall(r"\[center[\s\S]*?\[\/center\]", desc)
-        if centers != []:
-            for center in centers:
-                full_center = center
-                replace = ['[center]', ' ', '\n', '[/center]']
-                for each in replace:
-                    center = center.replace(each, '')
-                if center == "":
-                    desc = desc.replace(full_center, '')
-
-        # Convert Comparison spoilers to [comparison=]
-        desc = self.convert_collapse_to_comparison(desc, "spoiler", spoilers)
-
-        # Strip blank lines:
-        desc = desc.strip('\n')
-        desc = re.sub("\n\n+", "\n\n", desc)
-        while desc.startswith('\n'):
-            desc = desc.replace('\n', '', 1)
-        desc = desc.strip('\n')
+        # Strip trailing whitespace and newlines:
+        desc = desc.rstrip()
 
         if desc.replace('\n', '') == '':
             return "", imagelist

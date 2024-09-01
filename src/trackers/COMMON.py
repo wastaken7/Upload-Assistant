@@ -149,23 +149,31 @@ class COMMON():
         # Build the params for the API request
         params = {'api_token': self.config['TRACKERS'][tracker].get('api_key', '')}
 
-        # Determine the URL based on whether we're searching by ID or file name
-        if id:
-            url = f"{torrent_url}{id}"
-            console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow]")
-        elif file_name:
+        # Determine the URL based on whether we're searching by file name or ID
+        if file_name:
             url = f"{search_url}?file_name={file_name}"
             console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+        elif id:
+            url = f"{torrent_url}{id}?"
+            console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
             console.print("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, None, None
 
         response = requests.get(url=url, params=params)
+        # console.print(f"Requested URL: {response.url}")
+        # console.print(f"Status Code: {response.status_code}")
 
         try:
-            # console.print(f"[green]Raw response from {tracker}: {response.text}[/green]")
-            response = response.json()
-            data = response.get('data', [])
+            json_response = response.json()
+            # console.print(json_response)
+        except ValueError:
+            # console.print(f"Response Text: {response.text}")
+            return None, None, None, None, None, None, None, None, None
+
+        try:
+            # Handle response when searching by file name (which might return a 'data' array)
+            data = json_response.get('data', [])
             if data:
                 attributes = data[0].get('attributes', {})
 
@@ -178,7 +186,6 @@ class COMMON():
                 imdb = attributes.get('imdb_id')
                 infohash = attributes.get('info_hash')
 
-                # Process the description and imagelist if the description exists
                 if description:
                     bbcode = BBCODE()
                     description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
@@ -186,7 +193,7 @@ class COMMON():
                     console.print(f"[blue]Extracted description: [yellow]{description}")
 
                     # Allow user to edit or discard the description
-                    console.print("[cyan]Do you want to edit or discard the description?[/cyan]")
+                    console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                     edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
 
                     if edit_choice.lower() == 'e':
@@ -202,7 +209,43 @@ class COMMON():
                 else:
                     console.print(f"[yellow]No description found for {tracker}.[/yellow]")
             else:
-                console.print(f"[yellow]No data found in the response for {tracker}.[/yellow]")
+                console.print(f"[yellow]No data found in the response for {tracker} when searching by file name.[/yellow]")
+
+            # Handle response when searching by ID
+            if id and not data:
+                attributes = json_response.get('attributes', {})
+
+                # Extract data from the attributes
+                category = attributes.get('category')
+                description = attributes.get('description')
+                tmdb = attributes.get('tmdb_id')
+                tvdb = attributes.get('tvdb_id')
+                mal = attributes.get('mal_id')
+                imdb = attributes.get('imdb_id')
+                infohash = attributes.get('info_hash')
+
+                if description:
+                    bbcode = BBCODE()
+                    description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
+                    console.print(f"[green]Successfully grabbed description from {tracker}")
+                    console.print(f"[blue]Extracted description: [yellow]{description}")
+
+                    # Allow user to edit or discard the description
+                    console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                    edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
+
+                    if edit_choice.lower() == 'e':
+                        edited_description = click.edit(description)
+                        if edited_description:
+                            description = edited_description.strip()
+                        console.print(f"[green]Final description after editing:[/green] {description}")
+                    elif edit_choice.lower() == 'd':
+                        description = None
+                        console.print("[yellow]Description discarded.[/yellow]")
+                    else:
+                        console.print(f"[green]Keeping the original description.[/green]")
+                else:
+                    console.print(f"[yellow]No description found for {tracker}.[/yellow]")
 
         except Exception as e:
             console.print_exception()
