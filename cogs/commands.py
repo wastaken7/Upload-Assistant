@@ -8,10 +8,10 @@ from src.trackers.AITHER import AITHER
 from src.trackers.STC import STC
 from src.trackers.LCD import LCD
 from src.trackers.CBR import CBR
-from data.config import config
+from data.config import config  # type: ignore
 
-import discord
-from discord.ext import commands
+import discord  # type: ignore
+from discord.ext import commands  # type: ignore
 import os
 from datetime import datetime
 import asyncio

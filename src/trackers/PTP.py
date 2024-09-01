@@ -180,10 +180,10 @@ class PTP():
         console.print(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         response = requests.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
-        
+
         ptp_desc = response.text
         # console.print(f"[yellow]Raw description received:\n{ptp_desc[:3800]}...")  # Show first 500 characters for brevity
-        
+
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
