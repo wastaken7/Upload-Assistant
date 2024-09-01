@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import requests
 import asyncio
-import traceback
 
 from src.trackers.COMMON import COMMON
 from src.console import console

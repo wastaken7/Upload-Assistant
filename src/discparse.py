@@ -105,7 +105,7 @@ class DiscParse():
         bdinfo['subtitles'] = list()
         bdinfo['path'] = path
         lines = bdinfo_input.splitlines()
-        for l in lines:
+        for l in lines:  # noqa E741
             line = l.strip().lower()
             if line.startswith("*"):
                 line = l.replace("*", "").strip().lower()
@@ -115,7 +115,7 @@ class DiscParse():
             if line.startswith("disc size:"):
                 size = l.split(':', 1)[1]
                 size = size.split('bytes', 1)[0].replace(',', '')
-                size = float(size)/float(1 << 30)
+                size = float(size) / float(1 << 30)
                 bdinfo['size'] = size
             if line.startswith("length:"):
                 length = l.split(':', 1)[1]
@@ -153,8 +153,8 @@ class DiscParse():
                 })
             elif line.startswith("audio:"):
                 if "(" in l:
-                    l = l.split("(")[0]
-                l = l.strip()
+                    l = l.split("(")[0]  # noqa E741
+                l = l.strip()  # noqa E741
                 split1 = l.split(':', 1)[1]
                 split2 = split1.split('/')
                 n = 0
@@ -164,7 +164,7 @@ class DiscParse():
                 else:
                     fuckatmos = ""
                 try:
-                    bit_depth = split2[n+5].strip()
+                    bit_depth = split2[n + 5].strip()
                 except Exception:
                     bit_depth = ""
                 bdinfo['audio'].append({

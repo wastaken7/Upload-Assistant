@@ -4,15 +4,12 @@ import requests
 import asyncio
 import re
 import os
-from pathlib import Path
-import traceback
-import json
 import cli_ui
 from str2bool import str2bool
 from unidecode import unidecode
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse
 from src.trackers.COMMON import COMMON
-from src.exceptions import *
+from src.exceptions import *  # noqa #F405
 from src.console import console
 
 
@@ -28,10 +25,9 @@ class TTG():
         self.passan = str(config['TRACKERS']['TTG'].get('login_answer', '')).strip()
         self.uid = str(config['TRACKERS']['TTG'].get('user_id', '')).strip()
         self.passkey = str(config['TRACKERS']['TTG'].get('announce_url', '')).strip().split('/')[-1]
-        
+
         self.signature = None
         self.banned_groups = [""]
-
 
     async def edit_name(self, meta):
         ttg_name = meta['name']
@@ -48,46 +44,45 @@ class TTG():
         if meta['category'] == "MOVIE":
             # 51 = DVDRip
             if meta['resolution'].startswith("720"):
-                type_id = 52 # 720p
+                type_id = 52  # 720p
             if meta['resolution'].startswith("1080"):
-                type_id = 53 # 1080p/i
+                type_id = 53  # 1080p/i
             if meta['is_disc'] == "BDMV":
-                type_id = 54 # Blu-ray disc
-        
+                type_id = 54  # Blu-ray disc
+
         elif meta['category'] == "TV":
             if meta.get('tv_pack', 0) != 1:
                 # TV Singles
                 if meta['resolution'].startswith("720"):
-                    type_id = 69 # 720p TV EU/US
+                    type_id = 69  # 720p TV EU/US
                     if lang in ('ZH', 'CN', 'CMN'):
-                        type_id = 76 # Chinese
+                        type_id = 76  # Chinese
                 if meta['resolution'].startswith("1080"):
-                    type_id = 70 # 1080 TV EU/US
+                    type_id = 70  # 1080 TV EU/US
                     if lang in ('ZH', 'CN', 'CMN'):
-                        type_id = 75 # Chinese
+                        type_id = 75  # Chinese
                 if lang in ('KR', 'KO'):
-                    type_id = 75 # Korean
+                    type_id = 75  # Korean
                 if lang in ('JA', 'JP'):
-                    type_id = 73 # Japanese
+                    type_id = 73  # Japanese
             else:
                 # TV Packs
-                type_id = 87 # EN/US
+                type_id = 87  # EN/US
                 if lang in ('KR', 'KO'):
-                    type_id = 99 # Korean
+                    type_id = 99  # Korean
                 if lang in ('JA', 'JP'):
-                    type_id = 88 # Japanese
+                    type_id = 88  # Japanese
                 if lang in ('ZH', 'CN', 'CMN'):
-                    type_id = 90 # Chinese
-            
-        
+                    type_id = 90  # Chinese
+
         if "documentary" in meta.get("genres", "").lower().replace(' ', '').replace('-', '') or 'documentary' in meta.get("keywords", "").lower().replace(' ', '').replace('-', ''):
             if meta['resolution'].startswith("720"):
-                type_id = 62 # 720p
+                type_id = 62  # 720p
             if meta['resolution'].startswith("1080"):
-                type_id = 63 # 1080
+                type_id = 63  # 1080
             if meta.get('is_disc', '') == 'BDMV':
-                type_id = 64 # BDMV
-        
+                type_id = 64  # BDMV
+
         if "animation" in meta.get("genres", "").lower().replace(' ', '').replace('-', '') or 'animation' in meta.get("keywords", "").lower().replace(' ', '').replace('-', ''):
             if meta.get('sd', 1) == 0:
                 type_id = 58
@@ -104,15 +99,11 @@ class TTG():
         return type_id
 
     async def get_anon(self, anon):
-        if anon == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) == False:
+        if anon == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 'no'
         else:
             anon = 'yes'
         return anon
-
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
-    ###############################################################
 
     async def upload(self, meta):
         common = COMMON(config=self.config)
@@ -121,16 +112,16 @@ class TTG():
         ttg_name = await self.edit_name(meta)
 
         # FORM
-            # type = category dropdown
-            # name = name
-            # descr = description
-            # anonymity = "yes" / "no"
-            # nodistr = "yes" / "no" (exclusive?) not required
-            # imdb_c = tt123456
-            #
+        # type = category dropdown
+        # name = name
+        # descr = description
+        # anonymity = "yes" / "no"
+        # nodistr = "yes" / "no" (exclusive?) not required
+        # imdb_c = tt123456
+        #
         # POST > upload/upload
 
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8')
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8')
@@ -143,21 +134,20 @@ class TTG():
             else:
                 torrentFileName = unidecode(os.path.basename(meta['path']).replace(' ', '.'))
             files = {
-                'file' : (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent"),
-                'nfo' : ("torrent.nfo", mi_dump)
+                'file': (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent"),
+                'nfo': ("torrent.nfo", mi_dump)
             }
             data = {
-                'MAX_FILE_SIZE' : '4000000',
-                'team' : '',
-                'hr' : 'no',
-                'name' : ttg_name,
-                'type' : await self.get_type_id(meta),
-                'descr' : ttg_desc.rstrip(),
-                
+                'MAX_FILE_SIZE': '4000000',
+                'team': '',
+                'hr': 'no',
+                'name': ttg_name,
+                'type': await self.get_type_id(meta),
+                'descr': ttg_desc.rstrip(),
 
-                'anonymity' : await self.get_anon(meta['anon']),
-                'nodistr' : 'no',
-                
+                'anonymity': await self.get_anon(meta['anon']),
+                'nodistr': 'no',
+
             }
             url = "https://totheglory.im/takeupload.php"
             if int(meta['imdb_id'].replace('tt', '')) != 0:
@@ -175,7 +165,7 @@ class TTG():
                     up = session.post(url=url, data=data, files=files)
                     torrentFile.close()
                     mi_dump.close()
-                    
+
                     if up.url.startswith("https://totheglory.im/details.php?id="):
                         console.print(f"[green]Uploaded to: [yellow]{up.url}[/yellow][/green]")
                         id = re.search(r"(id=)(\d+)", urlparse(up.url).query).group(2)
@@ -184,9 +174,8 @@ class TTG():
                         console.print(data)
                         console.print("\n\n")
                         console.print(up.text)
-                        raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
+                        raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
         return
-
 
     async def search_existing(self, meta):
         dupes = []
@@ -194,7 +183,7 @@ class TTG():
             cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
             with open(cookiefile, 'rb') as cf:
                 session.cookies.update(pickle.load(cf))
-            
+
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 imdb = f"imdb{meta['imdb_id'].replace('tt', '')}"
             else:
@@ -218,18 +207,15 @@ class TTG():
 
         return dupes
 
-    
-
-
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
         if not os.path.exists(cookiefile):
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
-        if vcookie != True:
+        if vcookie is not True:
             console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate == True:
+            if recreate is True:
                 if os.path.exists(cookiefile):
                     os.remove(cookiefile)
                 await self.login(cookiefile)
@@ -238,7 +224,7 @@ class TTG():
             else:
                 return False
         return True
-    
+
     async def validate_cookies(self, meta, cookiefile):
         url = "https://totheglory.im"
         if os.path.exists(cookiefile):
@@ -259,7 +245,7 @@ class TTG():
 
     async def login(self, cookiefile):
         url = "https://totheglory.im/takelogin.php"
-        data={
+        data = {
             'username': self.username,
             'password': self.password,
             'passid': self.passid,
@@ -270,11 +256,11 @@ class TTG():
             await asyncio.sleep(0.5)
             if response.url.endswith('2fa.php'):
                 soup = BeautifulSoup(response.text, 'html.parser')
-                auth_token = soup.find('input', {'name' : 'authenticity_token'}).get('value')
+                auth_token = soup.find('input', {'name': 'authenticity_token'}).get('value')
                 two_factor_data = {
-                    'otp' : console.input('[yellow]TTG 2FA Code: '),
-                    'authenticity_token' : auth_token,
-                    'uid' : self.uid
+                    'otp': console.input('[yellow]TTG 2FA Code: '),
+                    'authenticity_token': auth_token,
+                    'uid': self.uid
                 }
                 two_factor_url = "https://totheglory.im/take2fa.php"
                 response = session.post(two_factor_url, data=two_factor_data)
@@ -290,8 +276,6 @@ class TTG():
                 console.print(response.url)
         return
 
-
-
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w') as descfile:
@@ -301,10 +285,10 @@ class TTG():
             if int(meta.get('imdb_id', '0').replace('tt', '')) != 0:
                 ptgen = await common.ptgen(meta)
                 if ptgen.strip() != '':
-                    descfile.write(ptgen)   
+                    descfile.write(ptgen)
 
             # Add This line for all web-dls
-            if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) == None:
+            if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None:
                 descfile.write(f"[center][b][color=#ff00ff][size=3]{meta['service_longname']}的无损REMUX片源，没有转码/This release is sourced from {meta['service_longname']} and is not transcoded, just remuxed from the direct {meta['service_longname']} stream[/size][/color][/b][/center]")
             bbcode = BBCODE()
             if meta.get('discs', []) != []:
@@ -330,14 +314,14 @@ class TTG():
             desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
             descfile.write(desc)
             images = meta['image_list']
-            if len(images) > 0: 
+            if len(images) > 0:
                 descfile.write("[center]")
                 for each in range(len(images[:int(meta['screens'])])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     descfile.write(f"[url={web_url}][img]{img_url}[/img][/url]")
                 descfile.write("[/center]")
-            if self.signature != None:
+            if self.signature is not None:
                 descfile.write("\n\n")
                 descfile.write(self.signature)
             descfile.close()

@@ -4,15 +4,13 @@ from torf import Torrent
 import requests
 import json
 import glob
-from difflib import SequenceMatcher
 import cli_ui
-import base64
 import os
 import re
 import platform
 from unidecode import unidecode
 
-from src.console import console 
+from src.console import console
 
 
 class THR():
@@ -29,19 +27,19 @@ class THR():
         self.password = config['TRACKERS']['THR'].get('password')
         self.banned_groups = [""]
         pass
-    
+
     async def upload(self, session, meta):
         await self.edit_torrent(meta)
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
-        pronfo = await self.edit_desc(meta)
+        pronfo = await self.edit_desc(meta)  # noqa #F841
         thr_name = unidecode(meta['name'].replace('DD+', 'DDP'))
 
         # Confirm the correct naming order for FL
         cli_ui.info(f"THR name: {thr_name}")
-        if meta.get('unattended', False) == False:
+        if meta.get('unattended', False) is False:
             thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
-            if thr_confirm != True:
+            if thr_confirm is not True:
                 thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
                 if thr_name_manually == "":
                     console.print('No proper name given')
@@ -50,7 +48,6 @@ class THR():
                 else:
                     thr_name = thr_name_manually
         torrent_name = re.sub(r"[^0-9a-zA-Z. '\-\[\]]+", " ", thr_name)
-
 
         if meta.get('is_disc', '') == 'BDMV':
             mi_file = None
@@ -65,39 +62,38 @@ class THR():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt", 'r') as f:
             desc = f.read()
             f.close()
-        
+
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]{meta['clean_name']}.torrent")
         with open(torrent_path, 'rb') as f:
             tfile = f.read()
             f.close()
-        
-        #Upload Form
+
+        # Upload Form
         url = 'https://www.torrenthr.org/takeupload.php'
         files = {
-            'tfile' : (f'{torrent_name}.torrent', tfile)
+            'tfile': (f'{torrent_name}.torrent', tfile)
         }
         payload = {
-            'name' : thr_name,
-            'descr' : desc,
-            'type' : cat_id,
-            'url' : f"https://www.imdb.com/title/tt{meta.get('imdb_id').replace('tt', '')}/",
-            'tube' : meta.get('youtube', '')
+            'name': thr_name,
+            'descr': desc,
+            'type': cat_id,
+            'url': f"https://www.imdb.com/title/tt{meta.get('imdb_id').replace('tt', '')}/",
+            'tube': meta.get('youtube', '')
         }
         headers = {
-            'User-Agent' : f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
-        #If pronfo fails, put mediainfo into THR parser
+        # If pronfo fails, put mediainfo into THR parser
         if meta.get('is_disc', '') != 'BDMV':
             files['nfo'] = ("MEDIAINFO.txt", mi_file)
         if subs != []:
             payload['subs[]'] = tuple(subs)
 
-
-        if meta['debug'] == False:
+        if meta['debug'] is False:
             thr_upload_prompt = True
         else:
             thr_upload_prompt = cli_ui.ask_yes_no("send to takeupload.php?", default=False)
-        if thr_upload_prompt == True:
+        if thr_upload_prompt is True:
             await asyncio.sleep(0.5)
             response = session.post(url=url, files=files, data=payload, headers=headers)
             try:
@@ -105,18 +101,16 @@ class THR():
                     console.print(response.text)
                 if response.url.endswith('uploaded=1'):
                     console.print(f'[green]Successfully Uploaded at: {response.url}')
-                #Check if actually uploaded
-            except:
+                # Check if actually uploaded
+            except Exception:
                 if meta['debug']:
                     console.print(response.text)
                 console.print("It may have uploaded, go check")
-                return 
+                return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(payload)
-            
-    
-    
+
     async def get_cat_id(self, meta):
         if meta['category'] == "MOVIE":
             if meta.get('is_disc') == "BMDV":
@@ -133,7 +127,7 @@ class THR():
                 cat = '7'
             else:
                 cat = '34'
-        elif meta.get('anime') != False:
+        elif meta.get('anime') is not False:
             cat = '31'
         return cat
 
@@ -156,18 +150,14 @@ class THR():
         if sub_langs != []:
             subs = []
             sub_lang_map = {
-                'hr' : 1, 'en' : 2, 'bs' : 3, 'sr' : 4, 'sl' : 5,
-                'Croatian' : 1, 'English' : 2, 'Bosnian' : 3, 'Serbian' : 4, 'Slovenian' : 5
+                'hr': 1, 'en': 2, 'bs': 3, 'sr': 4, 'sl': 5,
+                'Croatian': 1, 'English': 2, 'Bosnian': 3, 'Serbian': 4, 'Slovenian': 5
             }
             for sub in sub_langs:
                 language = sub_lang_map.get(sub)
-                if language != None:
+                if language is not None:
                     subs.append(language)
         return subs
-
-
-
-
 
     async def edit_torrent(self, meta):
         if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"):
@@ -175,8 +165,8 @@ class THR():
             THR_torrent.metainfo['announce'] = self.config['TRACKERS']['THR']['announce_url']
             THR_torrent.metainfo['info']['source'] = "[https://www.torrenthr.org] TorrentHR.org"
             Torrent.copy(THR_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]{meta['clean_name']}.torrent", overwrite=True)
-        return 
-        
+        return
+
     async def edit_desc(self, meta):
         pronfo = False
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
@@ -213,11 +203,11 @@ class THR():
             for image in image_glob:
                 url = "https://img2.torrenthr.org/api/1/upload"
                 data = {
-                    'key' : self.config['TRACKERS']['THR'].get('img_api'),
+                    'key': self.config['TRACKERS']['THR'].get('img_api'),
                     # 'source' : base64.b64encode(open(image, "rb").read()).decode('utf8')
                 }
-                files = {'source' : open(image, 'rb')}
-                response = requests.post(url, data = data, files=files)
+                files = {'source': open(image, 'rb')}
+                response = requests.post(url, data=data, files=files)
                 try:
                     response = response.json()
                     # med_url = response['image']['medium']['url']
@@ -239,22 +229,22 @@ class THR():
                 # ProNFO
                 pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['THR'].get('pronfo_api_key', '')}"
                 data = {
-                    'content' : open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r').read(),
-                    'theme' : self.config['TRACKERS']['THR'].get('pronfo_theme', 'gray'),
-                    'rapi' : self.config['TRACKERS']['THR'].get('pronfo_rapi_id')
+                    'content': open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r').read(),
+                    'theme': self.config['TRACKERS']['THR'].get('pronfo_theme', 'gray'),
+                    'rapi': self.config['TRACKERS']['THR'].get('pronfo_rapi_id')
                 }
                 response = requests.post(pronfo_url, data=data)
                 try:
                     response = response.json()
-                    if response.get('error', True) == False:
+                    if response.get('error', True) is False:
                         mi_img = response.get('url')
                         desc.write(f"\n[img]{mi_img}[/img]\n")
                         pronfo = True
-                except:
+                except Exception:
                     console.print('[bold red]Error parsing pronfo response, using THR parser instead')
                     if meta['debug']:
                         console.print(f"[red]{response}")
-                        console.print(response.text) 
+                        console.print(response.text)
 
             for each in image_list[:int(meta['screens'])]:
                 desc.write(f"\n[img]{each}[/img]\n")
@@ -266,9 +256,6 @@ class THR():
             desc.write("\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]Created by L4G's Upload Assistant[/url][/size][/align]")
             desc.close()
         return pronfo
-
-   
-
 
     def search_existing(self, session, imdb_id):
         from bs4 import BeautifulSoup
@@ -288,12 +275,12 @@ class THR():
     def login(self, session):
         url = 'https://www.torrenthr.org/takelogin.php'
         payload = {
-            'username' : self.username,
-            'password' : self.password,
-            'ssl' : 'yes'
+            'username': self.username,
+            'password': self.password,
+            'ssl': 'yes'
         }
         headers = {
-            'User-Agent' : f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
         resp = session.post(url, headers=headers, data=payload)
         if resp.url == "https://www.torrenthr.org/index.php":
