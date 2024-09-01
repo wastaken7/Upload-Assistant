@@ -509,26 +509,49 @@ class HDB():
             console.print("Failed to get info from HDB ID. Either the site is down or your credentials are invalid")
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash
 
-    async def search_filename(self, search_term, search_file_folder):
+    async def search_filename(self, search_term, search_file_folder, meta):
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_id = None
         url = "https://hdbits.org/api/torrents"
 
-        if search_file_folder == 'folder':  # Handling disc case
-            data = {
-                "username": self.username,
-                "passkey": self.passkey,
-                "limit": 100,
-                "folder_in_torrent": os.path.basename(search_term)  # Using folder name for search
-            }
-            console.print(f"[green]Searching HDB for folder: [bold yellow]{os.path.basename(search_term)}[/bold yellow]")
+        # Handle disc case
+        if search_file_folder == 'folder' and meta.get('is_disc'):  
+            bd_summary_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], 'BD_SUMMARY_00.txt')
+            bd_summary = None
+
+            # Parse the BD_SUMMARY_00.txt file to extract the Disc Title
+            try:
+                with open(bd_summary_path, 'r', encoding='utf-8') as file:
+                    for line in file:
+                        if "Disc Title:" in line:
+                            bd_summary = line.split("Disc Title:")[1].strip()
+                            break
+
+                if bd_summary:
+                    data = {
+                        "username": self.username,
+                        "passkey": self.passkey,
+                        "limit": 100,
+                        "search": bd_summary  # Using the Disc Title for search
+                    }
+                    console.print(f"[green]Searching HDB for disc title: [bold yellow]{bd_summary}[/bold yellow]")
+                    console.print(f"[yellow]Using this data: {data}")
+                else:
+                    console.print(f"[red]Error: 'Disc Title' not found in {bd_summary_path}[/red]")
+                    return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+
+            except FileNotFoundError:
+                console.print(f"[red]Error: File not found at {bd_summary_path}[/red]")
+                return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+
         else:  # Handling non-disc case
             data = {
                 "username": self.username,
                 "passkey": self.passkey,
                 "limit": 100,
-                "file_in_torrent": os.path.basename(search_term)  # Using filename for search
+                "file_in_torrent": os.path.basename(search_term)
             }
             console.print(f"[green]Searching HDB for file: [bold yellow]{os.path.basename(search_term)}[/bold yellow]")
+            console.print(f"[yellow]Using this data: {data}")
 
         response = requests.get(url, json=data)
 
@@ -537,21 +560,21 @@ class HDB():
                 response_json = response.json()
                 # console.print(f"[green]HDB API response: {response_json}[/green]")  # Log the entire response for debugging
 
-                # Check if 'data' key is present
                 if 'data' not in response_json:
                     console.print(f"[red]Error: 'data' key not found in HDB API response. Full response: {response_json}[/red]")
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
                 if response_json['data'] != []:
                     for each in response_json['data']:
-                        if search_file_folder == 'folder' or each['numfiles'] == len(search_term):  # Handle folder or filelist match
-                            hdb_imdb = each.get('imdb', {'id': None}).get('id')
-                            hdb_tvdb = each.get('tvdb', {'id': None}).get('id')
-                            hdb_name = each['name']
-                            hdb_torrenthash = each['hash']
-                            hdb_id = each['id']
-                            console.print(f'[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]')
-                            return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                        hdb_imdb = each.get('imdb', {'id': None}).get('id')
+                        hdb_tvdb = each.get('tvdb', {'id': None}).get('id')
+                        hdb_name = each['name']
+                        hdb_torrenthash = each['hash']
+                        hdb_id = each['id']
+                        console.print(f'[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]')
+                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                else:
+                    console.print('[yellow]No data found in the HDB API response[/yellow]')
             except Exception as e:
                 console.print_exception()
                 console.print(f"[red]Failed to parse HDB API response. Error: {str(e)}[/red]")

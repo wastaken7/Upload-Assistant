@@ -224,8 +224,14 @@ class BBCODE:
                     desc = desc.replace(center, cleaned_center.strip())
 
         # Remove bot signatures
-        bot_signature_regex = r"\[center\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[b\]Uploaded Using \[url=https:\/\/github\.com\/HDInnovations\/UNIT3D\]UNIT3D\[\/url\] Auto Uploader\[\/b\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[\/center\]"
-        desc = re.sub(bot_signature_regex, "", desc, flags=re.IGNORECASE)
+        bot_signature_regex = r"""
+            \[center\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[b\]
+            Uploaded\sUsing\s\[url=https:\/\/github\.com\/HDInnovations\/UNIT3D\]UNIT3D\[\/url\]\s
+            Auto\sUploader\[\/b\]\s*\[img=\d+\]https:\/\/blutopia\.xyz\/favicon\.ico\[\/img\]\s*\[\/center\]|
+            \[center\]\s*\[b\]Uploaded\sUsing\s\[url=https:\/\/github\.com\/HDInnovations\/UNIT3D\]UNIT3D\[\/url\]
+            \sAuto\sUploader\[\/b\]\s*\[\/center\]
+        """
+        desc = re.sub(bot_signature_regex, "", desc, flags=re.IGNORECASE | re.VERBOSE)
         desc = re.sub(r"\[center\].*Created by L4G's Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
 
         # Ensure no dangling tags and remove extra blank lines

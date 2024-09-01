@@ -230,7 +230,7 @@ class Prep():
                 console.print("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
 
                 # Use search_filename function if ID is not found in meta
-                imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder)
+                imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
 
                 meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
                 meta['hdb_name'] = hdb_name
@@ -241,7 +241,7 @@ class Prep():
             if found_match:
                 if imdb or tvdb_id or hdb_name:
                     console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
-                    if await self.prompt_user_for_confirmation(f"Do you want to keep the data found on {tracker_name}?"):
+                    if await self.prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
                         console.print(f"[green]{tracker_name} data retained.[/green]")
                     else:
                         console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
@@ -407,15 +407,6 @@ class Prep():
                         found_match = True
                         # console.print(f"[blue]PTP search complete, found_match: {found_match}[/blue]")
 
-            if "HDB" in default_trackers and not found_match:
-                if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
-                    # console.print(f"[blue]Searching HDB for: {search_term}[/blue]")
-                    hdb = HDB(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-                        # console.print(f"[blue]HDB search complete, found_match: {found_match}[/blue]")
-
             if "BLU" in default_trackers and not found_match:
                 if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                     # console.print(f"[blue]Searching BLU for: {search_term}[/blue]")
@@ -424,6 +415,15 @@ class Prep():
                     if match:
                         found_match = True
                         # console.print(f"[blue]BLU search complete, found_match: {found_match}[/blue]")
+
+            if "HDB" in default_trackers and not found_match:
+                if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
+                    # console.print(f"[blue]Searching HDB for: {search_term}[/blue]")
+                    hdb = HDB(config=self.config)
+                    meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
+                    if match:
+                        found_match = True
+                        # console.print(f"[blue]HDB search complete, found_match: {found_match}[/blue]")
 
             if not found_match:
                 console.print("[yellow]No matches found on any trackers.[/yellow]")
