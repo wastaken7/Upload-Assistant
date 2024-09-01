@@ -2,22 +2,18 @@ import requests
 import asyncio
 import re
 import os
-import json
-import glob
 import cli_ui
-import pickle
-from pathlib import Path
 from str2bool import str2bool
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 from pymediainfo import MediaInfo
-
 from src.trackers.COMMON import COMMON
-from src.exceptions import *
+from src.exceptions import *  # noqa F403
 from src.console import console
 
+
 class HDT():
-    
+
     def __init__(self, config):
         self.config = config
         self.tracker = 'HDT'
@@ -26,7 +22,7 @@ class HDT():
         self.password = config['TRACKERS'][self.tracker].get('password', '').strip()
         self.signature = None
         self.banned_groups = [""]
-    
+
     async def get_category_id(self, meta):
         if meta['category'] == 'MOVIE':
             # BDMV
@@ -37,7 +33,7 @@ class HDT():
                 if meta['resolution'] in ('1080p', '1080i'):
                     # 1 = Movie/Blu-Ray
                     cat_id = 1
-            
+
             # REMUX
             if meta.get('type', '') == 'REMUX':
                 if meta.get('uhd', '') == 'UHD' and meta['resolution'] == '2160p':
@@ -46,7 +42,7 @@ class HDT():
                 else:
                     # 2 = Movie/Remux
                     cat_id = 2
-            
+
             # REST OF THE STUFF
             if meta.get('type', '') not in ("DISC", "REMUX"):
                 if meta['resolution'] == '2160p':
@@ -68,7 +64,7 @@ class HDT():
                 if meta['resolution'] in ('1080p', '1080i'):
                     # 59 = TV Show/Blu-ray
                     cat_id = 59
-            
+
             # REMUX
             if meta.get('type', '') == 'REMUX':
                 if meta.get('uhd', '') == 'UHD' and meta['resolution'] == '2160p':
@@ -77,7 +73,7 @@ class HDT():
                 else:
                     # 60 = TV Show/Remux
                     cat_id = 60
-            
+
             # REST OF THE STUFF
             if meta.get('type', '') not in ("DISC", "REMUX"):
                 if meta['resolution'] == '2160p':
@@ -89,11 +85,8 @@ class HDT():
                 elif meta['resolution'] == '720p':
                     # 38 = TV Show/720p
                     cat_id = 38
-        
+
         return cat_id
-        
-
-
 
     async def edit_name(self, meta):
         hdt_name = meta['name']
@@ -103,14 +96,14 @@ class HDT():
             hdt_name = hdt_name.replace(meta['audio'], meta['audio'].replace(' ', '', 1))
         if 'DV' in meta.get('hdr', ''):
             hdt_name = hdt_name.replace(' DV ', ' DoVi ')
-        
+
         hdt_name = ' '.join(hdt_name.split())
         hdt_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", hdt_name)
         hdt_name = hdt_name.replace(':', '').replace('..', ' ').replace('  ', ' ')
         return hdt_name
 
     ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
+    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######  # noqa E266
     ###############################################################
 
     async def upload(self, meta):
@@ -122,9 +115,9 @@ class HDT():
 
         # Confirm the correct naming order for HDT
         cli_ui.info(f"HDT name: {hdt_name}")
-        if meta.get('unattended', False) == False:
+        if meta.get('unattended', False) is False:
             hdt_confirm = cli_ui.ask_yes_no("Correct?", default=False)
-            if hdt_confirm != True:
+            if hdt_confirm is not True:
                 hdt_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
                 if hdt_name_manually == "":
                     console.print('No proper name given')
@@ -132,7 +125,7 @@ class HDT():
                     return
                 else:
                     hdt_name = hdt_name_manually
-        
+
         # Upload
         hdt_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', newline='').read()
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
@@ -140,18 +133,18 @@ class HDT():
         with open(torrent_path, 'rb') as torrentFile:
             torrentFileName = unidecode(hdt_name)
             files = {
-                'torrent' : (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
+                'torrent': (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
             }
             data = {
-                'filename' : hdt_name,
-                'category' : cat_id,
-                'info' : hdt_desc.strip()
+                'filename': hdt_name,
+                'category': cat_id,
+                'info': hdt_desc.strip()
             }
 
             # 3D
             if "3D" in meta.get('3d', ''):
                 data['3d'] = 'true'
-            
+
             # HDR
             if "HDR" in meta.get('hdr', ''):
                 if "HDR10+" in meta['hdr']:
@@ -161,19 +154,19 @@ class HDT():
                     data['HDR10'] = 'true'
             if "DV" in meta.get('hdr', ''):
                 data['DolbyVision'] = 'true'
-            
+
             # IMDB
             if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
                 data['infosite'] = f"https://www.imdb.com/title/tt{meta['imdb_id']}/"
-            
+
             # Full Season Pack
             if int(meta.get('tv_pack', '0')) != 0:
                 data['season'] = 'true'
             else:
                 data['season'] = 'false'
-            
+
             # Anonymous check
-            if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) == False:
+            if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
                 data['anonymous'] = 'false'
             else:
                 data['anonymous'] = 'true'
@@ -200,35 +193,34 @@ class HDT():
                         console.print(data)
                         console.print("\n\n")
                         console.print(up.text)
-                        raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
+                        raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
-    
-    
+
     async def search_existing(self, meta):
         dupes = []
         with requests.Session() as session:
             common = COMMON(config=self.config)
             cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
             session.cookies.update(await common.parseCookieFile(cookiefile))
-            
-            search_url = f"https://hd-torrents.org/torrents.php"
+
+            search_url = "https://hd-torrents.org/torrents.php"
             csrfToken = await self.get_csrfToken(session, search_url)
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
-                    'csrfToken' : csrfToken,
-                    'search' : meta['imdb_id'],
-                    'active' : '0',
-                    'options' : '2',
-                    'category[]' : await self.get_category_id(meta)
+                    'csrfToken': csrfToken,
+                    'search': meta['imdb_id'],
+                    'active': '0',
+                    'options': '2',
+                    'category[]': await self.get_category_id(meta)
                 }
             else:
                 params = {
-                    'csrfToken' : csrfToken,
-                    'search' : meta['title'],
-                    'category[]' : await self.get_category_id(meta),
-                    'options' : '3'
+                    'csrfToken': csrfToken,
+                    'search': meta['title'],
+                    'category[]': await self.get_category_id(meta),
+                    'options': '3'
                 }
-            
+
             r = session.get(search_url, params=params)
             await asyncio.sleep(0.5)
             soup = BeautifulSoup(r.text, 'html.parser')
@@ -236,19 +228,17 @@ class HDT():
             for each in find:
                 if each['href'].startswith('details.php?id='):
                     dupes.append(each.text)
-        
+
         return dupes
 
-    
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
         vcookie = await self.validate_cookies(meta, cookiefile)
-        if vcookie != True:
+        if vcookie is not True:
             console.print('[red]Failed to validate cookies. Please confirm that the site is up or export a fresh cookie file from the site')
             return False
         return True
-    
-    
+
     async def validate_cookies(self, meta, cookiefile):
         common = COMMON(config=self.config)
         url = "https://hd-torrents.org/index.php"
@@ -267,10 +257,8 @@ class HDT():
                     return False
         else:
             return False
-        
 
-        
-    """ 
+    """
     Old login method, disabled because of site's DDOS protection. Better to use exported cookies.
 
 
@@ -299,14 +287,13 @@ class HDT():
         return
     """
 
-    
     async def get_csrfToken(self, session, url):
         r = session.get(url)
         await asyncio.sleep(0.5)
         soup = BeautifulSoup(r.text, 'html.parser')
-        csrfToken = soup.find('input', {'name' : 'csrfToken'}).get('value')
+        csrfToken = soup.find('input', {'name': 'csrfToken'}).get('value')
         return csrfToken
-    
+
     async def edit_desc(self, meta):
         # base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', newline='') as descfile:
@@ -315,18 +302,18 @@ class HDT():
                 video = meta['filelist'][0]
                 mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
                 if os.path.exists(mi_template):
-                    media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform" : f"file://{mi_template}"})
+                    media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
                     descfile.write(f"""[left][font=consolas]\n{media_info}\n[/font][/left]\n""")
                 else:
                     console.print("[bold red]Couldn't find the MediaInfo template")
                     console.print("[green]Using normal MediaInfo for the description.")
-                    
+
                     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8') as MI:
                         descfile.write(f"""[left][font=consolas]\n{MI.read()}\n[/font][/left]\n\n""")
             else:
                 with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8') as BD_SUMMARY:
                     descfile.write(f"""[left][font=consolas]\n{BD_SUMMARY.read()}\n[/font][/left]\n\n""")
-            
+
             # Add Screenshots
             images = meta['image_list']
             if len(images) > 0:
@@ -336,4 +323,3 @@ class HDT():
                     descfile.write(f'<a href="{raw_url}"><img src="{img_url}" height=137></a> ')
 
             descfile.close()
-

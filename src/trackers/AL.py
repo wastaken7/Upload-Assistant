@@ -9,7 +9,7 @@ from src.trackers.COMMON import COMMON
 from src.console import console
 
 
-class RF():
+class AL():
     """
     Edit for Tracker:
         Edit BASE.torrent with announce and source
@@ -20,28 +20,70 @@ class RF():
 
     def __init__(self, config):
         self.config = config
-        self.tracker = 'RF'
-        self.source_flag = 'ReelFliX'
-        self.upload_url = 'https://reelflix.xyz/api/torrents/upload'
-        self.search_url = 'https://reelflix.xyz/api/torrents/filter'
-        self.forum_link = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
+        self.tracker = 'AL'
+        self.source_flag = 'AnimeLovers'
+        self.upload_url = 'https://animelovers.club/api/torrents/upload'
+        self.search_url = 'https://animelovers.club/api/torrents/filter'
+        self.signature = None
         self.banned_groups = [""]
         pass
+
+    async def get_cat_id(self, category_name):
+        category_id = {
+            'MOVIE': '1',
+            'TV': '2',
+        }.get(category_name, '1')
+        return category_id
+
+    async def get_type_id(self, type):
+        type_id = {
+            'BDMV': '1',
+            'DISC': '1',
+            'REMUX': '2',
+            'ENCODE': '3',
+            'WEBDL': '4',
+            'WEBRIP': '5',
+            'HDTV': '6',
+            'DVDISO': '7',
+            'DVDRIP': '8',
+            'RAW': '9',
+            'BDRIP': '10',
+            'COLOR': '11',
+            'MONO': '12'
+        }.get(type, '1')
+        return type_id
+
+    async def get_res_id(self, resolution):
+        resolution_id = {
+            '8640p': '10',
+            '4320p': '1',
+            '2160p': '2',
+            '1440p': '3',
+            '1080p': '3',
+            '1080i': '4',
+            '720p': '5',
+            '576p': '6',
+            '576i': '7',
+            '480p': '8',
+            '480i': '9'
+        }.get(resolution, '10')
+        return resolution_id
 
     async def upload(self, meta):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
-        region_id = await common.unit3d_region_ids(meta.get('region'))
-        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        stt_name = await self.edit_name(meta)
+        region_id = await common.unit3d_region_ids(meta.get('region'))
+        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        name = await self.edit_name(meta)
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
             anon = 1
+
         if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
@@ -52,7 +94,7 @@ class RF():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name': stt_name,
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -84,14 +126,16 @@ class RF():
             data['region_id'] = region_id
         if distributor_id != 0:
             data['distributor_id'] = distributor_id
+        if meta.get('category') == "TV":
+            data['season_number'] = meta.get('season_int', '0')
+            data['episode_number'] = meta.get('episode_int', '0')
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
-        if meta.get('category') == "TV":
-            console.print('[bold red]This site only ALLOWS Movies.')
+
         if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
@@ -104,44 +148,6 @@ class RF():
             console.print(data)
         open_torrent.close()
 
-    async def edit_name(self, meta):
-        stt_name = meta['name']
-        return stt_name
-
-    async def get_cat_id(self, category_name):
-        category_id = {
-            'MOVIE': '1',
-        }.get(category_name, '0')
-        return category_id
-
-    async def get_type_id(self, type):
-        type_id = {
-            'DISC': '43',
-            'REMUX': '40',
-            'WEBDL': '42',
-            'WEBRIP': '45',
-            # 'FANRES': '6',
-            'ENCODE': '41',
-            'HDTV': '35',
-        }.get(type, '0')
-        return type_id
-
-    async def get_res_id(self, resolution):
-        resolution_id = {
-            # '8640p':'10',
-            '4320p': '1',
-            '2160p': '2',
-            # '1440p' : '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
-        }.get(resolution, '10')
-        return resolution_id
-
     async def search_existing(self, meta):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
@@ -153,11 +159,8 @@ class RF():
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }
-        if meta['category'] == 'TV':
-            console.print('[bold red]Unable to search site for TV as this site only ALLOWS Movies')
-        #     params['name'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
         if meta.get('edition', "") != "":
-            params['name'] = params['name'] + meta['edition']
+            params['name'] = params['name'] + f" {meta['edition']}"
         try:
             response = requests.get(url=self.search_url, params=params)
             response = response.json()
@@ -171,3 +174,8 @@ class RF():
             await asyncio.sleep(5)
 
         return dupes
+
+    # Got this from CBR and changed the encoding rename
+    async def edit_name(self, meta):
+        name = meta['uuid'].replace('.mkv', '').replace('.mp4', '').replace(".", " ").replace("DDP2 0", "DDP2.0").replace("DDP5 1", "DDP5.1").replace("H 264", "x264").replace("H 265", "x265").replace("DD+7 1", "DDP7.1").replace("AAC2 0", "AAC2.0").replace('DD5 1', 'DD5.1').replace('DD2 0', 'DD2.0').replace('TrueHD 7 1', 'TrueHD 7.1').replace('DTS-HD MA 7 1', 'DTS-HD MA 7.1').replace('DTS-HD MA 5 1', 'DTS-HD MA 5.1').replace("TrueHD 5 1", "TrueHD 5.1").replace("DTS-X 7 1", "DTS-X 7.1").replace("DTS-X 5 1", "DTS-X 5.1").replace("FLAC 2 0", "FLAC 2.0").replace("FLAC 2 0", "FLAC 2.0").replace("FLAC 5 1", "FLAC 5.1").replace("DD1 0", "DD1.0").replace("DTS ES 5 1", "DTS ES 5.1").replace("DTS5 1", "DTS 5.1").replace("AAC1 0", "AAC1.0").replace("DD+5 1", "DDP5.1").replace("DD+2 0", "DDP2.0").replace("DD+1 0", "DDP1.0")
+        return name

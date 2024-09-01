@@ -3,7 +3,6 @@ import argparse
 import urllib.parse
 import os
 import datetime
-import traceback
 
 from src.console import console
 
@@ -15,9 +14,7 @@ class Args():
     def __init__(self, config):
         self.config = config
         pass
-    
 
-     
     def parse(self, args, meta):
         input = args
         parser = argparse.ArgumentParser()
@@ -63,7 +60,7 @@ class Args():
         parser.add_argument('-webdv', '--webdv', action='store_true', required=False, help="Contains a Dolby Vision layer converted using dovi_tool")
         parser.add_argument('-hc', '--hardcoded-subs', action='store_true', required=False, help="Contains hardcoded subs", dest="hardcoded-subs")
         parser.add_argument('-pr', '--personalrelease', action='store_true', required=False, help="Personal Release")
-        parser.add_argument('-sdc','--skip-dupe-check', action='store_true', required=False, help="Pass if you know this is a dupe (Skips dupe check)", dest="dupe")
+        parser.add_argument('-sdc', '--skip-dupe-check', action='store_true', required=False, help="Pass if you know this is a dupe (Skips dupe check)", dest="dupe")
         parser.add_argument('-debug', '--debug', action='store_true', required=False, help="Debug Mode, will run through all the motions providing extra info, but will not upload to trackers.")
         parser.add_argument('-ffdebug', '--ffdebug', action='store_true', required=False, help="Will show info from ffmpeg while taking screenshots.")
         parser.add_argument('-m', '--manual', action='store_true', required=False, help="Manual Mode. Returns link to ddl screens/base.torrent")
@@ -71,7 +68,7 @@ class Args():
         parser.add_argument('-rh', '--rehash', action='store_true', required=False, help="DO hash .torrent")
         parser.add_argument('-ps', '--piece-size-max', dest='piece_size_max', nargs='*', required=False, help="Maximum piece size in MiB", choices=[1, 2, 4, 8, 16], type=int)
         parser.add_argument('-dr', '--draft', action='store_true', required=False, help="Send to drafts (BHD)")
-        parser.add_argument('-tc', '--torrent-creation', dest='torrent_creation', nargs='*', required=False, help="What tool should be used to create the base .torrent", choices=['torf', 'torrenttools', 'mktorrent'])
+        parser.add_argument('-mps', '--max-piece-size', nargs='*', required=False, help="Set max piece size allowed in MiB for default torrent creation (default 64 MiB)", choices=['2', '4', '8', '16', '32', '64', '128'])
         parser.add_argument('-client', '--client', nargs='*', required=False, help="Use this torrent client instead of default")
         parser.add_argument('-qbt', '--qbit-tag', dest='qbit_tag', nargs='*', required=False, help="Add to qbit with this tag")
         parser.add_argument('-qbc', '--qbit-cat', dest='qbit_cat', nargs='*', required=False, help="Add to qbit with this category")
@@ -81,7 +78,6 @@ class Args():
         parser.add_argument('-ua', '--unattended', action='store_true', required=False, help=argparse.SUPPRESS)
         parser.add_argument('-vs', '--vapoursynth', action='store_true', required=False, help="Use vapoursynth for screens (requires vs install)")
         parser.add_argument('-cleanup', '--cleanup', action='store_true', required=False, help="Clean up tmp directory")
-
         parser.add_argument('-fl', '--freeleech', nargs='*', required=False, help="Freeleech Percentage", default=0, dest="freeleech")
         args, before_args = parser.parse_known_args(input)
         args = vars(args)
@@ -95,8 +91,8 @@ class Args():
                             break
                     else:
                         break
-        
-        if meta.get('tmdb_manual') != None or meta.get('imdb') != None:
+
+        if meta.get('tmdb_manual') is not None or meta.get('imdb') is not None:
             meta['tmdb_manual'] = meta['imdb'] = None
         for key in args:
             value = args.get(key)
@@ -104,7 +100,7 @@ class Args():
                 if isinstance(value, list):
                     value2 = self.list_to_string(value)
                     if key == 'type':
-                        meta[key] = value2.upper().replace('-','')
+                        meta[key] = value2.upper().replace('-', '')
                     elif key == 'tag':
                         meta[key] = f"-{value2}"
                     elif key == 'screens':
@@ -122,7 +118,7 @@ class Args():
                             parsed = urllib.parse.urlparse(value2)
                             try:
                                 meta['ptp'] = urllib.parse.parse_qs(parsed.query)['torrentid'][0]
-                            except:
+                            except Exception:
                                 console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
                                 console.print('[red]Continuing without -ptp')
                         else:
@@ -135,7 +131,7 @@ class Args():
                                 if blupath.endswith('/'):
                                     blupath = blupath[:-1]
                                 meta['blu'] = blupath.split('/')[-1]
-                            except:
+                            except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --blu')
                         else:
@@ -145,7 +141,7 @@ class Args():
                             parsed = urllib.parse.urlparse(value2)
                             try:
                                 meta['hdb'] = urllib.parse.parse_qs(parsed.query)['id'][0]
-                            except:
+                            except Exception:
                                 console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
                                 console.print('[red]Continuing without -hdb')
                         else:
@@ -169,16 +165,14 @@ class Args():
                 # parser.print_help()
         return meta, parser, before_args
 
-
     def list_to_string(self, list):
         if len(list) == 1:
             return str(list[0])
         try:
             result = " ".join(list)
-        except:
+        except Exception:
             result = "None"
         return result
-
 
     def parse_tmdb_id(self, id, category):
         id = id.lower().lstrip()
@@ -191,18 +185,3 @@ class Args():
         else:
             id = id
         return category, id
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

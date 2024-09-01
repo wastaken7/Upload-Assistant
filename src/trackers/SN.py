@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import requests
 import asyncio
-import traceback
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -15,7 +14,6 @@ class SN():
         Set type/category IDs
         Upload
     """
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'SN'
@@ -31,7 +29,7 @@ class SN():
             'BluRay': '3',
             'Web': '1',
             # boxset is 4
-            #'NA': '4',
+            # 'NA': '4',
             'DVD': '2'
         }.get(type, '0')
         return type_id
@@ -39,11 +37,11 @@ class SN():
     async def upload(self, meta):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        #await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
+        # await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
         await self.edit_desc(meta)
         cat_id = ""
         sub_cat_id = ""
-        #cat_id = await self.get_cat_id(meta)
+        # cat_id = await self.get_cat_id(meta)
         if meta['category'] == 'MOVIE':
             cat_id = 1
             # sub cat is source so using source to get
@@ -56,8 +54,7 @@ class SN():
                 sub_cat_id = 5
             # todo need to do a check for docs and add as subcat
 
-
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
@@ -90,7 +87,7 @@ class SN():
 
         }
 
-        if meta['debug'] == False:
+        if meta['debug'] is False:
             response = requests.request("POST", url=self.upload_url, data=data, files=files)
 
             try:
@@ -99,15 +96,14 @@ class SN():
                 else:
                     console.print("[red]Did not upload successfully")
                     console.print(response.json())
-            except:
+            except Exception:
                 console.print("[red]Error! It may have uploaded, go check")
                 console.print(data)
                 console.print_exception()
                 return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(data)
-
 
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
@@ -125,13 +121,12 @@ class SN():
             desc.close()
         return
 
-
     async def search_existing(self, meta):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
 
         params = {
-            'api_key' : self.config['TRACKERS'][self.tracker]['api_key'].strip()
+            'api_key': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
 
         # using title if IMDB id does not exist to search
@@ -141,7 +136,7 @@ class SN():
             else:
                 params['filter'] = meta['title']
         else:
-            #using IMDB_id to search if it exists.
+            # using IMDB_id to search if it exists.
             if meta['category'] == 'TV':
                 params['media_ref'] = f"tt{meta['imdb_id']}"
                 params['filter'] = f"{meta.get('season', '')}{meta.get('episode', '')}" + " " + meta['resolution']
@@ -155,7 +150,7 @@ class SN():
             for i in response['data']:
                 result = i['name']
                 dupes.append(result)
-        except:
+        except Exception:
             console.print('[red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
             await asyncio.sleep(5)
 

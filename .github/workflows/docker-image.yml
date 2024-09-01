@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - develop
-      - qbit-torrent-check
+      - ID-and-Description
 
 env:
   REGISTRY: ghcr.io

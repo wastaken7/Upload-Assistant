@@ -35,13 +35,13 @@ class TL():
         self.upload_url = 'https://www.torrentleech.org/torrents/upload/apiupload'
         self.signature = None
         self.banned_groups = [""]
-        
+
         self.announce_key = self.config['TRACKERS'][self.tracker]['announce_key']
         self.config['TRACKERS'][self.tracker]['announce_url'] = f"https://tracker.torrentleech.org/a/{self.announce_key}/announce"
         pass
-    
+
     async def get_cat_id(self, common, meta):
-        if meta.get('anime', 0): 
+        if meta.get('anime', 0):
             return self.CATEGORIES['Anime']
 
         if meta['category'] == 'MOVIE':
@@ -64,7 +64,7 @@ class TL():
             elif meta['type'] == 'HDTV':
                 return self.CATEGORIES['MovieHdRip']
         elif meta['category'] == 'TV':
-            if meta['original_language'] != 'en': 
+            if meta['original_language'] != 'en':
                 return self.CATEGORIES['TvForeign']
             elif meta.get('tv_pack', 0):
                 return self.CATEGORIES['TvBoxsets']
@@ -82,13 +82,13 @@ class TL():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
 
         open_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'a+')
-        
-        info_filename = 'BD_SUMMARY_00' if meta['bdinfo'] != None else 'MEDIAINFO_CLEANPATH'
+
+        info_filename = 'BD_SUMMARY_00' if meta['bdinfo'] is not None else 'MEDIAINFO_CLEANPATH'
         open_info = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/{info_filename}.txt", 'r', encoding='utf-8')
         open_desc.write('\n\n')
         open_desc.write(open_info.read())
         open_info.close()
-        
+
         open_desc.seek(0)
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
         files = {
@@ -96,19 +96,19 @@ class TL():
             'torrent': (self.get_name(meta) + '.torrent', open_torrent)
         }
         data = {
-            'announcekey' : self.announce_key,
-            'category' : cat_id
+            'announcekey': self.announce_key,
+            'category': cat_id
         }
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
-        
-        if meta['debug'] == False:
+
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers)
             if not response.text.isnumeric():
                 console.print(f'[red]{response.text}')
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
         open_desc.close()

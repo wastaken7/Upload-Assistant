@@ -1,20 +1,17 @@
 import asyncio
 import datetime
-import json
 import logging
-import configparser
 from pathlib import Path
 
 import discord
 from discord.ext import commands
 
 
-
-
 def config_load():
     # Python Config
     from data.config import config
     return config
+
 
 async def run():
     """
@@ -75,7 +72,6 @@ class Bot(commands.Bot):
                 error = f'{extension}\n {type(e).__name__} : {e}'
                 print(f'failed to load extension {error}')
             print('-' * 10)
-        
 
     async def on_ready(self):
         """
@@ -100,10 +96,6 @@ class Bot(commands.Bot):
         if message.author.bot:
             return  # ignore all bots
         await self.process_commands(message)
-
-
-    
-    
 
 
 if __name__ == '__main__':

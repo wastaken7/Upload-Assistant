@@ -2,9 +2,7 @@
 # import discord
 import asyncio
 import requests
-import os
-from guessit import guessit 
-from str2bool import str2bool
+from guessit import guessit
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -18,13 +16,6 @@ class NBL():
         Set type/category IDs
         Upload
     """
-
-    ###############################################################
-    ########                    EDIT ME                    ########
-    ###############################################################
-
-    # ALSO EDIT CLASS NAME ABOVE
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'NBL'
@@ -38,9 +29,8 @@ class NBL():
                               'PlaySD', 'playXD', 'project-gxs', 'PSA', 'QaS', 'Ranger', 'RAPiDCOWS', 'Raze', 'Reaktor', 'REsuRRecTioN', 'RMTeam', 'ROBOTS',
                               'SpaceFish', 'SPASM', 'SSA', 'Telly', 'Tenrai-Sensei', 'TM', 'Trix', 'URANiME', 'VipapkStudios', 'ViSiON', 'Wardevil', 'xRed',
                               'XS', 'YakuboEncodes', 'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT']
-       
+
         pass
-    
 
     async def get_cat_id(self, meta):
         if meta.get('tv_pack', 0) == 1:
@@ -49,9 +39,6 @@ class NBL():
             cat_id = 1
         return cat_id
 
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
-    ###############################################################
     async def edit_desc(self, meta):
         # Leave this in so manual works
         return
@@ -63,21 +50,21 @@ class NBL():
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
 
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()[:-65].strip()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
         files = {'file_input': open_torrent}
         data = {
-            'api_key' : self.api_key,
-            'tvmazeid' : int(meta.get('tvmaze_id', 0)),
-            'mediainfo' : mi_dump,
-            'category' : await self.get_cat_id(meta),
-            'ignoredupes' : 'on'
+            'api_key': self.api_key,
+            'tvmazeid': int(meta.get('tvmaze_id', 0)),
+            'mediainfo': mi_dump,
+            'category': await self.get_cat_id(meta),
+            'ignoredupes': 'on'
         }
-        
-        if meta['debug'] == False:
+
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data)
             try:
                 if response.ok:
@@ -86,34 +73,30 @@ class NBL():
                 else:
                     console.print(response)
                     console.print(response.text)
-            except:
+            except Exception:
                 console.print_exception()
                 console.print("[bold yellow]It may have uploaded, go check")
-                return 
+                return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
-
-
-   
-
 
     async def search_existing(self, meta):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         if int(meta.get('tvmaze_id', 0)) != 0:
-            search_term = {'tvmaze' : int(meta['tvmaze_id'])}
+            search_term = {'tvmaze': int(meta['tvmaze_id'])}
         elif int(meta.get('imdb_id', '0').replace('tt', '')) == 0:
-            search_term = {'imdb' : meta.get('imdb_id', '0').replace('tt', '')}
+            search_term = {'imdb': meta.get('imdb_id', '0').replace('tt', '')}
         else:
-            search_term = {'series' : meta['title']}
+            search_term = {'series': meta['title']}
         json = {
-            'jsonrpc' : '2.0',
-            'id' : 1,
-            'method' : 'getTorrents',
-            'params' : [
-                self.api_key, 
+            'jsonrpc': '2.0',
+            'id': 1,
+            'method': 'getTorrents',
+            'params': [
+                self.api_key,
                 search_term
             ]
         }

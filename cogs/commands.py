@@ -1,4 +1,3 @@
-from discord.ext.commands.errors import CommandInvokeError
 from src.prep import Prep
 from src.args import Args
 from src.clients import Clients
@@ -9,26 +8,23 @@ from src.trackers.AITHER import AITHER
 from src.trackers.STC import STC
 from src.trackers.LCD import LCD
 from src.trackers.CBR import CBR
-from data.config import config
+from data.config import config  # type: ignore
 
-import discord
-from discord.ext import commands
+import discord  # type: ignore
+from discord.ext import commands  # type: ignore
 import os
 from datetime import datetime
 import asyncio
 import json
-import shutil
 import multiprocessing
 from pathlib import Path
 from glob import glob
 import argparse
 
 
-
 class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -46,7 +42,7 @@ class Commands(commands.Cog):
             return
 
         parser = Args(config)
-        if path == None:
+        if path is None:
             await ctx.send("Missing Path")
             return
         elif path.lower() == "-h":
@@ -61,17 +57,17 @@ class Commands(commands.Cog):
             try:
                 args = (meta['path'],) + args + search_args
                 meta, help, before_args = parser.parse(args, meta)
-            except SystemExit as error:
+            except SystemExit:
                 await ctx.send(f"Invalid argument detected, use `{config['DISCORD']['command_prefix']}args` for list of valid args")
                 return
-            if meta['imghost'] == None:
+            if meta['imghost'] is None:
                 meta['imghost'] = config['DEFAULT']['img_host_1']
             # if not meta['unattended']:
             #     ua = config['DEFAULT'].get('auto_mode', False)
             #     if str(ua).lower() == "true":
             #         meta['unattended'] = True
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
-            preparing_embed = discord.Embed(title=f"Preparing to upload:", description=f"```{path}```", color=0xffff00)
+            preparing_embed = discord.Embed(title="Preparing to upload:", description=f"```{path}```", color=0xffff00)
             if message_id == 0:
                 message = await ctx.send(embed=preparing_embed)
                 meta['embed_msg_id'] = message.id
@@ -86,7 +82,6 @@ class Commands(commands.Cog):
             await self.send_embed_and_upload(ctx, meta)
         else:
             await ctx.send("Invalid Path")
-
 
     @commands.command()
     async def args(self, ctx):
@@ -103,57 +98,7 @@ class Commands(commands.Cog):
             await ctx.send(f"```{help[1991:]}```")
         else:
             await ctx.send(help.format_help())
-        # await ctx.send("""
-        # ```Optional arguments:
-    
-        #     -s, --screens [SCREENS]
-        #                         Number of screenshots
-        #     -c, --category [{movie,tv,fanres}]
-        #                         Category
-        #     -t, --type [{disc,remux,encode,webdl,web-dl,webrip,hdtv}]
-        #                         Type
-        #     -res, --resolution 
-        #             [{2160p,1080p,1080i,720p,576p,576i,480p,480i,8640p,4320p,other}]
-        #                         Resolution
-        #     -tmdb, --tmdb [TMDB]
-        #                         TMDb ID
-        #     -g, --tag [TAG]
-        #                         Group Tag
-        #     -serv, --service [SERVICE]
-        #                         Streaming Service
-        #     -edition, --edition [EDITION]
-        #                         Edition
-        #     -d, --desc [DESC]
-        #                         Custom Description (string)
-        #     -nfo, --nfo           
-        #                         Use .nfo in directory for description
-        #     -k, --keywords [KEYWORDS]
-        #                         Add comma seperated keywords e.g. 'keyword, keyword2, etc'
-        #     -reg, --region [REGION]
-        #                         Region for discs
-        #     -a, --anon          Upload anonymously
-        #     -st, --stream       Stream Optimized Upload
-        #     -debug, --debug     Debug Mode```""")
 
-
-    # @commands.group(invoke_without_command=True)
-    # async def foo(self, ctx):
-        # """
-        # check out my subcommands!
-        # """
-        # await ctx.send('check out my subcommands!')
-    
-    # @foo.command(aliases=['an_alias'])
-    # async def bar(self, ctx):
-    #     """
-    #     I have an alias!, I also belong to command 'foo'
-    #     """
-    #     await ctx.send('foo bar!')
-
-  
-
-    
-    
     @commands.command()
     async def edit(self, ctx, uuid=None, *args):
         """
@@ -161,7 +106,7 @@ class Commands(commands.Cog):
         """
         if ctx.channel.id != int(config['DISCORD']['discord_channel_id']):
             return
-        if uuid == None:
+        if uuid is None:
             await ctx.send("Missing ID, please try again using the ID in the footer")
         parser = Args(config)
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
@@ -172,7 +117,7 @@ class Commands(commands.Cog):
         except FileNotFoundError:
             await ctx.send("ID not found, please try again using the ID in the footer")
             return
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config) 
+        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
         try:
             args = (meta['path'],) + args
             meta, help, before_args = parser.parse(args, meta)
@@ -183,14 +128,9 @@ class Commands(commands.Cog):
         new_msg = await msg.channel.send(f"Editing {meta['uuid']}")
         meta['embed_msg_id'] = new_msg.id
         meta['edit'] = True
-        meta = await prep.gather_prep(meta=meta, mode="discord") 
+        meta = await prep.gather_prep(meta=meta, mode="discord")
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
         await self.send_embed_and_upload(ctx, meta)
-
-
-
-
-
 
     @commands.group(invoke_without_command=True)
     async def search(self, ctx, *, args=None):
@@ -206,14 +146,14 @@ class Commands(commands.Cog):
             args = args.replace(search_terms, '')
             while args.startswith(" "):
                 args = args[1:]
-        except SystemExit as error:
+        except SystemExit:
             await ctx.send(f"Invalid argument detected, use `{config['DISCORD']['command_prefix']}args` for list of valid args")
             return
 
         if ctx.channel.id != int(config['DISCORD']['discord_channel_id']):
             return
         search = Search(config=config)
-        if search_terms == None:
+        if search_terms is None:
             await ctx.send("Missing search term(s)")
             return
         files_total = await search.searchFile(search_terms)
@@ -234,14 +174,12 @@ class Commands(commands.Cog):
             message = await ctx.send(embed=embed)
             await message.add_reaction(config['DISCORD']['discord_emojis']['UPLOAD'])
             channel = message.channel
-            
 
             def check(reaction, user):
                 if reaction.message.id == message.id:
-                    if str(user.id) == config['DISCORD']['admin_id']: 
+                    if str(user.id) == config['DISCORD']['admin_id']:
                         if str(reaction.emoji) == config['DISCORD']['discord_emojis']['UPLOAD']:
                             return reaction
-            
 
             try:
                 await self.bot.wait_for("reaction_add", timeout=120, check=check)
@@ -249,8 +187,6 @@ class Commands(commands.Cog):
                 await channel.send(f"Search: `{search_terms}`timed out")
             else:
                 await self.upload(ctx, files_total[0], search_args=tuple(args.split(" ")), message_id=message.id)
-
-
 
     @search.command()
     async def dir(self, ctx, *, args=None):
@@ -266,14 +202,14 @@ class Commands(commands.Cog):
             args = args.replace(search_terms, '')
             while args.startswith(" "):
                 args = args[1:]
-        except SystemExit as error:
+        except SystemExit:
             await ctx.send(f"Invalid argument detected, use `{config['DISCORD']['command_prefix']}args` for list of valid args")
             return
 
         if ctx.channel.id != int(config['DISCORD']['discord_channel_id']):
             return
         search = Search(config=config)
-        if search_terms == None:
+        if search_terms is None:
             await ctx.send("Missing search term(s)")
             return
         folders_total = await search.searchFolder(search_terms)
@@ -295,13 +231,11 @@ class Commands(commands.Cog):
             await message.add_reaction(config['DISCORD']['discord_emojis']['UPLOAD'])
             channel = message.channel
 
-
             def check(reaction, user):
                 if reaction.message.id == message.id:
-                    if str(user.id) == config['DISCORD']['admin_id']: 
+                    if str(user.id) == config['DISCORD']['admin_id']:
                         if str(reaction.emoji) == config['DISCORD']['discord_emojis']['UPLOAD']:
                             return reaction
-            
 
             try:
                 await self.bot.wait_for("reaction_add", timeout=120, check=check)
@@ -311,39 +245,31 @@ class Commands(commands.Cog):
                 await self.upload(ctx, path=folders_total[0], search_args=tuple(args.split(" ")), message_id=message.id)
         # await ctx.send(folders_total)
         return
-    
-    
-    
-    
-    
-    
-    
-    
-    async def send_embed_and_upload(self,ctx,meta):
+
+    async def send_embed_and_upload(self, ctx, meta):
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
-        
-        if meta.get('uploaded_screens', False) == False:
+
+        if meta.get('uploaded_screens', False) is False:
             if meta.get('embed_msg_id', '0') != '0':
                 message = await ctx.fetch_message(meta['embed_msg_id'])
                 await message.edit(embed=discord.Embed(title="Uploading Screenshots", color=0xffff00))
             else:
                 message = await ctx.send(embed=discord.Embed(title="Uploading Screenshots", color=0xffff00))
                 meta['embed_msg_id'] = message.id
-            
+
             channel = message.channel.id
             return_dict = multiprocessing.Manager().dict()
-            u = multiprocessing.Process(target = prep.upload_screens, args=(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict))
+            u = multiprocessing.Process(target=prep.upload_screens, args=(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict))
             u.start()
-            while u.is_alive() == True:
+            while u.is_alive() is True:
                 await asyncio.sleep(3)
             meta['image_list'] = return_dict['image_list']
             if meta['debug']:
                 print(meta['image_list'])
             meta['uploaded_screens'] = True
 
-        #Create base .torrent
-        
+        # Create base .torrent
         if len(glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")) == 0:
             if meta.get('embed_msg_id', '0') != '0':
                 message = await ctx.fetch_message(int(meta['embed_msg_id']))
@@ -352,15 +278,15 @@ class Commands(commands.Cog):
                 message = await ctx.send(embed=discord.Embed(title="Creating .torrent", color=0xffff00))
                 meta['embed_msg_id'] = message.id
             channel = message.channel
-            if meta['nohash'] == False:
-                if meta.get('torrenthash', None) != None:
-                    reuse_torrent = await client.find_existing_torrent(meta)
-                    if reuse_torrent != None:
+            if meta['nohash'] is False:
+                if meta.get('torrenthash', None) is not None:
+                    reuse_torrent = await client.find_existing_torrent(meta)  # noqa F821
+                    if reuse_torrent is not None:
                         prep.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
 
-                p = multiprocessing.Process(target = prep.create_torrent, args=(meta, Path(meta['path'])))
+                p = multiprocessing.Process(target=prep.create_torrent, args=(meta, Path(meta['path'])))
                 p.start()
-                while p.is_alive() == True:
+                while p.is_alive() is True:
                     await asyncio.sleep(5)
 
                 if int(meta.get('randomized', 0)) >= 1:
@@ -368,8 +294,7 @@ class Commands(commands.Cog):
             else:
                 meta['client'] = 'none'
 
-
-        #Format for embed
+        # Format for embed
         if meta['tag'] == "":
             tag = ""
         else:
@@ -388,19 +313,25 @@ class Commands(commands.Cog):
             res = meta['resolution']
         missing = await self.get_missing(meta)
 
-        embed=discord.Embed(title=f"Upload: {meta['title']}", url=f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}", description=meta['overview'], color=0x0080ff, timestamp=datetime.utcnow())
+        embed = discord.Embed(
+            title=f"Upload: {meta['title']}",
+            url=f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}",
+            description=meta['overview'],
+            color=0x0080ff,
+            timestamp=datetime.utcnow()
+        )
         embed.add_field(name="Links", value=f"[TMDB](https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}){imdb}{tvdb}")
         embed.add_field(name=f"{res} / {meta['type']}{tag}", value=f"```{meta['name']}```", inline=False)
         if missing != []:
-            embed.add_field(name=f"POTENTIALLY MISSING INFORMATION:", value="\n".join(missing), inline=False)
+            embed.add_field(name="POTENTIALLY MISSING INFORMATION:", value="\n".join(missing), inline=False)
         embed.set_thumbnail(url=f"https://image.tmdb.org/t/p/original{meta['poster']}")
         embed.set_footer(text=meta['uuid'])
-        embed.set_author(name="L4G's Upload Assistant", url="https://github.com/L4GSP1KE/Upload-Assistant", icon_url="https://images2.imgbox.com/6e/da/dXfdgNYs_o.png")
-        
+        embed.set_author(name="L4G's Upload Assistant", url="https://github.com/Audionut/Upload-Assistant", icon_url="https://images2.imgbox.com/6e/da/dXfdgNYs_o.png")
+
         message = await ctx.fetch_message(meta['embed_msg_id'])
         await message.edit(embed=embed)
 
-        if meta.get('trackers', None) != None:
+        if meta.get('trackers', None) is not None:
             trackers = meta['trackers']
         else:
             trackers = config['TRACKERS']['default_trackers']
@@ -423,21 +354,21 @@ class Commands(commands.Cog):
                 await asyncio.sleep(0.3)
             if "CBR" in each.replace(' ', ''):
                 await message.add_reaction(config['DISCORD']['discord_emojis']['CBR'])
-                await asyncio.sleep(0.3)                 
+                await asyncio.sleep(0.3)
         await message.add_reaction(config['DISCORD']['discord_emojis']['MANUAL'])
         await asyncio.sleep(0.3)
         await message.add_reaction(config['DISCORD']['discord_emojis']['CANCEL'])
         await asyncio.sleep(0.3)
         await message.add_reaction(config['DISCORD']['discord_emojis']['UPLOAD'])
 
-        #Save meta to json
-        with open (f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+        # Save meta to json
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
             f.close()
-        
+
         def check(reaction, user):
             if reaction.message.id == meta['embed_msg_id']:
-                if str(user.id) == config['DISCORD']['admin_id']: 
+                if str(user.id) == config['DISCORD']['admin_id']:
                     if str(reaction.emoji) == config['DISCORD']['discord_emojis']['UPLOAD']:
                         return reaction
                     if str(reaction.emoji) == config['DISCORD']['discord_emojis']['CANCEL']:
@@ -455,7 +386,7 @@ class Commands(commands.Cog):
                 await msg.clear_reactions()
                 await msg.edit(embed=timeout_embed)
                 return
-            except:
+            except Exception:
                 print("timeout after edit")
                 pass
         except CancelException:
@@ -464,20 +395,9 @@ class Commands(commands.Cog):
             await msg.clear_reactions()
             await msg.edit(embed=cancel_embed)
             return
-        # except ManualException:
-        #     msg = await ctx.fetch_message(meta['embed_msg_id'])
-        #     await msg.clear_reactions()
-        #     archive_url = await prep.package(meta)
-        #     if archive_url == False:
-        #         archive_fail_embed = discord.Embed(title="Unable to upload prep files", description=f"The files can be found at `tmp/{meta['title']}.tar`", color=0xff0000)
-        #         await msg.edit(embed=archive_fail_embed)
-        #     else:
-        #         archive_embed = discord.Embed(title="Files can be found at:",description=f"{archive_url} or `tmp/{meta['title']}.tar`", color=0x00ff40)
-        #         await msg.edit(embed=archive_embed)
-        #     return
         else:
-            
-            #Check which are selected and upload to them
+
+            # Check which are selected and upload to them
             msg = await ctx.fetch_message(message.id)
             tracker_list = list()
             tracker_emojis = config['DISCORD']['discord_emojis']
@@ -488,62 +408,59 @@ class Commands(commands.Cog):
                         tracker = list(config['DISCORD']['discord_emojis'].keys())[list(config['DISCORD']['discord_emojis'].values()).index(str(each))]
                         if tracker not in ("UPLOAD"):
                             tracker_list.append(tracker)
-            
+
             upload_embed_description = ' / '.join(tracker_list)
             upload_embed = discord.Embed(title=f"Uploading `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
             await msg.edit(embed=upload_embed)
             await msg.clear_reactions()
-
-
-            
 
             client = Clients(config=config)
             if "MANUAL" in tracker_list:
                 for manual_tracker in tracker_list:
                     manual_tracker = manual_tracker.replace(" ", "")
                     if manual_tracker.upper() == "BLU":
-                        blu = BLU(config=config) 
+                        blu = BLU(config=config)
                         await blu.edit_desc(meta)
                     if manual_tracker.upper() == "BHD":
                         bhd = BHD(config=config)
-                        await bhd.edit_desc(meta) 
+                        await bhd.edit_desc(meta)
                     if manual_tracker.upper() == "AITHER":
                         aither = AITHER(config=config)
-                        await aither.edit_desc(meta) 
+                        await aither.edit_desc(meta)
                     if manual_tracker.upper() == "STC":
                         stc = STC(config=config)
-                        await stc.edit_desc(meta) 
+                        await stc.edit_desc(meta)
                     if manual_tracker.upper() == "LCD":
                         lcd = LCD(config=config)
                         await lcd.edit_desc(meta)
                     if manual_tracker.upper() == "CBR":
                         cbr = CBR(config=config)
-                        await cbr.edit_desc(meta)                        
+                        await cbr.edit_desc(meta)
                 archive_url = await prep.package(meta)
                 upload_embed_description = upload_embed_description.replace('MANUAL', '~~MANUAL~~')
-                if archive_url == False:
+                if archive_url is False:
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0xff0000)
                     upload_embed.add_field(name="Unable to upload prep files", value=f"The files can be found at `tmp/{meta['title']}.tar`")
                     await msg.edit(embed=upload_embed)
                 else:
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    upload_embed.add_field(name="Files can be found at:",value=f"{archive_url} or `tmp/{meta['uuid']}`")
+                    upload_embed.add_field(name="Files can be found at:", value=f"{archive_url} or `tmp/{meta['uuid']}`")
                     await msg.edit(embed=upload_embed)
             if "BLU" in tracker_list:
                 blu = BLU(config=config)
                 dupes = await blu.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await blu.upload(meta)
                     await client.add_to_client(meta, "BLU")
                     upload_embed_description = upload_embed_description.replace('BLU', '~~BLU~~')
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    await msg.edit(embed=upload_embed) 
+                    await msg.edit(embed=upload_embed)
             if "BHD" in tracker_list:
                 bhd = BHD(config=config)
                 dupes = await bhd.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await bhd.upload(meta)
                     await client.add_to_client(meta, "BHD")
                     upload_embed_description = upload_embed_description.replace('BHD', '~~BHD~~')
@@ -553,27 +470,27 @@ class Commands(commands.Cog):
                 aither = AITHER(config=config)
                 dupes = await aither.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await aither.upload(meta)
                     await client.add_to_client(meta, "AITHER")
                     upload_embed_description = upload_embed_description.replace('AITHER', '~~AITHER~~')
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    await msg.edit(embed=upload_embed) 
+                    await msg.edit(embed=upload_embed)
             if "STC" in tracker_list:
                 stc = STC(config=config)
                 dupes = await stc.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await stc.upload(meta)
                     await client.add_to_client(meta, "STC")
                     upload_embed_description = upload_embed_description.replace('STC', '~~STC~~')
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    await msg.edit(embed=upload_embed) 
+                    await msg.edit(embed=upload_embed)
             if "LCD" in tracker_list:
                 lcd = LCD(config=config)
                 dupes = await lcd.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await lcd.upload(meta)
                     await client.add_to_client(meta, "LCD")
                     upload_embed_description = upload_embed_description.replace('LCD', '~~LCD~~')
@@ -583,26 +500,24 @@ class Commands(commands.Cog):
                 cbr = CBR(config=config)
                 dupes = await cbr.search_existing(meta)
                 meta = await self.dupe_embed(dupes, meta, tracker_emojis, channel)
-                if meta['upload'] == True:
+                if meta['upload'] is True:
                     await cbr.upload(meta)
                     await client.add_to_client(meta, "CBR")
                     upload_embed_description = upload_embed_description.replace('CBR', '~~CBR~~')
                     upload_embed = discord.Embed(title=f"Uploaded `{meta['name']}` to:", description=upload_embed_description, color=0x00ff40)
-                    await msg.edit(embed=upload_embed)                    
+                    await msg.edit(embed=upload_embed)
             return None
-    
-    
-    
+
     async def dupe_embed(self, dupes, meta, emojis, channel):
         if not dupes:
             print("No dupes found")
-            meta['upload'] = True   
+            meta['upload'] = True
             return meta
         else:
             dupe_text = "\n\n•".join(dupes)
             dupe_text = f"```•{dupe_text}```"
             embed = discord.Embed(title="Check if these are actually dupes!", description=dupe_text, color=0xff0000)
-            embed.set_footer(text=f"{emojis['CANCEL']} to abort upload | {emojis['UPLOAD']} to upload anyways") 
+            embed.set_footer(text=f"{emojis['CANCEL']} to abort upload | {emojis['UPLOAD']} to upload anyways")
             message = await channel.send(embed=embed)
             await message.add_reaction(emojis['CANCEL'])
             await asyncio.sleep(0.3)
@@ -610,7 +525,7 @@ class Commands(commands.Cog):
 
             def check(reaction, user):
                 if reaction.message.id == message.id:
-                    if str(user.id) == config['DISCORD']['admin_id']: 
+                    if str(user.id) == config['DISCORD']['admin_id']:
                         if str(reaction.emoji) == emojis['UPLOAD']:
                             return reaction
                         if str(reaction.emoji) == emojis['CANCEL']:
@@ -624,7 +539,7 @@ class Commands(commands.Cog):
                 try:
                     await channel.send(f"{meta['uuid']} timed out")
                     meta['upload'] = False
-                except:
+                except Exception:
                     return
             except CancelException:
                 await channel.send(f"{meta['title']} cancelled")
@@ -644,19 +559,18 @@ class Commands(commands.Cog):
             missing.append('--imdb')
         if isinstance(meta['potential_missing'], list) and len(meta['potential_missing']) > 0:
             for each in meta['potential_missing']:
-                if meta.get(each, '').replace(' ', '') == "": 
+                if meta.get(each, '').replace(' ', '') == "":
                     missing.append(f"--{each}")
         return missing
+
 
 def setup(bot):
     bot.add_cog(Commands(bot))
 
 
-
-
-
 class CancelException(Exception):
     pass
+
 
 class ManualException(Exception):
     pass

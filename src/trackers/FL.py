@@ -2,19 +2,18 @@ import requests
 import asyncio
 import re
 import os
-from pathlib import Path
 from str2bool import str2bool
-import json
 import glob
 import pickle
 from unidecode import unidecode
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse
 import cli_ui
 from bs4 import BeautifulSoup
 
 from src.trackers.COMMON import COMMON
-from src.exceptions import *
+from src.exceptions import *  # noqa F403
 from src.console import console
+
 
 class FL():
 
@@ -28,7 +27,6 @@ class FL():
         self.uploader_name = config['TRACKERS'][self.tracker].get('uploader_name')
         self.signature = None
         self.banned_groups = [""]
-    
 
     async def get_category_id(self, meta):
         has_ro_audio, has_ro_sub = await self.get_ro_tracks(meta)
@@ -51,7 +49,7 @@ class FL():
             if has_ro_sub and meta.get('sd', 0) == 0 and meta['resolution'] != '2160p':
                 # 19 = Movie + RO
                 cat_id = 19
-        
+
         if meta['category'] == 'TV':
             # 21 = TV HD
             cat_id = 21
@@ -61,15 +59,15 @@ class FL():
             elif meta.get('sd', 0) == 1:
                 # 23 = TV SD
                 cat_id = 23
-            
+
         if meta['is_disc'] == "DVD":
             # 2 = DVD
             cat_id = 2
             if has_ro_sub:
-                # 3 = DVD + RO 
+                # 3 = DVD + RO
                 cat_id = 3
 
-        if meta.get('anime', False) == True:
+        if meta.get('anime', False) is True:
             # 24 = Anime
             cat_id = 24
         return cat_id
@@ -100,11 +98,10 @@ class FL():
         fl_name = ' '.join(fl_name.split())
         fl_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", fl_name)
         fl_name = fl_name.replace(' ', '.').replace('..', '.')
-        return fl_name 
+        return fl_name
 
-    
     ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
+    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######  # noqa E266
     ###############################################################
 
     async def upload(self, meta):
@@ -114,12 +111,12 @@ class FL():
         fl_name = await self.edit_name(meta)
         cat_id = await self.get_category_id(meta)
         has_ro_audio, has_ro_sub = await self.get_ro_tracks(meta)
-        
+
         # Confirm the correct naming order for FL
         cli_ui.info(f"Filelist name: {fl_name}")
-        if meta.get('unattended', False) == False:
+        if meta.get('unattended', False) is False:
             fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
-            if fl_confirm != True:
+            if fl_confirm is not True:
                 fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
                 if fl_name_manually == "":
                     console.print('No proper name given')
@@ -130,10 +127,10 @@ class FL():
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
-        if meta.get('anime', True) == True and meta.get('tag', '') == '-SubsPlease':
+        if meta.get('anime', True) is True and meta.get('tag', '') == '-SubsPlease':
             torrentFileName = fl_name
         else:
-            if meta.get('isdir', False) == False:
+            if meta.get('isdir', False) is False:
                 torrentFileName = meta.get('uuid')
                 torrentFileName = os.path.splitext(torrentFileName)[0]
             else:
@@ -142,26 +139,26 @@ class FL():
         # Download new .torrent from site
         fl_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', newline='').read()
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
         with open(torrent_path, 'rb') as torrentFile:
             torrentFileName = unidecode(torrentFileName)
             files = {
-                'file' : (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
+                'file': (f"{torrentFileName}.torrent", torrentFile, "application/x-bittorent")
             }
             data = {
-                'name' : fl_name,
-                'type' : cat_id,
-                'descr' : fl_desc.strip(),
-                'nfo' : mi_dump
+                'name': fl_name,
+                'type': cat_id,
+                'descr': fl_desc.strip(),
+                'nfo': mi_dump
             }
 
             if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
                 data['imdbid'] = meta.get('imdb_id', '').replace('tt', '')
                 data['description'] = meta['imdb_info'].get('genres', '')
-            if self.uploader_name not in ("", None) and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) == False:
+            if self.uploader_name not in ("", None) and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
                 data['epenis'] = self.uploader_name
             if has_ro_audio:
                 data['materialro'] = 'on'
@@ -184,7 +181,7 @@ class FL():
                         session.cookies.update(pickle.load(cf))
                     up = session.post(url=url, data=data, files=files)
                     torrentFile.close()
-                    
+
                     # Match url to verify successful upload
                     match = re.match(r".*?filelist\.io/details\.php\?id=(\d+)&uploaded=(\d+)", up.url)
                     if match:
@@ -194,9 +191,8 @@ class FL():
                         console.print(data)
                         console.print("\n\n")
                         console.print(up.text)
-                        raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
+                        raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
-
 
     async def search_existing(self, meta):
         dupes = []
@@ -204,21 +200,21 @@ class FL():
             cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
             with open(cookiefile, 'rb') as cf:
                 session.cookies.update(pickle.load(cf))
-            
-            search_url = f"https://filelist.io/browse.php"
+
+            search_url = "https://filelist.io/browse.php"
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
-                    'search' : meta['imdb_id'],
-                    'cat' : await self.get_category_id(meta),
-                    'searchin' : '3'
+                    'search': meta['imdb_id'],
+                    'cat': await self.get_category_id(meta),
+                    'searchin': '3'
                 }
             else:
                 params = {
-                    'search' : meta['title'],
-                    'cat' : await self.get_category_id(meta),
-                    'searchin' : '0'
+                    'search': meta['title'],
+                    'cat': await self.get_category_id(meta),
+                    'searchin': '0'
                 }
-            
+
             r = session.get(search_url, params=params)
             await asyncio.sleep(0.5)
             soup = BeautifulSoup(r.text, 'html.parser')
@@ -229,18 +225,15 @@ class FL():
 
         return dupes
 
-    
-
-
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
         if not os.path.exists(cookiefile):
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
-        if vcookie != True:
+        if vcookie is not True:
             console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate == True:
+            if recreate is True:
                 if os.path.exists(cookiefile):
                     os.remove(cookiefile)
                 await self.login(cookiefile)
@@ -249,8 +242,7 @@ class FL():
             else:
                 return False
         return True
-    
-    
+
     async def validate_cookies(self, meta, cookiefile):
         url = "https://filelist.io/index.php"
         if os.path.exists(cookiefile):
@@ -268,18 +260,18 @@ class FL():
                     return False
         else:
             return False
-    
+
     async def login(self, cookiefile):
         with requests.Session() as session:
             r = session.get("https://filelist.io/login.php")
             await asyncio.sleep(0.5)
             soup = BeautifulSoup(r.text, 'html.parser')
-            validator = soup.find('input', {'name' : 'validator'}).get('value')
+            validator = soup.find('input', {'name': 'validator'}).get('value')
             data = {
-                'validator' : validator,
-                'username' : self.username,
-                'password' : self.password,
-                'unlock' : '1',
+                'validator': validator,
+                'username': self.username,
+                'password': self.password,
+                'unlock': '1',
             }
             response = session.post('https://filelist.io/takelogin.php', data=data)
             await asyncio.sleep(0.5)
@@ -306,14 +298,12 @@ class FL():
             console.print(r.text)
         return
 
-
-
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', newline='') as descfile:
             from src.bbcode import BBCODE
             bbcode = BBCODE()
-            
+
             desc = base
             desc = bbcode.remove_spoiler(desc)
             desc = bbcode.convert_code_to_quote(desc)
@@ -323,7 +313,7 @@ class FL():
             if meta['is_disc'] != 'BDMV':
                 url = "https://up.img4k.net/api/description"
                 data = {
-                    'mediainfo' : open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r').read(),
+                    'mediainfo': open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r').read(),
                 }
                 if int(meta['imdb_id'].replace('tt', '')) != 0:
                     data['imdbURL'] = f"tt{meta['imdb_id']}"
@@ -336,10 +326,10 @@ class FL():
             else:
                 # BD Description Generator
                 final_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_EXT.txt", 'r', encoding='utf-8').read()
-                if final_desc.strip() != "": # Use BD_SUMMARY_EXT and bbcode format it
+                if final_desc.strip() != "":  # Use BD_SUMMARY_EXT and bbcode format it
                     final_desc = final_desc.replace('[/pre][/quote]', f'[/pre][/quote]\n\n{desc}\n', 1)
                     final_desc = final_desc.replace('DISC INFO:', '[pre][quote=BD_Info][b][color=#FF0000]DISC INFO:[/color][/b]').replace('PLAYLIST REPORT:', '[b][color=#FF0000]PLAYLIST REPORT:[/color][/b]').replace('VIDEO:', '[b][color=#FF0000]VIDEO:[/color][/b]').replace('AUDIO:', '[b][color=#FF0000]AUDIO:[/color][/b]').replace('SUBTITLES:', '[b][color=#FF0000]SUBTITLES:[/color][/b]')
-                    final_desc += "[/pre][/quote]\n" # Closed bbcode tags
+                    final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
                     # Upload screens and append to the end of the description
                     url = "https://up.img4k.net/api/description"
                     screen_glob = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['filename']}-*.png")
@@ -350,11 +340,10 @@ class FL():
                     final_desc += response.text.replace('\r\n', '\n')
             descfile.write(final_desc)
 
-            if self.signature != None:
+            if self.signature is not None:
                 descfile.write(self.signature)
             descfile.close()
 
-    
     async def get_ro_tracks(self, meta):
         has_ro_audio = has_ro_sub = False
         if meta.get('is_disc', '') != 'BDMV':

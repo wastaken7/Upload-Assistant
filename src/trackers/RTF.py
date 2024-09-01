@@ -5,10 +5,10 @@ import requests
 import base64
 import re
 import datetime
-import json
 
 from src.trackers.COMMON import COMMON
 from src.console import console
+
 
 class RTF():
     """
@@ -18,10 +18,6 @@ class RTF():
         Set type/category IDs
         Upload
     """
-
-    ###############################################################
-    ########                    EDIT ME                    ########
-    ###############################################################
     def __init__(self, config):
         self.config = config
         self.tracker = 'RTF'
@@ -36,7 +32,7 @@ class RTF():
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
@@ -45,21 +41,21 @@ class RTF():
 
         screenshots = []
         for image in meta['image_list']:
-            if image['raw_url'] != None:
+            if image['raw_url'] is not None:
                 screenshots.append(image['raw_url'])
 
         json_data = {
-            'name' : meta['name'],
+            'name': meta['name'],
             # description does not work for some reason
             # 'description' : meta['overview'] + "\n\n" + desc + "\n\n" + "Uploaded by L4G Upload Assistant",
             'description': "this is a description",
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
-            'mediaInfo': re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump) if bd_dump == None else f"{bd_dump}",
+            'mediaInfo': re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump) if bd_dump is None else f"{bd_dump}",
             "nfo": "",
             "url": "https://www.imdb.com/title/" + (meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + meta['imdb_id']) + "/",
             # auto pulled from IMDB
             "descr": "This is short description",
-            "poster": meta["poster"] if meta["poster"] != None else "",
+            "poster": meta["poster"] if meta["poster"] is not None else "",
             "type": "401" if meta['category'] == 'MOVIE'else "402",
             "screenshots": screenshots,
             'isAnonymous': self.config['TRACKERS'][self.tracker]["anon"],
@@ -77,13 +73,11 @@ class RTF():
             'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
         }
 
-
         if datetime.date.today().year - meta['year'] <= 9:
-            console.print(f"[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
+            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
             return
 
-
-        if meta['debug'] == False:
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, json=json_data, headers=headers)
             try:
                 console.print(response.json())
@@ -91,13 +85,12 @@ class RTF():
                 t_id = response.json()['torrent']['id']
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://retroflix.club/browse/t/" + str(t_id))
 
-            except:
+            except Exception:
                 console.print("It may have uploaded, go check")
                 return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(json_data)
-
 
     async def search_existing(self, meta):
         dupes = []
@@ -108,7 +101,7 @@ class RTF():
         }
 
         params = {
-            'includingDead' : '1'
+            'includingDead': '1'
         }
 
         if meta['imdb_id'] != "0":
@@ -122,7 +115,7 @@ class RTF():
             for each in response:
                 result = [each][0]['name']
                 dupes.append(result)
-        except:
+        except Exception:
             console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
             await asyncio.sleep(5)
 
@@ -157,7 +150,7 @@ class RTF():
 
         if response.status_code == 201:
             console.print('[bold green]Using New API key generated for this upload')
-            console.print(f'[bold green]Please update your L4G config with the below RTF API Key for future uploads')
+            console.print('[bold green]Please update your L4G config with the below RTF API Key for future uploads')
             console.print(f'[bold yellow]{response.json()["token"]}')
             self.config['TRACKERS'][self.tracker]['api_key'] = response.json()["token"]
         else:

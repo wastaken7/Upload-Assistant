@@ -2,7 +2,6 @@
 # import discord
 import asyncio
 import requests
-from difflib import SequenceMatcher
 from str2bool import str2bool
 import os
 import re
@@ -10,6 +9,7 @@ import platform
 
 from src.trackers.COMMON import COMMON
 from src.console import console
+
 
 class HUNO():
     """
@@ -29,7 +29,6 @@ class HUNO():
         self.banned_groups = ["4K4U, Bearfish, BiTOR, BONE, D3FiL3R, d3g, DTR, ELiTE, EVO, eztv, EzzRips, FGT, HashMiner, HETeam, HEVCBay, HiQVE, HR-DR, iFT, ION265, iVy, JATT, Joy, LAMA, m3th, MeGusta, MRN, Musafirboy, OEPlus, Pahe.in, PHOCiS, PSA, RARBG, RMTeam, ShieldBearer, SiQ, TBD, Telly, TSP, VXT, WKS, YAWNiX, YIFY, YTS"]
         pass
 
-
     async def upload(self, meta):
         common = COMMON(config=self.config)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
@@ -37,17 +36,17 @@ class HUNO():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
-        if meta['anon'] == 0 and bool(str2bool(self.config['TRACKERS']['HUNO'].get('anon', "False"))) == False:
+        if meta['anon'] == 0 and bool(str2bool(self.config['TRACKERS']['HUNO'].get('anon', "False"))) is False:
             anon = 0
         else:
             anon = 1
 
         # adding logic to check if its an encode or webrip and not HEVC as only HEVC encodes and webrips are allowed
         if meta['video_codec'] != "HEVC" and (meta['type'] == "ENCODE" or meta['type'] == "WEBRIP"):
-            console.print(f'[bold red]Only x265/HEVC encodes are allowed')
+            console.print('[bold red]Only x265/HEVC encodes are allowed')
             return
 
-        if meta['bdinfo'] != None:
+        if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
         else:
@@ -57,22 +56,22 @@ class HUNO():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[HUNO]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name' : await self.get_name(meta),
-            'description' : desc,
-            'mediainfo' : mi_dump,
-            'bdinfo' : bd_dump,
-            'category_id' : cat_id,
-            'type_id' : type_id,
-            'resolution_id' : resolution_id,
-            'tmdb' : meta['tmdb'],
-            'imdb' : meta['imdb_id'].replace('tt', ''),
-            'tvdb' : meta['tvdb_id'],
-            'mal' : meta['mal_id'],
-            'igdb' : 0,
-            'anonymous' : anon,
-            'stream' : await self.is_plex_friendly(meta),
-            'sd' : meta['sd'],
-            'keywords' : meta['keywords'],
+            'name': await self.get_name(meta),
+            'description': desc,
+            'mediainfo': mi_dump,
+            'bdinfo': bd_dump,
+            'category_id': cat_id,
+            'type_id': type_id,
+            'resolution_id': resolution_id,
+            'tmdb': meta['tmdb'],
+            'imdb': meta['imdb_id'].replace('tt', ''),
+            'tvdb': meta['tvdb_id'],
+            'mal': meta['mal_id'],
+            'igdb': 0,
+            'anonymous': anon,
+            'stream': await self.is_plex_friendly(meta),
+            'sd': meta['sd'],
+            'keywords': meta['keywords'],
             'season_pack': meta.get('tv_pack', 0),
             # 'featured' : 0,
             # 'free' : 0,
@@ -95,18 +94,18 @@ class HUNO():
             'api_token': tracker_config['api_key'].strip()
         }
 
-        if meta['debug'] == False:
+        if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
                 console.print(response.json())
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://hawke.uno/torrents/" + t_id)
-            except:
+            except Exception:
                 console.print("It may have uploaded, go check")
                 return
         else:
-            console.print(f"[cyan]Request Data:")
+            console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
 
@@ -124,7 +123,7 @@ class HUNO():
         if language == "zxx":
             language = "Silent"
         return f'{codec} {channels} {language}'
-    
+
     def get_basename(self, meta):
         path = next(iter(meta['filelist']), meta['path'])
         return os.path.basename(path)
@@ -136,8 +135,8 @@ class HUNO():
         basename = self.get_basename(meta)
         hc = meta.get('hardcoded-subs')
         type = meta.get('type', "")
-        title = meta.get('title',"")
-        alt_title = meta.get('aka', "")
+        title = meta.get('title', "")
+        alt_title = meta.get('aka', "")  # noqa F841
         year = meta.get('year', "")
         resolution = meta.get('resolution', "")
         audio = self.get_audio(meta)
@@ -156,7 +155,7 @@ class HUNO():
         hdr = meta.get('hdr', "")
         if not hdr.strip():
             hdr = "SDR"
-        distributor = meta.get('distributor', "")
+        distributor = meta.get('distributor', "")  # noqa F841
         video_codec = meta.get('video_codec', "")
         video_encode = meta.get('video_encode', "").replace(".", "")
         if 'x265' in basename:
@@ -170,56 +169,54 @@ class HUNO():
             search_year = year
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
 
-        #YAY NAMING FUN
-        if meta['category'] == "MOVIE": #MOVIE SPECIFIC
-            if type == "DISC": #Disk
+        # YAY NAMING FUN
+        if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
+            if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
                     name = f"{title} ({year}) {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'DVD':
                     name = f"{title} ({year}) {edition} ({resolution} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
                     name = f"{title} ({year}) {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
-            elif type == "REMUX" and source == "BluRay": #BluRay Remux
+            elif type == "REMUX" and source == "BluRay":  # BluRay Remux
                 name = f"{title} ({year}) {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"): #DVD Remux
+            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"):  # DVD Remux
                 name = f"{title} ({year}) {edition} (DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
-            elif type == "ENCODE": #Encode
+            elif type == "ENCODE":  # Encode
                 name = f"{title} ({year}) {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
-            elif type in ("WEBDL", "WEBRIP"): #WEB
+            elif type in ("WEBDL", "WEBRIP"):  # WEB
                 name = f"{title} ({year}) {edition} ({resolution} {scale} {uhd} {service} WEB-DL {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
-            elif type == "HDTV": #HDTV
+            elif type == "HDTV":  # HDTV
                 name = f"{title} ({year}) {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
-        elif meta['category'] == "TV": #TV SPECIFIC
-            if type == "DISC": #Disk
+        elif meta['category'] == "TV":  # TV SPECIFIC
+            if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
                     name = f"{title} ({search_year}) {season}{episode} {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 if meta['is_disc'] == 'DVD':
                     name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
                     name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
-            elif type == "REMUX" and source == "BluRay": #BluRay Remux
-                name = f"{title} ({search_year}) {season}{episode} {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}" #SOURCE
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"): #DVD Remux
-                name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}" #SOURCE
-            elif type == "ENCODE": #Encode
-                name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}" #SOURCE
-            elif type in ("WEBDL", "WEBRIP"): #WEB
+            elif type == "REMUX" and source == "BluRay":  # BluRay Remux
+                name = f"{title} ({search_year}) {season}{episode} {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"  # SOURCE
+            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"):  # DVD Remux
+                name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"  # SOURCE
+            elif type == "ENCODE":  # Encode
+                name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"  # SOURCE
+            elif type in ("WEBDL", "WEBRIP"):  # WEB
                 name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} {scale} {uhd} {service} WEB-DL {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
-            elif type == "HDTV": #HDTV
+            elif type == "HDTV":  # HDTV
                 name = f"{title} ({search_year}) {season}{episode} {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
 
         if hc:
             name = re.sub(r'((\([0-9]{4}\)))', r'\1 Ensubbed', name)
         return ' '.join(name.split()).replace(": ", " - ")
 
-
     async def get_cat_id(self, category_name):
         category_id = {
             'MOVIE': '1',
             'TV': '2',
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         return category_id
-
 
     async def get_type_id(self, meta):
         basename = self.get_basename(meta)
@@ -236,43 +233,40 @@ class HUNO():
         else:
             return '0'
 
-
     async def get_res_id(self, resolution):
         resolution_id = {
-            'Other':'10',
+            'Other': '10',
             '4320p': '1',
             '2160p': '2',
             '1080p': '3',
-            '1080i':'4',
+            '1080i': '4',
             '720p': '5',
             '576p': '6',
             '576i': '7',
             '480p': '8',
             '480i': '9'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
-
 
     async def is_plex_friendly(self, meta):
         lossy_audio_codecs = ["AAC", "DD", "DD+", "OPUS"]
 
-        if any(l in meta["audio"] for l in lossy_audio_codecs):
+        if any(l in meta["audio"] for l in lossy_audio_codecs):  # noqa E741
             return 1
 
         return 0
-
 
     async def search_existing(self, meta):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
 
         params = {
-            'api_token' : self.config['TRACKERS']['HUNO']['api_key'].strip(),
-            'tmdbId' : meta['tmdb'],
-            'categories[]' : await self.get_cat_id(meta['category']),
-            'types[]' : await self.get_type_id(meta),
-            'resolutions[]' : await self.get_res_id(meta['resolution']),
-            'name' : ""
+            'api_token': self.config['TRACKERS']['HUNO']['api_key'].strip(),
+            'tmdbId': meta['tmdb'],
+            'categories[]': await self.get_cat_id(meta['category']),
+            'types[]': await self.get_type_id(meta),
+            'resolutions[]': await self.get_res_id(meta['resolution']),
+            'name': ""
         }
         if meta['category'] == 'TV':
             params['name'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
@@ -286,7 +280,7 @@ class HUNO():
                 # difference = SequenceMatcher(None, meta['clean_name'], result).ratio()
                 # if difference >= 0.05:
                 dupes.append(result)
-        except:
+        except Exception:
             console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
             await asyncio.sleep(5)
 

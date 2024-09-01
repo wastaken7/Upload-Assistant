@@ -7,9 +7,10 @@ class LoginException(Exception):
         if args:
             # ... pass them to the super constructor
             super().__init__(*args, **kwargs)
-        else: # else, the exception was raised without arguments ...
-                 # ... pass the default message to the super constructor
-                 super().__init__(default_message, **kwargs)
+        else:  # else, the exception was raised without arguments ...
+            # ... pass the default message to the super constructor
+            super().__init__(default_message, **kwargs)
+
 
 class UploadException(Exception):
     def __init__(self, *args, **kwargs):
@@ -20,14 +21,18 @@ class UploadException(Exception):
         if args:
             # ... pass them to the super constructor
             super().__init__(*args, **kwargs)
-        else: # else, the exception was raised without arguments ...
-                 # ... pass the default message to the super constructor
-                 super().__init__(default_message, **kwargs)
+        else:  # else, the exception was raised without arguments ...
+            # ... pass the default message to the super constructor
+            super().__init__(default_message, **kwargs)
 
 
 class XEMNotFound(Exception):
     pass
+
+
 class WeirdSystem(Exception):
     pass
+
+
 class ManualDateException(Exception):
     pass
