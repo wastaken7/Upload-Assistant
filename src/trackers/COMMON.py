@@ -226,13 +226,17 @@ class COMMON():
                         else:
                             file_name = [file['name'] for file in files[:5]]  # Return up to 5 filenames
 
-                console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+                    console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+
+                    # Skip the ID selection prompt if searching by ID
+                    console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}[/green]")
 
             if tmdb or imdb or tvdb:
-                console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}[/green]")
-                if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, file_name):
-                    console.print("[yellow]User chose to skip based on IDs.[/yellow]")
-                    return None, None, None, None, None, None, None, None, None
+                if not id:
+                    # Only prompt the user for ID selection if not searching by ID
+                    if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, file_name):
+                        console.print("[yellow]User chose to skip based on IDs.[/yellow]")
+                        return None, None, None, None, None, None, None, None, None
 
             if description:
                 bbcode = BBCODE()

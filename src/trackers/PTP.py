@@ -106,8 +106,9 @@ class PTP():
                     for movie in response['Movies']:
                         if len(movie['Torrents']) >= 1:
                             for torrent in movie['Torrents']:
+                                # First, try matching in filelist > path
                                 for file in torrent['FileList']:
-                                    if file['Path'] == filename:
+                                    if file.get('Path') == filename:
                                         imdb_id = movie['ImdbId']
                                         ptp_torrent_id = torrent['Id']
                                         dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
@@ -118,6 +119,19 @@ class PTP():
                                         console.print(f"[cyan]Torrent Info: {tinfo}[/cyan]")
                                         
                                         return imdb_id, ptp_torrent_id, ptp_torrent_hash
+                                
+                                # If no match in filelist > path, check directly in filepath
+                                if torrent.get('FilePath') == filename:
+                                    imdb_id = movie['ImdbId']
+                                    ptp_torrent_id = torrent['Id']
+                                    dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
+                                    console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
+                                    
+                                    # Call get_torrent_info and print the results
+                                    tinfo = await self.get_torrent_info(imdb_id, meta)
+                                    console.print(f"[cyan]Torrent Info: {tinfo}[/cyan]")
+                                    
+                                    return imdb_id, ptp_torrent_id, ptp_torrent_hash
 
                 console.print(f'[yellow]Could not find any release matching [bold yellow]{filename}[/bold yellow] on PTP')
                 return None, None, None

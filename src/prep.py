@@ -170,6 +170,11 @@ class Prep():
                 if ptp_torrent_id:
                     meta['ptp'] = ptp_torrent_id
                     meta['imdb'] = str(imdb_id).zfill(7) if imdb_id else None
+
+                    if meta.get('imdb') and await self.prompt_user_for_id_selection(imdb=meta['imdb']):
+                        console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb']}[/green]")
+                        found_match = True
+
             else:
                 ptp_torrent_id = meta['ptp']
                 console.print(f"[cyan]PTP ID found in meta: {ptp_torrent_id}, using it to get IMDb ID[/cyan]")
@@ -180,10 +185,7 @@ class Prep():
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
 
-            if meta.get('imdb') and await self.prompt_user_for_id_selection(imdb=meta['imdb']):
-                console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb']}[/green]")
-                found_match = True
-
+                # Retrieve PTP description and image list
                 ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta.get('is_disc', False))
                 if ptp_desc.strip():
                     meta['description'] = ptp_desc
@@ -201,9 +203,9 @@ class Prep():
                         console.print("[yellow]Description discarded from PTP[/yellow]")
                         meta['skip_gen_desc'] = True
                         meta['description'] = None
-            else:
-                console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
-                meta['skip_gen_desc'] = True
+
+            console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
+            meta['skip_gen_desc'] = True
 
         elif tracker_name == "HDB":
             if meta.get('hdb') is not None:
@@ -217,6 +219,8 @@ class Prep():
                 meta['hdb_name'] = hdb_name
                 found_match = True
 
+                # Skip user confirmation if searching by ID
+                console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
             else:
                 console.print("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
 
@@ -229,20 +233,19 @@ class Prep():
                     meta[tracker_key] = tracker_id
                 found_match = True
 
-            if found_match:
-                if imdb or tvdb_id or hdb_name:
-                    console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
-                    if await self.prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
-                        console.print(f"[green]{tracker_name} data retained.[/green]")
+                if found_match:
+                    if imdb or tvdb_id or hdb_name:
+                        console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
+                        if await self.prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                            console.print(f"[green]{tracker_name} data retained.[/green]")
+                        else:
+                            console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                            meta[tracker_key] = None
+                            meta['tvdb_id'] = None
+                            meta['hdb_name'] = None
+                            found_match = False
                     else:
-                        console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
-                        meta[tracker_key] = None
-                        meta['tvdb_id'] = None
-                        meta['hdb_name'] = None
                         found_match = False
-                else:
-                    # console.print(f"[yellow]Could not find a matching release on {tracker_name}.[/yellow]")
-                    found_match = False
 
         # console.print(f"[cyan]Finished processing tracker: {tracker_name} with found_match: {found_match}[/cyan]")
         return meta, found_match
