@@ -211,19 +211,23 @@ class Prep():
                 meta['skip_gen_desc'] = True
 
         elif tracker_name == "HDB":
-            # console.print(f"[blue]Handling HDB tracker[/blue]")
-            if meta.get(tracker_key) is not None:
+            if meta.get('hdb') is not None:
                 meta[manual_key] = meta[tracker_key]
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
-                imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder)
+                
+                # Use get_info_from_torrent_id function if ID is found in meta
+                imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
+                
                 meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
                 meta['hdb_name'] = hdb_name
-                if tracker_id:
-                    meta[tracker_key] = tracker_id
                 found_match = True
+                
             else:
                 console.print(f"[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
+                
+                # Use search_filename function if ID is not found in meta
                 imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder)
+                
                 meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
                 meta['hdb_name'] = hdb_name
                 if tracker_id:
@@ -242,7 +246,7 @@ class Prep():
                         meta['hdb_name'] = None
                         found_match = False
                 else:
-                    console.print(f"[yellow]Could not find a matching release on {tracker_name}.[/yellow]")
+                    # console.print(f"[yellow]Could not find a matching release on {tracker_name}.[/yellow]")
                     found_match = False
 
         console.print(f"[cyan]Finished processing tracker: {tracker_name} with found_match: {found_match}[/cyan]")
