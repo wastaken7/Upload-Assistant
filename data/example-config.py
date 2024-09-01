@@ -214,6 +214,18 @@ config = {
             "announce_url" : "https://UTP/announce/customannounceurl",
             # "anon" : False
         },
+        "AL": {
+            "api_key": "AL api key",
+            "announce_url": "https://animelovers.club/announce/customannounceurl",
+            # "anon" : False
+        },
+        "HDB": {
+            "useAPI": True,
+            "username": "HDB username",
+            "passkey": "HDB passkey",
+            "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
+            "anon": False,
+        },	    
         "SHRI" :{
             "api_key" : "SHRI api key",
             "announce_url" : "https://shareisland.org/announce/customannounceurl",
