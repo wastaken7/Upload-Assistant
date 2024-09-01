@@ -132,9 +132,9 @@ class DiscParse():
                 else:
                     three_dim = ""
                 try:
-                    bit_depth = split2[n+6].strip()
-                    hdr_dv = split2[n+7].strip()
-                    color = split2[n+8].strip()
+                    bit_depth = split2[n + 6].strip()
+                    hdr_dv = split2[n + 7].strip()
+                    color = split2[n + 8].strip()
                 except Exception:
                     bit_depth = ""
                     hdr_dv = ""
@@ -142,15 +142,15 @@ class DiscParse():
                 bdinfo['video'].append({
                     'codec': split2[0].strip(),
                     'bitrate': split2[1].strip(),
-                    'res': split2[n+2].strip(),
-                    'fps': split2[n+3].strip(),
-                    'aspect_ratio': split2[n+4].strip(),
-                    'profile': split2[n+5].strip(),
+                    'res': split2[n + 2].strip(),
+                    'fps': split2[n + 3].strip(),
+                    'aspect_ratio': split2[n + 4].strip(),
+                    'profile': split2[n + 5].strip(),
                     'bit_depth': bit_depth,
                     'hdr_dv': hdr_dv,
                     'color': color,
                     '3d': three_dim,
-                    })
+                })
             elif line.startswith("audio:"):
                 if "(" in l:
                     l = l.split("(")[0]
@@ -170,12 +170,12 @@ class DiscParse():
                 bdinfo['audio'].append({
                     'language': split2[0].strip(),
                     'codec': split2[1].strip(),
-                    'channels': split2[n+2].strip(),
-                    'sample_rate': split2[n+3].strip(),
-                    'bitrate': split2[n+4].strip(),
+                    'channels': split2[n + 2].strip(),
+                    'sample_rate': split2[n + 3].strip(),
+                    'bitrate': split2[n + 4].strip(),
                     'bit_depth': bit_depth,  # Also DialNorm, but is not in use anywhere yet
                     'atmos_why_you_be_like_this': fuckatmos,
-                    })
+                })
             elif line.startswith("disc title:"):
                 title = l.split(':', 1)[1]
                 bdinfo['title'] = title
@@ -193,10 +193,10 @@ class DiscParse():
                 stripped = line.split()
                 m2ts = {}
                 bd_file = stripped[0]
-                time_in = stripped[1]
+                time_in = stripped[1]  # noqa F841
                 bd_length = stripped[2]
-                bd_size = stripped[3]
-                bd_bitrate = stripped[4]
+                bd_size = stripped[3]  # noqa F841
+                bd_bitrate = stripped[4]  # noqa F841
                 m2ts['file'] = bd_file
                 m2ts['length'] = bd_length
                 bdinfo['files'].append(m2ts)
@@ -243,7 +243,7 @@ class DiscParse():
             each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
             each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
 
-            size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f))/float(1 << 30)
+            size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) / float(1 << 30)
             if size <= 7.95:
                 dvd_size = "DVD9"
                 if size <= 4.37:

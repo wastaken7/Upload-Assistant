@@ -51,7 +51,7 @@ class BHDTV():
                 str2bool(self.config['TRACKERS'][self.tracker].get('anon', "False"))) is False:
             anon = 0
         else:
-            anon = 1
+            anon = 1  # noqa F841
 
         if meta['bdinfo'] is not None:
             mi_dump = None
@@ -122,7 +122,7 @@ class BHDTV():
 
     async def get_type_movie_id(self, meta):
         type_id = '0'
-        test = meta['type']
+        test = meta['type']  # noqa F841
         if meta['type'] == 'DISC':
             if meta['3D']:
                 type_id = '46'
@@ -181,7 +181,7 @@ class BHDTV():
             '1080p': '3',
             '1080i': '2',
             '720p': '1'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def edit_desc(self, meta):

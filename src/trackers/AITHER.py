@@ -133,7 +133,7 @@ class AITHER():
         category_id = {
             'MOVIE': '1',
             'TV': '2',
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         return category_id
 
     async def get_type_id(self, type):
@@ -144,7 +144,7 @@ class AITHER():
             'WEBRIP': '5',
             'HDTV': '6',
             'ENCODE': '3'
-            }.get(type, '0')
+        }.get(type, '0')
         return type_id
 
     async def get_res_id(self, resolution):
@@ -160,7 +160,7 @@ class AITHER():
             '576i': '7',
             '480p': '8',
             '480i': '9'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def search_existing(self, meta):

@@ -112,7 +112,7 @@ class CBR():
             'MOVIE': '1',
             'TV': '2',
             'ANIMES': '4'
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         if meta['anime'] is True and category_id == '2':
             category_id = '4'
         return category_id
@@ -125,7 +125,7 @@ class CBR():
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6'
-            }.get(type, '0')
+        }.get(type, '0')
         return type_id
 
     async def get_res_id(self, resolution):
@@ -140,7 +140,7 @@ class CBR():
             '480p': '8',
             '480i': '9',
             'Other': '10',
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def search_existing(self, meta):

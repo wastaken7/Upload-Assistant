@@ -8,10 +8,11 @@ import glob
 from unidecode import unidecode
 from urllib.parse import urlparse, quote
 from src.trackers.COMMON import COMMON
-from src.exceptions import *
+from src.exceptions import *  # noqa F403
 from src.console import console
-from datetime import datetime, date
+from datetime import datetime
 from torf import Torrent
+
 
 class HDB():
 
@@ -90,7 +91,7 @@ class HDB():
             '576i': '7',
             '480p': '8',
             '480i': '9'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def get_tags(self, meta):
@@ -313,7 +314,7 @@ class HDB():
                         console.print(data)
                         console.print("\n\n")
                         console.print(up.text)
-                        raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')
+                        raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
 
     async def search_existing(self, meta):

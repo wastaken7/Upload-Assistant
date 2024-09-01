@@ -53,7 +53,7 @@ class Clients():
             await self.qbittorrent(meta['path'], torrent, local_path, remote_path, client, meta['is_disc'], meta['filelist'], meta)
         elif torrent_client.lower() == "deluge":
             if meta['type'] == "DISC":
-                path = os.path.dirname(meta['path'])
+                path = os.path.dirname(meta['path'])  # noqa F841
             self.deluge(meta['path'], torrent_path, torrent, local_path, remote_path, client, meta)
         elif torrent_client.lower() == "watch":
             shutil.copy(torrent_path, client['watch_folder'])
@@ -343,7 +343,7 @@ class Clients():
         client.connect()
         if client.connected is True:
             console.print("Connected to Deluge")
-            isdir = os.path.isdir(path)
+            isdir = os.path.isdir(path)  # noqa F841
             # Remote path mount
             if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
                 path = path.replace(local_path, remote_path)
@@ -395,8 +395,8 @@ class Clients():
                 priority=1,
                 mtime=int(os.path.getmtime(filepath)),
                 completed=(
-                    (offset + fileinfo["length"] + piece_length - 1) // piece_length
-                    - offset // piece_length
+                    (offset + fileinfo["length"] + piece_length - 1) // piece_length -
+                    offset // piece_length
                 ),
             ))
             offset += fileinfo["length"]

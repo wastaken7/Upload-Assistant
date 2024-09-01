@@ -303,7 +303,7 @@ class MTV():
             '576i': '0',
             '480p': '480',
             '480i': '480'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def get_cat_id(self, meta):
@@ -344,7 +344,7 @@ class MTV():
                 'MIXED': '11',
                 'Unknown': '12',
                 'ENCODE': '7'
-                }.get(meta['type'], '0')
+            }.get(meta['type'], '0')
         return type_id
 
     async def get_origin_id(self, meta):

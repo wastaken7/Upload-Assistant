@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from src.args import Args
 from src.console import console
-from src.exceptions import *
+from src.exceptions import *  # noqa: F403
 from src.trackers.PTP import PTP
 from src.trackers.BLU import BLU
 from src.trackers.HDB import HDB
@@ -315,7 +315,6 @@ class Prep():
             meta['sd'] = self.is_sd(meta['resolution'])
 
             mi = None
-            mi_dump = None
 
         elif meta['is_disc'] == "DVD":
             video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta.get('imdb', None))
@@ -542,7 +541,7 @@ class Prep():
         is_disc = None
         videoloc = meta['path']
         bdinfo = None
-        bd_summary = None
+        bd_summary = None  # noqa: F841
         discs = []
         parse = DiscParse()
         for path, directories, files in os. walk(meta['path']):
@@ -863,11 +862,11 @@ class Prep():
             "1280x540p": "720p", "1280x576p": "720p",
             "1024x576p": "576p", "576p": "576p",
             "1024x576i": "576i", "576i": "576i",
-            "854x480p":  "480p", "480p": "480p",
+            "854x480p": "480p", "480p": "480p",
             "854x480i": "480i", "480i": "480i",
             "720x576p": "576p", "576p": "576p",
             "720x576i": "576i", "576i": "576i",
-            "720x480p":  "480p", "480p": "480p",
+            "720x480p": "480p", "480p": "480p",
             "720x480i": "480i", "480i": "480i",
             "15360x8640p": "8640p", "8640p": "8640p",
             "7680x4320p": "4320p", "4320p": "4320p",
@@ -1032,7 +1031,7 @@ class Prep():
         sar = 1
         for track in ifo_mi.tracks:
             if track.track_type == "Video":
-                length = float(track.duration)/1000
+                length = float(track.duration)/1000  # noqa F841
                 par = float(track.pixel_aspect_ratio)
                 dar = float(track.display_aspect_ratio)
                 width = float(track.width)
@@ -1112,50 +1111,50 @@ class Prep():
                                         return voblength, n
                                     else:
                                         return 300, n
-                            try:
-                                voblength, n = _is_vob_good(n, 0, num_screens)
-                                img_time = random.randint(round(voblength/5), round(voblength - voblength/5))
-                                ss_times = self.valid_ss_time(ss_times, num_screens+1, voblength)
-                                ff = ffmpeg.input(f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}", ss=ss_times[-1])
-                                if w_sar != 1 or h_sar != 1:
-                                    ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
-                                (
-                                    ff
-                                    .output(image, vframes=1, pix_fmt="rgb24")
-                                    .overwrite_output()
-                                    .global_args('-loglevel', loglevel)
-                                    .run(quiet=debug)
-                                )
-                            except Exception:
-                                console.print(traceback.format_exc())
-                            self.optimize_images(image)
-                            n += 1
-                            try:
-                                if os.path.getsize(Path(image)) <= 31000000 and self.img_host == "imgbb":
-                                    i += 1
-                                elif os.path.getsize(Path(image)) <= 10000000 and self.img_host in ["imgbox", 'pixhost']:
-                                    i += 1
-                                elif os.path.getsize(Path(image)) <= 75000:
-                                    console.print("[yellow]Image is incredibly small (and is most likely to be a single color), retaking")
-                                    retake = True
-                                    time.sleep(1)
-                                elif self.img_host == "ptpimg":
-                                    i += 1
-                                elif self.img_host == "lensdump":
-                                    i += 1
-                                elif self.img_host == "ptscreens":
-                                    i += 1
-                                else:
-                                    console.print("[red]Image too large for your image host, retaking")
-                                    retake = True
-                                    time.sleep(1)
-                                looped = 0
-                            except Exception:
-                                if looped >= 25:
-                                    console.print('[red]Failed to take screenshots')
-                                    exit()
-                                looped += 1
-                        progress.advance(screen_task)
+                        try:
+                            voblength, n = _is_vob_good(n, 0, num_screens)
+                            # img_time = random.randint(round(voblength/5), round(voblength - voblength/5))
+                            ss_times = self.valid_ss_time(ss_times, num_screens + 1, voblength)
+                            ff = ffmpeg.input(f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}", ss=ss_times[-1])
+                            if w_sar != 1 or h_sar != 1:
+                                ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
+                            (
+                                ff
+                                .output(image, vframes=1, pix_fmt="rgb24")
+                                .overwrite_output()
+                                .global_args('-loglevel', loglevel)
+                                .run(quiet=debug)
+                            )
+                        except Exception:
+                            console.print(traceback.format_exc())
+                        self.optimize_images(image)
+                        n += 1
+                        try:
+                            if os.path.getsize(Path(image)) <= 31000000 and self.img_host == "imgbb":
+                                i += 1
+                            elif os.path.getsize(Path(image)) <= 10000000 and self.img_host in ["imgbox", 'pixhost']:
+                                i += 1
+                            elif os.path.getsize(Path(image)) <= 75000:
+                                console.print("[yellow]Image is incredibly small (and is most likely to be a single color), retaking")
+                                retake = True
+                                time.sleep(1)
+                            elif self.img_host == "ptpimg":
+                                i += 1
+                            elif self.img_host == "lensdump":
+                                i += 1
+                            elif self.img_host == "ptscreens":
+                                i += 1
+                            else:
+                                console.print("[red]Image too large for your image host, retaking")
+                                retake = True
+                                time.sleep(1)
+                            looped = 0
+                        except Exception:
+                            if looped >= 25:
+                                console.print('[red]Failed to take screenshots')
+                                exit()
+                            looped += 1
+                    progress.advance(screen_task)
             # remove smallest image
             smallest = ""
             smallestsize = 99**99
@@ -1291,7 +1290,7 @@ class Prep():
         while valid_time is not True:
             valid_time = True
             if ss_times != []:
-                sst = random.randint(round(length/5), round(length/2))
+                sst = random.randint(round(length / 5), round(length / 2))
                 for each in ss_times:
                     tolerance = length / 10 / num_screens
                     if abs(sst - each) <= tolerance:
@@ -1299,7 +1298,7 @@ class Prep():
                 if valid_time is True:
                     ss_times.append(sst)
             else:
-                ss_times.append(random.randint(round(length/5), round(length/2)))
+                ss_times.append(random.randint(round(length / 5), round(length / 2)))
         return ss_times
 
     def optimize_images(self, image):
@@ -1797,7 +1796,7 @@ class Prep():
                         dual = "Dual-Audio"
                     elif eng and not orig and meta['original_language'] not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
                         dual = "Dubbed"
-                except Exception as e:
+                except Exception:
                     console.print(traceback.format_exc())
                     pass
 
@@ -1855,7 +1854,7 @@ class Prep():
             "DTS-HD High": "DTS-HD HRA",
             "Free Lossless Audio Codec": "FLAC",
             "DTS-HD Master Audio": "DTS-HD MA"
-            }
+        }
 
         search_format = True
         # Ensure commercial and additional are not None before iterating
@@ -1942,7 +1941,7 @@ class Prep():
                         if track.track_type == "Video":
                             system = track.standard
                     if system not in ("PAL", "NTSC"):
-                        raise WeirdSystem
+                        raise WeirdSystem  # noqa: F405
                 except Exception:
                     try:
                         other = guessit(video)['other']
@@ -2391,7 +2390,6 @@ class Prep():
         img_host = meta['imghost']  # Use the correctly updated image host from meta
 
         image_list = []
-        newhost_list = []
 
         if custom_img_list:
             image_glob = custom_img_list
@@ -2499,7 +2497,7 @@ class Prep():
                             break
 
                         # Update progress bar and print the result on the same line
-                        progress.console.print(f"[cyan]Uploaded image {i+1}/{total_screens}: {raw_url}", end='\r')
+                        progress.console.print(f"[cyan]Uploaded image {i + 1}/{total_screens}: {raw_url}", end='\r')
 
                         # Add the image details to the list
                         image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
@@ -2674,7 +2672,7 @@ class Prep():
             if meta['anime'] is False:
                 try:
                     if meta.get('manual_date'):
-                        raise ManualDateException
+                        raise ManualDateException  # noqa: F405
                     try:
                         guess_year = guessit(video)['year']
                     except Exception:
@@ -2780,7 +2778,7 @@ class Prep():
                             url = "https://thexem.info/map/single"
                             response = requests.post(url, params=params).json()
                             if response['result'] == "failure":
-                                raise XEMNotFound
+                                raise XEMNotFound  # noqa: F405
                             if meta['debug']:
                                 console.log(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
                             season_int = int(response['data']['scene']['season'])  # Convert to integer
@@ -2818,7 +2816,7 @@ class Prep():
                                                     season = f"S{str(season_int).zfill(2)}"
                                                     difference = diff
                             else:
-                                raise XEMNotFound
+                                raise XEMNotFound  # noqa: F405
                     except Exception:
                         if meta['debug']:
                             console.print_exception()
@@ -2908,7 +2906,7 @@ class Prep():
             'Velocity': 'VLCT', 'VMEO': 'VMEO', 'Vimeo': 'VMEO', 'VRV': 'VRV', 'VUDU': 'VUDU', 'WME': 'WME', 'WatchMe': 'WME', 'WNET': 'WNET',
             'W Network': 'WNET', 'WWEN': 'WWEN', 'WWE Network': 'WWEN', 'XBOX': 'XBOX', 'Xbox Video': 'XBOX', 'YHOO': 'YHOO', 'Yahoo': 'YHOO',
             'YT': 'YT', 'ZDF': 'ZDF', 'iP': 'iP', 'BBC iPlayer': 'iP', 'iQIYI': 'iQIYI', 'iT': 'iT', 'iTunes': 'iT'
-            }
+        }
 
         video_name = re.sub(r"[.()]", " ", video.replace(tag, '').replace(guess_title, ''))
         if "DTS-HD MA" in audio:
@@ -2972,7 +2970,7 @@ class Prep():
 
         desclink = meta.get('desclink', None)
         descfile = meta.get('descfile', None)
-        ptp_desc = blu_desc = ""
+        ptp_desc = ""
         desc_source = []
         imagelist = []
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
@@ -3021,7 +3019,7 @@ class Prep():
                 description.write("[/code]")
                 description.write("\n")
                 meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from NFO file '{nfo}' used:\n{nfo_content}")
+                console.print(f"[INFO] Description from NFO file '{nfo}' used:\n{nfo_content}")  # noqa: F405
 
             if desclink is not None:
                 parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
@@ -3034,7 +3032,7 @@ class Prep():
                 description.write(requests.get(raw).text)
                 description.write("\n")
                 meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from link '{desclink}' used:\n{desclink_content}")
+                console.print(f"[INFO] Description from link '{desclink}' used:\n{desclink_content}")  # noqa: F405
 
             if descfile is not None:
                 if os.path.isfile(descfile):

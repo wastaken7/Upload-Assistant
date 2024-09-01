@@ -14,7 +14,7 @@ import click
 from pymediainfo import MediaInfo
 from src.trackers.COMMON import COMMON
 from src.bbcode import BBCODE
-from src.exceptions import *
+from src.exceptions import *  # noqa F403
 from src.console import console
 from torf import Torrent
 from datetime import datetime
@@ -33,7 +33,7 @@ class PTP():
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
         self.web_source = str2bool(str(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True)))
         self.user_agent = f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
-        self.banned_groups = ['aXXo',  'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
+        self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
                               'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
                               'WAF', 'x0r', 'YIFY',]
 
@@ -187,8 +187,8 @@ class PTP():
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
-        console.print(f"[bold green]Successfully grabbed description from PTP")
-        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:500]}...")  # Show first 500 characters for brevity
+        console.print("[bold green]Successfully grabbed description from PTP")
+        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...")  # Show first 1000 characters for brevity
 
         # Allow user to edit or discard the description
         console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
@@ -203,7 +203,7 @@ class PTP():
             desc = None
             console.print("[yellow]Description discarded.[/yellow]")
         else:
-            console.print(f"[green]Keeping the original description.[/green]")
+            console.print("[green]Keeping the original description.[/green]")
 
         return desc, imagelist
 
@@ -713,14 +713,14 @@ class PTP():
                         resp = loginresponse.json()
                     try:
                         if resp["Result"] != "Ok":
-                            raise LoginException("Failed to login to PTP. Probably due to the bad user name, password, announce url, or 2FA code.")
+                            raise LoginException("Failed to login to PTP. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
                         AntiCsrfToken = resp["AntiCsrfToken"]
                         with open(cookiefile, 'wb') as cf:
                             pickle.dump(session.cookies, cf)
                     except Exception:
-                        raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {loginresponse.text}")
+                        raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {loginresponse.text}")  # noqa F405
                 except Exception:
-                    raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {loginresponse.text}")
+                    raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {loginresponse.text}")  # noqa F405
         return AntiCsrfToken
 
     async def validate_login(self, response):
@@ -728,7 +728,7 @@ class PTP():
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
             console.print("Looks like you are not logged in to PTP. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
-            raise LoginException("Your PTP request/popcorn quota has been reached, try again later")
+            raise LoginException("Your PTP request/popcorn quota has been reached, try again later")  # noqa F405
         else:
             loggedIn = True
         return loggedIn
@@ -760,7 +760,7 @@ class PTP():
             "subtitles[]": ptp_subtitles,
             "trumpable[]": ptp_trumpable,
             "AntiCsrfToken": await self.get_AntiCsrfToken(meta)
-            }
+        }
         if data["remaster_year"] != "" or data["remaster_title"] != "":
             data["remaster"] = "on"
         if resolution == "Other":
@@ -887,11 +887,11 @@ class PTP():
                     if match is not None:
                         errorMessage = match.group(1)
 
-                    raise UploadException(f"Upload to PTP failed: {errorMessage} ({response.status_code}). (We are still on the upload page.)")
+                    raise UploadException(f"Upload to PTP failed: {errorMessage} ({response.status_code}). (We are still on the upload page.)")  # noqa F405
 
                 # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
                 match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", response.url)
                 if match is None:
                     console.print(url)
                     console.print(data)
-                    raise UploadException(f"Upload to PTP failed: result URL {response.url} ({response.status_code}) is not the expected one.")
+                    raise UploadException(f"Upload to PTP failed: result URL {response.url} ({response.status_code}) is not the expected one.")  # noqa F405

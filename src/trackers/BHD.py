@@ -53,7 +53,7 @@ class BHD():
         torrent_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
         files = {
             'mediainfo': mi_dump,
-            }
+        }
         if os.path.exists(torrent_file):
             open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
             files['file'] = open_torrent.read()
@@ -123,7 +123,7 @@ class BHD():
         category_id = {
             'MOVIE': '1',
             'TV': '2',
-            }.get(category_name, '1')
+        }.get(category_name, '1')
         return category_id
 
     async def get_source(self, source):
@@ -135,7 +135,7 @@ class BHD():
             "Web": "WEB",
             "HDTV": "HDTV",
             "UHDTV": "HDTV",
-            "NTSC": "DVD",  "NTSC DVD": "DVD",
+            "NTSC": "DVD", "NTSC DVD": "DVD",
             "PAL": "DVD", "PAL DVD": "DVD",
         }
 

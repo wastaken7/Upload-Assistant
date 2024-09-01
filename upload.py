@@ -136,11 +136,11 @@ async def do_the_thing(base_dir):
             p1 = split_path[0]
             for i, each in enumerate(split_path):
                 try:
-                    if os.path.exists(p1) and not os.path.exists(f"{p1} {split_path[i+1]}"):
+                    if os.path.exists(p1) and not os.path.exists(f"{p1} {split_path[i + 1]}"):
                         queue.append(p1)
-                        p1 = split_path[i+1]
+                        p1 = split_path[i + 1]
                     else:
-                        p1 += f" {split_path[i+1]}"
+                        p1 += f" {split_path[i + 1]}"
                 except IndexError:
                     if os.path.exists(p1):
                         queue.append(p1)

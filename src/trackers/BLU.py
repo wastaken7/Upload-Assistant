@@ -123,7 +123,7 @@ class BLU():
             'MOVIE': '1',
             'TV': '2',
             'FANRES': '3'
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         if category_name == 'MOVIE' and 'FANRES' in edition:
             category_id = '3'
         return category_id
@@ -136,7 +136,7 @@ class BLU():
             'WEBRIP': '5',
             'HDTV': '6',
             'ENCODE': '12'
-            }.get(type, '0')
+        }.get(type, '0')
         return type_id
 
     async def get_res_id(self, resolution):
@@ -152,7 +152,7 @@ class BLU():
             '576i': '7',
             '480p': '8',
             '480i': '9'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     async def derived_dv_layer(self, meta):

@@ -32,7 +32,7 @@ class ACM():
         category_id = {
             'MOVIE': '1',
             'TV': '2',
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         return category_id
 
     async def get_type(self, meta):
@@ -84,7 +84,7 @@ class ACM():
             'SDTV': '13',
             'DVD 9': '16',
             'HDTV': '17'
-            }.get(type, '0')
+        }.get(type, '0')
         return type_id
 
     async def get_res_id(self, resolution):
@@ -97,7 +97,7 @@ class ACM():
             '576i': '4',
             '480p': '5',
             '480i': '5'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     # ACM rejects uploads with more that 4 keywords
@@ -304,7 +304,7 @@ class ACM():
         name = meta.get('name')
         aka = meta.get('aka')
         original_title = meta.get('original_title')
-        year = str(meta.get('year'))
+        year = str(meta.get('year'))  # noqa F841
         audio = meta.get('audio')
         source = meta.get('source')
         is_disc = meta.get('is_disc')

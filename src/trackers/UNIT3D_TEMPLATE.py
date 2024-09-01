@@ -19,7 +19,7 @@ class UNIT3D_TEMPLATE():
     """
 
     ###############################################################
-    ########                    EDIT ME                    ########
+    ########                    EDIT ME                    ######## noqa E266
     ###############################################################
 
     # ALSO EDIT CLASS NAME ABOVE
@@ -38,7 +38,7 @@ class UNIT3D_TEMPLATE():
         category_id = {
             'MOVIE': '1',
             'TV': '2',
-            }.get(category_name, '0')
+        }.get(category_name, '0')
         return category_id
 
     async def get_type_id(self, type):
@@ -49,7 +49,7 @@ class UNIT3D_TEMPLATE():
             'WEBRIP': '5',
             'HDTV': '6',
             'ENCODE': '3'
-            }.get(type, '0')
+        }.get(type, '0')
         return type_id
 
     async def get_res_id(self, resolution):
@@ -65,11 +65,11 @@ class UNIT3D_TEMPLATE():
             '576i': '7',
             '480p': '8',
             '480i': '9'
-            }.get(resolution, '10')
+        }.get(resolution, '10')
         return resolution_id
 
     ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######
+    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ###### noqa E266
     ###############################################################
 
     async def upload(self, meta):

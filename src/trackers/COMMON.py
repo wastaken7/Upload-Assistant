@@ -143,7 +143,7 @@ class COMMON():
         return distributor_id
 
     async def unit3d_torrent_info(self, tracker, torrent_url, search_url, id=None, file_name=None):
-        tmdb = imdb = tvdb = description = category = infohash = mal = files = None
+        tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist = []
 
         # Build the params for the API request
