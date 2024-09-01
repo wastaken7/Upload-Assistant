@@ -90,11 +90,7 @@ class Prep():
         manual_key = f"{tracker_key}_manual"
         found_match = False
 
-        # console.print(f"[cyan]Starting update_metadata_from_tracker for: {tracker_name}[/cyan]")
-
-        # Handle each tracker separately
         if tracker_name == "BLU":
-            # console.print(f"[blue]Handling BLU tracker[/blue]")
             if meta.get(tracker_key) is not None:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
                 blu_tmdb, blu_imdb, blu_tvdb, blu_mal, blu_desc, blu_category, meta['ext_torrenthash'], blu_imagelist, blu_filename = await COMMON(self.config).unit3d_torrent_info(
@@ -103,33 +99,29 @@ class Prep():
                     tracker_instance.search_url,
                     id=meta[tracker_key]
                 )
-                # console.print(f"[blue]BLU search by ID complete[/blue]")
                 if blu_tmdb not in [None, '0'] or blu_imdb not in [None, '0'] or blu_tvdb not in [None, '0']:
                     console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
-                    if await self.prompt_user_for_id_selection(blu_tmdb, blu_imdb, blu_tvdb, blu_filename):
-                        if blu_tmdb not in [None, '0']:
-                            meta['tmdb_manual'] = blu_tmdb
-                        if blu_imdb not in [None, '0']:
-                            meta['imdb'] = str(blu_imdb).zfill(7)  # Pad IMDb ID with leading zeros
-                        if blu_tvdb not in [None, '0']:
-                            meta['tvdb_id'] = blu_tvdb
-                        if blu_mal not in [None, '0']:
-                            meta['mal'] = blu_mal
-                        if blu_desc not in [None, '0', '']:
-                            meta['blu_desc'] = blu_desc
-                        if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
-                            meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
-                                meta['image_list'] = blu_imagelist
-                                if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                                    await self.handle_image_list(meta, tracker_name)
-                        if blu_filename:
-                            meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
-                        found_match = True
-                        console.print("[green]BLU data successfully updated in meta[/green]")
-                    else:
-                        console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
+                    if blu_tmdb not in [None, '0']:
+                        meta['tmdb_manual'] = blu_tmdb
+                    if blu_imdb not in [None, '0']:
+                        meta['imdb'] = str(blu_imdb).zfill(7)  # Pad IMDb ID with leading zeros
+                    if blu_tvdb not in [None, '0']:
+                        meta['tvdb_id'] = blu_tvdb
+                    if blu_mal not in [None, '0']:
+                        meta['mal'] = blu_mal
+                    if blu_desc not in [None, '0', '']:
+                        meta['blu_desc'] = blu_desc
+                    if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
+                        meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
+                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                        if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
+                            meta['image_list'] = blu_imagelist
+                            if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                                await self.handle_image_list(meta, tracker_name)
+                    if blu_filename:
+                        meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
+                    found_match = True
+                    console.print("[green]BLU data successfully updated in meta[/green]")
                 else:
                     console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             else:
@@ -140,33 +132,32 @@ class Prep():
                     tracker_instance.search_url,
                     file_name=search_term
                 )
-                # console.print(f"[blue]BLU search by file name complete[/blue]")
+
                 if blu_tmdb not in [None, '0'] or blu_imdb not in [None, '0'] or blu_tvdb not in [None, '0']:
                     console.print(f"[green]Valid data found on {tracker_name} using file name, setting meta values[/green]")
-                    if await self.prompt_user_for_id_selection(blu_tmdb, blu_imdb, blu_tvdb, blu_filename):
-                        if blu_tmdb not in [None, '0']:
-                            meta['tmdb_manual'] = blu_tmdb
-                        if blu_imdb not in [None, '0']:
-                            meta['imdb'] = str(blu_imdb).zfill(7)
-                        if blu_tvdb not in [None, '0']:
-                            meta['tvdb_id'] = blu_tvdb
-                        if blu_mal not in [None, '0']:
-                            meta['mal'] = blu_mal
-                        if blu_desc not in [None, '0', '']:
-                            meta['blu_desc'] = blu_desc
-                        if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
-                            meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
-                                meta['image_list'] = blu_imagelist
-                                if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                                    await self.handle_image_list(meta, tracker_name)
-                        if blu_filename:
-                            meta['blu_filename'] = blu_filename
-                        found_match = True
-                        console.print("[green]BLU data successfully updated in meta[/green]")
-                    else:
-                        console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
+
+                    if blu_tmdb not in [None, '0']:
+                        meta['tmdb_manual'] = blu_tmdb
+                    if blu_imdb not in [None, '0']:
+                        meta['imdb'] = str(blu_imdb).zfill(7)
+                    if blu_tvdb not in [None, '0']:
+                        meta['tvdb_id'] = blu_tvdb
+                    if blu_mal not in [None, '0']:
+                        meta['mal'] = blu_mal
+                    if blu_desc not in [None, '0', '']:
+                        meta['blu_desc'] = blu_desc
+                    if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
+                        meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
+                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                        if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
+                            meta['image_list'] = blu_imagelist
+                            if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                                await self.handle_image_list(meta, tracker_name)
+                    if blu_filename:
+                        meta['blu_filename'] = blu_filename
+
+                    found_match = True
+                    console.print("[green]BLU data successfully updated in meta[/green]")
                 else:
                     console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
 
