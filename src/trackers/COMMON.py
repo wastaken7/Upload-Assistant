@@ -162,12 +162,17 @@ class COMMON():
         if filename:
             console.print(f"Filename: {filename}")  # Ensure filename is printed if available
 
-        selection = input(f"Do you want to use these IDs from {tracker_name}? (y/n): ").strip().lower()
-        return selection == 'y'
+        selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
+        if selection == '' or selection == 'y' or selection == 'yes':
+            return True
+        else:
+            return False
 
     async def prompt_user_for_confirmation(self, message):
-        selection = input(f"{message} (y/n): ").strip().lower()
-        return selection == 'y'
+        response = input(f"{message} (Y/n): ").strip().lower()
+        if response == '' or response == 'y':
+            return True
+        return False
 
     async def unit3d_torrent_info(self, tracker, torrent_url, search_url, id=None, file_name=None):
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
