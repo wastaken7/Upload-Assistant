@@ -175,6 +175,7 @@ class Prep():
                 found_match = True
             else:
                 console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+                found_match = False
 
         elif tracker_name == "PTP":
             imdb_id = None  # Ensure imdb_id is defined
@@ -211,7 +212,7 @@ class Prep():
 
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
-                    found_match = True
+                    found_match = False
                     meta['skip_gen_desc'] = True
                     meta['description'] = None
             else:
@@ -223,6 +224,7 @@ class Prep():
                     console.print(f"[green]IMDb ID found: tt{meta['imdb']}[/green]")
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
+                    found_match = False
 
                 # Retrieve PTP description and image list
                 ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta.get('is_disc', False))
