@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - develop
-      - ID-and-Description
+      - unit3d-searching
 
 env:
   REGISTRY: ghcr.io

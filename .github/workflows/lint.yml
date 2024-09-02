@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - master
+      - unit3d-searching
   pull_request:
     branches:
       - master
