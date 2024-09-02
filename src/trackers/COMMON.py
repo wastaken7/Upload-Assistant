@@ -142,20 +142,27 @@ class COMMON():
         }.get(distributor, 0)
         return distributor_id
 
-    async def prompt_user_for_id_selection(self, blu_tmdb=None, blu_imdb=None, blu_tvdb=None, blu_filename=None, imdb=None):
+    async def prompt_user_for_id_selection(self, tmdb=None, imdb=None, tvdb=None, filename=None, tracker_name=None):
+        if not tracker_name:
+            tracker_name = "Tracker"  # Fallback if tracker_name is not provided
+
         if imdb:
             imdb = str(imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
             console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}[/cyan]")
-        if blu_tmdb or blu_imdb or blu_tvdb:
-            if blu_imdb:
-                blu_imdb = str(blu_imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
-            console.print("[cyan]Found the following IDs on BLU:")
-            console.print(f"TMDb ID: {blu_tmdb}")
-            console.print(f"IMDb ID: https://www.imdb.com/title/tt{blu_imdb}")
-            console.print(f"TVDb ID: {blu_tvdb}")
-            console.print(f"Filename: {blu_filename}")  # Ensure filename is printed if available
 
-        selection = input("Do you want to use this ID? (y/n): ").strip().lower()
+        if any([tmdb, imdb, tvdb]):
+            console.print(f"[cyan]Found the following IDs on {tracker_name}:")
+            if tmdb:
+                console.print(f"TMDb ID: {tmdb}")
+            if imdb:
+                console.print(f"IMDb ID: https://www.imdb.com/title/tt{imdb}")
+            if tvdb:
+                console.print(f"TVDb ID: {tvdb}")
+
+        if filename:
+            console.print(f"Filename: {filename}")  # Ensure filename is printed if available
+
+        selection = input(f"Do you want to use these IDs from {tracker_name}? (y/n): ").strip().lower()
         return selection == 'y'
 
     async def prompt_user_for_confirmation(self, message):

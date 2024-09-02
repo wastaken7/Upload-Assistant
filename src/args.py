@@ -44,6 +44,8 @@ class Args():
         parser.add_argument('-year', '--year', dest='manual_year', nargs='?', required=False, help="Year", type=int, default=0)
         parser.add_argument('-ptp', '--ptp', nargs='*', required=False, help="PTP torrent id/permalink", type=str)
         parser.add_argument('-blu', '--blu', nargs='*', required=False, help="BLU torrent id/link", type=str)
+        parser.add_argument('-aither', '--aither', nargs='*', required=False, help="Aither torrent id/link", type=str)
+        parser.add_argument('-lst', '--lst', nargs='*', required=False, help="LST torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs='*', required=False, help="HDB torrent id/link", type=str)
         parser.add_argument('-d', '--desc', nargs='*', required=False, help="Custom Description (string)")
         parser.add_argument('-pb', '--desclink', nargs='*', required=False, help="Custom Description (link to hastebin/pastebin)")
@@ -136,6 +138,32 @@ class Args():
                                 console.print('[red]Continuing without --blu')
                         else:
                             meta['blu'] = value2
+                    elif key == 'aither':
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                aitherpath = parsed.path
+                                if aitherpath.endswith('/'):
+                                    aitherpath = aitherpath[:-1]
+                                meta['aither'] = aitherpath.split('/')[-1]
+                            except Exception:
+                                console.print('[red]Unable to parse id from url')
+                                console.print('[red]Continuing without --aither')
+                        else:
+                            meta['aither'] = value2
+                    elif key == 'lst':
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                lstpath = parsed.path
+                                if lstpath.endswith('/'):
+                                    lstpath = lstpath[:-1]
+                                meta['lst'] = lstpath.split('/')[-1]
+                            except Exception:
+                                console.print('[red]Unable to parse id from url')
+                                console.print('[red]Continuing without --lst')
+                        else:
+                            meta['lst'] = value2
                     elif key == 'hdb':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)

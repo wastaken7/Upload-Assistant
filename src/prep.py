@@ -4,6 +4,8 @@ from src.console import console
 from src.exceptions import *  # noqa: F403
 from src.trackers.PTP import PTP
 from src.trackers.BLU import BLU
+from src.trackers.AITHER import AITHER
+from src.trackers.LST import LST
 from src.trackers.HDB import HDB
 from src.trackers.COMMON import COMMON
 
@@ -65,101 +67,83 @@ class Prep():
         self.img_host = img_host.lower()
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
-    async def prompt_user_for_id_selection(self, blu_tmdb=None, blu_imdb=None, blu_tvdb=None, blu_filename=None, imdb=None):
+    async def prompt_user_for_id_selection(self, tmdb=None, imdb=None, tvdb=None, filename=None, tracker_name="BLU"):
         if imdb:
             imdb = str(imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
-            console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}")
-        if blu_tmdb or blu_imdb or blu_tvdb:
-            if blu_imdb:
-                blu_imdb = str(blu_imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
-            console.print("[cyan]Found the following IDs on BLU:")
-            console.print(f"TMDb ID: {blu_tmdb}")
-            console.print(f"IMDb ID: https://www.imdb.com/title/tt{blu_imdb}")
-            console.print(f"TVDb ID: {blu_tvdb}")
-            console.print(f"Filename: {blu_filename}")
+            console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}[/cyan]")
+        if tmdb or imdb or tvdb:
+            if imdb:
+                imdb = str(imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
+            console.print(f"[cyan]Found the following IDs on {tracker_name}:")
+            console.print(f"TMDb ID: {tmdb}")
+            console.print(f"IMDb ID: https://www.imdb.com/title/tt{imdb}")
+            console.print(f"TVDb ID: {tvdb}")
+            console.print(f"Filename: {filename}")  # Ensure filename is printed if available
 
-        selection = input("Do you want to use this ID? (y/n): ").strip().lower()
+        selection = input(f"Do you want to use these IDs from {tracker_name}? (y/n): ").strip().lower()
         return selection == 'y'
 
     async def prompt_user_for_confirmation(self, message):
-        selection = input(f"{message} (y/n): ").strip().lower()
-        return selection == 'y'
+        response = input(f"{message} (Y/n): ").strip().lower()
+        if response == '' or response == 'y':
+            return True
+        return False
+
+    async def update_meta_with_unit3d_data(self, meta, tracker_data, tracker_name):
+        # Unpack the expected 9 elements, ignoring any additional ones
+        tmdb, imdb, tvdb, mal, desc, category, infohash, imagelist, filename, *rest = tracker_data
+
+        if tmdb not in [None, '0']:
+            meta['tmdb_manual'] = tmdb
+        if imdb not in [None, '0']:
+            meta['imdb'] = str(imdb).zfill(7)
+        if tvdb not in [None, '0']:
+            meta['tvdb_id'] = tvdb
+        if mal not in [None, '0']:
+            meta['mal'] = mal
+        if desc not in [None, '0', '']:
+            meta[f'{tracker_name.lower()}_desc'] = desc
+        if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
+            meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
+        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+            if imagelist:  # Ensure imagelist is not empty before setting
+                meta['image_list'] = imagelist
+                if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                    await self.handle_image_list(meta, tracker_name)
+        if filename:
+            meta[f'{tracker_name.lower()}_filename'] = filename
+
+        console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
 
     async def update_metadata_from_tracker(self, tracker_name, tracker_instance, meta, search_term, search_file_folder):
         tracker_key = tracker_name.lower()
         manual_key = f"{tracker_key}_manual"
         found_match = False
 
-        if tracker_name == "BLU":
+        if tracker_name in ["BLU", "AITHER", "LST", ]:  # Example for UNIT3D trackers
             if meta.get(tracker_key) is not None:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
-                blu_tmdb, blu_imdb, blu_tvdb, blu_mal, blu_desc, blu_category, meta['ext_torrenthash'], blu_imagelist, blu_filename = await COMMON(self.config).unit3d_torrent_info(
-                    "BLU",
+                tracker_data = await COMMON(self.config).unit3d_torrent_info(
+                    tracker_name,
                     tracker_instance.torrent_url,
                     tracker_instance.search_url,
                     id=meta[tracker_key]
                 )
-                if blu_tmdb not in [None, '0'] or blu_imdb not in [None, '0'] or blu_tvdb not in [None, '0']:
-                    console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
-                    if blu_tmdb not in [None, '0']:
-                        meta['tmdb_manual'] = blu_tmdb
-                    if blu_imdb not in [None, '0']:
-                        meta['imdb'] = str(blu_imdb).zfill(7)  # Pad IMDb ID with leading zeros
-                    if blu_tvdb not in [None, '0']:
-                        meta['tvdb_id'] = blu_tvdb
-                    if blu_mal not in [None, '0']:
-                        meta['mal'] = blu_mal
-                    if blu_desc not in [None, '0', '']:
-                        meta['blu_desc'] = blu_desc
-                    if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
-                        meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
-                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                        if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
-                            meta['image_list'] = blu_imagelist
-                            if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                                await self.handle_image_list(meta, tracker_name)
-                    if blu_filename:
-                        meta['blu_filename'] = blu_filename  # Store the filename in meta for later use
-                    found_match = True
-                    console.print("[green]BLU data successfully updated in meta[/green]")
-                else:
-                    console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             else:
-                console.print("[yellow]No ID found in meta for BLU, searching by file name[/yellow]")
-                blu_tmdb, blu_imdb, blu_tvdb, blu_mal, blu_desc, blu_category, meta['ext_torrenthash'], blu_imagelist, blu_filename = await COMMON(self.config).unit3d_torrent_info(
-                    "BLU",
+                console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
+                tracker_data = await COMMON(self.config).unit3d_torrent_info(
+                    tracker_name,
                     tracker_instance.torrent_url,
                     tracker_instance.search_url,
                     file_name=search_term
                 )
 
-                if blu_tmdb not in [None, '0'] or blu_imdb not in [None, '0'] or blu_tvdb not in [None, '0']:
-                    console.print(f"[green]Valid data found on {tracker_name} using file name, setting meta values[/green]")
-
-                    if blu_tmdb not in [None, '0']:
-                        meta['tmdb_manual'] = blu_tmdb
-                    if blu_imdb not in [None, '0']:
-                        meta['imdb'] = str(blu_imdb).zfill(7)
-                    if blu_tvdb not in [None, '0']:
-                        meta['tvdb_id'] = blu_tvdb
-                    if blu_mal not in [None, '0']:
-                        meta['mal'] = blu_mal
-                    if blu_desc not in [None, '0', '']:
-                        meta['blu_desc'] = blu_desc
-                    if blu_category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
-                        meta['category'] = 'TV' if blu_category.upper() == 'TV SHOW' else blu_category.upper()
-                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                        if blu_imagelist:  # Ensure blu_imagelist is not empty before setting
-                            meta['image_list'] = blu_imagelist
-                            if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                                await self.handle_image_list(meta, tracker_name)
-                    if blu_filename:
-                        meta['blu_filename'] = blu_filename
-
-                    found_match = True
-                    console.print("[green]BLU data successfully updated in meta[/green]")
-                else:
-                    console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+            if any(item not in [None, '0'] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
+                console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
+                await self.update_meta_with_unit3d_data(meta, tracker_data, tracker_name)
+                found_match = True
+            else:
+                console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
 
         elif tracker_name == "PTP":
             imdb_id = None  # Ensure imdb_id is defined
@@ -247,7 +231,6 @@ class Prep():
                     else:
                         found_match = False
 
-        # console.print(f"[cyan]Finished processing tracker: {tracker_name} with found_match: {found_match}[/cyan]")
         return meta, found_match
 
     async def handle_image_list(self, meta, tracker_name):
@@ -397,6 +380,10 @@ class Prep():
                 specific_tracker = 'HDB'
             elif meta.get('blu'):
                 specific_tracker = 'BLU'
+            elif meta.get('aither'):
+                specific_tracker = 'AITHER'
+            elif meta.get('lst'):
+                specific_tracker = 'LST'
 
             # If a specific tracker is found, only process that one
             if specific_tracker:
@@ -411,6 +398,18 @@ class Prep():
                 elif specific_tracker == 'BLU' and str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                     blu = BLU(config=self.config)
                     meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
+                    if match:
+                        found_match = True
+
+                elif specific_tracker == 'AITHER' and str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
+                    aither = AITHER(config=self.config)
+                    meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
+                    if match:
+                        found_match = True
+
+                elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
+                    lst = LST(config=self.config)
+                    meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
                     if match:
                         found_match = True
 
