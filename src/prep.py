@@ -76,6 +76,19 @@ class Prep():
             return True
         return False
 
+    async def check_images_concurrently(self, imagelist):
+        async def check_and_collect(image_dict):
+            img_url = image_dict.get('img_url') or image_dict.get('raw_url')
+            if img_url and await self.check_image_link(img_url):
+                return image_dict
+            else:
+                console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                return None
+
+        tasks = [check_and_collect(image_dict) for image_dict in imagelist]
+        results = await asyncio.gather(*tasks)
+        return [image for image in results if image is not None]
+
     async def check_image_link(self, url):
         async with aiohttp.ClientSession() as session:
             try:
@@ -90,7 +103,7 @@ class Prep():
                                 image.verify()  # This will check if the image is broken
                                 console.print(f"[green]Image verified successfully: {url}[/green]")
                                 return True
-                            except (IOError, SyntaxError) as e:
+                            except (IOError, SyntaxError) as e:  # noqa #F841
                                 console.print(f"[red]Image verification failed (corrupt image): {url}[/red]")
                                 return False
                         else:
@@ -122,13 +135,7 @@ class Prep():
 
         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
             if imagelist:  # Ensure imagelist is not empty before setting
-                valid_images = []
-                for image_dict in imagelist:
-                    img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
-                    if img_url and await self.check_image_link(img_url):
-                        valid_images.append(image_dict)
-                    else:
-                        console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                valid_images = await self.check_images_concurrently(imagelist)
                 if valid_images:
                     meta['image_list'] = valid_images
                     if meta.get('image_list'):  # Double-check if image_list is set before handling it
@@ -189,13 +196,7 @@ class Prep():
                         meta['description'] = ptp_desc
 
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            valid_images = []
-                            for image_dict in ptp_imagelist:
-                                img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
-                                if img_url and await self.check_image_link(img_url):
-                                    valid_images.append(image_dict)
-                                else:
-                                    console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                            valid_images = await self.check_images_concurrently(ptp_imagelist)
                             if valid_images:
                                 meta['image_list'] = valid_images
                                 await self.handle_image_list(meta, tracker_name)
@@ -228,13 +229,7 @@ class Prep():
                 meta['description'] = ptp_desc
 
                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                    valid_images = []
-                    for image_dict in ptp_imagelist:
-                        img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
-                        if img_url and await self.check_image_link(img_url):
-                            valid_images.append(image_dict)
-                        else:
-                            console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                    valid_images = await self.check_images_concurrently(ptp_imagelist)
                     if valid_images:
                         meta['image_list'] = valid_images
                         await self.handle_image_list(meta, tracker_name)
