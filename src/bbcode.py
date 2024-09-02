@@ -201,6 +201,7 @@ class BBCODE:
         # Filter out bot images from imagelist
         bot_image_urls = [
             "https://blutopia.xyz/favicon.ico",  # Example bot image URL
+            "https://i.ibb.co/2NVWb0c/uploadrr.webp",
             # Add any other known bot image URLs here
         ]
         imagelist = [img for img in imagelist if img['img_url'] not in bot_image_urls]
