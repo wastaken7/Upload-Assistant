@@ -44,6 +44,9 @@ try:
     import cli_ui
     from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
     import platform
+    import aiohttp
+    from PIL import Image
+    import io
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
     console.print('[bold red]Missing Module Found. Please reinstall required dependancies.')
@@ -73,6 +76,33 @@ class Prep():
             return True
         return False
 
+    async def check_image_link(self, url):
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        content_type = response.headers.get('Content-Type', '').lower()
+                        if 'image' in content_type:
+                            # Attempt to load the image
+                            image_data = await response.read()
+                            try:
+                                image = Image.open(io.BytesIO(image_data))
+                                image.verify()  # This will check if the image is broken
+                                console.print(f"[green]Image verified successfully: {url}[/green]")
+                                return True
+                            except (IOError, SyntaxError) as e:
+                                console.print(f"[red]Image verification failed (corrupt image): {url}[/red]")
+                                return False
+                        else:
+                            console.print(f"[red]Content type is not an image: {url}[/red]")
+                            return False
+                    else:
+                        console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status})[/red]")
+                        return False
+            except Exception as e:
+                console.print(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
+                return False
+
     async def update_meta_with_unit3d_data(self, meta, tracker_data, tracker_name):
         # Unpack the expected 9 elements, ignoring any additional ones
         tmdb, imdb, tvdb, mal, desc, category, infohash, imagelist, filename, *rest = tracker_data
@@ -89,11 +119,21 @@ class Prep():
             meta[f'{tracker_name.lower()}_desc'] = desc
         if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
             meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
+
         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
             if imagelist:  # Ensure imagelist is not empty before setting
-                meta['image_list'] = imagelist
-                if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                    await self.handle_image_list(meta, tracker_name)
+                valid_images = []
+                for image_dict in imagelist:
+                    img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
+                    if img_url and await self.check_image_link(img_url):
+                        valid_images.append(image_dict)
+                    else:
+                        console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                if valid_images:
+                    meta['image_list'] = valid_images
+                    if meta.get('image_list'):  # Double-check if image_list is set before handling it
+                        await self.handle_image_list(meta, tracker_name)
+
         if filename:
             meta[f'{tracker_name.lower()}_filename'] = filename
 
@@ -147,10 +187,19 @@ class Prep():
                         # Retrieve PTP description and image list
                         ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta.get('is_disc', False))
                         meta['description'] = ptp_desc
+
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            meta['image_list'] = ptp_imagelist
-                            if meta.get('image_list'):
+                            valid_images = []
+                            for image_dict in ptp_imagelist:
+                                img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
+                                if img_url and await self.check_image_link(img_url):
+                                    valid_images.append(image_dict)
+                                else:
+                                    console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                            if valid_images:
+                                meta['image_list'] = valid_images
                                 await self.handle_image_list(meta, tracker_name)
+
                         meta['skip_gen_desc'] = True
                         console.print("[green]PTP images added to metadata.[/green]")
 
@@ -177,10 +226,19 @@ class Prep():
                 # Retrieve PTP description and image list
                 ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta.get('is_disc', False))
                 meta['description'] = ptp_desc
+
                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                    meta['image_list'] = ptp_imagelist
-                    if meta.get('image_list'):
+                    valid_images = []
+                    for image_dict in ptp_imagelist:
+                        img_url = image_dict.get('img_url') or image_dict.get('raw_url')  # Use img_url or raw_url
+                        if img_url and await self.check_image_link(img_url):
+                            valid_images.append(image_dict)
+                        else:
+                            console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+                    if valid_images:
+                        meta['image_list'] = valid_images
                         await self.handle_image_list(meta, tracker_name)
+
                 meta['skip_gen_desc'] = True
                 console.print("[green]PTP images added to metadata.[/green]")
 
