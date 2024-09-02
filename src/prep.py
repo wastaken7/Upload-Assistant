@@ -184,9 +184,6 @@ class Prep():
                 meta['skip_gen_desc'] = True
                 console.print("[green]PTP images added to metadata.[/green]")
 
-            console.print(f"[yellow]Skipped {tracker_name}, moving to the next site.[/yellow]")
-            meta['skip_gen_desc'] = True
-
         elif tracker_name == "HDB":
             if meta.get('hdb') is not None:
                 meta[manual_key] = meta[tracker_key]
