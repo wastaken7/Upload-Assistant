@@ -286,12 +286,21 @@ class Prep():
             console.print(f"[cyan]Found the following images from {tracker_name}:")
             for img in meta['image_list']:
                 console.print(f"[blue]{img}[/blue]")
+
+            approved_image_hosts = ['ptpimg', 'imgbox']
+
+            # Check if the images are already hosted on an approved image host
+            if all(any(host in img for host in approved_image_hosts) for img in meta['image_list']):
+                image_list = meta['image_list']  # noqa #F841
+            else:
+                console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
+
             keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
             if not keep_images:
                 meta['image_list'] = []
-                console.print(f"[yellow]Images discarded from {tracker_name}")
+                console.print(f"[yellow]Images discarded from {tracker_name}.")
             else:
-                console.print(f"[green]Images retained from {tracker_name}")
+                console.print(f"[green]Images retained from {tracker_name}.")
 
     async def gather_prep(self, meta, mode):
         meta['mode'] = mode
