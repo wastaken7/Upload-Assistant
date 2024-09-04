@@ -169,7 +169,7 @@ async def do_the_thing(base_dir):
                 for key, value in saved_meta.items():
                     overwrite_list = [
                         'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
-                        'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft', 'region', 'freeleech',
+                        'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft', 'modq', 'region', 'freeleech',
                         'personalrelease', 'unattended', 'season', 'episode', 'torrent_creation', 'qbit_tag', 'qbit_cat', 'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs'
                     ]
                     if meta.get(key, None) != value and key in overwrite_list:
@@ -247,7 +247,7 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'LST', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
@@ -345,6 +345,29 @@ async def do_the_thing(base_dir):
                     if meta['upload'] is True:
                         await bhd.upload(meta)
                         await client.add_to_client(meta, "BHD")
+
+            if tracker == "LST":
+                lst = LST(config=config)
+                modq, draft = await asyncio.gather(lst.get_flag(meta, 'modq'), lst.get_flag(meta, 'draft'))
+                
+                modq = 'Yes' if modq else 'No'
+                draft = 'Yes' if draft else 'No'
+                
+                upload_to_lst = meta['unattended'] or cli_ui.ask_yes_no(f"Upload to LST? (draft: {draft}) (modq: {modq}) {debug}", default=meta['unattended'])
+                if not upload_to_lst:
+                    return
+                
+                console.print("Uploading to LST")
+
+                if check_banned_group('LST', lst.banned_groups, meta):
+                    return
+                
+                dupes = await lst.search_existing(meta)
+                dupes = await common.filter_dupes(dupes, meta)
+                meta = dupe_check(dupes, meta)
+                if meta['upload']:
+                    await lst.upload(meta)
+                    await client.add_to_client(meta, lst.tracker)
 
             if tracker == "THR":
                 if meta['unattended']:

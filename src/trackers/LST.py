@@ -75,6 +75,8 @@ class LST():
         cat_id = await self.get_cat_id(meta['category'], meta.get('keywords', ''), meta.get('service', ''))
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
+        modq = await self.get_flag(meta, 'modq')
+        draft = await self.get_flag(meta, 'draft')
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -119,6 +121,8 @@ class LST():
             'free': 0,
             'doubleup': 0,
             'sticky': 0,
+            'mod_queue_opt_in': modq,
+            'draft_queue_opt_in': draft,
         }
 
         # Internal
@@ -151,6 +155,12 @@ class LST():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag:
+            return 1
+        return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta):
         dupes = []

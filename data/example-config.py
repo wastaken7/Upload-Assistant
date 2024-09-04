@@ -151,7 +151,9 @@ config = {
         "LST": {
             "api_key": "LST api key",
             "announce_url": "https://lst.gg/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
+            # "modq" : False,
+            # "draft" : False
         },
         "LT": {
             "api_key": "LT api key",
