@@ -104,7 +104,7 @@ class AITHER():
 
     async def edit_name(self, meta):
         aither_name = meta['name']
-        
+
         # Helper function to check if English audio is present
         def has_english_audio(tracks, is_bdmv=False):
             for track in tracks:
@@ -115,7 +115,7 @@ class AITHER():
                     if isinstance(track.get('Language'), str) and track.get('Language').startswith('en'):
                         return True
             return False
-        
+
         # Helper function to get audio language
         def get_audio_lang(tracks, is_bdmv=False):
             if is_bdmv:
@@ -126,7 +126,7 @@ class AITHER():
             try:
                 with open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json", 'r', encoding='utf-8') as f:
                     mi = json.load(f)
-                
+
                 audio_tracks = mi['media']['track']
                 has_eng_audio = has_english_audio(audio_tracks)
                 if not has_eng_audio:
