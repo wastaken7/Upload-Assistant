@@ -349,19 +349,19 @@ async def do_the_thing(base_dir):
             if tracker == "LST":
                 lst = LST(config=config)
                 modq, draft = await asyncio.gather(lst.get_flag(meta, 'modq'), lst.get_flag(meta, 'draft'))
-                
+
                 modq = 'Yes' if modq else 'No'
                 draft = 'Yes' if draft else 'No'
-                
+
                 upload_to_lst = meta['unattended'] or cli_ui.ask_yes_no(f"Upload to LST? (draft: {draft}) (modq: {modq}) {debug}", default=meta['unattended'])
                 if not upload_to_lst:
                     return
-                
+
                 console.print("Uploading to LST")
 
                 if check_banned_group('LST', lst.banned_groups, meta):
                     return
-                
+
                 dupes = await lst.search_existing(meta)
                 dupes = await common.filter_dupes(dupes, meta)
                 meta = dupe_check(dupes, meta)
