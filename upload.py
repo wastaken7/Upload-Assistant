@@ -255,7 +255,7 @@ async def do_the_thing(base_dir):
             'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI}
 
         tracker_capabilities = {
-            'LST': {'mod_q': False, 'draft': True},
+            'LST': {'mod_q': True, 'draft': True},
             'BLU': {'mod_q': True, 'draft': False},
             'AITHER': {'mod_q': True, 'draft': False},
             'BHD': {'draft_live': True},
@@ -300,7 +300,7 @@ async def do_the_thing(base_dir):
                     upload_to_tracker = True
                 else:
                     upload_to_tracker = cli_ui.ask_yes_no(
-                        f"Upload to {tracker_class.tracker}? {debug}", 
+                        f"Upload to {tracker_class.tracker}? {debug}",
                         default=meta['unattended']
                     )
 
