@@ -429,87 +429,90 @@ class Prep():
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
-        # Reuse information from trackers with fallback
-        found_match = False
+        if not meta.get('image_list'):
+            # Reuse information from trackers with fallback
+            found_match = False
 
-        if search_term:
-            # Check if specific trackers are already set in meta
-            specific_tracker = None
-            if meta.get('ptp'):
-                specific_tracker = 'PTP'
-            elif meta.get('hdb'):
-                specific_tracker = 'HDB'
-            elif meta.get('blu'):
-                specific_tracker = 'BLU'
-            elif meta.get('aither'):
-                specific_tracker = 'AITHER'
-            elif meta.get('lst'):
-                specific_tracker = 'LST'
+            if search_term:
+                # Check if specific trackers are already set in meta
+                specific_tracker = None
+                if meta.get('ptp'):
+                    specific_tracker = 'PTP'
+                elif meta.get('hdb'):
+                    specific_tracker = 'HDB'
+                elif meta.get('blu'):
+                    specific_tracker = 'BLU'
+                elif meta.get('aither'):
+                    specific_tracker = 'AITHER'
+                elif meta.get('lst'):
+                    specific_tracker = 'LST'
 
-            # If a specific tracker is found, only process that one
-            if specific_tracker:
-                console.print(f"[blue]Processing only the {specific_tracker} tracker based on meta.[/blue]")
+                # If a specific tracker is found, only process that one
+                if specific_tracker:
+                    console.print(f"[blue]Processing only the {specific_tracker} tracker based on meta.[/blue]")
 
-                if specific_tracker == 'PTP' and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
-                    ptp = PTP(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-
-                elif specific_tracker == 'BLU' and str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
-                    blu = BLU(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-
-                elif specific_tracker == 'AITHER' and str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
-                    aither = AITHER(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-
-                elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
-                    lst = LST(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-
-                elif specific_tracker == 'HDB' and str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
-                    hdb = HDB(config=self.config)
-                    meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                    if match:
-                        found_match = True
-            else:
-                # Process all trackers if no specific tracker is set in meta
-                default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
-
-                if "PTP" in default_trackers and not found_match:
-                    if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
+                    if specific_tracker == 'PTP' and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
                         ptp = PTP(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                if "BLU" in default_trackers and not found_match:
-                    if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'BLU' and str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                         blu = BLU(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                if "HDB" in default_trackers and not found_match:
-                    if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'AITHER' and str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
+                        aither = AITHER(config=self.config)
+                        meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
+                        if match:
+                            found_match = True
+
+                    elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
+                        lst = LST(config=self.config)
+                        meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
+                        if match:
+                            found_match = True
+
+                    elif specific_tracker == 'HDB' and str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
                         hdb = HDB(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
+                else:
+                    # Process all trackers if no specific tracker is set in meta
+                    default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
 
-            if not found_match:
-                console.print("[yellow]No matches found on any trackers.[/yellow]")
+                    if "PTP" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
+                            ptp = PTP(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "BLU" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
+                            blu = BLU(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "HDB" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
+                            hdb = HDB(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                if not found_match:
+                    console.print("[yellow]No matches found on any trackers.[/yellow]")
+                else:
+                    console.print(f"[green]Match found: {found_match}[/green]")
             else:
-                console.print(f"[green]Match found: {found_match}[/green]")
+                console.print("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
         else:
-            console.print("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
+            console.print("Skipping existing search as meta already populated")
 
         # Take Screenshots
         if meta['is_disc'] == "BDMV":
