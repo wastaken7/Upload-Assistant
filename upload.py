@@ -265,12 +265,12 @@ async def do_the_thing(base_dir):
             modq, draft = None, None
 
             tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
-            
+
             # Handle BHD specific draft/live logic
             if tracker_class.tracker == 'BHD' and tracker_caps.get('draft_live'):
                 draft_int = await tracker_class.get_live(meta)
                 draft = "Draft" if draft_int == 0 else "Live"
-            
+
             # Handle mod_q and draft for other trackers
             else:
                 if tracker_caps.get('mod_q'):
@@ -307,7 +307,7 @@ async def do_the_thing(base_dir):
                 if upload_to_tracker:
                     # Get mod_q, draft, or draft/live depending on the tracker
                     modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug)
-                    
+
                     # Print mod_q and draft info if relevant
                     if modq is not None:
                         console.print(f"(modq: {modq})")
@@ -315,11 +315,11 @@ async def do_the_thing(base_dir):
                         console.print(f"(draft: {draft})")
 
                     console.print(f"Uploading to {tracker_class.tracker}")
-                    
+
                     # Check if the group is banned for the tracker
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                         continue
-                    
+
                     # Perform the existing checks for dupes
                     if tracker == "RTF":
                         await tracker_class.api_test(meta)
@@ -327,7 +327,7 @@ async def do_the_thing(base_dir):
                     dupes = await tracker_class.search_existing(meta)
                     dupes = await common.filter_dupes(dupes, meta)
                     meta = dupe_check(dupes, meta)
-                    
+
                     # Proceed with upload if the meta is set to upload
                     if meta['upload']:
                         await tracker_class.upload(meta)
