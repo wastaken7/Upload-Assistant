@@ -247,17 +247,46 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI', 'LST', 'BHD']
         http_trackers = ['TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
             'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
             'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI}
 
+        tracker_capabilities = {
+            'LST': {'mod_q': False, 'draft': True},
+            'BLU': {'mod_q': True, 'draft': False},
+            'AITHER': {'mod_q': True, 'draft': False},
+            'BHD': {'draft_live': True},
+        }
+
+        async def check_mod_q_and_draft(tracker_class, meta, debug):
+            modq, draft = None, None
+
+            tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
+            
+            # Handle BHD specific draft/live logic
+            if tracker_class.tracker == 'BHD' and tracker_caps.get('draft_live'):
+                draft_int = await tracker_class.get_live(meta)
+                draft = "Draft" if draft_int == 0 else "Live"
+            
+            # Handle mod_q and draft for other trackers
+            else:
+                if tracker_caps.get('mod_q'):
+                    modq = await tracker_class.get_flag(meta, 'modq')
+                    modq = 'Yes' if modq else 'No'
+                if tracker_caps.get('draft'):
+                    draft = await tracker_class.get_flag(meta, 'draft')
+                    draft = 'Yes' if draft else 'No'
+
+            return modq, draft
+
         for tracker in trackers:
+            tracker = tracker.replace(" ", "").upper().strip()
             if meta['name'].endswith('DUPE?'):
                 meta['name'] = meta['name'].replace(' DUPE?', '')
-            tracker = tracker.replace(" ", "").upper().strip()
+
             if meta['debug']:
                 debug = "(DEBUG)"
             else:
@@ -265,21 +294,42 @@ async def do_the_thing(base_dir):
 
             if tracker in api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
+
+                # Confirm upload
                 if meta['unattended']:
                     upload_to_tracker = True
                 else:
-                    upload_to_tracker = cli_ui.ask_yes_no(f"Upload to {tracker_class.tracker}? {debug}", default=meta['unattended'])
+                    upload_to_tracker = cli_ui.ask_yes_no(
+                        f"Upload to {tracker_class.tracker}? {debug}", 
+                        default=meta['unattended']
+                    )
+
                 if upload_to_tracker:
+                    # Get mod_q, draft, or draft/live depending on the tracker
+                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug)
+                    
+                    # Print mod_q and draft info if relevant
+                    if modq is not None:
+                        console.print(f"(modq: {modq})")
+                    if draft is not None:
+                        console.print(f"(draft: {draft})")
+
                     console.print(f"Uploading to {tracker_class.tracker}")
+                    
+                    # Check if the group is banned for the tracker
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                         continue
+                    
+                    # Perform the existing checks for dupes
                     if tracker == "RTF":
                         await tracker_class.api_test(meta)
+
                     dupes = await tracker_class.search_existing(meta)
                     dupes = await common.filter_dupes(dupes, meta)
-                    # note BHDTV does not have search implemented.
                     meta = dupe_check(dupes, meta)
-                    if meta['upload'] is True:
+                    
+                    # Proceed with upload if the meta is set to upload
+                    if meta['upload']:
                         await tracker_class.upload(meta)
                         if tracker == 'SN':
                             await asyncio.sleep(16)
@@ -323,51 +373,6 @@ async def do_the_thing(base_dir):
                     else:
                         console.print(f"[green]{meta['name']}")
                         console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
-
-            if tracker == "BHD":
-                bhd = BHD(config=config)
-                draft_int = await bhd.get_live(meta)
-                if draft_int == 0:
-                    draft = "Draft"
-                else:
-                    draft = "Live"
-                if meta['unattended']:
-                    upload_to_bhd = True
-                else:
-                    upload_to_bhd = cli_ui.ask_yes_no(f"Upload to BHD? ({draft}) {debug}", default=meta['unattended'])
-                if upload_to_bhd:
-                    console.print("Uploading to BHD")
-                    if check_banned_group("BHD", bhd.banned_groups, meta):
-                        continue
-                    dupes = await bhd.search_existing(meta)
-                    dupes = await common.filter_dupes(dupes, meta)
-                    meta = dupe_check(dupes, meta)
-                    if meta['upload'] is True:
-                        await bhd.upload(meta)
-                        await client.add_to_client(meta, "BHD")
-
-            if tracker == "LST":
-                lst = LST(config=config)
-                modq, draft = await asyncio.gather(lst.get_flag(meta, 'modq'), lst.get_flag(meta, 'draft'))
-
-                modq = 'Yes' if modq else 'No'
-                draft = 'Yes' if draft else 'No'
-
-                upload_to_lst = meta['unattended'] or cli_ui.ask_yes_no(f"Upload to LST? (draft: {draft}) (modq: {modq}) {debug}", default=meta['unattended'])
-                if not upload_to_lst:
-                    continue
-
-                console.print("Uploading to LST")
-
-                if check_banned_group('LST', lst.banned_groups, meta):
-                    continue
-
-                dupes = await lst.search_existing(meta)
-                dupes = await common.filter_dupes(dupes, meta)
-                meta = dupe_check(dupes, meta)
-                if meta['upload']:
-                    await lst.upload(meta)
-                    await client.add_to_client(meta, lst.tracker)
 
             if tracker == "THR":
                 if meta['unattended']:

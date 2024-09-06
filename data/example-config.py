@@ -44,7 +44,8 @@ config = {
             "useAPI": False,  # Set to True if using BLU
             "api_key": "BLU api key",
             "announce_url": "https://blutopia.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
+            # "modq" : False
         },
         "BHD": {
             "api_key": "BHD api key",
@@ -71,7 +72,8 @@ config = {
         "AITHER": {
             "api_key": "AITHER api key",
             "announce_url": "https://aither.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
+            # "modq" : False
         },
         "R4E": {
             "api_key": "R4E api key",

@@ -46,6 +46,7 @@ class BLU():
         cat_id = await self.get_cat_id(meta['category'], meta.get('edition', ''))
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
+        modq = await self.get_flag(meta, 'modq')
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
@@ -85,6 +86,7 @@ class BLU():
             'free': 0,
             'doubleup': 0,
             'sticky': 0,
+            'mod_queue_opt_in': modq,
         }
         # Internal
         if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
@@ -117,6 +119,12 @@ class BLU():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag:
+            return 1
+        return 1 if meta.get(flag_name, False) else 0
 
     async def get_cat_id(self, category_name, edition):
         category_id = {
