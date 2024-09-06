@@ -602,13 +602,11 @@ def get_missing(meta):
 
 if __name__ == '__main__':
     pyver = platform.python_version_tuple()
-    if int(pyver[0]) != 3:
-        console.print("[bold red]Python2 Detected, please use python3")
-        exit()
-    else:
-        if int(pyver[1]) <= 6:
-            console.print("[bold red]Python <= 3.6 Detected, please use Python >=3.7")
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(do_the_thing(base_dir))
-        else:
-            asyncio.run(do_the_thing(base_dir))
+    if int(pyver[0]) != 3 or int(pyver[1]) < 12:
+        console.print("[bold red]Python version is too low. Please use Python 3.12 or higher.")
+        sys.exit(1)
+
+    try:
+        asyncio.run(do_the_thing(base_dir))  # Pass the correct base_dir value here
+    except (KeyboardInterrupt, SystemExit):
+        console.print("[bold red]Program interrupted. Exiting.")

@@ -70,11 +70,15 @@ class Prep():
         self.img_host = img_host.lower()
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
-    async def prompt_user_for_confirmation(self, message):
-        response = input(f"{message} (Y/n): ").strip().lower()
-        if response == '' or response == 'y':
-            return True
-        return False
+    async def prompt_user_for_confirmation(self, message: str) -> bool:
+        try:
+            response = input(f"{message} (Y/n): ").strip().lower()
+            if response in ["y", "yes", ""]:
+                return True
+            return False
+        except EOFError:
+            console.print("[bold red]Input was interrupted.")
+            return False
 
     async def check_images_concurrently(self, imagelist):
         async def check_and_collect(image_dict):
