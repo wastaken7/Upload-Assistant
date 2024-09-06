@@ -355,12 +355,12 @@ async def do_the_thing(base_dir):
 
                 upload_to_lst = meta['unattended'] or cli_ui.ask_yes_no(f"Upload to LST? (draft: {draft}) (modq: {modq}) {debug}", default=meta['unattended'])
                 if not upload_to_lst:
-                    return
+                    continue
 
                 console.print("Uploading to LST")
 
                 if check_banned_group('LST', lst.banned_groups, meta):
-                    return
+                    continue
 
                 dupes = await lst.search_existing(meta)
                 dupes = await common.filter_dupes(dupes, meta)
