@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.12
 
 # Update the package list and install system dependencies including mono
 RUN apt-get update && \
