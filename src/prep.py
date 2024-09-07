@@ -298,7 +298,10 @@ class Prep():
             if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
                 image_list = meta['image_list']  # noqa #F841
             else:
-                console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
+                default_trackers = self.config['TRACKERS'].get('default_trackers', '')
+                trackers_list = [tracker.strip() for tracker in default_trackers.split(',')]
+                if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', ''):
+                    console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
 
             keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
             if not keep_images:
