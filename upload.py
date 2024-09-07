@@ -295,14 +295,16 @@ async def do_the_thing(base_dir):
             if tracker in api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
 
-                # Confirm upload
                 if meta['unattended']:
                     upload_to_tracker = True
                 else:
-                    upload_to_tracker = cli_ui.ask_yes_no(
-                        f"Upload to {tracker_class.tracker}? {debug}",
-                        default=meta['unattended']
-                    )
+                    try:
+                        upload_to_tracker = cli_ui.ask_yes_no(
+                            f"Upload to {tracker_class.tracker}? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
 
                 if upload_to_tracker:
                     # Get mod_q, draft, or draft/live depending on the tracker
@@ -337,10 +339,18 @@ async def do_the_thing(base_dir):
 
             if tracker in http_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
+
                 if meta['unattended']:
                     upload_to_tracker = True
                 else:
-                    upload_to_tracker = cli_ui.ask_yes_no(f"Upload to {tracker_class.tracker}? {debug}", default=meta['unattended'])
+                    try:
+                        upload_to_tracker = cli_ui.ask_yes_no(
+                            f"Upload to {tracker_class.tracker}? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
+
                 if upload_to_tracker:
                     console.print(f"Uploading to {tracker}")
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
@@ -378,7 +388,13 @@ async def do_the_thing(base_dir):
                 if meta['unattended']:
                     upload_to_thr = True
                 else:
-                    upload_to_thr = cli_ui.ask_yes_no(f"Upload to THR? {debug}", default=meta['unattended'])
+                    try:
+                        upload_to_ptp = cli_ui.ask_yes_no(
+                            f"Upload to THR? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
                 if upload_to_thr:
                     console.print("Uploading to THR")
                     # nable to get IMDB id/Youtube Link
@@ -407,8 +423,15 @@ async def do_the_thing(base_dir):
                 if meta['unattended']:
                     upload_to_ptp = True
                 else:
-                    upload_to_ptp = cli_ui.ask_yes_no(f"Upload to {tracker}? {debug}", default=meta['unattended'])
-                if upload_to_ptp:
+                    try:
+                        upload_to_ptp = cli_ui.ask_yes_no(
+                            f"Upload to {tracker}? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
+
+                if upload_to_ptp:  # Ensure the variable is defined before this check
                     console.print(f"Uploading to {tracker}")
                     if meta.get('imdb_id', '0') == '0':
                         imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
@@ -445,7 +468,14 @@ async def do_the_thing(base_dir):
                 if meta['unattended']:
                     upload_to_tracker = True
                 else:
-                    upload_to_tracker = cli_ui.ask_yes_no(f"Upload to {tracker_class.tracker}? {debug}", default=meta['unattended'])
+                    try:
+                        upload_to_ptp = cli_ui.ask_yes_no(
+                            f"Upload to {tracker}? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
+
                 if upload_to_tracker:
                     console.print(f"Uploading to {tracker_class.tracker}")
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
@@ -509,7 +539,11 @@ def get_confirmation(meta):
 
         cli_ui.info_section(cli_ui.yellow, "Is this correct?")
         cli_ui.info(f"Name: {meta['name']}")
-        confirm = cli_ui.ask_yes_no("Correct?", default=False)
+        try:
+            confirm = cli_ui.ask_yes_no("Correct?", default=False)
+        except (KeyboardInterrupt, EOFError):
+            sys.exit(1)  # Exit immediately
+
     else:
         cli_ui.info(f"Name: {meta['name']}")
         confirm = True
