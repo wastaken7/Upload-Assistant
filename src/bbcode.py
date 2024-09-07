@@ -198,6 +198,12 @@ class BBCODE:
                 # Remove the [img] tag and its contents from the description
                 desc = re.sub(rf"\[img[^\]]*\]{re.escape(img_url)}\[/img\]", '', desc, flags=re.IGNORECASE)
 
+        # Now, remove matching URLs from [URL] tags
+        for img in imagelist:
+            img_url = re.escape(img['img_url'])
+            desc = re.sub(rf"\[URL={img_url}\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+            desc = re.sub(rf"\[URL={img_url}\]\[img[^\]]*\]{img_url}\[/img\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+
         # Filter out bot images from imagelist
         bot_image_urls = [
             "https://blutopia.xyz/favicon.ico",  # Example bot image URL
@@ -236,10 +242,10 @@ class BBCODE:
         desc = re.sub(bot_signature_regex, "", desc, flags=re.IGNORECASE | re.VERBOSE)
         desc = re.sub(r"\[center\].*Created by L4G's Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
 
-        # Ensure no dangling tags and remove extra blank lines
-        desc = re.sub(r'\n\s*\n', '\n', desc)  # Remove multiple consecutive blank lines
-        desc = re.sub(r'\n\n+', '\n\n', desc)  # Ensure no excessive blank lines
-        desc = desc.strip()  # Final cleanup of trailing newlines and spaces
+        # Remove leftover [img] or [URL] tags in the description
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()

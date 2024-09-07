@@ -47,6 +47,7 @@ try:
     import aiohttp
     from PIL import Image
     import io
+    import sys
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
     console.print('[bold red]Missing Module Found. Please reinstall required dependancies.')
@@ -77,8 +78,7 @@ class Prep():
                 return True
             return False
         except EOFError:
-            console.print("[bold red]Input was interrupted.")
-            return False
+            sys.exit(1)
 
     async def check_images_concurrently(self, imagelist):
         async def check_and_collect(image_dict):
@@ -294,7 +294,7 @@ class Prep():
             approved_image_hosts = ['ptpimg', 'imgbox']
 
             # Check if the images are already hosted on an approved image host
-            if all(any(host in img for host in approved_image_hosts) for img in meta['image_list']):
+            if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
                 image_list = meta['image_list']  # noqa #F841
             else:
                 console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")

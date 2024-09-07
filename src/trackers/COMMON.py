@@ -4,6 +4,7 @@ import requests
 import re
 import json
 import click
+import sys
 
 from src.bbcode import BBCODE
 from src.console import console
@@ -163,10 +164,13 @@ class COMMON():
             console.print(f"Filename: {filename}")  # Ensure filename is printed if available
 
         selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
-        if selection == '' or selection == 'y' or selection == 'yes':
-            return True
-        else:
-            return False
+        try:
+            if selection == '' or selection == 'y' or selection == 'yes':
+                return True
+            else:
+                return False
+        except (KeyboardInterrupt, EOFError):
+            sys.exit(1)
 
     async def prompt_user_for_confirmation(self, message):
         response = input(f"{message} (Y/n): ").strip().lower()
@@ -246,15 +250,18 @@ class COMMON():
             if tmdb or imdb or tvdb:
                 if not id:
                     # Only prompt the user for ID selection if not searching by ID
-                    if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, file_name):
-                        console.print("[yellow]User chose to skip based on IDs.[/yellow]")
-                        return None, None, None, None, None, None, None, None, None
+                    try:
+                        if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, file_name):
+                            console.print("[yellow]User chose to skip based on IDs.[/yellow]")
+                            return None, None, None, None, None, None, None, None, None
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)
 
             if description:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 console.print(f"[green]Successfully grabbed description from {tracker}")
-                console.print(f"[blue]Extracted description: [yellow]{description}")
+                console.print(f"[blue]Extracted description: [yellow]{description}", markup=False)
 
                 # Allow user to edit or discard the description
                 console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
@@ -264,7 +271,7 @@ class COMMON():
                     edited_description = click.edit(description)
                     if edited_description:
                         description = edited_description.strip()
-                    console.print(f"[green]Final description after editing:[/green] {description}")
+                    console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
                 elif edit_choice.lower() == 'd':
                     description = None
                     console.print("[yellow]Description discarded.[/yellow]")
