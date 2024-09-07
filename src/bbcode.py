@@ -123,7 +123,7 @@ class BBCODE:
         desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
 
         # Extract loose images and add to imagelist as dictionaries
-        loose_images = re.findall(r"(https?:\/\/.*\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
+        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
         if loose_images:
             for img_url in loose_images:
                 image_dict = {
