@@ -197,11 +197,12 @@ class COMMON():
             return None, None, None, None, None, None, None, None, None
 
         response = requests.get(url=url, params=params)
+        # console.print(f"[blue]Raw API Response: {response}[/blue]")
 
         try:
             json_response = response.json()
 
-            # console.print(f"[blue]Raw API Response: {json_response}[/blue]")
+            # console.print(f"[blue]Raw API Response: {json_response}[/blue]", markup=False)
 
         except ValueError:
             return None, None, None, None, None, None, None, None, None

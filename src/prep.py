@@ -6,6 +6,7 @@ from src.trackers.PTP import PTP
 from src.trackers.BLU import BLU
 from src.trackers.AITHER import AITHER
 from src.trackers.LST import LST
+from src.trackers.OE import OE
 from src.trackers.HDB import HDB
 from src.trackers.COMMON import COMMON
 
@@ -155,7 +156,7 @@ class Prep():
         manual_key = f"{tracker_key}_manual"
         found_match = False
 
-        if tracker_name in ["BLU", "AITHER", "LST"]:  # Example for UNIT3D trackers
+        if tracker_name in ["BLU", "AITHER", "LST", "OE"]:
             if meta.get(tracker_key) is not None:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
                 tracker_data = await COMMON(self.config).unit3d_torrent_info(
@@ -446,6 +447,8 @@ class Prep():
                     specific_tracker = 'AITHER'
                 elif meta.get('lst'):
                     specific_tracker = 'LST'
+                elif meta.get('oe'):
+                    specific_tracker = 'OE'
 
                 # If a specific tracker is found, only process that one
                 if specific_tracker:
@@ -472,6 +475,12 @@ class Prep():
                     elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
                         lst = LST(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
+                        if match:
+                            found_match = True
+
+                    elif specific_tracker == 'OE' and str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
+                        oe = OE(config=self.config)
+                        meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
@@ -1324,8 +1333,8 @@ class Prep():
                                         .global_args('-loglevel', loglevel)
                                         .run(quiet=debug)
                                     )
-                                except Exception:
-                                    console.print(traceback.format_exc())
+                                except (KeyboardInterrupt, Exception):
+                                    sys.exit(1)
 
                                 self.optimize_images(image_path)
                                 if os.path.getsize(Path(image_path)) <= 75000:
@@ -1394,8 +1403,8 @@ class Prep():
                         oxipng.optimize(image, level=6)
                     else:
                         oxipng.optimize(image, level=3)
-                except Exception:
-                    pass
+                except (KeyboardInterrupt, Exception):
+                    sys.exit(1)
         return
 
     """
