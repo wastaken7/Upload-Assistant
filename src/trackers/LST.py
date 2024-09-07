@@ -158,8 +158,9 @@ class LST():
 
     async def get_flag(self, meta, flag_name):
         config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
-        if config_flag:
-            return 1
+        if config_flag is not None:
+            return 1 if config_flag else 0
+
         return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta):
