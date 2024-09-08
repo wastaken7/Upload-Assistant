@@ -665,6 +665,7 @@ class PTP():
             elif len(meta.get('filelist', [])) >= 1:
                 for i in range(len(meta['filelist'])):
                     file = meta['filelist'][i]
+
                     if i == 0:
                         # Add This line for all web-dls
                         if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None and self.web_source is True:
@@ -673,24 +674,30 @@ class PTP():
                     else:
                         # Export Mediainfo
                         mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
-                        # mi_dump = mi_dump.replace(file, os.path.basename(file))
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "w", newline="", encoding="utf-8") as f:
                             f.write(mi_dump)
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "r", encoding="utf-8").read()
+
                         # Generate and upload screens for other files
-                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 2))
+                        # Add force_screenshots=True to ensure screenshots are taken even if images exist
+                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 2, True))
                         s.start()
                         while s.is_alive() is True:
                             await asyncio.sleep(3)
+
+                        # Upload new screenshots
                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                         images, dummy = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {})
 
+                    # Write MediaInfo and screenshots to the description
                     desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
+
                     if i == 0:
                         base2ptp = self.convert_bbcode(base)
                         if base2ptp.strip() != "":
                             desc.write(base2ptp)
                             desc.write("\n\n")
+
                     if len(images) > 0:
                         for each in range(len(images[:int(meta['screens'])])):
                             raw_url = images[each]['raw_url']

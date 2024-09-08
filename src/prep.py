@@ -1259,14 +1259,16 @@ class Prep():
                     smallest = screens
             os.remove(smallest)
 
-    def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None):
+    def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False):
         # Ensure the image list is initialized and preserve existing images
         if 'image_list' not in meta:
             meta['image_list'] = []
 
         # Check if there are already at least 3 image links in the image list
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
-        if len(existing_images) >= 3:
+
+        # Skip taking screenshots if there are already 3 images and force_screenshots is False
+        if len(existing_images) >= 3 and not force_screenshots:
             console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
             return
 
@@ -1375,9 +1377,14 @@ class Prep():
 
                         # Remove the smallest image if there are more than needed
                         if len(meta['image_list']) > self.screens:
-                            smallest = min(meta['image_list'], key=lambda x: os.path.getsize(x['img_url']))
-                            os.remove(smallest['img_url'])
-                            meta['image_list'].remove(smallest)
+                            local_images = [img for img in meta['image_list'] if not img['img_url'].startswith('http')]
+
+                            if local_images:
+                                smallest = min(local_images, key=lambda x: os.path.getsize(x['img_url']))
+                                os.remove(smallest['img_url'])
+                                meta['image_list'].remove(smallest)
+                            else:
+                                console.print("[yellow]No local images found to remove.")
 
     def valid_ss_time(self, ss_times, num_screens, length):
         valid_time = False
