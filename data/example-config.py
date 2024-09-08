@@ -37,14 +37,15 @@ config = {
     "TRACKERS": {
         # Which trackers do you want to upload to?
         # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB
-        # Remove the ones not used to save being asked everytime
+        # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
         "default_trackers": "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB",
 
         "BLU": {
             "useAPI": False,  # Set to True if using BLU
             "api_key": "BLU api key",
             "announce_url": "https://blutopia.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
+            # "modq" : False  ## Not working yet
         },
         "BHD": {
             "api_key": "BHD api key",
@@ -71,7 +72,8 @@ config = {
         "AITHER": {
             "api_key": "AITHER api key",
             "announce_url": "https://aither.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
+            # "modq" : False  ## Not working yet
         },
         "R4E": {
             "api_key": "R4E api key",
@@ -239,9 +241,9 @@ config = {
         },
     },
 
-    # enable_search to true will automatically try and find a suitable hash to save having to rehash when creating torrents
+    # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
     # Should use the qbit API, but will also use the torrent_storage_dir to find suitable hashes
-    # If you find issue, use the "--debug" command option to print out some related details
+    # If you find issue, use the "--debug" argument to print out some related details
     "TORRENT_CLIENTS": {
         # Name your torrent clients here, for example, this example is named "Client1" and is set as default_torrent_client above
         # All options relate to the webui, make sure you have the webui secured if it has WAN access
@@ -253,7 +255,7 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "username",
             "qbit_pass": "password",
-            # "torrent_storage_dir": "path/to/BT_backup folder"
+            # "torrent_storage_dir": "path/to/BT_backup folder"  ## use double-backslash on windows eg: "C:\\client\\backup"
 
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             # "local_path": "/LocalPath",

@@ -46,6 +46,7 @@ class Args():
         parser.add_argument('-blu', '--blu', nargs='*', required=False, help="BLU torrent id/link", type=str)
         parser.add_argument('-aither', '--aither', nargs='*', required=False, help="Aither torrent id/link", type=str)
         parser.add_argument('-lst', '--lst', nargs='*', required=False, help="LST torrent id/link", type=str)
+        parser.add_argument('-oe', '--oe', nargs='*', required=False, help="OE torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs='*', required=False, help="HDB torrent id/link", type=str)
         parser.add_argument('-d', '--desc', nargs='*', required=False, help="Custom Description (string)")
         parser.add_argument('-pb', '--desclink', nargs='*', required=False, help="Custom Description (link to hastebin/pastebin)")
@@ -165,6 +166,19 @@ class Args():
                                 console.print('[red]Continuing without --lst')
                         else:
                             meta['lst'] = value2
+                    elif key == 'oe':
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                oepath = parsed.path
+                                if oepath.endswith('/'):
+                                    oepath = oepath[:-1]
+                                meta['oe'] = oepath.split('/')[-1]
+                            except Exception:
+                                console.print('[red]Unable to parse id from url')
+                                console.print('[red]Continuing without --oe')
+                        else:
+                            meta['oe'] = value2
                     elif key == 'hdb':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)

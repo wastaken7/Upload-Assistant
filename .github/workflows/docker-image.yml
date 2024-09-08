@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - develop
-      - unit3d-searching
 
 env:
   REGISTRY: ghcr.io

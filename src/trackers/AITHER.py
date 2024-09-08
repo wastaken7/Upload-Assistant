@@ -24,6 +24,7 @@ class AITHER():
         self.source_flag = 'Aither'
         self.search_url = 'https://aither.cc/api/torrents/filter'
         self.upload_url = 'https://aither.cc/api/torrents/upload'
+        self.torrent_url = 'https://aither.cc/api/torrents/'
         self.signature = "\n[center][url=https://aither.cc/forums/topics/1349/posts/24958]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = ['4K4U', 'AROMA', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'FreetheFish', 'Hi10', 'HiQVE', 'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'nikt0', 'OEPlus', 'OFT', 'OsC', 'PYC',
                               'QxR', 'Ralphy', 'RARBG', 'RetroPeeps', 'SAMPA', 'Sicario', 'Silence', 'SkipTT', 'SPDVD', 'STUTTERSHIT', 'SWTYBLZ', 'TAoE', 'TGx', 'Tigole', 'TSP', 'TSPxL', 'VXT', 'Weasley[HONE]',
@@ -37,6 +38,7 @@ class AITHER():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
+        modq = await self.get_flag(meta, 'modq')
         name = await self.edit_name(meta)
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
@@ -74,6 +76,7 @@ class AITHER():
             'free': 0,
             'doubleup': 0,
             'sticky': 0,
+            'mod_queue_opt_in': modq,
         }
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
@@ -101,6 +104,13 @@ class AITHER():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag is not None:
+            return 1 if config_flag else 0
+
+        return 1 if meta.get(flag_name, False) else 0
 
     async def edit_name(self, meta):
         aither_name = meta['name']

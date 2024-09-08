@@ -6,6 +6,7 @@ from src.trackers.PTP import PTP
 from src.trackers.BLU import BLU
 from src.trackers.AITHER import AITHER
 from src.trackers.LST import LST
+from src.trackers.OE import OE
 from src.trackers.HDB import HDB
 from src.trackers.COMMON import COMMON
 
@@ -47,6 +48,7 @@ try:
     import aiohttp
     from PIL import Image
     import io
+    import sys
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
     console.print('[bold red]Missing Module Found. Please reinstall required dependancies.')
@@ -77,8 +79,7 @@ class Prep():
                 return True
             return False
         except EOFError:
-            console.print("[bold red]Input was interrupted.")
-            return False
+            sys.exit(1)
 
     async def check_images_concurrently(self, imagelist):
         async def check_and_collect(image_dict):
@@ -155,7 +156,7 @@ class Prep():
         manual_key = f"{tracker_key}_manual"
         found_match = False
 
-        if tracker_name in ["BLU", "AITHER", "LST"]:  # Example for UNIT3D trackers
+        if tracker_name in ["BLU", "AITHER", "LST", "OE"]:
             if meta.get(tracker_key) is not None:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
                 tracker_data = await COMMON(self.config).unit3d_torrent_info(
@@ -294,10 +295,13 @@ class Prep():
             approved_image_hosts = ['ptpimg', 'imgbox']
 
             # Check if the images are already hosted on an approved image host
-            if all(any(host in img for host in approved_image_hosts) for img in meta['image_list']):
+            if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
                 image_list = meta['image_list']  # noqa #F841
             else:
-                console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
+                default_trackers = self.config['TRACKERS'].get('default_trackers', '')
+                trackers_list = [tracker.strip() for tracker in default_trackers.split(',')]
+                if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', ''):
+                    console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
 
             keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
             if not keep_images:
@@ -446,6 +450,8 @@ class Prep():
                     specific_tracker = 'AITHER'
                 elif meta.get('lst'):
                     specific_tracker = 'LST'
+                elif meta.get('oe'):
+                    specific_tracker = 'OE'
 
                 # If a specific tracker is found, only process that one
                 if specific_tracker:
@@ -472,6 +478,12 @@ class Prep():
                     elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
                         lst = LST(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
+                        if match:
+                            found_match = True
+
+                    elif specific_tracker == 'OE' and str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
+                        oe = OE(config=self.config)
+                        meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
@@ -1324,8 +1336,8 @@ class Prep():
                                         .global_args('-loglevel', loglevel)
                                         .run(quiet=debug)
                                     )
-                                except Exception:
-                                    console.print(traceback.format_exc())
+                                except (KeyboardInterrupt, Exception):
+                                    sys.exit(1)
 
                                 self.optimize_images(image_path)
                                 if os.path.getsize(Path(image_path)) <= 75000:
@@ -1394,8 +1406,8 @@ class Prep():
                         oxipng.optimize(image, level=6)
                     else:
                         oxipng.optimize(image, level=3)
-                except Exception:
-                    pass
+                except (KeyboardInterrupt, Exception):
+                    sys.exit(1)
         return
 
     """
