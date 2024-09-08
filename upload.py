@@ -247,8 +247,8 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'HDB', 'SHRI', 'LST', 'BHD']
-        http_trackers = ['TTG', 'FL', 'PTER', 'HDT', 'MTV']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL']
+        http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
             'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
@@ -322,16 +322,17 @@ async def do_the_thing(base_dir):
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                         continue
 
-                    # Perform the existing checks for dupes
-                    if tracker == "RTF":
-                        await tracker_class.api_test(meta)
+                    # Perform the existing checks for dupes except TL
+                    if tracker != "TL":
+                        if tracker == "RTF":
+                            await tracker_class.api_test(meta)
 
-                    dupes = await tracker_class.search_existing(meta)
-                    dupes = await common.filter_dupes(dupes, meta)
-                    meta = dupe_check(dupes, meta)
+                        dupes = await tracker_class.search_existing(meta)
+                        dupes = await common.filter_dupes(dupes, meta)
+                        meta = dupe_check(dupes, meta)
 
                     # Proceed with upload if the meta is set to upload
-                    if meta['upload']:
+                    if tracker == "TL" or meta.get('upload', False):
                         await tracker_class.upload(meta)
                         if tracker == 'SN':
                             await asyncio.sleep(16)
@@ -462,26 +463,6 @@ async def do_the_thing(base_dir):
                             await client.add_to_client(meta, "PTP")
                     except Exception:
                         console.print(traceback.print_exc())
-
-            if tracker == "TL":
-                tracker_class = tracker_class_map[tracker](config=config)
-                if meta['unattended']:
-                    upload_to_tracker = True
-                else:
-                    try:
-                        upload_to_ptp = cli_ui.ask_yes_no(
-                            f"Upload to {tracker}? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
-
-                if upload_to_tracker:
-                    console.print(f"Uploading to {tracker_class.tracker}")
-                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
-                        continue
-                    await tracker_class.upload(meta)
-                    await client.add_to_client(meta, tracker_class.tracker)
 
 
 def get_confirmation(meta):
