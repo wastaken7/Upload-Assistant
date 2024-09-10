@@ -57,6 +57,7 @@ class PSS():
 
     async def get_res_id(self, resolution):
         resolution_id = {
+            '8640p':'10',
             '4320p': '1',
             '2160p': '2',
             '1080p': '3',
