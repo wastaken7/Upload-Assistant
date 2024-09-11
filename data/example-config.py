@@ -235,9 +235,9 @@ config = {
             "announce_url": "https://shareisland.org/announce/customannounceurl",
             # "anon" : "False"
         },
-        "PSS" : {
-            "api_key" : "PSS api key",
-            "announce_url" : "https://privatesilverscreen.cc/announce/customannounceurl",
+        "PSS": {
+            "api_key": "PSS api key",
+            "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
             # "anon" : False
         },
         "MANUAL": {
