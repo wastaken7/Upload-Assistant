@@ -2243,11 +2243,15 @@ class Prep():
                 codec = 'x264'
             elif format == 'HEVC':
                 codec = 'x265'
+            elif format == 'AV1':
+                codec = 'AV1'
         elif type in ('WEBDL', 'HDTV'):  # WEB-DL
             if format == 'AVC':
                 codec = 'H.264'
             elif format == 'HEVC':
                 codec = 'H.265'
+            elif format == 'AV1':
+                codec = 'AV1'
 
             if type == 'HDTV' and has_encode_settings is True:
                 codec = codec.replace('H.', 'x')
