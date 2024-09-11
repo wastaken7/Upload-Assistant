@@ -1125,7 +1125,8 @@ class Prep():
         sar = 1
         for track in ifo_mi.tracks:
             if track.track_type == "Video":
-                length = float(track.duration)/1000  # noqa F841
+                durations = [float(d) for d in track.duration.split(' / ')]
+                length = max(durations) / 1000  # noqa #F841
                 par = float(track.pixel_aspect_ratio)
                 dar = float(track.display_aspect_ratio)
                 width = float(track.width)
