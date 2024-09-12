@@ -130,8 +130,14 @@ class AITHER():
         def get_audio_lang(tracks, is_bdmv=False):
             if is_bdmv:
                 return tracks[0].get('language', '').upper() if tracks else ""
-            return tracks[2].get('Language_String', '').upper() if len(tracks) > 2 else ""
 
+            # For regular files, find the first audio track and return the language string
+            for track in tracks:
+                if track['@type'] == "Audio":
+                    return track.get('Language', '').upper()  # Correctly retrieve the language
+            return ""  # Return an empty string if no audio track is found
+
+        # Handle non-BDMV cases
         if meta['is_disc'] != "BDMV":
             try:
                 with open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json", 'r', encoding='utf-8') as f:
@@ -139,9 +145,12 @@ class AITHER():
 
                 audio_tracks = mi['media']['track']
                 has_eng_audio = has_english_audio(audio_tracks)
+
+                # If English audio is not present, get the audio language
                 if not has_eng_audio:
                     audio_lang = get_audio_lang(audio_tracks)
                     if audio_lang:
+                        # Insert the audio language before the resolution in the name
                         aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
             except (FileNotFoundError, KeyError, IndexError) as e:
                 print(f"Error processing MediaInfo: {e}")

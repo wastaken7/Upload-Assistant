@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - develop
-      - dvd-seasons
+      - aither_language
 
 env:
   REGISTRY: ghcr.io
