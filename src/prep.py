@@ -1139,7 +1139,15 @@ class Prep():
         sar = 1
         for track in ifo_mi.tracks:
             if track.track_type == "Video":
-                length = float(track.duration)/1000  # noqa F841
+                if isinstance(track.duration, str):
+                    # If the duration is a string, split and find the longest duration
+                    durations = [float(d) for d in track.duration.split(' / ')]
+                    length = max(durations) / 1000  # Use the longest duration
+                else:
+                    # If the duration is already an int or float, use it directly
+                    length = float(track.duration) / 1000  # noqa #F841 # Convert to seconds
+
+                # Proceed as usual for other fields
                 par = float(track.pixel_aspect_ratio)
                 dar = float(track.display_aspect_ratio)
                 width = float(track.width)
@@ -2261,11 +2269,15 @@ class Prep():
                 codec = 'x264'
             elif format == 'HEVC':
                 codec = 'x265'
+            elif format == 'AV1':
+                codec = 'AV1'
         elif type in ('WEBDL', 'HDTV'):  # WEB-DL
             if format == 'AVC':
                 codec = 'H.264'
             elif format == 'HEVC':
                 codec = 'H.265'
+            elif format == 'AV1':
+                codec = 'AV1'
 
             if type == 'HDTV' and has_encode_settings is True:
                 codec = codec.replace('H.', 'x')
