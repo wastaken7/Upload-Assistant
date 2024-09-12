@@ -1132,7 +1132,7 @@ class Prep():
                 else:
                     # If the duration is already an int or float, use it directly
                     length = float(track.duration) / 1000  # noqa #F841 # Convert to seconds
-                
+
                 # Proceed as usual for other fields
                 par = float(track.pixel_aspect_ratio)
                 dar = float(track.display_aspect_ratio)
