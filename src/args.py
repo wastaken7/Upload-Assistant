@@ -47,8 +47,15 @@ class Args():
         parser.add_argument('-aither', '--aither', nargs='*', required=False, help="Aither torrent id/link", type=str)
         parser.add_argument('-lst', '--lst', nargs='*', required=False, help="LST torrent id/link", type=str)
         parser.add_argument('-oe', '--oe', nargs='*', required=False, help="OE torrent id/link", type=str)
+        parser.add_argument('-tik', '--tik', nargs='*', required=False, help="TIK torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs='*', required=False, help="HDB torrent id/link", type=str)
+        parser.add_argument('--foreign', dest='foreign', action='store_true', required=False, help="Set for TIK Foreign category")
+        parser.add_argument('--opera', dest='opera', action='store_true', required=False, help="Set for TIK Opera & Musical category")
+        parser.add_argument('--asian', dest='asian', action='store_true', required=False, help="Set for TIK Asian category")
+        parser.add_argument('-disctype', '--disctype', nargs='*', required=False, help="Type of disc for TIK (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)", type=str)
+        parser.add_argument('--untouched', dest='untouched', action='store_true', required=False, help="Set when a completely untouched disc at TIK")
         parser.add_argument('-d', '--desc', nargs='*', required=False, help="Custom Description (string)")
+        parser.add_argument('-manual_dvds', '--manual_dvds', nargs='*', required=False, help="Override the default number of DVD's (eg: use 2xDVD9+DVD5 instead)", type=str, dest='manual_dvds', default="")
         parser.add_argument('-pb', '--desclink', nargs='*', required=False, help="Custom Description (link to hastebin/pastebin)")
         parser.add_argument('-df', '--descfile', nargs='*', required=False, help="Custom Description (path to file)")
         parser.add_argument('-ih', '--imghost', nargs='*', required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens'])
@@ -179,6 +186,19 @@ class Args():
                                 console.print('[red]Continuing without --oe')
                         else:
                             meta['oe'] = value2
+                    elif key == 'tik':
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                tikpath = parsed.path
+                                if tikpath.endswith('/'):
+                                    tikpath = tikpath[:-1]
+                                meta['tik'] = tikpath.split('/')[-1]
+                            except Exception:
+                                console.print('[red]Unable to parse id from url')
+                                console.print('[red]Continuing without --tik')
+                        else:
+                            meta['tik'] = value2
                     elif key == 'hdb':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -195,6 +215,8 @@ class Args():
                 else:
                     meta[key] = value
             elif key in ("manual_edition"):
+                meta[key] = value
+            elif key in ("manual_dvds"):
                 meta[key] = value
             elif key in ("freeleech"):
                 meta[key] = 100

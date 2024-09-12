@@ -39,6 +39,7 @@ from src.trackers.CBR import CBR
 from src.trackers.UTP import UTP
 from src.trackers.AL import AL
 from src.trackers.SHRI import SHRI
+from src.trackers.TIK import TIK
 import json
 from pathlib import Path
 import asyncio
@@ -247,10 +248,10 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL', 'TIK']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
-            'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
+            'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN, 'TIK': TIK,
             'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
             'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI}
 
@@ -261,7 +262,7 @@ async def do_the_thing(base_dir):
             'BHD': {'draft_live': True},
         }
 
-        async def check_mod_q_and_draft(tracker_class, meta, debug):
+        async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
             modq, draft = None, None
 
             tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
@@ -283,6 +284,7 @@ async def do_the_thing(base_dir):
             return modq, draft
 
         for tracker in trackers:
+            disctype = meta.get('disctype', None)
             tracker = tracker.replace(" ", "").upper().strip()
             if meta['name'].endswith('DUPE?'):
                 meta['name'] = meta['name'].replace(' DUPE?', '')
@@ -308,7 +310,7 @@ async def do_the_thing(base_dir):
 
                 if upload_to_tracker:
                     # Get mod_q, draft, or draft/live depending on the tracker
-                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug)
+                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
                     # Print mod_q and draft info if relevant
                     if modq is not None:
@@ -327,13 +329,13 @@ async def do_the_thing(base_dir):
                         if tracker == "RTF":
                             await tracker_class.api_test(meta)
 
-                        dupes = await tracker_class.search_existing(meta)
+                        dupes = await tracker_class.search_existing(meta, disctype)
                         dupes = await common.filter_dupes(dupes, meta)
                         meta = dupe_check(dupes, meta)
 
                     # Proceed with upload if the meta is set to upload
                     if tracker == "TL" or meta.get('upload', False):
-                        await tracker_class.upload(meta)
+                        await tracker_class.upload(meta, disctype)
                         if tracker == 'SN':
                             await asyncio.sleep(16)
                         await client.add_to_client(meta, tracker_class.tracker)

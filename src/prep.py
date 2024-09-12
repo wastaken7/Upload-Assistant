@@ -8,6 +8,7 @@ from src.trackers.AITHER import AITHER
 from src.trackers.LST import LST
 from src.trackers.OE import OE
 from src.trackers.HDB import HDB
+from src.trackers.TIK import TIK
 from src.trackers.COMMON import COMMON
 
 try:
@@ -156,7 +157,7 @@ class Prep():
         manual_key = f"{tracker_key}_manual"
         found_match = False
 
-        if tracker_name in ["BLU", "AITHER", "LST", "OE"]:
+        if tracker_name in ["BLU", "AITHER", "LST", "OE", "TIK"]:
             if meta.get(tracker_key) is not None:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
                 tracker_data = await COMMON(self.config).unit3d_torrent_info(
@@ -376,7 +377,7 @@ class Prep():
             else:
                 mi = meta['mediainfo']
 
-            meta['dvd_size'] = await self.get_dvd_size(meta['discs'])
+            meta['dvd_size'] = await self.get_dvd_size(meta['discs'], meta.get('manual_dvds'))
             meta['resolution'] = self.get_resolution(guessit(video), meta['uuid'], base_dir)
             meta['sd'] = self.is_sd(meta['resolution'])
 
@@ -452,6 +453,8 @@ class Prep():
                     specific_tracker = 'LST'
                 elif meta.get('oe'):
                     specific_tracker = 'OE'
+                elif meta.get('tik'):
+                    specific_tracker = 'TIK'
 
                 # If a specific tracker is found, only process that one
                 if specific_tracker:
@@ -484,6 +487,12 @@ class Prep():
                     elif specific_tracker == 'OE' and str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
                         oe = OE(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
+                        if match:
+                            found_match = True
+
+                    elif specific_tracker == 'TIK' and str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
+                        tik = TIK(config=self.config)
+                        meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
@@ -682,6 +691,9 @@ class Prep():
             export = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8')
             export.write(discs[0]['ifo_mi'])
             export.close()
+            export_clean = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8')
+            export_clean.write(discs[0]['ifo_mi'])
+            export_clean.close()
         elif is_disc == "HDDVD":
             discs = await parse.get_hddvd_info(discs)
             export = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8')
@@ -872,7 +884,6 @@ class Prep():
                         "@type": track["@type"],
                         "extra": track.get("extra"),
                     })
-
             return filtered
 
         if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") and export_text:
@@ -1107,14 +1118,17 @@ class Prep():
                                 time.sleep(1)
                             progress.advance(screen_task)
                 # remove smallest image
-                smallest = ""
+                smallest = None
                 smallestsize = 99 ** 99
                 for screens in glob.glob1(f"{base_dir}/tmp/{folder_id}/", f"{filename}-*"):
-                    screensize = os.path.getsize(screens)
+                    screen_path = os.path.join(f"{base_dir}/tmp/{folder_id}/", screens)
+                    screensize = os.path.getsize(screen_path)
                     if screensize < smallestsize:
                         smallestsize = screensize
-                        smallest = screens
-                os.remove(smallest)
+                        smallest = screen_path
+
+                if smallest is not None:
+                    os.remove(smallest)
 
     def dvd_screenshots(self, meta, disc_num, num_screens=None):
         if num_screens is None:
@@ -1250,14 +1264,17 @@ class Prep():
                             looped += 1
                     progress.advance(screen_task)
             # remove smallest image
-            smallest = ""
+            smallest = None
             smallestsize = 99**99
             for screens in glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*"):
-                screensize = os.path.getsize(screens)
+                screen_path = os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}/", screens)
+                screensize = os.path.getsize(screen_path)
                 if screensize < smallestsize:
                     smallestsize = screensize
-                    smallest = screens
-            os.remove(smallest)
+                    smallest = screen_path
+
+            if smallest is not None:
+                os.remove(smallest)
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False):
         # Ensure the image list is initialized and preserve existing images
@@ -1589,6 +1606,7 @@ class Prep():
             if meta.get('anime', False) is False:
                 meta['mal_id'], meta['aka'], meta['anime'] = self.get_anime(response, meta)
             meta['poster'] = response.get('poster_path', "")
+            meta['tmdb_poster'] = response.get('poster_path', "")
             meta['overview'] = response['overview']
             meta['tmdb_type'] = 'Movie'
             meta['runtime'] = response.get('episode_run_time', 60)
@@ -3299,7 +3317,7 @@ class Prep():
             aka = f" AKA {aka}"
         return aka, original_language
 
-    async def get_dvd_size(self, discs):
+    async def get_dvd_size(self, discs, manual_dvds):
         sizes = []
         dvd_sizes = []
         for each in discs:
@@ -3312,6 +3330,10 @@ class Prep():
                 dvd_sizes.append(each[0])
         dvd_sizes.sort()
         compact = " ".join(dvd_sizes)
+
+        if manual_dvds:
+            compact = str(manual_dvds)
+
         return compact
 
     def get_tmdb_imdb_from_mediainfo(self, mediainfo, category, is_disc, tmdbid, imdbid):
@@ -3362,6 +3384,7 @@ class Prep():
             imdb_info['cover'] = info.get('full-size cover url', '').replace(".jpg", "._V1_FMjpg_UX750_.jpg")
             imdb_info['plot'] = info.get('plot', [''])[0]
             imdb_info['genres'] = ', '.join(info.get('genres', ''))
+            imdb_info['rating'] = info.get('rating', 'N/A')
             imdb_info['original_language'] = info.get('language codes')
             if isinstance(imdb_info['original_language'], list):
                 if len(imdb_info['original_language']) > 1:
@@ -3406,6 +3429,7 @@ class Prep():
         meta['poster'] = imdb_info['cover']
         meta['original_language'] = imdb_info['original_language']
         meta['overview'] = imdb_info['plot']
+        meta['imdb_rating'] = imdb_info['rating']
 
         difference = SequenceMatcher(None, meta['title'].lower(), meta['aka'][5:].lower()).ratio()
         if difference >= 0.9 or meta['aka'][5:].strip() == "" or meta['aka'][5:].strip().lower() in meta['title'].lower():

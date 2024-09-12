@@ -40,6 +40,8 @@ class AITHER():
         resolution_id = await self.get_res_id(meta['resolution'])
         modq = await self.get_flag(meta, 'modq')
         name = await self.edit_name(meta)
+        region_id = await common.unit3d_region_ids(meta.get('region'))
+        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
@@ -89,7 +91,10 @@ class AITHER():
         if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
-
+        if region_id != 0:
+            data['region_id'] = region_id
+        if distributor_id != 0:
+            data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')

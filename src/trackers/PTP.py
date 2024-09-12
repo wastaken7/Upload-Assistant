@@ -201,7 +201,7 @@ class PTP():
         await asyncio.sleep(1)
 
         ptp_desc = response.text
-        # console.print(f"[yellow]Raw description received:\n{ptp_desc[:3800]}...")  # Show first 500 characters for brevity
+        # console.print(f"[yellow]Raw description received:\n{ptp_desc[:6800]}...")  # Show first 500 characters for brevity
 
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
