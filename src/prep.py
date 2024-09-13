@@ -126,7 +126,7 @@ class Prep():
         tmdb, imdb, tvdb, mal, desc, category, infohash, imagelist, filename, *rest = tracker_data
 
         if tmdb not in [None, '0']:
-            meta['tmdb'] = tmdb
+            meta['tmdb_manual'] = tmdb
         if imdb not in [None, '0']:
             meta['imdb'] = str(imdb).zfill(7)
         if tvdb not in [None, '0']:
@@ -3112,87 +3112,103 @@ class Prep():
         return name
 
     async def gen_desc(self, meta):
+        def clean_text(text):
+            return text.replace('\r\n', '').replace('\n', '').strip()
 
-        desclink = meta.get('desclink', None)
-        descfile = meta.get('descfile', None)
+        desclink = meta.get('desclink')
+        descfile = meta.get('descfile')
         ptp_desc = ""
-        desc_source = []
         imagelist = []
+
+        desc_sources = ['ptp', 'blu', 'aither', 'lst', 'oe']
+        desc_source = [source.upper() for source in desc_sources if meta.get(source)]
+        desc_source = desc_source[0] if len(desc_source) == 1 else None
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.seek(0)
-            if (desclink, descfile, meta['desc']) == (None, None, None):
-                if meta.get('ptp_manual') is not None:
-                    desc_source.append('PTP')
-                if meta.get('blu_manual') is not None:
-                    desc_source.append('BLU')
-                if len(desc_source) != 1:
-                    desc_source = None
-                else:
-                    desc_source = desc_source[0]
 
-                if meta.get('ptp', None) is not None and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true" and desc_source in ['PTP', None]:
+            if (desclink, descfile, meta['desc']) == (None, None, None):
+                if meta.get('ptp') and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true" and desc_source in ['PTP', None]:
                     if meta.get('skip_gen_desc', False):
                         console.print("[cyan]Something went wrong with PTP description.")
                         return meta
+
                     ptp = PTP(config=self.config)
                     ptp_desc, imagelist = await ptp.get_ptp_description(meta['ptp'], meta['is_disc'])
-                    if ptp_desc.replace('\r\n', '').replace('\n', '').strip() != "":
-                        description.write(ptp_desc)
-                        description.write("\n")
+                    if clean_text(ptp_desc):
+                        description.write(ptp_desc + "\n")
                         meta['description'] = 'PTP'
-                        meta['imagelist'] = imagelist  # Save the imagelist to meta if needed
+                        meta['imagelist'] = imagelist
 
-                if ptp_desc == "" and meta.get('blu_desc', '').rstrip() not in [None, ''] and desc_source in ['BLU', None]:
-                    if meta.get('blu_desc', '').strip().replace('\r\n', '').replace('\n', '') != '':
-                        description.write(meta['blu_desc'])
-                        meta['description'] = 'BLU'
+                # Handle BLU description
+                if not ptp_desc and clean_text(meta.get('blu_desc', '')) and desc_source in ['BLU', None]:
+                    description.write(meta['blu_desc'] + "\n")
+                    meta['description'] = 'BLU'
 
-            if meta.get('desc_template', None) is not None:
+                # Handle LST description
+                if not ptp_desc and clean_text(meta.get('lst_desc', '')) and desc_source in ['LST', None]:
+                    description.write(meta['lst_desc'] + "\n")
+                    meta['description'] = 'LST'
+
+                # Handle AITHER description
+                if not ptp_desc and clean_text(meta.get('aither_desc', '')) and desc_source in ['AITHER', None]:
+                    description.write(meta['aither_desc'] + "\n")
+                    meta['description'] = 'AITHER'
+
+                # Handle OE description
+                if not ptp_desc and clean_text(meta.get('oe_desc', '')) and desc_source in ['OE', None]:
+                    description.write(meta['oe_desc'] + "\n")
+                    meta['description'] = 'OE'
+
+            if meta.get('desc_template'):
                 from jinja2 import Template
-                with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
-                    desc_templater = Template(f.read())
-                    template_desc = desc_templater.render(meta)
-                    if template_desc.strip() != "":
-                        description.write(template_desc)
-                        description.write("\n")
-                        console.print(f"[INFO] Description from template '{meta['desc_template']}' used:\n{template_desc}")
+                try:
+                    with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
+                        template = Template(f.read())
+                        template_desc = template.render(meta)
+                        if clean_text(template_desc):
+                            description.write(template_desc + "\n")
+                            console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
+                except FileNotFoundError:
+                    console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
 
-            if meta['nfo'] is not False:
-                description.write("[code]")
-                nfo = glob.glob("*.nfo")[0]
-                description.write(open(nfo, 'r', encoding="utf-8").read())
-                description.write("[/code]")
-                description.write("\n")
-                meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from NFO file '{nfo}' used:\n{nfo_content}")  # noqa: F405
-
-            if desclink is not None:
-                parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
-                split = os.path.split(parsed.path)
-                if split[0] != '/':
-                    raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}")
-                else:
-                    raw = parsed._replace(path=f"/raw{parsed.path}")
-                raw = urllib.parse.urlunparse(raw)
-                description.write(requests.get(raw).text)
-                description.write("\n")
-                meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from link '{desclink}' used:\n{desclink_content}")  # noqa: F405
-
-            if descfile is not None:
-                if os.path.isfile(descfile):
-                    text = open(descfile, 'r').read()
-                    description.write(text)
+            if meta.get('nfo'):
+                nfo_files = glob.glob("*.nfo")
+                if nfo_files:
+                    nfo = nfo_files[0]
+                    with open(nfo, 'r', encoding="utf-8") as nfo_file:
+                        nfo_content = nfo_file.read()
+                    description.write(f"[code]{nfo_content}[/code]\n")
                     meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] Description from file '{descfile}' used:\n{text}")
+                    console.print(f"[INFO] NFO file '{nfo}' used.")
 
-            if meta['desc'] is not None:
-                description.write(meta['desc'])
-                description.write("\n")
+            if desclink:
+                try:
+                    parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
+                    split = os.path.split(parsed.path)
+                    raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
+                    raw_url = urllib.parse.urlunparse(raw)
+                    desclink_content = requests.get(raw_url).text
+                    description.write(desclink_content + "\n")
+                    meta['description'] = "CUSTOM"
+                    console.print(f"[INFO] Description from link '{desclink}' used.")
+                except Exception as e:
+                    console.print(f"[ERROR] Failed to fetch description from link: {e}")
+
+            if descfile and os.path.isfile(descfile):
+                with open(descfile, 'r') as f:
+                    file_content = f.read()
+                description.write(file_content)
                 meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Custom description used:\n{meta['desc']}")
+                console.print(f"[INFO] Description from file '{descfile}' used.")
+
+            if meta.get('desc'):
+                description.write(meta['desc'] + "\n")
+                meta['description'] = "CUSTOM"
+                console.print("[INFO] Custom description used.")
 
             description.write("\n")
+
         return meta
 
     async def tag_override(self, meta):
