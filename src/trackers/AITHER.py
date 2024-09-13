@@ -120,38 +120,51 @@ class AITHER():
     async def edit_name(self, meta):
         aither_name = meta['name']
 
-        # Helper function to check if English audio is present in the text-based MediaInfo
-        def has_english_audio(media_info_text):
-            # Look for the audio section and extract the language line
-            audio_section = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-            if audio_section:
-                language = audio_section.group(1)
-                if language.lower().startswith('en'):  # Check if it's English
-                    return True
+        # Helper function to check if English audio is present
+        def has_english_audio(tracks=None, media_info_text=None):
+            if meta['is_disc'] == "BDMV" and tracks:
+                for track in tracks:
+                    if track.get('language', '').lower() == 'english':
+                        return True
+            elif media_info_text:
+                audio_section = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                if audio_section:
+                    language = audio_section.group(1)
+                    if language.lower().startswith('en'):  # Check if it's English
+                        return True
             return False
 
-        # Helper function to extract the audio language from the text-based MediaInfo
-        def get_audio_lang(media_info_text):
-            # Find the audio section and extract the language
-            audio_section = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-            if audio_section:
-                return audio_section.group(1).upper()  # Return the language in uppercase
-            return ""  # Return empty if not found
+        # Helper function to extract the audio language from MediaInfo text or BDMV structure
+        def get_audio_lang(tracks=None, is_bdmv=False, media_info_text=None):
+            if meta['is_disc'] == "BDMV" and tracks:
+                return tracks[0].get('language', '').upper() if tracks else ""
+            elif media_info_text:
+                match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                if match:
+                    return match.group(1).upper()
+            return ""  # Return empty string if no audio track is found
 
-        # Handle non-BDMV cases
-        if meta['is_disc'] != "BDMV":
+        is_bdmv = meta['is_disc'] == "BDMV"  # noqa #F841
+        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+
+        if meta['is_disc'] == "BDMV":
+            bdinfo_audio = meta.get('bdinfo', {}).get('audio', [])
+            has_eng_audio = has_english_audio(bdinfo_audio, is_bdmv=True)
+            if not has_eng_audio:
+                audio_lang = get_audio_lang(bdinfo_audio, is_bdmv=True)
+                if audio_lang:
+                    aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+        else:
+            # Handle non-BDMV content
             try:
-                with open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO.txt", 'r', encoding='utf-8') as f:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
                     media_info_text = f.read()
 
-                # Check for English audio
-                has_eng_audio = has_english_audio(media_info_text)
-
-                # If English audio is not present, get the audio language
-                if not has_eng_audio:
-                    audio_lang = get_audio_lang(media_info_text)
+                # Check for English audio in the text-based MediaInfo
+                if not has_english_audio(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
                     if audio_lang:
-                        # Insert the audio language before the resolution in the name
                         aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
