@@ -451,7 +451,7 @@ class TIK():
             desc_text.append(f"  Source.............: {meta.get('disctype', 'Unknown')}\n")
         else:
             desc_text.append(f"  Source.............: {meta.get('dvd_size', 'Unknown')}\n")
-        desc_text.append(f"  Film Distributor...: [url={meta.get('distributor_link', '')}]{meta.get('distributor', 'Unknown')}[url]\n")
+        desc_text.append(f"  Film Distributor...: [url={meta.get('distributor_link', '')}]{meta.get('distributor', 'Unknown')}[url] [color=red]Don't forget the actual distributor link\n")
         desc_text.append(f"  Average Bitrate....: {total_bitrate}\n")
         desc_text.append("  Ripping Program....:  [color=red]Specify - if it's your rip or custom version, otherwise 'Not my rip'[/color]\n")
         desc_text.append("\n")

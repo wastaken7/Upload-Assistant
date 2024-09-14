@@ -29,7 +29,7 @@ class RTF():
         self.banned_groups = []
         pass
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
@@ -93,7 +93,7 @@ class RTF():
             console.print("[cyan]Request Data:")
             console.print(json_data)
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         headers = {

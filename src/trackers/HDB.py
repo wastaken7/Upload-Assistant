@@ -196,7 +196,7 @@ class HDB():
 
         return hdb_name
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -317,7 +317,7 @@ class HDB():
                         raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         url = "https://hdbits.org/api/torrents"

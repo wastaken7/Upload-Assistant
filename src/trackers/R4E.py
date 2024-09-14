@@ -27,7 +27,7 @@ class R4E():
         self.banned_groups = [""]
         pass
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'], meta['tmdb'])
@@ -136,7 +136,7 @@ class R4E():
                 is_docu = True
         return is_docu
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         url = "https://racing4everyone.eu/api/torrents/filter"

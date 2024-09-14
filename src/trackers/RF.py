@@ -28,7 +28,7 @@ class RF():
         self.banned_groups = [""]
         pass
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
@@ -142,7 +142,7 @@ class RF():
         }.get(resolution, '10')
         return resolution_id
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

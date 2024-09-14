@@ -63,7 +63,7 @@ class ANT():
             flags.append('Remux')
         return flags
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         torrent_filename = "BASE"
         torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
@@ -173,7 +173,7 @@ class ANT():
     async def edit_desc(self, meta):
         return
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

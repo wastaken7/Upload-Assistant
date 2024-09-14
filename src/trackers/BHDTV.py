@@ -30,7 +30,7 @@ class BHDTV():
         self.banned_groups = []
         pass
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -198,7 +198,7 @@ class BHDTV():
             desc.close()
         return
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         console.print("[red]Dupes must be checked Manually")
         return ['Dupes must be checked Manually']
         # hopefully someone else has the time to implement this.

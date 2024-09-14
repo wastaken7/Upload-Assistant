@@ -306,7 +306,7 @@ class PTP():
                 tags.append(each)
         return tags
 
-    async def search_existing(self, groupID, meta):
+    async def search_existing(self, groupID, meta, disctype):
         # Map resolutions to SD / HD / UHD
         quality = None
         if meta.get('sd', 0) == 1:  # 1 is SD
@@ -841,7 +841,7 @@ class PTP():
 
         return url, data
 
-    async def upload(self, meta, url, data):
+    async def upload(self, meta, url, data, disctype):
         torrent_filename = f"[{self.tracker}]{meta['clean_name']}.torrent"
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}"
         torrent = Torrent.read(torrent_path)

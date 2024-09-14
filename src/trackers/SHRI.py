@@ -18,12 +18,6 @@ class SHRI():
         Upload
     """
 
-    ###############################################################
-    ########                    EDIT ME                    ########  # noqa #E266
-    ###############################################################
-
-    # ALSO EDIT CLASS NAME ABOVE
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'SHRI'
@@ -68,11 +62,7 @@ class SHRI():
         }.get(resolution, '10')
         return resolution_id
 
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ######  # noqa #E266
-    ###############################################################
-
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
@@ -150,7 +140,7 @@ class SHRI():
             console.print(data)
         open_torrent.close()
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

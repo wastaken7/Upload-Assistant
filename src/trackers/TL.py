@@ -75,7 +75,7 @@ class TL():
 
         raise NotImplementedError('Failed to determine TL category!')
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(common, meta)

@@ -35,7 +35,7 @@ class BLU():
 
         pass
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         blu_name = meta['name']
         desc_header = ""
@@ -190,7 +190,7 @@ class BLU():
                 name = name.replace(meta['resolution'], f"Hybrid {meta['resolution']}")
         return name, desc_header
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

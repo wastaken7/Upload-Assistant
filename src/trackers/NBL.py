@@ -43,7 +43,7 @@ class NBL():
         # Leave this in so manual works
         return
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         if meta['category'] != 'TV':
             console.print("[red]Only TV Is allowed at NBL")
             return
@@ -82,7 +82,7 @@ class NBL():
             console.print(data)
         open_torrent.close()
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         if int(meta.get('tvmaze_id', 0)) != 0:

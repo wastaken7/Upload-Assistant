@@ -59,7 +59,7 @@ class PTER():
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         common = COMMON(config=self.config)
         cookiefile = f"{meta['base_dir']}/data/cookies/PTER.txt"
@@ -317,7 +317,7 @@ class PTER():
                     return 'yes'
         return None
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
 
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)

@@ -105,7 +105,7 @@ class TTG():
             anon = 'yes'
         return anon
 
-    async def upload(self, meta):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -177,7 +177,7 @@ class TTG():
                         raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
         return
 
-    async def search_existing(self, meta):
+    async def search_existing(self, meta, disctype):
         dupes = []
         with requests.Session() as session:
             cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
