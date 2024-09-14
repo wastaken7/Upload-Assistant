@@ -3135,7 +3135,7 @@ class Prep():
         ptp_desc = ""
         imagelist = []
 
-        desc_sources = ['ptp', 'blu', 'aither', 'lst', 'oe']
+        desc_sources = ['ptp', 'blu', 'aither', 'lst', 'oe', 'tik']
         desc_source = [source.upper() for source in desc_sources if meta.get(source)]
         desc_source = desc_source[0] if len(desc_source) == 1 else None
 
@@ -3155,25 +3155,25 @@ class Prep():
                         meta['description'] = 'PTP'
                         meta['imagelist'] = imagelist
 
-                # Handle BLU description
                 if not ptp_desc and clean_text(meta.get('blu_desc', '')) and desc_source in ['BLU', None]:
                     description.write(meta['blu_desc'] + "\n")
                     meta['description'] = 'BLU'
 
-                # Handle LST description
                 if not ptp_desc and clean_text(meta.get('lst_desc', '')) and desc_source in ['LST', None]:
                     description.write(meta['lst_desc'] + "\n")
                     meta['description'] = 'LST'
 
-                # Handle AITHER description
                 if not ptp_desc and clean_text(meta.get('aither_desc', '')) and desc_source in ['AITHER', None]:
                     description.write(meta['aither_desc'] + "\n")
                     meta['description'] = 'AITHER'
 
-                # Handle OE description
                 if not ptp_desc and clean_text(meta.get('oe_desc', '')) and desc_source in ['OE', None]:
                     description.write(meta['oe_desc'] + "\n")
                     meta['description'] = 'OE'
+
+                if not ptp_desc and clean_text(meta.get('tike_desc', '')) and desc_source in ['TIK', None]:
+                    description.write(meta['tik_desc'] + "\n")
+                    meta['description'] = 'TIK'
 
             if meta.get('desc_template'):
                 from jinja2 import Template
