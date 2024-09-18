@@ -360,11 +360,11 @@ async def do_the_thing(base_dir):
                     if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                         continue
                     if await tracker_class.validate_credentials(meta) is True:
-                        dupes = await tracker_class.search_existing(meta)
+                        dupes = await tracker_class.search_existing(meta, disctype)
                         dupes = await common.filter_dupes(dupes, meta)
                         meta = dupe_check(dupes, meta)
                         if meta['upload'] is True:
-                            await tracker_class.upload(meta)
+                            await tracker_class.upload(meta, disctype)
                             await client.add_to_client(meta, tracker_class.tracker)
 
             if tracker == "MANUAL":
@@ -414,11 +414,11 @@ async def do_the_thing(base_dir):
                             console.print("[yellow]Logging in to THR")
                             session = thr.login(session)
                             console.print("[yellow]Searching for Dupes")
-                            dupes = thr.search_existing(session, meta.get('imdb_id'))
+                            dupes = thr.search_existing(session, disctype, meta.get('imdb_id'))
                             dupes = await common.filter_dupes(dupes, meta)
                             meta = dupe_check(dupes, meta)
                             if meta['upload'] is True:
-                                await thr.upload(session, meta)
+                                await thr.upload(session, meta, disctype)
                                 await client.add_to_client(meta, "THR")
                     except Exception:
                         console.print(traceback.print_exc())
@@ -454,14 +454,14 @@ async def do_the_thing(base_dir):
                             meta['upload'] = True
                         else:
                             console.print("[yellow]Searching for Existing Releases")
-                            dupes = await ptp.search_existing(groupID, meta)
+                            dupes = await ptp.search_existing(groupID, meta, disctype)
                             dupes = await common.filter_dupes(dupes, meta)
                             meta = dupe_check(dupes, meta)
                         if meta.get('imdb_info', {}) == {}:
                             meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
                         if meta['upload'] is True:
                             ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                            await ptp.upload(meta, ptpUrl, ptpData)
+                            await ptp.upload(meta, ptpUrl, ptpData, disctype)
                             await asyncio.sleep(5)
                             await client.add_to_client(meta, "PTP")
                     except Exception:
