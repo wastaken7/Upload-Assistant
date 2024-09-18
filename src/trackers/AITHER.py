@@ -3,8 +3,8 @@
 import asyncio
 import requests
 from str2bool import str2bool
-import json
 import platform
+import re
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -40,6 +40,8 @@ class AITHER():
         resolution_id = await self.get_res_id(meta['resolution'])
         modq = await self.get_flag(meta, 'modq')
         name = await self.edit_name(meta)
+        region_id = await common.unit3d_region_ids(meta.get('region'))
+        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
@@ -89,7 +91,10 @@ class AITHER():
         if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
-
+        if region_id != 0:
+            data['region_id'] = region_id
+        if distributor_id != 0:
+            data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')
@@ -116,47 +121,53 @@ class AITHER():
         aither_name = meta['name']
 
         # Helper function to check if English audio is present
-        def has_english_audio(tracks, is_bdmv=False):
-            for track in tracks:
-                if is_bdmv and track.get('language') == 'English':
-                    return True
-                if not is_bdmv and track['@type'] == "Audio":
-                    # Ensure Language is not None and is a string before checking startswith
-                    if isinstance(track.get('Language'), str) and track.get('Language').startswith('en'):
+        def has_english_audio(tracks=None, media_info_text=None):
+            if meta['is_disc'] == "BDMV" and tracks:
+                for track in tracks:
+                    if track.get('language', '').lower() == 'english':
+                        return True
+            elif media_info_text:
+                audio_section = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                if audio_section:
+                    language = audio_section.group(1)
+                    if language.lower().startswith('en'):  # Check if it's English
                         return True
             return False
 
-        # Helper function to get audio language
-        def get_audio_lang(tracks, is_bdmv=False):
-            if is_bdmv:
+        # Helper function to extract the audio language from MediaInfo text or BDMV structure
+        def get_audio_lang(tracks=None, is_bdmv=False, media_info_text=None):
+            if meta['is_disc'] == "BDMV" and tracks:
                 return tracks[0].get('language', '').upper() if tracks else ""
-            return tracks[2].get('Language_String', '').upper() if len(tracks) > 2 else ""
+            elif media_info_text:
+                match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                if match:
+                    return match.group(1).upper()
+            return ""  # Return empty string if no audio track is found
 
-        if meta['is_disc'] != "BDMV":
-            try:
-                with open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json", 'r', encoding='utf-8') as f:
-                    mi = json.load(f)
+        is_bdmv = meta['is_disc'] == "BDMV"  # noqa #F841
+        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
 
-                audio_tracks = mi['media']['track']
-                has_eng_audio = has_english_audio(audio_tracks)
-                if not has_eng_audio:
-                    audio_lang = get_audio_lang(audio_tracks)
-                    if audio_lang:
-                        aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
-            except (FileNotFoundError, KeyError, IndexError) as e:
-                print(f"Error processing MediaInfo: {e}")
-
-        else:
+        if meta['is_disc'] == "BDMV":
             bdinfo_audio = meta.get('bdinfo', {}).get('audio', [])
             has_eng_audio = has_english_audio(bdinfo_audio, is_bdmv=True)
             if not has_eng_audio:
                 audio_lang = get_audio_lang(bdinfo_audio, is_bdmv=True)
                 if audio_lang:
                     aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+        else:
+            # Handle non-BDMV content
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
 
-        # Handle TV show episode title inclusion
-        if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() and meta['episode'].strip():
-            aither_name = aither_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
+                # Check for English audio in the text-based MediaInfo
+                if not has_english_audio(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
+                    if audio_lang:
+                        aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
 
         return aither_name
 
