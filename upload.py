@@ -40,6 +40,7 @@ from src.trackers.UTP import UTP
 from src.trackers.AL import AL
 from src.trackers.SHRI import SHRI
 from src.trackers.PSS import PSS
+from src.trackers.ULCX import ULCX
 import json
 from pathlib import Path
 import asyncio
@@ -248,18 +249,19 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL', 'PSS']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF', 'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL', 'PSS', 'ULCX']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN,
             'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
-            'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI, 'PSS': PSS}
+            'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL, 'SHRI': SHRI, 'PSS': PSS, 'ULCX': ULCX}
 
         tracker_capabilities = {
             'LST': {'mod_q': True, 'draft': True},
             'BLU': {'mod_q': True, 'draft': False},
             'AITHER': {'mod_q': True, 'draft': False},
             'BHD': {'draft_live': True},
+            'ULCX': {'mod_q': True}
         }
 
         async def check_mod_q_and_draft(tracker_class, meta, debug):
