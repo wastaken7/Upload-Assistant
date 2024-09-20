@@ -220,9 +220,9 @@ class BHD():
         if category == 'MOVIE':
             category = "Movies"
         data = {
-            'tmdb_id': meta['tmdb'],
+            'action': 'search',
+            'imdb_id': meta['imdb_id'],
             'categories': category,
-            'types': await self.get_type(meta),
         }
         # Search all releases if SD
         if meta['sd'] == 1:
@@ -232,7 +232,7 @@ class BHD():
             if meta.get('tv_pack', 0) == 1:
                 data['pack'] = 1
             data['search'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
-        url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}?action=search"
+        url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
         try:
             response = requests.post(url=url, data=data)
             response = response.json()
