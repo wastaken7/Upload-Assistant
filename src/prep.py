@@ -2400,7 +2400,7 @@ class Prep():
                         piece_size = our_max_size
                         break
                 elif torrent_file_size > 102400:
-                    cli_ui.error('WARNING: .torrent size will exceed 100 KiB!')
+                    cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
