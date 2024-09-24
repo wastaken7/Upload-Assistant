@@ -120,16 +120,15 @@ class AITHER():
     async def edit_name(self, meta):
         aither_name = meta['name']
 
-        # Helper function to check if English audio is present
         def has_english_audio(tracks=None, media_info_text=None):
             if meta['is_disc'] == "BDMV" and tracks:
                 for track in tracks:
                     if track.get('language', '').lower() == 'english':
                         return True
             elif media_info_text:
-                audio_section = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                if audio_section:
-                    language = audio_section.group(1)
+                audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                for i, language in enumerate(audio_section):
+                    language = language.lower().strip()
                     if language.lower().startswith('en'):  # Check if it's English
                         return True
             return False
