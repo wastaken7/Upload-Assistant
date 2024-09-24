@@ -70,6 +70,7 @@ config = {
             "announce_url": ""
         },
         "AITHER": {
+            "useAPI": False,  # Set to True if using Aither
             "api_key": "AITHER api key",
             "announce_url": "https://aither.cc/announce/customannounceurl",
             # "anon" : False,
@@ -151,6 +152,7 @@ config = {
             # "anon" : False
         },
         "LST": {
+            "useAPI": False,  # Set to True if using LST
             "api_key": "LST api key",
             "announce_url": "https://lst.gg/announce/customannounceurl",
             # "anon" : False,
@@ -186,6 +188,7 @@ config = {
             "announce_url": "https://hdts-announce.ru/announce.php",  # DO NOT EDIT THIS LINE
         },
         "OE": {
+            "useAPI": False,  # Set to True if using OE
             "api_key": "OE api key",
             "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
             # "anon" : False

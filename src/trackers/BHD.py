@@ -24,7 +24,7 @@ class BHD():
         self.tracker = 'BHD'
         self.source_flag = 'BHD'
         self.upload_url = 'https://beyond-hd.me/api/upload/'
-        self.signature = "\n[center][url=https://beyond-hd.me/forums/topic/toolpython-l4gs-upload-assistant.5456/post/138087#post-138087]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD']
         pass
 
@@ -218,11 +218,15 @@ class BHD():
         console.print("[yellow]Searching for existing torrents on site...")
         category = meta['category']
         if category == 'MOVIE':
+            tmdbID = "movie"
             category = "Movies"
+        if category == "TV":
+            tmdbID = "tv"
         data = {
             'action': 'search',
-            'imdb_id': meta['imdb_id'],
+            'tmdb_id': f"{tmdbID}/{meta['tmdb']}",
             'categories': category,
+            'types': await self.get_type(meta),
         }
         # Search all releases if SD
         if meta['sd'] == 1:
