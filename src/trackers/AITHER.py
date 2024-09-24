@@ -149,9 +149,9 @@ class AITHER():
 
         if meta['is_disc'] == "BDMV":
             bdinfo_audio = meta.get('bdinfo', {}).get('audio', [])
-            has_eng_audio = has_english_audio(bdinfo_audio, is_bdmv=True)
+            has_eng_audio = has_english_audio(bdinfo_audio)
             if not has_eng_audio:
-                audio_lang = get_audio_lang(bdinfo_audio, is_bdmv=True)
+                audio_lang = get_audio_lang(bdinfo_audio)
                 if audio_lang:
                     aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
         else:
