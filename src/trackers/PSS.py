@@ -26,7 +26,7 @@ class PSS():
         self.search_url = 'https://privatesilverscreen.cc/api/torrents/filter'
         self.signature = '\n[center][url=https://privatesilverscreen.cc/pages/1]Please Seed[/url][/center]'
         self.banned_groups = ['4K4U', 'AROMA', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'NeXus', 'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'nikt0', 'OEPlus', 'OFT', 'OsC', 'PYC',
-                              'QxR', 'Ralphy', 'RARBG', 'RetroPeeps', 'SAMPA', 'Sicario', 'Silence', 'STUTTERSHIT', 'Tigole', 'TSP', 'TSPxL', 'Will1869', 'x0r', 'YIFY', 'core', 'ZMNT',
+                              'QxR', 'Ralphy', 'RARBG', 'SAMPA', 'Sicario', 'Silence', 'STUTTERSHIT', 'Tigole', 'TSP', 'TSPxL', 'Will1869', 'x0r', 'YIFY', 'core', 'ZMNT',
                               'msd', 'nikt0', 'aXXo', 'BRrip', 'CM8', 'CrEwSaDe', 'DNL', 'FaNGDiNG0', 'FRDS', 'HD2DVD', 'HDTime', 'Leffe', 'mHD', 'mSD', 'nHD', 'nSD', 'NhaNc3', 'PRODJi',
                               'RDN', 'SANTi', 'ViSION', 'WAF', 'YTS', 'FROZEN', 'UTR', 'Grym', 'GrymLegacy', 'CK4', 'ProRes', 'MezRips', 'GalaxyRG', 'RCDiVX', 'LycanHD']
         pass
