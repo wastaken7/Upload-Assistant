@@ -218,7 +218,15 @@ class Prep():
                             found_match = False
                             meta['skip_gen_desc'] = True
                             meta['description'] = None
+                    else:
+                        found_match = True
+                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
+                        meta['description'] = ptp_desc
 
+                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                            valid_images = await self.check_images_concurrently(ptp_imagelist)
+                            if valid_images:
+                                meta['image_list'] = valid_images
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
                     found_match = False
@@ -231,6 +239,7 @@ class Prep():
                 if imdb_id:
                     meta['imdb'] = str(imdb_id).zfill(7)
                     console.print(f"[green]IMDb ID found: tt{meta['imdb']}[/green]")
+                    found_match = True
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                     found_match = False
