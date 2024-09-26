@@ -185,7 +185,7 @@ class PTP():
         except Exception:
             return None, None, None
 
-    async def get_ptp_description(self, ptp_torrent_id, is_disc):
+    async def get_ptp_description(self, ptp_torrent_id, meta, is_disc):
         params = {
             'id': ptp_torrent_id,
             'action': 'get_description'
@@ -209,20 +209,21 @@ class PTP():
         console.print("[bold green]Successfully grabbed description from PTP")
         console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...")  # Show first 1000 characters for brevity
 
-        # Allow user to edit or discard the description
-        console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-        edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+        if not meta.get('ptp') or meta['unattended']:
+            # Allow user to edit or discard the description
+            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-        if edit_choice.lower() == 'e':
-            edited_description = click.edit(desc)
-            if edited_description:
-                desc = edited_description.strip()
-            console.print(f"[green]Final description after editing:[/green] {desc}")
-        elif edit_choice.lower() == 'd':
-            desc = None
-            console.print("[yellow]Description discarded.[/yellow]")
-        else:
-            console.print("[green]Keeping the original description.[/green]")
+            if edit_choice.lower() == 'e':
+                edited_description = click.edit(desc)
+                if edited_description:
+                    desc = edited_description.strip()
+                console.print(f"[green]Final description after editing:[/green] {desc}")
+            elif edit_choice.lower() == 'd':
+                desc = None
+                console.print("[yellow]Description discarded.[/yellow]")
+            else:
+                console.print("[green]Keeping the original description.[/green]")
 
         return desc, imagelist
 

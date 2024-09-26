@@ -178,7 +178,7 @@ class COMMON():
             return True
         return False
 
-    async def unit3d_torrent_info(self, tracker, torrent_url, search_url, id=None, file_name=None):
+    async def unit3d_torrent_info(self, tracker, torrent_url, search_url, meta, id=None, file_name=None):
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist = []
 
@@ -265,19 +265,20 @@ class COMMON():
                 console.print(f"[blue]Extracted description: [yellow]{description}", markup=False)
 
                 # Allow user to edit or discard the description
-                console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
+                if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta.get('unattended'):
+                    console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                    edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
 
-                if edit_choice.lower() == 'e':
-                    edited_description = click.edit(description)
-                    if edited_description:
-                        description = edited_description.strip()
-                    console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
-                elif edit_choice.lower() == 'd':
-                    description = None
-                    console.print("[yellow]Description discarded.[/yellow]")
-                else:
-                    console.print("[green]Keeping the original description.[/green]")
+                    if edit_choice.lower() == 'e':
+                        edited_description = click.edit(description)
+                        if edited_description:
+                            description = edited_description.strip()
+                        console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
+                    elif edit_choice.lower() == 'd':
+                        description = None
+                        console.print("[yellow]Description discarded.[/yellow]")
+                    else:
+                        console.print("[green]Keeping the original description.[/green]")
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 

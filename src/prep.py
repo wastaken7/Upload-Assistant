@@ -145,7 +145,8 @@ class Prep():
                 if valid_images:
                     meta['image_list'] = valid_images
                     if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                        await self.handle_image_list(meta, tracker_name)
+                        if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta['unattended']:
+                            await self.handle_image_list(meta, tracker_name)
 
         if filename:
             meta[f'{tracker_name.lower()}_filename'] = filename
@@ -164,6 +165,7 @@ class Prep():
                     tracker_name,
                     tracker_instance.torrent_url,
                     tracker_instance.search_url,
+                    meta,
                     id=meta[tracker_key]
                 )
             else:
@@ -194,27 +196,28 @@ class Prep():
                     meta['imdb'] = str(imdb_id).zfill(7) if imdb_id else None
 
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb']}[/green]")
-                    if await self.prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
-                        meta['skip_gen_desc'] = True
-                        found_match = True
+                    if not meta['unattended']:
+                        if await self.prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
+                            meta['skip_gen_desc'] = True
+                            found_match = True
 
-                        # Retrieve PTP description and image list
-                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta.get('is_disc', False))
-                        meta['description'] = ptp_desc
+                            # Retrieve PTP description and image list
+                            ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
+                            meta['description'] = ptp_desc
 
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            valid_images = await self.check_images_concurrently(ptp_imagelist)
-                            if valid_images:
-                                meta['image_list'] = valid_images
-                                await self.handle_image_list(meta, tracker_name)
+                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                                valid_images = await self.check_images_concurrently(ptp_imagelist)
+                                if valid_images:
+                                    meta['image_list'] = valid_images
+                                    await self.handle_image_list(meta, tracker_name)
 
-                        meta['skip_gen_desc'] = True
-                        console.print("[green]PTP images added to metadata.[/green]")
+                            meta['skip_gen_desc'] = True
+                            console.print("[green]PTP images added to metadata.[/green]")
 
-                    else:
-                        found_match = False
-                        meta['skip_gen_desc'] = True
-                        meta['description'] = None
+                        else:
+                            found_match = False
+                            meta['skip_gen_desc'] = True
+                            meta['description'] = None
 
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
@@ -233,14 +236,13 @@ class Prep():
                     found_match = False
 
                 # Retrieve PTP description and image list
-                ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta.get('is_disc', False))
+                ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                 meta['description'] = ptp_desc
 
                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                     valid_images = await self.check_images_concurrently(ptp_imagelist)
                     if valid_images:
                         meta['image_list'] = valid_images
-                        await self.handle_image_list(meta, tracker_name)
 
                 meta['skip_gen_desc'] = True
                 console.print("[green]PTP images added to metadata.[/green]")
@@ -304,12 +306,15 @@ class Prep():
                 if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', ''):
                     console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
 
-            keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
-            if not keep_images:
-                meta['image_list'] = []
-                console.print(f"[yellow]Images discarded from {tracker_name}.")
+            if meta['unattended']:
+                keep_images = True
             else:
-                console.print(f"[green]Images retained from {tracker_name}.")
+                keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
+                if not keep_images:
+                    meta['image_list'] = []
+                    console.print(f"[yellow]Images discarded from {tracker_name}.")
+                else:
+                    console.print(f"[green]Images retained from {tracker_name}.")
 
     async def gather_prep(self, meta, mode):
         meta['mode'] = mode
