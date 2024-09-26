@@ -48,7 +48,7 @@ class UTP():
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
             bd_dump = None
-        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[UTOPIA]DESCRIPTION.txt", 'r').read()
+        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[UTOPIA]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[UTOPIA]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': ("placeholder.torrent", open_torrent, "application/x-bittorrent")}
         data = {

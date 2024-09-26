@@ -765,7 +765,7 @@ class PTP():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
-        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "r").read()
+        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "r", encoding='utf-8').read()
         ptp_subtitles = self.get_subtitles(meta)
         ptp_trumpable = None
         if not any(x in [3, 50] for x in ptp_subtitles) or meta['hardcoded-subs']:

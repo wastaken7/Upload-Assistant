@@ -93,7 +93,7 @@ class LST():
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
             bd_dump = None
 
-        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r').read()
+        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         if meta.get('service') == "hentai":
             desc = "[center]" + "[img]" + str(meta['poster']) + "[/img][/center]" + "\n[center]" + "https://www.themoviedb.org/tv/" + str(meta['tmdb']) + "\nhttps://myanimelist.net/anime/" + str(meta['mal']) + "[/center]" + desc
 

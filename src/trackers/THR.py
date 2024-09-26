@@ -59,7 +59,7 @@ class THR():
                 f.close()
             # bd_file = None
 
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt", 'r') as f:
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt", 'r', encoding='utf-8') as f:
             desc = f.read()
             f.close()
 
@@ -169,7 +169,7 @@ class THR():
 
     async def edit_desc(self, meta):
         pronfo = False
-        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
+        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt", 'w', encoding='utf-8') as desc:
             if meta['tag'] == "":
                 tag = ""
