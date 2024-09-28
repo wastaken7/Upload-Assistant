@@ -2458,17 +2458,14 @@ class Prep():
     def create_torrent(self, meta, path, output_filename):
         # Handle directories and file inclusion logic
         if meta['isdir']:
-            if meta['keep_folder']:
-                cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
-            else:
-                os.chdir(path)
-                globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
-                no_sample_globs = []
-                for file in globs:
-                    if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
-                        no_sample_globs.append(os.path.abspath(f"{path}{os.sep}{file}"))
-                if len(no_sample_globs) == 1:
-                    path = meta['filelist'][0]
+            os.chdir(path)
+            globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
+            no_sample_globs = []
+            for file in globs:
+                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
+                    no_sample_globs.append(os.path.abspath(f"{path}{os.sep}{file}"))
+            if len(no_sample_globs) == 1:
+                path = meta['filelist'][0]
         if meta['is_disc']:
             include, exclude = "", ""
         else:
