@@ -2529,7 +2529,8 @@ class Prep():
         img_host = meta['imghost']  # Use the correctly updated image host from meta
 
         image_list = []
-        successfully_uploaded = set()  # Keep track of uploaded images across hosts
+        successfully_uploaded = set()  # Track successfully uploaded images
+        initial_timeout = 5  # Set the initial timeout for backoff
 
         if custom_img_list:
             image_glob = custom_img_list
@@ -2544,146 +2545,167 @@ class Prep():
             console.print(f"[yellow]Skipping upload because images are already uploaded to {img_host}. Existing images: {len(existing_images)}, Required: {total_screens}")
             return existing_images, total_screens
 
-        if img_host == "imgbox":
-            console.print("[green]Uploading Screens to Imgbox...")
-            image_list = asyncio.run(self.imgbox_upload(f"{meta['base_dir']}/tmp/{meta['uuid']}", image_glob))
-            if not image_list:
-                console.print("[yellow]Imgbox failed, trying next image host")
-                img_host_num += 1
-                img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
-                if not img_host:
-                    console.print("[red]All image hosts failed. Unable to complete uploads.")
-                    return image_list, i
+        def exponential_backoff(retry_count, initial_timeout):
+            # First retry uses the initial timeout
+            if retry_count == 1:
+                backoff_time = initial_timeout
             else:
-                return image_list, i  # Return after successful Imgbox upload
-        else:
+                # Each subsequent retry increases the timeout by 50%
+                backoff_time = initial_timeout * (1.5 ** (retry_count - 1))
+
+            # Add a small random jitter to avoid synchronization
+            backoff_time += random.uniform(0, 1)
+
+            # Sleep for the calculated backoff time
+            time.sleep(backoff_time)
+
+            return backoff_time
+
+        while True:
+            # Get remaining images that have not been uploaded yet
+            remaining_images = [img for img in image_glob[-screens:] if img not in successfully_uploaded]
+
             with Progress(
                 TextColumn("[bold green]Uploading Screens..."),
                 BarColumn(),
                 "[cyan]{task.completed}/{task.total}",
                 TimeRemainingColumn()
             ) as progress:
-                while True:
-                    remaining_images = [img for img in image_glob[-screens:] if img not in successfully_uploaded]
-                    upload_task = progress.add_task(f"[green]Uploading Screens to {img_host}...", total=len(remaining_images))
+                upload_task = progress.add_task(f"[green]Uploading Screens to {img_host}...", total=len(remaining_images))
 
-                    for image in remaining_images:
-                        retry_count = 0
-                        while retry_count < max_retries:
-                            try:
-                                timeout = 10
-                                if img_host == "ptpimg":
-                                    payload = {
-                                        'format': 'json',
-                                        'api_key': self.config['DEFAULT']['ptpimg_api']
-                                    }
-                                    files = [('file-upload[0]', open(image, 'rb'))]
-                                    headers = {'referer': 'https://ptpimg.me/index.php'}
-                                    response = requests.post("https://ptpimg.me/upload.php", headers=headers, data=payload, files=files)
-                                    response = response.json()
-                                    ptpimg_code = response[0]['code']
-                                    ptpimg_ext = response[0]['ext']
-                                    img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
-                                    raw_url = img_url
-                                    web_url = img_url
-                                elif img_host == "imgbb":
-                                    url = "https://api.imgbb.com/1/upload"
-                                    data = {
-                                        'key': self.config['DEFAULT']['imgbb_api'],
-                                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                                    }
-                                    response = requests.post(url, data=data, timeout=timeout)
-                                    response = response.json()
-                                    img_url = response['data']['image']['url']
-                                    raw_url = img_url
-                                    web_url = img_url
-                                elif img_host == "ptscreens":
-                                    url = "https://ptscreens.com/api/1/upload"
-                                    data = {
-                                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                                    }
-                                    headers = {
-                                        'X-API-Key': self.config['DEFAULT']['ptscreens_api'],
-                                    }
-                                    response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                                    response = response.json()
-                                    if response.get('status_code') != 200:
-                                        console.print("[yellow]PT Screens failed, trying next image host")
-                                        break
-                                    img_url = response['data']['image']['url']
-                                    raw_url = img_url
-                                    web_url = img_url
-                                elif img_host == "pixhost":
-                                    url = "https://api.pixhost.to/images"
-                                    data = {
-                                        'content_type': '0',
-                                        'max_th_size': 350,
-                                    }
-                                    files = {
-                                        'img': ('file-upload[0]', open(image, 'rb')),
-                                    }
-                                    response = requests.post(url, data=data, files=files, timeout=timeout)
-                                    if response.status_code != 200:
-                                        console.print("[yellow]Pixhost failed, trying next image host")
-                                        break
-                                    response = response.json()
-                                    raw_url = response['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
-                                    img_url = response['th_url']
-                                    web_url = response['show_url']
-                                elif img_host == "lensdump":
-                                    url = "https://lensdump.com/api/1/upload"
-                                    data = {
-                                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                                    }
-                                    headers = {
-                                        'X-API-Key': self.config['DEFAULT']['lensdump_api'],
-                                    }
-                                    response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                                    response = response.json()
-                                    if response.get('status_code') != 200:
-                                        console.print("[yellow]Lensdump failed, trying next image host")
-                                        break
-                                    img_url = response['data']['image']['url']
-                                    raw_url = img_url
-                                    web_url = response['data']['url_viewer']
-                                else:
-                                    console.print(f"[red]Unsupported image host: {img_host}")
+                for image in remaining_images:
+                    retry_count = 0  # Reset retry count for each image
+                    upload_success = False  # Track if the image was successfully uploaded
+
+                    while retry_count < max_retries and not upload_success:
+                        try:
+                            timeout = exponential_backoff(retry_count + 1, initial_timeout)  # Backoff increases both delay and timeout
+                            if img_host == "ptpimg":
+                                payload = {
+                                    'format': 'json',
+                                    'api_key': self.config['DEFAULT']['ptpimg_api']
+                                }
+                                files = [('file-upload[0]', open(image, 'rb'))]
+                                headers = {'referer': 'https://ptpimg.me/index.php'}
+                                response = requests.post("https://ptpimg.me/upload.php", headers=headers, data=payload, files=files, timeout=timeout)
+                                response = response.json()
+                                ptpimg_code = response[0]['code']
+                                ptpimg_ext = response[0]['ext']
+                                img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
+                                raw_url = img_url
+                                web_url = img_url
+                                upload_success = True  # Mark the upload as successful
+
+                            elif img_host == "imgbb":
+                                url = "https://api.imgbb.com/1/upload"
+                                data = {
+                                    'key': self.config['DEFAULT']['imgbb_api'],
+                                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                                }
+                                response = requests.post(url, data=data, timeout=timeout)
+                                response = response.json()
+                                img_url = response['data']['image']['url']
+                                raw_url = img_url
+                                web_url = img_url
+                                upload_success = True  # Mark the upload as successful
+
+                            elif img_host == "ptscreens":
+                                url = "https://ptscreens.com/api/1/upload"
+                                data = {
+                                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                                }
+                                headers = {
+                                    'X-API-Key': self.config['DEFAULT']['ptscreens_api'],
+                                }
+                                response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                                response = response.json()
+                                if response.get('status_code') != 200:
+                                    console.print("[yellow]PT Screens failed, trying next image host")
                                     break
+                                img_url = response['data']['image']['url']
+                                raw_url = img_url
+                                web_url = img_url
+                                upload_success = True  # Mark the upload as successful
 
-                                # Update progress bar and print the result on the same line
-                                progress.console.print(f"[cyan]Uploaded image {i + 1}/{total_screens}: {raw_url}", end='\r')
+                            elif img_host == "pixhost":
+                                url = "https://api.pixhost.to/images"
+                                data = {
+                                    'content_type': '0',
+                                    'max_th_size': 350,
+                                }
+                                files = {
+                                    'img': ('file-upload[0]', open(image, 'rb')),
+                                }
+                                response = requests.post(url, data=data, files=files, timeout=timeout)
+                                if response.status_code != 200:
+                                    console.print("[yellow]Pixhost failed, trying next image host")
+                                    break
+                                response = response.json()
+                                raw_url = response['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
+                                img_url = response['th_url']
+                                web_url = response['show_url']
+                                upload_success = True  # Mark the upload as successful
 
-                                # Add the image details to the list
+                            elif img_host == "lensdump":
+                                url = "https://lensdump.com/api/1/upload"
+                                data = {
+                                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                                }
+                                headers = {
+                                    'X-API-Key': self.config['DEFAULT']['lensdump_api'],
+                                }
+                                response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                                response = response.json()
+                                if response.get('status_code') != 200:
+                                    console.print("[yellow]Lensdump failed, trying next image host")
+                                    break
+                                img_url = response['data']['image']['url']
+                                raw_url = img_url
+                                web_url = response['data']['url_viewer']
+                                upload_success = True  # Mark the upload as successful
+
+                            else:
+                                console.print(f"[red]Unsupported image host: {img_host}")
+                                break
+
+                            # Add the image details to the list after a successful upload
+                            if upload_success:
                                 image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
                                 image_list.append(image_dict)
-                                successfully_uploaded.add(image)  # Track successfully uploaded images
+                                successfully_uploaded.add(image)  # Track the uploaded image
                                 progress.advance(upload_task)
                                 i += 1
-                                break  # Break the retry loop if successful
+                                break  # Break retry loop after a successful upload
 
-                            except Exception as e:
-                                retry_count += 1
-                                console.print(f"[yellow]Failed to upload {image} to {img_host}. Attempt {retry_count}/{max_retries}. Exception: {str(e)}")
-                                if retry_count >= max_retries:
-                                    console.print(f"[red]Max retries reached for {img_host}. Moving to next image host.")
-                                    break
+                        except Exception as e:
+                            retry_count += 1
+                            console.print(f"[yellow]Failed to upload {image} to {img_host}. Attempt {retry_count}/{max_retries}. Exception: {str(e)}")
 
-                            time.sleep(0.5)
+                            # Backoff strategy
+                            exponential_backoff(retry_count, initial_timeout)
 
-                            if i >= total_screens:
-                                return_dict['image_list'] = image_list
-                                console.print(f"\n[cyan]Completed uploading images. Total uploaded: {len(image_list)}")
-                                return image_list, i
+                            if retry_count >= max_retries:
+                                console.print(f"[red]Max retries reached for {img_host}. Moving to next image host.")
+                                break  # Break out of retry loop after max retries
 
-                        # If we broke out of the loop due to a failure, switch to the next host and retry only remaining images
-                        img_host_num += 1
-                        img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
-                        if not img_host:
-                            console.print("[red]All image hosts failed. Unable to complete uploads.")
-                            return image_list, i
+                    # If max retries are reached, break out of the image loop and move to the next host
+                    if not upload_success:
+                        break
 
-            # Ensure that if all attempts fail, a valid tuple is returned
-            return image_list, i
+                # Switch to the next host if retries fail for any image
+                if not upload_success:
+                    img_host_num += 1
+                    img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+
+                    if not img_host:
+                        console.print("[red]All image hosts failed. Unable to complete uploads.")
+                        return image_list, i
+                else:
+                    # If successful, stop switching hosts
+                    break
+
+        # Ensure that if all attempts fail, a valid tuple is returned
+        return image_list, i
 
     async def imgbox_upload(self, chdir, image_glob):
         os.chdir(chdir)
