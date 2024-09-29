@@ -174,6 +174,7 @@ class Prep():
                     tracker_name,
                     tracker_instance.torrent_url,
                     tracker_instance.search_url,
+                    meta,
                     file_name=search_term
                 )
 
@@ -198,12 +199,10 @@ class Prep():
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb']}[/green]")
                     if not meta['unattended']:
                         if await self.prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
-                            meta['skip_gen_desc'] = True
                             found_match = True
 
                             # Retrieve PTP description and image list
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
-                            meta['description'] = ptp_desc
 
                             if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                                 valid_images = await self.check_images_concurrently(ptp_imagelist)
@@ -211,17 +210,14 @@ class Prep():
                                     meta['image_list'] = valid_images
                                     await self.handle_image_list(meta, tracker_name)
 
-                            meta['skip_gen_desc'] = True
-                            console.print("[green]PTP images added to metadata.[/green]")
-
                         else:
                             found_match = False
-                            meta['skip_gen_desc'] = True
-                            meta['description'] = None
+
                     else:
                         found_match = True
                         ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         meta['description'] = ptp_desc
+                        meta['skip_gen_desc'] = True
 
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                             valid_images = await self.check_images_concurrently(ptp_imagelist)
@@ -230,31 +226,27 @@ class Prep():
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
                     found_match = False
-                    meta['skip_gen_desc'] = True
-                    meta['description'] = None
+
             else:
                 ptp_torrent_id = meta['ptp']
-                console.print(f"[cyan]PTP ID found in meta: {ptp_torrent_id}, using it to get IMDb ID[/cyan]")
+                console.print("[cyan]Using specified PTP ID to get IMDb ID[/cyan]")
                 imdb_id, _, meta['ext_torrenthash'] = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
                 if imdb_id:
                     meta['imdb'] = str(imdb_id).zfill(7)
                     console.print(f"[green]IMDb ID found: tt{meta['imdb']}[/green]")
                     found_match = True
+                    meta['skipit'] = True
+                    ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
+                    meta['description'] = ptp_desc
+                    meta['skip_gen_desc'] = True
+                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                        valid_images = await self.check_images_concurrently(ptp_imagelist)
+                        if valid_images:
+                            meta['image_list'] = valid_images
+                            console.print("[green]PTP images added to metadata.[/green]")
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                     found_match = False
-
-                # Retrieve PTP description and image list
-                ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
-                meta['description'] = ptp_desc
-
-                if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                    valid_images = await self.check_images_concurrently(ptp_imagelist)
-                    if valid_images:
-                        meta['image_list'] = valid_images
-
-                meta['skip_gen_desc'] = True
-                console.print("[green]PTP images added to metadata.[/green]")
 
         elif tracker_name == "HDB":
             if meta.get('hdb') is not None:
@@ -3144,104 +3136,71 @@ class Prep():
         return name
 
     async def gen_desc(self, meta):
-        def clean_text(text):
-            return text.replace('\r\n', '').replace('\n', '').strip()
+        if not meta.get('skip_gen_desc', False):
+            def clean_text(text):
+                return text.replace('\r\n', '').replace('\n', '').strip()
 
-        desclink = meta.get('desclink')
-        descfile = meta.get('descfile')
-        ptp_desc = ""
-        imagelist = []
+            desclink = meta.get('desclink')
+            descfile = meta.get('descfile')
 
-        desc_sources = ['ptp', 'blu', 'aither', 'lst', 'oe', 'tik']
-        desc_source = [source.upper() for source in desc_sources if meta.get(source)]
-        desc_source = desc_source[0] if len(desc_source) == 1 else None
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                description.seek(0)
 
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-            description.seek(0)
+                if meta.get('desc_template'):
+                    from jinja2 import Template
+                    try:
+                        with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
+                            template = Template(f.read())
+                            template_desc = template.render(meta)
+                            if clean_text(template_desc):
+                                description.write(template_desc + "\n")
+                                console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
+                    except FileNotFoundError:
+                        console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
 
-            if (desclink, descfile, meta['desc']) == (None, None, None):
-                if meta.get('ptp') and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true" and desc_source in ['PTP', None]:
-                    if meta.get('skip_gen_desc', False):
-                        console.print("[cyan]Something went wrong with PTP description.")
-                        return meta
+                if meta.get('nfo'):
+                    nfo_files = glob.glob("*.nfo")
+                    if nfo_files:
+                        nfo = nfo_files[0]
+                        with open(nfo, 'r', encoding="utf-8") as nfo_file:
+                            nfo_content = nfo_file.read()
+                        description.write(f"[code]{nfo_content}[/code]\n")
+                        meta['description'] = "CUSTOM"
+                        console.print(f"[INFO] NFO file '{nfo}' used.")
 
-                    ptp = PTP(config=self.config)
-                    ptp_desc, imagelist = await ptp.get_ptp_description(meta['ptp'], meta['is_disc'])
-                    if clean_text(ptp_desc):
-                        description.write(ptp_desc + "\n")
-                        meta['description'] = 'PTP'
-                        meta['imagelist'] = imagelist
+                if desclink:
+                    try:
+                        parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
+                        split = os.path.split(parsed.path)
+                        raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
+                        raw_url = urllib.parse.urlunparse(raw)
+                        desclink_content = requests.get(raw_url).text
+                        description.write(desclink_content + "\n")
+                        meta['description'] = "CUSTOM"
+                        console.print(f"[INFO] Description from link '{desclink}' used.")
+                    except Exception as e:
+                        console.print(f"[ERROR] Failed to fetch description from link: {e}")
 
-                if not ptp_desc and clean_text(meta.get('blu_desc', '')) and desc_source in ['BLU', None]:
-                    description.write(meta['blu_desc'] + "\n")
-                    meta['description'] = 'BLU'
-
-                if not ptp_desc and clean_text(meta.get('lst_desc', '')) and desc_source in ['LST', None]:
-                    description.write(meta['lst_desc'] + "\n")
-                    meta['description'] = 'LST'
-
-                if not ptp_desc and clean_text(meta.get('aither_desc', '')) and desc_source in ['AITHER', None]:
-                    description.write(meta['aither_desc'] + "\n")
-                    meta['description'] = 'AITHER'
-
-                if not ptp_desc and clean_text(meta.get('oe_desc', '')) and desc_source in ['OE', None]:
-                    description.write(meta['oe_desc'] + "\n")
-                    meta['description'] = 'OE'
-
-                if not ptp_desc and clean_text(meta.get('tike_desc', '')) and desc_source in ['TIK', None]:
-                    description.write(meta['tik_desc'] + "\n")
-                    meta['description'] = 'TIK'
-
-            if meta.get('desc_template'):
-                from jinja2 import Template
-                try:
-                    with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
-                        template = Template(f.read())
-                        template_desc = template.render(meta)
-                        if clean_text(template_desc):
-                            description.write(template_desc + "\n")
-                            console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
-                except FileNotFoundError:
-                    console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
-
-            if meta.get('nfo'):
-                nfo_files = glob.glob("*.nfo")
-                if nfo_files:
-                    nfo = nfo_files[0]
-                    with open(nfo, 'r', encoding="utf-8") as nfo_file:
-                        nfo_content = nfo_file.read()
-                    description.write(f"[code]{nfo_content}[/code]\n")
+                if descfile and os.path.isfile(descfile):
+                    with open(descfile, 'r') as f:
+                        file_content = f.read()
+                    description.write(file_content)
                     meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] NFO file '{nfo}' used.")
+                    console.print(f"[INFO] Description from file '{descfile}' used.")
 
-            if desclink:
-                try:
-                    parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
-                    split = os.path.split(parsed.path)
-                    raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
-                    raw_url = urllib.parse.urlunparse(raw)
-                    desclink_content = requests.get(raw_url).text
-                    description.write(desclink_content + "\n")
+                if meta.get('desc'):
+                    description.write(meta['desc'] + "\n")
                     meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] Description from link '{desclink}' used.")
-                except Exception as e:
-                    console.print(f"[ERROR] Failed to fetch description from link: {e}")
+                    console.print("[INFO] Custom description used.")
 
-            if descfile and os.path.isfile(descfile):
-                with open(descfile, 'r') as f:
-                    file_content = f.read()
-                description.write(file_content)
-                meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from file '{descfile}' used.")
+                description.write("\n")
+                return meta
+        else:
+            description_text = meta.get('description') if meta.get('description') else ""
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                description.write(description_text + "\n")
 
-            if meta.get('desc'):
-                description.write(meta['desc'] + "\n")
-                meta['description'] = "CUSTOM"
-                console.print("[INFO] Custom description used.")
-
-            description.write("\n")
-
-        return meta
+            return meta
 
     async def tag_override(self, meta):
         with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:

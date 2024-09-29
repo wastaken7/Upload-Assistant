@@ -273,12 +273,19 @@ class COMMON():
                         edited_description = click.edit(description)
                         if edited_description:
                             description = edited_description.strip()
+                            meta['description'] = description
+                            meta['skip_gen_desc'] = True
                         console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
                     elif edit_choice.lower() == 'd':
                         description = None
                         console.print("[yellow]Description discarded.[/yellow]")
                     else:
                         console.print("[green]Keeping the original description.[/green]")
+                        meta['description'] = description
+                        meta['skip_gen_desc'] = True
+                else:
+                    meta['description'] = description
+                    meta['skip_gen_desc'] = True
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
