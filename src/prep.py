@@ -2529,6 +2529,7 @@ class Prep():
         img_host = meta['imghost']  # Use the correctly updated image host from meta
 
         image_list = []
+        successfully_uploaded = set()  # Keep track of uploaded images across hosts
 
         if custom_img_list:
             image_glob = custom_img_list
@@ -2563,9 +2564,10 @@ class Prep():
                 TimeRemainingColumn()
             ) as progress:
                 while True:
-                    upload_task = progress.add_task(f"[green]Uploading Screens to {img_host}...", total=len(image_glob[-screens:]))
-                    
-                    for image in image_glob[-screens:]:
+                    remaining_images = [img for img in image_glob[-screens:] if img not in successfully_uploaded]
+                    upload_task = progress.add_task(f"[green]Uploading Screens to {img_host}...", total=len(remaining_images))
+
+                    for image in remaining_images:
                         retry_count = 0
                         while retry_count < max_retries:
                             try:
@@ -2654,6 +2656,7 @@ class Prep():
                                 # Add the image details to the list
                                 image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
                                 image_list.append(image_dict)
+                                successfully_uploaded.add(image)  # Track successfully uploaded images
                                 progress.advance(upload_task)
                                 i += 1
                                 break  # Break the retry loop if successful
@@ -2672,7 +2675,7 @@ class Prep():
                                 console.print(f"\n[cyan]Completed uploading images. Total uploaded: {len(image_list)}")
                                 return image_list, i
 
-                        # If we broke out of the loop due to a failure, switch to the next host and retry
+                        # If we broke out of the loop due to a failure, switch to the next host and retry only remaining images
                         img_host_num += 1
                         img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
                         if not img_host:
