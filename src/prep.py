@@ -2530,7 +2530,7 @@ class Prep():
 
         image_list = []
         successfully_uploaded = set()  # Track successfully uploaded images
-        initial_timeout = 5  # Set the initial timeout for backoff
+        initial_timeout = 10  # Set the initial timeout for backoff
 
         if custom_img_list:
             image_glob = custom_img_list
@@ -2550,8 +2550,8 @@ class Prep():
             if retry_count == 1:
                 backoff_time = initial_timeout
             else:
-                # Each subsequent retry increases the timeout by 50%
-                backoff_time = initial_timeout * (1.5 ** (retry_count - 1))
+                # Each subsequent retry increases the timeout by 70%
+                backoff_time = initial_timeout * (1.7 ** (retry_count - 1))
 
             # Add a small random jitter to avoid synchronization
             backoff_time += random.uniform(0, 1)
