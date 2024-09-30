@@ -2546,23 +2546,16 @@ class Prep():
             return existing_images, total_screens
 
         def exponential_backoff(retry_count, initial_timeout):
-            # First retry uses the initial timeout
+            # Exponential backoff logic with jitter
             if retry_count == 1:
                 backoff_time = initial_timeout
             else:
-                # Each subsequent retry increases the timeout by 70%
-                backoff_time = initial_timeout * (1.7 ** (retry_count - 1))
-
-            # Add a small random jitter to avoid synchronization
+                backoff_time = initial_timeout * (1.4 ** (retry_count - 1))
             backoff_time += random.uniform(0, 1)
-
-            # Sleep for the calculated backoff time
             time.sleep(backoff_time)
-
             return backoff_time
 
         while True:
-            # Get remaining images that have not been uploaded yet
             remaining_images = [img for img in image_glob[-screens:] if img not in successfully_uploaded]
 
             with Progress(
@@ -2571,16 +2564,57 @@ class Prep():
                 "[cyan]{task.completed}/{task.total}",
                 TimeRemainingColumn()
             ) as progress:
-                upload_task = progress.add_task(f"[green]Uploading Screens to {img_host}...", total=len(remaining_images))
+                upload_task = progress.add_task("[green]Uploading Screens...", total=len(remaining_images))
+                console.print(f"[cyan]Uploading screens to {img_host}...")
 
                 for image in remaining_images:
-                    retry_count = 0  # Reset retry count for each image
-                    upload_success = False  # Track if the image was successfully uploaded
+                    retry_count = 0
+                    upload_success = False
 
                     while retry_count < max_retries and not upload_success:
                         try:
-                            timeout = exponential_backoff(retry_count + 1, initial_timeout)  # Backoff increases both delay and timeout
-                            if img_host == "ptpimg":
+                            timeout = exponential_backoff(retry_count + 1, initial_timeout)
+                            if img_host == "imgbox":
+                                try:
+                                    async def imgbox_upload(image):
+                                        gallery = pyimgbox.Gallery(thumb_width=350, square_thumbs=False)
+                                        async for submission in gallery.add(image):
+                                            return submission
+
+                                    submission = asyncio.run(imgbox_upload(image))
+
+                                    if not submission['success']:
+                                        console.print(f"[yellow]Imgbox upload failed: {submission['error']}, trying next image host")
+                                        retry_count += 1
+                                        if retry_count >= max_retries:
+                                            console.print("[red]Max retries reached for imgbox. Moving to next image host.")
+                                            img_host_num += 1
+                                            img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+                                            if not img_host:
+                                                console.print("[red]All image hosts failed. Unable to complete uploads.")
+                                                return image_list, i
+                                            break  # Move to the next host
+                                        continue  # Retry imgbox until max_retries
+
+                                    img_url = submission['thumbnail_url']
+                                    raw_url = submission['image_url']
+                                    web_url = submission['web_url']
+                                    upload_success = True
+
+                                except Exception as e:
+                                    console.print(f"[yellow]Failed to upload {image} to imgbox. Exception: {str(e)}")
+                                    retry_count += 1
+                                    if retry_count >= max_retries:
+                                        console.print("[red]Max retries reached for imgbox. Moving to next image host.")
+                                        img_host_num += 1
+                                        img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+                                        if not img_host:
+                                            console.print("[red]All image hosts failed. Unable to complete uploads.")
+                                            return image_list, i
+                                        break
+                                    continue
+
+                            elif img_host == "ptpimg":
                                 payload = {
                                     'format': 'json',
                                     'api_key': self.config['DEFAULT']['ptpimg_api']
@@ -2594,7 +2628,7 @@ class Prep():
                                 img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
                                 raw_url = img_url
                                 web_url = img_url
-                                upload_success = True  # Mark the upload as successful
+                                upload_success = True
 
                             elif img_host == "imgbb":
                                 url = "https://api.imgbb.com/1/upload"
@@ -2607,7 +2641,7 @@ class Prep():
                                 img_url = response['data']['image']['url']
                                 raw_url = img_url
                                 web_url = img_url
-                                upload_success = True  # Mark the upload as successful
+                                upload_success = True
 
                             elif img_host == "ptscreens":
                                 url = "https://ptscreens.com/api/1/upload"
@@ -2625,7 +2659,7 @@ class Prep():
                                 img_url = response['data']['image']['url']
                                 raw_url = img_url
                                 web_url = img_url
-                                upload_success = True  # Mark the upload as successful
+                                upload_success = True
 
                             elif img_host == "pixhost":
                                 url = "https://api.pixhost.to/images"
@@ -2644,7 +2678,7 @@ class Prep():
                                 raw_url = response['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
                                 img_url = response['th_url']
                                 web_url = response['show_url']
-                                upload_success = True  # Mark the upload as successful
+                                upload_success = True
 
                             elif img_host == "lensdump":
                                 url = "https://lensdump.com/api/1/upload"
@@ -2662,13 +2696,8 @@ class Prep():
                                 img_url = response['data']['image']['url']
                                 raw_url = img_url
                                 web_url = response['data']['url_viewer']
-                                upload_success = True  # Mark the upload as successful
+                                upload_success = True
 
-                            else:
-                                console.print(f"[red]Unsupported image host: {img_host}")
-                                break
-
-                            # Add the image details to the list after a successful upload
                             if upload_success:
                                 image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
                                 image_list.append(image_dict)
@@ -2680,62 +2709,24 @@ class Prep():
                         except Exception as e:
                             retry_count += 1
                             console.print(f"[yellow]Failed to upload {image} to {img_host}. Attempt {retry_count}/{max_retries}. Exception: {str(e)}")
-
-                            # Backoff strategy
                             exponential_backoff(retry_count, initial_timeout)
 
                             if retry_count >= max_retries:
                                 console.print(f"[red]Max retries reached for {img_host}. Moving to next image host.")
-                                break  # Break out of retry loop after max retries
+                                img_host_num += 1
+                                img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+                                if not img_host:
+                                    console.print("[red]All image hosts failed. Unable to complete uploads.")
+                                    return image_list, i
+                                break  # Move to the next host after max retries
 
-                    # If max retries are reached, break out of the image loop and move to the next host
-                    if not upload_success:
-                        break
-
-                # Switch to the next host if retries fail for any image
-                if not upload_success:
-                    img_host_num += 1
-                    img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
-
-                    if not img_host:
-                        console.print("[red]All image hosts failed. Unable to complete uploads.")
-                        return image_list, i
+                # Exit the loop after switching hosts
+                if img_host_num > 1 and not upload_success:
+                    continue  # Continue to the next host
                 else:
-                    # If successful, stop switching hosts
-                    break
+                    break  # Break if upload was successful
 
-        # Ensure that if all attempts fail, a valid tuple is returned
         return image_list, i
-
-    async def imgbox_upload(self, chdir, image_glob):
-        os.chdir(chdir)
-        image_list = []
-
-        # Initialize the progress bar
-        with Progress(
-            TextColumn("[bold green]Uploading Screens to Imgbox..."),
-            BarColumn(),
-            "[cyan]{task.completed}/{task.total}",
-            TimeRemainingColumn()
-        ) as progress:
-            upload_task = progress.add_task("Uploading...", total=len(image_glob))
-
-            async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
-                async for submission in gallery.add(image_glob):
-                    if not submission['success']:
-                        console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
-                        return []
-                    else:
-                        image_dict = {}
-                        image_dict['web_url'] = submission['web_url']
-                        image_dict['img_url'] = submission['thumbnail_url']
-                        image_dict['raw_url'] = submission['image_url']
-                        image_list.append(image_dict)
-
-                        # Update the progress bar
-                        progress.advance(upload_task)
-
-        return image_list
 
     async def get_name(self, meta):
         type = meta.get('type', "")
