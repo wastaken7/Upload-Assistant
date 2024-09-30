@@ -2550,7 +2550,7 @@ class Prep():
             if retry_count == 1:
                 backoff_time = initial_timeout
             else:
-                backoff_time = initial_timeout * (1.4 ** (retry_count - 1))
+                backoff_time = initial_timeout * (1.5 ** (retry_count - 1))
             backoff_time += random.uniform(0, 1)
             time.sleep(backoff_time)
             return backoff_time
@@ -2574,27 +2574,29 @@ class Prep():
                     while retry_count < max_retries and not upload_success:
                         try:
                             timeout = exponential_backoff(retry_count + 1, initial_timeout)
+
+                            # Add imgbox handling here
                             if img_host == "imgbox":
                                 try:
-                                    async def imgbox_upload(image):
+                                    async def imgbox_upload(image_glob):
                                         gallery = pyimgbox.Gallery(thumb_width=350, square_thumbs=False)
-                                        async for submission in gallery.add(image):
+                                        async for submission in gallery.add(image_glob):
                                             return submission
 
-                                    submission = asyncio.run(imgbox_upload(image))
+                                    submission = asyncio.run(imgbox_upload(image_glob))
 
                                     if not submission['success']:
-                                        console.print(f"[yellow]Imgbox upload failed: {submission['error']}, trying next image host")
-                                        retry_count += 1
-                                        if retry_count >= max_retries:
-                                            console.print("[red]Max retries reached for imgbox. Moving to next image host.")
-                                            img_host_num += 1
-                                            img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
-                                            if not img_host:
-                                                console.print("[red]All image hosts failed. Unable to complete uploads.")
-                                                return image_list, i
-                                            break  # Move to the next host
-                                        continue  # Retry imgbox until max_retries
+                                        console.print(f"[red]Imgbox upload failed: {submission['error']}")
+                                        img_host_num += 1
+                                        next_img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num + 1}', 'No more hosts')
+                                        console.print(f"[blue]Moving to next image host: {next_img_host}.")
+
+                                        img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+
+                                        if not img_host:
+                                            console.print("[red]All image hosts failed. Unable to complete uploads.")
+                                            return image_list, i
+                                        break
 
                                     img_url = submission['thumbnail_url']
                                     raw_url = submission['image_url']
@@ -2605,7 +2607,8 @@ class Prep():
                                     console.print(f"[yellow]Failed to upload {image} to imgbox. Exception: {str(e)}")
                                     retry_count += 1
                                     if retry_count >= max_retries:
-                                        console.print("[red]Max retries reached for imgbox. Moving to next image host.")
+                                        next_img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num + 1}', 'No more hosts')
+                                        console.print(f"[red]Max retries reached for imgbox. Moving to next image host: {next_img_host}.")
                                         img_host_num += 1
                                         img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
                                         if not img_host:
@@ -2698,12 +2701,13 @@ class Prep():
                                 web_url = response['data']['url_viewer']
                                 upload_success = True
 
+                            # Only increment `i` after a successful upload
                             if upload_success:
                                 image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
                                 image_list.append(image_dict)
                                 successfully_uploaded.add(image)  # Track the uploaded image
                                 progress.advance(upload_task)
-                                i += 1
+                                i += 1  # Increment the image counter only after success
                                 break  # Break retry loop after a successful upload
 
                         except Exception as e:
@@ -2712,13 +2716,14 @@ class Prep():
                             exponential_backoff(retry_count, initial_timeout)
 
                             if retry_count >= max_retries:
-                                console.print(f"[red]Max retries reached for {img_host}. Moving to next image host.")
+                                next_img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num + 1}', 'No more hosts')
+                                console.print(f"[red]Max retries reached for {img_host}. Moving to next image host: {next_img_host}.")
                                 img_host_num += 1
                                 img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
                                 if not img_host:
                                     console.print("[red]All image hosts failed. Unable to complete uploads.")
                                     return image_list, i
-                                break  # Move to the next host after max retries
+                                break
 
                 # Exit the loop after switching hosts
                 if img_host_num > 1 and not upload_success:
