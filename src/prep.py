@@ -1269,7 +1269,7 @@ class Prep():
                                 i += 1
                             elif self.img_host == "ptscreens":
                                 i += 1
-                            elif self.img_host == "oeimg"
+                            elif self.img_host == "oeimg":
                                 i += 1
                             else:
                                 console.print("[red]Image too large for your image host, retaking")
