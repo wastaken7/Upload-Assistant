@@ -1269,6 +1269,8 @@ class Prep():
                                 i += 1
                             elif self.img_host == "ptscreens":
                                 i += 1
+                            elif self.img_host == "oeimg"
+                                i += 1
                             else:
                                 console.print("[red]Image too large for your image host, retaking")
                                 retake = True
@@ -1384,7 +1386,7 @@ class Prep():
                                     i += 1
                                 elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", 'pixhost'] and retake is False:
                                     i += 1
-                                elif self.img_host in ["ptpimg", "lensdump", "ptscreens"] and retake is False:
+                                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and retake is False:
                                     i += 1
                                 elif self.img_host == "freeimage.host":
                                     console.print("[bold red]Support for freeimage.host has been removed. Please remove from your config")
@@ -2662,6 +2664,24 @@ class Prep():
                                 img_url = response['data']['image']['url']
                                 raw_url = img_url
                                 web_url = img_url
+                                upload_success = True
+
+                            elif img_host == "oeimg":
+                                url = "https://imgoe.download/api/1/upload"
+                                data = {
+                                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                                }
+                                headers = {
+                                    'X-API-Key': self.config['DEFAULT']['oeimg_api'],
+                                }
+                                response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                                response = response.json()
+                                if response.get('status_code') != 200:
+                                    console.print("[yellow]OEimg failed, trying next image host")
+                                    break
+                                img_url = response['data']['image']['url']
+                                raw_url = response['data']['image']['url']
+                                web_url = response['data']['url_viewer']
                                 upload_success = True
 
                             elif img_host == "pixhost":
