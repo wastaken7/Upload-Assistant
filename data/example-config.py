@@ -11,7 +11,7 @@ config = {
         "ptpimg_api": "ptpimg api key",
         "lensdump_api": "lensdump api key",
         "ptscreens_api": "ptscreens api key",
-        "oeimg_api": "oeimg api key"
+        "oeimg_api": "oeimg api key",
 
         # Order of image hosts, and backup image hosts
         "img_host_1": "imgbb",
@@ -20,7 +20,7 @@ config = {
         "img_host_4": "pixhost",
         "img_host_5": "lensdump",
         "img_host_6": "ptscreens",
-        "img_host_7": "oeimg"
+        "img_host_7": "oeimg",
 
 
         "screens": "6",
