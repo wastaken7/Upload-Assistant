@@ -782,6 +782,7 @@ class Prep():
                         "UniqueID": track.get("UniqueID"),
                         "Format": track.get("Format"),
                         "Format_Profile": track.get("Format_Profile"),
+                        "Format_Version": track.get("Format_Version"),
                         "Format_Level": track.get("Format_Level"),
                         "Format_Tier": track.get("Format_Tier"),
                         "HDR_Format": track.get("HDR_Format"),
