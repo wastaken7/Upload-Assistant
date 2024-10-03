@@ -82,18 +82,48 @@ class Prep():
         except EOFError:
             sys.exit(1)
 
-    async def check_images_concurrently(self, imagelist):
+    async def check_images_concurrently(self, imagelist, meta):
+        approved_image_hosts = ['ptpimg', 'imgbox']
+        invalid_host_found = False  # Track if any image is on a non-approved host
+
+        # Function to check each image's URL and host
         async def check_and_collect(image_dict):
             img_url = image_dict.get('img_url') or image_dict.get('raw_url')
-            if img_url and await self.check_image_link(img_url):
-                return image_dict
-            else:
-                console.print(f"[yellow]Image link failed verification and will be skipped: {img_url}[/yellow]")
+            if not img_url:
                 return None
 
+            # Verify the image link
+            if await self.check_image_link(img_url):
+                # Check if the image is hosted on an approved image host
+                if not any(host in img_url for host in approved_image_hosts):
+                    nonlocal invalid_host_found
+                    invalid_host_found = True  # Mark that we found an invalid host
+
+                return image_dict
+            else:
+                return None
+
+        # Run image verification concurrently
         tasks = [check_and_collect(image_dict) for image_dict in imagelist]
         results = await asyncio.gather(*tasks)
-        return [image for image in results if image is not None]
+
+        # Collect valid images
+        valid_images = [image for image in results if image is not None]
+
+        # Convert default_trackers string into a list
+        default_trackers = self.config['TRACKERS'].get('default_trackers', '')
+        trackers_list = [tracker.strip() for tracker in default_trackers.split(',')]
+
+        # Ensure meta['trackers'] is a list
+        if isinstance(meta.get('trackers', ''), str):
+            meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
+
+        # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
+        if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', []):
+            if invalid_host_found:
+                console.print("[yellow]Warning: Some images are not hosted on an MTV-approved image host. MTV will fail if you keep these images.[/yellow]")
+
+        return valid_images
 
     async def check_image_link(self, url):
         async with aiohttp.ClientSession() as session:
@@ -295,17 +325,6 @@ class Prep():
             console.print(f"[cyan]Found the following images from {tracker_name}:")
             for img in meta['image_list']:
                 console.print(f"[blue]{img}[/blue]")
-
-            approved_image_hosts = ['ptpimg', 'imgbox']
-
-            # Check if the images are already hosted on an approved image host
-            if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
-                image_list = meta['image_list']  # noqa #F841
-            else:
-                default_trackers = self.config['TRACKERS'].get('default_trackers', '')
-                trackers_list = [tracker.strip() for tracker in default_trackers.split(',')]
-                if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', ''):
-                    console.print("[red]Warning: Some images are not hosted on an MTV approved image host. MTV will fail if you keep these images.")
 
             if meta['unattended']:
                 keep_images = True
