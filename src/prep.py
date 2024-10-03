@@ -233,6 +233,8 @@ class Prep():
 
                             # Retrieve PTP description and image list
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
+                            meta['description'] = ptp_desc
+                            meta['skip_gen_desc'] = True
 
                             if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                                 valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
