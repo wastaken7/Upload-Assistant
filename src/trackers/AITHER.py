@@ -119,13 +119,12 @@ class AITHER():
 
     async def edit_name(self, meta):
         aither_name = meta['name']
+        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+        resolution = meta.get('resolution')
+        video_codec = meta.get('video_codec')
 
         def has_english_audio(tracks=None, media_info_text=None):
-            if meta['is_disc'] == "BDMV" and tracks:
-                for track in tracks:
-                    if track.get('language', '').lower() == 'english':
-                        return True
-            elif media_info_text:
+            if media_info_text:
                 audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                 for i, language in enumerate(audio_section):
                     language = language.lower().strip()
@@ -133,40 +132,28 @@ class AITHER():
                         return True
             return False
 
-        # Helper function to extract the audio language from MediaInfo text or BDMV structure
         def get_audio_lang(tracks=None, is_bdmv=False, media_info_text=None):
-            if meta['is_disc'] == "BDMV" and tracks:
-                return tracks[0].get('language', '').upper() if tracks else ""
-            elif media_info_text:
+            if media_info_text:
                 match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                 if match:
                     return match.group(1).upper()
-            return ""  # Return empty string if no audio track is found
+            return ""
 
-        is_bdmv = meta['is_disc'] == "BDMV"  # noqa #F841
-        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+        try:
+            media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+            with open(media_info_path, 'r', encoding='utf-8') as f:
+                media_info_text = f.read()
 
-        if meta['is_disc'] == "BDMV":
-            bdinfo_audio = meta.get('bdinfo', {}).get('audio', [])
-            has_eng_audio = has_english_audio(bdinfo_audio)
-            if not has_eng_audio:
-                audio_lang = get_audio_lang(bdinfo_audio)
+            if not has_english_audio(media_info_text=media_info_text):
+                audio_lang = get_audio_lang(media_info_text=media_info_text)
                 if audio_lang:
                     aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
-        else:
-            # Handle non-BDMV content
-            try:
-                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-                with open(media_info_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
+        except (FileNotFoundError, KeyError) as e:
+            print(f"Error processing MEDIAINFO.txt: {e}")
 
-                # Check for English audio in the text-based MediaInfo
-                if not has_english_audio(media_info_text=media_info_text):
-                    audio_lang = get_audio_lang(media_info_text=media_info_text)
-                    if audio_lang:
-                        aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
-            except (FileNotFoundError, KeyError) as e:
-                print(f"Error processing MEDIAINFO.txt: {e}")
+        if meta['is_disc'] == "DVD":
+            aither_name = aither_name.replace(str(meta['year']), f"{meta['year']} {resolution}", 1)
+            aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
         return aither_name
 

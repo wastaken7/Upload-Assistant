@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - develop
-      - tik
+      - aither-naming
 
 env:
   REGISTRY: ghcr.io
