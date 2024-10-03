@@ -171,7 +171,7 @@ class Prep():
 
         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
             if imagelist:  # Ensure imagelist is not empty before setting
-                valid_images = await self.check_images_concurrently(imagelist)
+                valid_images = await self.check_images_concurrently(imagelist, meta)
                 if valid_images:
                     meta['image_list'] = valid_images
                     if meta.get('image_list'):  # Double-check if image_list is set before handling it
@@ -235,7 +235,7 @@ class Prep():
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
 
                             if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                                valid_images = await self.check_images_concurrently(ptp_imagelist)
+                                valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
                                 if valid_images:
                                     meta['image_list'] = valid_images
                                     await self.handle_image_list(meta, tracker_name)
@@ -270,7 +270,7 @@ class Prep():
                     meta['description'] = ptp_desc
                     meta['skip_gen_desc'] = True
                     if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                        valid_images = await self.check_images_concurrently(ptp_imagelist)
+                        valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
                         if valid_images:
                             meta['image_list'] = valid_images
                             console.print("[green]PTP images added to metadata.[/green]")
