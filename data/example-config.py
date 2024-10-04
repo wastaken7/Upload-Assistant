@@ -229,7 +229,7 @@ config = {
             # "anon" : False
         },
         "HDB": {
-            "useAPI": True,
+            "useAPI": False,
             "username": "HDB username",
             "passkey": "HDB passkey",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
@@ -241,7 +241,7 @@ config = {
             # "anon" : "False"
         },
         "TIK": {
-            "useAPI": True,  # Set to True if using TIK
+            "useAPI": False,  # Set to True if using TIK
             "api_key": "",
             "announce_url": "https://cinematik.net/announce/",
             "anon": False,
@@ -256,7 +256,6 @@ config = {
             "api_key": "ULCX api key",
             "announce_url": "https://upload.cx/announce/customannounceurl",
             # "anon" : False,
-            # "modq" : False  ## Not working yet
         },
         "MANUAL": {
             # Uncomment and replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se
