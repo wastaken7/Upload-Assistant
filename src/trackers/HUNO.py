@@ -219,7 +219,6 @@ class HUNO():
         return category_id
 
     async def get_type_id(self, meta):
-        basename = self.get_basename(meta)
         type = meta['type']
         video_encode = meta['video_encode']
 
