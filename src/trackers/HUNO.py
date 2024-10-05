@@ -221,11 +221,12 @@ class HUNO():
     async def get_type_id(self, meta):
         basename = self.get_basename(meta)
         type = meta['type']
+        video_encode = meta['video_encode']
 
         if type == 'REMUX':
             return '2'
         elif type in ('WEBDL', 'WEBRIP'):
-            return '15' if 'x265' in basename else '3'
+            return '15' if 'x265' in video_encode else '3'
         elif type in ('ENCODE', 'HDTV'):
             return '15'
         elif type == 'DISC':
