@@ -874,6 +874,7 @@ class Prep():
                         "Channels": track.get("Channels"),
                         "ChannelPositions": track.get("ChannelPositions"),
                         "ChannelLayout": track.get("ChannelLayout"),
+                        "ChannelLayout_Original": track.get("ChannelLayout_Original"),
                         "SamplesPerFrame": track.get("SamplesPerFrame"),
                         "SamplingRate": track.get("SamplingRate"),
                         "SamplingCount": track.get("SamplingCount"),
@@ -1890,7 +1891,7 @@ class Prep():
 
             track = tracks[track_num] if len(tracks) > track_num else {}
             format = track.get('Format', '')
-            commercial = track.get('Format_Commercial', '')
+            commercial = track.get('Format_Commercial', '') or track.get('Format_Commercial_IfAny', '')
 
             if track.get('Language', '') == "zxx":
                 meta['silent'] = True
