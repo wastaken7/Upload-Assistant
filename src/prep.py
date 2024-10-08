@@ -2591,10 +2591,14 @@ class Prep():
             ) as progress:
                 upload_task = progress.add_task("[green]Uploading Screens...", total=len(remaining_images))
                 console.print(f"[cyan]Uploading screens to {img_host}...")
-
+                # console.print(f"[debug] Remaining images to upload: {remaining_images}")
                 for image in remaining_images:
                     retry_count = 0
                     upload_success = False
+
+                    # Ensure the correct image path is assigned here
+                    image_path = os.path.normpath(os.path.join(os.getcwd(), image))  # noqa F841
+                    # console.print(f"[debug] Normalized image path: {image_path}")
 
                     while retry_count < max_retries and not upload_success:
                         try:
@@ -2603,44 +2607,44 @@ class Prep():
                             # Add imgbox handling here
                             if img_host == "imgbox":
                                 try:
-                                    async def imgbox_upload(image_glob):
-                                        gallery = pyimgbox.Gallery(thumb_width=350, square_thumbs=False)
-                                        async for submission in gallery.add(image_glob):
-                                            return submission
+                                    console.print("[blue]Uploading images to imgbox...")
 
-                                    submission = asyncio.run(imgbox_upload(image_glob))
+                                    # Use the current event loop to run imgbox_upload
+                                    loop = asyncio.get_event_loop()
 
-                                    if not submission['success']:
-                                        console.print(f"[red]Imgbox upload failed: {submission['error']}")
+                                    # Run the imgbox upload in the current event loop
+                                    image_list = loop.run_until_complete(self.imgbox_upload(os.getcwd(), image_glob))  # Pass all images
+
+                                    # Ensure the image_list contains valid URLs before continuing
+                                    if image_list and all('img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list):
+                                        # console.print(f"[green]Successfully uploaded all images to imgbox.")
+                                        upload_success = True
+
+                                        # Track the successfully uploaded images without appending again to image_list
+                                        for img in image_glob:
+                                            successfully_uploaded.add(img)  # Track the uploaded images
+
+                                        # Exit the loop after a successful upload
+                                        return image_list, i
+
+                                    else:
+                                        console.print("[red]Imgbox upload failed, moving to the next image host.")
                                         img_host_num += 1
                                         next_img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num + 1}', 'No more hosts')
                                         console.print(f"[blue]Moving to next image host: {next_img_host}.")
-
                                         img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
 
                                         if not img_host:
                                             console.print("[red]All image hosts failed. Unable to complete uploads.")
                                             return image_list, i
-                                        break
-
-                                    img_url = submission['thumbnail_url']
-                                    raw_url = submission['image_url']
-                                    web_url = submission['web_url']
-                                    upload_success = True
 
                                 except Exception as e:
-                                    console.print(f"[yellow]Failed to upload {image} to imgbox. Exception: {str(e)}")
-                                    retry_count += 1
-                                    if retry_count >= max_retries:
-                                        next_img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num + 1}', 'No more hosts')
-                                        console.print(f"[red]Max retries reached for imgbox. Moving to next image host: {next_img_host}.")
-                                        img_host_num += 1
-                                        img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
-                                        if not img_host:
-                                            console.print("[red]All image hosts failed. Unable to complete uploads.")
-                                            return image_list, i
-                                        break
-                                    continue
+                                    console.print(f"[yellow]Failed to upload images to imgbox. Exception: {str(e)}")
+                                    img_host_num += 1
+                                    img_host = self.config['DEFAULT'].get(f'img_host_{img_host_num}')
+                                    if not img_host:
+                                        console.print("[red]All image hosts failed. Unable to complete uploads.")
+                                        return image_list, i
 
                             elif img_host == "ptpimg":
                                 payload = {
@@ -2775,6 +2779,45 @@ class Prep():
                     break  # Break if upload was successful
 
         return image_list, i
+
+    async def imgbox_upload(self, chdir, image_glob):
+        try:
+            os.chdir(chdir)
+            image_list = []
+
+            console.print(f"[debug] Starting upload of {len(image_glob)} images to imgbox...")
+
+            # Start a gallery context
+            async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
+                for image in image_glob:
+                    console.print(f"[blue]Uploading image: {image}")
+
+                    try:
+                        # Add the image to the gallery and await the response
+                        async for submission in gallery.add([image]):
+                            if not submission['success']:
+                                console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
+                                return []  # Return empty list in case of failure
+                            else:
+                                # Append the successful result to the image list
+                                image_dict = {
+                                    'web_url': submission['web_url'],
+                                    'img_url': submission['thumbnail_url'],
+                                    'raw_url': submission['image_url']
+                                }
+                                image_list.append(image_dict)
+                                # console.print(f"[green]Successfully uploaded image: {image}")
+
+                    except Exception as e:
+                        console.print(f"[red]Error during upload for {image}: {str(e)}")
+                        return []  # Return empty list in case of error
+
+            console.print(f"[green]Successfully uploaded all {len(image_list)} images to imgbox.")
+            return image_list  # Return the complete list when all images are done
+
+        except Exception as e:
+            console.print(f"[red]An error occurred while uploading images to imgbox: {str(e)}")
+            return []  # Return empty list in case of an unexpected failure
 
     async def get_name(self, meta):
         type = meta.get('type', "")
