@@ -1924,42 +1924,45 @@ class Prep():
             else:
                 chan = f"{channels}.0"
 
-            if meta.get('original_language', '') != 'en':
-                eng, orig = False, False
-                try:
-                    for t in mi.get('media', {}).get('track', []):
-                        if t.get('@type') != "Audio":
-                            continue
+            if meta.get('dual_audio', False):  # If dual_audio flag is set, skip other checks
+                dual = "Dual-Audio"
+            else:
+                if meta.get('original_language', '') != 'en':
+                    eng, orig = False, False
+                    try:
+                        for t in mi.get('media', {}).get('track', []):
+                            if t.get('@type') != "Audio":
+                                continue
 
-                        audio_language = t.get('Language', '')
+                            audio_language = t.get('Language', '')
 
-                        # Check for English Language Track
-                        if audio_language == "en" and "commentary" not in t.get('Title', '').lower():
-                            eng = True
+                            # Check for English Language Track
+                            if audio_language.startswith("en") and "commentary" not in t.get('Title', '').lower():
+                                eng = True
 
-                        # Check for original Language Track
-                        if audio_language == meta['original_language'] and "commentary" not in t.get('Title', '').lower():
-                            orig = True
+                            # Check for original Language Track
+                            if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in t.get('Title', '').lower():
+                                orig = True
 
-                        # Catch Chinese / Norwegian / Spanish variants
-                        variants = ['zh', 'cn', 'cmn', 'no', 'nb', 'es-419', 'es-ES', 'es']
-                        if audio_language in variants and meta['original_language'] in variants:
-                            orig = True
+                            # Catch Chinese / Norwegian Variants
+                            variants = ['zh', 'cn', 'cmn', 'no', 'nb']
+                            if any(audio_language.startswith(var) for var in variants) and any(meta['original_language'].startswith(var) for var in variants):
+                                orig = True
 
-                        # Check for additional, bloated Tracks
-                        if audio_language != meta['original_language'] and audio_language != "en":
-                            if meta['original_language'] not in variants and audio_language not in variants:
+                            # Check for additional, bloated Tracks
+                            if audio_language != meta['original_language'] and not audio_language.startswith("en"):
+                                # If audio_language is empty, set to 'und' (undefined)
                                 audio_language = "und" if audio_language == "" else audio_language
                                 console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                                 time.sleep(5)
 
-                    if eng and orig:
-                        dual = "Dual-Audio"
-                    elif eng and not orig and meta['original_language'] not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
-                        dual = "Dubbed"
-                except Exception:
-                    console.print(traceback.format_exc())
-                    pass
+                        if eng and orig:
+                            dual = "Dual-Audio"
+                        elif eng and not orig and meta['original_language'] not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
+                            dual = "Dubbed"
+                    except Exception:
+                        console.print(traceback.format_exc())
+                        pass
 
             for t in mi.get('media', {}).get('track', []):
                 if t.get('@type') != "Audio":
