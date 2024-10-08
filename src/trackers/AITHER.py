@@ -123,33 +123,34 @@ class AITHER():
         resolution = meta.get('resolution')
         video_codec = meta.get('video_codec')
 
-        def has_english_audio(tracks=None, media_info_text=None):
-            if media_info_text:
-                audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                for i, language in enumerate(audio_section):
-                    language = language.lower().strip()
-                    if language.lower().startswith('en'):  # Check if it's English
-                        return True
-            return False
+        if not meta['is_disc']:
+            def has_english_audio(tracks=None, media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    for i, language in enumerate(audio_section):
+                        language = language.lower().strip()
+                        if language.lower().startswith('en'):  # Check if it's English
+                            return True
+                return False
 
-        def get_audio_lang(tracks=None, is_bdmv=False, media_info_text=None):
-            if media_info_text:
-                match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                if match:
-                    return match.group(1).upper()
-            return ""
+            def get_audio_lang(tracks=None, is_bdmv=False, media_info_text=None):
+                if media_info_text:
+                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
 
-        try:
-            media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-            with open(media_info_path, 'r', encoding='utf-8') as f:
-                media_info_text = f.read()
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
 
-            if not has_english_audio(media_info_text=media_info_text):
-                audio_lang = get_audio_lang(media_info_text=media_info_text)
-                if audio_lang:
-                    aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
-        except (FileNotFoundError, KeyError) as e:
-            print(f"Error processing MEDIAINFO.txt: {e}")
+                if not has_english_audio(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
+                    if audio_lang:
+                        aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
 
         if meta['is_disc'] == "DVD":
             aither_name = aither_name.replace(str(meta['year']), f"{meta['year']} {resolution}", 1)

@@ -248,7 +248,7 @@ class COMMON():
                             file_name = [file['name'] for file in files[:5]]  # Return up to 5 filenames
 
                     console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
-                    
+
                     # Skip the ID selection prompt if searching by ID
                     console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}[/green]")
 
