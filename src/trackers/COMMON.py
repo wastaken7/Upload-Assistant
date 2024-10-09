@@ -143,15 +143,15 @@ class COMMON():
         }.get(distributor, 0)
         return distributor_id
 
-    async def prompt_user_for_id_selection(self, tmdb=None, imdb=None, tvdb=None, filename=None, tracker_name=None):
+    async def prompt_user_for_id_selection(self, tmdb=None, imdb=None, tvdb=None, mal=None, filename=None, tracker_name=None):
         if not tracker_name:
             tracker_name = "Tracker"  # Fallback if tracker_name is not provided
 
         if imdb:
             imdb = str(imdb).zfill(7)  # Convert to string and ensure IMDb ID is 7 characters long by adding leading zeros
-            console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}[/cyan]")
+            # console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}[/cyan]")
 
-        if any([tmdb, imdb, tvdb]):
+        if any([tmdb, imdb, tvdb, mal]):
             console.print(f"[cyan]Found the following IDs on {tracker_name}:")
             if tmdb:
                 console.print(f"TMDb ID: {tmdb}")
@@ -159,6 +159,8 @@ class COMMON():
                 console.print(f"IMDb ID: https://www.imdb.com/title/tt{imdb}")
             if tvdb:
                 console.print(f"TVDb ID: {tvdb}")
+            if mal:
+                console.print(f"MAL ID: {mal}")
 
         if filename:
             console.print(f"Filename: {filename}")  # Ensure filename is printed if available
@@ -250,13 +252,13 @@ class COMMON():
                     console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
                     # Skip the ID selection prompt if searching by ID
-                    console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}[/green]")
+                    console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}, MAL: {mal}[/green]")
 
             if tmdb or imdb or tvdb:
                 if not id:
                     # Only prompt the user for ID selection if not searching by ID
                     try:
-                        if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, file_name):
+                        if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, mal, file_name):
                             console.print("[yellow]User chose to skip based on IDs.[/yellow]")
                             return None, None, None, None, None, None, None, None, None
                     except (KeyboardInterrupt, EOFError):
