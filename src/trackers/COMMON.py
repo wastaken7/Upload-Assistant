@@ -202,7 +202,7 @@ class COMMON():
         try:
             json_response = response.json()
 
-            # console.print(f"[blue]Raw API Response: {json_response}[/blue]", markup=False)
+            # console.print(f"Raw API Response: {json_response}", markup=False)
 
         except ValueError:
             return None, None, None, None, None, None, None, None, None
@@ -266,7 +266,7 @@ class COMMON():
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 console.print(f"[green]Successfully grabbed description from {tracker}")
-                console.print(f"[blue]Extracted description: [yellow]{description}", markup=False)
+                console.print(f"Extracted description: {description}", markup=False)
 
                 # Allow user to edit or discard the description
                 if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta.get('unattended'):
@@ -279,7 +279,7 @@ class COMMON():
                             description = edited_description.strip()
                             meta['description'] = description
                             meta['skip_gen_desc'] = True
-                        console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
+                        console.print(f"Final description after editing: {description}", markup=False)
                     elif edit_choice.lower() == 'd':
                         description = None
                         console.print("[yellow]Description discarded.[/yellow]")
