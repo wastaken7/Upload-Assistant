@@ -1647,6 +1647,8 @@ class Prep():
             meta['tmdb_directors'] = self.get_directors(movie)
             if meta.get('anime', False) is False:
                 meta['mal_id'], meta['aka'], meta['anime'] = self.get_anime(response, meta)
+            if meta.get('mal') is not None:
+                meta['mal_id'] = meta['mal']
             meta['poster'] = response.get('poster_path', "")
             meta['tmdb_poster'] = response.get('poster_path', "")
             meta['overview'] = response['overview']
@@ -1694,6 +1696,8 @@ class Prep():
             meta['genres'] = self.get_genres(response)
             meta['tmdb_directors'] = self.get_directors(tv)
             meta['mal_id'], meta['aka'], meta['anime'] = self.get_anime(response, meta)
+            if meta.get('mal') is not None:
+                meta['mal_id'] = meta['mal']
             meta['poster'] = response.get('poster_path', '')
             meta['overview'] = response['overview']
 
@@ -1767,8 +1771,8 @@ class Prep():
             mal_id = 0
         if meta.get('mal_id', 0) != 0:
             mal_id = meta.get('mal_id')
-        if meta.get('mal') not in ('0', 0, None):
-            mal_id = meta.get('mal', 0)
+        if meta.get('mal') is not None:
+            mal_id = meta.get('mal')
         return mal_id, alt_name, anime
 
     def get_romaji(self, tmdb_name, mal):
@@ -3010,6 +3014,8 @@ class Prep():
                 romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None))
                 if mal_id:
                     meta['mal_id'] = mal_id
+                if meta.get('mal') is not None:
+                    mal_id = meta.get('mal')
                 if meta.get('tmdb_manual', None) is None:
                     year = parsed.get('anime_year', str(seasonYear))
                     meta = await self.get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
