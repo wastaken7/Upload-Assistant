@@ -211,7 +211,7 @@ class BBCODE:
             # Add any other known bot image URLs here
         ]
         imagelist = [
-            img for img in imagelist 
+            img for img in imagelist
             if img['img_url'] not in bot_image_urls and not re.search(r'thumbs', img['img_url'], re.IGNORECASE)
         ]
 

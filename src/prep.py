@@ -1981,7 +1981,7 @@ class Prep():
             "E-AC-3": "DD+",
             "MLP FBA": "TrueHD",
             "FLAC": "FLAC",
-            "Opus": "OPUS",
+            "Opus": "Opus",
             "Vorbis": "VORBIS",
             "PCM": "LPCM",
 
