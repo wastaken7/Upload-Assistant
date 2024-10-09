@@ -2370,15 +2370,15 @@ class Prep():
 
         print(f"Edition After Manual Edition: {edition}")
 
-        if "REPACK" in edition.upper() or "V2" in video:
+        if "REPACK" in (video or edition.upper()) or "V2" in video:
             repack = "REPACK"
-        if "REPACK2" in edition.upper() or "V3" in video:
+        if "REPACK2" in (video or edition.upper()) or "V3" in video:
             repack = "REPACK2"
-        if "REPACK3" in edition.upper() or "V4" in video:
+        if "REPACK3" in (video or edition.upper()) or "V4" in video:
             repack = "REPACK3"
-        if "PROPER" in edition.upper():
+        if "PROPER" in (video or edition.upper()):
             repack = "PROPER"
-        if "RERIP" in edition.upper():
+        if "RERIP" in (video or edition.upper()):
             repack = "RERIP"
 
         print(f"Repack after Checks: {repack}")
