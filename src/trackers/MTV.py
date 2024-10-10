@@ -267,7 +267,10 @@ class MTV():
         return description
 
     async def edit_name(self, meta):
-        mtv_name = meta['uuid']
+        if meta['scene'] is True:
+            mtv_name = meta['video']
+        else:
+            mtv_name = meta['uuid']
         # Try to use original filename if possible
         if meta['source'].lower().replace('-', '') in mtv_name.replace('-', '').lower():
             if not meta['isdir']:
