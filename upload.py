@@ -66,28 +66,13 @@ try:
     from data.config import config
 except Exception:
     if not os.path.exists(os.path.abspath(f"{base_dir}/data/config.py")):
-        try:
-            if os.path.exists(os.path.abspath(f"{base_dir}/data/config.json")):
-                with open(f"{base_dir}/data/config.json", 'r', encoding='utf-8-sig') as f:
-                    json_config = json.load(f)
-                    f.close()
-                with open(f"{base_dir}/data/config.py", 'w') as f:
-                    f.write(f"config = {json.dumps(json_config, indent=4)}")
-                    f.close()
-                cli_ui.info(cli_ui.green, "Successfully updated config from .json to .py")
-                cli_ui.info(cli_ui.green, "It is now safe for you to delete", cli_ui.yellow, "data/config.json", "if you wish")
-                from data.config import config
-            else:
-                raise NotImplementedError
-        except Exception:
-            cli_ui.info(cli_ui.red, "We have switched from .json to .py for config to have a much more lenient experience")
-            cli_ui.info(cli_ui.red, "Looks like the auto updater didnt work though")
-            cli_ui.info(cli_ui.red, "Updating is just 2 easy steps:")
-            cli_ui.info(cli_ui.red, "1: Rename", cli_ui.yellow, os.path.abspath(f"{base_dir}/data/config.json"), cli_ui.red, "to", cli_ui.green, os.path.abspath(f"{base_dir}/data/config.py"))
-            cli_ui.info(cli_ui.red, "2: Add", cli_ui.green, "config = ", cli_ui.red, "to the beginning of", cli_ui.green, os.path.abspath(f"{base_dir}/data/config.py"))
-            exit()
+        cli_ui.info(cli_ui.red, "Configuration file 'config.py' not found.")
+        cli_ui.info(cli_ui.red, "Please ensure the file is located at:", cli_ui.yellow, os.path.abspath(f"{base_dir}/data/config.py"))
+        cli_ui.info(cli_ui.red, "Follow the setup instructions: https://github.com/Audionut/Upload-Assistant")
+        exit()
     else:
         console.print(traceback.print_exc())
+
 client = Clients(config=config)
 parser = Args(config)
 
