@@ -279,13 +279,16 @@ class MTV():
             mtv_name = mtv_name.replace('Dubbed', '').replace('Dual-Audio', 'DUAL')
         if meta['source'].lower().replace('-', '') in mtv_name.replace('-', '').lower():
             if not meta['isdir']:
-                mtv_name = os.path.splitext(mtv_name)[0]
+                # Check if there is a valid file extension, otherwise, skip the split
+                if '.' in mtv_name and mtv_name.split('.')[-1].isalpha() and len(mtv_name.split('.')[-1]) <= 4:
+                    mtv_name = os.path.splitext(mtv_name)[0]
         # Add -NoGrp if missing tag
         if meta['tag'] == "":
             mtv_name = f"{mtv_name}-NoGrp"
         mtv_name = ' '.join(mtv_name.split())
         mtv_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", mtv_name)
         mtv_name = mtv_name.replace(' ', '.').replace('..', '.')
+        console.print(f"[yellow]Sent this name: {mtv_name}[/yellow]")
         return mtv_name
 
     async def get_res_id(self, resolution):
