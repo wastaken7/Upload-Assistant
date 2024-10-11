@@ -242,12 +242,9 @@ class MTV():
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
             images = meta['image_list']
             if len(images) > 0:
-                desc.write("[spoiler=Screenshots]")
                 for each in range(len(images)):
                     raw_url = images[each]['raw_url']
-                    img_url = images[each]['img_url']
-                    desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]")
-                desc.write("[/spoiler]")
+                    desc.write(f"[img={raw_url}][/img]\n")
             desc.write(f"\n\n{base}")
             desc.close()
         return
