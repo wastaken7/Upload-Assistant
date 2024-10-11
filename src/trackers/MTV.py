@@ -172,7 +172,8 @@ class MTV():
                         if "authkey.php" in response.url:
                             console.print("[red]No DL link in response, It may have uploaded, check manually.")
                         else:
-                            console.print("[red]Upload Failed. It doesn't look like you are logged in.")
+                            console.print("[red]Upload Failed. Either you are not logged in......")
+                            console.print("[red]or you are hitting this site bug: https://www.morethantv.me/forum/thread/3338?")
                 except Exception:
                     console.print("[red]It may have uploaded, check manually.")
                     print(traceback.print_exc())
