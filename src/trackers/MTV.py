@@ -271,12 +271,6 @@ class MTV():
         if meta['scene'] is True:
             mtv_name = meta['video']
         else:
-            mtv_name = meta['uuid']
-        # Try to use original filename if possible
-        if meta['source'].lower().replace('-', '') in mtv_name.replace('-', '').lower():
-            if not meta['isdir']:
-                mtv_name = os.path.splitext(mtv_name)[0]
-        else:
             mtv_name = meta['name']
             if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE') and "DD" in meta['audio']:
                 mtv_name = mtv_name.replace(meta['audio'], meta['audio'].replace(' ', '', 1))
@@ -286,6 +280,9 @@ class MTV():
             if 'DD+' in meta.get('audio', '') and 'DDP' in meta['uuid']:
                 mtv_name = mtv_name.replace('DD+', 'DDP')
             mtv_name = mtv_name.replace('Dubbed', '').replace('Dual-Audio', 'DUAL')
+        if meta['source'].lower().replace('-', '') in mtv_name.replace('-', '').lower():
+            if not meta['isdir']:
+                mtv_name = os.path.splitext(mtv_name)[0]
         # Add -NoGrp if missing tag
         if meta['tag'] == "":
             mtv_name = f"{mtv_name}-NoGrp"
