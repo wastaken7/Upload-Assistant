@@ -273,7 +273,7 @@ class COMMON():
                 # Allow user to edit or discard the description
                 if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta.get('unattended'):
                     console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                    edit_choice = input("[cyan]Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: [/cyan]")
+                    edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
 
                     if edit_choice.lower() == 'e':
                         edited_description = click.edit(description)
