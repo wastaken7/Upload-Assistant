@@ -254,7 +254,7 @@ class OE():
 
                         subtitle_tracks = [track for track in tracks if track.get('@type') == 'Text']
                         if subtitle_tracks and subtitle_languages:
-                            descfile.write(f"Subtitles: {', '.join(subtitle_languages)}\n")
+                            descfile.write(f"Subtitle Language: {', '.join(subtitle_languages)}\n")
                 else:
                     console.print("[red]No media information available in meta.[/red]")
 

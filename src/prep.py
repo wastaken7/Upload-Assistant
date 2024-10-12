@@ -1071,12 +1071,19 @@ class Prep():
     """
     Generate Screenshots
     """
+    def sanitize_filename(self, filename):
+        # Replace invalid characters like colons with an underscore
+        return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
     def disc_screenshots(self, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None):
         if num_screens is None:
             num_screens = self.screens
         if num_screens == 0 or len(image_list) >= num_screens:
             return
+
+        # Sanitize the filename
+        sanitized_filename = self.sanitize_filename(filename)
+
         # Get longest m2ts
         length = 0
         for each in bdinfo['files']:
@@ -1094,7 +1101,7 @@ class Prep():
             keyframe = 'none'
 
         os.chdir(f"{base_dir}/tmp/{folder_id}")
-        i = len(glob.glob(f"{filename}-*.png"))
+        i = len(glob.glob(f"{sanitized_filename}-*.png"))
         if i >= num_screens:
             i = num_screens
             console.print('[bold green]Reusing screenshots')
@@ -1104,55 +1111,52 @@ class Prep():
                 from src.vs import vs_screengn
                 vs_screengn(source=file, encode=None, filter_b_frames=False, num=num_screens, dir=f"{base_dir}/tmp/{folder_id}/")
             else:
-                if bool(ffdebug) is True:
-                    loglevel = 'verbose'
-                    debug = False
-                else:
-                    loglevel = 'quiet'
-                    debug = True
-                    with Progress(
-                        TextColumn("[bold green]Saving Screens..."),
-                        BarColumn(),
-                        "[cyan]{task.completed}/{task.total}",
-                        TimeRemainingColumn()
-                    ) as progress:
-                        screen_task = progress.add_task("[green]Saving Screens...", total=num_screens + 1)
-                        ss_times = []
-                        for i in range(num_screens + 1):
-                            image = f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png"
-                            try:
-                                ss_times = self.valid_ss_time(ss_times, num_screens + 1, length)
-                                (
-                                    ffmpeg
-                                    .input(file, ss=ss_times[-1], skip_frame=keyframe)
-                                    .output(image, vframes=1, pix_fmt="rgb24")
-                                    .overwrite_output()
-                                    .global_args('-loglevel', loglevel)
-                                    .run(quiet=debug)
-                                )
-                            except Exception:
-                                console.print(traceback.format_exc())
+                loglevel = 'verbose' if bool(ffdebug) else 'quiet'
+                debug = not ffdebug
+                with Progress(
+                    TextColumn("[bold green]Saving Screens..."),
+                    BarColumn(),
+                    "[cyan]{task.completed}/{task.total}",
+                    TimeRemainingColumn()
+                ) as progress:
+                    screen_task = progress.add_task("[green]Saving Screens...", total=num_screens + 1)
+                    ss_times = []
+                    for i in range(num_screens + 1):
+                        image = f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png"
+                        try:
+                            ss_times = self.valid_ss_time(ss_times, num_screens + 1, length)
+                            (
+                                ffmpeg
+                                .input(file, ss=ss_times[-1], skip_frame=keyframe)
+                                .output(image, vframes=1, pix_fmt="rgb24")
+                                .overwrite_output()
+                                .global_args('-loglevel', loglevel)
+                                .run(quiet=debug)
+                            )
+                        except Exception:
+                            console.print(traceback.format_exc())
 
-                            self.optimize_images(image)
-                            if os.path.getsize(Path(image)) <= 31000000 and self.img_host == "imgbb":
-                                i += 1
-                            elif os.path.getsize(Path(image)) <= 10000000 and self.img_host in ["imgbox", 'pixhost']:
-                                i += 1
-                            elif os.path.getsize(Path(image)) <= 75000:
-                                console.print("[bold yellow]Image is incredibly small, retaking")
-                                time.sleep(1)
-                            elif self.img_host == "ptpimg":
-                                i += 1
-                            elif self.img_host == "lensdump":
-                                i += 1
-                            else:
-                                console.print("[red]Image too large for your image host, retaking")
-                                time.sleep(1)
-                            progress.advance(screen_task)
-                # remove smallest image
+                        self.optimize_images(image)
+                        if os.path.getsize(Path(image)) <= 31000000 and self.img_host == "imgbb":
+                            i += 1
+                        elif os.path.getsize(Path(image)) <= 10000000 and self.img_host in ["imgbox", 'pixhost']:
+                            i += 1
+                        elif os.path.getsize(Path(image)) <= 75000:
+                            console.print("[bold yellow]Image is incredibly small, retaking")
+                            time.sleep(1)
+                        elif self.img_host == "ptpimg":
+                            i += 1
+                        elif self.img_host == "lensdump":
+                            i += 1
+                        else:
+                            console.print("[red]Image too large for your image host, retaking")
+                            time.sleep(1)
+                        progress.advance(screen_task)
+
+                # Remove the smallest image
                 smallest = None
-                smallestsize = 99 ** 99
-                for screens in glob.glob1(f"{base_dir}/tmp/{folder_id}/", f"{filename}-*"):
+                smallestsize = float('inf')
+                for screens in glob.glob1(f"{base_dir}/tmp/{folder_id}/", f"{sanitized_filename}-*"):
                     screen_path = os.path.join(f"{base_dir}/tmp/{folder_id}/", screens)
                     screensize = os.path.getsize(screen_path)
                     if screensize < smallestsize:
