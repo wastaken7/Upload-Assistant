@@ -12,6 +12,7 @@ from torf import Torrent
 from pathlib import Path
 from src.trackers.COMMON import COMMON
 from src.console import console
+import re
 
 
 class ANT():
@@ -119,14 +120,48 @@ class ANT():
         else:
             anon = 1
 
+        def extract_audio_languages(bd_summary):
+            audio_pattern = re.compile(r'Audio: ([\w\s]+) /')
+            audio_languages = audio_pattern.findall(bd_summary)
+            return audio_languages
+
+        def extract_subtitle_languages(bd_summary):
+            subtitle_pattern = re.compile(r'Subtitle: ([\w\s]+) /')
+            subtitle_languages = subtitle_pattern.findall(bd_summary)
+            return subtitle_languages
+
+        def insert_languages_into_mediainfo(mi_dump, audio_languages, subtitle_languages):
+            mi_lines = mi_dump.splitlines()
+
+            audio_index = 0
+            subtitle_index = 0
+
+            for i, line in enumerate(mi_lines):
+                if "Audio" in line:
+                    if audio_index < len(audio_languages):
+                        mi_lines.insert(i + 1, f"Language                                 : {audio_languages[audio_index]}")
+                        audio_index += 1
+
+                elif "Text" in line:
+                    if subtitle_index < len(subtitle_languages):
+                        mi_lines.insert(i + 1, f"Language                                 : {subtitle_languages[subtitle_index]}")
+                        subtitle_index += 1
+
+            return "\n".join(mi_lines)
+
         if meta['bdinfo'] is not None:
-            bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
+            bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
+            bd_dump = open(bd_summary_file, 'r', encoding='utf-8').read()
+            audio_languages = extract_audio_languages(bd_dump)
+            subtitle_languages = extract_subtitle_languages(bd_dump)
             bd_dump = f'[spoiler=BDInfo][pre]{bd_dump}[/pre][/spoiler]'
             path = os.path.join(meta['bdinfo']['path'], 'STREAM')
             file_name = meta['bdinfo']['files'][0]['file'].lower()
             m2ts = os.path.join(path, file_name)
             media_info_output = str(MediaInfo.parse(m2ts, output="text", full=False))
-            mi_dump = media_info_output.replace('\r\n', '\n')
+            mi_dump_replace = media_info_output.replace('\r\n', '\n')
+            mi_dump_with_languages = insert_languages_into_mediainfo(mi_dump_replace, audio_languages, subtitle_languages)
+            mi_dump = mi_dump_with_languages
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
