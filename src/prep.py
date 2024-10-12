@@ -2470,18 +2470,18 @@ class Prep():
                     if piece_size < our_min_size:
                         piece_size = our_min_size
                         break
+                    elif torrent_file_size > 92160:  # Break if .torrent size exceeds 90 KiB
+                        break
                 elif num_pieces > 2000:
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
                         break
-                    elif torrent_file_size > 92160:  # Break if .torrent size exceeds 90 KiB
-                        break
                 elif torrent_file_size > 102400:
-                    cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
+                        cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
                         break
                 num_pieces = math.ceil(total_size / piece_size)
                 torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
