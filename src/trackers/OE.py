@@ -4,7 +4,10 @@ import asyncio
 import requests
 from str2bool import str2bool
 import platform
-
+import re
+import os
+import cli_ui
+from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -45,11 +48,13 @@ class OE():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        await self.edit_desc(meta, self.tracker, self.signature)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'], meta.get('tv_pack', 0), meta.get('video_codec'), meta.get('category', ""))
         resolution_id = await self.get_res_id(meta['resolution'])
         oe_name = await self.edit_name(meta)
+        region_id = await common.unit3d_region_ids(meta.get('region'))
+        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
@@ -92,6 +97,11 @@ class OE():
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
 
+        if region_id != 0:
+            data['region_id'] = region_id
+        if distributor_id != 0:
+            data['distributor_id'] = distributor_id
+
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')
@@ -118,6 +128,37 @@ class OE():
 
     async def edit_name(self, meta):
         oe_name = meta.get('name')
+        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+
+        if not meta['is_disc']:
+            def has_english_audio(media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    for i, language in enumerate(audio_section):
+                        language = language.lower().strip()
+                        if language.lower().startswith('en'):  # Check if it's English
+                            return True
+                return False
+
+            def get_audio_lang(media_info_text=None):
+                if media_info_text:
+                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
+
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
+
+                if not has_english_audio(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
+                    if audio_lang:
+                        oe_name = oe_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
+
         return oe_name
 
     async def get_cat_id(self, category_name):
@@ -170,6 +211,90 @@ class OE():
             '480i': '9'
         }.get(resolution, '10')
         return resolution_id
+
+    async def edit_desc(self, meta, tracker, signature, comparison=False, desc_header=""):
+        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
+
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
+            if desc_header != "":
+                descfile.write(desc_header)
+
+            if not meta['is_disc']:
+                def process_languages(tracks):
+                    audio_languages = []
+                    subtitle_languages = []
+
+                    for track in tracks:
+                        if track.get('@type') == 'Audio':
+                            language = track.get('Language')
+                            if not language or language is None:
+                                audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
+                                if audio_lang:
+                                    audio_languages.append(audio_lang)
+                                else:
+                                    audio_languages.append("")
+                        elif track.get('@type') == 'Text':
+                            language = track.get('Language')
+                            if not language or language is None:
+                                subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
+                                if subtitle_lang:
+                                    subtitle_languages.append(subtitle_lang)
+                                else:
+                                    subtitle_languages.append("")
+
+                    return audio_languages, subtitle_languages
+
+                media_data = meta.get('mediainfo', {})
+                if media_data:
+                    tracks = media_data.get('media', {}).get('track', [])
+                    if tracks:
+                        audio_languages, subtitle_languages = process_languages(tracks)
+                        if audio_languages:
+                            descfile.write(f"Audio Language: {', '.join(audio_languages)}\n")
+
+                        subtitle_tracks = [track for track in tracks if track.get('@type') == 'Text']
+                        if subtitle_tracks and subtitle_languages:
+                            descfile.write(f"Subtitles: {', '.join(subtitle_languages)}\n")
+                else:
+                    console.print("[red]No media information available in meta.[/red]")
+
+            # Existing disc metadata handling
+            bbcode = BBCODE()
+            if meta.get('discs', []) != []:
+                discs = meta['discs']
+                if discs[0]['type'] == "DVD":
+                    descfile.write(f"[spoiler=VOB MediaInfo][code]{discs[0]['vob_mi']}[/code][/spoiler]\n\n")
+                if len(discs) >= 2:
+                    for each in discs[1:]:
+                        if each['type'] == "BDMV":
+                            descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                        elif each['type'] == "DVD":
+                            descfile.write(f"{each['name']}:\n")
+                            descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code][{each['vob_mi']}[/code][/spoiler] [spoiler={os.path.basename(each['ifo'])}][code][{each['ifo_mi']}[/code][/spoiler]\n\n")
+                        elif each['type'] == "HDDVD":
+                            descfile.write(f"{each['name']}:\n")
+                            descfile.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n\n")
+
+            desc = base
+            desc = bbcode.convert_pre_to_code(desc)
+            desc = bbcode.convert_hide_to_spoiler(desc)
+            if comparison is False:
+                desc = bbcode.convert_comparison_to_collapse(desc, 1000)
+
+            desc = desc.replace('[img]', '[img=300]')
+            descfile.write(desc)
+            images = meta['image_list']
+            if len(images) > 0:
+                descfile.write("[center]")
+                for each in range(len(images[:int(meta['screens'])])):
+                    web_url = images[each]['web_url']
+                    raw_url = images[each]['raw_url']
+                    descfile.write(f"[url={web_url}][img=350]{raw_url}[/img][/url]")
+                descfile.write("[/center]")
+
+            if signature is not None:
+                descfile.write(signature)
+        return
 
     async def search_existing(self, meta, disctype):
         dupes = []
