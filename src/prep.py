@@ -2473,8 +2473,9 @@ class Prep():
                 elif num_pieces > 2000:
                     piece_size *= 2
                     if piece_size > our_max_size:
-                        cli_ui.warning(f"Warning: Piece size exceeded 2000 pieces and .torrent will be approximately {torrent_file_size / 1024:.2f} KiB! Using ({num_pieces}) pieces.")
                         piece_size = our_max_size
+                        break
+                    elif torrent_file_size > 92160:  # Break if .torrent size exceeds 90 KiB
                         break
                 elif torrent_file_size > 102400:
                     cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
