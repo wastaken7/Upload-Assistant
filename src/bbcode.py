@@ -61,6 +61,36 @@ class BBCODE:
         desc = desc.replace('http://passthepopcorn.me', 'PTP').replace('https://passthepopcorn.me', 'PTP')
         desc = desc.replace('http://hdbits.org', 'HDB').replace('https://hdbits.org', 'HDB')
 
+        # Catch Stray Images and Prepare Image List
+        imagelist = []
+        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc)
+        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc)
+        comps.extend(hides)
+        nocomp = desc
+        comp_placeholders = []
+
+        # Replace comparison/hide tags with placeholder because sometimes uploaders use comp images as loose images
+        for i, comp in enumerate(comps):
+            nocomp = nocomp.replace(comp, '')
+            desc = desc.replace(comp, f"COMPARISON_PLACEHOLDER-{i} ")
+            comp_placeholders.append(comp)
+
+        # Remove Images in IMG tags:
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+
+        # Extract loose images and add to imagelist as dictionaries
+        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
+        if loose_images:
+            for img_url in loose_images:
+                image_dict = {
+                    'img_url': img_url,
+                    'raw_url': img_url,
+                    'web_url': img_url  # Since there is no distinction here, use the same URL for all
+                }
+                imagelist.append(image_dict)
+                desc = desc.replace(img_url, '')
+
         # Remove Mediainfo Tags / Attempt to regex out mediainfo
         mediainfo_tags = re.findall(r"\[mediainfo\][\s\S]*?\[\/mediainfo\]", desc)
         if mediainfo_tags:
@@ -72,7 +102,7 @@ class BBCODE:
             desc = re.sub(r"(^(video|audio|text)( #\d+)?\nid)(.*?)^$", "", desc, flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
             desc = re.sub(r"(^(menu)( #\d+)?\n)(.*?)^$", "", f"{desc}\n\n", flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
         elif any(x in is_disc for x in ["BDMV", "DVD"]):
-            return "", []
+            return "", imagelist
 
         # Convert Quote tags:
         desc = re.sub(r"\[quote.*?\]", "[code]", desc)
@@ -103,36 +133,6 @@ class BBCODE:
         ]
         for each in remove_list:
             desc = desc.replace(each, '')
-
-        # Catch Stray Images and Prepare Image List
-        imagelist = []
-        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc)
-        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc)
-        comps.extend(hides)
-        nocomp = desc
-        comp_placeholders = []
-
-        # Replace comparison/hide tags with placeholder because sometimes uploaders use comp images as loose images
-        for i, comp in enumerate(comps):
-            nocomp = nocomp.replace(comp, '')
-            desc = desc.replace(comp, f"COMPARISON_PLACEHOLDER-{i} ")
-            comp_placeholders.append(comp)
-
-        # Remove Images in IMG tags:
-        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
-
-        # Extract loose images and add to imagelist as dictionaries
-        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
-        if loose_images:
-            for img_url in loose_images:
-                image_dict = {
-                    'img_url': img_url,
-                    'raw_url': img_url,
-                    'web_url': img_url  # Since there is no distinction here, use the same URL for all
-                }
-                imagelist.append(image_dict)
-                desc = desc.replace(img_url, '')
 
         # Re-place comparisons
         for i, comp in enumerate(comp_placeholders):
