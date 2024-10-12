@@ -1910,7 +1910,7 @@ class Prep():
             for i, t in enumerate(tracks):
                 if t.get('@type') != "Audio":
                     continue
-                if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in t.get('Title', '').lower():
+                if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in (t.get('Title') or '').lower():
                     track_num = i
                     break
 
@@ -1962,11 +1962,11 @@ class Prep():
                             audio_language = t.get('Language', '')
 
                             # Check for English Language Track
-                            if audio_language.startswith("en") and "commentary" not in t.get('Title', '').lower():
+                            if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
                                 eng = True
 
                             # Check for original Language Track
-                            if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in t.get('Title', '').lower():
+                            if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in (t.get('Title') or '').lower():
                                 orig = True
 
                             # Catch Chinese / Norwegian Variants
@@ -1993,7 +1993,7 @@ class Prep():
                 if t.get('@type') != "Audio":
                     continue
 
-                if "commentary" in t.get('Title', '').lower():
+                if "commentary" in (t.get('Title') or '').lower():
                     has_commentary = True
 
         # Convert commercial name to naming conventions
