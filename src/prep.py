@@ -86,7 +86,11 @@ class Prep():
         approved_image_hosts = ['ptpimg', 'imgbox']
         invalid_host_found = False  # Track if any image is on a non-approved host
 
-        # Function to check each image's URL and host
+        # Ensure meta['image_sizes'] exists
+        if 'image_sizes' not in meta:
+            meta['image_sizes'] = {}
+
+        # Function to check each image's URL, host, and log size
         async def check_and_collect(image_dict):
             img_url = image_dict.get('img_url') or image_dict.get('raw_url')
             if not img_url:
@@ -98,6 +102,18 @@ class Prep():
                 if not any(host in img_url for host in approved_image_hosts):
                     nonlocal invalid_host_found
                     invalid_host_found = True  # Mark that we found an invalid host
+
+                # Download the image to check its size
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(img_url) as response:
+                        if response.status == 200:
+                            image_content = await response.read()  # Download the entire image content
+                            image_size = len(image_content)  # Calculate the size in bytes
+                            # Store the image size in meta['image_sizes']
+                            meta['image_sizes'][img_url] = image_size
+                            console.print(f"Size of {img_url}: {image_size / 1024:.2f} KiB")
+                        else:
+                            console.print(f"[red]Failed to get size for {img_url}. Skipping.")
 
                 return image_dict
             else:
@@ -2568,6 +2584,10 @@ class Prep():
         successfully_uploaded = set()  # Track successfully uploaded images
         initial_timeout = 10  # Set the initial timeout for backoff
 
+        # Initialize the meta key for image sizes if not already present
+        if 'image_sizes' not in meta:
+            meta['image_sizes'] = {}
+
         if custom_img_list:
             image_glob = custom_img_list
             existing_images = []
@@ -2761,9 +2781,18 @@ class Prep():
 
                             # Only increment `i` after a successful upload
                             if upload_success:
-                                image_dict = {'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+                                image_size = os.path.getsize(image)  # Get the image size in bytes
+                                image_dict = {
+                                    'img_url': img_url,
+                                    'raw_url': raw_url,
+                                    'web_url': web_url
+                                }
                                 image_list.append(image_dict)
                                 successfully_uploaded.add(image)  # Track the uploaded image
+
+                                # Store size in meta, indexed by the img_url
+                                meta['image_sizes'][img_url] = image_size  # Keep sizes separate in meta['image_sizes']
+
                                 progress.advance(upload_task)
                                 i += 1  # Increment the image counter only after success
                                 break  # Break retry loop after a successful upload

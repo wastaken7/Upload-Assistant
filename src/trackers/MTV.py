@@ -46,11 +46,40 @@ class MTV():
 
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
         approved_image_hosts = ['ptpimg', 'imgbox']
+        total_size_limit = 25 * 1024 * 1024  # 25 MiB in bytes
+
+        # Helper function to calculate total size of the images
+        def calculate_total_size(image_list, image_sizes):
+            total_size = 0
+            for image in image_list:
+                img_url = image['img_url']
+                size = image_sizes.get(img_url, 0)  # Get size from meta['image_sizes'], default to 0 if not found
+                total_size += size
+            return total_size
+
+        # Helper function to remove images until the total size is under the limit
+        def enforce_size_limit(image_list, image_sizes):
+            total_size = calculate_total_size(image_list, image_sizes)
+            valid_images = []
+
+            for image in image_list:
+                if total_size <= total_size_limit:
+                    valid_images.append(image)
+                else:
+                    img_url = image['img_url']
+                    size = image_sizes.get(img_url, 0)
+                    total_size -= size  # Subtract size of the removed image
+                    console.print(f"[red]Removed {img_url} to stay within the 25 MiB limit.")
+
+            return valid_images
 
         # Check if the images are already hosted on an approved image host
         if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
             console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
             image_list = meta['image_list']  # Use the existing images
+
+            # Enforce the total size limit on the existing image list
+            image_list = enforce_size_limit(image_list, meta['image_sizes'])
 
         else:
             # Proceed with the retry logic if images are not hosted on an approved image host
@@ -64,8 +93,10 @@ class MTV():
                     img_host_index += 1
                     continue
 
-                # If we successfully uploaded images, break out of the loop
+                # If we successfully uploaded images, enforce the size limit and break out of the loop
                 if image_list is not None:
+                    # Enforce the total size limit on the newly uploaded images
+                    image_list = enforce_size_limit(image_list, meta['image_sizes'])
                     break
 
             if image_list is None:
