@@ -901,6 +901,7 @@ class Prep():
                         "Delay_Source": track.get("Delay_Source"),
                         "Video_Delay": track.get("Video_Delay"),
                         "StreamSize": track.get("StreamSize"),
+                        "Title": track.get("Title"),
                         "Language": track.get("Language"),
                         "ServiceKind": track.get("ServiceKind"),
                         "Default": track.get("Default"),
