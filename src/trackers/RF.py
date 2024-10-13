@@ -37,7 +37,7 @@ class RF():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        stt_name = await self.edit_name(meta)
+        rf_name = await self.edit_name(meta)
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
             anon = 0
         else:
@@ -52,7 +52,7 @@ class RF():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name': stt_name,
+            'name': rf_name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -105,8 +105,10 @@ class RF():
         open_torrent.close()
 
     async def edit_name(self, meta):
-        stt_name = meta['name']
-        return stt_name
+        rf_name = meta['name']
+        if meta['tag'] == "":
+            rf_name = f"{rf_name}-NoGroup"
+        return rf_name
 
     async def get_cat_id(self, category_name):
         category_id = {
