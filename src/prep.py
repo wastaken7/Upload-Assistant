@@ -252,11 +252,12 @@ class Prep():
                             meta['description'] = ptp_desc
                             meta['skip_gen_desc'] = True
 
-                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                                valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
-                                if valid_images:
-                                    meta['image_list'] = valid_images
-                                    await self.handle_image_list(meta, tracker_name)
+                            if not meta['is_disc']:
+                                if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                                    valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
+                                    if valid_images:
+                                        meta['image_list'] = valid_images
+                                        await self.handle_image_list(meta, tracker_name)
 
                         else:
                             found_match = False
@@ -267,10 +268,11 @@ class Prep():
                         meta['description'] = ptp_desc
                         meta['skip_gen_desc'] = True
 
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            valid_images = await self.check_images_concurrently(ptp_imagelist)
-                            if valid_images:
-                                meta['image_list'] = valid_images
+                        if not meta['is_disc']:
+                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                                valid_images = await self.check_images_concurrently(ptp_imagelist)
+                                if valid_images:
+                                    meta['image_list'] = valid_images
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
                     found_match = False
@@ -287,11 +289,12 @@ class Prep():
                     ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                     meta['description'] = ptp_desc
                     meta['skip_gen_desc'] = True
-                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                        valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
-                        if valid_images:
-                            meta['image_list'] = valid_images
-                            console.print("[green]PTP images added to metadata.[/green]")
+                    if not meta['is_disc']:
+                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                            valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
+                            if valid_images:
+                                meta['image_list'] = valid_images
+                                console.print("[green]PTP images added to metadata.[/green]")
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                     found_match = False
