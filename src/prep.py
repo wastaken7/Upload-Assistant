@@ -1968,21 +1968,22 @@ class Prep():
 
                             audio_language = t.get('Language', '')
 
-                            # Check for English Language Track
-                            if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
-                                eng = True
+                            if isinstance(audio_language, str):
+                                # Check for English Language Track
+                                if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
+                                    eng = True
 
-                            # Check for original Language Track
-                            if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in (t.get('Title') or '').lower():
-                                orig = True
+                                # Check for original Language Track
+                                if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in (t.get('Title') or '').lower():
+                                    orig = True
 
-                            # Catch Chinese / Norwegian Variants
-                            variants = ['zh', 'cn', 'cmn', 'no', 'nb']
-                            if any(audio_language.startswith(var) for var in variants) and any(meta['original_language'].startswith(var) for var in variants):
-                                orig = True
+                                # Catch Chinese / Norwegian Variants
+                                variants = ['zh', 'cn', 'cmn', 'no', 'nb']
+                                if any(audio_language.startswith(var) for var in variants) and any(meta['original_language'].startswith(var) for var in variants):
+                                    orig = True
 
-                            # Check for additional, bloated Tracks
-                            if audio_language != meta['original_language'] and not audio_language.startswith("en"):
+                            # Only proceed if `audio_language` is valid after previous checks
+                            if isinstance(audio_language, str) and audio_language and audio_language != meta['original_language'] and not audio_language.startswith("en"):
                                 # If audio_language is empty, set to 'und' (undefined)
                                 audio_language = "und" if audio_language == "" else audio_language
                                 console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
