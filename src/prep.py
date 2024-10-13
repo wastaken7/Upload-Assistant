@@ -2478,12 +2478,16 @@ class Prep():
                     if piece_size < our_min_size:
                         piece_size = our_min_size
                         break
-                    elif torrent_file_size > 92160:  # Break if .torrent size exceeds 90 KiB
+                    elif torrent_file_size > 61440:  # Break if .torrent size exceeds 60 KiB
                         break
                 elif num_pieces > 2000:
                     piece_size *= 2
                     if piece_size > our_max_size:
                         piece_size = our_max_size
+                        break
+                    elif torrent_file_size > 81920:  # Break if .torrent size exceeds 80 KiB
+                        break
+                    elif torrent_file_size < 10240:  # Break if .torrent size less than 10 KiB
                         break
                 elif torrent_file_size > 102400:
                     piece_size *= 2
