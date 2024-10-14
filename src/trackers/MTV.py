@@ -391,7 +391,9 @@ class MTV():
     async def get_tags(self, meta):
         tags = []
         # Genres
-        tags.extend([x.strip(', ').lower().replace(' ', '.') for x in meta['genres'].split(',')])
+        # MTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
+        # to regex however many tags need changing, so they're just geting skipped
+        # tags.extend([x.strip(', ').lower().replace(' ', '.') for x in meta['genres'].split(',')])
         # Resolution
         tags.append(meta['resolution'].lower())
         if meta['sd'] == 1:
@@ -401,8 +403,12 @@ class MTV():
         else:
             tags.append('hd')
         # Streaming Service
+        # disney+ should be disneyplus, assume every other service is same.
+        # If I'm wrong, then they can either allowing editing tags or service will just get skipped also
         if str(meta['service_longname']) != "":
-            tags.append(f"{meta['service_longname'].lower().replace(' ', '.')}.source")
+            service_name = meta['service_longname'].lower().replace(' ', '.')
+            service_name = service_name.replace('+', 'plus')  # Replace '+' with 'plus'
+            tags.append(f"{service_name}.source")
         # Release Type/Source
         for each in ['remux', 'WEB.DL', 'WEBRip', 'HDTV', 'BluRay', 'DVD', 'HDDVD']:
             if (each.lower().replace('.', '') in meta['type'].lower()) or (each.lower().replace('-', '') in meta['source']):
@@ -412,9 +418,9 @@ class MTV():
             if meta.get('tv_pack', 0) == 0:
                 # Episodes
                 if meta['sd'] == 1:
-                    tags.extend(['episode.release', 'sd.episode'])
+                    tags.extend(['sd.episode'])
                 else:
-                    tags.extend(['episode.release', 'hd.episode'])
+                    tags.extend(['hd.episode'])
             else:
                 # Seasons
                 if meta['sd'] == 1:
