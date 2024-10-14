@@ -2665,7 +2665,7 @@ class Prep():
                                     loop = asyncio.get_event_loop()
 
                                     # Run the imgbox upload in the current event loop
-                                    image_list = loop.run_until_complete(self.imgbox_upload(os.getcwd(), image_glob))  # Pass all images
+                                    image_list = loop.run_until_complete(self.imgbox_upload(os.getcwd(), image_glob, meta))  # Pass all images
 
                                     # Ensure the image_list contains valid URLs before continuing
                                     if image_list and all('img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list):
@@ -2841,33 +2841,32 @@ class Prep():
 
         return image_list, i
 
-    async def imgbox_upload(self, chdir, image_glob):
+    async def imgbox_upload(self, chdir, image_glob, meta):
         try:
             os.chdir(chdir)
             image_list = []
 
             console.print(f"[debug] Starting upload of {len(image_glob)} images to imgbox...")
-
-            # Start a gallery context
             async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
                 for image in image_glob:
                     console.print(f"[blue]Uploading image: {image}")
 
                     try:
-                        # Add the image to the gallery and await the response
                         async for submission in gallery.add([image]):
                             if not submission['success']:
                                 console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
                                 return []  # Return empty list in case of failure
                             else:
-                                # Append the successful result to the image list
+                                image_size = os.path.getsize(image)
                                 image_dict = {
                                     'web_url': submission['web_url'],
                                     'img_url': submission['thumbnail_url'],
                                     'raw_url': submission['image_url']
                                 }
                                 image_list.append(image_dict)
-                                # console.print(f"[green]Successfully uploaded image: {image}")
+                                meta['image_sizes'][submission['image_url']] = image_size
+
+                                console.print(f"[green]Successfully uploaded image: {image}")
 
                     except Exception as e:
                         console.print(f"[red]Error during upload for {image}: {str(e)}")
