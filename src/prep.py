@@ -1945,18 +1945,14 @@ class Prep():
             if format_settings in ['Explicit']:
                 format_settings = ""
             # Channels
-            channels = mi['media']['track'][track_num].get('Channels_Original', mi['media']['track'][track_num]['Channels'])
+            channels = track.get('Channels_Original', track.get('Channels'))
             if not str(channels).isnumeric():
-                channels = mi['media']['track'][track_num]['Channels']
+                channels = track.get('Channels')
             try:
-                channel_layout = mi['media']['track'][track_num]['ChannelLayout']
+                channel_layout = track.get('ChannelLayout', '')
             except Exception:
-                try:
-                    channel_layout = mi['media']['track'][track_num]['ChannelLayout_Original']
-                except Exception:
-                    channel_layout = ""
+                channel_layout = track.get('ChannelLayout_Original', '')
 
-            # Ensure channel_layout is not None or an empty string before iterating
             if channel_layout and "LFE" in channel_layout:
                 chan = f"{int(channels) - 1}.1"
             elif channel_layout == "":
@@ -1967,35 +1963,30 @@ class Prep():
             else:
                 chan = f"{channels}.0"
 
-            if meta.get('dual_audio', False):  # If dual_audio flag is set, skip other checks
+            if meta.get('dual_audio', False):
                 dual = "Dual-Audio"
             else:
                 if meta.get('original_language', '') != 'en':
                     eng, orig = False, False
                     try:
-                        for t in mi.get('media', {}).get('track', []):
+                        for t in tracks:
                             if t.get('@type') != "Audio":
                                 continue
 
                             audio_language = t.get('Language', '')
 
                             if isinstance(audio_language, str):
-                                # Check for English Language Track
                                 if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
                                     eng = True
 
-                                # Check for original Language Track
                                 if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in (t.get('Title') or '').lower():
                                     orig = True
 
-                                # Catch Chinese / Norwegian Variants
                                 variants = ['zh', 'cn', 'cmn', 'no', 'nb']
                                 if any(audio_language.startswith(var) for var in variants) and any(meta['original_language'].startswith(var) for var in variants):
                                     orig = True
 
-                            # Only proceed if `audio_language` is valid after previous checks
                             if isinstance(audio_language, str) and audio_language and audio_language != meta['original_language'] and not audio_language.startswith("en"):
-                                # If audio_language is empty, set to 'und' (undefined)
                                 audio_language = "und" if audio_language == "" else audio_language
                                 console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                                 time.sleep(5)
@@ -2008,7 +1999,7 @@ class Prep():
                         console.print(traceback.format_exc())
                         pass
 
-            for t in mi.get('media', {}).get('track', []):
+            for t in tracks:
                 if t.get('@type') != "Audio":
                     continue
 
@@ -2017,7 +2008,6 @@ class Prep():
 
         # Convert commercial name to naming conventions
         audio = {
-            # Format
             "DTS": "DTS",
             "AAC": "AAC",
             "AAC LC": "AAC",
@@ -2028,12 +2018,9 @@ class Prep():
             "Opus": "Opus",
             "Vorbis": "VORBIS",
             "PCM": "LPCM",
-
-            # BDINFO AUDIOS
             "LPCM Audio": "LPCM",
             "Dolby Digital Audio": "DD",
             "Dolby Digital Plus Audio": "DD+",
-            # "Dolby TrueHD" : "TrueHD",
             "Dolby TrueHD Audio": "TrueHD",
             "DTS Audio": "DTS",
             "DTS-HD Master Audio": "DTS-HD MA",
@@ -2065,7 +2052,10 @@ class Prep():
         }
 
         search_format = True
-        # Ensure commercial and additional are not None before iterating
+
+        if isinstance(additional, dict):
+            additional = ""  # Set empty string if additional is a dictionary
+
         if commercial:
             for key, value in commercial_names.items():
                 if key in commercial:
@@ -2078,26 +2068,22 @@ class Prep():
             codec = audio.get(format, "") + audio_extra.get(additional, "")
             extra = format_extra.get(additional, "")
 
-        # Ensure format_settings is not None before looking it up
         format_settings = format_settings_extra.get(format_settings, "")
         if format_settings == "EX" and chan == "5.1":
             format_settings = "EX"
         else:
             format_settings = ""
 
-        # Ensure codec is not left empty
         if codec == "":
             codec = format
 
-        # Ensure additional and channels are not None before using them
         if format.startswith("DTS"):
             if additional and additional.endswith("X"):
                 codec = "DTS:X"
                 chan = f"{int(channels) - 1}.1"
         if format == "MPEG Audio":
-            codec = mi['media']['track'][2].get('CodecID_Hint', '')
+            codec = track.get('CodecID_Hint', '')
 
-        # Ensure audio is constructed properly even with potential None values
         audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
         audio = ' '.join(audio.split())
         return audio, chan, has_commentary
