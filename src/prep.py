@@ -134,6 +134,10 @@ class Prep():
         if isinstance(meta.get('trackers', ''), str):
             meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
 
+        # if trackers is none then it need to be blanked
+        if meta.get('trackers') is None:
+            meta['trackers'] = []
+
         # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
         if 'MTV' in trackers_list or 'MTV' in meta.get('trackers', []):
             if invalid_host_found:
