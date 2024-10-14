@@ -106,8 +106,11 @@ class RF():
 
     async def edit_name(self, meta):
         rf_name = meta['name']
-        if meta['tag'] == "":
+        tag_lower = meta['tag'].lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             rf_name = f"{rf_name}-NoGroup"
+
         return rf_name
 
     async def get_cat_id(self, category_name):
