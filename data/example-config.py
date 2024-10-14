@@ -27,6 +27,8 @@ config = {
         # Enable lossless PNG Compression (True/False)
         "optimize_images": True,
 
+        # Use only half available CPU cores to avoid memory allocation errors
+        "shared_seedbox": False,
 
         # The name of your default torrent client, set in the torrent client sections below
         "default_torrent_client": "Client1",
