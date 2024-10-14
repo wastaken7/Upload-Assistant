@@ -1494,10 +1494,10 @@ class Prep():
             if self.config['DEFAULT'].get('shared_seedbox', True) is True:
                 # Get number of CPU cores
                 num_cores = multiprocessing.cpu_count()
-                # Limit the number of threads based half available cores
+                # Limit the number of threads based on half available cores
                 max_threads = num_cores // 2
                 # Set cores for oxipng usage
-                os.environ['RAYON_NUM_THREADS'] = str(max_threads)  
+                os.environ['RAYON_NUM_THREADS'] = str(max_threads)
             if os.path.exists(image):
                 try:
                     pyver = platform.python_version_tuple()
