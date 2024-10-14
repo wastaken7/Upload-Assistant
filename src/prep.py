@@ -2474,7 +2474,7 @@ class Prep():
         def calculate_piece_size(cls, total_size, min_size, max_size, files):
             our_min_size = 16384
             our_max_size = max_size if max_size else 67108864  # Default to 64 MiB if max_size is None
-            piece_size = 8388608  # Start with 8 MiB
+            piece_size = 67108864  # Start with 64 MiB
             num_pieces = math.ceil(total_size / piece_size)
             torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)  # Approximate .torrent size
 
