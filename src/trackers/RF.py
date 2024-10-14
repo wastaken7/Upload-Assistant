@@ -3,6 +3,7 @@
 import asyncio
 import requests
 import platform
+import re
 from str2bool import str2bool
 
 from src.trackers.COMMON import COMMON
@@ -110,7 +111,7 @@ class RF():
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
-                rf_name = rf_name.lower().replace(f"-{invalid_tag}", "")
+                rf_name = rf_name.replace(f"-{invalid_tag}", "", flags=re.IGNORECASE)
             rf_name = f"{rf_name}-NoGroup"
 
         return rf_name
