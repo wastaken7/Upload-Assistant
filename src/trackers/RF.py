@@ -109,9 +109,10 @@ class RF():
         rf_name = meta['name']
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
-                rf_name = rf_name.replace(f"-{invalid_tag}", "", flags=re.IGNORECASE)
+                rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
             rf_name = f"{rf_name}-NoGroup"
 
         return rf_name
