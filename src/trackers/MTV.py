@@ -139,7 +139,7 @@ class MTV():
             )
 
             # Validate and write the new torrent
-            new_torrent.piece_size = 8 * 1024 * 1024 
+            new_torrent.piece_size = 8 * 1024 * 1024
             new_torrent.validate_piece_size()
             new_torrent.generate(callback=prep.torf_cb, interval=5)
             new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
@@ -205,7 +205,8 @@ class MTV():
                             console.print("[red]No DL link in response, It may have uploaded, check manually.")
                         else:
                             console.print("[red]Upload Failed. Either you are not logged in......")
-                            console.print("[red]or you are hitting this site bug: https://www.morethantv.me/forum/thread/3338?")
+                            console.print("[red]You are hitting this site bug: https://www.morethantv.me/forum/thread/3338?")
+                            console.print("[red]Or you hit some other error with the torrent upload.")
                 except Exception:
                     console.print("[red]It may have uploaded, check manually.")
                     print(traceback.print_exc())
