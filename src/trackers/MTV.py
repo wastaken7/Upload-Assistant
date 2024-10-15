@@ -139,6 +139,7 @@ class MTV():
             )
 
             # Validate and write the new torrent
+            new_torrent.piece_size = 8 * 1024 * 1024 
             new_torrent.validate_piece_size()
             new_torrent.generate(callback=prep.torf_cb, interval=5)
             new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
