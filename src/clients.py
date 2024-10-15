@@ -123,6 +123,10 @@ class Clients():
 
             # Reuse if disc and basename matches or --keep-folder was specified
             if meta.get('is_disc', None) is not None or (meta['keep_folder'] and meta['isdir']):
+                torrent_name = torrent.metainfo['info']['name']
+                if meta['uuid'] != torrent_name:
+                    console.print("Modified file structure, skipping hash")
+                    valid = False
                 torrent_filepath = os.path.commonpath(torrent.files)
                 if os.path.basename(meta['path']) in torrent_filepath:
                     valid = True
