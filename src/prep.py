@@ -677,10 +677,13 @@ class Prep():
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = self.get_video_encode(mi, meta['type'], bdinfo)
 
-        meta['edition'], meta['repack'] = self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
-        if "REPACK" in meta.get('edition', ""):
-            meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
-            meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
+        if meta.get('no_edition') is False:
+            meta['edition'], meta['repack'] = self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
+            if "REPACK" in meta.get('edition', ""):
+                meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
+                meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
+        else:
+            meta['edition'] = ""
 
         # WORK ON THIS
         meta.get('stream', False)
