@@ -585,6 +585,7 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
+        manual_frames = meta['manual_frames']
         # Take Screenshots
         if meta['is_disc'] == "BDMV":
             if meta.get('edit', False) is False:
@@ -611,7 +612,11 @@ class Prep():
         else:
             if meta.get('edit', False) is False:
                 try:
-                    s = multiprocessing.Process(target=self.screenshots, args=(videopath, filename, meta['uuid'], base_dir, meta))
+                    s = multiprocessing.Process(
+                        target=self.screenshots,
+                        args=(videopath, filename, meta['uuid'], base_dir, meta),  # Positional arguments
+                        kwargs={'manual_frames': manual_frames}  # Keyword argument
+                    )
                     s.start()
                     while s.is_alive() is True:
                         await asyncio.sleep(3)
@@ -676,7 +681,6 @@ class Prep():
             meta['video_codec'] = self.get_video_codec(bdinfo)
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = self.get_video_encode(mi, meta['type'], bdinfo)
-
         if meta.get('no_edition') is False:
             meta['edition'], meta['repack'] = self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
             if "REPACK" in meta.get('edition', ""):
@@ -1353,20 +1357,16 @@ class Prep():
             if smallest is not None:
                 os.remove(smallest)
 
-    def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False):
-        # Ensure the image list is initialized and preserve existing images
+    def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
         if 'image_list' not in meta:
             meta['image_list'] = []
 
-        # Check if there are already at least 3 image links in the image list
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        # Skip taking screenshots if there are already 3 images and force_screenshots is False
         if len(existing_images) >= 3 and not force_screenshots:
             console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
             return
 
-        # Determine the number of screenshots to take
         if num_screens is None:
             num_screens = self.screens - len(existing_images)
         if num_screens <= 0:
@@ -1380,6 +1380,7 @@ class Prep():
             height = float(video_track.get('Height'))
             par = float(video_track.get('PixelAspectRatio', 1))
             dar = float(video_track.get('DisplayAspectRatio'))
+            frame_rate = float(video_track.get('FrameRate', 24.0))
 
             if par == 1:
                 sar = w_sar = h_sar = 1
@@ -1394,106 +1395,128 @@ class Prep():
             length = round(float(length))
             os.chdir(f"{base_dir}/tmp/{folder_id}")
             i = 0
-            if len(glob.glob(f"{filename}-*.png")) >= num_screens:
-                i = num_screens
-                console.print('[bold green]Reusing screenshots')
-            else:
-                loglevel = 'quiet'
-                debug = True
-                if bool(meta.get('ffdebug', False)) is True:
-                    loglevel = 'verbose'
-                    debug = False
-                if meta.get('vapoursynth', False) is True:
-                    from src.vs import vs_screengn
-                    vs_screengn(source=path, encode=None, filter_b_frames=False, num=num_screens, dir=f"{base_dir}/tmp/{folder_id}/")
+
+            loglevel = 'quiet'
+            debug = True
+            if bool(meta.get('ffdebug', False)) is True:
+                loglevel = 'verbose'
+                debug = False
+
+            retake = False
+            with Progress(
+                TextColumn("[bold green]Saving Screens..."),
+                BarColumn(),
+                "[cyan]{task.completed}/{task.total}",
+                TimeRemainingColumn()
+            ) as progress:
+                ss_times = []
+                screen_task = progress.add_task("[green]Saving Screens...", total=num_screens)
+
+                if manual_frames:
+                    if isinstance(manual_frames, str):
+                        manual_frames = [frame.strip() for frame in manual_frames.split(',') if frame.strip().isdigit()]
+                    elif isinstance(manual_frames, list):
+                        manual_frames = [frame for frame in manual_frames if isinstance(frame, int) or frame.isdigit()]
+
+                    # Convert to integers
+                    manual_frames = [int(frame) for frame in manual_frames]
+                    ss_times = [frame / frame_rate for frame in manual_frames]
+
+                    # If not enough manual frames, fill in with random frames
+                    if len(ss_times) < num_screens:
+                        console.print(f"[yellow]Not enough manual frames provided. Using random frames for remaining {num_screens - len(ss_times)} screenshots.")
+                        random_times = self.valid_ss_time(ss_times, num_screens - len(ss_times), length)
+                        ss_times.extend(random_times)
+
                 else:
-                    retake = False
-                    with Progress(
-                        TextColumn("[bold green]Saving Screens..."),
-                        BarColumn(),
-                        "[cyan]{task.completed}/{task.total}",
-                        TimeRemainingColumn()
-                    ) as progress:
-                        ss_times = []
-                        screen_task = progress.add_task("[green]Saving Screens...", total=num_screens + 1)
-                        for i in range(num_screens + 1):
-                            image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
-                            if not os.path.exists(image_path) or retake is not False:
-                                retake = False
-                                try:
-                                    ss_times = self.valid_ss_time(ss_times, num_screens + 1, length)
-                                    ff = ffmpeg.input(path, ss=ss_times[-1])
-                                    if w_sar != 1 or h_sar != 1:
-                                        ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
-                                    (
-                                        ff
-                                        .output(image_path, vframes=1, pix_fmt="rgb24")
-                                        .overwrite_output()
-                                        .global_args('-loglevel', loglevel)
-                                        .run(quiet=debug)
-                                    )
-                                except (KeyboardInterrupt, Exception):
-                                    sys.exit(1)
+                    # No manual frames provided, generate random times
+                    # console.print("[yellow]No manual frames provided. Generating random frames.")
+                    ss_times = self.valid_ss_time(ss_times, num_screens, length)
 
-                                self.optimize_images(image_path)
-                                if os.path.getsize(Path(image_path)) <= 75000:
-                                    console.print("[yellow]Image is incredibly small, retaking")
-                                    retake = True
-                                    time.sleep(1)
-                                if os.path.getsize(Path(image_path)) <= 31000000 and self.img_host == "imgbb" and retake is False:
-                                    i += 1
-                                elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", 'pixhost'] and retake is False:
-                                    i += 1
-                                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and retake is False:
-                                    i += 1
-                                elif self.img_host == "freeimage.host":
-                                    console.print("[bold red]Support for freeimage.host has been removed. Please remove from your config")
-                                    exit()
-                                elif retake is True:
-                                    pass
-                                else:
-                                    console.print("[red]Image too large for your image host, retaking")
-                                    retake = True
-                                    time.sleep(1)
-                            else:
-                                i += 1
-                            progress.advance(screen_task)
+                for i in range(num_screens):
+                    image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
+                    if not os.path.exists(image_path) or retake is not False:
+                        retake = False
+                        try:
+                            # console.print(f"Taking screenshot at time (s): {ss_times[i]}")
+                            ff = ffmpeg.input(path, ss=ss_times[i])
 
-                        # Add new images to the meta['image_list'] as dictionaries
-                        new_images = glob.glob(f"{filename}-*.png")
-                        for image in new_images:
-                            img_dict = {
-                                'img_url': image,
-                                'raw_url': image,
-                                'web_url': image  # Assuming local path, but you might need to update this if uploading
-                            }
-                            meta['image_list'].append(img_dict)
+                            if w_sar != 1 or h_sar != 1:
+                                ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
-                        # Remove the smallest image if there are more than needed
-                        if len(meta['image_list']) > self.screens:
-                            local_images = [img for img in meta['image_list'] if not img['img_url'].startswith('http')]
+                            # console.print(f"Saving screenshot to {image_path}")
+                            (
+                                ff
+                                .output(image_path, vframes=1, pix_fmt="rgb24")
+                                .overwrite_output()
+                                .global_args('-loglevel', loglevel)
+                                .run(quiet=debug)
+                            )
 
-                            if local_images:
-                                smallest = min(local_images, key=lambda x: os.path.getsize(x['img_url']))
-                                os.remove(smallest['img_url'])
-                                meta['image_list'].remove(smallest)
-                            else:
-                                console.print("[yellow]No local images found to remove.")
+                        except Exception as e:
+                            console.print(f"[red]Error during screenshot capture: {e}")
+                            sys.exit(1)
 
-    def valid_ss_time(self, ss_times, num_screens, length):
-        valid_time = False
-        while valid_time is not True:
+                        self.optimize_images(image_path)
+                        if not manual_frames:
+                            if os.path.getsize(Path(image_path)) <= 75000:
+                                console.print("[yellow]Image is incredibly small, retaking")
+                                retake = True
+                                time.sleep(1)
+                        if os.path.getsize(Path(image_path)) <= 31000000 and self.img_host == "imgbb" and retake is False:
+                            i += 1
+                        elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", 'pixhost'] and retake is False:
+                            i += 1
+                        elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and retake is False:
+                            i += 1
+                        elif self.img_host == "freeimage.host":
+                            console.print("[bold red]Support for freeimage.host has been removed. Please remove from your config")
+                            exit()
+                        elif retake is True:
+                            pass
+                        else:
+                            console.print("[red]Image too large for your image host, retaking")
+                            retake = True
+                            time.sleep(1)
+
+                    progress.advance(screen_task)
+
+                new_images = glob.glob(f"{filename}-*.png")
+                for image in new_images:
+                    img_dict = {
+                        'img_url': image,
+                        'raw_url': image,
+                        'web_url': image
+                    }
+                    meta['image_list'].append(img_dict)
+
+                if len(meta['image_list']) > self.screens:
+                    local_images = [img for img in meta['image_list'] if not img['img_url'].startswith('http')]
+                    if local_images:
+                        smallest = min(local_images, key=lambda x: os.path.getsize(x['img_url']))
+                        os.remove(smallest['img_url'])
+                        meta['image_list'].remove(smallest)
+                    else:
+                        console.print("[yellow]No local images found to remove.")
+
+    def valid_ss_time(self, ss_times, num_screens, length, manual_frames=None):
+        if manual_frames:
+            ss_times.extend(manual_frames[:num_screens])  # Use only as many as needed
+            console.print(f"[green]Using provided manual frame numbers for screenshots: {ss_times}")
+            return ss_times
+
+        # Generate random times if manual frames are not provided
+        while len(ss_times) < num_screens:
             valid_time = True
-            if ss_times != []:
-                sst = random.randint(round(length / 5), round(length / 2))
-                for each in ss_times:
-                    tolerance = length / 10 / num_screens
-                    if abs(sst - each) <= tolerance:
-                        valid_time = False
-                if valid_time is True:
-                    ss_times.append(sst)
-            else:
-                ss_times.append(random.randint(round(length / 5), round(length / 2)))
+            sst = random.randint(round(length / 5), round(4 * length / 5))  # Adjust range for more spread out times
+            for each in ss_times:
+                tolerance = length / 10 / num_screens
+                if abs(sst - each) <= tolerance:
+                    valid_time = False
+                    break
+            if valid_time:
+                ss_times.append(sst)
+
         return ss_times
 
     def optimize_images(self, image):
@@ -2485,9 +2508,9 @@ class Prep():
                     if piece_size > our_max_size:
                         piece_size = our_max_size
                         break
-                    elif torrent_file_size > 81920:  # Break if .torrent size exceeds 80 KiB
+                    elif torrent_file_size < 81920:  # Break if .torrent size less than 80 KiB
                         break
-                    elif torrent_file_size < 2048:  # Break if .torrent size less than 2 KiB
+                    elif torrent_file_size > 2048:  # Break if .torrent size exceeds 2 KiB
                         break
                 elif torrent_file_size > 102400:
                     piece_size *= 2

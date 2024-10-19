@@ -3,6 +3,7 @@ import argparse
 import urllib.parse
 import os
 import datetime
+import sys
 
 from src.console import console
 
@@ -21,6 +22,7 @@ class Args():
 
         parser.add_argument('path', nargs='*', help="Path to file/directory")
         parser.add_argument('-s', '--screens', nargs='*', required=False, help="Number of screenshots", default=int(self.config['DEFAULT']['screens']))
+        parser.add_argument('-mf', '--manual_frames', required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
         parser.add_argument('-c', '--category', nargs='*', required=False, help="Category [MOVIE, TV, FANRES]", choices=['movie', 'tv', 'fanres'])
         parser.add_argument('-t', '--type', nargs='*', required=False, help="Type [DISC, REMUX, ENCODE, WEBDL, WEBRIP, HDTV]", choices=['disc', 'remux', 'encode', 'webdl', 'web-dl', 'webrip', 'hdtv'])
         parser.add_argument('--source', nargs='*', required=False, help="Source [Blu-ray, BluRay, DVD, HDDVD, WEB, HDTV, UHDTV]", choices=['Blu-ray', 'BluRay', 'DVD', 'HDDVD', 'WEB', 'HDTV', 'UHDTV'], dest="manual_source")
@@ -31,7 +33,7 @@ class Args():
         parser.add_argument('-g', '--tag', nargs='*', required=False, help="Group Tag", type=str)
         parser.add_argument('-serv', '--service', nargs='*', required=False, help="Streaming Service", type=str)
         parser.add_argument('-dist', '--distributor', nargs='*', required=False, help="Disc Distributor e.g.(Criterion, BFI, etc.)", type=str)
-        parser.add_argument('-edition', '--edition', '--repack', nargs='*', required=False, help="Edition/Repack String e.g.(Director's Cut, Uncut, Hybrid, REPACK, REPACK3)", type=str, dest='manual_edition', default="")
+        parser.add_argument('-edition', '--edition', '--repack', nargs='*', required=False, help="Edition/Repack String e.g.(Director's Cut, Uncut, Hybrid, REPACK, REPACK3)", type=str, dest='manual_edition', default=None)
         parser.add_argument('-season', '--season', nargs='*', required=False, help="Season (number)", type=str)
         parser.add_argument('-episode', '--episode', nargs='*', required=False, help="Episode (number)", type=str)
         parser.add_argument('-daily', '--daily', nargs=1, required=False, help="Air date of this episode (YYYY-MM-DD)", type=datetime.date.fromisoformat, dest="manual_date")
@@ -94,6 +96,17 @@ class Args():
         args, before_args = parser.parse_known_args(input)
         args = vars(args)
         # console.print(args)
+        if meta.get('manual_frames') is not None:
+            try:
+                # Join the list into a single string, split by commas, and convert to integers
+                meta['manual_frames'] = [int(time.strip()) for time in meta['manual_frames'].split(',')]
+                # console.print(f"Processed manual_frames: {meta['manual_frames']}")
+            except ValueError:
+                console.print("[red]Invalid format for manual_frames. Please provide a comma-separated list of integers.")
+                console.print(f"Processed manual_frames: {meta['manual_frames']}")
+                sys.exit(1)
+        else:
+            meta['manual_frames'] = None  # Explicitly set it to None if not provided
         if len(before_args) >= 1 and not os.path.exists(' '.join(args['path'])):
             for each in before_args:
                 args['path'].append(each)
