@@ -235,8 +235,9 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'SN', 'LT', 'NBL', 'ANT', 'JPTV', 'TDC', 'OE', 'BHDTV', 'RTF',
-                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TL', 'TIK', 'PSS', 'ULCX']
+        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'LT', 'JPTV', 'TDC', 'OE',
+                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'BHD', 'TIK', 'PSS', 'ULCX']
+        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN, 'TIK': TIK,
@@ -284,6 +285,51 @@ async def do_the_thing(base_dir):
                 debug = ""
 
             if tracker in api_trackers:
+                tracker_class = tracker_class_map[tracker](config=config)
+
+                if meta['unattended']:
+                    upload_to_tracker = True
+                else:
+                    try:
+                        upload_to_tracker = cli_ui.ask_yes_no(
+                            f"Upload to {tracker_class.tracker}? {debug}",
+                            default=meta['unattended']
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        sys.exit(1)  # Exit immediately
+
+                if upload_to_tracker:
+                    # Get mod_q, draft, or draft/live depending on the tracker
+                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+
+                    # Print mod_q and draft info if relevant
+                    if modq is not None:
+                        console.print(f"(modq: {modq})")
+                    if draft is not None:
+                        console.print(f"(draft: {draft})")
+
+                    console.print(f"Uploading to {tracker_class.tracker}")
+
+                    # Check if the group is banned for the tracker
+                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
+                        continue
+
+                    dupes = await tracker_class.search_existing(meta, disctype)
+                    dupes = await common.filter_dupes(dupes, meta)
+                    meta = dupe_check(dupes, meta)
+
+                    # Proceed with upload if the meta is set to upload
+                    if meta.get('upload', False):
+                        await tracker_class.upload(meta, disctype)
+                        perm = config['DEFAULT'].get('get_permalink', False)
+                        if perm:
+                            # need a wait so we don't race the api
+                            await asyncio.sleep(5)
+                            await tracker_class.search_torrent_page(meta, disctype)
+                            await asyncio.sleep(0.5)
+                        await client.add_to_client(meta, tracker_class.tracker)
+
+            if tracker in other_api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
 
                 if meta['unattended']:

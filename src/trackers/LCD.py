@@ -4,6 +4,7 @@ import asyncio
 import requests
 import platform
 from str2bool import str2bool
+import bencodepy
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -179,3 +180,42 @@ class LCD():
         name = meta['uuid'].replace('.mkv', '').replace('.mp4', '').replace(".", " ").replace("DDP2 0", "DDP2.0").replace("DDP5 1", "DDP5.1").replace("H 264", "H.264").replace("H 265", "H.264").replace("DD+7 1", "DD+7.1").replace("AAC2 0", "AAC2.0").replace('DD5 1', 'DD5.1').replace('DD2 0', 'DD2.0').replace('TrueHD 7 1', 'TrueHD 7.1').replace('DTS-HD MA 7 1', 'DTS-HD MA 7.1').replace('-C A A', '-C.A.A'),
 
         return name
+
+    async def search_torrent_page(self, meta, disctype):
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        Name = meta['name']
+        quoted_name = f'"{Name}"'
+
+        params = {
+            'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
+            'name': quoted_name
+        }
+
+        try:
+            response = requests.get(url=self.search_url, params=params)
+            response.raise_for_status()
+            response_data = response.json()
+
+            if response_data['data'] and isinstance(response_data['data'], list):
+                details_link = response_data['data'][0]['attributes'].get('details_link')
+
+                if details_link:
+                    with open(torrent_file_path, 'rb') as open_torrent:
+                        torrent_data = open_torrent.read()
+
+                    torrent = bencodepy.decode(torrent_data)
+                    torrent[b'comment'] = details_link.encode('utf-8')
+                    updated_torrent_data = bencodepy.encode(torrent)
+
+                    with open(torrent_file_path, 'wb') as updated_torrent_file:
+                        updated_torrent_file.write(updated_torrent_data)
+
+                    return details_link
+                else:
+                    return None
+            else:
+                return None
+
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred during the request: {e}")
+            return None
