@@ -6,6 +6,8 @@ from difflib import SequenceMatcher
 from str2bool import str2bool
 import os
 import platform
+import hashlib
+import bencodepy
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -25,7 +27,7 @@ class BHD():
         self.source_flag = 'BHD'
         self.upload_url = 'https://beyond-hd.me/api/upload/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
-        self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD']
+        self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD', 'Telly', 'AOC', 'WKS', 'SasukeducK']
         pass
 
     async def upload(self, meta, disctype):
@@ -326,3 +328,48 @@ class BHD():
         if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
             name = name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
         return name
+
+    async def search_torrent_page(self, meta, disctype):
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        with open(torrent_file_path, 'rb') as open_torrent:
+            torrent_data = open_torrent.read()
+        torrent = bencodepy.decode(torrent_data)
+        info_dict = torrent[b'info']
+        bencoded_info = bencodepy.encode(info_dict)
+        info_hash = hashlib.sha1(bencoded_info).hexdigest()
+        console.print(f"Info Hash: {info_hash}")
+
+        params = {
+            'action': 'search',
+            'info_hash': info_hash
+        }
+        url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
+        try:
+            response = requests.post(url=url, json=params)
+            response_data = response.json()
+            console.print(f"[yellow]Response Data: {response_data}")
+
+            if response_data.get('total_results') == 1:
+                for each in response_data['results']:
+                    details_link = f"https://beyond-hd.me/details/{each['id']}"
+
+                if details_link:
+                    with open(torrent_file_path, 'rb') as open_torrent:
+                        torrent_data = open_torrent.read()
+
+                    torrent = bencodepy.decode(torrent_data)
+                    torrent[b'comment'] = details_link.encode('utf-8')
+                    updated_torrent_data = bencodepy.encode(torrent)
+
+                    with open(torrent_file_path, 'wb') as updated_torrent_file:
+                        updated_torrent_file.write(updated_torrent_data)
+
+                    return details_link
+                else:
+                    return None
+            else:
+                return None
+
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred during the request: {e}")
+            return None

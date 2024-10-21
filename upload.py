@@ -236,8 +236,8 @@ async def do_the_thing(base_dir):
         ####################################
         common = COMMON(config=config)
         api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'LT', 'JPTV', 'TDC', 'OE',
-                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'TIK', 'PSS', 'ULCX']
-        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL', 'BHD']
+                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'TIK', 'PSS', 'ULCX', 'BHD']
+        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN, 'TIK': TIK,
@@ -546,7 +546,7 @@ def get_confirmation(meta):
         if meta.get('is disc', False) is False:
             meta['keep_folder'] = False  # Ensure 'keep_folder' is False if 'is disc' is True
 
-        if meta.get('keep_folder') is True:
+        if meta.get('keep_folder'):
             if meta['isdir']:
                 cli_ui.info_section(cli_ui.yellow, "Uploading with --keep-folder")
                 kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
