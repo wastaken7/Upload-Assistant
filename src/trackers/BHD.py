@@ -337,7 +337,7 @@ class BHD():
         info_dict = torrent[b'info']
         bencoded_info = bencodepy.encode(info_dict)
         info_hash = hashlib.sha1(bencoded_info).hexdigest()
-        console.print(f"Info Hash: {info_hash}")
+        # console.print(f"Info Hash: {info_hash}")
 
         params = {
             'action': 'search',
@@ -347,7 +347,7 @@ class BHD():
         try:
             response = requests.post(url=url, json=params)
             response_data = response.json()
-            console.print(f"[yellow]Response Data: {response_data}")
+            # console.print(f"[yellow]Response Data: {response_data}")
 
             if response_data.get('total_results') == 1:
                 for each in response_data['results']:
