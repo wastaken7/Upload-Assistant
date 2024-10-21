@@ -543,24 +543,20 @@ def get_confirmation(meta):
         cli_ui.info(ring_the_bell)
 
         # Handle the 'keep_folder' logic based on 'is disc' and 'isdir'
-        if meta.get('is disc', False):
+        if meta.get('is disc', False) is False:
             meta['keep_folder'] = False  # Ensure 'keep_folder' is False if 'is disc' is True
 
-        if meta['isdir']:
-            if 'keep_folder' in meta:
-                if meta['keep_folder']:
-                    cli_ui.info_section(cli_ui.yellow, "Uploading with --keep-folder")
-                    kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
-                    if not kf_confirm:
-                        cli_ui.info('Aborting...')
-                        exit()
+        if meta.get('keep_folder') is True:
+            if meta['isdir']:
+                cli_ui.info_section(cli_ui.yellow, "Uploading with --keep-folder")
+                kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
+                if not kf_confirm:
+                    cli_ui.info('Aborting...')
+                    exit()
 
         cli_ui.info_section(cli_ui.yellow, "Is this correct?")
         cli_ui.info(f"Name: {meta['name']}")
-        try:
-            confirm = cli_ui.ask_yes_no("Correct?", default=False)
-        except (KeyboardInterrupt, EOFError):
-            sys.exit(1)  # Exit immediately
+        confirm = cli_ui.ask_yes_no("Correct?", default=False)
 
     else:
         cli_ui.info(f"Name: {meta['name']}")
@@ -665,5 +661,5 @@ if __name__ == '__main__':
 
     try:
         asyncio.run(do_the_thing(base_dir))  # Pass the correct base_dir value here
-    except (KeyboardInterrupt, SystemExit):
+    except (KeyboardInterrupt):
         console.print("[bold red]Program interrupted. Exiting.")
