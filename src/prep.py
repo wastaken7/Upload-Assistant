@@ -356,7 +356,6 @@ class Prep():
                 keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
                 if not keep_images:
                     meta['image_list'] = []
-                    meta['image_sizes'] = []
                     console.print(f"[yellow]Images discarded from {tracker_name}.")
                 else:
                     console.print(f"[green]Images retained from {tracker_name}.")
