@@ -2675,7 +2675,7 @@ class Prep():
                             # Add imgbox handling here
                             if img_host == "imgbox":
                                 try:
-                                    console.print("[blue]Uploading images to imgbox...")
+                                    # console.print("[blue]Uploading images to imgbox...")
 
                                     # Use the current event loop to run imgbox_upload
                                     loop = asyncio.get_event_loop()
@@ -2865,7 +2865,7 @@ class Prep():
             console.print(f"[debug] Starting upload of {len(image_glob)} images to imgbox...")
             async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
                 for image in image_glob:
-                    console.print(f"[blue]Uploading image: {image}")
+                    # console.print(f"[blue]Uploading image: {image}")
 
                     try:
                         async for submission in gallery.add([image]):
@@ -2888,11 +2888,11 @@ class Prep():
                         return []  # Return empty list in case of error
 
             # After uploading all images, validate URLs and get sizes
-            console.print("[blue]Validating images and retrieving their sizes...")
+            # console.print("[blue]Validating images and retrieving their sizes...")
             valid_images = await self.check_images_concurrently(image_list, meta)
 
             if valid_images:
-                console.print(f"[green]Successfully uploaded and validated {len(valid_images)} images.")
+                console.print(f"[yellow]Successfully uploaded and validated {len(valid_images)} images.")
             else:
                 console.print("[red]Failed to validate any images.")
                 return []  # Return empty list if no valid images
