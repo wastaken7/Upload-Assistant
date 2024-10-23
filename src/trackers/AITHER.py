@@ -123,6 +123,8 @@ class AITHER():
         media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
         resolution = meta.get('resolution')
         video_codec = meta.get('video_codec')
+        name_type = meta.get('type', "")
+        source = meta.get('source', "")
 
         if not meta['is_disc']:
             def has_english_audio(tracks=None, media_info_text=None):
@@ -153,7 +155,7 @@ class AITHER():
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
 
-        if meta['is_disc'] == "DVD":
+        if meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
             aither_name = aither_name.replace(str(meta['year']), f"{meta['year']} {resolution}", 1)
             aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
