@@ -92,7 +92,7 @@ class Prep():
 
         # Function to check each image's URL, host, and log size
         async def check_and_collect(image_dict):
-            img_url = image_dict.get('img_url') or image_dict.get('raw_url')
+            img_url = image_dict.get('raw_url')
             if not img_url:
                 return None
 
@@ -134,7 +134,7 @@ class Prep():
         if meta.get('trackers') is not None:
             if isinstance(meta.get('trackers', ''), str):
                 meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
-            if 'MTV' in meta['trackers', []]:
+            if 'MTV' in meta.get('trackers', []):
                 if invalid_host_found:
                     console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will fail if you keep these images.[/red]")
         # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
@@ -356,6 +356,7 @@ class Prep():
                 keep_images = await self.prompt_user_for_confirmation(f"Do you want to keep the images found on {tracker_name}?")
                 if not keep_images:
                     meta['image_list'] = []
+                    meta['image_sizes'] = {}
                     console.print(f"[yellow]Images discarded from {tracker_name}.")
                 else:
                     console.print(f"[green]Images retained from {tracker_name}.")
@@ -2872,14 +2873,13 @@ class Prep():
                                 console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
                                 return []  # Return empty list in case of failure
                             else:
-                                image_size = os.path.getsize(image)
+                                # Add the uploaded image info to image_list
                                 image_dict = {
                                     'web_url': submission['web_url'],
                                     'img_url': submission['thumbnail_url'],
                                     'raw_url': submission['image_url']
                                 }
                                 image_list.append(image_dict)
-                                meta['image_sizes'][submission['image_url']] = image_size
 
                                 console.print(f"[green]Successfully uploaded image: {image}")
 
@@ -2887,8 +2887,17 @@ class Prep():
                         console.print(f"[red]Error during upload for {image}: {str(e)}")
                         return []  # Return empty list in case of error
 
-            console.print(f"[green]Successfully uploaded all {len(image_list)} images to imgbox.")
-            return image_list  # Return the complete list when all images are done
+            # After uploading all images, validate URLs and get sizes
+            console.print("[blue]Validating images and retrieving their sizes...")
+            valid_images = await self.check_images_concurrently(image_list, meta)
+
+            if valid_images:
+                console.print(f"[green]Successfully uploaded and validated {len(valid_images)} images.")
+            else:
+                console.print("[red]Failed to validate any images.")
+                return []  # Return empty list if no valid images
+
+            return valid_images  # Return the valid image list after validation
 
         except Exception as e:
             console.print(f"[red]An error occurred while uploading images to imgbox: {str(e)}")
