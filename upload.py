@@ -237,8 +237,8 @@ async def do_the_thing(base_dir):
         ####################################
         common = COMMON(config=config)
         api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'LT', 'JPTV', 'TDC', 'OE',
-                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'TIK', 'TVC', 'PSS', 'ULCX', 'BHD']
-        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL']
+                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'TIK', 'PSS', 'ULCX', 'BHD']
+        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL', 'TVC']
         http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
         tracker_class_map = {
             'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN, 'TIK': TIK, 'TVC': TVC,
