@@ -1171,7 +1171,7 @@ class Prep():
                             ss_times = self.valid_ss_time(ss_times, num_screens + 1, length)
                             (
                                 ffmpeg
-                                .input(file, ss=ss_times[-1], skip_frame=keyframe)
+                                .input(file, ss=ss_times[i], skip_frame=keyframe)
                                 .output(image, vframes=1, pix_fmt="rgb24")
                                 .overwrite_output()
                                 .global_args('-loglevel', loglevel)
@@ -1311,7 +1311,7 @@ class Prep():
                             voblength, n = _is_vob_good(n, 0, num_screens)
                             # img_time = random.randint(round(voblength/5), round(voblength - voblength/5))
                             ss_times = self.valid_ss_time(ss_times, num_screens + 1, voblength)
-                            ff = ffmpeg.input(f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}", ss=ss_times[-1])
+                            ff = ffmpeg.input(f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}", ss=ss_times[i])
                             if w_sar != 1 or h_sar != 1:
                                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
                             (
