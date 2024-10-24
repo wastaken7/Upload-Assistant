@@ -380,12 +380,21 @@ class COMMON():
         console.log(dupes)
         new_dupes = []
         types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
-        file_type_present = {t for t in types_to_check if t in meta['type']}
+
+        normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
+
+        file_type_present = {t for t in types_to_check if t in normalized_meta_type}
+
         for each in dupes:
             if meta.get('sd', 0) == 1:
                 remove_set = set()
             else:
                 remove_set = set({meta['resolution']})
+
+            normalized_each_type = each.replace('-', '').upper()
+
+            # console.log(f"normalized results: {normalized_each_type}")
+
             search_combos = [
                 {
                     'search': meta['hdr'],
@@ -419,10 +428,19 @@ class COMMON():
                     'in': meta['type']
                 }
             ]
+            # console.log(f"Meta type: {normalized_meta_type}")
+            # console.log(f"Each type: {normalized_each_type}")
+            # Check if the type of the dupe matches or is sufficiently similar
+            dupe_type_matches = {t for t in types_to_check if t in normalized_each_type}
 
-            dupe_type_matches = {t for t in types_to_check if t in each.upper()}
             if file_type_present:
-                if not file_type_present.intersection(dupe_type_matches):
+                # Allow WEB-DL and similar matches if types are related (e.g., WEB-DL vs AMZN WEB-DL)
+                if 'WEBDL' in normalized_meta_type and 'WEBDL' in normalized_each_type:
+                    console.log(f"[green]Allowing result we will catch later: {each}")
+                # Allow based on matching resolution, HDR, and audio despite type mismatch
+                elif meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each:
+                    console.log(f"[green]Allowing result we will catch later: {each}")
+                else:
                     console.log(f"[yellow]Excluding result due to type mismatch: {each}")
                     continue
             else:
