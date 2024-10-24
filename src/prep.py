@@ -585,6 +585,8 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
+        if 'manual_frames' not in meta:
+            meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
         # Take Screenshots
         if meta['is_disc'] == "BDMV":
