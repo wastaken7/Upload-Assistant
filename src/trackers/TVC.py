@@ -224,7 +224,7 @@ class TVC():
 
             except Exception:
                 console.print(traceback.print_exc())
-                console.print("It may have uploaded, go check")
+                console.print("[yellow]It may have uploaded, go check")
                 console.print(response.text.strip('application/x-bittorrent\n'))
                 return
         else:
@@ -287,8 +287,8 @@ class TVC():
     async def search_existing(self, meta, disctype):
         # Search on TVCUK has been DISABLED due to issues
         # leaving code here for future use when it is re-enabled
-        console.print("[RED]Cannot search for dupes as search api is not working...")
-        console.print("[RED]Please make sure you are not uploading duplicates.")
+        console.print("[red]Cannot search for dupes as search api is not working...")
+        console.print("[red]Please make sure you are not uploading duplicates.")
         # https://tvchaosuk.com/api/torrents/filter?api_token=<API_key>&tmdb=138108
 
         dupes = []
