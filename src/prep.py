@@ -669,7 +669,11 @@ class Prep():
         if meta.get('no_tag', False):
             meta['tag'] = ""
         meta['3D'] = self.is_3d(mi, bdinfo)
-        meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+        if meta.get('manual_source', None):
+            meta['source'] = meta['manual_source']
+            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+        else:
+            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
@@ -2149,8 +2153,6 @@ class Prep():
                     source = guessit(path)['source']
                 except Exception:
                     source = "BluRay"
-            if meta.get('manual_source', None):
-                source = meta['manual_source']
             if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
                 if type == "DISC":
                     source = "Blu-ray"
