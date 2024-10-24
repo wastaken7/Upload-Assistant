@@ -2745,9 +2745,9 @@ class Prep():
                                 }
                                 response = requests.post(url, data=data, timeout=timeout)
                                 response = response.json()
-                                img_url = response['data']['image']['url']
-                                raw_url = img_url
-                                web_url = img_url
+                                img_url = response['data'].get('medium', response['data']['image'])['url']
+                                raw_url = response['data']['image']['url']
+                                web_url = response['data']['url_viewer']
                                 upload_success = True
 
                             elif img_host == "ptscreens":
