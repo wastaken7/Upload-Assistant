@@ -376,10 +376,11 @@ class COMMON():
         return ptgen
 
     async def filter_dupes(self, dupes, meta):
-        if meta['debug']:
-            console.log("[cyan]Pre-filtered dupes")
-            console.log(dupes)
+        console.log("[cyan]Pre-filtered dupes")
+        console.log(dupes)
         new_dupes = []
+        types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
+        file_type_present = {t for t in types_to_check if t in meta['type']}
         for each in dupes:
             if meta.get('sd', 0) == 1:
                 remove_set = set()
@@ -418,6 +419,17 @@ class COMMON():
                     'in': meta['type']
                 }
             ]
+
+            dupe_type_matches = {t for t in types_to_check if t in each.upper()}
+            if file_type_present:
+                if not file_type_present.intersection(dupe_type_matches):
+                    console.log(f"[yellow]Excluding result due to type mismatch: {each}")
+                    continue
+            else:
+                if dupe_type_matches:
+                    console.log(f"[red]Excluding extra result with new type match: {each}")
+                    continue
+
             for s in search_combos:
                 if s.get('search_for') not in (None, ''):
                     if any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_for']):
