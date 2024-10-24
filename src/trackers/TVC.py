@@ -405,7 +405,7 @@ class TVC():
             description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.images['mal_75']}[/img][/URL]"
         return description + " \n \n "
 
-    # my get subs function
+    # get subs function
     # used in naming conventions
     def get_subs_info(self, meta, mi):
         subs = ""
@@ -432,4 +432,4 @@ class TVC():
                             meta['sdh_subs'] = 1
 
         return
-    # my get summary function^^^^
+    # get subs function^^^^
