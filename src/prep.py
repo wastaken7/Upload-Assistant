@@ -2482,9 +2482,9 @@ class Prep():
                 self.piece_size_max = torf.Torrent.piece_size_max
 
             # Calculate and set the piece size
-            total_size = self._calculate_total_size()
-            piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files)
-            self.piece_size = piece_size
+            # total_size = self._calculate_total_size()
+            # piece_size = self.calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files)
+            self.metainfo['info']['piece length'] = self._piece_size
 
         @property
         def piece_size(self):
@@ -2500,53 +2500,90 @@ class Prep():
 
         @classmethod
         def calculate_piece_size(cls, total_size, min_size, max_size, files):
+            file_count = len(files)
+            # console.print(f"[red]Calculating piece size for {file_count} files")
+
             our_min_size = 16384
             our_max_size = max_size if max_size else 268435456  # Default to 256 MiB if max_size is None
-            piece_size = 268435456  # Start with 256 MiB
+            piece_size = 4194304  # Start with 4 MiB
+
             num_pieces = math.ceil(total_size / piece_size)
-            torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)  # Approximate .torrent size
+
+            # Initial torrent_file_size calculation based on file_count
+            # More paths = greater error in pathname_bytes, roughly recalibrate
+            if file_count > 1000:
+                torrent_file_size = 20 + (num_pieces * 20) + int(cls._calculate_pathname_bytes(files) * 71 / 100)
+            elif file_count > 500:
+                torrent_file_size = 20 + (num_pieces * 20) + int(cls._calculate_pathname_bytes(files) * 4 / 5)
+            else:
+                torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
+
+            # iteration = 0  # Track the number of iterations
+            # print(f"Initial piece size: {piece_size} bytes")
+            # print(f"Initial num_pieces: {num_pieces}, Initial torrent_file_size: {torrent_file_size} bytes")
 
             # Adjust the piece size to fit within the constraints
-            while not (1000 <= num_pieces <= 2000 and torrent_file_size <= 102400):  # 100 KiB .torrent size limit
-                if num_pieces < 1000 and torrent_file_size >= 102400:
+            while not ((750 <= num_pieces <= 2200 or num_pieces < 750 and 40960 <= torrent_file_size <= 102400) and torrent_file_size <= 102400):
+                # iteration += 1
+                # print(f"\nIteration {iteration}:")
+                # print(f"Current piece_size: {piece_size} bytes")
+                # print(f"Current num_pieces: {num_pieces}, Current torrent_file_size: {torrent_file_size} bytes")
+                if num_pieces > 1000 and num_pieces < 2000 and torrent_file_size < 100000:
+                    break
+                elif num_pieces < 1500 and torrent_file_size >= 102400:
                     piece_size *= 2
+                    # print(f"Doubled piece_size to {piece_size} bytes (num_pieces < 1500 and torrent_file_size >= 100 KiB)")
                     if piece_size > our_max_size:
                         piece_size = our_max_size
+                        # print(f"piece_size exceeded max_size, set to our_max_size: {our_max_size} bytes")
                         break
-                elif num_pieces < 1000:
+                elif num_pieces < 750:
                     piece_size //= 2
+                    # print(f"Halved piece_size to {piece_size} bytes (num_pieces < 750)")
                     if piece_size < our_min_size:
                         piece_size = our_min_size
+                        # print(f"piece_size went below min_size, set to our_min_size: {our_min_size} bytes")
                         break
-                    elif piece_size > 18000000 and torrent_file_size >= 102400:
-                        piece_size *= 2
-                        if piece_size > our_max_size:
-                            piece_size = our_max_size
-                            break
-                    elif torrent_file_size > 61440:  # Break if .torrent size exceeds 60 KiB
+                    elif 40960 < torrent_file_size < 102400:
+                        # print(f"torrent_file_size is between 40 KiB and 100 KiB, exiting loop.")
                         break
-                elif num_pieces > 2000:
+                elif num_pieces > 2200:
                     piece_size *= 2
+                    # print(f"Doubled piece_size to {piece_size} bytes (num_pieces > 2500)")
                     if piece_size > our_max_size:
                         piece_size = our_max_size
+                        # print(f"piece_size exceeded max_size, set to our_max_size: {our_max_size} bytes")
                         break
-                    elif torrent_file_size < 81920:  # Break if .torrent size less than 80 KiB
-                        break
-                    elif torrent_file_size > 2048:  # Break if .torrent size exceeds 2 KiB
+                    elif torrent_file_size < 2048:
+                        # print(f"torrent_file_size is less than 2 KiB, exiting loop.")
                         break
                 elif torrent_file_size > 102400:
                     piece_size *= 2
+                    # print(f"Doubled piece_size to {piece_size} bytes (torrent_file_size > 100 KiB)")
                     if piece_size > our_max_size:
                         piece_size = our_max_size
+                        # print(f"piece_size exceeded max_size, set to our_max_size: {our_max_size} bytes")
                         cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
                         break
-                num_pieces = math.ceil(total_size / piece_size)
-                torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
 
+                # Update num_pieces
+                num_pieces = math.ceil(total_size / piece_size)
+
+                # Recalculate torrent_file_size based on file_count in each iteration
+                if file_count > 1000:
+                    torrent_file_size = 20 + (num_pieces * 20) + int(cls._calculate_pathname_bytes(files) * 71 / 100)
+                elif file_count > 500:
+                    torrent_file_size = 20 + (num_pieces * 20) + int(cls._calculate_pathname_bytes(files) * 4 / 5)
+                else:
+                    torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
+
+            # print(f"\nFinal piece_size: {piece_size} bytes after {iteration} iterations.")
+            print(f"Final num_pieces: {num_pieces}, Final torrent_file_size: {torrent_file_size} bytes")
             return piece_size
 
         def _calculate_total_size(self):
-            return sum(file.size for file in self.files)
+            total_size = sum(file.size for file in self.files)
+            return total_size
 
         @classmethod
         def _calculate_pathname_bytes(cls, files):
