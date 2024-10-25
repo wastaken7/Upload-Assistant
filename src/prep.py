@@ -2503,11 +2503,21 @@ class Prep():
 
             # Adjust the piece size to fit within the constraints
             while not (1000 <= num_pieces <= 2000 and torrent_file_size <= 102400):  # 100 KiB .torrent size limit
-                if num_pieces < 1000:
+                if num_pieces < 1000 and torrent_file_size >= 102400:
+                    piece_size *= 2
+                    if piece_size > our_max_size:
+                        piece_size = our_max_size
+                        break
+                elif num_pieces < 1000:
                     piece_size //= 2
                     if piece_size < our_min_size:
                         piece_size = our_min_size
                         break
+                    elif piece_size > 18000000 and torrent_file_size >= 102400:
+                        piece_size *= 2
+                        if piece_size > our_max_size:
+                            piece_size = our_max_size
+                            break
                     elif torrent_file_size > 61440:  # Break if .torrent size exceeds 60 KiB
                         break
                 elif num_pieces > 2000:
