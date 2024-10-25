@@ -47,6 +47,7 @@ class MTV():
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
         approved_image_hosts = ['ptpimg', 'imgbox']
         total_size_limit = 25 * 1024 * 1024  # 25 MiB in bytes
+        images_reuploaded = False
 
         # Helper function to calculate total size of the images
         def calculate_total_size(image_list, image_sizes):
