@@ -2466,7 +2466,7 @@ class Prep():
     class CustomTorrent(torf.Torrent):
         # Default piece size limits
         torf.Torrent.piece_size_min = 16384  # 16 KiB
-        torf.Torrent.piece_size_max = 67108864  # 64 MiB
+        torf.Torrent.piece_size_max = 268435456  # 256 MiB
 
         def __init__(self, meta, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -2501,8 +2501,8 @@ class Prep():
         @classmethod
         def calculate_piece_size(cls, total_size, min_size, max_size, files):
             our_min_size = 16384
-            our_max_size = max_size if max_size else 67108864  # Default to 64 MiB if max_size is None
-            piece_size = 67108864  # Start with 64 MiB
+            our_max_size = max_size if max_size else 268435456  # Default to 256 MiB if max_size is None
+            piece_size = 268435456  # Start with 256 MiB
             num_pieces = math.ceil(total_size / piece_size)
             torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)  # Approximate .torrent size
 

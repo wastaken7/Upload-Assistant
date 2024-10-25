@@ -78,7 +78,7 @@ class Args():
         parser.add_argument('-debug', '--debug', action='store_true', required=False, help="Debug Mode, will run through all the motions providing extra info, but will not upload to trackers.")
         parser.add_argument('-ffdebug', '--ffdebug', action='store_true', required=False, help="Will show info from ffmpeg while taking screenshots.")
         parser.add_argument('-m', '--manual', action='store_true', required=False, help="Manual Mode. Returns link to ddl screens/base.torrent")
-        parser.add_argument('-mps', '--max-piece-size', nargs='*', required=False, help="Set max piece size allowed in MiB for default torrent creation (default 64 MiB)", choices=['2', '4', '8', '16', '32', '64'])
+        parser.add_argument('-mps', '--max-piece-size', nargs='*', required=False, help="Set max piece size allowed in MiB for default torrent creation (default 256 MiB)", choices=['2', '4', '8', '16', '32', '64', '128', '256'])
         parser.add_argument('-nh', '--nohash', action='store_true', required=False, help="Don't hash .torrent")
         parser.add_argument('-rh', '--rehash', action='store_true', required=False, help="DO hash .torrent")
         parser.add_argument('-dr', '--draft', action='store_true', required=False, help="Send to drafts (BHD, LST)")
