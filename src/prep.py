@@ -2429,9 +2429,12 @@ class Prep():
             edition = edition + " Open Matte"
 
         if manual_edition:
+            if isinstance(manual_edition, list):
+                manual_edition = " ".join(manual_edition)
             edition = str(manual_edition)
+        edition = edition.replace(",", " ")
 
-        print(f"Edition After Manual Edition: {edition}")
+        # print(f"Edition After Manual Edition: {edition}")
 
         if "REPACK" in (video or edition.upper()) or "V2" in video:
             repack = "REPACK"
@@ -2444,14 +2447,16 @@ class Prep():
         if "RERIP" in (video or edition.upper()):
             repack = "RERIP"
 
-        print(f"Repack after Checks: {repack}")
+        # print(f"Repack after Checks: {repack}")
 
         # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
-        edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
+        if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'rerip'] for tag in manual_edition.strip().lower().split()):
+            edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
+        print(f"Final Edition: {edition}")
         bad = ['internal', 'limited', 'retail']
 
         if edition.lower() in bad:
-            edition = ""
+            edition = re.sub(r'\b(?:' + '|'.join(bad) + r')\b', '', edition, flags=re.IGNORECASE).strip()
 
         return edition, repack
 
