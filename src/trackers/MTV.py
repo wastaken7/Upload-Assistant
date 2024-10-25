@@ -83,9 +83,10 @@ class MTV():
 
         else:
             # Proceed with the retry logic if images are not hosted on an approved image host
+            images_reuploaded = False
             while img_host_index <= len(approved_image_hosts):
                 # Call handle_image_upload and pass the updated meta with the current image host index
-                image_list, retry_mode = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
+                image_list, retry_mode, images_reuploaded = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
 
                 # If retry_mode is True, switch to the next host
                 if retry_mode:
@@ -155,7 +156,7 @@ class MTV():
         des_tags = await self.get_tags(meta)
 
         # Edit description and other details
-        await self.edit_desc(meta)
+        await self.edit_desc(meta, images_reuploaded)
         group_desc = await self.edit_group_desc(meta)
         mtv_name = await self.edit_name(meta)
 
@@ -219,25 +220,30 @@ class MTV():
         if approved_image_hosts is None:
             approved_image_hosts = ['ptpimg', 'imgbox']
 
-        current_img_host_key = f'img_host_{img_host_index}'
-        current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+        retry_mode = False
+        images_reuploaded = False
 
-        if not current_img_host or current_img_host not in approved_image_hosts:
-            console.print("[red]Your preferred image host is not supported at MTV, re-uploading to an allowed image host.")
-            retry_mode = True  # Ensure retry_mode is set to True when switching hosts
-            meta['imghost'] = approved_image_hosts[0]  # Switch to the first approved host
-        else:
-            meta['imghost'] = current_img_host
-            retry_mode = False  # Start with retry_mode False unless we know we need to switch
+        while True:
+            current_img_host_key = f'img_host_{img_host_index}'
+            current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+
+            if not current_img_host:
+                console.print("[red]No more image hosts left to try.")
+                raise Exception("No valid image host found in the config.")
+
+            if current_img_host not in approved_image_hosts:
+                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at MTV, trying next host.")
+                retry_mode = True  # Ensure retry_mode is set to True when switching hosts
+                images_reuploaded = True  # Mark that reuploading occurred
+                img_host_index += 1  # Move to the next image host in the config
+                continue
+            else:
+                meta['imghost'] = current_img_host
+                break  # Exit the loop when a valid host is found
 
         from src.prep import Prep
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-
-        # Screenshot and upload process
-        prep.screenshots(Path(meta['path']), meta['name'], meta['uuid'], meta['base_dir'], meta)
         return_dict = {}
-
-        # Call upload_screens with the appropriate retry_mode
         prep.upload_screens(
             meta,
             screens=meta['screens'],
@@ -249,35 +255,45 @@ class MTV():
             retry_mode=retry_mode  # Honor the retry_mode flag passed in
         )
 
-        # Update meta['image_list'] with uploaded images
-        meta['image_list'] = return_dict.get('image_list', [])
+        # Overwrite meta['image_list'] with the newly uploaded images
+        new_image_list = return_dict.get('image_list', [])
+        if new_image_list:
+            meta['image_list'] = new_image_list  # Overwrite with new images
 
         # Ensure images are from approved hosts
         if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta['image_list']):
             console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
-            return meta['image_list'], True  # Trigger retry_mode if switching hosts
+            return meta['image_list'], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
-        return meta['image_list'], False  # No need to retry, successful upload
+        return meta['image_list'], False, images_reuploaded  # Return retry_mode and images_reuploaded
 
-    async def edit_desc(self, meta):
+    async def edit_desc(self, meta, images_reuploaded):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as desc:
-            # adding bd_dump to description if it exits and adding empty string to mediainfo
             if meta['bdinfo'] is not None:
                 mi_dump = None
                 bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
             else:
                 mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()[:-65].strip()
                 bd_dump = None
+
             if bd_dump:
                 desc.write("[mediainfo]" + bd_dump + "[/mediainfo]\n\n")
             elif mi_dump:
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
+
             images = meta['image_list']
             if len(images) > 0:
-                for each in range(len(images)):
-                    raw_url = images[each]['raw_url']
-                    desc.write(f"[img={raw_url}][/img]\n")
+                for image in images:
+                    raw_url = image['raw_url']
+                    img_url = image['img_url']
+
+                    if images_reuploaded:
+                        desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]\n")
+                    else:
+                        desc.write(f"[img={raw_url}][/img]\n")
+
             desc.write(f"\n\n{base}")
             desc.close()
         return

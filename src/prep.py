@@ -2688,7 +2688,7 @@ class Prep():
                                     loop = asyncio.get_event_loop()
 
                                     # Run the imgbox upload in the current event loop
-                                    image_list = loop.run_until_complete(self.imgbox_upload(os.getcwd(), image_glob, meta))  # Pass all images
+                                    image_list = loop.run_until_complete(self.imgbox_upload(os.getcwd(), image_glob, meta, return_dict))  # Pass all images
 
                                     # Ensure the image_list contains valid URLs before continuing
                                     if image_list and all('img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list):
@@ -2839,6 +2839,7 @@ class Prep():
 
                                 progress.advance(upload_task)
                                 i += 1  # Increment the image counter only after success
+                                return_dict['image_list'] = image_list
                                 break  # Break retry loop after a successful upload
 
                         except Exception as e:
@@ -2864,7 +2865,7 @@ class Prep():
 
         return image_list, i
 
-    async def imgbox_upload(self, chdir, image_glob, meta):
+    async def imgbox_upload(self, chdir, image_glob, meta, return_dict):
         try:
             os.chdir(chdir)
             image_list = []
@@ -2872,8 +2873,6 @@ class Prep():
             console.print(f"[debug] Starting upload of {len(image_glob)} images to imgbox...")
             async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
                 for image in image_glob:
-                    # console.print(f"[blue]Uploading image: {image}")
-
                     try:
                         async for submission in gallery.add([image]):
                             if not submission['success']:
@@ -2895,11 +2894,11 @@ class Prep():
                         return []  # Return empty list in case of error
 
             # After uploading all images, validate URLs and get sizes
-            # console.print("[blue]Validating images and retrieving their sizes...")
             valid_images = await self.check_images_concurrently(image_list, meta)
 
             if valid_images:
                 console.print(f"[yellow]Successfully uploaded and validated {len(valid_images)} images.")
+                return_dict['image_list'] = valid_images  # Set the validated images in return_dict
             else:
                 console.print("[red]Failed to validate any images.")
                 return []  # Return empty list if no valid images
