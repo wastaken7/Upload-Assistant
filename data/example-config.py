@@ -282,7 +282,6 @@ config = {
             "login_question": "login_question",
             "login_answer": "login_answer",
             "user_id": "user_id",
-            "user_id": "pronfo theme code",
             "announce_url": "https://totheglory.im/announce/",
             # "anon" : False
         },
@@ -301,7 +300,7 @@ config = {
         #    "announce_url": "https://domain.tld/announce/customannounceurl",
         #    # "anon" : False,
         #    # "modq" : False  ## Not working yet
-        },
+        #},
         "UTP": {
             "api_key": "UTP api key",
             "announce_url": "https://UTP/announce/customannounceurl",
