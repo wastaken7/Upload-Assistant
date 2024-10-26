@@ -52,83 +52,10 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB, TIK, PSS, ULCX
+        # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
-        "default_trackers": "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB, TIK, PSS, ULCX",
+        "default_trackers": "ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP",
 
-        "BLU": {
-            "useAPI": False,  # Set to True if using BLU
-            "api_key": "BLU api key",
-            "announce_url": "https://blutopia.cc/announce/customannounceurl",
-            # "anon" : False,
-            # "modq" : False  ## Not working yet
-        },
-        "BHD": {
-            "api_key": "BHD api key",
-            "announce_url": "https://beyond-hd.me/announce/customannounceurl",
-            "draft_default": "True",
-            # "anon" : False
-        },
-        "BHDTV": {
-            "api_key": "found under https://www.bit-hdtv.com/my.php",
-            "announce_url": "https://trackerr.bit-hdtv.com/announce",
-            # passkey found under https://www.bit-hdtv.com/my.php
-            "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
-            # "anon" : "False"
-        },
-        "PTP": {
-            "useAPI": False,  # Set to True if using PTP
-            "add_web_source_to_desc": True,
-            "ApiUser": "ptp api user",
-            "ApiKey": 'ptp api key',
-            "username": "",
-            "password": "",
-            "announce_url": ""
-        },
-        "AITHER": {
-            "useAPI": False,  # Set to True if using Aither
-            "api_key": "AITHER api key",
-            "announce_url": "https://aither.cc/announce/customannounceurl",
-            # "anon" : False,
-            # "modq" : False  ## Not working yet
-        },
-        "R4E": {
-            "api_key": "R4E api key",
-            "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
-            # "anon" : False
-        },
-        "HUNO": {
-            "api_key": "HUNO api key",
-            "announce_url": "https://hawke.uno/announce/customannounceurl",
-            # "anon" : False
-        },
-        "MTV": {
-            'api_key': 'get from security page',
-            'username': '<USERNAME>',
-            'password': '<PASSWORD>',
-            'announce_url': "get from https://www.morethantv.me/upload.php",
-            'anon': False,
-            # 'otp_uri' : 'OTP URI, read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format'
-        },
-        "STC": {
-            "api_key": "STC",
-            "announce_url": "https://skipthecommericals.xyz/announce/customannounceurl",
-            # "anon" : False
-        },
-        "STT": {
-            "api_key": "STC",
-            "announce_url": "https://stt.xyz/announce/customannounceurl",
-            # "anon" : False
-        },
-        "SN": {
-            "api_key": "SN",
-            "announce_url": "https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce",
-        },
-        "HP": {
-            "api_key": "HP",
-            "announce_url": "https://hidden-palace.net/announce/customannounceurl",
-            # "anon" : False
-        },
         "ACM": {
             "api_key": "ACM api key",
             "announce_url": "https://asiancinema.me/announce/customannounceurl",
@@ -138,14 +65,195 @@ config = {
             # "internal" : True,
             # "internal_groups" : ["What", "Internal", "Groups", "Are", "You", "In"],
         },
-        "NBL": {
-            "api_key": "NBL api key",
-            "announce_url": "https://nebulance.io/customannounceurl",
+        "AITHER": {
+            "useAPI": False,  # Set to True if using Aither for automatic ID searching
+            "api_key": "AITHER api key",
+            "announce_url": "https://aither.cc/announce/customannounceurl",
+            # "anon" : False,
+            # "modq" : False  ## Not working yet
+        },
+        "AL": {
+            "api_key": "AL api key",
+            "announce_url": "https://animelovers.club/announce/customannounceurl",
+            # "anon" : False
         },
         "ANT": {
             "api_key": "ANT api key",
             "announce_url": "https://anthelion.me/announce/customannounceurl",
             # "anon" : False
+        },
+        "BHD": {
+            "api_key": "BHD api key",
+            "announce_url": "https://beyond-hd.me/announce/customannounceurl",
+            "draft_default": "True",  # Send to drafts
+            # "anon" : False
+        },
+        "BHDTV": {
+            "api_key": "found under https://www.bit-hdtv.com/my.php",
+            "announce_url": "https://trackerr.bit-hdtv.com/announce",
+            # passkey found under https://www.bit-hdtv.com/my.php
+            "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
+            # "anon" : "False"
+        },
+        "BLU": {
+            "useAPI": False,  # Set to True if using BLU for automatic ID searching
+            "api_key": "BLU api key",
+            "announce_url": "https://blutopia.cc/announce/customannounceurl",
+            # "anon" : False,
+            # "modq" : False  ## Not working yet
+        },
+        "CBR": {
+            "api_key": "CBR api key",
+            "announce_url": "https://capybarabr.com/announce/customannounceurl",
+            # "anon" : False
+        },
+        "FL": {
+            "username": "FL username",
+            "passkey": "FL passkey",
+            "uploader_name": "https://hdbits.org/announce/Custom_Announce_URL",
+            # "anon": False,
+        },
+        "FNP": {
+            "api_key": "FNP api key",
+            "announce_url": "https://fearnopeer.com/announce/customannounceurl",
+            # "anon" : "False"
+        },
+        "HDB": {
+            "useAPI": False,  # Set to True if using HDB for automatic ID searching
+            "username": "HDB username",
+            "passkey": "HDB passkey",
+            "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
+            # "anon": False,
+        },
+        "HDT": {
+            "username": "username",
+            "password": "password",
+            "my_announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
+            # "anon" : "False"
+            "announce_url": "https://hdts-announce.ru/announce.php",  # DO NOT EDIT THIS LINE
+        },
+        "HP": {
+            "api_key": "HP",
+            "announce_url": "https://hidden-palace.net/announce/customannounceurl",
+            # "anon" : False
+        },
+        "HUNO": {
+            "api_key": "HUNO api key",
+            "announce_url": "https://hawke.uno/announce/customannounceurl",
+            # "anon" : False
+        },
+        "JPTV": {
+            "api_key": "JPTV api key",
+            "announce_url": "https://jptv.club/announce/customannounceurl",
+            # "anon" : False
+        },
+        "LCD": {
+            "api_key": "LCD api key",
+            "announce_url": "https://locadora.cc/announce/customannounceurl",
+            # "anon" : False
+        },
+        "LST": {
+            "useAPI": False,  # Set to True if using LST for automatic ID searching
+            "api_key": "LST api key",
+            "announce_url": "https://lst.gg/announce/customannounceurl",
+            # "anon" : False,
+            # "modq" : False,  # Send to modq for staff approval
+            # "draft" : False  # Send to drafts
+        },
+        "LT": {
+            "api_key": "LT api key",
+            "announce_url": "https://lat-team.com/announce/customannounceurl",
+            # "anon" : False
+        },
+        "MTV": {
+            'api_key': 'get from security page',
+            'username': '<USERNAME>',
+            'password': '<PASSWORD>',
+            'announce_url': "get from https://www.morethantv.me/upload.php",
+            # 'anon': False,
+            # 'otp_uri' : 'OTP URI, read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format'
+        },
+        "NBL": {
+            "api_key": "NBL api key",
+            "announce_url": "https://nebulance.io/customannounceurl",
+        },
+        "OE": {
+            "useAPI": False,  # Set to True if using OE for automatic ID searching
+            "api_key": "OE api key",
+            "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
+            # "anon" : False
+        },
+        "OTW": {
+            "api_key": "OTW api key",
+            "announce_url": "https://oldtoons.world/announce/customannounceurl",
+            # "anon" : False
+        },
+        "PSS": {
+            "api_key": "PSS api key",
+            "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
+            # "anon" : False
+        },
+        "PTER": {  # Does not appear to be working at all
+            "passkey": 'passkey',
+            "img_rehost": False,
+            "username": "",
+            "password": "",
+            "ptgen_api": "",
+            # "anon": True,
+        },
+        "PTP": {
+            "useAPI": False,  # Set to True if using PTP for automatic ID searching
+            "add_web_source_to_desc": True,
+            "ApiUser": "ptp api user",
+            "ApiKey": 'ptp api key',
+            "username": "",
+            "password": "",
+            "announce_url": ""
+        },
+        "R4E": {
+            "api_key": "R4E api key",
+            "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
+            # "anon" : False
+        },
+        "RF": {
+            "api_key": "RF api key",
+            "announce_url": "https://reelflix.xyz/announce/customannounceurl",
+            # "anon" : False
+        },
+        "RTF": {
+            "username": "username",
+            "password": "password",
+            "api_key": 'get_it_by_running_/api/ login command from https://retroflix.club/api/doc',
+            "announce_url": "get from upload page",
+            # "anon": True
+        },
+        "SHRI": {
+            "api_key": "SHRI api key",
+            "announce_url": "https://shareisland.org/announce/customannounceurl",
+            # "anon" : "False"
+        },
+        "SN": {
+            "api_key": "SN",
+            "announce_url": "https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce",
+        },
+        "SPD": {
+            "api_key": "SPEEDAPP API KEY",
+            "announce_url": "https://ramjet.speedapp.io/<PASSKEY>/announce",
+        },
+        "STC": {
+            "api_key": "STC",
+            "announce_url": "https://skipthecommericals.xyz/announce/customannounceurl",
+            # "anon" : False
+        },
+        "STT": {
+            "api_key": "STT",
+            "announce_url": "https://stt.xyz/announce/customannounceurl",
+            # "anon" : False
+        },
+        "TDC": {
+            "api_key": "TDC api key",
+            "announce_url": "https://thedarkcommunity.cc/announce/customannounceurl",
+            # "anon" : "False"
         },
         "THR": {
             "username": "username",
@@ -157,131 +265,45 @@ config = {
             "pronfo_rapi_id": "pronfo remote api id",
             # "anon" : False
         },
-        "LCD": {
-            "api_key": "LCD api key",
-            "announce_url": "https://locadora.cc/announce/customannounceurl",
-            # "anon" : False
-        },
-        "CBR": {
-            "api_key": "CBR api key",
-            "announce_url": "https://capybarabr.com/announce/customannounceurl",
-            # "anon" : False
-        },
-        "LST": {
-            "useAPI": False,  # Set to True if using LST
-            "api_key": "LST api key",
-            "announce_url": "https://lst.gg/announce/customannounceurl",
-            # "anon" : False,
-            # "modq" : False,
-            # "draft" : False
-        },
-        "LT": {
-            "api_key": "LT api key",
-            "announce_url": "https://lat-team.com/announce/customannounceurl",
-            # "anon" : False
-        },
-        "PTER": {
-            "passkey": 'passkey',
-            "img_rehost": False,
-            "username": "",
-            "password": "",
-            "ptgen_api": "",
-            "anon": True,
+        "TIK": {
+            "useAPI": False,  # Set to True if using TIK for automatic ID searching, won't work great until folder searching is added to UNIT3D API
+            "api_key": "TIK api key",
+            "announce_url": "https://cinematik.net/announce/",
+            # "anon": False,
+            # "modq": True, # Not working for now, ignored unless correct class
         },
         "TL": {
             "announce_key": "TL announce key",
         },
-        "TDC": {
-            "api_key": "TDC api key",
-            "announce_url": "https://thedarkcommunity.cc/announce/customannounceurl",
-            # "anon" : "False"
-        },
-        "HDT": {
+        "TTG": {
             "username": "username",
             "password": "password",
-            "my_announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
-            # "anon" : "False"
-            "announce_url": "https://hdts-announce.ru/announce.php",  # DO NOT EDIT THIS LINE
-        },
-        "OE": {
-            "useAPI": False,  # Set to True if using OE
-            "api_key": "OE api key",
-            "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
+            "login_question": "login_question",
+            "login_answer": "login_answer",
+            "user_id": "user_id",
+            "announce_url": "https://totheglory.im/announce/",
             # "anon" : False
-        },
-        "RTF": {
-            "username": "username",
-            "password": "password",
-            "api_key": 'get_it_by_running_/api/ login command from https://retroflix.club/api/doc',
-            "announce_url": "get from upload page",
-            "anon": True
-        },
-        "RF": {
-            "api_key": "RF api key",
-            "announce_url": "https://reelflix.xyz/announce/customannounceurl",
-            # "anon" : False
-        },
-        "OTW": {
-            "api_key": "OTW api key",
-            "announce_url": "https://oldtoons.world/announce/customannounceurl",
-            # "anon" : False
-        },
-        "FNP": {
-            "api_key": "FNP api key",
-            "announce_url": "https://fearnopeer.com/announce/customannounceurl",
-            # "anon" : "False"
-        },
-        "UTP": {
-            "api_key": "UTP api key",
-            "announce_url": "https://UTP/announce/customannounceurl",
-            # "anon" : False
-        },
-        "AL": {
-            "api_key": "AL api key",
-            "announce_url": "https://animelovers.club/announce/customannounceurl",
-            # "anon" : False
-        },
-        "HDB": {
-            "useAPI": False,
-            "username": "HDB username",
-            "passkey": "HDB passkey",
-            "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
-            "anon": False,
-        },
-        "SHRI": {
-            "api_key": "SHRI api key",
-            "announce_url": "https://shareisland.org/announce/customannounceurl",
-            # "anon" : "False"
-        },
-        "SPD": {
-            "api_key": "SPEEDAPP API KEY",
-            "announce_url": "https://ramjet.speedapp.io/<PASSKEY>/announce",
-        },
-        "TIK": {
-            "useAPI": False,  # Set to True if using TIK
-            "api_key": "",
-            "announce_url": "https://cinematik.net/announce/",
-            "anon": False,
-            "modq": True,
         },
         "TVC": {
             "api_key": "TVC API Key",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
-            "anon": "False"
-        },
-        "PSS": {
-            "api_key": "PSS api key",
-            "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon": "False"
         },
         "ULCX": {
             "api_key": "ULCX api key",
             "announce_url": "https://upload.cx/announce/customannounceurl",
             # "anon" : False,
         },
-        "MANUAL": {
-            # Uncomment and replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se
-            # "filebrowser" : "https://domain.tld/filebrowser/files/Upload-Assistant/"
+        # "UNIT3D_TEMPLATE": {
+        #    "api_key": "UNIT3D_TEMPLATE api key",
+        #    "announce_url": "https://domain.tld/announce/customannounceurl",
+        #    # "anon" : False,
+        #    # "modq" : False  ## Not working yet
+        # },
+        "UTP": {
+            "api_key": "UTP api key",
+            "announce_url": "https://UTP/announce/customannounceurl",
+            # "anon" : False
         },
     },
 
