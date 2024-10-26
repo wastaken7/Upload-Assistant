@@ -266,6 +266,7 @@ config = {
             # "anon" : False
         },
         "TIK": {
+            "useAPI": False,  # Set to True if using TIK for automatic ID searching, won't work great until folder searching is added to UNIT3D API
             "api_key": "TIK api key",
             "announce_url": "https://cinematik.net/announce/",
             # "anon": False,
