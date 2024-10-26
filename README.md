@@ -8,7 +8,7 @@ A simple tool to take the work out of uploading.
   - Generates and Parses MediaInfo/BDInfo.
   - Generates and Uploads screenshots.
   - Uses srrdb to fix scene filenames
-  - Can grab descriptions from PTP/BLU (automatically on filename match or arg) / Aither/LST/OE (with arg)
+  - Can grab descriptions from PTP/BLU/Aither/LST/OE (with config option automatically on filename match, or using arg)
   - Can strip existing screenshots from descriptions to skip screenshot generation and uploading
   - Obtains TMDb/IMDb/MAL identifiers.
   - Converts absolute to season episode numbering for Anime

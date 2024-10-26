@@ -510,49 +510,49 @@ class Prep():
                 if specific_tracker:
                     console.print(f"[blue]Processing only the {specific_tracker} tracker based on meta.[/blue]")
 
-                    if specific_tracker == 'PTP' and str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
+                    if specific_tracker == 'PTP':
                         ptp = PTP(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'BLU' and str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'BLU':
                         blu = BLU(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'AITHER' and str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'AITHER':
                         aither = AITHER(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'LST' and str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'LST':
                         lst = LST(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'OE' and str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'OE':
                         oe = OE(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'TIK' and str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'TIK':
                         tik = TIK(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
 
-                    elif specific_tracker == 'HDB' and str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
+                    elif specific_tracker == 'HDB':
                         hdb = HDB(config=self.config)
                         meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
                 else:
-                    # Process all trackers if no specific tracker is set in meta
+                    # Process all trackers with API = true if no specific tracker is set in meta
                     default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
 
                     if "PTP" in default_trackers and not found_match:
@@ -566,6 +566,34 @@ class Prep():
                         if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                             blu = BLU(config=self.config)
                             meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "AITHER" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
+                            aither = AITHER(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "LST" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
+                            lst = LST(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "OE" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
+                            oe = OE(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
+                            if match:
+                                found_match = True
+
+                    if "TIK" in default_trackers and not found_match:
+                        if str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
+                            tik = TIK(config=self.config)
+                            meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
                             if match:
                                 found_match = True
 
