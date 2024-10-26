@@ -100,7 +100,6 @@ class Clients():
     async def is_valid_torrent(self, meta, torrent_path, torrenthash, torrent_client, print_err=False):
         valid = False
         wrong_file = False
-        err_print = ""
 
         # Normalize the torrent hash based on the client
         if torrent_client in ('qbit', 'deluge'):
@@ -174,16 +173,16 @@ class Clients():
 
                     # Piece size and count validations
                     if (reuse_torrent.pieces >= 7000 and reuse_torrent.piece_size < 8388608) or (reuse_torrent.pieces >= 4000 and reuse_torrent.piece_size < 4194304):
-                        err_print = "[bold yellow]Too many pieces exist in current hash. REHASHING"
+                        console.print("[bold yellow]Too many pieces exist in current hash. REHASHING")
                         valid = False
                     elif reuse_torrent.piece_size < 32768:
-                        err_print = "[bold yellow]Piece size too small to reuse"
+                        console.print("[bold yellow]Piece size too small to reuse")
                         valid = False
                     elif wrong_file:
-                        err_print = "[bold red] Provided .torrent has files that were not expected"
+                        console.print("[bold red] Provided .torrent has files that were not expected")
                         valid = False
                     else:
-                        err_print = f'[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}'
+                        console.print(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")
                 except Exception as e:
                     console.print(f'[bold red]Error checking reuse torrent: {e}')
                     valid = False
@@ -191,11 +190,7 @@ class Clients():
             if meta['debug']:
                 console.log(f"Final validity after piece checks: valid={valid}")
         else:
-            err_print = '[bold yellow]Unwanted Files/Folders Identified'
-
-        # Print the error message if needed
-        if print_err:
-            console.print(err_print)
+            console.print("[bold yellow]Unwanted Files/Folders Identified")
 
         return valid, torrent_path
 
