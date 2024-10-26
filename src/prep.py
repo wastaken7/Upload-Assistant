@@ -2578,7 +2578,7 @@ class Prep():
                     torrent_file_size = 20 + (num_pieces * 20) + cls._calculate_pathname_bytes(files)
 
             # print(f"\nFinal piece_size: {piece_size} bytes after {iteration} iterations.")
-            print(f"Final num_pieces: {num_pieces}, Final torrent_file_size: {torrent_file_size} bytes")
+            # print(f"Final num_pieces: {num_pieces}, Final torrent_file_size: {torrent_file_size} bytes")
             return piece_size
 
         def _calculate_total_size(self):
