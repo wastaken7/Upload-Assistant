@@ -134,7 +134,7 @@ class Clients():
                     console.log(f"Torrent is valid based on disc/basename or keep-folder: {valid}")
 
             # If one file, check for folder
-            if len(torrent.files) == len(meta['filelist']) == 1:
+            elif len(torrent.files) == len(meta['filelist']) == 1:
                 if os.path.basename(torrent.files[0]) == os.path.basename(meta['filelist'][0]):
                     if str(torrent.files[0]) == os.path.basename(torrent.files[0]):
                         valid = True
