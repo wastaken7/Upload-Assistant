@@ -52,9 +52,9 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB, TIK, PSS, ULCX
+        # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
-        "default_trackers": "BLU, BHD, AITHER, STC, STT, SN, THR, R4E, HP, ACM, PTP, LCD, LST, PTER, NBL, ANT, MTV, CBR, RTF, HUNO, BHDTV, LT, PTER, TL, TDC, HDT, OE, RF, OTW, FNP, UTP, AL, HDB, TIK, PSS, ULCX",
+        "default_trackers": "ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -66,7 +66,7 @@ config = {
             # "internal_groups" : ["What", "Internal", "Groups", "Are", "You", "In"],
         },
         "AITHER": {
-            "useAPI": False,  # Set to True if using Aither
+            "useAPI": False,  # Set to True if using Aither for automatic ID searching
             "api_key": "AITHER api key",
             "announce_url": "https://aither.cc/announce/customannounceurl",
             # "anon" : False,
@@ -85,7 +85,7 @@ config = {
         "BHD": {
             "api_key": "BHD api key",
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
-            "draft_default": "True",
+            "draft_default": "True",  # Send to drafts
             # "anon" : False
         },
         "BHDTV": {
@@ -96,7 +96,7 @@ config = {
             # "anon" : "False"
         },
         "BLU": {
-            "useAPI": False,  # Set to True if using BLU
+            "useAPI": False,  # Set to True if using BLU for automatic ID searching
             "api_key": "BLU api key",
             "announce_url": "https://blutopia.cc/announce/customannounceurl",
             # "anon" : False,
@@ -108,11 +108,10 @@ config = {
             # "anon" : False
         },
         "FL": {
-            "useAPI": False,
             "username": "FL username",
             "passkey": "FL passkey",
             "uploader_name": "https://hdbits.org/announce/Custom_Announce_URL",
-            "anon": False,
+            # "anon": False,
         },
         "FNP": {
             "api_key": "FNP api key",
@@ -120,11 +119,11 @@ config = {
             # "anon" : "False"
         },
         "HDB": {
-            "useAPI": False,
+            "useAPI": False,  # Set to True if using HDB for automatic ID searching
             "username": "HDB username",
             "passkey": "HDB passkey",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
-            "anon": False,
+            # "anon": False,
         },
         "HDT": {
             "username": "username",
@@ -154,12 +153,12 @@ config = {
             # "anon" : False
         },
         "LST": {
-            "useAPI": False,  # Set to True if using LST
+            "useAPI": False,  # Set to True if using LST for automatic ID searching
             "api_key": "LST api key",
             "announce_url": "https://lst.gg/announce/customannounceurl",
             # "anon" : False,
-            # "modq" : False,
-            # "draft" : False
+            # "modq" : False,  # Send to modq for staff approval
+            # "draft" : False  # Send to drafts
         },
         "LT": {
             "api_key": "LT api key",
@@ -171,7 +170,7 @@ config = {
             'username': '<USERNAME>',
             'password': '<PASSWORD>',
             'announce_url': "get from https://www.morethantv.me/upload.php",
-            'anon': False,
+            # 'anon': False,
             # 'otp_uri' : 'OTP URI, read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format'
         },
         "NBL": {
@@ -179,7 +178,7 @@ config = {
             "announce_url": "https://nebulance.io/customannounceurl",
         },
         "OE": {
-            "useAPI": False,  # Set to True if using OE
+            "useAPI": False,  # Set to True if using OE for automatic ID searching
             "api_key": "OE api key",
             "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
             # "anon" : False
@@ -194,16 +193,16 @@ config = {
             "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
             # "anon" : False
         },
-        "PTER": {
+        "PTER": {  # Does not appear to be working at all
             "passkey": 'passkey',
             "img_rehost": False,
             "username": "",
             "password": "",
             "ptgen_api": "",
-            "anon": True,
+            # "anon": True,
         },
         "PTP": {
-            "useAPI": False,  # Set to True if using PTP
+            "useAPI": False,  # Set to True if using PTP for automatic ID searching
             "add_web_source_to_desc": True,
             "ApiUser": "ptp api user",
             "ApiKey": 'ptp api key',
@@ -226,7 +225,7 @@ config = {
             "password": "password",
             "api_key": 'get_it_by_running_/api/ login command from https://retroflix.club/api/doc',
             "announce_url": "get from upload page",
-            "anon": True
+            # "anon": True
         },
         "SHRI": {
             "api_key": "SHRI api key",
@@ -267,11 +266,10 @@ config = {
             # "anon" : False
         },
         "TIK": {
-            "useAPI": False,  # Set to True if using TIK
-            "api_key": "",
+            "api_key": "TIK api key",
             "announce_url": "https://cinematik.net/announce/",
-            "anon": False,
-            "modq": True,
+            # "anon": False,
+            # "modq": True, # Not working for now, ignored unless correct class
         },
         "TL": {
             "announce_key": "TL announce key",
@@ -288,19 +286,19 @@ config = {
         "TVC": {
             "api_key": "TVC API Key",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
-            "anon": "False"
+            # "anon": "False"
         },
         "ULCX": {
             "api_key": "ULCX api key",
             "announce_url": "https://upload.cx/announce/customannounceurl",
             # "anon" : False,
         },
-        #"UNIT3D_TEMPLATE": {
+        # "UNIT3D_TEMPLATE": {
         #    "api_key": "UNIT3D_TEMPLATE api key",
         #    "announce_url": "https://domain.tld/announce/customannounceurl",
         #    # "anon" : False,
         #    # "modq" : False  ## Not working yet
-        #},
+        # },
         "UTP": {
             "api_key": "UTP api key",
             "announce_url": "https://UTP/announce/customannounceurl",
