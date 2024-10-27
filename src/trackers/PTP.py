@@ -704,7 +704,7 @@ class PTP():
                             await asyncio.sleep(3)
                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                         if new_screens:
-                            uploaded_images, _ = prep.upload_screens(meta, multi_screens + 1, 1, 0, 2, new_screens, {})
+                            uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
                             for img in uploaded_images[:int(meta['screens'])]:
                                 raw_url = img['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
