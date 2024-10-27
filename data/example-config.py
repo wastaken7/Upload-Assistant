@@ -25,6 +25,10 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Number of screenshots to use for each disc/episode in packs
+        # Currently PTP only
+        "multiScreens": "2",
+
         # Providing the option to change the size of the thumbnails where supported, default is 350
         "thumbnail_size": "350",
 

@@ -615,6 +615,7 @@ class PTP():
         from src.prep import Prep
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
+        multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
             discs = meta.get('discs', [])
             # For Discs
@@ -629,7 +630,7 @@ class PTP():
                             if base2ptp.strip() != "":
                                 desc.write(base2ptp)
                                 desc.write("\n\n")
-                            for img_index in range(min(2, len(meta['image_list']))):
+                            for img_index in range(min(multi_screens, len(meta['image_list']))):
                                 raw_url = meta['image_list'][img_index]['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
@@ -637,13 +638,13 @@ class PTP():
                         else:
                             mi_dump = each['summary']
                             use_vs = meta.get('vapoursynth', False)
-                            ds = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), 2))
+                            ds = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens))
                             ds.start()
                             while ds.is_alive() is True:
                                 await asyncio.sleep(1)
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if new_screens:
-                                uploaded_images, _ = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {})
+                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
                                 for img in uploaded_images[:int(meta['screens'])]:
                                     raw_url = img['raw_url']
                                     desc.write(f"[img]{raw_url}[/img]\n")
@@ -659,18 +660,18 @@ class PTP():
                             if base2ptp.strip() != "":
                                 desc.write(base2ptp)
                                 desc.write("\n\n")
-                            for img_index in range(min(2, len(meta['image_list']))):
+                            for img_index in range(min(multi_screens, len(meta['image_list']))):
                                 raw_url = meta['image_list'][img_index]['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
                         else:
-                            ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, 2))
+                            ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens))
                             ds.start()
                             while ds.is_alive() is True:
                                 await asyncio.sleep(1)
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                             if new_screens:
-                                uploaded_images, _ = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {})
+                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
                                 for img in uploaded_images[:int(meta['screens'])]:
                                     raw_url = img['raw_url']
                                     desc.write(f"[img]{raw_url}[/img]\n")
@@ -686,7 +687,7 @@ class PTP():
                             desc.write(f"[quote][align=center]This release is sourced from {meta['service_longname']}[/align][/quote]")
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
-                        for each in range(min(2, len(meta['image_list']))):
+                        for each in range(min(multi_screens, len(meta['image_list']))):
                             raw_url = meta['image_list'][each]['raw_url']
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
@@ -697,13 +698,13 @@ class PTP():
                             f.write(mi_dump)
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "r", encoding="utf-8").read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
-                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 3, True, None))
+                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
                         s.start()
                         while s.is_alive() is True:
                             await asyncio.sleep(3)
                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                         if new_screens:
-                            uploaded_images, _ = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {})
+                            uploaded_images, _ = prep.upload_screens(meta, multi_screens + 1, 1, 0, 2, new_screens, {})
                             for img in uploaded_images[:int(meta['screens'])]:
                                 raw_url = img['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
