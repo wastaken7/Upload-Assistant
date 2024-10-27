@@ -48,12 +48,13 @@ class MTV():
         approved_image_hosts = ['ptpimg', 'imgbox']
         total_size_limit = 25 * 1024 * 1024  # 25 MiB in bytes
         images_reuploaded = False
+        valid_images = []
 
         # Helper function to calculate total size of the images
         def calculate_total_size(image_list, image_sizes):
             total_size = 0
             for image in image_list:
-                img_url = image['img_url']
+                img_url = image['raw_url']
                 size = image_sizes.get(img_url, 0)  # Get size from meta['image_sizes'], default to 0 if not found
                 total_size += size
             return total_size
@@ -61,24 +62,21 @@ class MTV():
         # Helper function to remove images until the total size is under the limit
         def enforce_size_limit(image_list, image_sizes):
             total_size = calculate_total_size(image_list, image_sizes)
-            valid_images = []
 
             for image in image_list:
                 if total_size <= total_size_limit:
                     valid_images.append(image)
                 else:
-                    img_url = image['img_url']
+                    img_url = image['raw_url']
                     size = image_sizes.get(img_url, 0)
                     total_size -= size  # Subtract size of the removed image
                     console.print(f"[red]Removed {img_url} to stay within the 25 MiB limit.")
 
             return valid_images
-
+        image_list = meta['image_list']
         # Check if the images are already hosted on an approved image host
         if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
             console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
-            image_list = meta['image_list']  # Use the existing images
-
             # Enforce the total size limit on the existing image list
             image_list = enforce_size_limit(image_list, meta['image_sizes'])
 
@@ -106,49 +104,51 @@ class MTV():
                 return
 
         # Proceed with the rest of the upload process
-        torrent_filename = "BASE"
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
-        torrent = Torrent.read(torrent_path)
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        if not os.path.exists(torrent_file_path):
+            torrent_filename = "BASE"
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+            torrent = Torrent.read(torrent_path)
 
-        if torrent.piece_size > 8388608:  # 8 MiB in bytes
-            console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+            if torrent.piece_size > 8388608:  # 8 MiB in bytes
+                console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
 
-            # Override the max_piece_size to 8 MiB
-            meta['max_piece_size'] = '8'  # 8 MiB, to ensure the new torrent adheres to this limit
+                # Override the max_piece_size to 8 MiB
+                meta['max_piece_size'] = '8'  # 8 MiB, to ensure the new torrent adheres to this limit
 
-            # Determine include and exclude patterns based on whether it's a disc or not
-            if meta['is_disc']:
-                include = []  # Adjust as needed for disc-specific inclusions, make sure it's a list
-                exclude = []  # Adjust as needed for disc-specific exclusions, make sure it's a list
-            else:
-                include = ["*.mkv", "*.mp4", "*.ts"]
-                exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+                # Determine include and exclude patterns based on whether it's a disc or not
+                if meta['is_disc']:
+                    include = []  # Adjust as needed for disc-specific inclusions, make sure it's a list
+                    exclude = []  # Adjust as needed for disc-specific exclusions, make sure it's a list
+                else:
+                    include = ["*.mkv", "*.mp4", "*.ts"]
+                    exclude = ["*.*", "*sample.mkv", "!sample*.*"]
 
-            # Create a new torrent with piece size explicitly set to 8 MiB
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-            new_torrent = prep.CustomTorrent(
-                meta=meta,
-                path=Path(meta['path']),
-                trackers=["https://fake.tracker"],
-                source="L4G",
-                private=True,
-                exclude_globs=exclude,  # Ensure this is always a list
-                include_globs=include,  # Ensure this is always a list
-                creation_date=datetime.now(),
-                comment="Created by L4G's Upload Assistant",
-                created_by="L4G's Upload Assistant"
-            )
+                # Create a new torrent with piece size explicitly set to 8 MiB
+                from src.prep import Prep
+                prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+                new_torrent = prep.CustomTorrent(
+                    meta=meta,
+                    path=Path(meta['path']),
+                    trackers=["https://fake.tracker"],
+                    source="L4G",
+                    private=True,
+                    exclude_globs=exclude,  # Ensure this is always a list
+                    include_globs=include,  # Ensure this is always a list
+                    creation_date=datetime.now(),
+                    comment="Created by L4G's Upload Assistant",
+                    created_by="L4G's Upload Assistant"
+                )
 
-            # Validate and write the new torrent
-            new_torrent.piece_size = 8 * 1024 * 1024
-            new_torrent.validate_piece_size()
-            new_torrent.generate(callback=prep.torf_cb, interval=5)
-            new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
+                # Validate and write the new torrent
+                new_torrent.piece_size = 8 * 1024 * 1024
+                new_torrent.validate_piece_size()
+                new_torrent.generate(callback=prep.torf_cb, interval=5)
+                new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
 
-            torrent_filename = "MTV"
+                torrent_filename = "MTV"
 
-        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
+            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
 
         cat_id = await self.get_cat_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
@@ -157,7 +157,7 @@ class MTV():
         des_tags = await self.get_tags(meta)
 
         # Edit description and other details
-        await self.edit_desc(meta, images_reuploaded)
+        await self.edit_desc(meta, images_reuploaded, valid_images)
         group_desc = await self.edit_group_desc(meta)
         mtv_name = await self.edit_name(meta)
 
@@ -268,7 +268,7 @@ class MTV():
 
         return meta['image_list'], False, images_reuploaded  # Return retry_mode and images_reuploaded
 
-    async def edit_desc(self, meta, images_reuploaded):
+    async def edit_desc(self, meta, images_reuploaded, valid_images):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as desc:
@@ -284,7 +284,10 @@ class MTV():
             elif mi_dump:
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
 
-            images = meta['image_list']
+            if valid_images:
+                images = valid_images
+            else:
+                images = meta['image_list']
             if len(images) > 0:
                 for image in images:
                     raw_url = image['raw_url']
