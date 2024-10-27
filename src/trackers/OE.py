@@ -234,7 +234,7 @@ class OE():
                                     audio_languages.append(audio_lang)
                                 else:
                                     audio_languages.append("")
-                        elif track.get('@type') == 'Text':
+                        if track.get('@type') == 'Text':
                             language = track.get('Language')
                             if not language or language is None:
                                 subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
