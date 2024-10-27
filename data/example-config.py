@@ -56,9 +56,9 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP
+        # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
-        "default_trackers": "ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TDC, TIK, TL, ULCX, UTP",
+        "default_trackers": "ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -253,11 +253,6 @@ config = {
             "api_key": "STT",
             "announce_url": "https://stt.xyz/announce/customannounceurl",
             # "anon" : False
-        },
-        "TDC": {
-            "api_key": "TDC api key",
-            "announce_url": "https://thedarkcommunity.cc/announce/customannounceurl",
-            # "anon" : "False"
         },
         "THR": {
             "username": "username",

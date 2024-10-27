@@ -29,7 +29,6 @@ from src.trackers.PTER import PTER
 from src.trackers.MTV import MTV
 from src.trackers.JPTV import JPTV
 from src.trackers.TL import TL
-from src.trackers.TDC import TDC
 from src.trackers.HDT import HDT
 from src.trackers.RF import RF
 from src.trackers.OE import OE
@@ -239,21 +238,29 @@ async def do_the_thing(base_dir):
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = ['BLU', 'AITHER', 'STC', 'R4E', 'STT', 'RF', 'ACM', 'LCD', 'HUNO', 'LT', 'JPTV', 'TDC', 'OE',
-                        'OTW', 'FNP', 'CBR', 'UTP', 'AL', 'SHRI', 'LST', 'TIK', 'PSS', 'ULCX', 'BHD']
-        other_api_trackers = ['SN', 'NBL', 'ANT', 'BHDTV', 'RTF', 'TL', 'TVC', 'SPD']
-        http_trackers = ['HDB', 'TTG', 'FL', 'PTER', 'HDT', 'MTV']
+        api_trackers = [
+            'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT', 
+            'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'STC', 'STT', 'TIK', 'ULCX', 'UTP'
+        ]
+        other_api_trackers = [
+            'ANT', 'BHDTV', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TVC'
+        ]
+        http_trackers = [
+            'FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'
+        ]
         tracker_class_map = {
-            'BLU': BLU, 'BHD': BHD, 'AITHER': AITHER, 'STC': STC, 'R4E': R4E, 'THR': THR, 'STT': STT, 'HP': HP, 'PTP': PTP, 'RF': RF, 'SN': SN, 'TIK': TIK, 'TVC': TVC,
-            'ACM': ACM, 'HDB': HDB, 'LCD': LCD, 'TTG': TTG, 'LST': LST, 'HUNO': HUNO, 'FL': FL, 'LT': LT, 'NBL': NBL, 'ANT': ANT, 'PTER': PTER, 'JPTV': JPTV,
-            'TL': TL, 'TDC': TDC, 'HDT': HDT, 'MTV': MTV, 'OE': OE, 'BHDTV': BHDTV, 'RTF': RTF, 'OTW': OTW, 'FNP': FNP, 'CBR': CBR, 'UTP': UTP, 'AL': AL,
-            'SHRI': SHRI, 'PSS': PSS, 'ULCX': ULCX, 'SPD': SPD}
+            'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
+            'FNP': FNP, 'FL': FL, 'HDB': HDB, 'HDT': HDT, 'HP': HP, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
+            'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
+            'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SPD': SPD, 'STC': STC, 'STT': STT, 'THR': THR,
+            'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP
+        }
 
         tracker_capabilities = {
-            'LST': {'mod_q': True, 'draft': True},
-            'BLU': {'mod_q': True, 'draft': False},
             'AITHER': {'mod_q': True, 'draft': False},
             'BHD': {'draft_live': True},
+            'BLU': {'mod_q': True, 'draft': False},
+            'LST': {'mod_q': True, 'draft': True}
         }
 
         async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
