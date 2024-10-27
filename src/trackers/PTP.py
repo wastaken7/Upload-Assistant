@@ -636,7 +636,7 @@ class PTP():
                                 use_vs = True
                             else:
                                 use_vs = False
-                            ds = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), 2))
+                            ds = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), 3))
                             ds.start()
                             while ds.is_alive() is True:
                                 await asyncio.sleep(1)
@@ -654,7 +654,7 @@ class PTP():
                                 desc.write(base2ptp)
                                 desc.write("\n\n")
                         else:
-                            ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, 2))
+                            ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, 3))
                             ds.start()
                             while ds.is_alive() is True:
                                 await asyncio.sleep(1)
@@ -685,7 +685,7 @@ class PTP():
 
                         # Generate and upload screens for other files
                         # Add force_screenshots=True to ensure screenshots are taken even if images exist
-                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 2, True))
+                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 3, True, None))
                         s.start()
                         while s.is_alive() is True:
                             await asyncio.sleep(3)
