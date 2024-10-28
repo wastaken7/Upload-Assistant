@@ -3426,66 +3426,66 @@ class Prep():
         return name
 
     async def gen_desc(self, meta):
+        def clean_text(text):
+            return text.replace('\r\n', '').replace('\n', '').strip()
+
+        desclink = meta.get('desclink')
+        descfile = meta.get('descfile')
+
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+            description.seek(0)
+
+            if meta.get('desc_template'):
+                from jinja2 import Template
+                try:
+                    with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
+                        template = Template(f.read())
+                        template_desc = template.render(meta)
+                        if clean_text(template_desc):
+                            description.write(template_desc + "\n")
+                            console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
+                except FileNotFoundError:
+                    console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
+
+            if meta.get('nfo'):
+                nfo_files = glob.glob("*.nfo")
+                if nfo_files:
+                    nfo = nfo_files[0]
+                    with open(nfo, 'r', encoding="utf-8") as nfo_file:
+                        nfo_content = nfo_file.read()
+                    description.write(f"[code]{nfo_content}[/code]\n")
+                    meta['description'] = "CUSTOM"
+                    console.print(f"[INFO] NFO file '{nfo}' used.")
+
+            if desclink:
+                try:
+                    parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
+                    split = os.path.split(parsed.path)
+                    raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
+                    raw_url = urllib.parse.urlunparse(raw)
+                    desclink_content = requests.get(raw_url).text
+                    description.write(desclink_content + "\n")
+                    meta['description'] = "CUSTOM"
+                    console.print(f"[INFO] Description from link '{desclink}' used.")
+                except Exception as e:
+                    console.print(f"[ERROR] Failed to fetch description from link: {e}")
+
+            if descfile and os.path.isfile(descfile):
+                with open(descfile, 'r') as f:
+                    file_content = f.read()
+                description.write(file_content)
+                meta['description'] = "CUSTOM"
+                console.print(f"[INFO] Description from file '{descfile}' used.")
+
+            if meta.get('desc'):
+                description.write(meta['desc'] + "\n")
+                meta['description'] = "CUSTOM"
+                console.print("[INFO] Custom description used.")
+
+            description.write("\n")
+            return meta
+
         if not meta.get('skip_gen_desc', False):
-            def clean_text(text):
-                return text.replace('\r\n', '').replace('\n', '').strip()
-
-            desclink = meta.get('desclink')
-            descfile = meta.get('descfile')
-
-            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                description.seek(0)
-
-                if meta.get('desc_template'):
-                    from jinja2 import Template
-                    try:
-                        with open(f"{meta['base_dir']}/data/templates/{meta['desc_template']}.txt", 'r') as f:
-                            template = Template(f.read())
-                            template_desc = template.render(meta)
-                            if clean_text(template_desc):
-                                description.write(template_desc + "\n")
-                                console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
-                    except FileNotFoundError:
-                        console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
-
-                if meta.get('nfo'):
-                    nfo_files = glob.glob("*.nfo")
-                    if nfo_files:
-                        nfo = nfo_files[0]
-                        with open(nfo, 'r', encoding="utf-8") as nfo_file:
-                            nfo_content = nfo_file.read()
-                        description.write(f"[code]{nfo_content}[/code]\n")
-                        meta['description'] = "CUSTOM"
-                        console.print(f"[INFO] NFO file '{nfo}' used.")
-
-                if desclink:
-                    try:
-                        parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
-                        split = os.path.split(parsed.path)
-                        raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
-                        raw_url = urllib.parse.urlunparse(raw)
-                        desclink_content = requests.get(raw_url).text
-                        description.write(desclink_content + "\n")
-                        meta['description'] = "CUSTOM"
-                        console.print(f"[INFO] Description from link '{desclink}' used.")
-                    except Exception as e:
-                        console.print(f"[ERROR] Failed to fetch description from link: {e}")
-
-                if descfile and os.path.isfile(descfile):
-                    with open(descfile, 'r') as f:
-                        file_content = f.read()
-                    description.write(file_content)
-                    meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] Description from file '{descfile}' used.")
-
-                if meta.get('desc'):
-                    description.write(meta['desc'] + "\n")
-                    meta['description'] = "CUSTOM"
-                    console.print("[INFO] Custom description used.")
-
-                description.write("\n")
-                return meta
-        else:
             description_text = meta.get('description') if meta.get('description') else ""
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                 description.write(description_text + "\n")
