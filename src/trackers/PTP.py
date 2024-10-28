@@ -616,12 +616,42 @@ class PTP():
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
+            images = meta['image_list']
             discs = meta.get('discs', [])
-            # For Discs
-            if len(discs) >= 1:
+            filelist = meta.get('filelist', [])
+
+            # Handle single disc case
+            if len(discs) == 1:
+                each = discs[0]
+                new_screens = []
+                if each['type'] == "BDMV":
+                    desc.write(f"[mediainfo]{each['summary']}[/mediainfo]\n\n")
+                    base2ptp = self.convert_bbcode(base)
+                    if base2ptp.strip() != "":
+                        desc.write(base2ptp)
+                        desc.write("\n\n")
+                    for img_index in range(len(images[:int(meta['screens'])])):
+                        raw_url = meta['image_list'][img_index]['raw_url']
+                        desc.write(f"[img]{raw_url}[/img]\n")
+                    desc.write("\n")
+                elif each['type'] == "DVD":
+                    desc.write(f"[b][size=3]{each['name']}:[/size][/b]\n")
+                    desc.write(f"[mediainfo]{each['ifo_mi_full']}[/mediainfo]\n")
+                    desc.write(f"[mediainfo]{each['vob_mi_full']}[/mediainfo]\n\n")
+                    base2ptp = self.convert_bbcode(base)
+                    if base2ptp.strip() != "":
+                        desc.write(base2ptp)
+                        desc.write("\n\n")
+                    for img_index in range(len(images[:int(meta['screens'])])):
+                        raw_url = meta['image_list'][img_index]['raw_url']
+                        desc.write(f"[img]{raw_url}[/img]\n")
+                    desc.write("\n")
+
+            # Handle multiple discs case
+            elif len(discs) > 1:
                 for i, each in enumerate(discs):
-                    each = discs[i]
                     new_screens = []
                     if each['type'] == "BDMV":
                         desc.write(f"[mediainfo]{each['summary']}[/mediainfo]\n\n")
@@ -634,9 +664,7 @@ class PTP():
                                 raw_url = meta['image_list'][img_index]['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
-                            mi_dump = each['summary']
                         else:
-                            mi_dump = each['summary']
                             use_vs = meta.get('vapoursynth', False)
                             ds = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens))
                             ds.start()
@@ -645,7 +673,7 @@ class PTP():
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if new_screens:
                                 uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
-                                for img in uploaded_images[:int(meta['screens'])]:
+                                for img in uploaded_images[:multi_screens]:
                                     raw_url = img['raw_url']
                                     desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
@@ -653,8 +681,7 @@ class PTP():
                     elif each['type'] == "DVD":
                         desc.write(f"[b][size=3]{each['name']}:[/size][/b]\n")
                         desc.write(f"[mediainfo]{each['ifo_mi_full']}[/mediainfo]\n")
-                        desc.write(f"[mediainfo]{each['vob_mi_full']}[/mediainfo]\n")
-                        desc.write("\n")
+                        desc.write(f"[mediainfo]{each['vob_mi_full']}[/mediainfo]\n\n")
                         if i == 0:
                             base2ptp = self.convert_bbcode(base)
                             if base2ptp.strip() != "":
@@ -672,27 +699,37 @@ class PTP():
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                             if new_screens:
                                 uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
-                                for img in uploaded_images[:int(meta['screens'])]:
+                                for img in uploaded_images[:multi_screens]:
                                     raw_url = img['raw_url']
                                     desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
-            # For non-discs
-            elif len(meta.get('filelist', [])) >= 1:
-                for i in range(len(meta['filelist'])):
-                    new_screens = []
-                    file = meta['filelist'][i]
+
+            # Handle single file case
+            elif len(filelist) == 1:
+                file = filelist[0]
+                if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None and self.web_source is True:
+                    desc.write(f"[quote][align=center]This release is sourced from {meta['service_longname']}[/align][/quote]")
+                mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
+                desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
+                for img_index in range(len(images[:int(meta['screens'])])):
+                    raw_url = meta['image_list'][img_index]['raw_url']
+                    desc.write(f"[img]{raw_url}[/img]\n")
+                desc.write("\n")
+
+            # Handle multiple files case
+            elif len(filelist) > 1:
+                for i in range(len(filelist)):
+                    file = filelist[i]
                     if i == 0:
-                        # Add This line for all web-dls
                         if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None and self.web_source is True:
                             desc.write(f"[quote][align=center]This release is sourced from {meta['service_longname']}[/align][/quote]")
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
-                        for each in range(min(multi_screens, len(meta['image_list']))):
-                            raw_url = meta['image_list'][each]['raw_url']
+                        for img_index in range(min(multi_screens, len(meta['image_list']))):
+                            raw_url = meta['image_list'][img_index]['raw_url']
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
                     else:
-                        # Export Mediainfo
                         mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "w", newline="", encoding="utf-8") as f:
                             f.write(mi_dump)
@@ -705,7 +742,7 @@ class PTP():
                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                         if new_screens:
                             uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
-                            for img in uploaded_images[:int(meta['screens'])]:
+                            for img in uploaded_images[:multi_screens]:
                                 raw_url = img['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
