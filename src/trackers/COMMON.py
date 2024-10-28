@@ -376,8 +376,9 @@ class COMMON():
         return ptgen
 
     async def filter_dupes(self, dupes, meta):
-        console.log("[cyan]Pre-filtered dupes")
-        console.log(dupes)
+        if meta['debug']:
+            console.log("[cyan]Pre-filtered dupes")
+            console.log(dupes)
         new_dupes = []
         types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
 
@@ -428,8 +429,6 @@ class COMMON():
                     'in': meta['type']
                 }
             ]
-            # console.log(f"Meta type: {normalized_meta_type}")
-            # console.log(f"Each type: {normalized_each_type}")
             # Check if the type of the dupe matches or is sufficiently similar
             dupe_type_matches = {t for t in types_to_check if t in normalized_each_type}
 
@@ -439,13 +438,16 @@ class COMMON():
                     console.log(f"[green]Allowing result we will catch later: {each}")
                 # Allow based on matching resolution, HDR, and audio despite type mismatch
                 elif meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each:
-                    console.log(f"[green]Allowing result we will catch later: {each}")
+                    if meta['debug']:
+                        console.log(f"[green]Allowing result we will catch later: {each}")
                 else:
-                    console.log(f"[yellow]Excluding result due to type mismatch: {each}")
+                    if meta['debug']:
+                        console.log(f"[yellow]Excluding result due to type mismatch: {each}")
                     continue
             else:
                 if dupe_type_matches:
-                    console.log(f"[red]Excluding extra result with new type match: {each}")
+                    if meta['debug']:
+                        console.log(f"[red]Excluding extra result with new type match: {each}")
                     continue
 
             for s in search_combos:
