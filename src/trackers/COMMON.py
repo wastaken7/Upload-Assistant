@@ -77,21 +77,16 @@ class COMMON():
                     # Set a unique key per disc for managing images
                     new_images_key = f'new_images_disc_{i}'
 
-                    # Writing summary for each disc type
-                    if each['type'] == "BDMV":
-                        console.print("[yellow]Writing each summary")
-                        descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                    elif each['type'] == "DVD":
-                        descfile.write(f"{each['name']}:\n")
-                        descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
-                        descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
-
                     if i == 0:
+                        descfile.write("[center]")
+                        if each['type'] == "BDMV":
+                            descfile.write(f"{each.get('name', 'BDINFO')}\n\n")
+                        elif each['type'] == "DVD":
+                            descfile.write(f"{each['name']}:\n")
                         # For the first disc, use images from `meta['image_list']`
                         if meta['debug']:
                             console.print("[yellow]Using original uploaded images for first disc")
                         images = meta['image_list']
-                        descfile.write("[center]")
                         for img_index in range(min(multi_screens, len(images))):
                             raw_url = images[img_index]['raw_url']
                             descfile.write(f"[img=300]{raw_url}[/img] ")
@@ -101,17 +96,32 @@ class COMMON():
                         if new_images_key in meta and meta[new_images_key]:
                             if meta['debug']:
                                 console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            descfile.write("[center]")
+                            if each['type'] == "BDMV":
+                                descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                            elif each['type'] == "DVD":
+                                descfile.write(f"{each['name']}:\n")
+                                descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            descfile.write("[/center]\n\n")
                             # Use existing URLs from meta to write to descfile
                             descfile.write("[center]")
                             for img in meta[new_images_key]:
                                 raw_url = img['raw_url']
-                                descfile.write("[img=300]{raw_url}[/img] ")
+                                descfile.write(f"[img=300]{raw_url}[/img] ")
                             descfile.write("[/center]\n\n")
                         else:
                             # Increment retry_count for tracking but use unique disc keys for each disc
                             meta['retry_count'] += 1
                             meta[new_images_key] = []
-
+                            descfile.write("[center]")
+                            if each['type'] == "BDMV":
+                                descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                            elif each['type'] == "DVD":
+                                descfile.write(f"{each['name']}:\n")
+                                descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            descfile.write("[/center]\n\n")
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if not new_screens:
