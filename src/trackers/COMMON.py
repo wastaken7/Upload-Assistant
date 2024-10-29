@@ -88,7 +88,8 @@ class COMMON():
 
                     if i == 0:
                         # For the first disc, use images from `meta['image_list']`
-                        console.print("[yellow]Using original images from meta['image_list'] for disc_0")
+                        if meta['debug']:
+                            console.print("[yellow]Using original uploaded images for first disc")
                         images = meta['image_list']
                         descfile.write("[center]")
                         for img_index in range(min(multi_screens, len(images))):
@@ -98,7 +99,8 @@ class COMMON():
                     else:
                         # Check if screenshots exist for the current disc key
                         if new_images_key in meta and meta[new_images_key]:
-                            console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            if meta['debug']:
+                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
                             # Use existing URLs from meta to write to descfile
                             descfile.write("[center]")
                             for img in meta[new_images_key]:
@@ -112,9 +114,9 @@ class COMMON():
 
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                            console.print(f"[yellow]Checking new screens for {new_images_key}: {new_screens}")
                             if not new_screens:
-                                console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
+                                if meta['debug']:
+                                    console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
                                 use_vs = meta.get('vapoursynth', False)
                                 s = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens))
@@ -190,7 +192,8 @@ class COMMON():
                         # Check and write screenshots if they exist
                         new_images_key = f'new_images_file_{i}'
                         if new_images_key in meta and meta[new_images_key]:
-                            console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            if meta['debug']:
+                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
                             descfile.write("[center]")
                             char_count += len("[center]")
                             for img in meta[new_images_key]:
@@ -212,9 +215,7 @@ class COMMON():
                             if mi_dump:
                                 parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                                 formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
-
-                                match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
-                                filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+                                filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
                                 descfile.write(f"[center]{filename}\n[/center]\n")
                                 char_count += len(f"[center]{filename}\n[/center]\n")
@@ -222,6 +223,8 @@ class COMMON():
                                 images = meta['image_list']
                                 descfile.write("[center]")
                                 char_count += len("[center]")
+                                if meta['debug']:
+                                    console.print("[yellow]Using original uploaded images for first file")
                                 for img_index in range(min(multi_screens, len(images))):
                                     web_url = images[img_index]['web_url']
                                     raw_url = images[img_index]['raw_url']
@@ -235,14 +238,14 @@ class COMMON():
                             parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                             formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
 
-                            match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
-                            filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+                            filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
                             descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
                             char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
 
                             if new_images_key in meta and meta[new_images_key]:
-                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                                if meta['debug']:
+                                    console.print(f"[yellow]Found needed image URLs for {new_images_key}")
                                 descfile.write("[center]")
                                 char_count += len("[center]")
                                 for img in meta[new_images_key]:
@@ -259,6 +262,8 @@ class COMMON():
 
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if not new_screens:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                     s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
                                     s.start()
                                     while s.is_alive():
@@ -299,8 +304,7 @@ class COMMON():
                         parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
 
-                        match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
-                        filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+                        filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
                         descfile.write(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
                         char_count += len(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
@@ -324,7 +328,7 @@ class COMMON():
                     descfile.write("[/spoiler][/center]\n")
                     char_count += len("[/spoiler][/center]\n")
 
-            console.print(f"[green]Total characters written to description: {char_count}")
+            console.print(f"[yellow]Total characters written to description: {char_count}")
 
             # Append signature if provided
             if signature:
