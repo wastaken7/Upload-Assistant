@@ -27,15 +27,15 @@ config = {
 
         # Number of screenshots to use for each disc/episode in packs
         "multiScreens": "2",
-        
+
         # Description character count (including bbcode) cutoff for UNIT3D sites when season packs only
         # After hitting this limit, only filenames and screenshots will be used for any ADDITIONAL files
         # still to be added to the description. You can set this small like 50, to only ever
         # print filenames and screenshots for each file, no mediainfo will be printed.
         # UNIT3D sites have a hard character limit for descriptions. A little over 17000
         # worked fine in a forum post at BLU. If you are at 1 < charLimit, the next full description will be added.
-        "charLimit": "16000",
-        
+        "charLimit": "14000",
+
         # How many files in a season pack will be added to the description before using an additional spoiler tag
         # Any other files past this limit will be hidden/added all within a spoiler tag.
         "fileLimit": "5",
