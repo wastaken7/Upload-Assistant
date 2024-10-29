@@ -28,7 +28,7 @@ config = {
         # Number of screenshots to use for each disc/episode in packs
         "multiScreens": "2",
         
-        # Description character count cutoff for UNIT3D sites when season packs only
+        # Description character count (including bbcode) cutoff for UNIT3D sites when season packs only
         # After hitting this limit, only filenames and screenshots will be used for any ADDITIONAL files
         # still to be added to the description. You can set this small like 50, to only ever
         # print filenames and screenshots for each file, no mediainfo will be printed.
