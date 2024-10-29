@@ -5,6 +5,10 @@ import re
 import json
 import click
 import sys
+import glob
+from pymediainfo import MediaInfo
+import multiprocessing
+import asyncio
 
 from src.bbcode import BBCODE
 from src.console import console
@@ -13,6 +17,7 @@ from src.console import console
 class COMMON():
     def __init__(self, config):
         self.config = config
+        self.parser = self.MediaInfoParser()
         pass
 
     async def edit_torrent(self, meta, tracker, source_flag, torrent_filename="BASE"):
@@ -35,60 +40,293 @@ class COMMON():
             Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{meta['clean_name']}.torrent", overwrite=True)
 
     async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header=""):
+        from src.prep import Prep
+        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
-            if desc_header != "":
+            if desc_header:
                 descfile.write(desc_header)
 
             bbcode = BBCODE()
-            if meta.get('discs', []) != []:
-                discs = meta['discs']
-                if discs[0]['type'] == "DVD":
-                    descfile.write(f"[spoiler=VOB MediaInfo][code]{discs[0]['vob_mi']}[/code][/spoiler]\n")
-                    descfile.write("\n")
-                if len(discs) >= 2:
-                    for each in discs[1:]:
-                        if each['type'] == "BDMV":
-                            descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n")
-                            descfile.write("\n")
-                        elif each['type'] == "DVD":
-                            descfile.write(f"{each['name']}:\n")
-                            descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code][{each['vob_mi']}[/code][/spoiler] [spoiler={os.path.basename(each['ifo'])}][code][{each['ifo_mi']}[/code][/spoiler]\n")
-                            descfile.write("\n")
-                        elif each['type'] == "HDDVD":
-                            descfile.write(f"{each['name']}:\n")
-                            descfile.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n")
-                            descfile.write("\n")
+            discs = meta.get('discs', [])
+            filelist = meta.get('filelist', [])
             desc = base
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             if comparison is False:
                 desc = bbcode.convert_comparison_to_collapse(desc, 1000)
-
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
-            images = meta['image_list']
-            if len(images) > 0:
-                try:
-                    thumbsize = self.config['DEFAULT']['thumbnail_size']
-                except Exception:
-                    thumbsize = "350"
+            # Handle single disc case
+            if len(discs) == 1:
+                images = meta['image_list']
+                for img_index in range(len(images[:int(meta['screens'])])):
+                    raw_url = images[img_index]['raw_url']
+                    descfile.write(f"[img={self.config['DEFAULT'].get('thumbnail_size', '350')}] {raw_url}[/img]\n")
 
-                try:
-                    screenheader = self.config['DEFAULT']['screenshot_header']
-                except Exception:
-                    screenheader = None
-                if screenheader is not None:
-                    descfile.write(screenheader + '\n')
+            # Handle multiple discs case
+            elif len(discs) > 1:
+                # Initialize retry_count if not already set
+                if 'retry_count' not in meta:
+                    meta['retry_count'] = 0
 
+                for i, each in enumerate(discs):
+                    # Set a unique key per disc for managing images
+                    new_images_key = f'new_images_disc_{i}'
+
+                    # Writing summary for each disc type
+                    if each['type'] == "BDMV":
+                        console.print("[yellow]Writing each summary")
+                        descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                    elif each['type'] == "DVD":
+                        descfile.write(f"{each['name']}:\n")
+                        descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                        descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+
+                    if i == 0:
+                        # For the first disc, use images from `meta['image_list']`
+                        console.print("[yellow]Using original images from meta['image_list'] for disc_0")
+                        images = meta['image_list']
+                        descfile.write("[center]")
+                        for img_index in range(min(2, len(images))):
+                            raw_url = images[img_index]['raw_url']
+                            descfile.write(f"[img=300]{raw_url}[/img] ")
+                        descfile.write("[/center]\n\n")
+                    else:
+                        # Check if screenshots exist for the current disc key
+                        if new_images_key in meta and meta[new_images_key]:
+                            console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            # Use existing URLs from meta to write to descfile
+                            descfile.write("[center]")
+                            for img in meta[new_images_key]:
+                                raw_url = img['raw_url']
+                                descfile.write("[img=300]{raw_url}[/img] ")
+                            descfile.write("[/center]\n\n")
+                        else:
+                            # Increment retry_count for tracking but use unique disc keys for each disc
+                            meta['retry_count'] += 1
+                            meta[new_images_key] = []
+
+                            # Check if new screenshots already exist before running prep.screenshots
+                            new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                            console.print(f"[yellow]Checking new screens for {new_images_key}: {new_screens}")
+                            if not new_screens:
+                                console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
+                                # Run prep.screenshots if no screenshots are present
+                                use_vs = meta.get('vapoursynth', False)
+                                s = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), 2))
+                                s.start()
+                                while s.is_alive():
+                                    await asyncio.sleep(1)
+
+                                # Re-check for new screenshots after screenshots process
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+
+                            if new_screens:
+                                uploaded_images, _ = prep.upload_screens(
+                                    meta,
+                                    2, 1, 0, 2,
+                                    new_screens,
+                                    {new_images_key: meta[new_images_key]}
+                                )
+
+                                # Append each uploaded image's data to `meta[new_images_key]`
+                                for img in uploaded_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img['img_url'],
+                                        'raw_url': img['raw_url'],
+                                        'web_url': img['web_url']
+                                    })
+
+                                # Write new URLs to descfile
+                                descfile.write("[center]")
+                                for img in uploaded_images:
+                                    raw_url = img['raw_url']
+                                    descfile.write(f"[img=300]{raw_url}[/img] ")
+                                descfile.write("[/center]\n\n")
+
+                                # Save the updated meta to `meta.json` after upload
+                                meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+                                with open(meta_filename, 'w') as f:
+                                    json.dump(meta, f, indent=4)
+
+            # Handle single file case
+            if len(filelist) == 1:
+                images = meta['image_list']
                 descfile.write("[center]")
-                for each in range(len(images[:int(meta['screens'])])):
-                    web_url = images[each]['web_url']
-                    raw_url = images[each]['raw_url']
-                    descfile.write(f"[url={web_url}][img={thumbsize}]{raw_url}[/img][/url] ")
+                for img_index in range(len(images[:int(meta['screens'])])):
+                    web_url = images[img_index]['web_url']
+                    raw_url = images[img_index]['raw_url']
+                    descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}] {raw_url}[/img][/url] ")
                 descfile.write("[/center]")
 
-            if signature is not None:
+            # Handle multiple files case
+            # Initialize character counter
+            char_count = 0
+            max_char_limit = 100  # Character limit
+            other_files_spoiler_open = False  # Track if "Other files" spoiler has been opened
+
+            # Process each file
+            if len(filelist) > 1:
+                for i, file in enumerate(filelist):
+                    # Check if character limit is reached
+                    if char_count >= max_char_limit:
+                        # Open the "Other files" spoiler if it's the first time we're exceeding the limit
+                        if not other_files_spoiler_open and i >= 5:
+                            descfile.write("[center][spoiler=Other files]\n")
+                            char_count += len("[center][spoiler=Other files]\n")
+                            other_files_spoiler_open = True
+
+                        # Extract filename directly from the file path
+                        filename = os.path.splitext(os.path.basename(file.strip()))[0]
+
+                        # Write filename in BBCode format
+                        descfile.write(f"[center]{filename}\n[/center]\n")
+                        char_count += len(f"[center]{filename}\n[/center]\n")
+
+                        # Check and write screenshots if they exist
+                        new_images_key = f'new_images_file_{i}'
+                        if new_images_key in meta and meta[new_images_key]:
+                            console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            descfile.write("[center]")
+                            char_count += len("[center]")
+                            for img in meta[new_images_key]:
+                                web_url = img['web_url']
+                                raw_url = img['raw_url']
+                                image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
+                                descfile.write(image_str)
+                                char_count += len(image_str)
+                            descfile.write("[/center]\n\n")
+                            char_count += len("[/center]\n\n")
+
+                        continue  # Skip full MediaInfo and spoilers for remaining files
+
+                    # Standard processing for files until character limit is reached
+                    new_images_key = f'new_images_file_{i}'
+
+                    if i < 5:
+                        # Standard processing for the first five files
+                        if i == 0:
+                            mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
+                            if mi_dump:
+                                parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
+                                formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
+
+                                match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
+                                filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+
+                                descfile.write(f"[center]{filename}\n[/center]\n")
+                                char_count += len(f"[center]{filename}\n[/center]\n")
+
+                                images = meta['image_list']
+                                descfile.write("[center]")
+                                char_count += len("[center]")
+                                for img_index in range(min(2, len(images))):
+                                    web_url = images[img_index]['web_url']
+                                    raw_url = images[img_index]['raw_url']
+                                    image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
+                                    descfile.write(image_str)
+                                    char_count += len(image_str)
+                                descfile.write("[/center]\n\n")
+                                char_count += len("[/center]\n\n")
+                        else:
+                            mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+                            parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
+                            formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
+
+                            match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
+                            filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+
+                            descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
+                            char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
+
+                            if new_images_key in meta and meta[new_images_key]:
+                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                                descfile.write("[center]")
+                                char_count += len("[center]")
+                                for img in meta[new_images_key]:
+                                    web_url = img['web_url']
+                                    raw_url = img['raw_url']
+                                    image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
+                                    descfile.write(image_str)
+                                    char_count += len(image_str)
+                                descfile.write("[/center]\n\n")
+                                char_count += len("[/center]\n\n")
+                            else:
+                                meta['retry_count'] = meta.get('retry_count', 0) + 1
+                                meta[new_images_key] = []
+
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                                if not new_screens:
+                                    s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 3, True, None))
+                                    s.start()
+                                    while s.is_alive():
+                                        await asyncio.sleep(1)
+                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+
+                                if new_screens:
+                                    uploaded_images, _ = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    for img in uploaded_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img['img_url'],
+                                            'raw_url': img['raw_url'],
+                                            'web_url': img['web_url']
+                                        })
+                                    descfile.write("[center]")
+                                    char_count += len("[center]")
+                                    for img in uploaded_images:
+                                        web_url = img['web_url']
+                                        raw_url = img['raw_url']
+                                        image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
+                                        descfile.write(image_str)
+                                        char_count += len(image_str)
+                                    descfile.write("[/center]\n\n")
+                                    char_count += len("[/center]\n\n")
+
+                            meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+                            with open(meta_filename, 'w') as f:
+                                json.dump(meta, f, indent=4)
+
+                    elif i == 5 and not other_files_spoiler_open:
+                        # Open "Other files" spoiler for the fifth file
+                        descfile.write("[spoiler=Other files]\n")
+                        char_count += len("[spoiler=Other files]\n")
+                        other_files_spoiler_open = True
+
+                    if i >= 5 and char_count < max_char_limit:
+                        mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
+                        formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
+
+                        match = re.search(r"Complete name\s+:\s+(.+)", mi_dump)
+                        filename = os.path.splitext(os.path.basename(match.group(1)).strip())[0] if match else "MediaInfo"
+
+                        descfile.write(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
+                        char_count += len(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
+
+                        if new_images_key in meta and meta[new_images_key]:
+                            console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                            descfile.write("[center]")
+                            char_count += len("[center]")
+                            for img in meta[new_images_key]:
+                                web_url = img['web_url']
+                                raw_url = img['raw_url']
+                                image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
+                                descfile.write(image_str)
+                                char_count += len(image_str)
+                            descfile.write("[/center]\n\n")
+                            char_count += len("[/center]\n\n")
+                    else:
+                        continue  # Skip if character limit has been reached
+
+                if other_files_spoiler_open:
+                    descfile.write("[/spoiler][/center]\n")
+                    char_count += len("[/spoiler][/center]\n")
+
+            console.print(f"[green]Total characters written to description: {char_count}")
+
+            # Append signature if provided
+            if signature:
                 descfile.write(signature)
             descfile.close()
         return
@@ -483,3 +721,154 @@ class COMMON():
             if allow and each not in new_dupes:
                 new_dupes.append(each)
         return new_dupes
+
+    class MediaInfoParser:
+        # Language to ISO country code mapping
+        LANGUAGE_CODE_MAP = {
+            "english": "us",
+            "german": "de",
+            "french": "fr",
+            "spanish": "es",
+            "italian": "it",
+            "portuguese": "pt",
+            "dutch": "nl",
+            "japanese": "jp",
+            "arabic": "ae",
+            "czech": "cz",
+            "danish": "dk",
+            "greek": "gr",
+            "finnish": "fi",
+            "hebrew": "il",
+            "hungarian": "hu",
+            "indonesian": "id",
+            "korean": "kr",
+            "norwegian bokmal": "no",
+            "polish": "pl",
+            "romanian": "ro",
+            "russian": "ru",
+            "swedish": "se",
+            "thai": "th",
+            "turkish": "tr",
+            "vietnamese": "vn",
+            "chinese": "cn",
+            # Add more mappings as needed
+        }
+
+        def parse_mediainfo(self, mediainfo_text):
+            # Patterns for matching sections and fields
+            section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
+            parsed_data = {"general": {}, "video": [], "audio": [], "text": []}
+            current_section = None
+            current_track = {}
+
+            # Field lists based on PHP definitions
+            general_fields = {'file_name', 'format', 'duration', 'file_size', 'bit_rate'}
+            video_fields = {
+                'format', 'format_version', 'codec', 'width', 'height', 'stream_size',
+                'framerate_mode', 'frame_rate', 'aspect_ratio', 'bit_rate', 'bit_rate_mode', 'bit_rate_nominal',
+                'bit_pixel_frame', 'bit_depth', 'language', 'format_profile',
+                'color_primaries', 'title', 'scan_type', 'transfer_characteristics', 'hdr_format'
+            }
+            audio_fields = {
+                'codec', 'format', 'bit_rate', 'channels', 'title', 'language', 'format_profile', 'stream_size'
+            }
+            text_fields = {'language'}
+
+            # Split MediaInfo by lines and process each line
+            for line in mediainfo_text.splitlines():
+                line = line.strip()
+
+                # Detect a new section
+                section_match = section_pattern.match(line)
+                if section_match:
+                    # Save the last track data if moving to a new section
+                    if current_section and current_track:
+                        if current_section in ["video", "audio", "text"]:
+                            parsed_data[current_section].append(current_track)
+                        else:
+                            parsed_data[current_section] = current_track
+                        current_track = {}
+
+                    # Update the current section
+                    current_section = section_match.group(1).lower()
+                    continue
+
+                # Split each line on the first colon to separate property and value
+                if ":" in line:
+                    property_name, property_value = map(str.strip, line.split(":", 1))
+                    property_name = property_name.lower().replace(" ", "_")
+
+                    # Add property if it's a recognized field for the current section
+                    if current_section == "general" and property_name in general_fields:
+                        current_track[property_name] = property_value
+                    elif current_section == "video" and property_name in video_fields:
+                        current_track[property_name] = property_value
+                    elif current_section == "audio" and property_name in audio_fields:
+                        current_track[property_name] = property_value
+                    elif current_section == "text" and property_name in text_fields:
+                        # Convert language to country code or fallback to the text if not in map
+                        country_code = self.LANGUAGE_CODE_MAP.get(property_value.lower())
+                        if country_code:
+                            current_track[property_name] = f"[img=20]https://blutopia.cc/img/flags/{country_code}.png[/img]"
+                        else:
+                            current_track[property_name] = property_value  # Fallback to text if no match
+
+            # Append the last track to the parsed data
+            if current_section and current_track:
+                if current_section in ["video", "audio", "text"]:
+                    parsed_data[current_section].append(current_track)
+                else:
+                    parsed_data[current_section] = current_track
+
+            return parsed_data
+
+        def format_bbcode(self, parsed_mediainfo):
+            bbcode_output = "\n"
+
+            # Format General Section
+            if "general" in parsed_mediainfo:
+                bbcode_output += "[b]General[/b]\n"
+                for prop, value in parsed_mediainfo["general"].items():
+                    bbcode_output += f"[b]{prop.replace('_', ' ').capitalize()}:[/b] {value}\n"
+
+            # Format Video Section
+            if "video" in parsed_mediainfo:
+                bbcode_output += "\n[b]Video[/b]\n"
+                for track in parsed_mediainfo["video"]:
+                    for prop, value in track.items():
+                        bbcode_output += f"[b]{prop.replace('_', ' ').capitalize()}:[/b] {value}\n"
+
+            # Format Audio Section
+            if "audio" in parsed_mediainfo:
+                bbcode_output += "\n[b]Audio[/b]\n"
+                for index, track in enumerate(parsed_mediainfo["audio"], start=1):  # Start enumeration at 1
+                    parts = [f"{index}."]  # Start with track number without a trailing slash
+
+                    # Language flag image
+                    language = track.get("language", "").lower()
+                    country_code = self.LANGUAGE_CODE_MAP.get(language)
+                    if country_code:
+                        parts.append(f"[img=20]https://blutopia.cc/img/flags/{country_code}.png[/img]")
+                    else:
+                        parts.append(language.capitalize() if language else "")
+
+                    # Other properties to concatenate
+                    properties = ["language", "codec", "format", "channels", "bit_rate", "format_profile", "stream_size"]
+                    for prop in properties:
+                        if prop in track and track[prop]:  # Only add non-empty properties
+                            parts.append(track[prop])
+
+                    # Join parts (starting from index 1, after the track number) with slashes and add to bbcode_output
+                    bbcode_output += f"{parts[0]} " + " / ".join(parts[1:]) + "\n"
+
+            # Format Text Section - Centered with flags or text, spaced apart
+            if "text" in parsed_mediainfo:
+                bbcode_output += "\n[b]Subtitles[/b]\n"
+                subtitle_entries = []
+                for track in parsed_mediainfo["text"]:
+                    language_display = track.get("language", "")
+                    subtitle_entries.append(language_display)
+                bbcode_output += " ".join(subtitle_entries)
+
+            bbcode_output += "\n"
+            return bbcode_output
