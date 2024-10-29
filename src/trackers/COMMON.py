@@ -242,7 +242,7 @@ class COMMON():
                         if i == 0:
                             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
                             if mi_dump:
-                                parsed_mediainfo = self.parser.parse_mediainfo(mi_dump, tracker)
+                                parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                                 formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
                                 filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
@@ -264,7 +264,7 @@ class COMMON():
                                 char_count += len("[/center]\n\n")
                         else:
                             mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
-                            parsed_mediainfo = self.parser.parse_mediainfo(mi_dump, tracker)
+                            parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                             formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
 
                             filename = os.path.splitext(os.path.basename(file.strip()))[0]
@@ -330,7 +330,7 @@ class COMMON():
 
                     if i >= file_limit and char_count < max_char_limit:
                         mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
-                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump, tracker)
+                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
 
                         filename = os.path.splitext(os.path.basename(file.strip()))[0]
@@ -798,37 +798,12 @@ class COMMON():
             # Add more mappings as needed
         }
 
-        TRACKER_MAP = {
-            "BLU": "blutopia.cc",
-            "AITHER": "aither.cc",
-            "AL": "animelovers.club",
-            "CBR": "capybarabr.com",
-            "FNP": "fearnopeer.com",
-            "HP": "hidden-palace.net",
-            "HUNO": "hawke.uno",
-            "JPTV": "jptv.club",
-            "LCD": "locadora.cc",
-            "LST": "lst.gg",
-            "LT": "lat-team.com",
-            "OTW": "oldtoons.world",
-            "PSS": "privatesilverscreen.cc",
-            "R4E": "racing4everyone.eu",
-            "RF": "reelflix.xyz",
-            "SHRI": "shareisland.org",
-            "STC": "skipthecommericals",
-            "STT": "skipthetrailers.xyz",
-            "ULCX": "upload.cx",
-            "UTP": "utp.to"
-            # Add more mappings as needed
-        }
-
-        def parse_mediainfo(self, mediainfo_text, tracker):
+        def parse_mediainfo(self, mediainfo_text):
             # Patterns for matching sections and fields
             section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
             parsed_data = {"general": {}, "video": [], "audio": [], "text": []}
             current_section = None
             current_track = {}
-            mapped_tracker = self.TRACKER_MAP.get(tracker, tracker)
 
             # Field lists based on PHP definitions
             general_fields = {'file_name', 'format', 'duration', 'file_size', 'bit_rate'}
@@ -878,7 +853,7 @@ class COMMON():
                         # Convert language to country code or fallback to the text if not in map
                         country_code = self.LANGUAGE_CODE_MAP.get(property_value.lower())
                         if country_code:
-                            current_track[property_name] = f"[img=20]https://{mapped_tracker}/img/flags/{country_code}.png[/img]"
+                            current_track[property_name] = f"[img=20]https://blutopia.cc/img/flags/{country_code}.png[/img]"
                         else:
                             current_track[property_name] = property_value  # Fallback to text if no match
 
