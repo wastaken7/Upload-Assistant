@@ -759,42 +759,42 @@ class COMMON():
     class MediaInfoParser:
         # Language to ISO country code mapping
         LANGUAGE_CODE_MAP = {
-            "arabic": "ae",
-            "bulgarian": "bg",
-            "chinese": "cn",
-            "croatian": "hr",
-            "czech": "cz",
-            "danish": "dk",
-            "dutch": "nl",
-            "english": "us",
-            "estonian": "ee",
-            "finnish": "fi",
-            "french": "fr",
-            "german": "de",
-            "greek": "gr",
-            "hebrew": "il",
-            "hungarian": "hu",
-            "icelandic": "is",
-            "indonesian": "id",
-            "italian": "it",
-            "japanese": "jp",
-            "korean": "kr",
-            "latvian": "lv",
-            "lithuanian": "lt",
-            "norwegian bokmal": "no",
-            "polish": "pl",
-            "portuguese": "pt",
-            "romanian": "ro",
-            "russian": "ru",
-            "serbian": "rs",
-            "slovak": "sk",
-            "slovenian": "si",
-            "spanish": "es",
-            "swedish": "se",
-            "thai": "th",
-            "turkish": "tr",
-            "ukrainian": "ua",
-            "vietnamese": "vn"
+            "arabic": "https://ptpimg.me/5g8i9u.png",
+            "bulgarian": "https://ptpimg.me/un9dc6.png",
+            "chinese": "https://ptpimg.me/ea3yv3.png",
+            "croatian": "https://ptpimg.me/rxi533.png",
+            "czech": "https://ptpimg.me/5m75n3.png",
+            "danish": "https://ptpimg.me/m35c41.png",
+            "dutch": "https://ptpimg.me/6nmwpx.png",
+            "english": "https://ptpimg.me/ine2fd.png",
+            "estonian": "https://ptpimg.me/z25pmk.png",
+            "finnish": "https://ptpimg.me/p4354c.png",
+            "french": "https://ptpimg.me/m7mfoi.png",
+            "german": "https://ptpimg.me/dw8d04.png",
+            "greek": "https://ptpimg.me/px1u3e.png",
+            "hebrew": "https://ptpimg.me/5jw1jp.png",
+            "hungarian": "https://ptpimg.me/fr4aj7.png",
+            "icelandic": "https://ptpimg.me/40o553.png",
+            "indonesian": "https://ptpimg.me/f00c8u.png",
+            "italian": "https://ptpimg.me/ao762a.png",
+            "japanese": "https://ptpimg.me/o1amm3.png",
+            "korean": "https://ptpimg.me/2tvwgn.png",
+            "latvian": "https://ptpimg.me/3x2y1b.png",
+            "lithuanian": "https://ptpimg.me/b444z8.png",
+            "norwegian bokmal": "https://ptpimg.me/1t11u4.png",
+            "polish": "https://ptpimg.me/m73uwa.png",
+            "portuguese": "https://ptpimg.me/5j1a7q.png",
+            "romanian": "https://ptpimg.me/ux94x0.png",
+            "russian": "https://ptpimg.me/v33j64.png",
+            "serbian": "https://ptpimg.me/2139p2.png",
+            "slovak": "https://ptpimg.me/70994n.png",
+            "slovenian": "https://ptpimg.me/61yp81.png",
+            "spanish": "https://ptpimg.me/xj51b9.png",
+            "swedish": "https://ptpimg.me/082090.png",
+            "thai": "https://ptpimg.me/38ru43.png",
+            "turkish": "https://ptpimg.me/g4jg39.png",
+            "ukrainian": "https://ptpimg.me/d8fp6k.png",
+            "vietnamese": "https://ptpimg.me/qnuya2.png"
             # Add more mappings as needed
         }
 
@@ -853,7 +853,7 @@ class COMMON():
                         # Convert language to country code or fallback to the text if not in map
                         country_code = self.LANGUAGE_CODE_MAP.get(property_value.lower())
                         if country_code:
-                            current_track[property_name] = f"[img=20]https://blutopia.cc/img/flags/{country_code}.png[/img]"
+                            current_track[property_name] = f"[img=20]{country_code}[/img]"
                         else:
                             current_track[property_name] = property_value  # Fallback to text if no match
 
@@ -892,7 +892,7 @@ class COMMON():
                     language = track.get("language", "").lower()
                     country_code = self.LANGUAGE_CODE_MAP.get(language)
                     if country_code:
-                        parts.append(f"[img=20]https://blutopia.cc/img/flags/{country_code}.png[/img]")
+                        parts.append(f"[img=20]{country_code}[/img]")
                     else:
                         parts.append(language.capitalize() if language else "")
 
