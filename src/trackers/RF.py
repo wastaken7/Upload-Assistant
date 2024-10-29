@@ -31,6 +31,9 @@ class RF():
         pass
 
     async def upload(self, meta, disctype):
+        if meta.get('category') == "TV":
+            console.print('[bold red]This site only ALLOWS Movies.')
+            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
@@ -92,8 +95,6 @@ class RF():
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
-        if meta.get('category') == "TV":
-            console.print('[bold red]This site only ALLOWS Movies.')
         if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
