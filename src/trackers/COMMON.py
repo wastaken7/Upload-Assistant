@@ -43,6 +43,9 @@ class COMMON():
         from src.prep import Prep
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
+        multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
+        char_limit = int(self.config['DEFAULT'].get('charLimit', 16000))
+        file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
@@ -88,7 +91,7 @@ class COMMON():
                         console.print("[yellow]Using original images from meta['image_list'] for disc_0")
                         images = meta['image_list']
                         descfile.write("[center]")
-                        for img_index in range(min(2, len(images))):
+                        for img_index in range(min(multi_screens, len(images))):
                             raw_url = images[img_index]['raw_url']
                             descfile.write(f"[img=300]{raw_url}[/img] ")
                         descfile.write("[/center]\n\n")
@@ -114,7 +117,7 @@ class COMMON():
                                 console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
                                 use_vs = meta.get('vapoursynth', False)
-                                s = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), 2))
+                                s = multiprocessing.Process(target=prep.disc_screenshots, args=(f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens))
                                 s.start()
                                 while s.is_alive():
                                     await asyncio.sleep(1)
@@ -125,7 +128,7 @@ class COMMON():
                             if new_screens:
                                 uploaded_images, _ = prep.upload_screens(
                                     meta,
-                                    2, 1, 0, 2,
+                                    multi_screens, 1, 0, 2,
                                     new_screens,
                                     {new_images_key: meta[new_images_key]}
                                 )
@@ -163,7 +166,7 @@ class COMMON():
             # Handle multiple files case
             # Initialize character counter
             char_count = 0
-            max_char_limit = 100  # Character limit
+            max_char_limit = char_limit  # Character limit
             other_files_spoiler_open = False  # Track if "Other files" spoiler has been opened
 
             # Process each file
@@ -201,11 +204,9 @@ class COMMON():
 
                         continue  # Skip full MediaInfo and spoilers for remaining files
 
-                    # Standard processing for files until character limit is reached
                     new_images_key = f'new_images_file_{i}'
 
-                    if i < 5:
-                        # Standard processing for the first five files
+                    if i < file_limit:
                         if i == 0:
                             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
                             if mi_dump:
@@ -221,7 +222,7 @@ class COMMON():
                                 images = meta['image_list']
                                 descfile.write("[center]")
                                 char_count += len("[center]")
-                                for img_index in range(min(2, len(images))):
+                                for img_index in range(min(multi_screens, len(images))):
                                     web_url = images[img_index]['web_url']
                                     raw_url = images[img_index]['raw_url']
                                     image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url] "
@@ -258,14 +259,14 @@ class COMMON():
 
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if not new_screens:
-                                    s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, 3, True, None))
+                                    s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
                                     s.start()
                                     while s.is_alive():
                                         await asyncio.sleep(1)
                                     new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
 
                                 if new_screens:
-                                    uploaded_images, _ = prep.upload_screens(meta, 2, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -287,13 +288,13 @@ class COMMON():
                             with open(meta_filename, 'w') as f:
                                 json.dump(meta, f, indent=4)
 
-                    elif i == 5 and not other_files_spoiler_open:
+                    elif i == file_limit and not other_files_spoiler_open:
                         # Open "Other files" spoiler for the fifth file
                         descfile.write("[spoiler=Other files]\n")
                         char_count += len("[spoiler=Other files]\n")
                         other_files_spoiler_open = True
 
-                    if i >= 5 and char_count < max_char_limit:
+                    if i >= file_limit and char_count < max_char_limit:
                         mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
                         parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
