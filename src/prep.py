@@ -2704,6 +2704,7 @@ class Prep():
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         initial_img_host = self.config['DEFAULT'][f'img_host_{img_host_num}']
         img_host = meta['imghost']  # Use the correctly updated image host from meta
+        using_custom_img_list = bool(custom_img_list)
 
         image_list = []
         successfully_uploaded = set()  # Track successfully uploaded images
@@ -2916,7 +2917,9 @@ class Prep():
                                 successfully_uploaded.add(image)  # Track the uploaded image
 
                                 # Store size in meta, indexed by the img_url
-                                meta['image_sizes'][img_url] = image_size  # Keep sizes separate in meta['image_sizes']
+                                # Storing image_sizes for any multi disc/files will probably break something, so lets not do that.
+                                if not using_custom_img_list:
+                                    meta['image_sizes'][img_url] = image_size  # Keep sizes separate in meta['image_sizes']
 
                                 progress.advance(upload_task)
                                 i += 1  # Increment the image counter only after success
