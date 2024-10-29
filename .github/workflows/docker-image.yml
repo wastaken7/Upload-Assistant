@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - develop
-      - dupe-checking
+      - descriptions
   workflow_dispatch:
 
 env:
