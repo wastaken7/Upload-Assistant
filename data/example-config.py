@@ -25,23 +25,28 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
-        # Number of screenshots to use for each disc/episode in packs
+        # Providing the option to change the size of the screenshot thumbnails where supported.
+        # Default is 350, ie [img=350]
+        "thumbnail_size": "350",
+
+        # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites
         "multiScreens": "2",
 
-        # Description character count (including bbcode) cutoff for UNIT3D sites when season packs only
+        # When uploading packs, you can specifiy a different screenshot thumbnail size, default 300.
+        "pack_thumb_size": "300",
+
+        # Description character count (including bbcode) cutoff for UNIT3D sites when **season packs only**
         # After hitting this limit, only filenames and screenshots will be used for any ADDITIONAL files
         # still to be added to the description. You can set this small like 50, to only ever
         # print filenames and screenshots for each file, no mediainfo will be printed.
         # UNIT3D sites have a hard character limit for descriptions. A little over 17000
-        # worked fine in a forum post at BLU. If you are at 1 < charLimit, the next full description will be added.
+        # worked fine in a forum post at BLU. If the description is at 1 < charLimit, the next full
+        # description will be added before respecting this cutoff.
         "charLimit": "14000",
 
         # How many files in a season pack will be added to the description before using an additional spoiler tag
         # Any other files past this limit will be hidden/added all within a spoiler tag.
         "fileLimit": "5",
-
-        # Providing the option to change the size of the thumbnails where supported, default is 350
-        "thumbnail_size": "350",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[centers] SCREENSHOTS [/center]"

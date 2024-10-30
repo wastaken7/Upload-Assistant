@@ -46,6 +46,7 @@ class COMMON():
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         char_limit = int(self.config['DEFAULT'].get('charLimit', 16000))
         file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
+        thumb_size = int(self.config['DEFAULT'].get('pack_thumb_size', '300'))
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
@@ -72,7 +73,7 @@ class COMMON():
                 for img_index in range(len(images[:int(meta['screens'])])):
                     web_url = images[img_index]['web_url']
                     raw_url = images[img_index]['raw_url']
-                    descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                    descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url]")
                 descfile.write("[/center]")
 
             # Handle multiple discs case
@@ -100,7 +101,7 @@ class COMMON():
                         for img_index in range(min(multi_screens, len(images))):
                             web_url = images[img_index]['web_url']
                             raw_url = images[img_index]['raw_url']
-                            image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                            image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                             descfile.write(image_str)
                         descfile.write("[/center]\n\n")
                     else:
@@ -121,7 +122,7 @@ class COMMON():
                             for img in meta[new_images_key]:
                                 web_url = img['web_url']
                                 raw_url = img['raw_url']
-                                image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                 descfile.write(image_str)
                             descfile.write("[/center]\n\n")
                         else:
@@ -175,7 +176,7 @@ class COMMON():
                                 for img in uploaded_images:
                                     web_url = img['web_url']
                                     raw_url = img['raw_url']
-                                    image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                     descfile.write(image_str)
                                 descfile.write("[/center]\n\n")
 
@@ -228,7 +229,7 @@ class COMMON():
                             for img in meta[new_images_key]:
                                 web_url = img['web_url']
                                 raw_url = img['raw_url']
-                                image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                 descfile.write(image_str)
                                 char_count += len(image_str)
                             descfile.write("[/center]\n\n")
@@ -257,7 +258,7 @@ class COMMON():
                                 for img_index in range(min(multi_screens, len(images))):
                                     web_url = images[img_index]['web_url']
                                     raw_url = images[img_index]['raw_url']
-                                    image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                     descfile.write(image_str)
                                     char_count += len(image_str)
                                 descfile.write("[/center]\n\n")
@@ -280,7 +281,7 @@ class COMMON():
                                 for img in meta[new_images_key]:
                                     web_url = img['web_url']
                                     raw_url = img['raw_url']
-                                    image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                     descfile.write(image_str)
                                     char_count += len(image_str)
                                 descfile.write("[/center]\n\n")
@@ -312,7 +313,7 @@ class COMMON():
                                     for img in uploaded_images:
                                         web_url = img['web_url']
                                         raw_url = img['raw_url']
-                                        image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                         descfile.write(image_str)
                                         char_count += len(image_str)
                                     descfile.write("[/center]\n\n")
@@ -345,7 +346,7 @@ class COMMON():
                             for img in meta[new_images_key]:
                                 web_url = img['web_url']
                                 raw_url = img['raw_url']
-                                image_str = f"[url={web_url}][img=300]{raw_url}[/img][/url]"
+                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                 descfile.write(image_str)
                                 char_count += len(image_str)
                             descfile.write("[/center]\n\n")
