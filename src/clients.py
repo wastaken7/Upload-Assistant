@@ -213,7 +213,8 @@ class Clients():
         try:
             qbt_client = qbittorrentapi.Client(host=client['qbit_url'], port=client['qbit_port'], username=client['qbit_user'], password=client['qbit_pass'], VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True))
             qbt_client.auth_log_in()
-            console.print("We logged into qbittorrent")
+            if meta['debug']:
+                console.print("We logged into qbittorrent")
         except qbittorrentapi.LoginFailed:
             console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
             return None
@@ -232,12 +233,10 @@ class Clients():
                 console.print(f"Remote path: {remote_path}")
 
         torrents = qbt_client.torrents.info()
-        for i, torrent in enumerate(torrents):
-            if i >= 5:
-                break  # Limit to only the first 5 torrent paths
+        for torrent in torrents:
             try:
                 torrent_path = torrent.get('content_path', f"{torrent.save_path}{torrent.name}")
-                console.print("Trying torrent_path:", torrent_path)
+                # console.print("Trying torrent_paths")
             except AttributeError:
                 if meta['debug']:
                     console.print(torrent)
@@ -247,26 +246,28 @@ class Clients():
                 # Replace remote path with local path only if not already mapped
                 if not torrent_path.startswith(local_path):
                     torrent_path = torrent_path.replace(remote_path, local_path)
-                    console.print("Replaced paths round 2:", torrent_path)
+                    if meta['debug']:
+                        console.print("Replaced paths round 2:", torrent_path)
 
                 # Check if the local path was accidentally duplicated and correct it
                 if torrent_path.startswith(f"{local_path}/{local_path.split('/')[-1]}"):
                     torrent_path = torrent_path.replace(f"{local_path}/{local_path.split('/')[-1]}", local_path)
-                    console.print("Corrected duplicate in torrent path round 2:", torrent_path)
+                    if meta['debug']:
+                        console.print("Corrected duplicate in torrent path round 2:", torrent_path)
 
                 # Standardize path separators for the local OS
                 torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
-                console.print("Final torrent path after remote mapping round 2:", torrent_path)
+                if meta['debug']:
+                    console.print("Final torrent path after remote mapping round 2:", torrent_path)
 
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
-                if torrent_path == meta['filelist'][0] and len(torrent.files) == len(meta['filelist']):
-                    console.print("we've found an is_disc torrent path, now validating")
+                if torrent_path.lower() == meta['filelist'][0].lower() and len(torrent.files) == len(meta['filelist']):
                     valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
                     if valid:
                         console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
                         return torrent.hash
-            elif meta['path'] == torrent_path:
-                console.print("Now validating a path torrent path")
+
+            elif os.path.normpath(meta['path']).lower() == os.path.normpath(torrent_path).lower():
                 valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
                 if valid:
                     console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
