@@ -787,17 +787,37 @@ class PTP():
                             f.write(mi_dump)
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "r", encoding="utf-8").read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
-                        s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
-                        s.start()
-                        while s.is_alive() is True:
-                            await asyncio.sleep(3)
-                        new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                        if new_screens:
-                            uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {})
-                            for img in uploaded_images[:multi_screens]:
+                        new_images_key = f'new_images_file_{i}'
+                        if new_images_key in meta and meta[new_images_key]:
+                            for img in meta[new_images_key]:
                                 raw_url = img['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
-                        desc.write("\n")
+                            desc.write("\n")
+                        else:
+                            meta['retry_count'] = meta.get('retry_count', 0) + 1
+                            meta[new_images_key] = []
+                            new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                            if not new_screens:
+                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
+                                s.start()
+                                while s.is_alive() is True:
+                                    await asyncio.sleep(3)
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                            if new_screens:
+                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                for img in uploaded_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img['img_url'],
+                                        'raw_url': img['raw_url'],
+                                        'web_url': img['web_url']
+                                    })
+                                    raw_url = img['raw_url']
+                                    desc.write(f"[img]{raw_url}[/img]\n")
+                                desc.write("\n")
+
+                        meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+                        with open(meta_filename, 'w') as f:
+                            json.dump(meta, f, indent=4)
 
     async def get_AntiCsrfToken(self, meta):
         if not os.path.exists(f"{meta['base_dir']}/data/cookies"):
