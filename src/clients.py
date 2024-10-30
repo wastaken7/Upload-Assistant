@@ -77,10 +77,12 @@ class Clients():
         torrenthash = None
         if torrent_storage_dir is not None and os.path.exists(torrent_storage_dir):
             if meta.get('torrenthash', None) is not None:
+                console.print("torrenthash:", torrenthash)
                 valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{meta['torrenthash']}.torrent", meta['torrenthash'], torrent_client, print_err=True)
                 if valid:
                     torrenthash = meta['torrenthash']
             elif meta.get('ext_torrenthash', None) is not None:
+                console.print("ext_torrenthash:", meta.get('ext_torrenthash'))
                 valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{meta['ext_torrenthash']}.torrent", meta['ext_torrenthash'], torrent_client, print_err=True)
                 if valid:
                     torrenthash = meta['ext_torrenthash']
@@ -89,6 +91,7 @@ class Clients():
                 if not torrenthash:
                     console.print("[bold yellow]No Valid .torrent found")
             if not torrenthash:
+                console.print("No torrenthash in find_existing")
                 return None
             torrent_path = f"{torrent_storage_dir}/{torrenthash}.torrent"
             valid2, torrent_path = await self.is_valid_torrent(meta, torrent_path, torrenthash, torrent_client, print_err=False)
@@ -98,6 +101,7 @@ class Clients():
         return None
 
     async def is_valid_torrent(self, meta, torrent_path, torrenthash, torrent_client, print_err=False):
+        console.print("We've moved into torrent validation")
         valid = False
         wrong_file = False
 
@@ -209,6 +213,7 @@ class Clients():
         try:
             qbt_client = qbittorrentapi.Client(host=client['qbit_url'], port=client['qbit_port'], username=client['qbit_user'], password=client['qbit_pass'], VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True))
             qbt_client.auth_log_in()
+            console.print("We logged into qbittorrent")
         except qbittorrentapi.LoginFailed:
             console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
             return None
@@ -230,6 +235,7 @@ class Clients():
         for torrent in torrents:
             try:
                 torrent_path = torrent.get('content_path', f"{torrent.save_path}{torrent.name}")
+                console.print("trying torrent_path", torrent_path)
             except AttributeError:
                 if meta['debug']:
                     console.print(torrent)
@@ -238,14 +244,17 @@ class Clients():
             if remote_path_map:
                 torrent_path = torrent_path.replace(remote_path, local_path)
                 torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
+                console.print("torrent path after remote mapping", torrent_path)
 
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
                 if torrent_path == meta['filelist'][0] and len(torrent.files) == len(meta['filelist']):
+                    console.print("we've found an is_disc torrent path, now validating")
                     valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
                     if valid:
                         console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
                         return torrent.hash
             elif meta['path'] == torrent_path:
+                console.print("Now validating a path torrent path")
                 valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
                 if valid:
                     console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
