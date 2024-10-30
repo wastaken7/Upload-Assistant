@@ -232,10 +232,12 @@ class Clients():
                 console.print(f"Remote path: {remote_path}")
 
         torrents = qbt_client.torrents.info()
-        for torrent in torrents:
+        for i, torrent in enumerate(torrents):
+            if i >= 5:
+                break  # Limit to only the first 5 torrent paths
             try:
                 torrent_path = torrent.get('content_path', f"{torrent.save_path}{torrent.name}")
-                console.print("trying torrent_path", torrent_path)
+                console.print("Trying torrent_path:", torrent_path)
             except AttributeError:
                 if meta['debug']:
                     console.print(torrent)
