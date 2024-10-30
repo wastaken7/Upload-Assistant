@@ -657,11 +657,6 @@ class PTP():
                     new_images_key = f'new_images_disc_{i}'
                     if each['type'] == "BDMV":
                         if i == 0:
-                            desc.write(f"[mediainfo]{each['summary']}[/mediainfo]\n\n")
-                            base2ptp = self.convert_bbcode(base)
-                            if base2ptp.strip() != "":
-                                desc.write(base2ptp)
-                                desc.write("\n\n")
                             for img_index in range(min(multi_screens, len(meta['image_list']))):
                                 raw_url = meta['image_list'][img_index]['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
@@ -706,13 +701,6 @@ class PTP():
 
                     elif each['type'] == "DVD":
                         if i == 0:
-                            desc.write(f"[b][size=3]{each['name']}:[/size][/b]\n")
-                            desc.write(f"[mediainfo]{each['ifo_mi_full']}[/mediainfo]\n")
-                            desc.write(f"[mediainfo]{each['vob_mi_full']}[/mediainfo]\n\n")
-                            base2ptp = self.convert_bbcode(base)
-                            if base2ptp.strip() != "":
-                                desc.write(base2ptp)
-                                desc.write("\n\n")
                             for img_index in range(min(multi_screens, len(meta['image_list']))):
                                 raw_url = meta['image_list'][img_index]['raw_url']
                                 desc.write(f"[img]{raw_url}[/img]\n")
