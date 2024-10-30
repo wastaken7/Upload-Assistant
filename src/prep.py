@@ -2552,16 +2552,16 @@ class Prep():
             # print(f"Initial num_pieces: {num_pieces}, Initial torrent_file_size: {torrent_file_size} bytes")
 
             # Adjust the piece size to fit within the constraints
-            while not ((750 <= num_pieces <= 2200 or num_pieces < 750 and 40960 <= torrent_file_size <= 102400) and torrent_file_size <= 102400):
+            while not ((750 <= num_pieces <= 2200 or num_pieces < 750 and 40960 <= torrent_file_size <= 250000) and torrent_file_size <= 250000):
                 # iteration += 1
                 # print(f"\nIteration {iteration}:")
                 # print(f"Current piece_size: {piece_size} bytes")
                 # print(f"Current num_pieces: {num_pieces}, Current torrent_file_size: {torrent_file_size} bytes")
-                if num_pieces > 1000 and num_pieces < 2000 and torrent_file_size < 100000:
+                if num_pieces > 1000 and num_pieces < 2000 and torrent_file_size < 250000:
                     break
-                elif num_pieces < 1500 and torrent_file_size >= 102400:
+                elif num_pieces < 1500 and torrent_file_size >= 250000:
                     piece_size *= 2
-                    # print(f"Doubled piece_size to {piece_size} bytes (num_pieces < 1500 and torrent_file_size >= 100 KiB)")
+                    # print(f"Doubled piece_size to {piece_size} bytes (num_pieces < 1500 and torrent_file_size >= 250 KiB)")
                     if piece_size > our_max_size:
                         piece_size = our_max_size
                         # print(f"piece_size exceeded max_size, set to our_max_size: {our_max_size} bytes")
@@ -2573,8 +2573,8 @@ class Prep():
                         piece_size = our_min_size
                         # print(f"piece_size went below min_size, set to our_min_size: {our_min_size} bytes")
                         break
-                    elif 40960 < torrent_file_size < 102400:
-                        # print(f"torrent_file_size is between 40 KiB and 100 KiB, exiting loop.")
+                    elif 40960 < torrent_file_size < 250000:
+                        # print(f"torrent_file_size is between 40 KiB and 250 KiB, exiting loop.")
                         break
                 elif num_pieces > 2200:
                     piece_size *= 2
@@ -2586,13 +2586,13 @@ class Prep():
                     elif torrent_file_size < 2048:
                         # print(f"torrent_file_size is less than 2 KiB, exiting loop.")
                         break
-                elif torrent_file_size > 102400:
+                elif torrent_file_size > 250000:
                     piece_size *= 2
-                    # print(f"Doubled piece_size to {piece_size} bytes (torrent_file_size > 100 KiB)")
+                    # print(f"Doubled piece_size to {piece_size} bytes (torrent_file_size > 250 KiB)")
                     if piece_size > our_max_size:
                         piece_size = our_max_size
                         # print(f"piece_size exceeded max_size, set to our_max_size: {our_max_size} bytes")
-                        cli_ui.warning('WARNING: .torrent size will exceed 100 KiB!')
+                        cli_ui.warning('WARNING: .torrent size will exceed 250 KiB!')
                         break
 
                 # Update num_pieces

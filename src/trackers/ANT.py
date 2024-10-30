@@ -67,8 +67,8 @@ class ANT():
         torrent_file_size_kib = os.path.getsize(torrent_path) / 1024
 
         # Trigger regeneration automatically if size constraints aren't met
-        if torrent_file_size_kib > 100:  # 100 KiB
-            console.print("[yellow]Existing .torrent exceeds 100 KiB and will be regenerated to fit constraints.")
+        if torrent_file_size_kib > 250:  # 250 KiB
+            console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
 
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
