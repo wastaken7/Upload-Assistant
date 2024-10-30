@@ -759,43 +759,91 @@ class COMMON():
     class MediaInfoParser:
         # Language to ISO country code mapping
         LANGUAGE_CODE_MAP = {
+            "afrikaans": "https://ptpimg.me/i9pt6k.png",
+            "albanian": "https://ptpimg.me/sfhik8.png",
+            "amharic": "https://ptpimg.me/zm816y.png",
             "arabic": "https://ptpimg.me/5g8i9u.png",
+            "armenian": "https://ptpimg.me/zm816y.png",
+            "azerbaijani": "https://ptpimg.me/h3rbe0.png",
+            "basque": "https://ptpimg.me/xj51b9.png",
+            "belarusian": "https://ptpimg.me/iushg1.png",
+            "bengali": "https://ptpimg.me/jq996n.png",
+            "bosnian": "https://ptpimg.me/19t9rv.png",
             "bulgarian": "https://ptpimg.me/un9dc6.png",
+            "catalan": "https://ptpimg.me/v4h5bf.png",
             "chinese": "https://ptpimg.me/ea3yv3.png",
             "croatian": "https://ptpimg.me/rxi533.png",
             "czech": "https://ptpimg.me/5m75n3.png",
             "danish": "https://ptpimg.me/m35c41.png",
             "dutch": "https://ptpimg.me/6nmwpx.png",
+            "dzongkha": "https://ptpimg.me/56e7y5.png",
             "english": "https://ptpimg.me/ine2fd.png",
             "estonian": "https://ptpimg.me/z25pmk.png",
+            "filipino": "https://ptpimg.me/9d3z9w.png",
             "finnish": "https://ptpimg.me/p4354c.png",
             "french": "https://ptpimg.me/m7mfoi.png",
+            "galician": "https://ptpimg.me/xj51b9.png",
+            "georgian": "https://ptpimg.me/pp412q.png",
             "german": "https://ptpimg.me/dw8d04.png",
             "greek": "https://ptpimg.me/px1u3e.png",
+            "gujarati": "https://ptpimg.me/d0l479.png",
+            "haitian creole": "https://ptpimg.me/f64wlp.png",
             "hebrew": "https://ptpimg.me/5jw1jp.png",
+            "hindi": "https://ptpimg.me/d0l479.png",
             "hungarian": "https://ptpimg.me/fr4aj7.png",
             "icelandic": "https://ptpimg.me/40o553.png",
             "indonesian": "https://ptpimg.me/f00c8u.png",
+            "irish": "https://ptpimg.me/71x9mk.png",
             "italian": "https://ptpimg.me/ao762a.png",
             "japanese": "https://ptpimg.me/o1amm3.png",
+            "kannada": "https://ptpimg.me/d0l479.png",
+            "kazakh": "https://ptpimg.me/tq1h8b.png",
+            "khmer": "https://ptpimg.me/0p1tli.png",
             "korean": "https://ptpimg.me/2tvwgn.png",
+            "kurdish": "https://ptpimg.me/g290wo.png",
+            "kyrgyz": "https://ptpimg.me/336unh.png",
+            "lao": "https://ptpimg.me/n3nan1.png",
             "latvian": "https://ptpimg.me/3x2y1b.png",
             "lithuanian": "https://ptpimg.me/b444z8.png",
+            "luxembourgish": "https://ptpimg.me/52x189.png",
+            "macedonian": "https://ptpimg.me/2g5lva.png",
+            "malagasy": "https://ptpimg.me/n5120r.png",
+            "malay": "https://ptpimg.me/06suor.png",
+            "malayalam": "https://ptpimg.me/d0l479.png",
+            "maltese": "https://ptpimg.me/ua46c2.png",
+            "maori": "https://ptpimg.me/2fw03g.png",
+            "marathi": "https://ptpimg.me/d0l479.png",
+            "mongolian": "https://ptpimg.me/z2h682.png",
+            "nepali": "https://ptpimg.me/5yd3sp.png",
             "norwegian bokmal": "https://ptpimg.me/1t11u4.png",
+            "pashto": "https://ptpimg.me/i9pt6k.png",
+            "persian": "https://ptpimg.me/i0y103.png",
             "polish": "https://ptpimg.me/m73uwa.png",
             "portuguese": "https://ptpimg.me/5j1a7q.png",
+            "punjabi": "https://ptpimg.me/d0l479.png",
             "romanian": "https://ptpimg.me/ux94x0.png",
             "russian": "https://ptpimg.me/v33j64.png",
+            "samoan": "https://ptpimg.me/8nt3zq.png",
             "serbian": "https://ptpimg.me/2139p2.png",
             "slovak": "https://ptpimg.me/70994n.png",
             "slovenian": "https://ptpimg.me/61yp81.png",
+            "somali": "https://ptpimg.me/320pa6.png",
             "spanish": "https://ptpimg.me/xj51b9.png",
+            "swahili": "https://ptpimg.me/d0l479.png",
             "swedish": "https://ptpimg.me/082090.png",
+            "tamil": "https://ptpimg.me/d0l479.png",
+            "telugu": "https://ptpimg.me/d0l479.png",
             "thai": "https://ptpimg.me/38ru43.png",
             "turkish": "https://ptpimg.me/g4jg39.png",
             "ukrainian": "https://ptpimg.me/d8fp6k.png",
-            "vietnamese": "https://ptpimg.me/qnuya2.png"
-            # Add more mappings as needed
+            "urdu": "https://ptpimg.me/z23gg5.png",
+            "uzbek": "https://ptpimg.me/89854s.png",
+            "vietnamese": "https://ptpimg.me/qnuya2.png",
+            "welsh": "https://ptpimg.me/a9w539.png",
+            "xhosa": "https://ptpimg.me/7teg09.png",
+            "yiddish": "https://ptpimg.me/5jw1jp.png",
+            "yoruba": "https://ptpimg.me/9l34il.png",
+            "zulu": "https://ptpimg.me/7teg09.png"
         }
 
         def parse_mediainfo(self, mediainfo_text):
@@ -816,7 +864,7 @@ class COMMON():
             audio_fields = {
                 'codec', 'format', 'bit_rate', 'channels', 'title', 'language', 'format_profile', 'stream_size'
             }
-            text_fields = {'language'}
+            text_fields = {'title', 'language'}
 
             # Split MediaInfo by lines and process each line
             for line in mediainfo_text.splitlines():
@@ -853,9 +901,12 @@ class COMMON():
                         # Convert language to country code or fallback to the text if not in map
                         country_code = self.LANGUAGE_CODE_MAP.get(property_value.lower())
                         if country_code:
+                            # If there is a country code, use it and append title if available
                             current_track[property_name] = f"[img=20]{country_code}[/img]"
-                        else:
-                            current_track[property_name] = property_value  # Fallback to text if no match
+                            # if "title" in current_track and current_track["title"]:
+                            #     current_track[property_name] += f" {current_track['title']}"
+                        elif property_value:  # Only fallback if `property_value` exists but is not in LANGUAGE_CODE_MAP
+                            current_track[property_name] = property_value
 
             # Append the last track to the parsed data
             if current_section and current_track:
