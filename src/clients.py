@@ -242,18 +242,19 @@ class Clients():
                     console.print_exception()
                 continue
             if remote_path_map:
-                # Replace remote path with local path
-                torrent_path = torrent_path.replace(remote_path, local_path)
-                console.print("replaced paths:", torrent_path)
+                # Replace remote path with local path only if not already mapped
+                if not torrent_path.startswith(local_path):
+                    torrent_path = torrent_path.replace(remote_path, local_path)
+                    console.print("Replaced paths round 2:", torrent_path)
 
                 # Check if the local path was accidentally duplicated and correct it
                 if torrent_path.startswith(f"{local_path}/{local_path.split('/')[-1]}"):
                     torrent_path = torrent_path.replace(f"{local_path}/{local_path.split('/')[-1]}", local_path)
-                    console.print("replaced torrent path after duplicate removal:", torrent_path)
+                    console.print("Corrected duplicate in torrent path round 2:", torrent_path)
 
                 # Standardize path separators for the local OS
                 torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
-                console.print("Final torrent path after remote mapping:", torrent_path)
+                console.print("Final torrent path after remote mapping round 2:", torrent_path)
 
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
                 if torrent_path == meta['filelist'][0] and len(torrent.files) == len(meta['filelist']):
