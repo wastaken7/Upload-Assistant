@@ -187,6 +187,15 @@ class COMMON():
 
             # Handle single file case
             if len(filelist) == 1:
+                if meta['debug']:
+                    mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
+                    if mi_dump:
+                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
+                        formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
+                        for i, file in enumerate(filelist):
+                            if i == 0:
+                                filename = os.path.splitext(os.path.basename(file.strip()))[0]
+                                descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
                 images = meta['image_list']
                 descfile.write("[center]")
                 for img_index in range(len(images[:int(meta['screens'])])):
