@@ -186,7 +186,7 @@ class Prep():
         if desc not in [None, '0', '']:
             meta['description'] = desc
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                description.write(desc + "\n")
+                description.write((desc or "") + "\n")
         if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
             meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
 
@@ -256,7 +256,7 @@ class Prep():
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                             meta['description'] = ptp_desc
                             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                                description.write(ptp_desc + "\n")
+                                description.write((ptp_desc or "") + "\n")
 
                             if not meta['is_disc']:
                                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
@@ -273,7 +273,7 @@ class Prep():
                         ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         meta['description'] = ptp_desc
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                            description.write(ptp_desc + "\n")
+                            description.write((ptp_desc or "") + "\n")
                         meta['saved_description'] = True
 
                         if not meta['is_disc']:
