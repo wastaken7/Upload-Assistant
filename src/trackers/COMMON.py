@@ -325,8 +325,8 @@ class COMMON():
 
                     elif i == file_limit and not other_files_spoiler_open:
                         # Open "Other files" spoiler for the fifth file
-                        descfile.write("[spoiler=Other files]\n")
-                        char_count += len("[spoiler=Other files]\n")
+                        descfile.write("[center][spoiler=Other files]\n")
+                        char_count += len("[center][spoiler=Other files]\n")
                         other_files_spoiler_open = True
 
                     if i >= file_limit and char_count < max_char_limit:
@@ -336,8 +336,8 @@ class COMMON():
 
                         filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
-                        descfile.write(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
-                        char_count += len(f"[spoiler={filename}]{formatted_bbcode}[/spoiler]\n\n")
+                        descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n\n")
+                        char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n\n")
 
                         if new_images_key in meta and meta[new_images_key]:
                             console.print(f"[yellow]Found needed image URLs for {new_images_key}")
