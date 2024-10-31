@@ -184,7 +184,9 @@ class Prep():
         if mal not in [None, '0']:
             meta['mal'] = mal
         if desc not in [None, '0', '']:
-            meta[f'{tracker_name.lower()}_desc'] = desc
+            meta['description'] = desc
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                description.write(desc + "\n")
         if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
             meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
 
@@ -253,7 +255,8 @@ class Prep():
                             # Retrieve PTP description and image list
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                             meta['description'] = ptp_desc
-                            meta['skip_gen_desc'] = True
+                            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                                description.write(ptp_desc + "\n")
 
                             if not meta['is_disc']:
                                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
@@ -269,7 +272,9 @@ class Prep():
                         found_match = True
                         ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         meta['description'] = ptp_desc
-                        meta['skip_gen_desc'] = True
+                        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                            description.write(ptp_desc + "\n")
+                        meta['saved_description'] = True
 
                         if not meta['is_disc']:
                             if not meta.get('image_list'):  # Only handle images if image_list is not already populated
@@ -291,7 +296,9 @@ class Prep():
                     meta['skipit'] = True
                     ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                     meta['description'] = ptp_desc
-                    meta['skip_gen_desc'] = True
+                    with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                        description.write(ptp_desc + "\n")
+                    meta['saved_description'] = True
                     if not meta['is_disc']:
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                             valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
@@ -366,6 +373,7 @@ class Prep():
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
+        meta['saved_description'] = False
 
         if meta.get('uuid', None) is None:
             folder_id = os.path.basename(meta['path'])
@@ -561,7 +569,6 @@ class Prep():
                             meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
                             if match:
                                 found_match = True
-
                     if not meta['is_disc']:
                         if "BLU" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
@@ -729,7 +736,8 @@ class Prep():
         meta['stream'] = self.stream_optimized(meta['stream'])
         meta.get('anon', False)
         meta['anon'] = self.is_anon(meta['anon'])
-        meta = await self.gen_desc(meta)
+        if meta['saved_description'] is False:
+            meta = await self.gen_desc(meta)
         return meta
 
     """

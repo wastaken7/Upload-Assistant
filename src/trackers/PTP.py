@@ -219,7 +219,7 @@ class PTP():
                 if edited_description:
                     desc = edited_description.strip()
                     meta['description'] = desc
-                    meta['skip_gen_desc'] = True
+                    meta['saved_description'] = True
                 console.print(f"[green]Final description after editing:[/green] {desc}")
             elif edit_choice.lower() == 'd':
                 desc = None
@@ -227,7 +227,7 @@ class PTP():
             else:
                 console.print("[green]Keeping the original description.[/green]")
                 meta['description'] = ptp_desc
-                meta['skip_gen_desc'] = True
+                meta['saved_description'] = True
 
         return desc, imagelist
 

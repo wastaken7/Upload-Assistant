@@ -565,7 +565,7 @@ class COMMON():
                         if edited_description:
                             description = edited_description.strip()
                             meta['description'] = description
-                            meta['skip_gen_desc'] = True
+                            meta['saved_description'] = True
                         console.print(f"Final description after editing: {description}", markup=False)
                     elif edit_choice.lower() == 'd':
                         description = None
@@ -573,10 +573,10 @@ class COMMON():
                     else:
                         console.print("[green]Keeping the original description.[/green]")
                         meta['description'] = description
-                        meta['skip_gen_desc'] = True
+                        meta['saved_description'] = True
                 else:
                     meta['description'] = description
-                    meta['skip_gen_desc'] = True
+                    meta['saved_description'] = True
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
