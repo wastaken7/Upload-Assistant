@@ -3130,6 +3130,8 @@ class Prep():
                         season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
 
                         # For --daily flagged shows, pass the supplied date as the episode title
+                        season = f"S{str(season_int).zfill(2)}"
+                        episode = f"E{str(episode_int).zfill(2)}"                        
                         meta['episode_title'] = meta.get('manual_date')
                         
                     else:
