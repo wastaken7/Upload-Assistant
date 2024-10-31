@@ -3121,13 +3121,15 @@ class Prep():
             if meta['anime'] is False:
                 try:
                     if meta.get('manual_date'):
+                        is_daily = True
                         guess_date = meta.get('manual_date', guessit(video)['date']) if meta.get('manual_date') else guessit(video)['date']
                         season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
-                        season = f"S{str(season_int).zfill(2)}"
-                        episode = f"E{str(episode_int).zfill(2)}"
-                        # season = str(guess_date)
-                        # episode = ""
-                        is_daily = True
+
+                        # For --daily flagged shows, always use the supplied date as the episode title
+                        season = ""
+                        episode = ""
+                        meta['episode_title'] = meta.get('manual_date')
+                        
                     else:
                         try:
                             guess_year = guessit(video)['year']
