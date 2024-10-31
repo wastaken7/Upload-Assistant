@@ -3026,6 +3026,10 @@ class Prep():
                 year = meta['year']
             else:
                 year = ""
+            if meta.get('manual_date'):
+                # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
+                season = ''
+                episode = ''
         if meta.get('no_season', False) is True:
             season = ''
         if meta.get('no_year', False) is True:
@@ -3125,9 +3129,7 @@ class Prep():
                         guess_date = meta.get('manual_date', guessit(video)['date']) if meta.get('manual_date') else guessit(video)['date']
                         season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
 
-                        # For --daily flagged shows, always use the supplied date as the episode title
-                        season = ""
-                        episode = ""
+                        # For --daily flagged shows, pass the supplied date as the episode title
                         meta['episode_title'] = meta.get('manual_date')
                         
                     else:
