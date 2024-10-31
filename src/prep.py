@@ -492,6 +492,10 @@ class Prep():
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
+        description_text = meta.get('description') if meta.get('description') else ""
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+            description.write(description_text)
+
         if not meta.get('image_list'):
             # Reuse information from trackers with fallback
             found_match = False
