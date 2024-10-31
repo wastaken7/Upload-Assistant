@@ -791,6 +791,7 @@ class COMMON():
             "estonian": "https://ptpimg.me/z25pmk.png",
             "filipino": "https://ptpimg.me/9d3z9w.png",
             "finnish": "https://ptpimg.me/p4354c.png",
+            "french canadian": "https://ptpimg.me/ei4s6u.png",
             "french": "https://ptpimg.me/m7mfoi.png",
             "galician": "https://ptpimg.me/xj51b9.png",
             "georgian": "https://ptpimg.me/pp412q.png",
@@ -874,7 +875,7 @@ class COMMON():
             audio_fields = {
                 'codec', 'format', 'bit_rate', 'channels', 'title', 'language', 'format_profile', 'stream_size'
             }
-            text_fields = {'title', 'language'}
+            # text_fields = {'title', 'language'}
 
             # Split MediaInfo by lines and process each line
             for line in mediainfo_text.splitlines():
@@ -889,7 +890,9 @@ class COMMON():
                             parsed_data[current_section].append(current_track)
                         else:
                             parsed_data[current_section] = current_track
-                        current_track = {}
+                        # Debug output for finalizing the current track data
+                        # print(f"Final processed track data for section '{current_section}': {current_track}")
+                        current_track = {}  # Reset current track
 
                     # Update the current section
                     current_section = section_match.group(1).lower()
@@ -907,23 +910,50 @@ class COMMON():
                         current_track[property_name] = property_value
                     elif current_section == "audio" and property_name in audio_fields:
                         current_track[property_name] = property_value
-                    elif current_section == "text" and property_name in text_fields:
-                        # Convert language to country code or fallback to the text if not in map
-                        country_code = self.LANGUAGE_CODE_MAP.get(property_value.lower())
-                        if country_code:
-                            # If there is a country code, use it and append title if available
-                            current_track[property_name] = f"[img=20]{country_code}[/img]"
-                            # if "title" in current_track and current_track["title"]:
-                            #     current_track[property_name] += f" {current_track['title']}"
-                        elif property_value:  # Only fallback if `property_value` exists but is not in LANGUAGE_CODE_MAP
-                            current_track[property_name] = property_value
+                    elif current_section == "text":
+                        # Processing specific properties for text
+                        # Process title field
+                        if property_name == "title" and "title" not in current_track:
+                            title_lower = property_value.lower()
+                            # print(f"\nProcessing Title: '{property_value}'")  # Debugging output
 
-            # Append the last track to the parsed data
+                            # Store the title as-is since it should remain descriptive
+                            current_track["title"] = property_value
+                            # print(f"Stored title: '{property_value}'")
+
+                            # If there's an exact match in LANGUAGE_CODE_MAP, add country code to language field
+                            if title_lower in self.LANGUAGE_CODE_MAP:
+                                country_code = self.LANGUAGE_CODE_MAP[title_lower]
+                                current_track["language"] = f"[img=20]{country_code}[/img]"
+                                # print(f"Exact match found for title '{title_lower}' with country code: {country_code}")
+
+                        # Process language field only if it hasn't already been set
+                        elif property_name == "language" and "language" not in current_track:
+                            language_lower = property_value.lower()
+                            # print(f"\nProcessing Language: '{property_value}'")  # Debugging output
+
+                            if language_lower in self.LANGUAGE_CODE_MAP:
+                                country_code = self.LANGUAGE_CODE_MAP[language_lower]
+                                current_track["language"] = f"[img=20]{country_code}[/img]"
+                                # print(f"Matched language '{language_lower}' to country code: {country_code}")
+                            else:
+                                # If no match in LANGUAGE_CODE_MAP, store language as-is
+                                current_track["language"] = property_value
+                                # print(f"No match found for language '{property_value}', stored as-is.")
+
+            # Append the last track to the parsed data if it exists
             if current_section and current_track:
                 if current_section in ["video", "audio", "text"]:
                     parsed_data[current_section].append(current_track)
                 else:
                     parsed_data[current_section] = current_track
+                # Final debug output for the last track data
+                # print(f"Final processed track data for last section '{current_section}': {current_track}")
+
+            # Debug output for the complete parsed_data
+            # print("\nComplete Parsed Data:")
+            for section, data in parsed_data.items():
+                print(f"{section}: {data}")
 
             return parsed_data
 
