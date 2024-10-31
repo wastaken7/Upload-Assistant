@@ -3121,35 +3121,34 @@ class Prep():
             if meta['anime'] is False:
                 try:
                     if meta.get('manual_date'):
-                        raise ManualDateException  # noqa: F405
-                    try:
-                        guess_year = guessit(video)['year']
-                    except Exception:
-                        guess_year = ""
-                    if guessit(video)["season"] == guess_year:
-                        if f"s{guessit(video)['season']}" in video.lower():
-                            season_int = str(guessit(video)["season"])
-                            season = "S" + season_int.zfill(2)
-                        else:
-                            season_int = "1"
-                            season = "S01"
-                    else:
-                        season_int = str(guessit(video)["season"])
-                        season = "S" + season_int.zfill(2)
-
-                except Exception:
-                    try:
                         guess_date = meta.get('manual_date', guessit(video)['date']) if meta.get('manual_date') else guessit(video)['date']
                         season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
-                        # season = f"S{season_int.zfill(2)}"
-                        # episode = f"E{episode_int.zfill(2)}"
-                        season = str(guess_date)
-                        episode = ""
+                        season = f"S{str(season_int).zfill(2)}"
+                        episode = f"E{str(episode_int).zfill(2)}"
+                        # season = str(guess_date)
+                        # episode = ""
                         is_daily = True
-                    except Exception:
-                        console.print_exception()
-                        season_int = "1"
-                        season = "S01"
+                    else:
+                        try:
+                            guess_year = guessit(video)['year']
+                        except Exception:
+                            guess_year = ""
+                        if guessit(video)["season"] == guess_year:
+                            if f"s{guessit(video)['season']}" in video.lower():
+                                season_int = str(guessit(video)["season"])
+                                season = "S" + season_int.zfill(2)
+                            else:
+                                season_int = "1"
+                                season = "S01"
+                        else:
+                            season_int = str(guessit(video)["season"])
+                            season = "S" + season_int.zfill(2)
+
+                except Exception:
+                    console.print_exception()
+                    season_int = "1"
+                    season = "S01"
+
                 try:
                     if is_daily is not True:
                         episodes = ""
@@ -3172,6 +3171,7 @@ class Prep():
                     episode = ""
                     episode_int = "0"
                     meta['tv_pack'] = 1
+
             else:
                 # If Anime
                 parsed = anitopy.parse(Path(video).name)
@@ -3648,17 +3648,17 @@ class Prep():
     def daily_to_tmdb_season_episode(self, tmdbid, date):
         show = tmdb.TV(tmdbid)
         seasons = show.info().get('seasons')
-        season = '1'
-        episode = '1'
+        season = 1
+        episode = 1
         date = datetime.fromisoformat(str(date))
         for each in seasons:
             air_date = datetime.fromisoformat(each['air_date'])
             if air_date <= date:
-                season = str(each['season_number'])
+                season = int(each['season_number'])
         season_info = tmdb.TV_Seasons(tmdbid, season).info().get('episodes')
         for each in season_info:
-            if str(each['air_date']) == str(date):
-                episode = str(each['episode_number'])
+            if str(each['air_date']) == str(date.date()):
+                episode = int(each['episode_number'])
                 break
         else:
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")
