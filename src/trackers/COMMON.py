@@ -728,6 +728,7 @@ class COMMON():
             "estonian": "https://ptpimg.me/z25pmk.png",
             "filipino": "https://ptpimg.me/9d3z9w.png",
             "finnish": "https://ptpimg.me/p4354c.png",
+            "french (canada)": "https://ptpimg.me/ei4s6u.png",
             "french canadian": "https://ptpimg.me/ei4s6u.png",
             "french": "https://ptpimg.me/m7mfoi.png",
             "galician": "https://ptpimg.me/xj51b9.png",
@@ -769,6 +770,7 @@ class COMMON():
             "persian": "https://ptpimg.me/i0y103.png",
             "polish": "https://ptpimg.me/m73uwa.png",
             "portuguese": "https://ptpimg.me/5j1a7q.png",
+            "portuguese (brazil)": "https://ptpimg.me/p8sgla.png",
             "punjabi": "https://ptpimg.me/d0l479.png",
             "romanian": "https://ptpimg.me/ux94x0.png",
             "russian": "https://ptpimg.me/v33j64.png",
@@ -778,6 +780,7 @@ class COMMON():
             "slovenian": "https://ptpimg.me/61yp81.png",
             "somali": "https://ptpimg.me/320pa6.png",
             "spanish": "https://ptpimg.me/xj51b9.png",
+            "spanish (latin america)": "https://ptpimg.me/11350x.png",
             "swahili": "https://ptpimg.me/d0l479.png",
             "swedish": "https://ptpimg.me/082090.png",
             "tamil": "https://ptpimg.me/d0l479.png",
@@ -890,8 +893,8 @@ class COMMON():
 
             # Debug output for the complete parsed_data
             # print("\nComplete Parsed Data:")
-            for section, data in parsed_data.items():
-                print(f"{section}: {data}")
+            # for section, data in parsed_data.items():
+                # print(f"{section}: {data}")
 
             return parsed_data
 
