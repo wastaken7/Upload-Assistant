@@ -559,9 +559,7 @@ class Prep():
                         if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
                             ptp = PTP(config=self.config)
                             try:
-                                meta, match = await asyncio.wait_for(
-                                    self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder),
-                                )
+                                meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
                                 if match:
                                     found_match = True
                             except aiohttp.ClientSSLError:
@@ -574,9 +572,7 @@ class Prep():
                             if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                                 blu = BLU(config=self.config)
                                 try:
-                                    meta, match = await asyncio.wait_for(
-                                        self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder),
-                                    )
+                                    meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
                                     if match:
                                         found_match = True
                                 except aiohttp.ClientSSLError:
@@ -588,9 +584,7 @@ class Prep():
                             if str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
                                 aither = AITHER(config=self.config)
                                 try:
-                                    meta, match = await asyncio.wait_for(
-                                        self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder),
-                                    )
+                                    meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
                                     if match:
                                         found_match = True
                                 except aiohttp.ClientSSLError:
@@ -602,9 +596,7 @@ class Prep():
                             if str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
                                 lst = LST(config=self.config)
                                 try:
-                                    meta, match = await asyncio.wait_for(
-                                        self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder),
-                                    )
+                                    meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
                                     if match:
                                         found_match = True
                                 except aiohttp.ClientSSLError:
@@ -616,9 +608,7 @@ class Prep():
                             if str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
                                 oe = OE(config=self.config)
                                 try:
-                                    meta, match = await asyncio.wait_for(
-                                        self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder),
-                                    )
+                                    meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
                                     if match:
                                         found_match = True
                                 except aiohttp.ClientSSLError:
@@ -630,9 +620,7 @@ class Prep():
                             if str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
                                 tik = TIK(config=self.config)
                                 try:
-                                    meta, match = await asyncio.wait_for(
-                                        self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder),
-                                    )
+                                    meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
                                     if match:
                                         found_match = True
                                 except aiohttp.ClientSSLError:
@@ -644,9 +632,7 @@ class Prep():
                         if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
                             hdb = HDB(config=self.config)
                             try:
-                                meta, match = await asyncio.wait_for(
-                                    self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder),
-                                )
+                                meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
                                 if match:
                                     found_match = True
                             except aiohttp.ClientSSLError:
