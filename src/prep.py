@@ -492,7 +492,7 @@ class Prep():
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
-        description_text = meta.get('description') if meta.get('description') else ""
+        description_text = meta['description'] if meta['description'] else ""
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.write(description_text)
 
@@ -563,6 +563,7 @@ class Prep():
                         meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
                         if match:
                             found_match = True
+
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
@@ -3500,6 +3501,8 @@ class Prep():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.seek(0)
 
+            content_written = False
+
             if meta.get('desc_template'):
                 from jinja2 import Template
                 try:
@@ -3508,11 +3511,11 @@ class Prep():
                         template_desc = template.render(meta)
                         if clean_text(template_desc):
                             description.write(template_desc + "\n")
-                            console.print(f"[INFO] Description from template '{meta['desc_template']}' used.")
+                            content_written = True
                 except FileNotFoundError:
                     console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
 
-            if meta.get('nfo'):
+            if meta.get('nfo') and not content_written:
                 nfo_files = glob.glob("*.nfo")
                 if nfo_files:
                     nfo = nfo_files[0]
@@ -3520,38 +3523,44 @@ class Prep():
                         nfo_content = nfo_file.read()
                     description.write(f"[code]{nfo_content}[/code]\n")
                     meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] NFO file '{nfo}' used.")
+                    content_written = True
 
-            if desclink:
+            if desclink and not content_written:
                 try:
                     parsed = urllib.parse.urlparse(desclink.replace('/raw/', '/'))
                     split = os.path.split(parsed.path)
                     raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != '/' else f"/raw{parsed.path}")
                     raw_url = urllib.parse.urlunparse(raw)
                     desclink_content = requests.get(raw_url).text
-                    description.write(desclink_content + "\n")
-                    meta['description'] = "CUSTOM"
-                    console.print(f"[INFO] Description from link '{desclink}' used.")
+                    if clean_text(desclink_content):
+                        description.write(desclink_content + "\n")
+                        meta['description'] = "CUSTOM"
+                        content_written = True
                 except Exception as e:
                     console.print(f"[ERROR] Failed to fetch description from link: {e}")
 
-            if descfile and os.path.isfile(descfile):
+            if descfile and os.path.isfile(descfile) and not content_written:
                 with open(descfile, 'r') as f:
                     file_content = f.read()
-                description.write(file_content)
-                meta['description'] = "CUSTOM"
-                console.print(f"[INFO] Description from file '{descfile}' used.")
+                if clean_text(file_content):
+                    description.write(file_content)
+                    meta['description'] = "CUSTOM"
+                    content_written = True
 
-            if meta.get('desc'):
+            if meta.get('desc') and not content_written:
                 description.write(meta['desc'] + "\n")
                 meta['description'] = "CUSTOM"
-                console.print("[INFO] Custom description used.")
+                content_written = True
+
+            if not content_written:
+                description.write(meta['description'] + "\n")
 
             description.write("\n")
             return meta
 
+        # Fallback if no description is provided
         if not meta.get('skip_gen_desc', False):
-            description_text = meta.get('description') if meta.get('description') else ""
+            description_text = meta['description'] if meta['description'] else ""
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                 description.write(description_text + "\n")
 
