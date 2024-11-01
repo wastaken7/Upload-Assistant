@@ -552,7 +552,6 @@ class Prep():
                         if match:
                             found_match = True
                 else:
-                    timeout_duration = 2  # seconds
                     # Process all trackers with API = true if no specific tracker is set in meta
                     default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
 
@@ -566,8 +565,6 @@ class Prep():
                                 )
                                 if match:
                                     found_match = True
-                            except asyncio.TimeoutError:
-                                print("PTP tracker request timed out.")
                             except aiohttp.ClientSSLError:
                                 print("PTP tracker request failed due to SSL error.")
                             except requests.exceptions.ConnectionError as conn_err:
@@ -584,8 +581,6 @@ class Prep():
                                     )
                                     if match:
                                         found_match = True
-                                except asyncio.TimeoutError:
-                                    print("BLU tracker request timed out.")
                                 except aiohttp.ClientSSLError:
                                     print("BLU tracker request failed due to SSL error.")
                                 except requests.exceptions.ConnectionError as conn_err:
@@ -601,8 +596,6 @@ class Prep():
                                     )
                                     if match:
                                         found_match = True
-                                except asyncio.TimeoutError:
-                                    print("AITHER tracker request timed out.")
                                 except aiohttp.ClientSSLError:
                                     print("AITHER tracker request failed due to SSL error.")
                                 except requests.exceptions.ConnectionError as conn_err:
@@ -618,8 +611,6 @@ class Prep():
                                     )
                                     if match:
                                         found_match = True
-                                except asyncio.TimeoutError:
-                                    print("LST tracker request timed out.")
                                 except aiohttp.ClientSSLError:
                                     print("LST tracker request failed due to SSL error.")
                                 except requests.exceptions.ConnectionError as conn_err:
@@ -635,8 +626,6 @@ class Prep():
                                     )
                                     if match:
                                         found_match = True
-                                except asyncio.TimeoutError:
-                                    print("OE tracker request timed out.")
                                 except aiohttp.ClientSSLError:
                                     print("OE tracker request failed due to SSL error.")
                                 except requests.exceptions.ConnectionError as conn_err:
@@ -652,8 +641,6 @@ class Prep():
                                     )
                                     if match:
                                         found_match = True
-                                except asyncio.TimeoutError:
-                                    print("TIK tracker request timed out.")
                                 except aiohttp.ClientSSLError:
                                     print("TIK tracker request failed due to SSL error.")
                                 except requests.exceptions.ConnectionError as conn_err:
@@ -669,8 +656,6 @@ class Prep():
                                 )
                                 if match:
                                     found_match = True
-                            except asyncio.TimeoutError:
-                                print("HDB tracker request timed out.")
                             except aiohttp.ClientSSLError:
                                 print("HDB tracker request failed due to SSL error.")
                             except requests.exceptions.ConnectionError as conn_err:
