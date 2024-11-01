@@ -212,34 +212,35 @@ class COMMON():
 
             # First Pass: Create and Upload Images for Each File
             for i, file in enumerate(filelist):
-                if i > 0:
-                    new_images_key = f'new_images_file_{i}'
-                    if new_images_key not in meta or not meta[new_images_key]:
-                        # Proceed with image generation if not already present
-                        meta[new_images_key] = []
-                        new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-
-                        # If no screenshots exist, create them
-                        if not new_screens:
-                            if meta['debug']:
-                                console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
-                            s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
-                            s.start()
-                            while s.is_alive():
-                                await asyncio.sleep(1)
-
+                if multi_screens != 0:
+                    if i > 0:
+                        new_images_key = f'new_images_file_{i}'
+                        if new_images_key not in meta or not meta[new_images_key]:
+                            # Proceed with image generation if not already present
+                            meta[new_images_key] = []
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
 
-                        # Upload generated screenshots
-                        if new_screens:
-                            uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
-                            meta[new_images_key] = []
-                            for img in uploaded_images:
-                                meta[new_images_key].append({
-                                    'img_url': img['img_url'],
-                                    'raw_url': img['raw_url'],
-                                    'web_url': img['web_url']
-                                })
+                            # If no screenshots exist, create them
+                            if not new_screens:
+                                if meta['debug']:
+                                    console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
+                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
+                                s.start()
+                                while s.is_alive():
+                                    await asyncio.sleep(1)
+
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+
+                            # Upload generated screenshots
+                            if new_screens:
+                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                meta[new_images_key] = []
+                                for img in uploaded_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img['img_url'],
+                                        'raw_url': img['raw_url'],
+                                        'web_url': img['web_url']
+                                    })
 
             # Save updated meta
             meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
@@ -253,33 +254,38 @@ class COMMON():
                     filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
                     # If we are beyond the file limit, add all further files in a spoiler
-                    if i >= file_limit:
-                        if not other_files_spoiler_open:
-                            descfile.write("[center][spoiler=Other files]\n")
-                            char_count += len("[center][spoiler=Other files]\n")
-                            other_files_spoiler_open = True
+                    if multi_screens != 0:
+                        if i >= file_limit:
+                            if not other_files_spoiler_open:
+                                descfile.write("[center][spoiler=Other files]\n")
+                                char_count += len("[center][spoiler=Other files]\n")
+                                other_files_spoiler_open = True
 
                     # Write filename in BBCode format with MediaInfo in spoiler if not the first file
-                    if i > 0 and char_count < max_char_limit:
-                        mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
-                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
-                        formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
-                        descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
-                        char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
-                    else:
-                        descfile.write(f"[center]{filename}\n[/center]\n")
-                        char_count += len(f"[center]{filename}\n[/center]\n")
+                    if multi_screens != 0:
+                        if i > 0 and char_count < max_char_limit:
+                            mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+                            parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
+                            formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
+                            descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
+                            char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
+                        else:
+                            descfile.write(f"[center]{filename}\n[/center]\n")
+                            char_count += len(f"[center]{filename}\n[/center]\n")
 
                     # Write images if they exist
                     new_images_key = f'new_images_file_{i}'
                     if i == 0:  # For the first file, use 'image_list' key
                         images = meta['image_list']
                         if images:
+                            # Process all images if multi_screens is 0 or set multi_screens as usual
+                            if file_limit == 1 or multi_screens == 0:
+                                single_screens = len(images)  # Use all images if only one file or if multi_screens is 0
+                            else:
+                                single_screens = multi_screens
                             descfile.write("[center]")
                             char_count += len("[center]")
-                            if file_limit == 1:
-                                multi_screens = len(images)  # Use all images if only one file
-                            for img_index in range(min(multi_screens, len(images))):
+                            for img_index in range(min(single_screens, len(images))):
                                 web_url = images[img_index]['web_url']
                                 raw_url = images[img_index]['raw_url']
                                 image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
@@ -287,17 +293,18 @@ class COMMON():
                                 char_count += len(image_str)
                             descfile.write("[/center]\n\n")
                             char_count += len("[/center]\n\n")
-                    elif new_images_key in meta and meta[new_images_key]:
-                        descfile.write("[center]")
-                        char_count += len("[center]")
-                        for img in meta[new_images_key]:
-                            web_url = img['web_url']
-                            raw_url = img['raw_url']
-                            image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                            descfile.write(image_str)
-                            char_count += len(image_str)
-                        descfile.write("[/center]\n\n")
-                        char_count += len("[/center]\n\n")
+                    elif multi_screens != 0:
+                        if new_images_key in meta and meta[new_images_key]:
+                            descfile.write("[center]")
+                            char_count += len("[center]")
+                            for img in meta[new_images_key]:
+                                web_url = img['web_url']
+                                raw_url = img['raw_url']
+                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
+                                descfile.write(image_str)
+                                char_count += len(image_str)
+                            descfile.write("[/center]\n\n")
+                            char_count += len("[/center]\n\n")
 
                 if other_files_spoiler_open:
                     descfile.write("[/spoiler][/center]\n")
@@ -894,7 +901,7 @@ class COMMON():
             # Debug output for the complete parsed_data
             # print("\nComplete Parsed Data:")
             # for section, data in parsed_data.items():
-                # print(f"{section}: {data}")
+            #    print(f"{section}: {data}")
 
             return parsed_data
 

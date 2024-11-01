@@ -29,13 +29,14 @@ config = {
         # Default is 350, ie [img=350]
         "thumbnail_size": "350",
 
-        # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites
-        "multiScreens": "2",
+        # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
+        # 0 equals old behavior where only the original description and images are added.
+        "multiScreens": "0",
 
         # When uploading packs, you can specifiy a different screenshot thumbnail size, default 300.
         "pack_thumb_size": "300",
 
-        # Description character count (including bbcode) cutoff for UNIT3D sites when **season packs only**
+        # Description character count (including bbcode) cutoff for UNIT3D sites when **season packs only**.
         # After hitting this limit, only filenames and screenshots will be used for any ADDITIONAL files
         # still to be added to the description. You can set this small like 50, to only ever
         # print filenames and screenshots for each file, no mediainfo will be printed.
@@ -44,9 +45,9 @@ config = {
         # description will be added before respecting this cutoff.
         "charLimit": "14000",
 
-        # How many files in a season pack will be added to the description before using an additional spoiler tag
+        # How many files in a season pack will be added to the description before using an additional spoiler tag.
         # Any other files past this limit will be hidden/added all within a spoiler tag.
-        "fileLimit": "5",
+        "fileLimit": "2",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[centers] SCREENSHOTS [/center]"
