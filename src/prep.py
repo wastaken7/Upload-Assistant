@@ -561,7 +561,6 @@ class Prep():
                             try:
                                 meta, match = await asyncio.wait_for(
                                     self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder),
-                                    timeout=timeout_duration
                                 )
                                 if match:
                                     found_match = True
@@ -577,7 +576,6 @@ class Prep():
                                 try:
                                     meta, match = await asyncio.wait_for(
                                         self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder),
-                                        timeout=timeout_duration
                                     )
                                     if match:
                                         found_match = True
@@ -592,7 +590,6 @@ class Prep():
                                 try:
                                     meta, match = await asyncio.wait_for(
                                         self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder),
-                                        timeout=timeout_duration
                                     )
                                     if match:
                                         found_match = True
@@ -607,7 +604,6 @@ class Prep():
                                 try:
                                     meta, match = await asyncio.wait_for(
                                         self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder),
-                                        timeout=timeout_duration
                                     )
                                     if match:
                                         found_match = True
@@ -622,7 +618,6 @@ class Prep():
                                 try:
                                     meta, match = await asyncio.wait_for(
                                         self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder),
-                                        timeout=timeout_duration
                                     )
                                     if match:
                                         found_match = True
@@ -637,7 +632,6 @@ class Prep():
                                 try:
                                     meta, match = await asyncio.wait_for(
                                         self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder),
-                                        timeout=timeout_duration
                                     )
                                     if match:
                                         found_match = True
@@ -652,7 +646,6 @@ class Prep():
                             try:
                                 meta, match = await asyncio.wait_for(
                                     self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder),
-                                    timeout=timeout_duration
                                 )
                                 if match:
                                     found_match = True
