@@ -798,6 +798,13 @@ class COMMON():
             "zulu": "https://ptpimg.me/7teg09.png"
         }
 
+        HDR_CODE_MAP = {
+            "dvhe": ("https://ptpimg.me/y1a27n.png", "102x92"),
+            "hdr10+": ("https://ptpimg.me/c3tw3w.png", "85x85"),
+            "hdr10": ("https://ptpimg.me/h34our.png", "50"),
+            "hdr": ("https://ptpimg.me/h34our.png", "50")
+        }
+
         def parse_mediainfo(self, mediainfo_text):
             # Patterns for matching sections and fields
             section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
@@ -848,7 +855,25 @@ class COMMON():
                     if current_section == "general" and property_name in general_fields:
                         current_track[property_name] = property_value
                     elif current_section == "video" and property_name in video_fields:
-                        current_track[property_name] = property_value
+                        if property_name == "hdr_format":
+                            hdr_format_lower = property_value.lower()
+                            print(f"\nProcessing hdr_format: '{property_value}'")
+                            matched_icons = []
+                            matched_keys = set()
+
+                            # Check for each key in HDR_CODE_MAP to see if it exists anywhere in the hdr_format field
+                            for hdr_key, (icon_url, img_size) in self.HDR_CODE_MAP.items():
+                                if hdr_key in hdr_format_lower and hdr_key not in matched_keys:
+                                    matched_icons.append(f"[img={img_size}]{icon_url}[/img]")
+                                    matched_keys.add(hdr_key)
+                                    # Stop matching further HDR types if HDR10+ is matched
+                                    if hdr_key == "hdr10+":
+                                        break
+
+                            # If matches were found, display only the icons; otherwise, keep the original text
+                            current_track[property_name] = " ".join(matched_icons) if matched_icons else property_value
+                        else:
+                            current_track[property_name] = property_value
                     elif current_section == "audio" and property_name in audio_fields:
                         current_track[property_name] = property_value
                     elif current_section == "text":
@@ -894,7 +919,7 @@ class COMMON():
             # Debug output for the complete parsed_data
             # print("\nComplete Parsed Data:")
             # for section, data in parsed_data.items():
-                # print(f"{section}: {data}")
+            #     print(f"{section}: {data}")
 
             return parsed_data
 
