@@ -492,7 +492,10 @@ class Prep():
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
-        description_text = meta['description'] if meta['description'] else ""
+        if 'description' not in meta:
+            meta['description'] = ""
+
+        description_text = meta.get('description', '')
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.write(description_text)
 
