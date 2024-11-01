@@ -564,57 +564,129 @@ class Prep():
                         if match:
                             found_match = True
                 else:
+                    timeout_duration = 2  # seconds
                     # Process all trackers with API = true if no specific tracker is set in meta
                     default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
 
                     if "PTP" in default_trackers and not found_match:
                         if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
                             ptp = PTP(config=self.config)
-                            meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
-                            if match:
-                                found_match = True
+                            try:
+                                meta, match = await asyncio.wait_for(
+                                    self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder),
+                                    timeout=timeout_duration
+                                )
+                                if match:
+                                    found_match = True
+                            except asyncio.TimeoutError:
+                                print("PTP tracker request timed out.")
+                            except aiohttp.ClientSSLError:
+                                print("PTP tracker request failed due to SSL error.")
+                            except requests.exceptions.ConnectionError as conn_err:
+                                print(f"PTP tracker request failed due to connection error: {conn_err}")
+
                     if not meta['is_disc']:
                         if "BLU" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                                 blu = BLU(config=self.config)
-                                meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
+                                try:
+                                    meta, match = await asyncio.wait_for(
+                                        self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder),
+                                        timeout=timeout_duration
+                                    )
+                                    if match:
+                                        found_match = True
+                                except asyncio.TimeoutError:
+                                    print("BLU tracker request timed out.")
+                                except aiohttp.ClientSSLError:
+                                    print("BLU tracker request failed due to SSL error.")
+                                except requests.exceptions.ConnectionError as conn_err:
+                                    print(f"BLU tracker request failed due to connection error: {conn_err}")
 
                         if "AITHER" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
                                 aither = AITHER(config=self.config)
-                                meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
+                                try:
+                                    meta, match = await asyncio.wait_for(
+                                        self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder),
+                                        timeout=timeout_duration
+                                    )
+                                    if match:
+                                        found_match = True
+                                except asyncio.TimeoutError:
+                                    print("AITHER tracker request timed out.")
+                                except aiohttp.ClientSSLError:
+                                    print("AITHER tracker request failed due to SSL error.")
+                                except requests.exceptions.ConnectionError as conn_err:
+                                    print(f"AITHER tracker request failed due to connection error: {conn_err}")
 
                         if "LST" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
                                 lst = LST(config=self.config)
-                                meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
+                                try:
+                                    meta, match = await asyncio.wait_for(
+                                        self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder),
+                                        timeout=timeout_duration
+                                    )
+                                    if match:
+                                        found_match = True
+                                except asyncio.TimeoutError:
+                                    print("LST tracker request timed out.")
+                                except aiohttp.ClientSSLError:
+                                    print("LST tracker request failed due to SSL error.")
+                                except requests.exceptions.ConnectionError as conn_err:
+                                    print(f"LST tracker request failed due to connection error: {conn_err}")
 
                         if "OE" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
                                 oe = OE(config=self.config)
-                                meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
+                                try:
+                                    meta, match = await asyncio.wait_for(
+                                        self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder),
+                                        timeout=timeout_duration
+                                    )
+                                    if match:
+                                        found_match = True
+                                except asyncio.TimeoutError:
+                                    print("OE tracker request timed out.")
+                                except aiohttp.ClientSSLError:
+                                    print("OE tracker request failed due to SSL error.")
+                                except requests.exceptions.ConnectionError as conn_err:
+                                    print(f"OE tracker request failed due to connection error: {conn_err}")
 
                         if "TIK" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
                                 tik = TIK(config=self.config)
-                                meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
+                                try:
+                                    meta, match = await asyncio.wait_for(
+                                        self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder),
+                                        timeout=timeout_duration
+                                    )
+                                    if match:
+                                        found_match = True
+                                except asyncio.TimeoutError:
+                                    print("TIK tracker request timed out.")
+                                except aiohttp.ClientSSLError:
+                                    print("TIK tracker request failed due to SSL error.")
+                                except requests.exceptions.ConnectionError as conn_err:
+                                    print(f"TIK tracker request failed due to connection error: {conn_err}")
 
                     if "HDB" in default_trackers and not found_match:
                         if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
                             hdb = HDB(config=self.config)
-                            meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                            if match:
-                                found_match = True
+                            try:
+                                meta, match = await asyncio.wait_for(
+                                    self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder),
+                                    timeout=timeout_duration
+                                )
+                                if match:
+                                    found_match = True
+                            except asyncio.TimeoutError:
+                                print("HDB tracker request timed out.")
+                            except aiohttp.ClientSSLError:
+                                print("HDB tracker request failed due to SSL error.")
+                            except requests.exceptions.ConnectionError as conn_err:
+                                print(f"HDB tracker request failed due to connection error: {conn_err}")
 
                 if not found_match:
                     console.print("[yellow]No matches found on any trackers.[/yellow]")

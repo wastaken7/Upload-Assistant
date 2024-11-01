@@ -6,6 +6,10 @@ from functools import partial
 
 core = vs.core
 
+# core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libffms2.so")
+# core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libsub.so")
+# core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libimwri.so")
+
 
 def CustomFrameInfo(clip, text):
     def FrameProps(n, f, clip):
