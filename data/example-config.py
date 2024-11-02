@@ -31,7 +31,7 @@ config = {
 
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
-        "multiScreens": "0",
+        "multiScreens": "2",
 
         # When uploading packs, you can specifiy a different screenshot thumbnail size, default 300.
         "pack_thumb_size": "300",
