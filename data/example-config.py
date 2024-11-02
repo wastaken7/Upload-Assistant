@@ -49,6 +49,9 @@ config = {
         # Any other files past this limit will be hidden/added all within a spoiler tag.
         "fileLimit": "2",
 
+        # Absolute limit on processed files in packs. You might not want to upload images for a large number of episodes
+        "processLimit": "10",
+
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[centers] SCREENSHOTS [/center]"
 

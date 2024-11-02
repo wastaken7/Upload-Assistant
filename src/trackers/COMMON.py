@@ -47,6 +47,7 @@ class COMMON():
         char_limit = int(self.config['DEFAULT'].get('charLimit', 14000))
         file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
         thumb_size = int(self.config['DEFAULT'].get('pack_thumb_size', '300'))
+        process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
@@ -55,7 +56,10 @@ class COMMON():
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])
             desc = base
+            # Regular expression to find and remove the specific spoiler section wrapped with [center] tags
             desc = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
+
+            # Writing the cleaned description to the file
             descfile.write(desc)
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
@@ -216,6 +220,9 @@ class COMMON():
 
             # First Pass: Create and Upload Images for Each File
             for i, file in enumerate(filelist):
+                if i >= process_limit:
+                    # console.print("[yellow]Skipping processing more files as they exceed the process limit.")
+                    continue
                 if multi_screens != 0:
                     if i > 0:
                         new_images_key = f'new_images_file_{i}'
@@ -254,6 +261,8 @@ class COMMON():
             # Second Pass: Process MediaInfo and Write Descriptions
             if len(filelist) > 1:
                 for i, file in enumerate(filelist):
+                    if i >= process_limit:
+                        continue
                     # Extract filename directly from the file path
                     filename = os.path.splitext(os.path.basename(file.strip()))[0]
 
@@ -282,14 +291,9 @@ class COMMON():
                     if i == 0:  # For the first file, use 'image_list' key
                         images = meta['image_list']
                         if images:
-                            # Process all images if multi_screens is 0 or set multi_screens as usual
-                            if file_limit == 1 or multi_screens == 0:
-                                single_screens = len(images)  # Use all images if only one file or if multi_screens is 0
-                            else:
-                                single_screens = multi_screens
                             descfile.write("[center]")
                             char_count += len("[center]")
-                            for img_index in range(min(single_screens, len(images))):
+                            for img_index in range(len(images)):
                                 web_url = images[img_index]['web_url']
                                 raw_url = images[img_index]['raw_url']
                                 image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
