@@ -1176,12 +1176,10 @@ class Prep():
         base = os.path.splitext(base)[0]
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
-        console.print("srrdb url:", url)
 
         try:
             response = requests.get(url, timeout=30)
             response_json = response.json()
-            console.print(response_json)
 
             if int(response_json.get('resultsCount', 0)) > 0:
                 first_result = response_json['results'][0]
@@ -1194,7 +1192,6 @@ class Prep():
                         release = first_result['release']
                         release_lower = release.lower()
                         nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
-                        console.print("nfo url:", nfo_url)
 
                         # Define path and create directory
                         save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
