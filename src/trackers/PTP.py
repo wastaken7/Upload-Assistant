@@ -618,7 +618,7 @@ class PTP():
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         if multi_screens == 0:
             multi_screens = 2
-            console.print(f"[yellow]PTP requires screenshots for multi disc/file content, overriding config")
+            console.print("[yellow]PTP requires screenshots for multi disc/file content, overriding config")
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
             images = meta['image_list']
