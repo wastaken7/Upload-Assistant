@@ -78,6 +78,8 @@ class COMMON():
 
             # Handle multiple discs case
             elif len(discs) > 1:
+                if multi_screens == 0:
+                    multi_screens = 2
                 # Initialize retry_count if not already set
                 if 'retry_count' not in meta:
                     meta['retry_count'] = 0
