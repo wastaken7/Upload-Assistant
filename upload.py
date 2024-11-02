@@ -184,6 +184,9 @@ async def do_the_thing(base_dir):
         if meta.get('image_list', False) in (False, []) and meta.get('skip_imghost_upload', False) is False:
             return_dict = {}
             meta['image_list'], dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict)
+            meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+            with open(meta_filename, 'w') as f:
+                json.dump(meta, f, indent=4)
             if meta['debug']:
                 console.print(meta['image_list'])
             # meta['uploaded_screens'] = True
