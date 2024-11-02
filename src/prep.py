@@ -390,7 +390,7 @@ class Prep():
         # console.print(f"Debug: meta['filelist'] before population: {meta.get('filelist', 'Not Set')}")
 
         if meta['is_disc'] == "BDMV":
-            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta.get('imdb', None))
+            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta, meta.get('imdb', None))
             meta['filelist'] = []  # No filelist for discs, use path
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -418,7 +418,7 @@ class Prep():
             mi = None
 
         elif meta['is_disc'] == "DVD":
-            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta.get('imdb', None))
+            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta, meta.get('imdb', None))
             meta['filelist'] = []
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -440,7 +440,7 @@ class Prep():
             meta['sd'] = self.is_sd(meta['resolution'])
 
         elif meta['is_disc'] == "HDDVD":
-            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta.get('imdb', None))
+            video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta, meta.get('imdb', None))
             meta['filelist'] = []
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -464,7 +464,7 @@ class Prep():
             videopath, meta['filelist'] = self.get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
             search_file_folder = 'file'
-            video, meta['scene'], meta['imdb'] = self.is_scene(videopath, meta.get('imdb', None))
+            video, meta['scene'], meta['imdb'] = self.is_scene(videopath, meta, meta.get('imdb', None))
             guess_name = ntpath.basename(video).replace('-', ' ')
             filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
             untouched_filename = os.path.basename(video)
@@ -1170,27 +1170,66 @@ class Prep():
     """
     Is a scene release?
     """
-    def is_scene(self, video, imdb=None):
+    def is_scene(self, video, meta, imdb=None):
         scene = False
         base = os.path.basename(video)
         base = os.path.splitext(base)[0]
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
+        console.print("srrdb url:", url)
+
         try:
             response = requests.get(url, timeout=30)
-            response = response.json()
-            if int(response.get('resultsCount', 0)) != 0:
-                video = f"{response['results'][0]['release']}.mkv"
+            response_json = response.json()
+            console.print(response_json)
+
+            if int(response_json.get('resultsCount', 0)) > 0:
+                first_result = response_json['results'][0]
+                video = f"{first_result['release']}.mkv"
                 scene = True
-                r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
-                r = r.json()
-                if r['releases'] != [] and imdb is None:
-                    imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
-                console.print(f"[green]SRRDB: Matched to {response['results'][0]['release']}")
-        except Exception:
-            video = video
-            scene = False
-            console.print("[yellow]SRRDB: No match found, or request has timed out")
+
+                # NFO Download Handling
+                if first_result.get("hasNFO") == "yes":
+                    try:
+                        release = first_result['release']
+                        release_lower = release.lower()
+                        nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
+                        console.print("nfo url:", nfo_url)
+                        
+                        # Define path and create directory
+                        save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                        os.makedirs(save_path, exist_ok=True)
+                        nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+                        
+                        # Download the NFO file
+                        nfo_response = requests.get(nfo_url, timeout=30)
+                        if nfo_response.status_code == 200:
+                            with open(nfo_file_path, 'wb') as f:
+                                f.write(nfo_response.content)
+                                meta['nfo'] = True
+                            console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                        else:
+                            console.print("[yellow]NFO file not available for download.")
+                    except Exception as e:
+                        console.print("[yellow]Failed to download NFO file:", e)
+
+                # IMDb Handling
+                try:
+                    r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
+                    r = r.json()
+                    
+                    if r['releases'] != [] and imdb is None:
+                        imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
+                    console.print(f"[green]SRRDB: Matched to {first_result['release']}")
+                except Exception as e:
+                    console.print("[yellow]Failed to fetch IMDb information:", e)
+
+            else:
+                console.print("[yellow]SRRDB: No match found")
+
+        except Exception as e:
+            console.print("[yellow]SRRDB: No match found, or request has timed out", e)
+        
         return video, scene, imdb
 
     """
@@ -3486,10 +3525,10 @@ class Prep():
 
         desclink = meta.get('desclink')
         descfile = meta.get('descfile')
+        scene_nfo = False
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.seek(0)
-
             content_written = False
 
             if meta.get('desc_template'):
@@ -3504,13 +3543,34 @@ class Prep():
                 except FileNotFoundError:
                     console.print(f"[ERROR] Template '{meta['desc_template']}' not found.")
 
+            base_dir = meta['base_dir']
+            uuid = meta['uuid']
+            current_dir_path = "*.nfo"
+            specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+
             if meta.get('nfo') and not content_written:
-                nfo_files = glob.glob("*.nfo")
+                nfo_files = glob.glob(current_dir_path)
+                if not nfo_files:
+                    nfo_files = glob.glob(specified_dir_path)
+                    scene_nfo = True
+
                 if nfo_files:
+                    console.print("We found nfo")
                     nfo = nfo_files[0]
-                    with open(nfo, 'r', encoding="utf-8") as nfo_file:
-                        nfo_content = nfo_file.read()
-                    description.write(f"[code]{nfo_content}[/code]\n")
+                    try:
+                        with open(nfo, 'r', encoding="utf-8") as nfo_file:
+                            nfo_content = nfo_file.read()
+                        console.print("NFO content read with utf-8 encoding.")
+                    except UnicodeDecodeError:
+                        console.print("utf-8 decoding failed, trying latin1.")
+                        with open(nfo, 'r', encoding="latin1") as nfo_file:
+                            nfo_content = nfo_file.read()
+                        console.print("NFO content read with latin1 encoding.")
+
+                    if scene_nfo is True:
+                        description.write(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
+                    else:
+                        description.write(f"[code]{nfo_content}[/code]\n")
                     meta['description'] = "CUSTOM"
                     content_written = True
 
