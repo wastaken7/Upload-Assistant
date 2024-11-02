@@ -1195,12 +1195,12 @@ class Prep():
                         release_lower = release.lower()
                         nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
                         console.print("nfo url:", nfo_url)
-                        
+
                         # Define path and create directory
                         save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
                         os.makedirs(save_path, exist_ok=True)
                         nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
-                        
+
                         # Download the NFO file
                         nfo_response = requests.get(nfo_url, timeout=30)
                         if nfo_response.status_code == 200:
@@ -1217,7 +1217,7 @@ class Prep():
                 try:
                     r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
                     r = r.json()
-                    
+
                     if r['releases'] != [] and imdb is None:
                         imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
                     console.print(f"[green]SRRDB: Matched to {first_result['release']}")
@@ -1229,7 +1229,7 @@ class Prep():
 
         except Exception as e:
             console.print("[yellow]SRRDB: No match found, or request has timed out", e)
-        
+
         return video, scene, imdb
 
     """

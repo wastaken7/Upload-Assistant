@@ -55,6 +55,8 @@ class COMMON():
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])
             desc = base
+            desc = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
+            descfile.write(desc)
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             if comparison is False:
