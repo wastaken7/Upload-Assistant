@@ -937,11 +937,15 @@ class COMMON():
 
                     # Language flag image
                     language = track.get("language", "").lower()
-                    country_code, size = self.LANGUAGE_CODE_MAP.get(language)
-                    if country_code:
+                    result = self.LANGUAGE_CODE_MAP.get(language)
+                    
+                    # Check if the language was found in LANGUAGE_CODE_MAP
+                    if result is not None:
+                        country_code, size = result
                         parts.append(f"[img={size}]{country_code}[/img]")
                     else:
-                        parts.append(language.capitalize() if language else "")
+                        # If language is not found, use a fallback or display the language as plain text
+                        parts.append(language.capitalize() if language else "Unknown")
 
                     # Other properties to concatenate
                     properties = ["language", "codec", "format", "channels", "bit_rate", "format_profile", "stream_size"]
