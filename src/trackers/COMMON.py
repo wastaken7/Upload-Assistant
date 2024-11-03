@@ -945,7 +945,7 @@ class COMMON():
                         parts.append(f"[img={size}]{country_code}[/img]")
                     else:
                         # If language is not found, use a fallback or display the language as plain text
-                        parts.append(language.capitalize() if language else "Unknown")
+                        parts.append(language.capitalize() if language else "")
 
                     # Other properties to concatenate
                     properties = ["language", "codec", "format", "channels", "bit_rate", "format_profile", "stream_size"]
