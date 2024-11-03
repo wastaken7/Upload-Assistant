@@ -938,7 +938,7 @@ class COMMON():
                     # Language flag image
                     language = track.get("language", "").lower()
                     result = self.LANGUAGE_CODE_MAP.get(language)
-                    
+
                     # Check if the language was found in LANGUAGE_CODE_MAP
                     if result is not None:
                         country_code, size = result
