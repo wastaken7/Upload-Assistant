@@ -3117,6 +3117,10 @@ class Prep():
                 year = meta['year']
             else:
                 year = ""
+            if meta.get('manual_date'):
+                # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
+                season = ''
+                episode = ''
         if meta.get('no_season', False) is True:
             season = ''
         if meta.get('no_year', False) is True:
@@ -3211,36 +3215,44 @@ class Prep():
             is_daily = False
             if meta['anime'] is False:
                 try:
-                    if meta.get('manual_date'):
-                        raise ManualDateException  # noqa: F405
-                    try:
-                        guess_year = guessit(video)['year']
-                    except Exception:
-                        guess_year = ""
-                    if guessit(video)["season"] == guess_year:
-                        if f"s{guessit(video)['season']}" in video.lower():
+                    daily_match = re.search(r"\d{4}[-\.]\d{2}[-\.]\d{2}", video)
+                    if meta.get('manual_date') or daily_match:
+                        # Handle daily episodes
+                        # The user either provided the --daily argument or a date was found in the filename
+
+                        if meta.get('manual_date') is None and daily_match is not None:
+                            meta['manual_date'] = daily_match.group().replace('.', '-')
+                        is_daily = True
+                        guess_date = meta.get('manual_date', guessit(video).get('date')) if meta.get('manual_date') else guessit(video).get('date')
+                        season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
+
+                        season = f"S{str(season_int).zfill(2)}"
+                        episode = f"E{str(episode_int).zfill(2)}"
+                        # For daily shows, pass the supplied date as the episode title
+                        # Season and episode will be stripped later to conform with standard daily episode naming format
+                        meta['episode_title'] = meta.get('manual_date')
+
+                    else:
+                        try:
+                            guess_year = guessit(video)['year']
+                        except Exception:
+                            guess_year = ""
+                        if guessit(video)["season"] == guess_year:
+                            if f"s{guessit(video)['season']}" in video.lower():
+                                season_int = str(guessit(video)["season"])
+                                season = "S" + season_int.zfill(2)
+                            else:
+                                season_int = "1"
+                                season = "S01"
+                        else:
                             season_int = str(guessit(video)["season"])
                             season = "S" + season_int.zfill(2)
-                        else:
-                            season_int = "1"
-                            season = "S01"
-                    else:
-                        season_int = str(guessit(video)["season"])
-                        season = "S" + season_int.zfill(2)
 
                 except Exception:
-                    try:
-                        guess_date = meta.get('manual_date', guessit(video)['date']) if meta.get('manual_date') else guessit(video)['date']
-                        season_int, episode_int = self.daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
-                        # season = f"S{season_int.zfill(2)}"
-                        # episode = f"E{episode_int.zfill(2)}"
-                        season = str(guess_date)
-                        episode = ""
-                        is_daily = True
-                    except Exception:
-                        console.print_exception()
-                        season_int = "1"
-                        season = "S01"
+                    console.print_exception()
+                    season_int = "1"
+                    season = "S01"
+
                 try:
                     if is_daily is not True:
                         episodes = ""
@@ -3263,6 +3275,7 @@ class Prep():
                     episode = ""
                     episode_int = "0"
                     meta['tv_pack'] = 1
+
             else:
                 # If Anime
                 parsed = anitopy.parse(Path(video).name)
@@ -3656,6 +3669,8 @@ class Prep():
                 generic.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
             if meta['tvdb_id'] != "0":
                 generic.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
+            if meta['tvmaze_id'] != "0":
+                generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}\n")
             poster_img = f"{meta['base_dir']}/tmp/{meta['uuid']}/POSTER.png"
             if meta.get('poster', None) not in ['', None] and not os.path.exists(poster_img):
                 if meta.get('rehosted_poster', None) is None:
@@ -3768,17 +3783,17 @@ class Prep():
     def daily_to_tmdb_season_episode(self, tmdbid, date):
         show = tmdb.TV(tmdbid)
         seasons = show.info().get('seasons')
-        season = '1'
-        episode = '1'
+        season = 1
+        episode = 1
         date = datetime.fromisoformat(str(date))
         for each in seasons:
             air_date = datetime.fromisoformat(each['air_date'])
             if air_date <= date:
-                season = str(each['season_number'])
+                season = int(each['season_number'])
         season_info = tmdb.TV_Seasons(tmdbid, season).info().get('episodes')
         for each in season_info:
-            if str(each['air_date']) == str(date):
-                episode = str(each['episode_number'])
+            if str(each['air_date']) == str(date.date()):
+                episode = int(each['episode_number'])
                 break
         else:
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")

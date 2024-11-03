@@ -533,6 +533,8 @@ def get_confirmation(meta):
         cli_ui.info(f"IMDB: https://www.imdb.com/title/tt{meta['imdb_id']}")
     if int(meta.get('tvdb_id', '0')) != 0:
         cli_ui.info(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
+    if int(meta.get('tvmaze_id', '0')) != 0:
+        cli_ui.info(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
     if int(meta.get('mal_id', 0)) != 0:
         cli_ui.info(f"MAL : https://myanimelist.net/anime/{meta['mal_id']}")
     console.print()
