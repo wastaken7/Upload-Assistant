@@ -88,7 +88,7 @@ class ANT():
             bd_dump = f'[spoiler=BDInfo][pre]{bd_dump}[/pre][/spoiler]'
             path = os.path.join(meta['bdinfo']['path'], 'STREAM')
             longest_file = max(
-                meta['bdinfo']['files'], 
+                meta['bdinfo']['files'],
                 key=lambda x: x.get('length', 0)
             )
             file_name = longest_file['file'].lower()
