@@ -87,7 +87,11 @@ class ANT():
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
             bd_dump = f'[spoiler=BDInfo][pre]{bd_dump}[/pre][/spoiler]'
             path = os.path.join(meta['bdinfo']['path'], 'STREAM')
-            file_name = meta['bdinfo']['files'][0]['file'].lower()
+            longest_file = max(
+                meta['bdinfo']['files'], 
+                key=lambda x: x.get('length', 0)
+            )
+            file_name = longest_file['file'].lower()
             m2ts = os.path.join(path, file_name)
             media_info_output = str(MediaInfo.parse(m2ts, output="text", full=False))
             mi_dump = media_info_output.replace('\r\n', '\n')
