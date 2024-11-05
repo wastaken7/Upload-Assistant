@@ -1089,7 +1089,12 @@ class Prep():
             elif framerate == "25.000":
                 scan = "p"
             else:
-                scan = "i"
+                # Fallback using regex on meta['uuid'] - mainly for HUNO fun and games.
+                match = re.search(r'\b(1080p|720p|2160p)\b', folder_id, re.IGNORECASE)
+                if match:
+                    scan = "p"  # Assume progressive based on common resolution markers
+                else:
+                    scan = "i"  # Default to interlaced if no indicators are found
             width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
             height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
             width = self.closest(width_list, int(width))
