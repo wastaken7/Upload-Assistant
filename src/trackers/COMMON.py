@@ -616,8 +616,8 @@ class COMMON():
         types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
 
         normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
-
         file_type_present = {t for t in types_to_check if t in normalized_meta_type}
+        has_repack_in_uuid = "repack" in meta['uuid'].lower() if meta.get('uuid') else False
 
         for each in dupes:
             if meta.get('sd', 0) == 1:
@@ -666,10 +666,9 @@ class COMMON():
             dupe_type_matches = {t for t in types_to_check if t in normalized_each_type}
 
             if file_type_present:
-                # Allow WEB-DL and similar matches if types are related (e.g., WEB-DL vs AMZN WEB-DL)
                 if 'WEBDL' in normalized_meta_type and 'WEBDL' in normalized_each_type:
-                    console.log(f"[green]Allowing result we will catch later: {each}")
-                # Allow based on matching resolution, HDR, and audio despite type mismatch
+                    if meta['debug']:
+                        console.log(f"[green]Allowing result we will catch later: {each}")
                 elif meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each:
                     if meta['debug']:
                         console.log(f"[green]Allowing result we will catch later: {each}")
@@ -682,6 +681,12 @@ class COMMON():
                     if meta['debug']:
                         console.log(f"[red]Excluding extra result with new type match: {each}")
                     continue
+
+            # If "repack" is in the UUID, only keep results that also contain "repack"
+            if has_repack_in_uuid and "repack" not in each.lower():
+                if meta['debug']:
+                    console.log(f"[yellow]Excluding result because it lacks 'repack': {each}")
+                continue
 
             for s in search_combos:
                 if s.get('search_for') not in (None, ''):
@@ -715,6 +720,7 @@ class COMMON():
                         allow = False
             if allow and each not in new_dupes:
                 new_dupes.append(each)
+
         return new_dupes
 
     class MediaInfoParser:
