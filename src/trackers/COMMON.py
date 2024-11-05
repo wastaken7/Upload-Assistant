@@ -58,9 +58,6 @@ class COMMON():
             desc = base
             # Regular expression to find and remove the specific spoiler section wrapped with [center] tags
             desc = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
-
-            # Writing the cleaned description to the file
-            descfile.write(desc)
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             if comparison is False:
