@@ -740,6 +740,7 @@ class COMMON():
             "dutch": ("https://ptpimg.me/6nmwpx.png", "20"),
             "dzongkha": ("https://ptpimg.me/56e7y5.png", "20"),
             "english": ("https://ptpimg.me/ine2fd.png", "25x10"),
+            "english (gb)": ("https://ptpimg.me/a9w539.png", "20"),
             "estonian": ("https://ptpimg.me/z25pmk.png", "20"),
             "filipino": ("https://ptpimg.me/9d3z9w.png", "20"),
             "finnish": ("https://ptpimg.me/p4354c.png", "20"),
