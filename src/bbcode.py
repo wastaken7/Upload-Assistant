@@ -209,6 +209,7 @@ class BBCODE:
             "https://blutopia.xyz/favicon.ico",  # Example bot image URL
             "https://i.ibb.co/2NVWb0c/uploadrr.webp",
             "https://blutopia/favicon.ico",
+            "https://ptpimg.me/606tk4.png",
             # Add any other known bot image URLs here
         ]
         imagelist = [
