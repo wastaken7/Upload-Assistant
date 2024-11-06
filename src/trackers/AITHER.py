@@ -138,6 +138,7 @@ class AITHER():
         source = meta.get('source', "")
 
         if not meta['is_disc']:
+
             def has_english_audio(tracks=None, media_info_text=None):
                 if media_info_text:
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
@@ -162,12 +163,15 @@ class AITHER():
                 if not has_english_audio(media_info_text=media_info_text):
                     audio_lang = get_audio_lang(media_info_text=media_info_text)
                     if audio_lang:
-                        aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+                        if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+                            aither_name = aither_name.replace(str(meta['year']), f"{meta['year']} {audio_lang}", 1)
+                        else:
+                            aither_name = aither_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
 
         if meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            aither_name = aither_name.replace(str(meta['year']), f"{meta['year']} {resolution}", 1)
+            aither_name = aither_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
             aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
         if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
