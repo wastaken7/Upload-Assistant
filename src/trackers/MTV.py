@@ -319,8 +319,10 @@ class MTV():
 
     async def edit_name(self, meta):
         if meta['scene'] is True:
-            if meta['tv_pack'] != 0:
-                mtv_name = meta['video']
+            if meta.get('scene_name') != "":
+                mtv_name = meta.get('scene_name')
+            else:
+                mtv_name = meta['uuid']
         else:
             mtv_name = meta['name']
             if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE') and "DD" in meta['audio']:

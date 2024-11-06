@@ -1188,6 +1188,7 @@ class Prep():
 
             if int(response_json.get('resultsCount', 0)) > 0:
                 first_result = response_json['results'][0]
+                meta['scene_name'] = first_result['release']
                 video = f"{first_result['release']}.mkv"
                 scene = True
 
