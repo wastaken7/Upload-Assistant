@@ -12,6 +12,8 @@ from pathlib import Path
 from str2bool import str2bool
 from src.trackers.COMMON import COMMON
 from datetime import datetime
+import glob
+import multiprocessing
 
 
 class MTV():
@@ -217,56 +219,105 @@ class MTV():
             console.print(data)
         return
 
-    async def handle_image_upload(self, meta, img_host_index=1, approved_image_hosts=None):
+    async def handle_image_upload(self, meta, img_host_index=1, approved_image_hosts=None, file=None):
         if approved_image_hosts is None:
             approved_image_hosts = ['ptpimg', 'imgbox']
 
         retry_mode = False
         images_reuploaded = False
+        new_images_key = f'mtv_images_key_{img_host_index}'
+        discs = meta.get('discs', [])  # noqa F841
+        filelist = meta.get('video', [])
+        filename = meta['filename']
 
-        while True:
-            current_img_host_key = f'img_host_{img_host_index}'
-            current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+        if isinstance(filelist, str):
+            filelist = [filelist]
 
-            if not current_img_host:
-                console.print("[red]No more image hosts left to try.")
-                raise Exception("No valid image host found in the config.")
-
-            if current_img_host not in approved_image_hosts:
-                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at MTV, trying next host.")
-                retry_mode = True  # Ensure retry_mode is set to True when switching hosts
-                images_reuploaded = True  # Mark that reuploading occurred
-                img_host_index += 1  # Move to the next image host in the config
-                continue
-            else:
-                meta['imghost'] = current_img_host
-                break  # Exit the loop when a valid host is found
-
+        multi_screens = int(self.config['DEFAULT'].get('screens', 6))
+        base_dir = meta['base_dir']
+        folder_id = meta['uuid']
         from src.prep import Prep
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-        return_dict = {}
-        prep.upload_screens(
-            meta,
-            screens=meta['screens'],
-            img_host_num=img_host_index,
-            i=0,
-            total_screens=meta['screens'],
-            custom_img_list=[],  # This remains to handle any custom logic in the original function
-            return_dict=return_dict,
-            retry_mode=retry_mode  # Honor the retry_mode flag passed in
-        )
+        if new_images_key not in meta:
+            meta[new_images_key] = []
 
-        # Overwrite meta['image_list'] with the newly uploaded images
-        new_image_list = return_dict.get('image_list', [])
-        if new_image_list:
-            meta['image_list'] = new_image_list  # Overwrite with new images
+        screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
+        all_screenshots = []
 
-        # Ensure images are from approved hosts
-        if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta['image_list']):
+        for i, file in enumerate(filelist):
+            filename_pattern = f"{filename}*.png"
+            existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+            if len(existing_screens) < multi_screens:
+                if meta.get('debug'):
+                    console.print("[yellow]The image host of exsting images is not supported.")
+                    console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
+
+                if meta['type'] == "BDMV":
+                    s = multiprocessing.Process(
+                        target=prep.disc_screenshots,
+                        args=(f"FILE_{img_host_index}", meta['bdinfo'], folder_id, base_dir,
+                              meta.get('vapoursynth', False), [], meta.get('ffdebug', False), img_host_index)
+                    )
+                elif meta['type'] == "DVD":
+                    s = multiprocessing.Process(
+                        target=prep.dvd_screenshots,
+                        args=(meta, img_host_index, img_host_index)
+                    )
+                else:
+                    s = multiprocessing.Process(
+                        target=prep.screenshots,
+                        args=(file, f"{filename}", meta['uuid'], base_dir,
+                              meta, multi_screens + 1, True, None)
+                    )
+
+                s.start()
+                while s.is_alive():
+                    await asyncio.sleep(1)
+
+                existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+
+            all_screenshots.extend(existing_screens)
+
+        if all_screenshots:
+            return_dict = {}
+            while True:
+                current_img_host_key = f'img_host_{img_host_index}'
+                current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+
+                if not current_img_host:
+                    console.print("[red]No more image hosts left to try.")
+                    raise Exception("No valid image host found in the config.")
+
+                if current_img_host not in approved_image_hosts:
+                    console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at MTV, trying next host.")
+                    retry_mode = True
+                    images_reuploaded = True
+                    img_host_index += 1
+                    continue
+                else:
+                    meta['imghost'] = current_img_host
+                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+                    break  # Exit loop when a valid host is found
+
+            uploaded_images, _ = prep.upload_screens(
+                meta,
+                screens=multi_screens,
+                img_host_num=img_host_index,
+                i=0,
+                total_screens=multi_screens,
+                custom_img_list=all_screenshots,
+                return_dict=return_dict,
+                retry_mode=retry_mode
+            )
+
+            if uploaded_images:
+                meta[new_images_key] = uploaded_images
+
+        if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta.get(new_images_key, [])):
             console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
-            return meta['image_list'], True, images_reuploaded  # Trigger retry_mode if switching hosts
+            return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
-        return meta['image_list'], False, images_reuploaded  # Return retry_mode and images_reuploaded
+        return meta[new_images_key], False, images_reuploaded  # Return retry_mode and images_reuploaded
 
     async def edit_desc(self, meta, images_reuploaded, valid_images):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()

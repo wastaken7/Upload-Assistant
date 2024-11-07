@@ -136,11 +136,11 @@ class Prep():
                 meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
             if 'MTV' in meta.get('trackers', []):
                 if invalid_host_found:
-                    console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will fail if you keep these images.[/red]")
+                    console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]")
         # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
         elif 'MTV' in trackers_list:
             if invalid_host_found:
-                console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will fail if you keep these images.[/red]")
+                console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]")
 
         return valid_images
 
