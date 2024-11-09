@@ -48,6 +48,10 @@ class COMMON():
         file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
         thumb_size = int(self.config['DEFAULT'].get('pack_thumb_size', '300'))
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
+        try:
+            screenheader = self.config['DEFAULT']['screenshot_header']
+        except Exception:
+            screenheader = None
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
@@ -56,7 +60,6 @@ class COMMON():
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])
             desc = base
-            # Regular expression to find and remove the specific spoiler section wrapped with [center] tags
             desc = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
@@ -72,6 +75,8 @@ class COMMON():
                     descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]\n\n")
                     descfile.write("[/center]")
                 images = meta['image_list']
+                if screenheader is not None:
+                    descfile.write(screenheader + '\n')
                 descfile.write("[center]")
                 for img_index in range(len(images[:int(meta['screens'])])):
                     web_url = images[img_index]['web_url']
@@ -202,6 +207,8 @@ class COMMON():
                                 filename = os.path.splitext(os.path.basename(file.strip()))[0]
                                 descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
                 images = meta['image_list']
+                if screenheader is not None:
+                    descfile.write(screenheader + '\n')
                 descfile.write("[center]")
                 for img_index in range(len(images[:int(meta['screens'])])):
                     web_url = images[img_index]['web_url']
@@ -503,7 +510,7 @@ class COMMON():
                 if not id:
                     # Only prompt the user for ID selection if not searching by ID
                     try:
-                        if not await self.prompt_user_for_id_selection(tmdb, imdb, tvdb, mal, file_name):
+                        if not await self.prompt_user_for_id_selection(meta, tmdb, imdb, tvdb, mal, file_name):
                             console.print("[yellow]User chose to skip based on IDs.[/yellow]")
                             return None, None, None, None, None, None, None, None, None
                     except (KeyboardInterrupt, EOFError):
@@ -535,8 +542,6 @@ class COMMON():
                         console.print("[green]Keeping the original description.[/green]")
                         meta['description'] = description
                         meta['saved_description'] = True
-
-            return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
@@ -616,7 +621,6 @@ class COMMON():
         types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
 
         normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
-
         file_type_present = {t for t in types_to_check if t in normalized_meta_type}
 
         for each in dupes:
@@ -666,10 +670,9 @@ class COMMON():
             dupe_type_matches = {t for t in types_to_check if t in normalized_each_type}
 
             if file_type_present:
-                # Allow WEB-DL and similar matches if types are related (e.g., WEB-DL vs AMZN WEB-DL)
                 if 'WEBDL' in normalized_meta_type and 'WEBDL' in normalized_each_type:
-                    console.log(f"[green]Allowing result we will catch later: {each}")
-                # Allow based on matching resolution, HDR, and audio despite type mismatch
+                    if meta['debug']:
+                        console.log(f"[green]Allowing result we will catch later: {each}")
                 elif meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each:
                     if meta['debug']:
                         console.log(f"[green]Allowing result we will catch later: {each}")
