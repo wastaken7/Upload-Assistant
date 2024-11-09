@@ -1692,8 +1692,8 @@ class Prep():
         elif is_disc is not None:
             type = "DISC"
         elif "dvdrip" in filename:
-            console.print("[bold red]DVDRip Detected, exiting")
-            exit()
+            type = "DVDRIP"
+            # exit()
         else:
             type = "ENCODE"
         return type
@@ -3170,6 +3170,9 @@ class Prep():
             elif type == "HDTV":  # HDTV
                 name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
+            elif type == "DVDRIP":
+                name = f"{title} {alt_title} {year} {resolution} DVDRip {audio} {video_encode}"
+                potential_missing = []
         elif meta['category'] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
@@ -3198,6 +3201,9 @@ class Prep():
                 potential_missing = ['edition', 'service']
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
+                potential_missing = []
+            elif type == "DVDRIP":
+                name = f"{title} {alt_title} {season} {resolution} DVDRip {audio} {video_encode}"
                 potential_missing = []
 
         try:
