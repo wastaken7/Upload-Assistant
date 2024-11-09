@@ -180,6 +180,7 @@ async def do_the_thing(base_dir):
                     else:
                         sanitized_saved_meta[clean_key] = value
                 meta.update(sanitized_saved_meta)
+            f.close()
         except FileNotFoundError:
             pass
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
