@@ -385,7 +385,7 @@ class COMMON():
         }.get(distributor, 0)
         return distributor_id
 
-    async def prompt_user_for_id_selection(self, tmdb=None, imdb=None, tvdb=None, mal=None, filename=None, tracker_name=None):
+    async def prompt_user_for_id_selection(self, meta, tmdb=None, imdb=None, tvdb=None, mal=None, filename=None, tracker_name=None):
         if not tracker_name:
             tracker_name = "Tracker"  # Fallback if tracker_name is not provided
 
@@ -407,14 +407,17 @@ class COMMON():
         if filename:
             console.print(f"Filename: {filename}")  # Ensure filename is printed if available
 
-        selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
-        try:
-            if selection == '' or selection == 'y' or selection == 'yes':
-                return True
-            else:
-                return False
-        except (KeyboardInterrupt, EOFError):
-            sys.exit(1)
+        if not meta['unattended']:
+            selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
+            try:
+                if selection == '' or selection == 'y' or selection == 'yes':
+                    return True
+                else:
+                    return False
+            except (KeyboardInterrupt, EOFError):
+                sys.exit(1)
+        else:
+            return True
 
     async def prompt_user_for_confirmation(self, message):
         response = input(f"{message} (Y/n): ").strip().lower()
@@ -512,8 +515,10 @@ class COMMON():
                 console.print(f"[green]Successfully grabbed description from {tracker}")
                 console.print(f"Extracted description: {description}", markup=False)
 
-                # Allow user to edit or discard the description
-                if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta.get('unattended'):
+                if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')):
+                    meta['description'] = description
+                    meta['saved_description'] = True
+                else:
                     console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                     edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
 
@@ -521,9 +526,8 @@ class COMMON():
                         edited_description = click.edit(description)
                         if edited_description:
                             description = edited_description.strip()
-                            meta['description'] = description
-                            meta['saved_description'] = True
-                        console.print(f"Final description after editing: {description}", markup=False)
+                        meta['description'] = description
+                        meta['saved_description'] = True
                     elif edit_choice.lower() == 'd':
                         description = None
                         console.print("[yellow]Description discarded.[/yellow]")
@@ -531,9 +535,8 @@ class COMMON():
                         console.print("[green]Keeping the original description.[/green]")
                         meta['description'] = description
                         meta['saved_description'] = True
-                else:
-                    meta['description'] = description
-                    meta['saved_description'] = True
+
+            return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
