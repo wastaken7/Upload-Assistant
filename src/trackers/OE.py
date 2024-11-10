@@ -51,6 +51,8 @@ class OE():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta, self.tracker, self.signature)
         cat_id = await self.get_cat_id(meta['category'])
+        if meta.get('type') == "DVDRIP":
+            meta['type'] = "ENCODE"
         type_id = await self.get_type_id(meta['type'], meta.get('tv_pack', 0), meta.get('video_codec'), meta.get('category', ""))
         resolution_id = await self.get_res_id(meta['resolution'])
         oe_name = await self.edit_name(meta)
