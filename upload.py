@@ -592,7 +592,12 @@ def dupe_check(dupes, meta):
         console.print()
         cli_ui.info_section(cli_ui.bold, "Check if these are actually dupes!")
         cli_ui.info(dupe_text)
-        if meta['unattended']:
+        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+            if meta.get('dupe', False) is False:
+                upload = cli_ui.ask_yes_no("Upload Anyways?", default=False)
+            else:
+                upload = True
+        else:
             if meta.get('dupe', False) is False:
                 console.print("[red]Found potential dupes. Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
                 upload = False
@@ -600,11 +605,6 @@ def dupe_check(dupes, meta):
                 console.print("[yellow]Found potential dupes. --skip-dupe-check was passed. Uploading anyways")
                 upload = True
         console.print()
-        if not meta['unattended']:
-            if meta.get('dupe', False) is False:
-                upload = cli_ui.ask_yes_no("Upload Anyways?", default=False)
-            else:
-                upload = True
         if upload is False:
             meta['upload'] = False
         else:

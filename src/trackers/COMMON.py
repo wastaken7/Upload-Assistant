@@ -622,6 +622,7 @@ class COMMON():
 
         normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
         file_type_present = {t for t in types_to_check if t in normalized_meta_type}
+        has_repack_in_uuid = "repack" in meta['uuid'].lower() if meta.get('uuid') else False
 
         for each in dupes:
             if meta.get('sd', 0) == 1:
@@ -686,6 +687,12 @@ class COMMON():
                         console.log(f"[red]Excluding extra result with new type match: {each}")
                     continue
 
+            # If "repack" is in the UUID, only keep results that also contain "repack"
+            if has_repack_in_uuid and "repack" not in each.lower():
+                if meta['debug']:
+                    console.log(f"[yellow]Excluding result because it lacks 'repack': {each}")
+                continue
+
             for s in search_combos:
                 if s.get('search_for') not in (None, ''):
                     if any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_for']):
@@ -718,6 +725,7 @@ class COMMON():
                         allow = False
             if allow and each not in new_dupes:
                 new_dupes.append(each)
+
         return new_dupes
 
     class MediaInfoParser:
