@@ -51,6 +51,8 @@ class OE():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta, self.tracker, self.signature)
         cat_id = await self.get_cat_id(meta['category'])
+        if meta.get('type') == "DVDRIP":
+            meta['type'] = "ENCODE"
         type_id = await self.get_type_id(meta['type'], meta.get('tv_pack', 0), meta.get('video_codec'), meta.get('category', ""))
         resolution_id = await self.get_res_id(meta['resolution'])
         oe_name = await self.edit_name(meta)
@@ -130,6 +132,16 @@ class OE():
     async def edit_name(self, meta):
         oe_name = meta.get('name')
         media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+        resolution = meta.get('resolution')
+        video_encode = meta.get('video_encode')
+        name_type = meta.get('type', "")
+
+        if name_type == "DVDRIP":
+            if meta.get('category') == "MOVIE":
+                oe_name = oe_name.replace(f"{meta['source']}{meta['video_encode']}", f"{resolution}", 1)
+                oe_name = oe_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+            else:
+                oe_name = oe_name.replace(f"{meta['source']}", f"{resolution}", 1)
 
         if not meta['is_disc']:
             def has_english_audio(media_info_text=None):

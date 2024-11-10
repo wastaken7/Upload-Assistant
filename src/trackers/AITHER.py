@@ -136,8 +136,16 @@ class AITHER():
         media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
         resolution = meta.get('resolution')
         video_codec = meta.get('video_codec')
+        video_encode = meta.get('video_encode')
         name_type = meta.get('type', "")
         source = meta.get('source', "")
+
+        if name_type == "DVDRIP":
+            if meta.get('category') == "MOVIE":
+                aither_name = aither_name.replace(f"{meta['source']}{meta['video_encode']}", f"{resolution}", 1)
+                aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+            else:
+                aither_name = aither_name.replace(f"{meta['source']}", f"{resolution}", 1)
 
         if not meta['is_disc']:
 
@@ -195,7 +203,8 @@ class AITHER():
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6',
-            'ENCODE': '3'
+            'ENCODE': '3',
+            'DVDRIP': '3'
         }.get(type, '0')
         return type_id
 

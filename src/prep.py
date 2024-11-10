@@ -751,9 +751,9 @@ class Prep():
         meta['3D'] = self.is_3d(mi, bdinfo)
         if meta.get('manual_source', None):
             meta['source'] = meta['manual_source']
-            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, base_dir)
         else:
-            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, base_dir)
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
@@ -979,6 +979,7 @@ class Prep():
                         "MaxCLL_Source": track.get("MaxCLL_Source", {}),
                         "MaxFALL": track.get("MaxFALL", {}),
                         "MaxFALL_Source": track.get("MaxFALL_Source", {}),
+                        "Encoded_Library_Settings": track.get("Encoded_Library_Settings", {}),
                     })
                 elif track["@type"] == "Audio":
                     filtered["media"]["track"].append({
@@ -1692,8 +1693,8 @@ class Prep():
         elif is_disc is not None:
             type = "DISC"
         elif "dvdrip" in filename:
-            console.print("[bold red]DVDRip Detected, exiting")
-            exit()
+            type = "DVDRIP"
+            # exit()
         else:
             type = "ENCODE"
         return type
@@ -2267,7 +2268,11 @@ class Prep():
             tag = ""
         return tag
 
-    def get_source(self, type, video, path, is_disc, meta):
+    def get_source(self, type, video, path, is_disc, meta, base_dir):
+        folder_id = meta['uuid']
+        if type == "DVDRIP":
+            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+                mi = json.load(f)
         try:
             try:
                 source = guessit(video)['source']
@@ -2319,6 +2324,13 @@ class Prep():
                 source = "Web"
             if source == "Ultra HDTV":
                 source = "UHDTV"
+            if type == "DVDRIP":
+                console.print("correct source type")
+                framerate = mi['media']['track'][1].get('FrameRate', '')
+                if framerate == 25 and framerate == 50:
+                    source = "PAL"
+                else:
+                    source = "NTSC"
         except Exception:
             console.print(traceback.format_exc())
             source = "BluRay"
@@ -2487,7 +2499,7 @@ class Prep():
         except Exception:
             format = bdinfo['video'][0]['codec']
             format_profile = bdinfo['video'][0]['profile']
-        if type in ("ENCODE", "WEBRIP"):  # ENCODE or WEBRIP
+        if type in ("ENCODE", "WEBRIP", "DVDRIP"):  # ENCODE or WEBRIP or DVDRIP
             if format == 'AVC':
                 codec = 'x264'
             elif format == 'HEVC':
@@ -3170,6 +3182,9 @@ class Prep():
             elif type == "HDTV":  # HDTV
                 name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
+            elif type == "DVDRIP":
+                name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
+                potential_missing = []
         elif meta['category'] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
@@ -3198,6 +3213,9 @@ class Prep():
                 potential_missing = ['edition', 'service']
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
+                potential_missing = []
+            elif type == "DVDRIP":
+                name = f"{title} {alt_title} {season} {source} DVDRip {video_encode}"
                 potential_missing = []
 
         try:
