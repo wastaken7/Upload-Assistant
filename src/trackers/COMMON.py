@@ -687,10 +687,10 @@ class COMMON():
                         console.log(f"[red]Excluding extra result with new type match: {each}")
                     continue
 
-            # If "repack" is in the UUID, only keep results that also contain "repack"
-            if has_repack_in_uuid and "repack" not in each.lower():
+            # Only check for "repack" if `meta['tag']` is in `each`
+            if meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower():
                 if meta['debug']:
-                    console.log(f"[yellow]Excluding result because it lacks 'repack': {each}")
+                    console.log(f"[yellow]Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}")
                 continue
 
             for s in search_combos:
