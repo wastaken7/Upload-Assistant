@@ -29,9 +29,11 @@ class AITHER():
         self.upload_url = 'https://aither.cc/api/torrents/upload'
         self.torrent_url = 'https://aither.cc/api/torrents/'
         self.signature = "\n[center][url=https://aither.cc/forums/topics/1349/posts/24958]Created by L4G's Upload Assistant[/url][/center]"
-        self.banned_groups = ['4K4U', 'AROMA', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'FreetheFish', 'Hi10', 'HiQVE', 'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'nikt0', 'OEPlus', 'OFT', 'OsC', 'PYC',
-                              'QxR', 'Ralphy', 'RARBG', 'RetroPeeps', 'SAMPA', 'Sicario', 'Silence', 'SkipTT', 'SPDVD', 'STUTTERSHIT', 'SWTYBLZ', 'TAoE', 'TGx', 'Tigole', 'TSP', 'TSPxL', 'VXT', 'Weasley[HONE]',
-                              'Will1869', 'x0r', 'YIFY']
+        self.banned_groups = [
+            '4K4U', 'afm72', 'AROMA', 'Bandi', 'BiTOR', 'Bluespots', 'Chivaman', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'FreetheFish', 'Garshasp', 'Ghost', 'Grym', 'Hi10', 'HiQVE', 'ImE', 'ION10',
+            'iVy', 'Judas', 'LAMA', 'Langbard', 'LION', 'MeGusta', 'MONOLITH', 'Natty', 'nikt0', 'noxxus', 'OEPlus', 'OFT', 'OsC', 'Panda', 'PYC', 'QxR', 'r00t', 'Ralphy', 'RARBG', 'RCVR', 'RetroPeeps',
+            'RZeroX', 'SAMPA', 'Sicario', 'Silence', 'SkipTT', 'SM737', 'SPDVD', 'STUTTERSHIT', 'SWTYBLZ', 't3nzin', 'TAoE', 'Telly', 'TGx', 'Tigole', 'TSP', 'TSPxL', 'VXT', 'Vyndros', 'Weasley[HONE]',
+            'Will1869', 'x0r', 'YIFY']
         pass
 
     async def upload(self, meta, disctype):
