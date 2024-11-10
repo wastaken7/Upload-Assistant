@@ -617,23 +617,32 @@ class COMMON():
         if meta['debug']:
             console.log("[cyan]Pre-filtered dupes")
             console.log(dupes)
-        new_dupes = []
-        types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}
 
+        new_dupes = []
+        types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}  # noqa F841
         normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
-        file_type_present = {t for t in types_to_check if t in normalized_meta_type}
         has_repack_in_uuid = "repack" in meta['uuid'].lower() if meta.get('uuid') else False
 
         for each in dupes:
-            if meta.get('sd', 0) == 1:
-                remove_set = set()
-            else:
-                remove_set = set({meta['resolution']})
-
+            remove_set = set({meta['resolution']})
             normalized_each_type = each.replace('-', '').upper()
 
-            # console.log(f"normalized results: {normalized_each_type}")
+            # Check if types match loosely, based on core attributes (resolution, HDR, audio)
+            type_match = any(t in normalized_each_type for t in normalized_meta_type) or \
+                            (meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each)
 
+            if not type_match:
+                if meta['debug']:
+                    console.log(f"[yellow]Excluding result due to type mismatch: {each}")
+                continue
+
+            # Repack filtering if the tag matches
+            if meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower():
+                if meta['debug']:
+                    console.log(f"[yellow]Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}")
+                continue
+
+            # Define search combos for more nuanced matching
             search_combos = [
                 {
                     'search': meta['hdr'],
@@ -661,38 +670,8 @@ class COMMON():
                     'update': {meta['season'], meta['episode']}
                 }
             ]
-            search_matches = [
-                {
-                    'if': {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'},
-                    'in': meta['type']
-                }
-            ]
-            # Check if the type of the dupe matches or is sufficiently similar
-            dupe_type_matches = {t for t in types_to_check if t in normalized_each_type}
 
-            if file_type_present:
-                if 'WEBDL' in normalized_meta_type and 'WEBDL' in normalized_each_type:
-                    if meta['debug']:
-                        console.log(f"[green]Allowing result we will catch later: {each}")
-                elif meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each:
-                    if meta['debug']:
-                        console.log(f"[green]Allowing result we will catch later: {each}")
-                else:
-                    if meta['debug']:
-                        console.log(f"[yellow]Excluding result due to type mismatch: {each}")
-                    continue
-            else:
-                if dupe_type_matches:
-                    if meta['debug']:
-                        console.log(f"[red]Excluding extra result with new type match: {each}")
-                    continue
-
-            # Only check for "repack" if `meta['tag']` is in `each`
-            if meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower():
-                if meta['debug']:
-                    console.log(f"[yellow]Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}")
-                continue
-
+            # Apply search combos to refine remove_set
             for s in search_combos:
                 if s.get('search_for') not in (None, ''):
                     if any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_for']):
@@ -700,12 +679,9 @@ class COMMON():
                 if s.get('search_not') not in (None, ''):
                     if not any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_not']):
                         remove_set.update(s['update'])
-            for sm in search_matches:
-                for a in sm['if']:
-                    if a in sm['in']:
-                        remove_set.add(a)
 
             search = each.lower().replace('-', '').replace(' ', '').replace('.', '')
+
             for x in remove_set.copy():
                 if "|" in x:
                     look_for = x.split('|')
