@@ -2270,8 +2270,9 @@ class Prep():
 
     def get_source(self, type, video, path, is_disc, meta, base_dir):
         folder_id = meta['uuid']
-        with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-            mi = json.load(f)
+        if type == "DVDRIP":
+            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+                mi = json.load(f)
         try:
             try:
                 source = guessit(video)['source']
