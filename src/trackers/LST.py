@@ -85,6 +85,7 @@ class LST():
         resolution_id = await self.get_res_id(meta['resolution'])
         modq = await self.get_flag(meta, 'modq')
         draft = await self.get_flag(meta, 'draft')
+        name = await self.edit_name(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -116,7 +117,7 @@ class LST():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -172,6 +173,21 @@ class LST():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def edit_name(self, meta):
+        lst_name = meta['name']
+        resolution = meta.get('resolution')
+        video_encode = meta.get('video_encode')
+        name_type = meta.get('type', "")
+
+        if name_type == "DVDRIP":
+            if meta.get('category') == "MOVIE":
+                lst_name = lst_name.replace(f"{meta['source']}{meta['video_encode']}", f"{resolution}", 1)
+                lst_name = lst_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+            else:
+                lst_name = lst_name.replace(f"{meta['source']}", f"{resolution}", 1)
+
+        return lst_name
 
     async def get_flag(self, meta, flag_name):
         config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)

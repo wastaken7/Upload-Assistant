@@ -3183,7 +3183,7 @@ class Prep():
                 name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
             elif type == "DVDRIP":
-                name = f"{title} {alt_title} {year} {resolution} DVDRip {audio} {video_encode}"
+                name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
                 potential_missing = []
         elif meta['category'] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
@@ -3215,7 +3215,7 @@ class Prep():
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
             elif type == "DVDRIP":
-                name = f"{title} {alt_title} {season} {resolution} DVDRip {audio} {video_encode}"
+                name = f"{title} {alt_title} {season} {source} DVDRip {video_encode}"
                 potential_missing = []
 
         try:
