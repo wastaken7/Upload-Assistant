@@ -2325,11 +2325,17 @@ class Prep():
             if source == "Ultra HDTV":
                 source = "UHDTV"
             if type == "DVDRIP":
-                console.print("correct source type")
-                framerate = mi['media']['track'][1].get('FrameRate', '')
-                if framerate == 25 and framerate == 50:
-                    source = "PAL"
+                framerate_str = mi['media']['track'][1].get('FrameRate', '')
+                match = re.match(r"(\d+(\.\d+)?)", framerate_str)
+                if match:
+                    framerate = float(match.group(0))
+
+                    if 24.9 <= framerate <= 25.1:
+                        source = "PAL"
+                    else:
+                        source = "NTSC"
                 else:
+                    console.print("Invalid framerate format, using NTSC")
                     source = "NTSC"
         except Exception:
             console.print(traceback.format_exc())
