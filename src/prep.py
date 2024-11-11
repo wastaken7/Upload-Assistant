@@ -751,9 +751,9 @@ class Prep():
         meta['3D'] = self.is_3d(mi, bdinfo)
         if meta.get('manual_source', None):
             meta['source'] = meta['manual_source']
-            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, base_dir)
+            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
         else:
-            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, base_dir)
+            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
@@ -2268,11 +2268,8 @@ class Prep():
             tag = ""
         return tag
 
-    def get_source(self, type, video, path, is_disc, meta, base_dir):
-        folder_id = meta['uuid']
-        if type == "DVDRIP":
-            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-                mi = json.load(f)
+    def get_source(self, type, video, path, is_disc, meta):
+        resolution = meta['resolution']
         try:
             try:
                 source = guessit(video)['source']
@@ -2325,17 +2322,9 @@ class Prep():
             if source == "Ultra HDTV":
                 source = "UHDTV"
             if type == "DVDRIP":
-                framerate_str = mi['media']['track'][1].get('FrameRate', '')
-                match = re.match(r"(\d+(\.\d+)?)", framerate_str)
-                if match:
-                    framerate = float(match.group(0))
-
-                    if 24.9 <= framerate <= 25.1:
-                        source = "PAL"
-                    else:
-                        source = "NTSC"
+                if resolution in [540, 576]:
+                    source = "PAL"
                 else:
-                    console.print("Invalid framerate format, using NTSC")
                     source = "NTSC"
         except Exception:
             console.print(traceback.format_exc())
