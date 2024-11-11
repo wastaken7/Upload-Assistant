@@ -142,6 +142,7 @@ class OE():
                 oe_name = oe_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
             else:
                 oe_name = oe_name.replace(f"{meta['source']}", f"{resolution}", 1)
+                oe_name = oe_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
 
         if not meta['is_disc']:
             def has_english_audio(media_info_text=None):

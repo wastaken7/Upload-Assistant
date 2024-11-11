@@ -186,6 +186,7 @@ class LST():
                 lst_name = lst_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
             else:
                 lst_name = lst_name.replace(f"{meta['source']}", f"{resolution}", 1)
+                lst_name = lst_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
 
         return lst_name
 
