@@ -61,6 +61,9 @@ class ANT():
         return flags
 
     async def upload(self, meta, disctype):
+        if meta.get('category') == "TV":
+            console.print('[bold red]This site only ALLOWS Movies.')
+            return
         common = COMMON(config=self.config)
         torrent_filename = "BASE"
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
