@@ -30,6 +30,9 @@ class RTF():
         pass
 
     async def upload(self, meta, disctype):
+        if datetime.date.today().year - meta['year'] <= 9:
+            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
+            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
@@ -73,10 +76,6 @@ class RTF():
             'Content-Type': 'application/json',
             'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
         }
-
-        if datetime.date.today().year - meta['year'] <= 9:
-            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
-            return
 
         if meta['debug'] is False:
             response = requests.post(url=self.upload_url, json=json_data, headers=headers)
