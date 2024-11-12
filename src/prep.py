@@ -258,12 +258,11 @@ class Prep():
                             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                                 description.write((ptp_desc or "") + "\n")
 
-                            if not meta['is_disc']:
-                                if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                                    valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
-                                    if valid_images:
-                                        meta['image_list'] = valid_images
-                                        await self.handle_image_list(meta, tracker_name)
+                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                                valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
+                                if valid_images:
+                                    meta['image_list'] = valid_images
+                                    await self.handle_image_list(meta, tracker_name)
 
                         else:
                             found_match = False
@@ -276,11 +275,10 @@ class Prep():
                             description.write((ptp_desc or "") + "\n")
                         meta['saved_description'] = True
 
-                        if not meta['is_disc']:
-                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                                valid_images = await self.check_images_concurrently(ptp_imagelist)
-                                if valid_images:
-                                    meta['image_list'] = valid_images
+                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                            valid_images = await self.check_images_concurrently(ptp_imagelist)
+                            if valid_images:
+                                meta['image_list'] = valid_images
                 else:
                     console.print("[yellow]Skipping PTP as no match found[/yellow]")
                     found_match = False
@@ -299,12 +297,11 @@ class Prep():
                     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                         description.write(ptp_desc + "\n")
                     meta['saved_description'] = True
-                    if not meta['is_disc']:
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
-                            if valid_images:
-                                meta['image_list'] = valid_images
-                                console.print("[green]PTP images added to metadata.[/green]")
+                    if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                        valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
+                        if valid_images:
+                            meta['image_list'] = valid_images
+                            console.print("[green]PTP images added to metadata.[/green]")
                 else:
                     console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                     found_match = False
@@ -676,7 +673,7 @@ class Prep():
                 else:
                     use_vs = False
                 try:
-                    ds = multiprocessing.Process(target=self.disc_screenshots, args=(filename, bdinfo, meta['uuid'], base_dir, use_vs, meta.get('image_list', []), meta.get('ffdebug', False), None))
+                    ds = multiprocessing.Process(target=self.disc_screenshots, args=(meta, filename, bdinfo, meta['uuid'], base_dir, use_vs, meta.get('image_list', []), meta.get('ffdebug', False), None))
                     ds.start()
                     while ds.is_alive() is True:
                         await asyncio.sleep(1)
@@ -1243,7 +1240,15 @@ class Prep():
         # Replace invalid characters like colons with an underscore
         return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
-    def disc_screenshots(self, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None):
+    def disc_screenshots(self, meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None):
+        if 'image_list' not in meta:
+            meta['image_list'] = []
+        existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
+
+        if len(existing_images) >= 3:
+            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+            return
+
         if num_screens is None:
             num_screens = self.screens
         if num_screens == 0 or len(image_list) >= num_screens:
@@ -1335,6 +1340,14 @@ class Prep():
                     os.remove(smallest)
 
     def dvd_screenshots(self, meta, disc_num, num_screens=None):
+        if 'image_list' not in meta:
+            meta['image_list'] = []
+        existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
+
+        if len(existing_images) >= 3:
+            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+            return
+
         if num_screens is None:
             num_screens = self.screens
         if num_screens == 0 or (len(meta.get('image_list', [])) >= num_screens and disc_num == 0):
