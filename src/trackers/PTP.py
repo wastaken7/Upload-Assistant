@@ -209,7 +209,7 @@ class PTP():
         console.print("[bold green]Successfully grabbed description from PTP")
         console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...")  # Show first 1000 characters for brevity
 
-        if not meta.get('skipit') or meta['unattended']:
+        if not meta.get('skipit') and not meta['unattended']:
             # Allow user to edit or discard the description
             console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
             edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
@@ -228,6 +228,9 @@ class PTP():
                 console.print("[green]Keeping the original description.[/green]")
                 meta['description'] = ptp_desc
                 meta['saved_description'] = True
+        else:
+            meta['description'] = ptp_desc
+            meta['saved_description'] = True
 
         return desc, imagelist
 
