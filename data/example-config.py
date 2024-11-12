@@ -59,7 +59,7 @@ config = {
         "optimize_images": True,
 
         # Use only half available CPU cores to avoid memory allocation errors
-        # Only when usig lossless compression
+        # Only when using lossless compression
         "shared_seedbox": False,
 
         # The name of your default torrent client, set in the torrent client sections below

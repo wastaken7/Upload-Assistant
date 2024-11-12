@@ -1084,6 +1084,8 @@ class Prep():
                 scan = "Progressive"
             if scan == "Progressive":
                 scan = "p"
+            elif scan == "Interlaced":
+                scan = 'i'
             elif framerate == "25.000":
                 scan = "p"
             else:
