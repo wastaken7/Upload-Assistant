@@ -565,7 +565,10 @@ class Prep():
                             found_match = True
 
                 else:
-                    if "PTP" not in found_match:
+                    # Process all trackers with API = true if no specific tracker is set in meta
+                    default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
+
+                    if "PTP" in default_trackers and not found_match:
                         if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
                             ptp = PTP(config=self.config)
                             try:
@@ -578,7 +581,7 @@ class Prep():
                                 print(f"PTP tracker request failed due to connection error: {conn_err}")
 
                     if not meta['is_disc']:
-                        if "BLU" not in found_match:
+                        if "BLU" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
                                 blu = BLU(config=self.config)
                                 try:
@@ -590,7 +593,7 @@ class Prep():
                                 except requests.exceptions.ConnectionError as conn_err:
                                     print(f"BLU tracker request failed due to connection error: {conn_err}")
 
-                        if "AITHER" not in found_match:
+                        if "AITHER" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
                                 aither = AITHER(config=self.config)
                                 try:
@@ -602,7 +605,7 @@ class Prep():
                                 except requests.exceptions.ConnectionError as conn_err:
                                     print(f"AITHER tracker request failed due to connection error: {conn_err}")
 
-                        if "LST" not in found_match:
+                        if "LST" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
                                 lst = LST(config=self.config)
                                 try:
@@ -614,7 +617,7 @@ class Prep():
                                 except requests.exceptions.ConnectionError as conn_err:
                                     print(f"LST tracker request failed due to connection error: {conn_err}")
 
-                        if "OE" not in found_match:
+                        if "OE" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
                                 oe = OE(config=self.config)
                                 try:
@@ -626,7 +629,7 @@ class Prep():
                                 except requests.exceptions.ConnectionError as conn_err:
                                     print(f"OE tracker request failed due to connection error: {conn_err}")
 
-                        if "TIK" not in found_match:
+                        if "TIK" in default_trackers and not found_match:
                             if str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
                                 tik = TIK(config=self.config)
                                 try:
@@ -638,7 +641,7 @@ class Prep():
                                 except requests.exceptions.ConnectionError as conn_err:
                                     print(f"TIK tracker request failed due to connection error: {conn_err}")
 
-                    if "HDB" not in found_match:
+                    if "HDB" in default_trackers and not found_match:
                         if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
                             hdb = HDB(config=self.config)
                             try:
