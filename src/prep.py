@@ -10,6 +10,8 @@ from src.trackers.OE import OE
 from src.trackers.HDB import HDB
 from src.trackers.TIK import TIK
 from src.trackers.COMMON import COMMON
+from src.clients import Clients
+from data.config import config
 
 try:
     import traceback
@@ -495,6 +497,11 @@ class Prep():
         description_text = meta.get('description', '')
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.write(description_text)
+
+        client = Clients(config=config)
+        if meta.get('infohash') is not None:
+            meta = await client.get_ptp_from_hash(meta)
+            console.print("PTP meta:", meta['ptp'])
 
         if not meta.get('image_list'):
             # Reuse information from trackers with fallback
