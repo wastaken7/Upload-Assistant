@@ -478,15 +478,41 @@ class Clients():
         for torrent in torrents:
             if torrent.get('infohash_v1') == info_hash_v1:
                 comment = torrent.get('comment', "")
-                match = re.search(r'torrentid=(\d+)', comment)
-                if match:
-                    meta['ptp'] = match.group(1)
-                    console.print(f"[bold cyan]meta['ptp'] set to torrentid: {meta['ptp']}")
-                else:
-                    console.print("[bold red]No torrentid found in comment.")
+
+                if "https://passthepopcorn.me" in comment:
+                    match = re.search(r'torrentid=(\d+)', comment)
+                    if match:
+                        meta['ptp'] = match.group(1)
+                        console.print(f"[bold cyan]meta['ptp'] set to torrentid: {meta['ptp']}")
+
+                elif "https://aither.cc" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['aither'] = match.group(1)
+                        console.print(f"[bold cyan]meta['aither'] set to ID: {meta['aither']}")
+
+                elif "https://lst.gg" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['lst'] = match.group(1)
+                        console.print(f"[bold cyan]meta['lst'] set to ID: {meta['lst']}")
+
+                elif "https://onlyencodes.cc" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['oe'] = match.group(1)
+                        console.print(f"[bold cyan]meta['oe'] set to ID: {meta['oe']}")
+
+                elif "https://blutopia.cc" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['blu'] = match.group(1)
+                        console.print(f"[bold cyan]meta['blu'] set to ID: {meta['blu']}")
+
                 found = True
                 break
 
         if not found:
             console.print("[bold red]Torrent with the specified infohash_v1 not found.")
+
         return meta
