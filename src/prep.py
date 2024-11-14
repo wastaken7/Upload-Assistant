@@ -501,7 +501,6 @@ class Prep():
         client = Clients(config=config)
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
-            console.print("PTP meta:", meta['ptp'])
 
         if not meta.get('image_list'):
             # Reuse information from trackers with fallback
@@ -527,7 +526,6 @@ class Prep():
 
                 # If a specific tracker is found, only process that one
                 if specific_tracker:
-                    console.print(f"[blue]Processing only the {specific_tracker} tracker based on meta.[/blue]")
 
                     if specific_tracker == 'PTP':
                         ptp = PTP(config=self.config)
