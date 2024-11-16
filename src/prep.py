@@ -2,13 +2,13 @@
 from src.args import Args
 from src.console import console
 from src.exceptions import *  # noqa: F403
-from src.trackers.PTP import PTP
-from src.trackers.BLU import BLU
-from src.trackers.AITHER import AITHER
-from src.trackers.LST import LST
-from src.trackers.OE import OE
-from src.trackers.HDB import HDB
-from src.trackers.TIK import TIK
+from src.trackers.PTP import PTP  # noqa F401
+from src.trackers.BLU import BLU  # noqa F401
+from src.trackers.AITHER import AITHER  # noqa F401
+from src.trackers.LST import LST  # noqa F401
+from src.trackers.OE import OE  # noqa F401
+from src.trackers.HDB import HDB  # noqa F401
+from src.trackers.TIK import TIK  # noqa F401
 from src.trackers.COMMON import COMMON
 from src.clients import Clients
 from data.config import config
@@ -507,161 +507,55 @@ class Prep():
             found_match = False
 
             if search_term:
-                # Check if specific trackers are already set in meta
-                specific_tracker = None
-                if meta.get('ptp'):
-                    specific_tracker = 'PTP'
-                elif meta.get('hdb'):
-                    specific_tracker = 'HDB'
-                elif meta.get('blu'):
-                    specific_tracker = 'BLU'
-                elif meta.get('aither'):
-                    specific_tracker = 'AITHER'
-                elif meta.get('lst'):
-                    specific_tracker = 'LST'
-                elif meta.get('oe'):
-                    specific_tracker = 'OE'
-                elif meta.get('tik'):
-                    specific_tracker = 'TIK'
+                # Check if a specific tracker is already set in meta
+                tracker_keys = {
+                    'ptp': 'PTP',
+                    'hdb': 'HDB',
+                    'blu': 'BLU',
+                    'aither': 'AITHER',
+                    'lst': 'LST',
+                    'oe': 'OE',
+                    'tik': 'TIK',
+                }
+                specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key)), None)
 
-                # If a specific tracker is found, only process that one
+                async def process_tracker(tracker_name, meta):
+                    nonlocal found_match
+                    tracker_class = globals().get(tracker_name)
+                    if tracker_class is None:
+                        print(f"Tracker class for {tracker_name} not found.")
+                        return meta
+
+                    tracker_instance = tracker_class(config=self.config)
+                    try:
+                        updated_meta, match = await self.update_metadata_from_tracker(
+                            tracker_name, tracker_instance, meta, search_term, search_file_folder
+                        )
+                        if match:
+                            found_match = True
+                            console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
+                        return updated_meta
+                    except aiohttp.ClientSSLError:
+                        print(f"{tracker_name} tracker request failed due to SSL error.")
+                    except requests.exceptions.ConnectionError as conn_err:
+                        print(f"{tracker_name} tracker request failed due to connection error: {conn_err}")
+                    return meta
+
+                # If a specific tracker is found, process only that tracker
                 if specific_tracker:
-
-                    if specific_tracker == 'PTP':
-                        ptp = PTP(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'BLU':
-                        blu = BLU(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'AITHER':
-                        aither = AITHER(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'LST':
-                        lst = LST(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'OE':
-                        oe = OE(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'TIK':
-                        tik = TIK(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
-                    elif specific_tracker == 'HDB':
-                        hdb = HDB(config=self.config)
-                        meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                        if match:
-                            found_match = True
-
+                    meta = await process_tracker(specific_tracker, meta)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    default_trackers = self.config['TRACKERS'].get('default_trackers', "").split(", ")
+                    tracker_order = ["PTP", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
 
-                    if "PTP" in default_trackers and not found_match:
-                        if str(self.config['TRACKERS'].get('PTP', {}).get('useAPI')).lower() == "true":
-                            ptp = PTP(config=self.config)
-                            try:
-                                meta, match = await self.update_metadata_from_tracker('PTP', ptp, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
-                            except aiohttp.ClientSSLError:
-                                print("PTP tracker request failed due to SSL error.")
-                            except requests.exceptions.ConnectionError as conn_err:
-                                print(f"PTP tracker request failed due to connection error: {conn_err}")
-
-                    if not meta['is_disc']:
-                        if "BLU" in default_trackers and not found_match:
-                            if str(self.config['TRACKERS'].get('BLU', {}).get('useAPI')).lower() == "true":
-                                blu = BLU(config=self.config)
-                                try:
-                                    meta, match = await self.update_metadata_from_tracker('BLU', blu, meta, search_term, search_file_folder)
-                                    if match:
-                                        found_match = True
-                                except aiohttp.ClientSSLError:
-                                    print("BLU tracker request failed due to SSL error.")
-                                except requests.exceptions.ConnectionError as conn_err:
-                                    print(f"BLU tracker request failed due to connection error: {conn_err}")
-
-                        if "AITHER" in default_trackers and not found_match:
-                            if str(self.config['TRACKERS'].get('AITHER', {}).get('useAPI')).lower() == "true":
-                                aither = AITHER(config=self.config)
-                                try:
-                                    meta, match = await self.update_metadata_from_tracker('AITHER', aither, meta, search_term, search_file_folder)
-                                    if match:
-                                        found_match = True
-                                except aiohttp.ClientSSLError:
-                                    print("AITHER tracker request failed due to SSL error.")
-                                except requests.exceptions.ConnectionError as conn_err:
-                                    print(f"AITHER tracker request failed due to connection error: {conn_err}")
-
-                        if "LST" in default_trackers and not found_match:
-                            if str(self.config['TRACKERS'].get('LST', {}).get('useAPI')).lower() == "true":
-                                lst = LST(config=self.config)
-                                try:
-                                    meta, match = await self.update_metadata_from_tracker('LST', lst, meta, search_term, search_file_folder)
-                                    if match:
-                                        found_match = True
-                                except aiohttp.ClientSSLError:
-                                    print("LST tracker request failed due to SSL error.")
-                                except requests.exceptions.ConnectionError as conn_err:
-                                    print(f"LST tracker request failed due to connection error: {conn_err}")
-
-                        if "OE" in default_trackers and not found_match:
-                            if str(self.config['TRACKERS'].get('OE', {}).get('useAPI')).lower() == "true":
-                                oe = OE(config=self.config)
-                                try:
-                                    meta, match = await self.update_metadata_from_tracker('OE', oe, meta, search_term, search_file_folder)
-                                    if match:
-                                        found_match = True
-                                except aiohttp.ClientSSLError:
-                                    print("OE tracker request failed due to SSL error.")
-                                except requests.exceptions.ConnectionError as conn_err:
-                                    print(f"OE tracker request failed due to connection error: {conn_err}")
-
-                        if "TIK" in default_trackers and not found_match:
-                            if str(self.config['TRACKERS'].get('TIK', {}).get('useAPI')).lower() == "true":
-                                tik = TIK(config=self.config)
-                                try:
-                                    meta, match = await self.update_metadata_from_tracker('TIK', tik, meta, search_term, search_file_folder)
-                                    if match:
-                                        found_match = True
-                                except aiohttp.ClientSSLError:
-                                    print("TIK tracker request failed due to SSL error.")
-                                except requests.exceptions.ConnectionError as conn_err:
-                                    print(f"TIK tracker request failed due to connection error: {conn_err}")
-
-                    if "HDB" in default_trackers and not found_match:
-                        if str(self.config['TRACKERS'].get('HDB', {}).get('useAPI')).lower() == "true":
-                            hdb = HDB(config=self.config)
-                            try:
-                                meta, match = await self.update_metadata_from_tracker('HDB', hdb, meta, search_term, search_file_folder)
-                                if match:
-                                    found_match = True
-                            except aiohttp.ClientSSLError:
-                                print("HDB tracker request failed due to SSL error.")
-                            except requests.exceptions.ConnectionError as conn_err:
-                                print(f"HDB tracker request failed due to connection error: {conn_err}")
+                    for tracker_name in tracker_order:
+                        if not found_match:  # Stop checking once a match is found
+                            tracker_config = self.config['TRACKERS'].get(tracker_name, {})
+                            if str(tracker_config.get('useAPI', 'false')).lower() == "true":
+                                meta = await process_tracker(tracker_name, meta)
 
                 if not found_match:
                     console.print("[yellow]No matches found on any trackers.[/yellow]")
-                else:
-                    console.print(f"[green]Match found: {found_match}[/green]")
             else:
                 console.print("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
         else:
