@@ -134,7 +134,7 @@ config = {
         "FL": {
             "username": "FL username",
             "passkey": "FL passkey",
-            "uploader_name": "https://hdbits.org/announce/Custom_Announce_URL",
+            "uploader_name": "https://filelist.io/Custom_Announce_URL",
             # "anon": False,
         },
         "FNP": {
