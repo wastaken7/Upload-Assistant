@@ -31,7 +31,11 @@ config = {
 
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
+        # This setting also effect PTP, however PTP requries at least 2 images for each.
+        # PTP will always use a *minimum* of 2, regardless of what is set here.
         "multiScreens": "2",
+
+        # The below options for packed content do not effect PTP. PTP has a set standard.
 
         # When uploading packs, you can specifiy a different screenshot thumbnail size, default 300.
         "pack_thumb_size": "300",

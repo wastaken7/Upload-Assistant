@@ -619,9 +619,9 @@ class PTP():
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
-        if multi_screens == 0:
+        if multi_screens < 2:
             multi_screens = 2
-            console.print("[yellow]PTP requires screenshots for multi disc/file content, overriding config")
+            console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
             images = meta['image_list']
