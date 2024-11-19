@@ -119,7 +119,7 @@ class HUNO():
         if dual:
             language = "DUAL"
         elif 'mediainfo' in meta:
-            language = next(x for x in meta["mediainfo"]["media"]["track"] if x["@type"] == "Audio").get('Language_String', "English")
+            language = next(x for x in meta["mediainfo"]["media"]["track"] if x["@type"] == "Audio").get('Language', "English")
             language = re.sub(r'\(.+\)', '', language)
         if language == "zxx":
             language = "Silent"
