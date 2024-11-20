@@ -118,11 +118,29 @@ class HUNO():
 
         if dual:
             language = "DUAL"
-        elif 'mediainfo' in meta:
-            language = next(x for x in meta["mediainfo"]["media"]["track"] if x["@type"] == "Audio").get('Language', "English")
-            language = re.sub(r'\(.+\)', '', language)
+        else:
+            media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+            with open(media_info_path, 'r', encoding='utf-8') as f:
+                media_info_text = f.read()
+
+            try:
+                audio_lines = [
+                    line for line in media_info_text.splitlines() if "Audio" in line
+                ]
+                if audio_lines:
+                    language_line = next(
+                        (line for line in audio_lines if "Language" in line), None
+                    )
+                    if language_line:
+                        language = re.search(r'Language\s*:\s*(.+)', language_line)
+                        language = language.group(1) if language else "English"
+                        language = re.sub(r'\(.+\)', '', language)
+            except StopIteration:
+                language = "English"
+
         if language == "zxx":
             language = "Silent"
+
         return f'{codec} {channels} {language}'
 
     def get_basename(self, meta):
