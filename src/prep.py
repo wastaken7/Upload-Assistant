@@ -1141,12 +1141,12 @@ class Prep():
         # Replace invalid characters like colons with an underscore
         return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
-    def disc_screenshots(self, meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None):
+    def disc_screenshots(self, meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None, force_screenshots=False):
         if 'image_list' not in meta:
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3:
+        if len(existing_images) >= 3 and not force_screenshots:
             console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
             return
 

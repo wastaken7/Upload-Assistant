@@ -158,7 +158,7 @@ class COMMON():
                                 # Run prep.screenshots if no screenshots are present
                                 if each['type'] == "BDMV":
                                     use_vs = meta.get('vapoursynth', False)
-                                    s = multiprocessing.Process(target=prep.disc_screenshots, args=(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens))
+                                    s = multiprocessing.Process(target=prep.disc_screenshots, args=(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True))
                                     s.start()
                                     while s.is_alive():
                                         await asyncio.sleep(1)
