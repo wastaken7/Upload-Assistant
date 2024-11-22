@@ -119,27 +119,28 @@ class HUNO():
         if dual:
             language = "DUAL"
         else:
+            # Read the MEDIAINFO.txt file
             media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
             with open(media_info_path, 'r', encoding='utf-8') as f:
                 media_info_text = f.read()
 
-            try:
-                audio_lines = [
-                    line for line in media_info_text.splitlines() if "Audio" in line
-                ]
-                if audio_lines:
-                    language_line = next(
-                        (line for line in audio_lines if "Language" in line), None
-                    )
-                    if language_line:
-                        language = re.search(r'Language\s*:\s*(.+)', language_line)
-                        language = language.group(1) if language else "English"
-                        language = re.sub(r'\(.+\)', '', language)
-            except StopIteration:
-                language = "English"
+            # Extract the first audio section
+            first_audio_section = re.search(r'Audio\s+ID\s+:\s+2(.*?)\n\n', media_info_text, re.DOTALL)
+            if not first_audio_section:  # Fallback in case of a different structure
+                first_audio_section = re.search(r'Audio(.*?)Text', media_info_text, re.DOTALL)
 
+            if first_audio_section:
+                # Extract language information from the first audio track
+                language_match = re.search(r'Language\s*:\s*(.+)', first_audio_section.group(1))
+                if language_match:
+                    language = language_match.group(1).strip()
+                    language = re.sub(r'\(.+\)', '', language)  # Remove text in parentheses
+
+        # Handle special cases
         if language == "zxx":
             language = "Silent"
+        elif not language:
+            language = "Unknown"  # Default if no language is found
 
         return f'{codec} {channels} {language}'
 
