@@ -3545,7 +3545,8 @@ class Prep():
                 content_written = True
 
             if not content_written:
-                description.write(meta['description'] + "\n")
+                description_text = meta.get('description', '') or ''
+                description.write(description_text + "\n")
 
             description.write("\n")
             return meta
