@@ -278,7 +278,7 @@ class Prep():
                         meta['saved_description'] = True
 
                         if not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                            valid_images = await self.check_images_concurrently(ptp_imagelist)
+                            valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
                             if valid_images:
                                 meta['image_list'] = valid_images
                 else:
