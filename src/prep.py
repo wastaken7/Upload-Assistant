@@ -1187,7 +1187,6 @@ class Prep():
             else:
                 if (meta.get('ffdebug', False)):
                     loglevel = 'verbose'
-                    debug = False
                 else:
                     loglevel = 'quiet'
                 with Progress(
@@ -1208,7 +1207,7 @@ class Prep():
                                 .output(image, vframes=1, pix_fmt="rgb24")
                                 .overwrite_output()
                                 .global_args('-loglevel', loglevel)
-                                .run(quiet=debug)
+                                .run()
                             )
                         except Exception:
                             console.print(traceback.format_exc())
@@ -1300,7 +1299,6 @@ class Prep():
         else:
             if (meta.get('ffdebug', False)):
                 loglevel = 'verbose'
-                debug = False
             else:
                 loglevel = 'quiet'
             looped = 0
@@ -1387,7 +1385,7 @@ class Prep():
                                     image,
                                     vframes=1,
                                     pix_fmt="rgb24"
-                                ).overwrite_output().global_args('-loglevel', loglevel).run(quiet=debug)
+                                ).overwrite_output().global_args('-loglevel', loglevel).run()
 
                                 if not os.path.exists(image):
                                     if meta['debug']:
@@ -1487,7 +1485,6 @@ class Prep():
             i = 0
             if (meta.get('ffdebug', False)):
                 loglevel = 'verbose'
-                debug = False
             else:
                 loglevel = 'quiet'
 
@@ -1539,7 +1536,7 @@ class Prep():
                                 .output(image_path, vframes=1, pix_fmt="rgb24")
                                 .overwrite_output()
                                 .global_args('-loglevel', loglevel)
-                                .run(quiet=debug)
+                                .run()
                             )
 
                         except Exception as e:
