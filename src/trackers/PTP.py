@@ -207,7 +207,7 @@ class PTP():
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
         console.print("[bold green]Successfully grabbed description from PTP")
-        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...")  # Show first 1000 characters for brevity
+        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
 
         if not meta.get('skipit') and not meta['unattended']:
             # Allow user to edit or discard the description
