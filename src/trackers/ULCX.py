@@ -45,6 +45,8 @@ class ULCX():
         return type_id
 
     async def get_res_id(self, resolution):
+        if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
+            return None
         resolution_id = {
             '8640p': '10',
             '4320p': '1',
@@ -69,6 +71,9 @@ class ULCX():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
+        if resolution_id is None:
+            console.print("Resolution is below 720p; skipping.")
+            return
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
