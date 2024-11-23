@@ -61,6 +61,9 @@ class ULCX():
         return resolution_id
 
     async def upload(self, meta, disctype):
+        if 'concert' in meta['keywords']:
+            console.print('[bold red]Concerts not allowed.')
+            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
