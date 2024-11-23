@@ -51,6 +51,7 @@ try:
     import aiohttp
     from PIL import Image
     import io
+    from io import BytesIO
     import sys
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
@@ -92,7 +93,31 @@ class Prep():
         if 'image_sizes' not in meta:
             meta['image_sizes'] = {}
 
-        # Function to check each image's URL, host, and log size
+        # Map fixed resolution names to vertical resolutions
+        resolution_map = {
+            '8640p': 8640,
+            '4320p': 4320,
+            '2160p': 2160,
+            '1440p': 1440,
+            '1080p': 1080,
+            '1080i': 1080,
+            '720p': 720,
+            '576p': 576,
+            '576i': 576,
+            '480p': 480,
+            '480i': 480,
+        }
+
+        # Get expected vertical resolution
+        expected_resolution_name = meta.get('resolution', None)
+        expected_vertical_resolution = resolution_map.get(expected_resolution_name, None)
+
+        # If no valid resolution is found, skip processing
+        if expected_vertical_resolution is None:
+            console.print("[red]Meta resolution is invalid or missing. Skipping all images.[/red]")
+            return []
+
+        # Function to check each image's URL, host, and log resolution
         async def check_and_collect(image_dict):
             img_url = image_dict.get('raw_url')
             if not img_url:
@@ -110,17 +135,37 @@ class Prep():
                     nonlocal invalid_host_found
                     invalid_host_found = True  # Mark that we found an invalid host
 
-                # Download the image to check its size
                 async with aiohttp.ClientSession() as session:
                     async with session.get(img_url) as response:
                         if response.status == 200:
-                            image_content = await response.read()  # Download the entire image content
-                            image_size = len(image_content)  # Calculate the size in bytes
-                            # Store the image size in meta['image_sizes']
-                            meta['image_sizes'][img_url] = image_size
-                            console.print(f"Size of {img_url}: {image_size / 1024:.2f} KiB")
+                            image_content = await response.read()
+
+                            try:
+                                image = Image.open(BytesIO(image_content))
+                                vertical_resolution = image.height
+                                lower_bound = expected_vertical_resolution * 0.70  # 30% below
+                                upper_bound = expected_vertical_resolution * 1.00
+
+                                if not (lower_bound <= vertical_resolution <= upper_bound):
+                                    console.print(
+                                        f"[red]Image {img_url} resolution ({vertical_resolution}p) "
+                                        f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
+                                    )
+                                    return None
+
+                                meta['image_sizes'][img_url] = {
+                                    "size": len(image_content),
+                                    "resolution": f"{image.width}x{image.height}",
+                                }
+                                console.print(
+                                    f"Valid image {img_url} with resolution {image.width}x{image.height} "
+                                    f"and size {len(image_content) / 1024:.2f} KiB"
+                                )
+                            except Exception as e:
+                                console.print(f"[red]Failed to process image {img_url}: {e}")
+                                return None
                         else:
-                            console.print(f"[red]Failed to get size for {img_url}. Skipping.")
+                            console.print(f"[red]Failed to fetch image {img_url}. Skipping.")
 
                 return image_dict
             else:
@@ -143,7 +188,9 @@ class Prep():
                 meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
             if 'MTV' in meta.get('trackers', []):
                 if invalid_host_found:
-                    console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]")
+                    console.print(
+                        "[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]"
+                    )
         # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
         elif 'MTV' in trackers_list:
             if invalid_host_found:
