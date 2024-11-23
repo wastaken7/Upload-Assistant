@@ -342,8 +342,6 @@ class Clients():
         if not path.endswith('/'):
             path += '/'
 
-        console.print("[red]Final Path:", path)
-
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
             host=client['qbit_url'],
