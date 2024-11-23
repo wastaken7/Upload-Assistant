@@ -47,7 +47,11 @@ class BBCODE:
         desc = desc.replace('\r\n', '\n')
 
         # Remove url tags with PTP/HDB links
-        url_tags = re.findall(r"(\[url[\=\]]https?:\/\/passthepopcorn\.m[^\]]+)([^\[]+)(\[\/url\])?", desc, flags=re.IGNORECASE)
+        url_tags = re.findall(
+            r"(?:\[url(?:=|\])[^\]]*https?:\/\/passthepopcorn\.m[^\]]*\]|\bhttps?:\/\/passthepopcorn\.m[^\s]+)",
+            desc,
+            flags=re.IGNORECASE,
+        )
         url_tags += re.findall(r"(\[url[\=\]]https?:\/\/hdbits\.o[^\]]+)([^\[]+)(\[\/url\])?", desc, flags=re.IGNORECASE)
         if url_tags:
             for url_tag in url_tags:
