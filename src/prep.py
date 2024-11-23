@@ -98,6 +98,11 @@ class Prep():
             if not img_url:
                 return None
 
+            if "ptpimg.me" in img_url and img_url.startswith("http://"):
+                img_url = img_url.replace("http://", "https://")
+                image_dict['raw_url'] = img_url
+                image_dict['web_url'] = img_url
+
             # Verify the image link
             if await self.check_image_link(img_url):
                 # Check if the image is hosted on an approved image host
