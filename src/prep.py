@@ -2881,6 +2881,8 @@ class Prep():
                                 }
                                 response = requests.post(url, data=data, timeout=timeout)
                                 response = response.json()
+                                if meta.get('debug'):
+                                    console.print('imgbb API response', response)
                                 img_url = response['data'].get('medium', response['data']['image'])['url']
                                 raw_url = response['data']['image']['url']
                                 web_url = response['data']['url_viewer']
