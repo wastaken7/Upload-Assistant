@@ -574,7 +574,7 @@ def get_confirmation(meta):
         cli_ui.info(ring_the_bell)
 
         # Handle the 'keep_folder' logic based on 'is disc' and 'isdir'
-        if meta.get('is disc', False) is False:
+        if meta.get('is disc', False) is True:
             meta['keep_folder'] = False  # Ensure 'keep_folder' is False if 'is disc' is True
 
         if meta.get('keep_folder'):

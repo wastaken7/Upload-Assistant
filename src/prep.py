@@ -2681,14 +2681,18 @@ class Prep():
     def create_torrent(self, meta, path, output_filename):
         # Handle directories and file inclusion logic
         if meta['isdir']:
-            os.chdir(path)
-            globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
-            no_sample_globs = []
-            for file in globs:
-                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
-                    no_sample_globs.append(os.path.abspath(f"{path}{os.sep}{file}"))
-            if len(no_sample_globs) == 1:
-                path = meta['filelist'][0]
+            if meta['keep_folder']:
+                cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
+                path = path
+            else:
+                os.chdir(path)
+                globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
+                no_sample_globs = []
+                for file in globs:
+                    if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
+                        no_sample_globs.append(os.path.abspath(f"{path}{os.sep}{file}"))
+                if len(no_sample_globs) == 1:
+                    path = meta['filelist'][0]
         if meta['is_disc']:
             include, exclude = "", ""
         else:
@@ -2881,8 +2885,6 @@ class Prep():
                                 }
                                 response = requests.post(url, data=data, timeout=timeout)
                                 response = response.json()
-                                if meta.get('debug'):
-                                    console.print('imgbb API response', response)
                                 img_url = response['data'].get('medium', response['data']['image'])['url']
                                 raw_url = response['data']['image']['url']
                                 web_url = response['data']['url_viewer']
