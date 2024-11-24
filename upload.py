@@ -56,6 +56,7 @@ import shutil
 import glob
 import cli_ui
 import traceback
+import click
 
 from src.console import console
 from rich.markdown import Markdown
@@ -81,147 +82,269 @@ client = Clients(config=config)
 parser = Args(config)
 
 
+def get_log_file(base_dir, queue_name):
+    """
+    Returns the path to the log file for the given base directory and queue name.
+    """
+    safe_queue_name = queue_name.replace(" ", "_")
+    return os.path.join(base_dir, "tmp", f"{safe_queue_name}_processed_files.log")
+
+
+def load_processed_files(log_file):
+    """
+    Loads the list of processed files from the log file.
+    """
+    if os.path.exists(log_file):
+        with open(log_file, "r") as f:
+            return set(json.load(f))
+    return set()
+
+
+def save_processed_file(log_file, file_path):
+    """
+    Adds a processed file to the log.
+    """
+    processed_files = load_processed_files(log_file)
+    processed_files.add(file_path)
+    with open(log_file, "w") as f:
+        json.dump(list(processed_files), f, indent=4)
+
+
+def gather_files_recursive(path, allowed_extensions=None):
+    """
+    Gather files and first-level subfolders.
+    Each subfolder is treated as a single unit, without exploring deeper.
+    """
+    queue = []
+    if os.path.isdir(path):
+        for entry in os.scandir(path):
+            if entry.is_dir():
+                queue.append(entry.path)
+            elif entry.is_file() and (allowed_extensions is None or entry.name.lower().endswith(tuple(allowed_extensions))):
+                queue.append(entry.path)
+    elif os.path.isfile(path):
+        if allowed_extensions is None or path.lower().endswith(tuple(allowed_extensions)):
+            queue.append(path)
+    else:
+        console.print(f"[red]Invalid path: {path}")
+    return queue
+
+
+def resolve_queue_with_glob_or_split(path, paths, allowed_extensions=None):
+    """
+    Handle glob patterns and split path resolution.
+    Treat subfolders as single units and filter files by allowed_extensions.
+    """
+    queue = []
+    if os.path.exists(os.path.dirname(path)) and len(paths) <= 1:
+        escaped_path = path.replace('[', '[[]')
+        queue = [
+            file for file in glob.glob(escaped_path)
+            if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions is None or file.lower().endswith(tuple(allowed_extensions))))
+        ]
+        if queue:
+            display_queue(queue)
+    elif os.path.exists(os.path.dirname(path)) and len(paths) > 1:
+        queue = [
+            file for file in paths
+            if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions is None or file.lower().endswith(tuple(allowed_extensions))))
+        ]
+        display_queue(queue)
+    elif not os.path.exists(os.path.dirname(path)):
+        queue = [
+            file for file in resolve_split_path(path)  # noqa F8221
+            if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions is None or file.lower().endswith(tuple(allowed_extensions))))
+        ]
+        display_queue(queue)
+    return queue
+
+
+def merge_meta(meta, saved_meta):
+    """Merges saved metadata with the current meta, respecting overwrite rules."""
+    overwrite_list = [
+        'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
+        'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft',
+        'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
+        'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio'
+    ]
+    sanitized_meta = {}
+    for key, value in saved_meta.items():
+        clean_key = key.strip().strip("'").strip('"')
+        if clean_key in overwrite_list and meta.get(clean_key) is not None:
+            sanitized_meta[clean_key] = meta[clean_key]
+        else:
+            sanitized_meta[clean_key] = value
+    return sanitized_meta
+
+
+def display_queue(queue, base_dir, queue_name, save_to_log=True):
+    """Displays the queued files in markdown format and optionally saves them to a log file in the tmp directory."""
+    md_text = "\n - ".join(queue)
+    console.print("\n[bold green]Queuing these files:[/bold green]", end='')
+    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+    console.print("\n\n")
+
+    if save_to_log:
+        tmp_dir = os.path.join(base_dir, "tmp")
+        os.makedirs(tmp_dir, exist_ok=True)
+        log_file = os.path.join(tmp_dir, f"{queue_name}_queue.log")
+
+        try:
+            with open(log_file, 'w') as f:
+                json.dump(queue, f, indent=4)
+            console.print(f"[bold green]Queue successfully saved to log file: {log_file}")
+        except Exception as e:
+            console.print(f"[bold red]Failed to save queue to log file: {e}")
+
+
+async def process_meta(meta, base_dir):
+    """Process the metadata for each queued path."""
+
+    if meta['imghost'] is None:
+        meta['imghost'] = config['DEFAULT']['img_host_1']
+
+    if not meta['unattended']:
+        ua = config['DEFAULT'].get('auto_mode', False)
+        if str(ua).lower() == "true":
+            meta['unattended'] = True
+            console.print("[yellow]Running in Auto Mode")
+
+    prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
+    meta = await prep.gather_prep(meta=meta, mode='cli')
+    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+
+    if meta.get('image_list', False) in (False, []) and meta.get('skip_imghost_upload', False) is False:
+        return_dict = {}
+        meta['image_list'], dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict)
+        meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+        with open(meta_filename, 'w') as f:
+            json.dump(meta, f, indent=4)
+
+        if meta.get('debug', False):
+            console.print(meta['image_list'])
+
+    elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
+        meta['image_list'] = []
+
+    torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+    if not os.path.exists(torrent_path):
+        reuse_torrent = None
+        if meta.get('rehash', False) is False:
+            reuse_torrent = await client.find_existing_torrent(meta)
+            if reuse_torrent is not None:
+                prep.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
+
+        if meta['nohash'] is False and reuse_torrent is None:
+            prep.create_torrent(meta, Path(meta['path']), "BASE")
+        if meta['nohash']:
+            meta['client'] = "none"
+
+    elif os.path.exists(torrent_path) and meta.get('rehash', False) is True and meta['nohash'] is False:
+        prep.create_torrent(meta, Path(meta['path']), "BASE")
+
+    if int(meta.get('randomized', 0)) >= 1:
+        prep.create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
+
+
 async def do_the_thing(base_dir):
-    meta = dict()
-    meta['base_dir'] = base_dir
+    meta = {'base_dir': base_dir}
     paths = []
+    prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     for each in sys.argv[1:]:
         if os.path.exists(each):
             paths.append(os.path.abspath(each))
         else:
             break
-    meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
-    if meta['cleanup'] and os.path.exists(f"{base_dir}/tmp"):
-        shutil.rmtree(f"{base_dir}/tmp")
-        console.print("[bold green]Sucessfully emptied tmp directory")
-    if not meta['path']:
-        exit(0)
-    path = meta['path']
-    path = os.path.abspath(path)
-    if path.endswith('"'):
-        path = path[:-1]
-    queue = []
-    if os.path.exists(path):
-        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
-        queue = [path]
-    else:
-        # Search glob if dirname exists
-        if os.path.exists(os.path.dirname(path)) and len(paths) <= 1:
-            escaped_path = path.replace('[', '[[]')
-            globs = glob.glob(escaped_path)
-            queue = globs
-            if len(queue) != 0:
-                md_text = "\n - ".join(queue)
-                console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-                console.print("\n\n")
-            else:
-                console.print(f"[red]Path: [bold red]{path}[/bold red] does not exist")
 
-        elif os.path.exists(os.path.dirname(path)) and len(paths) != 1:
-            queue = paths
-            md_text = "\n - ".join(queue)
-            console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-            console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-            console.print("\n\n")
-        elif not os.path.exists(os.path.dirname(path)):
-            split_path = path.split()
-            p1 = split_path[0]
-            for i, each in enumerate(split_path):
-                try:
-                    if os.path.exists(p1) and not os.path.exists(f"{p1} {split_path[i + 1]}"):
-                        queue.append(p1)
-                        p1 = split_path[i + 1]
-                    else:
-                        p1 += f" {split_path[i + 1]}"
-                except IndexError:
-                    if os.path.exists(p1):
-                        queue.append(p1)
-                    else:
-                        console.print(f"[red]Path: [bold red]{p1}[/bold red] does not exist")
-            if len(queue) >= 1:
-                md_text = "\n - ".join(queue)
-                console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-                console.print("\n\n")
+    meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+    if meta.get('cleanup') and os.path.exists(f"{base_dir}/tmp"):
+        shutil.rmtree(f"{base_dir}/tmp")
+        console.print("[bold green]Successfully emptied tmp directory")
+
+    if not meta.get('path'):
+        exit(0)
+
+    path = os.path.abspath(meta['path'].strip('"'))
+    queue = []
+
+    allowed_extensions = ['.mkv', '.mp4', '.ts']
+    if meta.get('queue'):
+        log_file = os.path.join(base_dir, "tmp", f"{meta['queue']}_queue.log")
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                existing_queue = json.load(f)
+            console.print(f"[bold yellow]Found an existing queue log file: {log_file}[/bold yellow]")
+            console.print(f"[cyan]The queue log contains {len(existing_queue)} items.[/cyan]")
+            console.print("[cyan]Do you want to edit, discard, or keep the existing queue?[/cyan]")
+            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
+
+            if edit_choice == 'e':
+                edited_content = click.edit(json.dumps(existing_queue, indent=4))
+                if edited_content:
+                    try:
+                        queue = json.loads(edited_content.strip())
+                        console.print("[bold green]Successfully updated the queue from the editor.")
+                    except json.JSONDecodeError as e:
+                        console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
+                        queue = existing_queue
+                else:
+                    console.print("[bold red]No changes were made. Using the original queue.")
+                    queue = existing_queue
+            elif edit_choice == 'd':
+                console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
+                queue = []
+            else:
+                console.print("[bold green]Keeping the existing queue as is.")
+                queue = existing_queue
+        else:
+            if os.path.exists(path):
+                queue = gather_files_recursive(path, allowed_extensions=allowed_extensions)
+            else:
+                queue = resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
+    else:
+        queue = [path]
+
+    if not queue:
+        console.print(f"[red]No valid files or directories found for path: {path}")
+        exit(1)
+
+    if meta.get('queue'):
+        queue_name = meta['queue']
+        if 'queue' in meta:
+            log_file = get_log_file(base_dir, meta['queue'])
+            processed_files = load_processed_files(log_file)
+            queue = [file for file in queue if file not in processed_files]
+            if not queue:
+                console.print(f"[bold yellow]All files in the {meta['queue']} queue have already been processed.")
+                exit(0)
+
+            display_queue(queue, base_dir, queue_name, save_to_log=True)
+            total_files = len(queue)
+            processed_files_count = 0
 
         else:
-            # Add Search Here
-            console.print("[red]There was an issue with your input. If you think this was not an issue, please make a report that includes the full command used.")
-            exit()
+            console.print("[bold yellow]Processing all files without a log file.")
+            display_queue(queue, base_dir, queue_name, save_to_log=True)
+            total_files = len(queue)
+            processed_files_count = 0
 
     base_meta = {k: v for k, v in meta.items()}
     for path in queue:
-        meta = {k: v for k, v in base_meta.items()}
+        meta = base_meta.copy()
         meta['path'] = path
         meta['uuid'] = None
+
         try:
-            with open(f"{base_dir}/tmp/{os.path.basename(path)}/meta.json") as f:
-                saved_meta = json.load(f)
+            meta_file = f"{base_dir}/tmp/{os.path.basename(path)}/meta.json"
+            if os.path.exists(meta_file):
+                with open(meta_file) as f:
+                    saved_meta = json.load(f)
+                    meta.update(merge_meta(meta, saved_meta))
+        except Exception as e:
+            console.print(f"[red]Failed to load metadata for {path}: {e}")
 
-                # Define the list of keys that can be overwritten
-                overwrite_list = [
-                    'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
-                    'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft',
-                    'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
-                    'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio'
-                ]
-
-                sanitized_saved_meta = {}
-                for key, value in saved_meta.items():
-                    clean_key = key.strip().strip("'").strip('"')
-
-                    if clean_key in overwrite_list:
-                        if clean_key in meta and meta.get(clean_key) is not None:
-                            sanitized_saved_meta[clean_key] = meta[clean_key]
-                            if meta['debug']:
-                                console.print(f"Overriding {clean_key} with meta value:", meta[clean_key])
-                        else:
-                            sanitized_saved_meta[clean_key] = value
-                    else:
-                        sanitized_saved_meta[clean_key] = value
-                meta.update(sanitized_saved_meta)
-            f.close()
-        except FileNotFoundError:
-            pass
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
-        if meta['imghost'] is None:
-            meta['imghost'] = config['DEFAULT']['img_host_1']
-        if not meta['unattended']:
-            ua = config['DEFAULT'].get('auto_mode', False)
-            if str(ua).lower() == "true":
-                meta['unattended'] = True
-                console.print("[yellow]Running in Auto Mode")
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
-        meta = await prep.gather_prep(meta=meta, mode='cli')
-        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
-
-        if meta.get('image_list', False) in (False, []) and meta.get('skip_imghost_upload', False) is False:
-            return_dict = {}
-            meta['image_list'], dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict)
-            meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
-            with open(meta_filename, 'w') as f:
-                json.dump(meta, f, indent=4)
-            if meta['debug']:
-                console.print(meta['image_list'])
-            # meta['uploaded_screens'] = True
-        elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
-            meta['image_list'] = []
-
-        if not os.path.exists(os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")):
-            reuse_torrent = None
-            if meta.get('rehash', False) is False:
-                reuse_torrent = await client.find_existing_torrent(meta)
-                if reuse_torrent is not None:
-                    prep.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
-            if meta['nohash'] is False and reuse_torrent is None:
-                prep.create_torrent(meta, Path(meta['path']), "BASE")
-            if meta['nohash']:
-                meta['client'] = "none"
-        elif os.path.exists(os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")) and meta.get('rehash', False) is True and meta['nohash'] is False:
-            prep.create_torrent(meta, Path(meta['path']), "BASE")
-        if int(meta.get('randomized', 0)) >= 1:
-            prep.create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
+        await process_meta(meta, base_dir)
 
         if meta.get('trackers', None) is not None:
             trackers = meta['trackers']
@@ -231,23 +354,20 @@ async def do_the_thing(base_dir):
             trackers = trackers.split(',')
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
-            f.close()
         confirm = get_confirmation(meta)
         while confirm is False:
-            # help.print_help()
-            editargs = cli_ui.ask_string("Input args that need correction e.g.(--tag NTb --category tv --tmdb 12345)")
+            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
             editargs = (meta['path'],) + tuple(editargs.split())
-            if meta['debug']:
-                editargs = editargs + ("--debug",)
+            if meta.get('debug', False):
+                editargs += ("--debug",)
             meta, help, before_args = parser.parse(editargs, meta)
-            # meta = await prep.tmdb_other_meta(meta)
             meta['edit'] = True
             meta = await prep.gather_prep(meta=meta, mode='cli')
             meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
             confirm = get_confirmation(meta)
 
-        if isinstance(trackers, list) is False:
-            trackers = [trackers]
+        if isinstance(trackers, str):
+            trackers = trackers.split(',')
         trackers = [s.strip().upper() for s in trackers]
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
@@ -529,6 +649,13 @@ async def do_the_thing(base_dir):
                             await client.add_to_client(meta, "PTP")
                     except Exception:
                         console.print(traceback.print_exc())
+
+        # Update progress tracking
+        processed_files_count += 1
+        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+        # Add file to processed log
+        if 'queue' in meta:
+            save_processed_file(log_file, path)
 
 
 def get_confirmation(meta):

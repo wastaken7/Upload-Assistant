@@ -1142,6 +1142,8 @@ class Prep():
                 meta['scene_name'] = first_result['release']
                 video = f"{first_result['release']}.mkv"
                 scene = True
+                if meta['is_dir']:
+                    meta['keep_folder'] = True
 
                 # NFO Download Handling
                 if first_result.get("hasNFO") == "yes":
