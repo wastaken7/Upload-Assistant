@@ -693,11 +693,9 @@ async def do_the_thing(base_dir):
                     except Exception:
                         console.print(traceback.print_exc())
 
-        # Update progress tracking
-        processed_files_count += 1
-        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
-        # Add file to processed log
-        if 'queue' in meta:
+        if meta.get('queue') is not None:
+            processed_files_count += 1
+            console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
             save_processed_file(log_file, path)
 
 
