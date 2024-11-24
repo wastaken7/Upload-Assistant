@@ -94,6 +94,34 @@ class BBCODE:
             desc = re.sub(r"(^(video|audio|text)( #\d+)?\nid)(.*?)^$", "", desc, flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
             desc = re.sub(r"(^(menu)( #\d+)?\n)(.*?)^$", "", f"{desc}\n\n", flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
 
+            desc = re.sub(
+                r"\[b\](.*?)(Matroska|DTS|AVC|x264|Progressive|23\.976 fps|16:9|[0-9]+x[0-9]+|[0-9]+ MiB|[0-9]+ Kbps|[0-9]+ bits|cabac=.*?/ aq=.*?|\d+\.\d+ Mbps)\[/b\]",
+                "",
+                desc,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            desc = re.sub(
+                r"(Matroska|DTS|AVC|x264|Progressive|23\.976 fps|16:9|[0-9]+x[0-9]+|[0-9]+ MiB|[0-9]+ Kbps|[0-9]+ bits|cabac=.*?/ aq=.*?|\d+\.\d+ Mbps|[0-9]+\s+channels|[0-9]+\.[0-9]+\s+KHz|[0-9]+ KHz|[0-9]+\s+bits)",
+                "",
+                desc,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            desc = re.sub(
+                r"\[u\](Format|Bitrate|Channels|Sampling Rate|Resolution):\[/u\]\s*\d*.*?",
+                "",
+                desc,
+                flags=re.IGNORECASE,
+            )
+            desc = re.sub(
+                r"^\s*\d+\s*(channels|KHz|bits)\s*$",
+                "",
+                desc,
+                flags=re.MULTILINE | re.IGNORECASE,
+            )
+
+            desc = re.sub(r"^\s+$", "", desc, flags=re.MULTILINE)
+            desc = re.sub(r"\n{2,}", "\n", desc)
+
         # Convert Quote tags:
         desc = re.sub(r"\[quote.*?\]", "[code]", desc)
         desc = desc.replace("[/quote]", "[/code]")
