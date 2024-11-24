@@ -159,22 +159,31 @@ def resolve_queue_with_glob_or_split(path, paths, allowed_extensions=None):
     return queue
 
 
-def merge_meta(meta, saved_meta):
+def merge_meta(meta, saved_meta, path):
     """Merges saved metadata with the current meta, respecting overwrite rules."""
-    overwrite_list = [
-        'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
-        'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft',
-        'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
-        'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio'
-    ]
-    sanitized_meta = {}
-    for key, value in saved_meta.items():
-        clean_key = key.strip().strip("'").strip('"')
-        if clean_key in overwrite_list and meta.get(clean_key) is not None:
-            sanitized_meta[clean_key] = meta[clean_key]
-        else:
-            sanitized_meta[clean_key] = value
-    return sanitized_meta
+    with open(f"{base_dir}/tmp/{os.path.basename(path)}/meta.json") as f:
+        saved_meta = json.load(f)
+        overwrite_list = [
+            'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
+            'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft',
+            'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
+            'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio'
+        ]
+        sanitized_saved_meta = {}
+        for key, value in saved_meta.items():
+            clean_key = key.strip().strip("'").strip('"')
+            if clean_key in overwrite_list:
+                if clean_key in meta and meta.get(clean_key) is not None:
+                    sanitized_saved_meta[clean_key] = meta[clean_key]
+                    if meta['debug']:
+                        console.print(f"Overriding {clean_key} with meta value:", meta[clean_key])
+                else:
+                    sanitized_saved_meta[clean_key] = value
+            else:
+                sanitized_saved_meta[clean_key] = value
+        meta.update(sanitized_saved_meta)
+    f.close()
+    return sanitized_saved_meta
 
 
 def display_queue(queue, base_dir, queue_name, save_to_log=True):
@@ -211,13 +220,14 @@ async def process_meta(meta, base_dir):
 
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     meta = await prep.gather_prep(meta=meta, mode='cli')
+    with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+        json.dump(meta, f, indent=4)
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
 
     if meta.get('image_list', False) in (False, []) and meta.get('skip_imghost_upload', False) is False:
         return_dict = {}
         meta['image_list'], dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict)
-        meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
-        with open(meta_filename, 'w') as f:
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
         if meta.get('debug', False):
@@ -249,7 +259,6 @@ async def process_meta(meta, base_dir):
 async def do_the_thing(base_dir):
     meta = {'base_dir': base_dir}
     paths = []
-    prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     for each in sys.argv[1:]:
         if os.path.exists(each):
             paths.append(os.path.abspath(each))
@@ -264,11 +273,15 @@ async def do_the_thing(base_dir):
     if not meta.get('path'):
         exit(0)
 
-    path = os.path.abspath(meta['path'].strip('"'))
+    path = meta['path']
+    path = os.path.abspath(path)
+    if path.endswith('"'):
+        path = path[:-1]
     queue = []
 
     allowed_extensions = ['.mkv', '.mp4', '.ts']
     if meta.get('queue'):
+        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
         log_file = os.path.join(base_dir, "tmp", f"{meta['queue']}_queue.log")
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
@@ -302,6 +315,7 @@ async def do_the_thing(base_dir):
             else:
                 queue = resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
     else:
+        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
         queue = [path]
 
     if not queue:
@@ -330,30 +344,37 @@ async def do_the_thing(base_dir):
 
     base_meta = {k: v for k, v in meta.items()}
     for path in queue:
-        meta = base_meta.copy()
-        meta['path'] = path
-        meta['uuid'] = None
-
         try:
-            meta_file = f"{base_dir}/tmp/{os.path.basename(path)}/meta.json"
+            meta = base_meta.copy()
+            meta['path'] = path
+            meta['uuid'] = None
+
+            if not path:
+                raise ValueError("The 'path' variable is not defined or is empty.")
+
+            meta_file = os.path.join(base_dir, "tmp", os.path.basename(path), "meta.json")
+
             if os.path.exists(meta_file):
-                with open(meta_file) as f:
+                with open(meta_file, "r") as f:
                     saved_meta = json.load(f)
-                    meta.update(merge_meta(meta, saved_meta))
+                    meta.update(merge_meta(meta, saved_meta, path))
+            else:
+                console.print(f"[yellow]No metadata file found at {meta_file}")
+
         except Exception as e:
-            console.print(f"[red]Failed to load metadata for {path}: {e}")
+            import traceback
+            traceback.print_exc()
+            console.print(f"[red]Failed to load metadata for path '{path}': {e}")
 
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         await process_meta(meta, base_dir)
-
+        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
         if meta.get('trackers', None) is not None:
             trackers = meta['trackers']
         else:
             trackers = config['TRACKERS']['default_trackers']
         if "," in trackers:
             trackers = trackers.split(',')
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-            json.dump(meta, f, indent=4)
         confirm = get_confirmation(meta)
         while confirm is False:
             editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
@@ -363,6 +384,8 @@ async def do_the_thing(base_dir):
             meta, help, before_args = parser.parse(editargs, meta)
             meta['edit'] = True
             meta = await prep.gather_prep(meta=meta, mode='cli')
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+                json.dump(meta, f, indent=4)
             meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
             confirm = get_confirmation(meta)
 
@@ -371,7 +394,6 @@ async def do_the_thing(base_dir):
         trackers = [s.strip().upper() for s in trackers]
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
-
         ####################################
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
