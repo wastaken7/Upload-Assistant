@@ -314,7 +314,7 @@ async def do_the_thing(base_dir):
                 queue = gather_files_recursive(path, allowed_extensions=allowed_extensions)
             else:
                 queue = resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
-            
+
             console.print(f"[cyan]A new queue log file will be created: {log_file}[/cyan]")
             console.print(f"[cyan]The new queue will contain {len(queue)} items.[/cyan]")
             console.print("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
@@ -330,7 +330,7 @@ async def do_the_thing(base_dir):
                         console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
                 else:
                     console.print("[bold red]No changes were made. Using the original queue.")
-            
+
             # Save the queue to the log file
             with open(log_file, 'w') as f:
                 json.dump(queue, f, indent=4)
