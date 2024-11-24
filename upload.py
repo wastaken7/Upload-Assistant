@@ -507,7 +507,7 @@ async def do_the_thing(base_dir):
                         continue
 
                     dupes = await tracker_class.search_existing(meta, disctype)
-                    if meta['skipping'] is None:
+                    if 'skipping' not in meta or meta['skipping'] is None:
                         dupes = await common.filter_dupes(dupes, meta)
                         meta = dupe_check(dupes, meta)
 
@@ -559,11 +559,11 @@ async def do_the_thing(base_dir):
                             await tracker_class.api_test(meta)
 
                         dupes = await tracker_class.search_existing(meta, disctype)
-                        if meta['skipping'] is None:
+                        if 'skipping' not in meta or meta['skipping'] is None:
                             dupes = await common.filter_dupes(dupes, meta)
                             meta = dupe_check(dupes, meta)
 
-                    if meta['skipping'] is None:
+                    if 'skipping' not in meta or meta['skipping'] is None:
                         # Proceed with upload if the meta is set to upload
                         if tracker == "TL" or meta.get('upload', False):
                             await tracker_class.upload(meta, disctype)
