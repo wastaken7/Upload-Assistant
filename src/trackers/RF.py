@@ -33,6 +33,10 @@ class RF():
         pass
 
     async def upload(self, meta, disctype):
+        disallowed_keywords = {'XXX', 'Erotic'}
+        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
+            console.print('[bold red]Concerts not allowed.')
+            return
         if meta.get('category') == "TV":
             console.print('[bold red]This site only ALLOWS Movies.')
             return

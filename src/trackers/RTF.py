@@ -30,6 +30,10 @@ class RTF():
         pass
 
     async def upload(self, meta, disctype):
+        disallowed_keywords = {'XXX', 'Erotic'}
+        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
+            console.print('[bold red]Concerts not allowed.')
+            return
         if datetime.date.today().year - meta['year'] <= 9:
             console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
             return
