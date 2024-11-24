@@ -821,7 +821,10 @@ def check_banned_group(tracker, banned_group_list, meta):
                     console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     q = True
         if q:
-            if not cli_ui.ask_yes_no(cli_ui.red, "Upload Anyways?", default=False):
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                if not cli_ui.ask_yes_no(cli_ui.red, "Upload Anyways?", default=False):
+                    return True
+            else:
                 return True
     return False
 
