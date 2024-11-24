@@ -30,13 +30,6 @@ class RTF():
         pass
 
     async def upload(self, meta, disctype):
-        disallowed_keywords = {'XXX', 'Erotic'}
-        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
-            console.print('[bold red]Concerts not allowed.')
-            return
-        if datetime.date.today().year - meta['year'] <= 9:
-            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
-            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
@@ -97,6 +90,15 @@ class RTF():
             console.print(json_data)
 
     async def search_existing(self, meta, disctype):
+        disallowed_keywords = {'XXX', 'Erotic'}
+        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
+            console.print('[bold red]XXX not allowed.')
+            meta['skipping'] = "RTF"
+            return
+        if datetime.date.today().year - meta['year'] <= 9:
+            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
+            meta['skipping'] = "RTF"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         headers = {

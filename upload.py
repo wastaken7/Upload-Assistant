@@ -507,19 +507,21 @@ async def do_the_thing(base_dir):
                         continue
 
                     dupes = await tracker_class.search_existing(meta, disctype)
-                    dupes = await common.filter_dupes(dupes, meta)
-                    meta = dupe_check(dupes, meta)
+                    if meta['skipping'] is None:
+                        dupes = await common.filter_dupes(dupes, meta)
+                        meta = dupe_check(dupes, meta)
 
-                    # Proceed with upload if the meta is set to upload
-                    if meta.get('upload', False):
-                        await tracker_class.upload(meta, disctype)
-                        perm = config['DEFAULT'].get('get_permalink', False)
-                        if perm:
-                            # need a wait so we don't race the api
-                            await asyncio.sleep(5)
-                            await tracker_class.search_torrent_page(meta, disctype)
-                            await asyncio.sleep(0.5)
-                        await client.add_to_client(meta, tracker_class.tracker)
+                        # Proceed with upload if the meta is set to upload
+                        if meta.get('upload', False):
+                            await tracker_class.upload(meta, disctype)
+                            perm = config['DEFAULT'].get('get_permalink', False)
+                            if perm:
+                                # need a wait so we don't race the api
+                                await asyncio.sleep(5)
+                                await tracker_class.search_torrent_page(meta, disctype)
+                                await asyncio.sleep(0.5)
+                            await client.add_to_client(meta, tracker_class.tracker)
+                    meta['skipping'] = None
 
             if tracker in other_api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
@@ -557,15 +559,18 @@ async def do_the_thing(base_dir):
                             await tracker_class.api_test(meta)
 
                         dupes = await tracker_class.search_existing(meta, disctype)
-                        dupes = await common.filter_dupes(dupes, meta)
-                        meta = dupe_check(dupes, meta)
+                        if meta['skipping'] is None:
+                            dupes = await common.filter_dupes(dupes, meta)
+                            meta = dupe_check(dupes, meta)
 
-                    # Proceed with upload if the meta is set to upload
-                    if tracker == "TL" or meta.get('upload', False):
-                        await tracker_class.upload(meta, disctype)
-                        if tracker == 'SN':
-                            await asyncio.sleep(16)
-                        await client.add_to_client(meta, tracker_class.tracker)
+                    if meta['skipping'] is None:
+                        # Proceed with upload if the meta is set to upload
+                        if tracker == "TL" or meta.get('upload', False):
+                            await tracker_class.upload(meta, disctype)
+                            if tracker == 'SN':
+                                await asyncio.sleep(16)
+                            await client.add_to_client(meta, tracker_class.tracker)
+                    meta['skipping'] = None
 
             if tracker in http_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)

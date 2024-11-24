@@ -47,9 +47,6 @@ class OE():
         pass
 
     async def upload(self, meta, disctype):
-        if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed.')
-            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta, self.tracker, self.signature)
@@ -314,6 +311,10 @@ class OE():
         return
 
     async def search_existing(self, meta, disctype):
+        if 'concert' in meta['keywords']:
+            console.print('[bold red]Concerts not allowed.')
+            meta['skipping'] = "OE"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {
