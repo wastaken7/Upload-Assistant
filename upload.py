@@ -297,6 +297,8 @@ async def do_the_thing(base_dir):
                     try:
                         queue = json.loads(edited_content.strip())
                         console.print("[bold green]Successfully updated the queue from the editor.")
+                        with open(log_file, 'w') as f:
+                            json.dump(queue, f, indent=4)
                     except json.JSONDecodeError as e:
                         console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
                         queue = existing_queue
@@ -345,23 +347,16 @@ async def do_the_thing(base_dir):
 
     if meta.get('queue'):
         queue_name = meta['queue']
-        if 'queue' in meta:
-            log_file = get_log_file(base_dir, meta['queue'])
-            processed_files = load_processed_files(log_file)
-            queue = [file for file in queue if file not in processed_files]
-            if not queue:
-                console.print(f"[bold yellow]All files in the {meta['queue']} queue have already been processed.")
-                exit(0)
-
-            display_queue(queue, base_dir, queue_name, save_to_log=True)
-            total_files = len(queue)
-            processed_files_count = 0
-
-        else:
-            console.print("[bold yellow]Processing all files without a log file.")
-            display_queue(queue, base_dir, queue_name, save_to_log=True)
-            total_files = len(queue)
-            processed_files_count = 0
+        log_file = get_log_file(base_dir, meta['queue'])
+        processed_files = load_processed_files(log_file)
+        queue = [file for file in queue if file not in processed_files]
+        if not queue:
+            console.print(f"[bold yellow]All files in the {meta['queue']} queue have already been processed.")
+            exit(0)
+        if meta['debug']:
+            display_queue(queue, base_dir, queue_name, save_to_log=False)
+        total_files = len(queue)
+        processed_files_count = 0
 
     base_meta = {k: v for k, v in meta.items()}
     for path in queue:
