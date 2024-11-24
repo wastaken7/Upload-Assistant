@@ -314,6 +314,27 @@ async def do_the_thing(base_dir):
                 queue = gather_files_recursive(path, allowed_extensions=allowed_extensions)
             else:
                 queue = resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
+            
+            console.print(f"[cyan]A new queue log file will be created: {log_file}[/cyan]")
+            console.print(f"[cyan]The new queue will contain {len(queue)} items.[/cyan]")
+            console.print("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
+            edit_choice = input("Enter 'e' to edit, or press Enter to save as is: ").strip().lower()
+
+            if edit_choice == 'e':
+                edited_content = click.edit(json.dumps(queue, indent=4))
+                if edited_content:
+                    try:
+                        queue = json.loads(edited_content.strip())
+                        console.print("[bold green]Successfully updated the queue from the editor.")
+                    except json.JSONDecodeError as e:
+                        console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
+                else:
+                    console.print("[bold red]No changes were made. Using the original queue.")
+            
+            # Save the queue to the log file
+            with open(log_file, 'w') as f:
+                json.dump(queue, f, indent=4)
+            console.print(f"[bold green]Queue log file created: {log_file}[/bold green]")
     else:
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
         queue = [path]
