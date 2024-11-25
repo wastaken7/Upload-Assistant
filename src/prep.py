@@ -153,10 +153,7 @@ class Prep():
                                     )
                                     return None
 
-                                meta['image_sizes'][img_url] = {
-                                    "size": len(image_content),
-                                    "resolution": f"{image.width}x{image.height}",
-                                }
+                                meta['image_sizes'][img_url] = len(image_content)
                                 console.print(
                                     f"Valid image {img_url} with resolution {image.width}x{image.height} "
                                     f"and size {len(image_content) / 1024:.2f} KiB"
