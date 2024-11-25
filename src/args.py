@@ -45,7 +45,6 @@ class Args():
         parser.add_argument('--no-edition', dest='no_edition', action='store_true', required=False, help="Remove Edition from title")
         parser.add_argument('--dual-audio', dest='dual_audio', action='store_true', required=False, help="Add Dual-Audio to the title")
         parser.add_argument('-ns', '--no-seed', action='store_true', required=False, help="Do not add torrent to the client")
-        parser.add_argument('-year', '--year', dest='manual_year', nargs='?', required=False, help="Year", type=int, default=0)
         parser.add_argument('-ptp', '--ptp', nargs='*', required=False, help="PTP torrent id/permalink", type=str)
         parser.add_argument('-blu', '--blu', nargs='*', required=False, help="BLU torrent id/link", type=str)
         parser.add_argument('-aither', '--aither', nargs='*', required=False, help="Aither torrent id/link", type=str)
