@@ -292,8 +292,7 @@ class OE():
             desc = base
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
-            if comparison is False:
-                desc = bbcode.convert_comparison_to_collapse(desc, 1000)
+            desc = bbcode.convert_comparison_to_collapse(desc, 1000)
 
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)

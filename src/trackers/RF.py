@@ -28,14 +28,14 @@ class RF():
         self.source_flag = 'ReelFliX'
         self.upload_url = 'https://reelflix.xyz/api/torrents/upload'
         self.search_url = 'https://reelflix.xyz/api/torrents/filter'
-        self.forum_link = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         cat_id = await self.get_cat_id(meta['category'])
