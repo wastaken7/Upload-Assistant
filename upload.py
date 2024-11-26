@@ -355,11 +355,11 @@ async def do_the_thing(base_dir):
             exit(0)
         if meta['debug']:
             display_queue(queue, base_dir, queue_name, save_to_log=False)
-        total_files = len(queue)
-        processed_files_count = 0
 
     base_meta = {k: v for k, v in meta.items()}
     for path in queue:
+        total_files = len(queue)
+        processed_files_count = 0
         try:
             meta = base_meta.copy()
             meta['path'] = path
@@ -697,7 +697,9 @@ async def do_the_thing(base_dir):
         if meta.get('queue') is not None:
             processed_files_count += 1
             console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
-            save_processed_file(log_file, path)
+            if not meta['debug']:
+                if log_file:
+                    save_processed_file(log_file, path)
 
 
 def get_confirmation(meta):
