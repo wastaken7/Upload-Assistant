@@ -662,10 +662,10 @@ class COMMON():
                 "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
             {
-                "key": "blu-ray",
-                "uuid_flag": "blu-ray" in meta.get('uuid', '').lower(),
-                "condition": lambda each: "blu-ray" in each.lower(),
-                "exclude_msg": lambda each: f"Excluding result due to 'Blu-Ray' mismatch: {each}"
+                "key": "disc_check",
+                "uuid_flag": meta.get('is_disc', False),
+                "condition": lambda each: not re.search(r'\.\w{2,4}$', each),
+                "exclude_msg": lambda each: f"Excluding result because it has a file extension but meta['is_disc'] is True: {each}"
             }
         ]
 
