@@ -614,95 +614,137 @@ class COMMON():
         return ptgen
 
     async def filter_dupes(self, dupes, meta):
+        """
+        Allowed entries are returned as dupes.
+        """
         if meta['debug']:
             console.log("[cyan]Pre-filtered dupes")
             console.log(dupes)
 
         new_dupes = []
-        types_to_check = {'REMUX', 'WEBDL', 'WEBRip', 'HDTV'}  # noqa F841
-        normalized_meta_type = {t.replace('-', '').upper() for t in meta['type']} if isinstance(meta['type'], list) else {meta['type'].replace('-', '').upper()}
-        has_repack_in_uuid = "repack" in meta['uuid'].lower() if meta.get('uuid') else False
+        normalized_meta_type = (
+            {t.replace('-', '').upper() for t in meta['type']}
+            if isinstance(meta['type'], list)
+            else {meta['type'].replace('-', '').upper()}
+        )
+
+        has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
+
+        attribute_checks = [
+            {
+                "key": "repack",
+                "uuid_flag": has_repack_in_uuid,
+                "condition": lambda each: meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}"
+            },
+            {
+                "key": "remux",
+                "uuid_flag": "remux" in meta.get('uuid', '').lower(),
+                "condition": lambda each: "remux" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'remux' mismatch: {each}"
+            },
+            {
+                "key": "uhd",
+                "uuid_flag": "uhd" in meta.get('uuid', '').lower(),
+                "condition": lambda each: "uhd" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'UHD' mismatch: {each}"
+            },
+            {
+                "key": "webdl",
+                "uuid_flag": "webdl" in meta.get('uuid', '').lower(),
+                "condition": lambda each: "webdl" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'WEBDL' mismatch: {each}"
+            },
+            {
+                "key": "hdtv",
+                "uuid_flag": "hdtv" in meta.get('uuid', '').lower(),
+                "condition": lambda each: "hdtv" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
+            },
+            {
+                "key": "blu-ray",
+                "uuid_flag": "blu-ray" in meta.get('uuid', '').lower(),
+                "condition": lambda each: "blu-ray" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'Blu-Ray' mismatch: {each}"
+            }
+        ]
 
         for each in dupes:
-            remove_set = set({meta['resolution']})
+            remove_set = {meta['resolution']}
             normalized_each_type = each.replace('-', '').upper()
 
-            # Check if types match loosely, based on core attributes (resolution, HDR, audio)
-            type_match = any(t in normalized_each_type for t in normalized_meta_type) or \
-                            (meta['resolution'] in each and meta['hdr'] in each and meta['audio'] in each)
-
+            # Type matching logic
+            type_match = (
+                any(t in normalized_each_type for t in normalized_meta_type) or
+                (meta['resolution'] in each)
+            )
             if not type_match:
                 if meta['debug']:
                     console.log(f"[yellow]Excluding result due to type mismatch: {each}")
                 continue
 
-            # Repack filtering if the tag matches
-            if meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower():
-                if meta['debug']:
-                    console.log(f"[yellow]Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}")
-                continue
+            for check in attribute_checks:
+                if check["key"] == "repack" and check["condition"](each):
+                    if meta['debug']:
+                        console.log(f"[yellow]{check['exclude_msg'](each)}")
+                    break
+                elif check["uuid_flag"] != check["condition"](each):
+                    if meta['debug']:
+                        console.log(f"[yellow]{check['exclude_msg'](each)}")
+                    break
+            else:
+                search_combos = [
+                    {'search': meta['hdr'], 'search_for': {'HDR', 'PQ10'}, 'update': {'HDR|PQ10'}},
+                    {'search': meta['hdr'], 'search_for': {'DV'}, 'update': {'DV|DoVi'}},
+                    {'search': meta['hdr'], 'search_not': {'DV', 'DoVi', 'HDR', 'PQ10'}, 'update': {'!(DV)|(DoVi)|(HDR)|(PQ10)'}},
+                    {'search': str(meta.get('tv_pack', 0)), 'search_for': '1', 'update': {rf"{meta['season']}(?!E\d+)"}},
+                    {'search': meta['episode'], 'search_for': meta['episode'], 'update': {meta['season'], meta['episode']}},
+                ]
 
-            # Define search combos for more nuanced matching
-            search_combos = [
-                {
-                    'search': meta['hdr'],
-                    'search_for': {'HDR', 'PQ10'},
-                    'update': {'HDR|PQ10'}
-                },
-                {
-                    'search': meta['hdr'],
-                    'search_for': {'DV'},
-                    'update': {'DV|DoVi'}
-                },
-                {
-                    'search': meta['hdr'],
-                    'search_not': {'DV', 'DoVi', 'HDR', 'PQ10'},
-                    'update': {'!(DV)|(DoVi)|(HDR)|(PQ10)'}
-                },
-                {
-                    'search': str(meta.get('tv_pack', 0)),
-                    'search_for': '1',
-                    'update': {rf"{meta['season']}(?!E\d+)"}
-                },
-                {
-                    'search': meta['episode'],
-                    'search_for': meta['episode'],
-                    'update': {meta['season'], meta['episode']}
-                }
-            ]
+                for combo in search_combos:
+                    search = combo.get('search', '')
+                    if search:
+                        if combo.get('search_for') and any(re.search(x, search, flags=re.IGNORECASE) for x in combo['search_for']):
+                            remove_set.update(combo['update'])
+                        elif meta['debug']:
+                            console.log(f"[yellow]Skipping update for '{combo['update']}' because none of '{combo['search_for']}' matched in '{search}'")
 
-            # Apply search combos to refine remove_set
-            for s in search_combos:
-                if s.get('search_for') not in (None, ''):
-                    if any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_for']):
-                        remove_set.update(s['update'])
-                if s.get('search_not') not in (None, ''):
-                    if not any(re.search(x, s['search'], flags=re.IGNORECASE) for x in s['search_not']):
-                        remove_set.update(s['update'])
+                remove_set = self.refine_remove_set(remove_set)
 
-            search = each.lower().replace('-', '').replace(' ', '').replace('.', '')
-
-            for x in remove_set.copy():
-                if "|" in x:
-                    look_for = x.split('|')
-                    for y in look_for:
-                        if y.lower() in search:
-                            if x in remove_set:
-                                remove_set.remove(x)
-                            remove_set.add(y)
-
-            allow = True
-            for x in remove_set:
-                if not x.startswith("!"):
-                    if not re.search(x, search, flags=re.I):
-                        allow = False
-                else:
-                    if re.search(x.replace("!", "", 1), search, flags=re.I) not in (None, False):
-                        allow = False
-            if allow and each not in new_dupes:
-                new_dupes.append(each)
+                search_normalized = each.lower().replace('-', '').replace(' ', '').replace('.', '')
+                if self.should_allow_entry(search_normalized, remove_set, meta):
+                    new_dupes.append(each)
 
         return new_dupes
+
+    def refine_remove_set(self, remove_set):
+        """
+        Process remove_set to split "|" options into individual entries.
+        """
+        refined_set = set()
+        for item in remove_set:
+            if "|" in item:
+                refined_set.update(item.split('|'))
+            else:
+                refined_set.add(item)
+        return refined_set
+
+    def should_allow_entry(self, search, remove_set, meta):
+        """
+        Determine if an entry should be allowed based on the remove_set.
+        """
+        for item in remove_set:
+            if not item.startswith("!"):
+                if not re.search(item, search, flags=re.I):
+                    if meta['debug']:
+                        console.log(f"[yellow]Excluding result because '{item}' not found in: {search}")
+                    return False
+            else:
+                if re.search(item[1:], search, flags=re.I):
+                    if meta['debug']:
+                        console.log(f"[yellow]Excluding result because '{item[1:]}' found in: {search}")
+                    return False
+        return True
 
     class MediaInfoParser:
         # Language to ISO country code mapping
