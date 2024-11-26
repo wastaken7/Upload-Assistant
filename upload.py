@@ -286,7 +286,7 @@ async def do_the_thing(base_dir):
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
                 existing_queue = json.load(f)
-            console.print(f"[bold yellow]Found an existing queue log file: {log_file}[/bold yellow]")
+            console.print(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
             console.print(f"[cyan]The queue log contains {len(existing_queue)} items.[/cyan]")
             console.print("[cyan]Do you want to edit, discard, or keep the existing queue?[/cyan]")
             edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
@@ -317,7 +317,7 @@ async def do_the_thing(base_dir):
             else:
                 queue = resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
 
-            console.print(f"[cyan]A new queue log file will be created: {log_file}[/cyan]")
+            console.print(f"[cyan]A new queue log file will be created:[/cyan] [green]{log_file}[/green]")
             console.print(f"[cyan]The new queue will contain {len(queue)} items.[/cyan]")
             console.print("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
             edit_choice = input("Enter 'e' to edit, or press Enter to save as is: ").strip().lower()
@@ -375,7 +375,8 @@ async def do_the_thing(base_dir):
                     saved_meta = json.load(f)
                     meta.update(merge_meta(meta, saved_meta, path))
             else:
-                console.print(f"[yellow]No metadata file found at {meta_file}")
+                if meta['debug']:
+                    console.print(f"[yellow]No metadata file found at {meta_file}")
 
         except Exception as e:
             import traceback
