@@ -334,8 +334,8 @@ class Clients():
                 path = os.path.dirname(path)
 
         # Ensure remote path replacement and normalization
-        if path.startswith(local_path) and local_path.lower() != remote_path.lower():
-            path = path.replace(local_path, remote_path, 1)
+        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
+            path = path.replace(local_path, remote_path)
             path = path.replace(os.sep, '/')
 
         # Ensure trailing slash for qBittorrent
@@ -362,15 +362,13 @@ class Clients():
         auto_management = False
         am_config = client.get('automatic_management_paths', '')
         if isinstance(am_config, list):
-            auto_management = any(
-                os.path.normpath(each).lower() in os.path.normpath(path).lower()
-                for each in am_config
-            )
-        elif am_config.strip():
-            auto_management = os.path.normpath(am_config).lower() in os.path.normpath(path).lower()
-
-        # Set qBittorrent category and content layout
-        qbt_category = meta.get("qbit_cat", client.get("qbit_cat"))
+            for each in am_config:
+                if os.path.normpath(each).lower() in os.path.normpath(path).lower():
+                    auto_management = True
+        else:
+            if os.path.normpath(am_config).lower() in os.path.normpath(path).lower() and am_config.strip() != "":
+                auto_management = True
+        qbt_category = client.get("qbit_cat") if not meta.get("qbit_cat") else meta.get('qbit_cat')
         content_layout = client.get('content_layout', 'Original')
 
         # Add the torrent
