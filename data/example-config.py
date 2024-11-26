@@ -57,7 +57,7 @@ config = {
         "processLimit": "10",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
-        # "screenshot_header": "[centers] SCREENSHOTS [/center]",
+        # "screenshot_header": "[center] SCREENSHOTS [/center]",
 
         # Enable lossless PNG Compression (True/False)
         "optimize_images": True,
