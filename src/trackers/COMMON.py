@@ -680,7 +680,7 @@ class COMMON():
             )
             if not type_match:
                 if meta['debug']:
-                    console.log(f"[yellow]Excluding result due to type mismatch: {each}")
+                    console.log(f"[yellow]Excluding result due to resolution mismatch: {each}")
                 continue
 
             for check in attribute_checks:
@@ -706,8 +706,6 @@ class COMMON():
                     if search:
                         if combo.get('search_for') and any(re.search(x, search, flags=re.IGNORECASE) for x in combo['search_for']):
                             remove_set.update(combo['update'])
-                        elif meta['debug']:
-                            console.log(f"[yellow]Skipping update for '{combo['update']}' because none of '{combo['search_for']}' matched in '{search}'")
 
                 remove_set = self.refine_remove_set(remove_set)
 
