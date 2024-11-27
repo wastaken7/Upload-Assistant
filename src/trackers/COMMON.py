@@ -661,6 +661,12 @@ class COMMON():
                 "condition": lambda each: "hdtv" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
+            {
+                "key": "bluray",
+                "uuid_flag": "blu-ray" in meta.get('name', '').lower(),
+                "condition": lambda each: "blu-ray" in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'Blu-ray' mismatch: {each}"
+            },
         ]
 
         def log_exclusion(reason, item):
@@ -680,6 +686,9 @@ class COMMON():
                 console.log(f"[debug] Normalized dupe: {normalized}")
                 console.log(f"[debug] File HDR terms: {file_hdr}")
                 console.log(f"[debug] Target HDR terms: {target_hdr}")
+
+            if has_is_disc and each.lower().endswith(".m2ts"):
+                return False
 
             if has_is_disc and re.search(r'\.\w{2,4}$', each):
                 log_exclusion("file extension mismatch (is_disc=True)", each)
