@@ -623,12 +623,6 @@ class COMMON():
 
         new_dupes = []
 
-        normalized_meta_type = (
-            {t.replace("-", "").upper() for t in meta['type']}
-            if isinstance(meta['type'], list)
-            else {meta['type'].replace("-", "").upper()}
-        )
-
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
         has_is_disc = bool(meta.get('is_disc', False))
         target_hdr = self.refine_hdr_terms(meta.get("hdr"))
