@@ -224,9 +224,11 @@ async def process_meta(meta, base_dir):
         json.dump(meta, f, indent=4)
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
 
-    if meta.get('image_list', False) in (False, []) and meta.get('skip_imghost_upload', False) is False:
+    if len(meta.get('image_list', [])) < 3 and meta.get('skip_imghost_upload', False) is False:
         return_dict = {}
-        meta['image_list'], dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict)
+        new_images, dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
+        meta['image_list'].extend(new_images)
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
@@ -279,10 +281,10 @@ async def do_the_thing(base_dir):
         path = path[:-1]
     queue = []
 
+    log_file = os.path.join(base_dir, "tmp", f"{meta['queue']}_queue.log")
     allowed_extensions = ['.mkv', '.mp4', '.ts']
     if meta.get('queue'):
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
-        log_file = os.path.join(base_dir, "tmp", f"{meta['queue']}_queue.log")
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
                 existing_queue = json.load(f)
