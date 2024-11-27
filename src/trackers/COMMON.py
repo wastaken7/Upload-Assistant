@@ -615,21 +615,26 @@ class COMMON():
 
     async def filter_dupes(self, dupes, meta):
         """
-        Allowed entries are returned as dupes.
+        Filter duplicates by applying exclusion rules. Only non-excluded entries are returned.
         """
         if meta['debug']:
             console.log("[cyan]Pre-filtered dupes")
             console.log(dupes)
 
         new_dupes = []
+
         normalized_meta_type = (
-            {t.replace('-', '').upper() for t in meta['type']}
+            {t.replace("-", "").upper() for t in meta['type']}
             if isinstance(meta['type'], list)
-            else {meta['type'].replace('-', '').upper()}
+            else {meta['type'].replace("-", "").upper()}
         )
 
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
         has_is_disc = bool(meta.get('is_disc', False))
+        target_hdr = self.refine_hdr_terms(meta.get("hdr"))
+        target_season = meta.get("season")
+        target_episode = meta.get("episode")
+        target_resolution = meta.get("resolution")
 
         attribute_checks = [
             {
@@ -664,85 +669,127 @@ class COMMON():
             },
         ]
 
-        for each in dupes:
-            remove_set = {meta['resolution']}
-            normalized_each_type = each.replace('-', '').upper()
+        def log_exclusion(reason, item):
+            if meta['debug']:
+                console.log(f"[yellow]Excluding result due to {reason}: {item}")
 
-            # Type matching logic
-            type_match = (
-                any(t in normalized_each_type for t in normalized_meta_type) or
-                (meta['resolution'] in each)
-            )
-            if not type_match:
-                if meta['debug']:
-                    console.log(f"[yellow]Excluding result due to resolution mismatch: {each}")
-                continue
+        def process_exclusion(each):
+            """
+            Determine if an entry should be excluded.
+            Returns True if the entry should be excluded, otherwise allowed as dupe.
+            """
+            normalized = self.normalize_filename(each)
+            file_hdr = self.refine_hdr_terms(normalized)
+
+            if meta['debug']:
+                console.log(f"[debug] Evaluating dupe: {each}")
+                console.log(f"[debug] Normalized dupe: {normalized}")
+                console.log(f"[debug] File HDR terms: {file_hdr}")
+                console.log(f"[debug] Target HDR terms: {target_hdr}")
 
             if has_is_disc and re.search(r'\.\w{2,4}$', each):
-                if meta['debug']:
-                    console.log(f"[yellow]Excluding result because it has a file extension but meta['is_disc'] is True: {each}")
-                continue
+                log_exclusion("file extension mismatch (is_disc=True)", each)
+                return True
+
+            if target_resolution and target_resolution not in each:
+                log_exclusion(f"resolution '{target_resolution}' mismatch", each)
+                return True
 
             for check in attribute_checks:
                 if check["key"] == "repack" and check["condition"](each):
                     if meta['debug']:
                         console.log(f"[yellow]{check['exclude_msg'](each)}")
-                    break
+                    return True
                 elif check["uuid_flag"] != check["condition"](each):
                     if meta['debug']:
                         console.log(f"[yellow]{check['exclude_msg'](each)}")
-                    break
-            else:
-                search_combos = [
-                    {'search': meta['hdr'], 'search_for': {'HDR', 'PQ10'}, 'update': {'HDR|PQ10'}},
-                    {'search': meta['hdr'], 'search_for': {'DV'}, 'update': {'DV|DoVi'}},
-                    {'search': meta['hdr'], 'search_not': {'DV', 'DoVi', 'HDR', 'PQ10'}, 'update': {'!(DV)|(DoVi)|(HDR)|(PQ10)'}},
-                    {'search': str(meta.get('tv_pack', 0)), 'search_for': '1', 'update': {rf"{meta['season']}(?!E\d+)"}},
-                    {'search': meta['episode'], 'search_for': meta['episode'], 'update': {meta['season'], meta['episode']}},
-                ]
+                    return True
 
-                for combo in search_combos:
-                    search = combo.get('search', '')
-                    if search:
-                        if combo.get('search_for') and any(re.search(x, search, flags=re.IGNORECASE) for x in combo['search_for']):
-                            remove_set.update(combo['update'])
+            if not self.has_matching_hdr(file_hdr, target_hdr):
+                log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
+                return True
 
-                remove_set = self.refine_remove_set(remove_set)
+            season_episode_match = self.is_season_episode_match(normalized, target_season, target_episode)
+            if meta['debug']:
+                console.log(f"[debug] Season/Episode match result: {season_episode_match}")
+            if not season_episode_match:
+                log_exclusion("season/episode mismatch", each)
+                return True
 
-                search_normalized = each.lower().replace('-', '').replace(' ', '').replace('.', '')
-                if self.should_allow_entry(search_normalized, remove_set, meta):
-                    new_dupes.append(each)
+            console.log(f"[debug] Passed all checks: {each}")
+            return False
+
+        for each in dupes:
+            console.log(f"[debug] Evaluating dupe: {each}")
+            if not process_exclusion(each):
+                new_dupes.append(each)
+
+        if meta['debug']:
+            console.log(f"[cyan]Final dupes: {new_dupes}")
 
         return new_dupes
 
-    def refine_remove_set(self, remove_set):
+    def normalize_filename(self, filename):
         """
-        Process remove_set to split "|" options into individual entries.
+        Normalize a filename for easier matching.
+        Retain season/episode information in the format SxxExx.
         """
-        refined_set = set()
-        for item in remove_set:
-            if "|" in item:
-                refined_set.update(item.split('|'))
-            else:
-                refined_set.add(item)
-        return refined_set
+        normalized = filename.lower().replace("-", "").replace(" ", "").replace(".", "")
 
-    def should_allow_entry(self, search, remove_set, meta):
+        return normalized
+
+    def is_season_episode_match(self, filename, target_season, target_episode):
         """
-        Determine if an entry should be allowed based on the remove_set.
+        Check if the filename matches the given season and episode.
         """
-        for item in remove_set:
-            if not item.startswith("!"):
-                if not re.search(item, search, flags=re.I):
-                    if meta['debug']:
-                        console.log(f"[yellow]Excluding result because '{item}' not found in: {search}")
-                    return False
-            else:
-                if re.search(item[1:], search, flags=re.I):
-                    if meta['debug']:
-                        console.log(f"[yellow]Excluding result because '{item[1:]}' found in: {search}")
-                    return False
+        if target_season:
+            target_season = int(str(target_season).lstrip('sS'))
+        if target_episode:
+            target_episode = int(str(target_episode).lstrip('eE'))
+
+        season_pattern = f"s{target_season:02}" if target_season else None
+        episode_pattern = f"e{target_episode:02}" if target_episode else None
+
+        if season_pattern and episode_pattern:
+            return season_pattern in filename and episode_pattern in filename
+        if season_pattern:
+            return season_pattern in filename
+        if episode_pattern:
+            return episode_pattern in filename
         return True
+
+    def refine_hdr_terms(self, hdr):
+        """
+        Normalize HDR terms for consistent comparison.
+        Simplifies all HDR entries to 'HDR' and DV entries to 'DV'.
+        """
+        if hdr is None:
+            return set()
+        hdr = hdr.upper()
+        terms = set()
+        if "DV" in hdr or "DOVI" in hdr:
+            terms.add("DV")
+        if "HDR" in hdr:  # Any HDR-related term is normalized to 'HDR'
+            terms.add("HDR")
+        return terms
+
+    def has_matching_hdr(self, file_hdr, target_hdr):
+        """
+        Check if the HDR terms match or are compatible.
+        """
+        def simplify_hdr(hdr_set):
+            """Simplify HDR terms to just HDR and DV."""
+            simplified = set()
+            if any(h in hdr_set for h in {"HDR", "HDR10", "HDR10+"}):
+                simplified.add("HDR")
+            if "DV" in hdr_set or "DOVI" in hdr_set:
+                simplified.add("DV")
+            return simplified
+
+        file_hdr_simple = simplify_hdr(file_hdr)
+        target_hdr_simple = simplify_hdr(target_hdr)
+
+        return file_hdr_simple == target_hdr_simple
 
     class MediaInfoParser:
         # Language to ISO country code mapping
