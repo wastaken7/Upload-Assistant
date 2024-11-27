@@ -624,6 +624,7 @@ class COMMON():
         new_dupes = []
 
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
+        has_encoder_in_name = meta.get("video_encode").lower()
         has_is_disc = bool(meta.get('is_disc', False))
         target_hdr = self.refine_hdr_terms(meta.get("hdr"))
         target_season = meta.get("season")
@@ -666,6 +667,12 @@ class COMMON():
                 "uuid_flag": "blu-ray" in meta.get('name', '').lower(),
                 "condition": lambda each: "blu-ray" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'Blu-ray' mismatch: {each}"
+            },
+            {
+                "key": "encoder",
+                "uuid_flag": has_encoder_in_name,
+                "condition": lambda each: has_encoder_in_name in each.lower(),
+                "exclude_msg": lambda each: f"Excluding result due to 'Encoder' mismatch: {each}"
             },
         ]
 
