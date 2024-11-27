@@ -629,6 +629,7 @@ class COMMON():
         )
 
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
+        has_is_disc = bool(meta.get('is_disc', False))
 
         attribute_checks = [
             {
@@ -661,12 +662,6 @@ class COMMON():
                 "condition": lambda each: "hdtv" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
-            {
-                "key": "disc_check",
-                "uuid_flag": meta.get('is_disc', False),
-                "condition": lambda each: not re.search(r'\.\w{2,4}$', each),
-                "exclude_msg": lambda each: f"Excluding result because it has a file extension but meta['is_disc'] is True: {each}"
-            }
         ]
 
         for each in dupes:
@@ -681,6 +676,11 @@ class COMMON():
             if not type_match:
                 if meta['debug']:
                     console.log(f"[yellow]Excluding result due to resolution mismatch: {each}")
+                continue
+
+            if has_is_disc and re.search(r'\.\w{2,4}$', each):
+                if meta['debug']:
+                    console.log(f"[yellow]Excluding result because it has a file extension but meta['is_disc'] is True: {each}")
                 continue
 
             for check in attribute_checks:
