@@ -135,6 +135,8 @@ class OE():
         resolution = meta.get('resolution')
         video_encode = meta.get('video_encode')
         name_type = meta.get('type', "")
+        tag_lower = meta['tag'].lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
         if name_type == "DVDRIP":
             if meta.get('category') == "MOVIE":
@@ -172,6 +174,11 @@ class OE():
                         oe_name = oe_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
+
+        if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+            for invalid_tag in invalid_tags:
+                oe_name = re.sub(f"-{invalid_tag}", "", oe_name, flags=re.IGNORECASE)
+            oe_name = f"{oe_name}-NOGRP"
 
         return oe_name
 
