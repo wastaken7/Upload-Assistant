@@ -226,6 +226,8 @@ async def process_meta(meta, base_dir):
 
     if len(meta.get('image_list', [])) < 3 and meta.get('skip_imghost_upload', False) is False:
         return_dict = {}
+        if 'image_list' not in meta:
+            meta['image_list'] = []
         new_images, dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
         meta['image_list'].extend(new_images)
 
