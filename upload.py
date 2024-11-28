@@ -285,6 +285,19 @@ async def do_the_thing(base_dir):
 
     log_file = os.path.join(base_dir, "tmp", f"{meta['queue']}_queue.log")
     allowed_extensions = ['.mkv', '.mp4', '.ts']
+
+    if path.endswith('.log') and meta['debug']:
+        console.print(f"[bold yellow]Processing debugging queue:[/bold yellow] [bold green{path}[/bold green]")
+        if os.path.exists(path):
+            log_file = path
+            with open(path, 'r') as f:
+                queue = json.load(f)
+                meta['queue'] = "debugging"
+
+        else:
+            console.print(f"[bold red]Log file not found: {path}. Exiting.[/bold red]")
+            exit(1)
+
     if meta.get('queue'):
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
         if os.path.exists(log_file):
