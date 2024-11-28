@@ -3186,7 +3186,7 @@ class Prep():
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {three_d} {edition} {repack} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"  # SOURCE
                 potential_missing = ['edition', 'description']
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"):  # DVD Remux
+            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {source} REMUX {audio}"  # SOURCE
                 potential_missing = ['edition', 'description']
             elif type == "ENCODE":  # Encode
