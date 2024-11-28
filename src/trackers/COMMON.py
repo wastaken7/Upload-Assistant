@@ -616,6 +616,7 @@ class COMMON():
     async def filter_dupes(self, dupes, meta):
         """
         Filter duplicates by applying exclusion rules. Only non-excluded entries are returned.
+        Everything is a dupe, until it matches a criteria to be excluded.
         """
         if meta['debug']:
             console.log("[cyan]Pre-filtered dupes")
@@ -625,6 +626,7 @@ class COMMON():
 
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
         has_encoder_in_name = meta.get("video_encode").lower()
+        normalized_encoder = self.normalize_filename(has_encoder_in_name)
         has_is_disc = bool(meta.get('is_disc', False))
         target_hdr = self.refine_hdr_terms(meta.get("hdr"))
         target_season = meta.get("season")
@@ -667,12 +669,6 @@ class COMMON():
                 "uuid_flag": "blu-ray" in meta.get('name', '').lower(),
                 "condition": lambda each: "blu-ray" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'Blu-ray' mismatch: {each}"
-            },
-            {
-                "key": "encoder",
-                "uuid_flag": has_encoder_in_name,
-                "condition": lambda each: has_encoder_in_name in each.lower(),
-                "exclude_msg": lambda each: f"Excluding result due to 'Encoder' mismatch: {each}"
             },
         ]
 
@@ -725,6 +721,10 @@ class COMMON():
             if not season_episode_match:
                 log_exclusion("season/episode mismatch", each)
                 return True
+                
+            if normalized_encoder and normalized_encoder not in normalized:
+                log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
+                return True  
 
             console.log(f"[debug] Passed all checks: {each}")
             return False
