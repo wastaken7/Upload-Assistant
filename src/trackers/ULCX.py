@@ -63,9 +63,6 @@ class ULCX():
         return resolution_id
 
     async def upload(self, meta, disctype):
-        if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed.')
-            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
@@ -74,7 +71,7 @@ class ULCX():
         if resolution_id is None:
             console.print("Resolution is below 720p; skipping.")
             return
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
@@ -156,6 +153,10 @@ class ULCX():
         open_torrent.close()
 
     async def search_existing(self, meta, disctype):
+        if 'concert' in meta['keywords']:
+            console.print('[bold red]Concerts not allowed.')
+            meta['skipping'] = "ULCX"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

@@ -47,9 +47,6 @@ class OE():
         pass
 
     async def upload(self, meta, disctype):
-        if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed.')
-            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta, self.tracker, self.signature)
@@ -302,8 +299,7 @@ class OE():
             desc = base
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
-            if comparison is False:
-                desc = bbcode.convert_comparison_to_collapse(desc, 1000)
+            desc = bbcode.convert_comparison_to_collapse(desc, 1000)
 
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
@@ -321,6 +317,10 @@ class OE():
         return
 
     async def search_existing(self, meta, disctype):
+        if 'concert' in meta['keywords']:
+            console.print('[bold red]Concerts not allowed.')
+            meta['skipping'] = "OE"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {

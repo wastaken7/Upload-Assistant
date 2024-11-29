@@ -28,21 +28,14 @@ class RF():
         self.source_flag = 'ReelFliX'
         self.upload_url = 'https://reelflix.xyz/api/torrents/upload'
         self.search_url = 'https://reelflix.xyz/api/torrents/filter'
-        self.forum_link = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
 
     async def upload(self, meta, disctype):
-        disallowed_keywords = {'XXX', 'Erotic'}
-        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
-            console.print('[bold red]Concerts not allowed.')
-            return
-        if meta.get('category') == "TV":
-            console.print('[bold red]This site only ALLOWS Movies.')
-            return
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         cat_id = await self.get_cat_id(meta['category'])
@@ -169,6 +162,15 @@ class RF():
         return resolution_id
 
     async def search_existing(self, meta, disctype):
+        disallowed_keywords = {'XXX', 'Erotic'}
+        if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
+            console.print('[bold red]Erotic not allowed.')
+            meta['skipping'] = "RF"
+            return
+        if meta.get('category') == "TV":
+            console.print('[bold red]This site only ALLOWS Movies.')
+            meta['skipping'] = "RF"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         params = {
@@ -179,9 +181,6 @@ class RF():
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }
-        if meta['category'] == 'TV':
-            console.print('[bold red]Unable to search site for TV as this site only ALLOWS Movies')
-        #     params['name'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + meta['edition']
         try:
