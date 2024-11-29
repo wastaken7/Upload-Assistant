@@ -57,6 +57,7 @@ import glob
 import cli_ui
 import traceback
 import click
+import re
 
 from src.console import console
 from rich.markdown import Markdown
@@ -157,6 +158,36 @@ def resolve_queue_with_glob_or_split(path, paths, allowed_extensions=None):
         ]
         display_queue(queue)
     return queue
+
+
+def extract_safe_file_locations(log_file):
+    """
+    Parse the log file to extract file locations under the 'safe' header.
+
+    :param log_file: Path to the log file to parse.
+    :return: List of file paths from the 'safe' section.
+    """
+    safe_section = False
+    safe_file_locations = []
+
+    with open(log_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+
+            # Detect the start and end of 'safe' sections
+            if line.lower() == "safe":
+                safe_section = True
+                continue
+            elif line.lower() in {"danger", "risky"}:
+                safe_section = False
+
+            # Extract 'File Location' if in a 'safe' section
+            if safe_section and line.startswith("File Location:"):
+                match = re.search(r"File Location:\s*(.+)", line)
+                if match:
+                    safe_file_locations.append(match.group(1).strip())
+
+    return safe_file_locations
 
 
 def merge_meta(meta, saved_meta, path):
