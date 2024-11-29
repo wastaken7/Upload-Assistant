@@ -216,6 +216,11 @@ class BHD():
         return
 
     async def search_existing(self, meta, disctype):
+        bhd_name = await self.edit_name(meta)
+        if any(phrase in bhd_name.lower() for phrase in ("-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi", "-ncmt", "-tdd", "-flux", "-crfw", "-sonny", "-zr-", "-mkvultra", "-rpg", "-w4nk3r", "-irobot", "-beyondhd")):
+            console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
+            meta['skipping'] = "BHD"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         category = meta['category']
