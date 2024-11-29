@@ -22,6 +22,7 @@ class Args():
 
         parser.add_argument('path', nargs='*', help="Path to file/directory")
         parser.add_argument('--queue', nargs='*', required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
+        parser.add_argument('--unit3d', action='store_true', required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
         parser.add_argument('-s', '--screens', nargs='*', required=False, help="Number of screenshots", default=int(self.config['DEFAULT']['screens']))
         parser.add_argument('-mf', '--manual_frames', required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
         parser.add_argument('-c', '--category', nargs='*', required=False, help="Category [MOVIE, TV, FANRES]", choices=['movie', 'tv', 'fanres'])
