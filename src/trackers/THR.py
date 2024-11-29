@@ -81,7 +81,7 @@ class THR():
             'tube': meta.get('youtube', '')
         }
         headers = {
-            'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         }
         # If pronfo fails, put mediainfo into THR parser
         if meta.get('is_disc', '') != 'BDMV':

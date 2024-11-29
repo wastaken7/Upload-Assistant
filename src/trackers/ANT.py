@@ -113,12 +113,12 @@ class ANT():
                 'media': 'Blu-ray',
                 'releasegroup': str(meta['tag'])[1:],
                 'release_desc': bd_dump,
-                'flagchangereason': "BDMV Uploaded with L4G's Upload Assistant"})
+                'flagchangereason': "BDMV Uploaded with Upload Assistant"})
         if meta['scene']:
             # ID of "Scene?" checkbox on upload form is actually "censored"
             data['censored'] = 1
         headers = {
-            'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         }
 
         try:
