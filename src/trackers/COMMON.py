@@ -788,6 +788,8 @@ class COMMON():
                 simplified.add("HDR")
             if "DV" in hdr_set or "DOVI" in hdr_set:
                 simplified.add("DV")
+                if "framestor" in meta['tag'].lower():
+                    simplified.add("HDR")
             return simplified
 
         file_hdr_simple = simplify_hdr(file_hdr)
