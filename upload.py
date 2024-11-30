@@ -475,10 +475,10 @@ async def do_the_thing(base_dir):
         if meta['debug']:
             display_queue(queue, base_dir, queue_name, save_to_log=False)
 
+    processed_files_count = 0
     base_meta = {k: v for k, v in meta.items()}
     for path in queue:
         total_files = len(queue)
-        processed_files_count = 0
         try:
             meta = base_meta.copy()
             meta['path'] = path
