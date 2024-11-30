@@ -498,8 +498,6 @@ async def do_the_thing(base_dir):
                     console.print(f"[yellow]No metadata file found at {meta_file}")
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             console.print(f"[red]Failed to load metadata for path '{path}': {e}")
 
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
@@ -767,7 +765,7 @@ async def do_the_thing(base_dir):
                                 await thr.upload(session, meta, disctype)
                                 await client.add_to_client(meta, "THR")
                     except Exception:
-                        console.print(traceback.print_exc())
+                        console.print(traceback.format_exc())
 
             if tracker == "PTP":
                 if meta['unattended']:
@@ -811,7 +809,7 @@ async def do_the_thing(base_dir):
                             await asyncio.sleep(5)
                             await client.add_to_client(meta, "PTP")
                     except Exception:
-                        console.print(traceback.print_exc())
+                        console.print(traceback.format_exc())
 
         if meta.get('queue') is not None:
             processed_files_count += 1
