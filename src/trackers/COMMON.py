@@ -705,7 +705,7 @@ class COMMON():
                         console.log(f"[yellow]{check['exclude_msg'](each)}")
                     return True
 
-            if not self.has_matching_hdr(file_hdr, target_hdr):
+            if not self.has_matching_hdr(file_hdr, target_hdr, meta):
                 log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                 return True
 
@@ -777,7 +777,7 @@ class COMMON():
             terms.add("HDR")
         return terms
 
-    def has_matching_hdr(self, file_hdr, target_hdr):
+    def has_matching_hdr(self, file_hdr, target_hdr, meta):
         """
         Check if the HDR terms match or are compatible.
         """
