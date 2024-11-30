@@ -664,12 +664,6 @@ class COMMON():
                 "condition": lambda each: "hdtv" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
-            {
-                "key": "bluray",
-                "uuid_flag": "blu-ray" in meta.get('name', '').lower(),
-                "condition": lambda each: "blu-ray" in each.lower(),
-                "exclude_msg": lambda each: f"Excluding result due to 'Blu-ray' mismatch: {each}"
-            },
         ]
 
         def log_exclusion(reason, item):
