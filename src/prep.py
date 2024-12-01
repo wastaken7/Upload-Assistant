@@ -1554,37 +1554,39 @@ class Prep():
         else:
             ss_times = self.valid_ss_time([], num_screens, length)
 
-        # Prepare tasks for screenshot capture
         capture_tasks = []
         for i in range(num_screens):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
-            capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
-
-        # Capture screenshots in parallel with feedback
-        with Pool(processes=num_screens) as pool:
-            capture_results = list(
-                tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=num_screens, desc="Capturing Screenshots")
-            )
-
-        # Filter out errors and prepare optimization tasks
-        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
-
-        # Optimize images in parallel with feedback
-        with Pool(processes=len(optimize_tasks)) as pool:
-            optimize_results = list(
-                tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images")
-            )
-
-        for image_path in optimize_results:
-            if "Error" not in image_path:
-                img_dict = {
-                    'img_url': image_path,
-                    'raw_url': image_path,
-                    'web_url': image_path
-                }
-                meta['image_list'].append(img_dict)
+            if not os.path.exists(image_path) or meta.get('retake', False):
+                capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
             else:
-                console.print(f"[red]{image_path}")
+                if meta['debug']:
+                    console.print(f"[yellow]Skipping existing screenshot: {image_path}")
+
+        if not capture_tasks:
+            console.print("[yellow]All screenshots already exist. Skipping capture process.")
+        else:
+            with Pool(processes=len(capture_tasks)) as pool:
+                capture_results = list(
+                    tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=len(capture_tasks), desc="Capturing Screenshots")
+                )
+
+            optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
+            with Pool(processes=len(optimize_tasks)) as pool:
+                optimize_results = list(
+                    tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images")
+                )
+
+            for image_path in optimize_results:
+                if "Error" not in image_path:
+                    img_dict = {
+                        'img_url': image_path,
+                        'raw_url': image_path,
+                        'web_url': image_path
+                    }
+                    meta['image_list'].append(img_dict)
+                else:
+                    console.print(f"[red]{image_path}")
 
         if meta['debug']:
             finish_time = time.time()
