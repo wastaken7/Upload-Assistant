@@ -2967,21 +2967,23 @@ class Prep():
         if 'POSTER.png' in image_glob:
             image_glob.remove('POSTER.png')
         image_glob = list(set(image_glob))
+        existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
+        existing_count = len(existing_images)
+        images_needed = max(0, total_screens - existing_count)
 
-        if len(meta['image_list']) >= total_screens and not retry_mode and img_host == initial_img_host:
-            console.print(f"[yellow]Skipping upload because images are already uploaded to {img_host}. Existing images: {len(meta['image_list'])}, Required: {total_screens}")
+        if existing_count >= total_screens and not retry_mode and img_host == initial_img_host:
+            console.print(f"[yellow]Skipping upload because enough images are already uploaded to {img_host}. Existing images: {existing_count}, Required: {total_screens}")
             return meta['image_list'], total_screens
+
+        upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[:images_needed]]
 
         # Define host-specific limits
         host_limits = {
             "imgbox": 6,
             # Other hosts can use the default pool size
         }
-
         default_pool_size = os.cpu_count()
         pool_size = host_limits.get(img_host, default_pool_size)
-
-        upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[-screens:]]
 
         try:
             with Pool(processes=min(len(upload_tasks), pool_size)) as pool:
@@ -3032,6 +3034,7 @@ class Prep():
             return new_images, len(new_images)
 
         return meta['image_list'], len(successfully_uploaded)
+
 
     async def imgbox_upload(self, chdir, image_glob, meta, return_dict):
         try:
