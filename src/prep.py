@@ -546,6 +546,8 @@ class Prep():
             meta['description'] = ""
 
         description_text = meta.get('description', '')
+        if description_text is None:
+            description_text = ""
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.write(description_text)
 
