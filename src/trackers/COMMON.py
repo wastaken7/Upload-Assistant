@@ -625,8 +625,12 @@ class COMMON():
         new_dupes = []
 
         has_repack_in_uuid = "repack" in meta.get('uuid', '').lower()
-        has_encoder_in_name = meta.get("video_encode").lower()
-        normalized_encoder = self.normalize_filename(has_encoder_in_name)
+        video_encode = meta.get("video_encode")
+        if video_encode is not None:
+            has_encoder_in_name = video_encode.lower()
+            normalized_encoder = self.normalize_filename(has_encoder_in_name)
+        else:
+            normalized_encoder = False
         has_is_disc = bool(meta.get('is_disc', False))
         target_hdr = self.refine_hdr_terms(meta.get("hdr"))
         target_season = meta.get("season")
