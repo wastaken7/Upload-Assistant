@@ -42,91 +42,51 @@ class MTV():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
-
-        # Initiate the upload with retry logic
         await self.upload_with_retry(meta, cookiefile, common)
 
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
         approved_image_hosts = ['ptpimg', 'imgbox']
-        total_size_limit = 25 * 1024 * 1024  # 25 MiB in bytes
         images_reuploaded = False
-        valid_images = []
 
-        # Helper function to calculate total size of the images
-        def calculate_total_size(image_list, image_sizes):
-            total_size = 0
-            for image in image_list:
-                img_url = image['raw_url']
-                size = image_sizes.get(img_url, 0)  # Get size from meta['image_sizes'], default to 0 if not found
-                total_size += size
-            return total_size
-
-        # Helper function to remove images until the total size is under the limit
-        def enforce_size_limit(image_list, image_sizes):
-            total_size = calculate_total_size(image_list, image_sizes)
-
-            for image in image_list:
-                if total_size <= total_size_limit:
-                    valid_images.append(image)
-                else:
-                    img_url = image['raw_url']
-                    size = image_sizes.get(img_url, 0)
-                    total_size -= size  # Subtract size of the removed image
-                    console.print(f"[red]Removed {img_url} to stay within the 25 MiB limit.")
-
-            return valid_images
-        image_list = meta['image_list']
-        # Check if the images are already hosted on an approved image host
         if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
             console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
-            # Enforce the total size limit on the existing image list
-            image_list = enforce_size_limit(image_list, meta['image_sizes'])
+            image_list = meta['image_list']
 
         else:
-            # Proceed with the retry logic if images are not hosted on an approved image host
             images_reuploaded = False
             while img_host_index <= len(approved_image_hosts):
-                # Call handle_image_upload and pass the updated meta with the current image host index
                 image_list, retry_mode, images_reuploaded = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
 
-                # If retry_mode is True, switch to the next host
                 if retry_mode:
                     console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
                     img_host_index += 1
                     continue
 
-                # If we successfully uploaded images, enforce the size limit and break out of the loop
                 if image_list is not None:
-                    # Enforce the total size limit on the newly uploaded images
-                    image_list = enforce_size_limit(image_list, meta['image_sizes'])
+                    image_list = meta['new_images_key']
                     break
 
             if image_list is None:
                 console.print("[red]All image hosts failed. Please check your configuration.")
                 return
 
-        # Proceed with the rest of the upload process
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
         if not os.path.exists(torrent_file_path):
             torrent_filename = "BASE"
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
             torrent = Torrent.read(torrent_path)
 
-            if torrent.piece_size > 8388608:  # 8 MiB in bytes
+            if torrent.piece_size > 8388608:
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
 
-                # Override the max_piece_size to 8 MiB
-                meta['max_piece_size'] = '8'  # 8 MiB, to ensure the new torrent adheres to this limit
-
-                # Determine include and exclude patterns based on whether it's a disc or not
+                meta['max_piece_size'] = '8'
                 if meta['is_disc']:
-                    include = []  # Adjust as needed for disc-specific inclusions, make sure it's a list
-                    exclude = []  # Adjust as needed for disc-specific exclusions, make sure it's a list
+                    include = []
+                    exclude = []
                 else:
                     include = ["*.mkv", "*.mp4", "*.ts"]
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"]
 
-                # Create a new torrent with piece size explicitly set to 8 MiB
                 from src.prep import Prep
                 prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
                 new_torrent = prep.CustomTorrent(
@@ -142,7 +102,6 @@ class MTV():
                     created_by="L4G's Upload Assistant"
                 )
 
-                # Validate and write the new torrent
                 new_torrent.piece_size = 8 * 1024 * 1024
                 new_torrent.validate_piece_size()
                 new_torrent.generate(callback=prep.torf_cb, interval=5)
@@ -157,9 +116,7 @@ class MTV():
         source_id = await self.get_source_id(meta)
         origin_id = await self.get_origin_id(meta)
         des_tags = await self.get_tags(meta)
-
-        # Edit description and other details
-        await self.edit_desc(meta, images_reuploaded, valid_images)
+        await self.edit_desc(meta, images_reuploaded, image_list)
         group_desc = await self.edit_group_desc(meta)
         mtv_name = await self.edit_name(meta)
 
@@ -312,7 +269,9 @@ class MTV():
 
             if uploaded_images:
                 meta[new_images_key] = uploaded_images
-
+        if meta['debug']:
+            for image in uploaded_images:
+                console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
         if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta.get(new_images_key, [])):
             console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
             return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
@@ -343,11 +302,7 @@ class MTV():
                 for image in images:
                     raw_url = image['raw_url']
                     img_url = image['img_url']
-
-                    if images_reuploaded:
-                        desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]\n")
-                    else:
-                        desc.write(f"[img={raw_url}][/img]\n")
+                    desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]\n")
 
             desc.write(f"\n\n{base}")
             desc.close()

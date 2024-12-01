@@ -256,17 +256,13 @@ async def process_meta(meta, base_dir):
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
 
     if len(meta.get('image_list', [])) < 3 and meta.get('skip_imghost_upload', False) is False:
-        return_dict = {}
         if 'image_list' not in meta:
             meta['image_list'] = []
+        return_dict = {}
         new_images, dummy_var = prep.upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
-        meta['image_list'].extend(new_images)
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
-
-        if meta.get('debug', False):
-            console.print(meta['image_list'])
 
     elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
         meta['image_list'] = []
