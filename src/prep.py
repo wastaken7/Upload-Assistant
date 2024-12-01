@@ -17,6 +17,8 @@ try:
     import traceback
     from src.discparse import DiscParse
     import multiprocessing
+    from multiprocessing import Pool
+    from tqdm import tqdm
     import os
     import re
     import math
@@ -1497,6 +1499,8 @@ class Prep():
                 os.remove(smallest)
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
+        if meta['debug']:
+            start_time = time.time()
         if 'image_list' not in meta:
             meta['image_list'] = []
 
@@ -1532,109 +1536,59 @@ class Prep():
                 sar = w_sar = par
                 h_sar = 1
             length = round(float(length))
-            os.chdir(f"{base_dir}/tmp/{folder_id}")
-            i = 0
-            if (meta.get('ffdebug', False)):
-                loglevel = 'verbose'
+
+        if (meta.get('ffdebug', False)):
+            loglevel = 'verbose'
+        else:
+            loglevel = 'quiet'
+
+        os.chdir(f"{base_dir}/tmp/{folder_id}")
+
+        if manual_frames:
+            manual_frames = [int(frame) for frame in manual_frames]
+            ss_times = [frame / frame_rate for frame in manual_frames]
+
+            if len(ss_times) < num_screens:
+                random_times = self.valid_ss_time(ss_times, num_screens - len(ss_times), length)
+                ss_times.extend(random_times)
+        else:
+            ss_times = self.valid_ss_time([], num_screens, length)
+
+        # Prepare tasks for screenshot capture
+        capture_tasks = []
+        for i in range(num_screens):
+            image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
+            capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
+
+        # Capture screenshots in parallel with feedback
+        with Pool(processes=num_screens) as pool:
+            capture_results = list(
+                tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=num_screens, desc="Capturing Screenshots")
+            )
+
+        # Filter out errors and prepare optimization tasks
+        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
+
+        # Optimize images in parallel with feedback
+        with Pool(processes=len(optimize_tasks)) as pool:
+            optimize_results = list(
+                tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images")
+            )
+
+        for image_path in optimize_results:
+            if "Error" not in image_path:
+                img_dict = {
+                    'img_url': image_path,
+                    'raw_url': image_path,
+                    'web_url': image_path
+                }
+                meta['image_list'].append(img_dict)
             else:
-                loglevel = 'quiet'
+                console.print(f"[red]{image_path}")
 
-            retake = False
-            with Progress(
-                TextColumn("[bold green]Saving Screens..."),
-                BarColumn(),
-                "[cyan]{task.completed}/{task.total}",
-                TimeRemainingColumn()
-            ) as progress:
-                ss_times = []
-                screen_task = progress.add_task("[green]Saving Screens...", total=num_screens)
-
-                if manual_frames:
-                    if isinstance(manual_frames, str):
-                        manual_frames = [frame.strip() for frame in manual_frames.split(',') if frame.strip().isdigit()]
-                    elif isinstance(manual_frames, list):
-                        manual_frames = [frame for frame in manual_frames if isinstance(frame, int) or frame.isdigit()]
-
-                    # Convert to integers
-                    manual_frames = [int(frame) for frame in manual_frames]
-                    ss_times = [frame / frame_rate for frame in manual_frames]
-
-                    # If not enough manual frames, fill in with random frames
-                    if len(ss_times) < num_screens:
-                        console.print(f"[yellow]Not enough manual frames provided. Using random frames for remaining {num_screens - len(ss_times)} screenshots.")
-                        random_times = self.valid_ss_time(ss_times, num_screens - len(ss_times), length)
-                        ss_times.extend(random_times)
-
-                else:
-                    # No manual frames provided, generate random times
-                    # console.print("[yellow]No manual frames provided. Generating random frames.")
-                    ss_times = self.valid_ss_time(ss_times, num_screens, length)
-
-                for i in range(num_screens):
-                    image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
-                    if not os.path.exists(image_path) or retake is not False:
-                        retake = False
-                        try:
-                            # console.print(f"Taking screenshot at time (s): {ss_times[i]}")
-                            ff = ffmpeg.input(path, ss=ss_times[i])
-
-                            if w_sar != 1 or h_sar != 1:
-                                ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
-
-                            # console.print(f"Saving screenshot to {image_path}")
-                            (
-                                ff
-                                .output(image_path, vframes=1, pix_fmt="rgb24")
-                                .overwrite_output()
-                                .global_args('-loglevel', loglevel)
-                                .run()
-                            )
-
-                        except Exception as e:
-                            console.print(f"[red]Error during screenshot capture: {e}")
-                            sys.exit(1)
-
-                        self.optimize_images(image_path)
-                        if not manual_frames:
-                            if os.path.getsize(Path(image_path)) <= 75000:
-                                console.print("[yellow]Image is incredibly small, retaking")
-                                retake = True
-                                time.sleep(1)
-                        if os.path.getsize(Path(image_path)) <= 31000000 and self.img_host == "imgbb" and retake is False:
-                            i += 1
-                        elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", 'pixhost'] and retake is False:
-                            i += 1
-                        elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and retake is False:
-                            i += 1
-                        elif self.img_host == "freeimage.host":
-                            console.print("[bold red]Support for freeimage.host has been removed. Please remove from your config")
-                            exit()
-                        elif retake is True:
-                            pass
-                        else:
-                            console.print("[red]Image too large for your image host, retaking")
-                            retake = True
-                            time.sleep(1)
-
-                    progress.advance(screen_task)
-
-                new_images = glob.glob(f"{filename}-*.png")
-                for image in new_images:
-                    img_dict = {
-                        'img_url': image,
-                        'raw_url': image,
-                        'web_url': image
-                    }
-                    meta['image_list'].append(img_dict)
-
-                if len(meta['image_list']) > self.screens:
-                    local_images = [img for img in meta['image_list'] if not img['img_url'].startswith('http')]
-                    if local_images:
-                        smallest = min(local_images, key=lambda x: os.path.getsize(x['img_url']))
-                        os.remove(smallest['img_url'])
-                        meta['image_list'].remove(smallest)
-                    else:
-                        console.print("[yellow]No local images found to remove.")
+        if meta['debug']:
+            finish_time = time.time()
+            print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
     def valid_ss_time(self, ss_times, num_screens, length, manual_frames=None):
         if manual_frames:
@@ -1656,17 +1610,40 @@ class Prep():
 
         return ss_times
 
-    def optimize_images(self, image):
-        if self.config['DEFAULT'].get('optimize_images', True) is True:
-            if self.config['DEFAULT'].get('shared_seedbox', True) is True:
-                # Get number of CPU cores
-                num_cores = multiprocessing.cpu_count()
-                # Limit the number of threads based on half available cores
-                max_threads = num_cores // 2
-                # Set cores for oxipng usage
-                os.environ['RAYON_NUM_THREADS'] = str(max_threads)
-            if os.path.exists(image):
-                try:
+    def capture_screenshot(self, args):
+        path, ss_time, image_path, width, height, w_sar, h_sar, loglevel = args
+        try:
+            ff = ffmpeg.input(path, ss=ss_time)
+
+            if w_sar != 1 or h_sar != 1:
+                ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
+
+            (
+                ff
+                .output(image_path, vframes=1, pix_fmt="rgb24")
+                .overwrite_output()
+                .global_args('-loglevel', loglevel)
+                .run()
+            )
+            return image_path
+        except Exception as e:
+            return f"Error: {e}"
+
+    def optimize_image_task(self, args):
+        image, config = args
+        try:
+            # Extract shared_seedbox and optimize_images from config
+            optimize_images = config['DEFAULT'].get('optimize_images', True)
+            shared_seedbox = config['DEFAULT'].get('shared_seedbox', True)
+
+            if optimize_images:
+                if shared_seedbox:
+                    # Limit the number of threads for oxipng
+                    num_cores = multiprocessing.cpu_count()
+                    max_threads = num_cores // 2
+                    os.environ['RAYON_NUM_THREADS'] = str(max_threads)
+
+                if os.path.exists(image):
                     pyver = platform.python_version_tuple()
                     if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
                         import oxipng
@@ -1674,9 +1651,9 @@ class Prep():
                         oxipng.optimize(image, level=6)
                     else:
                         oxipng.optimize(image, level=3)
-                except (KeyboardInterrupt, Exception):
-                    sys.exit(1)
-        return
+            return image  # Return image path if successful
+        except (KeyboardInterrupt, Exception) as e:
+            return f"Error: {e}"  # Return error message
 
     """
     Get type and category
