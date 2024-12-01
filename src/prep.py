@@ -2865,7 +2865,7 @@ class Prep():
                 }
                 response = requests.post(url, data=data, timeout=timeout)
                 response_data = response.json()
-                img_url = response_data['data']['url']
+                img_url = response['data'].get('medium', response['data']['image'])['url']
                 raw_url = response_data['data']['image']['url']
                 web_url = response_data['data']['url_viewer']
 
@@ -2880,9 +2880,9 @@ class Prep():
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
                 response_data = response.json()
                 if response_data.get('status_code') == 200:
-                    img_url = response_data['data']['image']['url']
-                    raw_url = img_url
-                    web_url = img_url
+                    img_url = response['data'].get('medium', response['data']['image'])['url']
+                    raw_url = response['data']['image']['url']
+                    web_url = response['data']['url_viewer']
 
             elif img_host == "oeimg":
                 url = "https://imgoe.download/api/1/upload"
@@ -2895,8 +2895,8 @@ class Prep():
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
                 response_data = response.json()
                 if response_data.get('status_code') == 200:
-                    img_url = response_data['data']['image']['url']
-                    raw_url = img_url
+                    img_url = response['data']['image']['url']
+                    raw_url = response['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
             elif img_host == "pixhost":
@@ -2926,8 +2926,8 @@ class Prep():
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
                 response_data = response.json()
                 if response_data.get('status_code') == 200:
-                    img_url = response_data['data']['image']['url']
-                    raw_url = img_url
+                    img_url = response['data'].get('medium', response['data']['image'])['url']
+                    raw_url = response['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
             if img_url and raw_url and web_url:
