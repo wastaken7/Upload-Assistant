@@ -1310,25 +1310,27 @@ class Prep():
             num_screens = self.screens
         if num_screens == 0 or (len(meta.get('image_list', [])) >= num_screens and disc_num == 0):
             return
+
+        if len(glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-*.png")) >= num_screens:
+            i = num_screens
+            console.print('[bold green]Reusing screenshots')
+            return
+
         ifo_mi = MediaInfo.parse(f"{meta['discs'][disc_num]['path']}/VTS_{meta['discs'][disc_num]['main_set'][0][:2]}_0.IFO", mediainfo_options={'inform_version': '1'})
         sar = 1
         for track in ifo_mi.tracks:
             if track.track_type == "Video":
                 if isinstance(track.duration, str):
-                    # If the duration is a string, split and find the longest duration
                     durations = [float(d) for d in track.duration.split(' / ')]
-                    length = max(durations) / 1000  # Use the longest duration
+                    length = max(durations) / 1000
                 else:
-                    # If the duration is already an int or float, use it directly
                     length = float(track.duration) / 1000  # noqa #F841 # Convert to seconds
 
-                # Proceed as usual for other fields
                 par = float(track.pixel_aspect_ratio)
                 dar = float(track.display_aspect_ratio)
                 width = float(track.width)
                 height = float(track.height)
         if par < 1:
-            # multiply that dar by the height and then do a simple width / height
             new_height = dar * height
             sar = width / new_height
             w_sar = 1
@@ -1338,167 +1340,109 @@ class Prep():
             w_sar = sar
             h_sar = 1
 
-        main_set_length = len(meta['discs'][disc_num]['main_set'])
-        if main_set_length >= 3:
-            main_set = meta['discs'][disc_num]['main_set'][1:-1]
-        elif main_set_length == 2:
-            main_set = meta['discs'][disc_num]['main_set'][1:]
-        elif main_set_length == 1:
-            main_set = meta['discs'][disc_num]['main_set']
-        n = 0
-        os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
-        i = 0
-        if len(glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-*.png")) >= num_screens:
-            i = num_screens
-            console.print('[bold green]Reusing screenshots')
-        else:
-            if (meta.get('ffdebug', False)):
-                loglevel = 'verbose'
-            else:
-                loglevel = 'quiet'
-            looped = 0
-            retake = False
-            with Progress(
-                TextColumn("[bold green]Saving Screens..."),
-                BarColumn(),
-                "[cyan]{task.completed}/{task.total}",
-                TimeRemainingColumn()
-            ) as progress:
-                screen_task = progress.add_task("[green]Saving Screens...", total=num_screens + 1)
-                ss_times = []
-                for i in range(num_screens + 1):
-                    if n >= len(main_set):
-                        n = 0
-                    if n >= num_screens:
-                        n -= num_screens
-                    image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
-                    if not os.path.exists(image) or retake:
-                        retake = False
+        def _is_vob_good(n, loops, num_screens):
+            max_loops = 6
+            fallback_duration = 300
+            voblength = fallback_duration
 
-                        def _is_vob_good(n, loops, num_screens):
-                            max_loops = 6
-                            fallback_duration = 300
-                            voblength = fallback_duration
+            while loops < max_loops:
+                try:
+                    vob_mi = MediaInfo.parse(
+                        f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}",
+                        output='JSON'
+                    )
+                    vob_mi = json.loads(vob_mi)
+                    if meta['debug']:
+                        console.print("[yellow]Analyzing VOB file:[/yellow]", main_set[n])
 
-                            while loops < max_loops:
-                                try:
-                                    vob_mi = MediaInfo.parse(
-                                        f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}",
-                                        output='JSON'
-                                    )
-                                    vob_mi = json.loads(vob_mi)
-                                    if meta['debug']:
-                                        console.print("[yellow]Analyzing VOB file:[/yellow]", main_set[n])
+                    for track in vob_mi.get('media', {}).get('track', []):
+                        duration = track.get('Duration')
+                        width = track.get('Width')
+                        height = track.get('Height')
+                        if meta['debug']:
+                            console.print(f"Track {n}: Duration={duration}, Width={width}, Height={height}")
 
-                                    for track in vob_mi.get('media', {}).get('track', []):
-                                        duration = track.get('Duration')
-                                        width = track.get('Width')
-                                        height = track.get('Height')
-                                        if meta['debug']:
-                                            console.print(f"Track {n}: Duration={duration}, Width={width}, Height={height}")
-
-                                        if duration and width and height:
-                                            if float(width) > 0 and float(height) > 0:
-                                                voblength = float(duration)
-                                                if meta['debug']:
-                                                    console.print(f"[green]Valid track found: voblength={voblength}, n={n}[/green]")
-                                                return voblength, n
-
-                                except Exception as e:
-                                    console.print(f"[red]Error parsing VOB {n}: {e}")
-
-                                n = (n + 1) % len(main_set)
-                                if n >= num_screens:
-                                    n -= num_screens
-                                loops += 1
+                        if duration and width and height:
+                            if float(width) > 0 and float(height) > 0:
+                                voblength = float(duration)
                                 if meta['debug']:
-                                    console.print(f"[yellow]Retrying: loops={loops}, current voblength={voblength}[/yellow]")
-                            if meta['debug']:
-                                console.print(f"[red]Fallback triggered: returning fallback_duration={fallback_duration}[/red]")
-                            return fallback_duration, n
+                                    console.print(f"[green]Valid track found: voblength={voblength}, n={n}[/green]")
+                                return voblength, n
 
-                        try:
-                            voblength, n = _is_vob_good(n, 0, num_screens)
-                            ss_times = self.valid_ss_time(ss_times, num_screens + 1, voblength)
+                except Exception as e:
+                    console.print(f"[red]Error parsing VOB {n}: {e}")
 
-                            if ss_times[i] < 0 or ss_times[i] > voblength:
-                                raise ValueError(f"Invalid seek time: {ss_times[i]} for video length {voblength}")
+                n = (n + 1) % len(main_set)
+                if n >= num_screens:
+                    n -= num_screens
+                loops += 1
+                if meta['debug']:
+                    console.print(f"[yellow]Retrying: loops={loops}, current voblength={voblength}[/yellow]")
 
-                            input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}"
-                            if not os.path.exists(input_file):
-                                console.print(f"[red]Missing input file: {input_file}")
-                                retake = True
-                                continue
+            if meta['debug']:
+                console.print(f"[red]Fallback triggered: returning fallback_duration={fallback_duration}[/red]")
+            return fallback_duration, n
 
-                            # Run FFmpeg with timeout
-                            try:
-                                ff = ffmpeg.input(input_file, ss=ss_times[i])
-                                if w_sar != 1 or h_sar != 1:
-                                    ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
+        main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
+        os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
 
-                                ff.output(
-                                    image,
-                                    vframes=1,
-                                    pix_fmt="rgb24"
-                                ).overwrite_output().global_args('-loglevel', loglevel).run()
+        voblength, n = _is_vob_good(0, 0, num_screens)
+        ss_times = self.valid_ss_time([], num_screens + 1, voblength)
+        tasks = []
+        for i in range(num_screens + 1):
+            image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
+            input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
+            tasks.append((input_file, image, ss_times[i], meta, width, height, w_sar, h_sar))
 
-                                if not os.path.exists(image):
-                                    if meta['debug']:
-                                        console.print(f"[red]Image not created: {image}, retaking...")
-                                    retake = True
-                                    continue
+        with Pool(processes=min(num_screens + 1, os.cpu_count())) as pool:
+            results = list(tqdm(pool.imap_unordered(self.capture_dvd_screenshot, tasks), total=len(tasks), desc="Capturing Screenshots"))
 
-                            except ffmpeg.Error as e:
-                                console.print(f"[red]FFmpeg error: {e.stderr}")
-                                retake = True
-                                continue
-
-                        except Exception as e:
-                            console.print(f"[red]Error processing video file: {e}")
-                            console.print(traceback.format_exc())
-                            retake = True
-                            continue
-
-                        self.optimize_images(image)
-                        progress.update(screen_task, advance=1)
-                        n += 1
-                        try:
-                            file_size = os.path.getsize(image)
-                            if self.img_host == "imgbb" and file_size <= 31000000:
-                                i += 1
-                            elif self.img_host in ["imgbox", "pixhost"] and file_size <= 10000000:
-                                i += 1
-                            elif file_size <= 75000:
-                                console.print("[yellow]Image too small (likely a single color), retaking...")
-                                retake = True
-                                time.sleep(1)
-                            elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"]:
-                                i += 1
-                            else:
-                                console.print("[red]Image too large for image host, retaking...")
-                                retake = True
-                                time.sleep(1)
-
-                            looped = 0
-
-                        except Exception as e:
-                            console.print(f"[red]Error validating image file: {e}")
-                            looped += 1
-                            if looped >= 15:
-                                console.print('[red]Failed to take screenshots after multiple attempts')
-                                raise RuntimeError("Screenshot process failed")
-
+        if len(glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*")) > num_screens:
             smallest = None
             smallest_size = float('inf')
             for screens in glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*"):
                 screen_path = os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}/", screens)
-                screen_size = os.path.getsize(screen_path)
-                if screen_size < smallest_size:
-                    smallest_size = screen_size
-                    smallest = screen_path
+                try:
+                    screen_size = os.path.getsize(screen_path)
+                    if screen_size < smallest_size:
+                        smallest_size = screen_size
+                        smallest = screen_path
+                except FileNotFoundError:
+                    console.print(f"[red]File not found: {screen_path}[/red]")
+                    continue
 
             if smallest:
+                console.print(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
                 os.remove(smallest)
+
+        optimize_tasks = [(image, self.config) for image in results if image and os.path.exists(image)]
+
+        with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
+            optimize_results = list(  # noqa F841
+                tqdm(
+                    pool.imap_unordered(self.optimize_image_task, optimize_tasks),
+                    total=len(optimize_tasks),
+                    desc="Optimizing Images"
+                )
+            )
+
+        valid_results_count = len([r for r in results if r])
+        console.print(f"[green]Successfully captured {valid_results_count - 1} screenshots.")
+
+    def capture_dvd_screenshot(self, task):
+        input_file, image, seek_time, meta, width, height, w_sar, h_sar = task
+        if os.path.exists(image):
+            return image
+        try:
+            loglevel = 'verbose' if meta.get('ffdebug', False) else 'quiet'
+            ff = ffmpeg.input(input_file, ss=seek_time)
+            if w_sar != 1 or h_sar != 1:
+                ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
+            ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel).run()
+            return image if os.path.exists(image) else None
+        except Exception as e:
+            console.print(f"[red]Error capturing screenshot for {input_file}: {str(e)}")
+            return None
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
         if meta['debug']:
