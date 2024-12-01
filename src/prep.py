@@ -2816,16 +2816,28 @@ class Prep():
             img_url, raw_url, web_url = None, None, None
 
             if img_host == "imgbox":
-                loop = asyncio.get_event_loop()
-                image_list = loop.run_until_complete(
-                    self.imgbox_upload(os.getcwd(), [image], {}, {})
-                )
-                if image_list and all(
-                    'img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list
-                ):
-                    img_url = image_list[0]['img_url']
-                    raw_url = image_list[0]['raw_url']
-                    web_url = image_list[0]['web_url']
+                try:
+                    # Call the asynchronous imgbox_upload function
+                    loop = asyncio.get_event_loop()
+                    image_list = loop.run_until_complete(
+                        self.imgbox_upload(os.getcwd(), [image], meta, return_dict={})
+                    )
+                    if image_list and all(
+                        'img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list
+                    ):
+                        img_url = image_list[0]['img_url']
+                        raw_url = image_list[0]['raw_url']
+                        web_url = image_list[0]['web_url']
+                    else:
+                        return {
+                            'status': 'failed',
+                            'reason': "Imgbox upload failed. No valid URLs returned."
+                        }
+                except Exception as e:
+                    return {
+                        'status': 'failed',
+                        'reason': f"Error during Imgbox upload: {str(e)}"
+                    }
 
             elif img_host == "ptpimg":
                 payload = {
@@ -2947,34 +2959,44 @@ class Prep():
         initial_img_host = self.config['DEFAULT'][f'img_host_{img_host_num}']
         img_host = meta['imghost']
         using_custom_img_list = bool(custom_img_list)
-        meta['image_list'] = list({image['img_url']: image for image in meta['image_list']}.values())
-        existing_urls = {image['img_url'] for image in meta['image_list']}
 
         if 'image_sizes' not in meta:
             meta['image_sizes'] = {}
 
-        if custom_img_list:
-            image_glob = list(set(custom_img_list))
-        else:
-            image_glob = glob.glob("*.png")
-            if 'POSTER.png' in image_glob:
-                image_glob.remove('POSTER.png')
-            image_glob = list(set(image_glob))
+        image_glob = list(set(custom_img_list)) if using_custom_img_list else glob.glob("*.png")
+        if 'POSTER.png' in image_glob:
+            image_glob.remove('POSTER.png')
+        image_glob = list(set(image_glob))
 
         if len(meta['image_list']) >= total_screens and not retry_mode and img_host == initial_img_host:
             console.print(f"[yellow]Skipping upload because images are already uploaded to {img_host}. Existing images: {len(meta['image_list'])}, Required: {total_screens}")
             return meta['image_list'], total_screens
 
+        # Define host-specific limits
+        host_limits = {
+            "imgbox": 6,
+            # Other hosts can use the default pool size
+        }
+
+        default_pool_size = os.cpu_count()
+        pool_size = host_limits.get(img_host, default_pool_size)
+
         upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[-screens:]]
 
-        with Pool(processes=min(len(upload_tasks), os.cpu_count())) as pool:
-            results = list(
-                tqdm(
-                    pool.imap_unordered(self.upload_image_task, upload_tasks),
-                    total=len(upload_tasks),
-                    desc="Uploading Images"
+        try:
+            with Pool(processes=min(len(upload_tasks), pool_size)) as pool:
+                results = list(
+                    tqdm(
+                        pool.imap_unordered(self.upload_image_task, upload_tasks),
+                        total=len(upload_tasks),
+                        desc=f"Uploading Images to {img_host}"
+                    )
                 )
-            )
+        except KeyboardInterrupt:
+            console.print("[red]Upload process interrupted by user. Exiting...")
+            pool.terminate()
+            pool.join()
+            return meta['image_list'], len(meta['image_list'])
 
         successfully_uploaded = []
         for result in results:
@@ -2983,27 +3005,32 @@ class Prep():
             else:
                 console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
 
+        new_images = []
         for upload in successfully_uploaded:
-            img_url = upload['img_url']
-            if img_url not in existing_urls:
+            raw_url = upload['raw_url']
+            new_image = {
+                'img_url': upload['img_url'],
+                'raw_url': raw_url,
+                'web_url': upload['web_url']
+            }
+            new_images.append(new_image)
+            if not using_custom_img_list and raw_url not in {img['raw_url'] for img in meta['image_list']}:
                 if meta['debug']:
-                    console.print(f"[blue]Adding {img_url} to image_list")
-                meta['image_list'].append({
-                    'img_url': img_url,
-                    'raw_url': upload['raw_url'],
-                    'web_url': upload['web_url']
-                })
-                existing_urls.add(img_url)
-                if not using_custom_img_list:
-                    local_file_path = upload.get('local_file_path')
-                    if local_file_path:
-                        image_size = os.path.getsize(local_file_path)
-                        meta['image_sizes'][img_url] = image_size
+                    console.print(f"[blue]Adding {raw_url} to image_list")
+                meta['image_list'].append(new_image)
+                local_file_path = upload.get('local_file_path')
+                if local_file_path:
+                    image_size = os.path.getsize(local_file_path)
+                    meta['image_sizes'][raw_url] = image_size
 
-        console.print(f"[green]Successfully uploaded {len(successfully_uploaded)} images.")
+        console.print(f"[green]Successfully uploaded {len(new_images)} images.")
         if meta['debug']:
             upload_finish_time = time.time()
             print(f"Screenshot uploads processed in {upload_finish_time - upload_start_time:.4f} seconds")
+
+        if using_custom_img_list:
+            return new_images, len(new_images)
+
         return meta['image_list'], len(successfully_uploaded)
 
     async def imgbox_upload(self, chdir, image_glob, meta, return_dict):
@@ -3011,44 +3038,34 @@ class Prep():
             os.chdir(chdir)
             image_list = []
 
-            console.print(f"[debug] Starting upload of {len(image_glob)} images to imgbox...")
             async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
                 for image in image_glob:
                     try:
                         async for submission in gallery.add([image]):
                             if not submission['success']:
-                                console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
-                                return []  # Return empty list in case of failure
+                                console.print(f"[red]Error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
                             else:
-                                # Add the uploaded image info to image_list
-                                image_dict = {
-                                    'web_url': submission['web_url'],
-                                    'img_url': submission['thumbnail_url'],
-                                    'raw_url': submission['image_url']
-                                }
-                                image_list.append(image_dict)
-
-                                console.print(f"[green]Successfully uploaded image: {image}")
-
+                                web_url = submission.get('web_url')
+                                img_url = submission.get('thumbnail_url')
+                                raw_url = submission.get('image_url')
+                                if web_url and img_url and raw_url:
+                                    image_dict = {
+                                        'web_url': web_url,
+                                        'img_url': img_url,
+                                        'raw_url': raw_url
+                                    }
+                                    image_list.append(image_dict)
+                                else:
+                                    console.print(f"[red]Incomplete URLs received for image: {image}")
                     except Exception as e:
                         console.print(f"[red]Error during upload for {image}: {str(e)}")
-                        return []  # Return empty list in case of error
 
-            # After uploading all images, validate URLs and get sizes
-            valid_images = await self.check_images_concurrently(image_list, meta)
-
-            if valid_images:
-                console.print(f"[yellow]Successfully uploaded and validated {len(valid_images)} images.")
-                return_dict['image_list'] = valid_images  # Set the validated images in return_dict
-            else:
-                console.print("[red]Failed to validate any images.")
-                return []  # Return empty list if no valid images
-
-            return valid_images  # Return the valid image list after validation
+            return_dict['image_list'] = image_list
+            return image_list
 
         except Exception as e:
             console.print(f"[red]An error occurred while uploading images to imgbox: {str(e)}")
-            return []  # Return empty list in case of an unexpected failure
+            return []
 
     async def get_name(self, meta):
         type = meta.get('type', "")
