@@ -1322,7 +1322,7 @@ class Prep():
             if track.track_type == "Video":
                 if isinstance(track.duration, str):
                     durations = [float(d) for d in track.duration.split(' / ')]
-                    length = max(durations) / 1000
+                    length = max(durations) / 1000  # Use the longest duration
                 else:
                     length = float(track.duration) / 1000  # noqa #F841 # Convert to seconds
 
@@ -1385,7 +1385,6 @@ class Prep():
 
         main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
-
         voblength, n = _is_vob_good(0, 0, num_screens)
         ss_times = self.valid_ss_time([], num_screens + 1, voblength)
         tasks = []
@@ -1408,11 +1407,12 @@ class Prep():
                         smallest_size = screen_size
                         smallest = screen_path
                 except FileNotFoundError:
-                    console.print(f"[red]File not found: {screen_path}[/red]")
+                    console.print(f"[red]File not found: {screen_path}[/red]")  # Handle potential edge cases
                     continue
 
             if smallest:
-                console.print(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
+                if meta['debug']:
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
                 os.remove(smallest)
 
         optimize_tasks = [(image, self.config) for image in results if image and os.path.exists(image)]
@@ -1483,7 +1483,7 @@ class Prep():
                 h_sar = 1
             length = round(float(length))
 
-        if (meta.get('ffdebug', False)):
+        if meta.get('ffdebug', False):
             loglevel = 'verbose'
         else:
             loglevel = 'quiet'
@@ -1498,10 +1498,10 @@ class Prep():
                 random_times = self.valid_ss_time(ss_times, num_screens - len(ss_times), length)
                 ss_times.extend(random_times)
         else:
-            ss_times = self.valid_ss_time([], num_screens, length)
+            ss_times = self.valid_ss_time([], num_screens + 1, length)
 
         capture_tasks = []
-        for i in range(num_screens):
+        for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
                 capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
@@ -1512,31 +1512,71 @@ class Prep():
         if not capture_tasks:
             console.print("[yellow]All screenshots already exist. Skipping capture process.")
         else:
+            capture_results = []
             with Pool(processes=len(capture_tasks)) as pool:
-                capture_results = list(
-                    tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=len(capture_tasks), desc="Capturing Screenshots")
-                )
+                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=len(capture_tasks), desc="Capturing Screenshots"):
+                    capture_results.append(result)
 
-            optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
-            with Pool(processes=len(optimize_tasks)) as pool:
-                optimize_results = list(
-                    tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images")
-                )
+        if len(capture_results) > num_screens:
+            smallest = min(capture_results, key=os.path.getsize)
+            if meta['debug']:
+                console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+            os.remove(smallest)
+            capture_results.remove(smallest)
 
-            for image_path in optimize_results:
-                if "Error" not in image_path:
-                    img_dict = {
-                        'img_url': image_path,
-                        'raw_url': image_path,
-                        'web_url': image_path
-                    }
-                    meta['image_list'].append(img_dict)
-                else:
-                    console.print(f"[red]{image_path}")
+        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
+        optimize_results = []
+        with Pool(processes=len(optimize_tasks)) as pool:
+            for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images"):
+                optimize_results.append(result)
+
+        valid_results = []
+        for image_path in optimize_results:
+            if "Error" in image_path:
+                console.print(f"[red]{image_path}")
+                continue
+
+            retake = False
+            image_size = os.path.getsize(image_path)
+            if not manual_frames:
+                if image_size <= 75000:
+                    console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
+                    retake = True
+                    time.sleep(1)
+                elif image_size <= 31000000 and self.img_host == "imgbb" and not retake:
+                    pass
+                elif image_size <= 10000000 and self.img_host in ["imgbox", "pixhost"] and not retake:
+                    pass
+                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and not retake:
+                    pass
+                elif self.img_host == "freeimage.host":
+                    console.print("[bold red]Support for freeimage.host has been removed. Please remove it from your config.")
+                    exit()
+                elif not retake:
+                    console.print("[red]Image too large for your image host, retaking.")
+                    retake = True
+                    time.sleep(1)
+
+            if retake:
+                console.print(f"[yellow]Retaking screenshot for: {image_path}[/yellow]")
+                capture_tasks.append(image_path)
+            else:
+                valid_results.append(image_path)
+
+        for image_path in valid_results:
+            img_dict = {
+                'img_url': image_path,
+                'raw_url': image_path,
+                'web_url': image_path
+            }
+            meta['image_list'].append(img_dict)
+
+        valid_results_count = len(valid_results)
+        console.print(f"[green]Successfully captured {valid_results_count} screenshots.")
 
         if meta['debug']:
             finish_time = time.time()
-            print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
+            console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
     def valid_ss_time(self, ss_times, num_screens, length, manual_frames=None):
         if manual_frames:
