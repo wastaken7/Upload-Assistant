@@ -3012,7 +3012,6 @@ class Prep():
 
         return meta['image_list'], len(successfully_uploaded)
 
-
     async def imgbox_upload(self, chdir, image_glob, meta, return_dict):
         try:
             os.chdir(chdir)
