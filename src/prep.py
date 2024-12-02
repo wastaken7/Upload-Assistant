@@ -2955,18 +2955,25 @@ class Prep():
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         initial_img_host = self.config['DEFAULT'][f'img_host_{img_host_num}']
         img_host = meta['imghost']
-        using_custom_img_list = bool(custom_img_list)
+        using_custom_img_list = custom_img_list is not None
 
         if 'image_sizes' not in meta:
             meta['image_sizes'] = {}
 
         image_glob = list(set(custom_img_list)) if using_custom_img_list else glob.glob("*.png")
+
+        # Exclude 'POSTER.png' from the list
         if 'POSTER.png' in image_glob:
             image_glob.remove('POSTER.png')
+
+        # Ensure uniqueness in the image list
         image_glob = list(set(image_glob))
         existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
         existing_count = len(existing_images)
-        images_needed = max(0, total_screens - existing_count)
+        if not retry_mode:
+            images_needed = max(0, total_screens - existing_count)
+        else:
+            images_needed = total_screens
 
         if existing_count >= total_screens and not retry_mode and img_host == initial_img_host:
             console.print(f"[yellow]Skipping upload because enough images are already uploaded to {img_host}. Existing images: {existing_count}, Required: {total_screens}")

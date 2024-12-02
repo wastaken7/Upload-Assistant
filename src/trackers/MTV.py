@@ -62,8 +62,9 @@ class MTV():
                     img_host_index += 1
                     continue
 
+                new_images_key = f'mtv_images_key_{img_host_index}'
                 if image_list is not None:
-                    image_list = meta['new_images_key']
+                    image_list = meta[new_images_key]
                     break
 
             if image_list is None:
@@ -195,8 +196,7 @@ class MTV():
         folder_id = meta['uuid']
         from src.prep import Prep
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-        if new_images_key not in meta:
-            meta[new_images_key] = []
+        meta[new_images_key] = []
 
         screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
         all_screenshots = []
@@ -236,7 +236,6 @@ class MTV():
             all_screenshots.extend(existing_screens)
 
         if all_screenshots:
-            return_dict = {}
             while True:
                 current_img_host_key = f'img_host_{img_host_index}'
                 current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
@@ -254,18 +253,8 @@ class MTV():
                 else:
                     meta['imghost'] = current_img_host
                     console.print(f"[green]Uploading to approved host '{current_img_host}'.")
-                    break  # Exit loop when a valid host is found
-
-            uploaded_images, _ = prep.upload_screens(
-                meta,
-                screens=multi_screens,
-                img_host_num=img_host_index,
-                i=0,
-                total_screens=multi_screens,
-                custom_img_list=all_screenshots,
-                return_dict=return_dict,
-                retry_mode=retry_mode
-            )
+                    break
+            uploaded_images, _ = prep.upload_screens(meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode)
 
             if uploaded_images:
                 meta[new_images_key] = uploaded_images
