@@ -1672,7 +1672,7 @@ class Prep():
                     if os.path.getsize(image) >= 16000000:
                         oxipng.optimize(image, level=6)
                     else:
-                        oxipng.optimize(image, level=3)
+                        oxipng.optimize(image, level=2)
             return image  # Return image path if successful
         except (KeyboardInterrupt, Exception) as e:
             return f"Error: {e}"  # Return error message
