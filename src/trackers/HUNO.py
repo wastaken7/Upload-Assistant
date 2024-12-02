@@ -196,7 +196,7 @@ class HUNO():
                     name = f"{title} ({year}) {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source == "BluRay":  # BluRay Remux
                 name = f"{title} ({year}) {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD"):  # DVD Remux
+            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
                 name = f"{title} ({year}) {edition} (DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "ENCODE":  # Encode
                 name = f"{title} ({year}) {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
