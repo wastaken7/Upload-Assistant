@@ -2955,27 +2955,32 @@ class Prep():
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         initial_img_host = self.config['DEFAULT'][f'img_host_{img_host_num}']
         img_host = meta['imghost']
-        using_custom_img_list = custom_img_list is not None
+        using_custom_img_list = isinstance(custom_img_list, list) and bool(custom_img_list)
 
         if 'image_sizes' not in meta:
             meta['image_sizes'] = {}
 
-        image_glob = list(set(custom_img_list)) if using_custom_img_list else glob.glob("*.png")
+        if using_custom_img_list:
+            image_glob = custom_img_list
+            existing_images = []
+            existing_count = 0
+        else:
+            image_glob = glob.glob("*.png")
+            if 'POSTER.png' in image_glob:
+                image_glob.remove('POSTER.png')
+            image_glob = list(set(image_glob))
+            if meta['debug']:
+                console.print("image globs:", image_glob)
 
-        # Exclude 'POSTER.png' from the list
-        if 'POSTER.png' in image_glob:
-            image_glob.remove('POSTER.png')
+            existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
+            existing_count = len(existing_images)
 
-        # Ensure uniqueness in the image list
-        image_glob = list(set(image_glob))
-        existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
-        existing_count = len(existing_images)
         if not retry_mode:
             images_needed = max(0, total_screens - existing_count)
         else:
             images_needed = total_screens
 
-        if existing_count >= total_screens and not retry_mode and img_host == initial_img_host:
+        if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
             console.print(f"[yellow]Skipping upload because enough images are already uploaded to {img_host}. Existing images: {existing_count}, Required: {total_screens}")
             return meta['image_list'], total_screens
 
@@ -2990,7 +2995,7 @@ class Prep():
         pool_size = host_limits.get(img_host, default_pool_size)
 
         try:
-            with Pool(processes=min(len(upload_tasks), pool_size)) as pool:
+            with Pool(processes=max(1, min(len(upload_tasks), pool_size))) as pool:
                 results = list(
                     tqdm(
                         pool.imap_unordered(self.upload_image_task, upload_tasks),
