@@ -660,7 +660,7 @@ class Prep():
 
         meta['tmdb'] = meta.get('tmdb_manual', None)
         if meta.get('type', None) is None:
-            meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'])
+            meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = self.get_cat(video)
         else:
@@ -1696,25 +1696,28 @@ class Prep():
     Get type and category
     """
 
-    def get_type(self, video, scene, is_disc):
-        filename = os.path.basename(video).lower()
-        if "remux" in filename:
-            type = "REMUX"
-        elif any(word in filename for word in [" web ", ".web.", "web-dl"]):
-            type = "WEBDL"
-        elif "webrip" in filename:
-            type = "WEBRIP"
-        # elif scene == True:
-            # type = "ENCODE"
-        elif "hdtv" in filename:
-            type = "HDTV"
-        elif is_disc is not None:
-            type = "DISC"
-        elif "dvdrip" in filename:
-            type = "DVDRIP"
-            # exit()
+    def get_type(self, video, scene, is_disc, meta):
+        if meta.get('manual_type'):
+            type = meta.get('manual_type')
         else:
-            type = "ENCODE"
+            filename = os.path.basename(video).lower()
+            if "remux" in filename:
+                type = "REMUX"
+            elif any(word in filename for word in [" web ", ".web.", "web-dl"]):
+                type = "WEBDL"
+            elif "webrip" in filename:
+                type = "WEBRIP"
+            # elif scene == True:
+                # type = "ENCODE"
+            elif "hdtv" in filename:
+                type = "HDTV"
+            elif is_disc is not None:
+                type = "DISC"
+            elif "dvdrip" in filename:
+                type = "DVDRIP"
+                # exit()
+            else:
+                type = "ENCODE"
         return type
 
     def get_cat(self, video):
@@ -3094,7 +3097,7 @@ class Prep():
             return []
 
     async def get_name(self, meta):
-        type = meta.get('type', "")
+        type = meta.get('type', "").upper()
         title = meta.get('title', "")
         alt_title = meta.get('aka', "")
         year = meta.get('year', "")
