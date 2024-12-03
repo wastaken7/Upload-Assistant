@@ -62,7 +62,7 @@ class MTV():
                     img_host_index += 1
                     continue
 
-                new_images_key = f'mtv_images_key_{img_host_index}'
+                new_images_key = 'mtv_images_key'
                 if image_list is not None:
                     image_list = meta[new_images_key]
                     break
@@ -117,7 +117,7 @@ class MTV():
         source_id = await self.get_source_id(meta)
         origin_id = await self.get_origin_id(meta)
         des_tags = await self.get_tags(meta)
-        await self.edit_desc(meta, images_reuploaded, image_list)
+        await self.edit_desc(meta)
         group_desc = await self.edit_group_desc(meta)
         mtv_name = await self.edit_name(meta)
 
@@ -183,7 +183,7 @@ class MTV():
 
         retry_mode = False
         images_reuploaded = False
-        new_images_key = f'mtv_images_key_{img_host_index}'
+        new_images_key = 'mtv_images_key'
         discs = meta.get('discs', [])  # noqa F841
         filelist = meta.get('video', [])
         filename = meta['filename']
@@ -267,7 +267,7 @@ class MTV():
 
         return meta[new_images_key], False, images_reuploaded  # Return retry_mode and images_reuploaded
 
-    async def edit_desc(self, meta, images_reuploaded, valid_images):
+    async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as desc:
@@ -283,8 +283,8 @@ class MTV():
             elif mi_dump:
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
 
-            if valid_images:
-                images = valid_images
+            if meta['mtv_images_key']:
+                images = meta['mtv_images_key']
             else:
                 images = meta['image_list']
             if len(images) > 0:
