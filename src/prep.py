@@ -1263,13 +1263,13 @@ class Prep():
                         desc="Capturing Screenshots"
                     )
                 )
-
-            if len(capture_results) > num_screens:
-                smallest = min(capture_results, key=os.path.getsize)
-                if meta['debug']:
-                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
-                os.remove(smallest)
-                capture_results.remove(smallest)
+            if capture_results:
+                if len(capture_results) > num_screens:
+                    smallest = min(capture_results, key=os.path.getsize)
+                    if meta['debug']:
+                        console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+                    os.remove(smallest)
+                    capture_results.remove(smallest)
 
             optimize_tasks = [(result, self.config) for result in capture_results if result and os.path.exists(result)]
             with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
