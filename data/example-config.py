@@ -162,6 +162,7 @@ config = {
             "passkey": "HDB passkey",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             # "anon": False,
+            "img_rehost": True,
         },
         "HDT": {
             "username": "username",
