@@ -1703,7 +1703,7 @@ class Prep():
             filename = os.path.basename(video).lower()
             if "remux" in filename:
                 type = "REMUX"
-            elif any(word in filename for word in [" web ", ".web.", "web-dl"]):
+            elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl"]):
                 type = "WEBDL"
             elif "webrip" in filename:
                 type = "WEBRIP"
