@@ -1164,6 +1164,7 @@ class Prep():
                             with open(nfo_file_path, 'wb') as f:
                                 f.write(nfo_response.content)
                                 meta['nfo'] = True
+                                meta['auto_nfo'] = True
                             console.print(f"[green]NFO downloaded to {nfo_file_path}")
                         else:
                             console.print("[yellow]NFO file not available for download.")
@@ -3562,25 +3563,34 @@ class Prep():
             uuid = meta['uuid']
             current_dir_path = "*.nfo"
             specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
-
+            if meta['debug']:
+                console.print(f"specified_dir_path: {specified_dir_path}")
             if meta.get('nfo') and not content_written:
-                nfo_files = glob.glob(current_dir_path)
-                if not nfo_files:
+                if meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
+                else:
+                    nfo_files = glob.glob(current_dir_path)
+                if meta['debug']:
+                    console.print(f"Glob current_dir_path matches: {glob.glob(current_dir_path)}")
+                    console.print(f"Glob specified_dir_path matches: {glob.glob(specified_dir_path)}")
+                if not nfo_files:
+                    console.print("NFO was set but no nfo file was found")
+                    description.write("\n")
+                    return meta
 
                 if nfo_files:
-                    console.print("We found nfo")
                     nfo = nfo_files[0]
                     try:
                         with open(nfo, 'r', encoding="utf-8") as nfo_file:
                             nfo_content = nfo_file.read()
-                        console.print("NFO content read with utf-8 encoding.")
+                        if meta['debug']:
+                            console.print("NFO content read with utf-8 encoding.")
                     except UnicodeDecodeError:
-                        console.print("utf-8 decoding failed, trying latin1.")
+                        if meta['debug']:
+                            console.print("utf-8 decoding failed, trying latin1.")
                         with open(nfo, 'r', encoding="latin1") as nfo_file:
                             nfo_content = nfo_file.read()
-                        console.print("NFO content read with latin1 encoding.")
 
                     if scene_nfo is True:
                         description.write(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
