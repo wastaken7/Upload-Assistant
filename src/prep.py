@@ -420,6 +420,9 @@ class Prep():
 
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
+        task_limit = self.config['DEFAULT'].get('task_limit', "0")
+        if int(task_limit) > 0:
+            meta['task_limit'] = task_limit
         meta['mode'] = mode
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         meta['isdir'] = os.path.isdir(meta['path'])
@@ -1234,6 +1237,8 @@ class Prep():
 
         console.print("[bold yellow]Saving Screens...")
         capture_results = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
+
         if use_vs:
             from src.vs import vs_screengn
             vs_screengn(source=file, encode=None, filter_b_frames=False, num=num_screens, dir=f"{base_dir}/tmp/{folder_id}/")
@@ -1255,7 +1260,7 @@ class Prep():
                 for i in range(num_screens + 1)
             ]
 
-            with Pool(processes=min(len(capture_tasks), os.cpu_count())) as pool:
+            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                 capture_results = list(
                     tqdm(
                         pool.imap_unordered(self.capture_disc_task, capture_tasks),
@@ -1272,7 +1277,7 @@ class Prep():
                     capture_results.remove(smallest)
 
             optimize_tasks = [(result, self.config) for result in capture_results if result and os.path.exists(result)]
-            with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
+            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
                 optimized_results = list(
                     tqdm(
                         pool.imap_unordered(self.optimize_image_task, optimize_tasks),
@@ -1424,12 +1429,13 @@ class Prep():
         voblength, n = _is_vob_good(0, 0, num_screens)
         ss_times = self.valid_ss_time([], num_screens + 1, voblength)
         tasks = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
         for i in range(num_screens + 1):
             image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
             input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
             tasks.append((input_file, image, ss_times[i], meta, width, height, w_sar, h_sar))
 
-        with Pool(processes=min(num_screens + 1, os.cpu_count())) as pool:
+        with Pool(processes=min(num_screens + 1, task_limit)) as pool:
             results = list(tqdm(pool.imap_unordered(self.capture_dvd_screenshot, tasks), total=len(tasks), desc="Capturing Screenshots"))
 
         if len(glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*")) > num_screens:
@@ -1453,7 +1459,7 @@ class Prep():
 
         optimize_tasks = [(image, self.config) for image in results if image and os.path.exists(image)]
 
-        with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
+        with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
             optimize_results = list(  # noqa F841
                 tqdm(
                     pool.imap_unordered(self.optimize_image_task, optimize_tasks),
@@ -1538,37 +1544,40 @@ class Prep():
 
         capture_tasks = []
         capture_results = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
 
+        capture_tasks = []
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
                 capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
-            else:
-                if meta['debug']:
-                    console.print(f"[yellow]Skipping existing screenshot: {image_path}")
+            elif meta['debug']:
+                console.print(f"[yellow]Skipping existing screenshot: {image_path}")
 
         if not capture_tasks:
             console.print("[yellow]All screenshots already exist. Skipping capture process.")
         else:
-            with Pool(processes=len(capture_tasks)) as pool:
+            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                 for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks),
                                    total=len(capture_tasks),
                                    desc="Capturing Screenshots"):
                     capture_results.append(result)
 
-        if capture_results:
-            if len(capture_results) > num_screens:
+            if capture_results and len(capture_results) > num_screens:
                 smallest = min(capture_results, key=os.path.getsize)
-                if meta.get('debug', False):
+                if meta['debug']:
                     console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
                 os.remove(smallest)
                 capture_results.remove(smallest)
 
         optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
         optimize_results = []
-        with Pool(processes=len(optimize_tasks)) as pool:
-            for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images"):
-                optimize_results.append(result)
+        if optimize_tasks:
+            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks),
+                                   total=len(optimize_tasks),
+                                   desc="Optimizing Images"):
+                    optimize_results.append(result)
 
         valid_results = []
         for image_path in optimize_results:
