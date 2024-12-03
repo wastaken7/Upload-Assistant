@@ -22,7 +22,7 @@ class HDB():
         self.source_flag = 'HDBits'
         self.username = config['TRACKERS']['HDB'].get('username', '').strip()
         self.passkey = config['TRACKERS']['HDB'].get('passkey', '').strip()
-        self.rehost_images = config['TRACKERS']['HDB'].get('img_rehost', False)
+        self.rehost_images = config['TRACKERS']['HDB'].get('img_rehost', True)
         self.signature = None
         self.banned_groups = [""]
 
