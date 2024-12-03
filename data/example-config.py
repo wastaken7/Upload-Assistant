@@ -25,6 +25,11 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Number of cutoff screenshots
+        # If there are at least this many screenshots already, perhaps pulled from existing
+        # description, skip creating and uploading any further screenshots.
+        "cutoff_screens": "3",
+
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
         "thumbnail_size": "350",

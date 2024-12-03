@@ -419,6 +419,7 @@ class Prep():
                     console.print(f"[green]Images retained from {tracker_name}.")
 
     async def gather_prep(self, meta, mode):
+        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
         meta['mode'] = mode
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         meta['isdir'] = os.path.isdir(meta['path'])
@@ -1202,8 +1203,8 @@ class Prep():
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3 and not force_screenshots:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff') and not force_screenshots:
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1232,7 +1233,7 @@ class Prep():
             return
 
         console.print("[bold yellow]Saving Screens...")
-
+        capture_results = []
         if use_vs:
             from src.vs import vs_screengn
             vs_screengn(source=file, encode=None, filter_b_frames=False, num=num_screens, dir=f"{base_dir}/tmp/{folder_id}/")
@@ -1337,8 +1338,8 @@ class Prep():
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff'):
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1487,8 +1488,8 @@ class Prep():
 
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3 and not force_screenshots:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff') and not force_screenshots:
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1536,6 +1537,8 @@ class Prep():
             ss_times = self.valid_ss_time([], num_screens + 1, length)
 
         capture_tasks = []
+        capture_results = []
+
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
@@ -1547,17 +1550,19 @@ class Prep():
         if not capture_tasks:
             console.print("[yellow]All screenshots already exist. Skipping capture process.")
         else:
-            capture_results = []
             with Pool(processes=len(capture_tasks)) as pool:
-                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=len(capture_tasks), desc="Capturing Screenshots"):
+                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks),
+                                   total=len(capture_tasks),
+                                   desc="Capturing Screenshots"):
                     capture_results.append(result)
 
-        if len(capture_results) > num_screens:
-            smallest = min(capture_results, key=os.path.getsize)
-            if meta['debug']:
-                console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
-            os.remove(smallest)
-            capture_results.remove(smallest)
+        if capture_results:
+            if len(capture_results) > num_screens:
+                smallest = min(capture_results, key=os.path.getsize)
+                if meta.get('debug', False):
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+                os.remove(smallest)
+                capture_results.remove(smallest)
 
         optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
         optimize_results = []

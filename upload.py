@@ -254,8 +254,8 @@ async def process_meta(meta, base_dir):
     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
         json.dump(meta, f, indent=4)
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
-
-    if len(meta.get('image_list', [])) < 3 and meta.get('skip_imghost_upload', False) is False:
+    meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 3))
+    if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
         if 'image_list' not in meta:
             meta['image_list'] = []
         return_dict = {}
