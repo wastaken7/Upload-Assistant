@@ -291,27 +291,23 @@ class Prep():
                 found_match = False
 
         elif tracker_name == "PTP":
-            imdb_id = None  # Ensure imdb_id is defined
-            # Check if the PTP ID is already in meta
+            imdb_id = None
             if meta.get('ptp') is None:
-                # No PTP ID in meta, search by search term
                 imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
                 if ptp_torrent_id:
-                    meta['ptp'] = ptp_torrent_id
                     meta['imdb'] = str(imdb_id).zfill(7) if imdb_id else None
-
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb']}[/green]")
+
                     if not meta['unattended']:
                         if await self.prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
                             found_match = True
-
-                            # Retrieve PTP description and image list
+                            meta['ptp'] = ptp_torrent_id
                             ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                             meta['description'] = ptp_desc
                             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                                 description.write((ptp_desc or "") + "\n")
 
-                            if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                            if not meta.get('image_list'):
                                 valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
                                 if valid_images:
                                     meta['image_list'] = valid_images
@@ -319,6 +315,7 @@ class Prep():
 
                         else:
                             found_match = False
+                            meta['imdb'] = None
 
                     else:
                         found_match = True
@@ -328,7 +325,7 @@ class Prep():
                             description.write((ptp_desc or "") + "\n")
                         meta['saved_description'] = True
 
-                        if not meta.get('image_list'):  # Only handle images if image_list is not already populated
+                        if not meta.get('image_list'):
                             valid_images = await self.check_images_concurrently(ptp_imagelist, meta)
                             if valid_images:
                                 meta['image_list'] = valid_images
