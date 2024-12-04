@@ -659,8 +659,7 @@ class Prep():
                     s.terminate()
 
         meta['tmdb'] = meta.get('tmdb_manual', None)
-        if meta.get('type', None) is None:
-            meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
+        meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = self.get_cat(video)
         else:
@@ -3224,6 +3223,7 @@ class Prep():
             console.print(f"--category [yellow]{meta['category']}")
             console.print(f"--type [yellow]{meta['type']}")
             console.print(f"--source [yellow]{meta['source']}")
+            console.print("[bold green]If you specified type, try also specifying source")
 
             exit()
         name_notag = name
