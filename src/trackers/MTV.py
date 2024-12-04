@@ -283,7 +283,7 @@ class MTV():
             elif mi_dump:
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
 
-            if meta['mtv_images_key']:
+            if 'mtv_images_key' in meta:
                 images = meta['mtv_images_key']
             else:
                 images = meta['image_list']
