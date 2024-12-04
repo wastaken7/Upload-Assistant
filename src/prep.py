@@ -3033,6 +3033,10 @@ class Prep():
             else:
                 console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
 
+        if len(successfully_uploaded) < 3 and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+            console.print("[red]Less than 3 images were successfully uploaded. Aborting upload process.")
+            return
+
         new_images = []
         for upload in successfully_uploaded:
             raw_url = upload['raw_url']
