@@ -2823,7 +2823,7 @@ class Prep():
     def upload_image_task(self, args):
         image, img_host, config, meta = args
         try:
-            timeout = 40  # Default timeout
+            timeout = 10  # Default timeout
             img_url, raw_url, web_url = None, None, None
 
             if img_host == "imgbox":
@@ -2870,97 +2870,45 @@ class Prep():
 
             elif img_host == "imgbb":
                 url = "https://api.imgbb.com/1/upload"
-                try:
-                    data = {
-                        'key': config['DEFAULT']['imgbb_api'],
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                    }
-                    response = requests.post(url, data=data, timeout=timeout)
-                    if meta['debug']:
-                        console.print(f"[yellow]Response status code: {response.status_code}")
-                        console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
-                    response_data = response.json()
-                    if response_data.get('status_code') != 200:
-                        console.print("[yellow]imgbb failed, trying next image host")
-                        return {'status': 'failed', 'reason': 'imgbb upload failed'}
-
-                    img_url = response_data['data']['image']['url']
-                    raw_url = response_data['data']['image']['url']
-                    web_url = response_data['data']['url_viewer']
-                    if meta['debug']:
-                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
-
-                except requests.exceptions.Timeout:
-                    console.print("[red]Request timed out. The server took too long to respond.")
-                    return {'status': 'failed', 'reason': 'Request timed out'}
-                except requests.exceptions.RequestException as e:
-                    console.print(f"[red]Request failed with error: {e}")
-                    return {'status': 'failed', 'reason': str(e)}
+                data = {
+                    'key': config['DEFAULT']['imgbb_api'],
+                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                }
+                response = requests.post(url, data=data, timeout=timeout)
+                response_data = response.json()
+                img_url = response['data'].get('medium', response['data']['image'])['url']
+                raw_url = response_data['data']['image']['url']
+                web_url = response_data['data']['url_viewer']
 
             elif img_host == "ptscreens":
                 url = "https://ptscreens.com/api/1/upload"
-                try:
-                    data = {
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                    }
-                    headers = {
-                        'X-API-Key': config['DEFAULT']['ptscreens_api']
-                    }
-                    response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                    if meta['debug']:
-                        console.print(f"[yellow]Response status code: {response.status_code}")
-                        console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
-                    response_data = response.json()
-                    if response_data.get('status_code') != 200:
-                        console.print("[yellow]ptscreens failed, trying next image host")
-                        return {'status': 'failed', 'reason': 'ptscreens upload failed'}
-
-                    img_url = response_data['data']['image']['url']
-                    raw_url = response_data['data']['image']['url']
-                    web_url = response_data['data']['url_viewer']
-                    if meta['debug']:
-                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
-
-                except requests.exceptions.Timeout:
-                    console.print("[red]Request timed out. The server took too long to respond.")
-                    return {'status': 'failed', 'reason': 'Request timed out'}
-                except requests.exceptions.RequestException as e:
-                    console.print(f"[red]Request failed with error: {e}")
-                    return {'status': 'failed', 'reason': str(e)}
+                data = {
+                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                }
+                headers = {
+                    'X-API-Key': config['DEFAULT']['ptscreens_api']
+                }
+                response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                response_data = response.json()
+                if response_data.get('status_code') == 200:
+                    img_url = response['data'].get('medium', response['data']['image'])['url']
+                    raw_url = response['data']['image']['url']
+                    web_url = response['data']['url_viewer']
 
             elif img_host == "oeimg":
                 url = "https://imgoe.download/api/1/upload"
-                try:
-                    data = {
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
-                    }
-                    headers = {
-                        'X-API-Key': self.config['DEFAULT']['oeimg_api'],
-                    }
-                    response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                    if meta['debug']:
-                        console.print(f"[yellow]Response status code: {response.status_code}")
-                        console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
-                    response_data = response.json()
-                    if response_data.get('status_code') != 200:
-                        console.print("[yellow]OEimg failed, trying next image host")
-                        return {'status': 'failed', 'reason': 'OEimg upload failed'}
-
-                    img_url = response_data['data']['image']['url']
-                    raw_url = response_data['data']['image']['url']
+                data = {
+                    'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                }
+                headers = {
+                    'X-API-Key': config['DEFAULT']['oeimg_api']
+                }
+                response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                response_data = response.json()
+                if response_data.get('status_code') == 200:
+                    img_url = response['data']['image']['url']
+                    raw_url = response['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
-                    if meta['debug']:
-                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
-
-                except requests.exceptions.Timeout:
-                    console.print("[red]Request timed out. The server took too long to respond.")
-                    return {'status': 'failed', 'reason': 'Request timed out'}
-                except requests.exceptions.RequestException as e:
-                    console.print(f"[red]Request failed with error: {e}")
-                    return {'status': 'failed', 'reason': str(e)}
 
             elif img_host == "pixhost":
                 url = "https://api.pixhost.to/images"
@@ -3054,9 +3002,6 @@ class Prep():
 
         # Define host-specific limits
         host_limits = {
-            "oeimg": 1,
-            "ptscreens": 1,
-            "lensdump": 1,
             "imgbb": 1,
             # Other hosts can use the default pool size
         }
