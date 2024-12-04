@@ -33,7 +33,7 @@ config = {
         # multi processing task limit
         # When capturing/optimizing images, limit to this many concurrent tasks
         # defaults to 'os.cpu_count()'
-        # "task_limit": "2",
+        "task_limit": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
