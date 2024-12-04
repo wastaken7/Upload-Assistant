@@ -2823,7 +2823,7 @@ class Prep():
     def upload_image_task(self, args):
         image, img_host, config, meta = args
         try:
-            timeout = 40  # Default timeout
+            timeout = 60  # Default timeout
             img_url, raw_url, web_url = None, None, None
 
             if img_host == "imgbox":
@@ -2901,13 +2901,13 @@ class Prep():
             elif img_host == "ptscreens":
                 url = "https://ptscreens.com/api/1/upload"
                 try:
-                    data = {
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                    files = {
+                        'source': ('file-upload[0]', open(image, 'rb')),
                     }
                     headers = {
                         'X-API-Key': config['DEFAULT']['ptscreens_api']
                     }
-                    response = requests.post(url, data=data, headers=headers, timeout=timeout)
+                    response = requests.post(url, headers=headers, files=files, timeout=timeout)
                     if meta['debug']:
                         console.print(f"[yellow]Response status code: {response.status_code}")
                         console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
@@ -2917,9 +2917,9 @@ class Prep():
                         console.print("[yellow]ptscreens failed, trying next image host")
                         return {'status': 'failed', 'reason': 'ptscreens upload failed'}
 
-                    img_url = response_data['data']['image']['url']
-                    raw_url = response_data['data']['image']['url']
-                    web_url = response_data['data']['url_viewer']
+                    img_url = response_data['image']['thumb']['url']
+                    raw_url = response_data['image']['url']
+                    web_url = response_data['image']['url_viewer']
                     if meta['debug']:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
