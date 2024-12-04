@@ -3005,7 +3005,7 @@ class Prep():
 
         # Define host-specific limits
         host_limits = {
-            "imgbox": 6,
+            "imgbb": 1,
             # Other hosts can use the default pool size
         }
         default_pool_size = os.cpu_count()
