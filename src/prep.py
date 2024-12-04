@@ -419,6 +419,10 @@ class Prep():
                     console.print(f"[green]Images retained from {tracker_name}.")
 
     async def gather_prep(self, meta, mode):
+        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
+        task_limit = self.config['DEFAULT'].get('task_limit', "0")
+        if int(task_limit) > 0:
+            meta['task_limit'] = task_limit
         meta['mode'] = mode
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         meta['isdir'] = os.path.isdir(meta['path'])
@@ -655,8 +659,7 @@ class Prep():
                     s.terminate()
 
         meta['tmdb'] = meta.get('tmdb_manual', None)
-        if meta.get('type', None) is None:
-            meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'])
+        meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = self.get_cat(video)
         else:
@@ -1164,6 +1167,7 @@ class Prep():
                             with open(nfo_file_path, 'wb') as f:
                                 f.write(nfo_response.content)
                                 meta['nfo'] = True
+                                meta['auto_nfo'] = True
                             console.print(f"[green]NFO downloaded to {nfo_file_path}")
                         else:
                             console.print("[yellow]NFO file not available for download.")
@@ -1201,8 +1205,8 @@ class Prep():
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3 and not force_screenshots:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff') and not force_screenshots:
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1231,6 +1235,8 @@ class Prep():
             return
 
         console.print("[bold yellow]Saving Screens...")
+        capture_results = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
 
         if use_vs:
             from src.vs import vs_screengn
@@ -1253,7 +1259,7 @@ class Prep():
                 for i in range(num_screens + 1)
             ]
 
-            with Pool(processes=min(len(capture_tasks), os.cpu_count())) as pool:
+            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                 capture_results = list(
                     tqdm(
                         pool.imap_unordered(self.capture_disc_task, capture_tasks),
@@ -1261,16 +1267,16 @@ class Prep():
                         desc="Capturing Screenshots"
                     )
                 )
-
-            if len(capture_results) > num_screens:
-                smallest = min(capture_results, key=os.path.getsize)
-                if meta['debug']:
-                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
-                os.remove(smallest)
-                capture_results.remove(smallest)
+            if capture_results:
+                if len(capture_results) > num_screens:
+                    smallest = min(capture_results, key=os.path.getsize)
+                    if meta['debug']:
+                        console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+                    os.remove(smallest)
+                    capture_results.remove(smallest)
 
             optimize_tasks = [(result, self.config) for result in capture_results if result and os.path.exists(result)]
-            with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
+            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
                 optimized_results = list(
                     tqdm(
                         pool.imap_unordered(self.optimize_image_task, optimize_tasks),
@@ -1336,8 +1342,8 @@ class Prep():
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff'):
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1422,12 +1428,13 @@ class Prep():
         voblength, n = _is_vob_good(0, 0, num_screens)
         ss_times = self.valid_ss_time([], num_screens + 1, voblength)
         tasks = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
         for i in range(num_screens + 1):
             image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
             input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
             tasks.append((input_file, image, ss_times[i], meta, width, height, w_sar, h_sar))
 
-        with Pool(processes=min(num_screens + 1, os.cpu_count())) as pool:
+        with Pool(processes=min(num_screens + 1, task_limit)) as pool:
             results = list(tqdm(pool.imap_unordered(self.capture_dvd_screenshot, tasks), total=len(tasks), desc="Capturing Screenshots"))
 
         if len(glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*")) > num_screens:
@@ -1451,7 +1458,7 @@ class Prep():
 
         optimize_tasks = [(image, self.config) for image in results if image and os.path.exists(image)]
 
-        with Pool(processes=min(len(optimize_tasks), os.cpu_count())) as pool:
+        with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
             optimize_results = list(  # noqa F841
                 tqdm(
                     pool.imap_unordered(self.optimize_image_task, optimize_tasks),
@@ -1486,8 +1493,8 @@ class Prep():
 
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= 3 and not force_screenshots:
-            console.print("[yellow]There are already at least 3 images in the image list. Skipping additional screenshots.")
+        if len(existing_images) >= meta.get('cutoff') and not force_screenshots:
+            console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
         if num_screens is None:
@@ -1535,34 +1542,41 @@ class Prep():
             ss_times = self.valid_ss_time([], num_screens + 1, length)
 
         capture_tasks = []
+        capture_results = []
+        task_limit = int(meta.get('task_limit', os.cpu_count()))
+
+        capture_tasks = []
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
                 capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
-            else:
-                if meta['debug']:
-                    console.print(f"[yellow]Skipping existing screenshot: {image_path}")
+            elif meta['debug']:
+                console.print(f"[yellow]Skipping existing screenshot: {image_path}")
 
         if not capture_tasks:
             console.print("[yellow]All screenshots already exist. Skipping capture process.")
         else:
-            capture_results = []
-            with Pool(processes=len(capture_tasks)) as pool:
-                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks), total=len(capture_tasks), desc="Capturing Screenshots"):
+            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks),
+                                   total=len(capture_tasks),
+                                   desc="Capturing Screenshots"):
                     capture_results.append(result)
 
-        if len(capture_results) > num_screens:
-            smallest = min(capture_results, key=os.path.getsize)
-            if meta['debug']:
-                console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
-            os.remove(smallest)
-            capture_results.remove(smallest)
+            if capture_results and len(capture_results) > num_screens:
+                smallest = min(capture_results, key=os.path.getsize)
+                if meta['debug']:
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+                os.remove(smallest)
+                capture_results.remove(smallest)
 
         optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
         optimize_results = []
-        with Pool(processes=len(optimize_tasks)) as pool:
-            for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks), total=len(optimize_tasks), desc="Optimizing Images"):
-                optimize_results.append(result)
+        if optimize_tasks:
+            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks),
+                                   total=len(optimize_tasks),
+                                   desc="Optimizing Images"):
+                    optimize_results.append(result)
 
         valid_results = []
         for image_path in optimize_results:
@@ -1681,25 +1695,28 @@ class Prep():
     Get type and category
     """
 
-    def get_type(self, video, scene, is_disc):
-        filename = os.path.basename(video).lower()
-        if "remux" in filename:
-            type = "REMUX"
-        elif any(word in filename for word in [" web ", ".web.", "web-dl"]):
-            type = "WEBDL"
-        elif "webrip" in filename:
-            type = "WEBRIP"
-        # elif scene == True:
-            # type = "ENCODE"
-        elif "hdtv" in filename:
-            type = "HDTV"
-        elif is_disc is not None:
-            type = "DISC"
-        elif "dvdrip" in filename:
-            type = "DVDRIP"
-            # exit()
+    def get_type(self, video, scene, is_disc, meta):
+        if meta.get('manual_type'):
+            type = meta.get('manual_type')
         else:
-            type = "ENCODE"
+            filename = os.path.basename(video).lower()
+            if "remux" in filename:
+                type = "REMUX"
+            elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl"]):
+                type = "WEBDL"
+            elif "webrip" in filename:
+                type = "WEBRIP"
+            # elif scene == True:
+                # type = "ENCODE"
+            elif "hdtv" in filename:
+                type = "HDTV"
+            elif is_disc is not None:
+                type = "DISC"
+            elif "dvdrip" in filename:
+                type = "DVDRIP"
+                # exit()
+            else:
+                type = "ENCODE"
         return type
 
     def get_cat(self, video):
@@ -2988,7 +3005,7 @@ class Prep():
 
         # Define host-specific limits
         host_limits = {
-            "imgbox": 6,
+            "imgbb": 1,
             # Other hosts can use the default pool size
         }
         default_pool_size = os.cpu_count()
@@ -3079,7 +3096,7 @@ class Prep():
             return []
 
     async def get_name(self, meta):
-        type = meta.get('type', "")
+        type = meta.get('type', "").upper()
         title = meta.get('title', "")
         alt_title = meta.get('aka', "")
         year = meta.get('year', "")
@@ -3206,6 +3223,7 @@ class Prep():
             console.print(f"--category [yellow]{meta['category']}")
             console.print(f"--type [yellow]{meta['type']}")
             console.print(f"--source [yellow]{meta['source']}")
+            console.print("[bold green]If you specified type, try also specifying source")
 
             exit()
         name_notag = name
@@ -3562,25 +3580,34 @@ class Prep():
             uuid = meta['uuid']
             current_dir_path = "*.nfo"
             specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
-
+            if meta['debug']:
+                console.print(f"specified_dir_path: {specified_dir_path}")
             if meta.get('nfo') and not content_written:
-                nfo_files = glob.glob(current_dir_path)
-                if not nfo_files:
+                if meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
+                else:
+                    nfo_files = glob.glob(current_dir_path)
+                if meta['debug']:
+                    console.print(f"Glob current_dir_path matches: {glob.glob(current_dir_path)}")
+                    console.print(f"Glob specified_dir_path matches: {glob.glob(specified_dir_path)}")
+                if not nfo_files:
+                    console.print("NFO was set but no nfo file was found")
+                    description.write("\n")
+                    return meta
 
                 if nfo_files:
-                    console.print("We found nfo")
                     nfo = nfo_files[0]
                     try:
                         with open(nfo, 'r', encoding="utf-8") as nfo_file:
                             nfo_content = nfo_file.read()
-                        console.print("NFO content read with utf-8 encoding.")
+                        if meta['debug']:
+                            console.print("NFO content read with utf-8 encoding.")
                     except UnicodeDecodeError:
-                        console.print("utf-8 decoding failed, trying latin1.")
+                        if meta['debug']:
+                            console.print("utf-8 decoding failed, trying latin1.")
                         with open(nfo, 'r', encoding="latin1") as nfo_file:
                             nfo_content = nfo_file.read()
-                        console.print("NFO content read with latin1 encoding.")
 
                     if scene_nfo is True:
                         description.write(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")

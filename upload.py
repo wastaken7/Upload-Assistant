@@ -198,7 +198,7 @@ def merge_meta(meta, saved_meta, path):
             'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
             'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'desclink', 'descfile', 'desc', 'draft',
             'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
-            'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio'
+            'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type'
         ]
         sanitized_saved_meta = {}
         for key, value in saved_meta.items():
@@ -254,8 +254,8 @@ async def process_meta(meta, base_dir):
     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
         json.dump(meta, f, indent=4)
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
-
-    if len(meta.get('image_list', [])) < 3 and meta.get('skip_imghost_upload', False) is False:
+    meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 3))
+    if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
         if 'image_list' not in meta:
             meta['image_list'] = []
         return_dict = {}

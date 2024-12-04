@@ -25,6 +25,16 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Number of cutoff screenshots
+        # If there are at least this many screenshots already, perhaps pulled from existing
+        # description, skip creating and uploading any further screenshots.
+        "cutoff_screens": "3",
+
+        # multi processing task limit
+        # When capturing/optimizing images, limit to this many concurrent tasks
+        # defaults to 'os.cpu_count()'
+        "task_limit": "1",
+
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
         "thumbnail_size": "350",
@@ -152,6 +162,7 @@ config = {
             "passkey": "HDB passkey",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             # "anon": False,
+            "img_rehost": True,
         },
         "HDT": {
             "username": "username",
