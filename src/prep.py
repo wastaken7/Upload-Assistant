@@ -2989,8 +2989,8 @@ class Prep():
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
                 response_data = response.json()
                 if response_data.get('status_code') == 200:
-                    img_url = response['data'].get('medium', response['data']['image'])['url']
-                    raw_url = response['data']['image']['url']
+                    img_url = response_data['data']['image']['url']
+                    raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
             if img_url and raw_url and web_url:
