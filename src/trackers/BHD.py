@@ -8,6 +8,8 @@ import os
 import platform
 import hashlib
 import bencodepy
+import glob
+import multiprocessing
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -31,6 +33,36 @@ class BHD():
         pass
 
     async def upload(self, meta, disctype):
+        common = COMMON(config=self.config)
+        await self.upload_with_retry(meta, common)
+
+    async def upload_with_retry(self, meta, common, img_host_index=1):
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
+        images_reuploaded = False
+
+        if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
+            console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
+            image_list = meta['image_list']
+
+        else:
+            images_reuploaded = False
+            while img_host_index <= len(approved_image_hosts):
+                image_list, retry_mode, images_reuploaded = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
+
+                if retry_mode:
+                    console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
+                    img_host_index += 1
+                    continue
+
+                new_images_key = 'bhd_images_key'
+                if image_list is not None:
+                    image_list = meta[new_images_key]
+                    break
+
+            if image_list is None:
+                console.print("[red]All image hosts failed. Please check your configuration.")
+                return
+
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
@@ -121,6 +153,96 @@ class BHD():
             console.print("[cyan]Request Data:")
             console.print(data)
 
+    async def handle_image_upload(self, meta, img_host_index=1, approved_image_hosts=None, file=None):
+        if approved_image_hosts is None:
+            approved_image_hosts = ['ptpimg', 'imgbox']
+
+        retry_mode = False
+        images_reuploaded = False
+        new_images_key = 'bhd_images_key'
+        discs = meta.get('discs', [])  # noqa F841
+        filelist = meta.get('video', [])
+        filename = meta['filename']
+
+        if isinstance(filelist, str):
+            filelist = [filelist]
+
+        multi_screens = int(self.config['DEFAULT'].get('screens', 6))
+        base_dir = meta['base_dir']
+        folder_id = meta['uuid']
+        from src.prep import Prep
+        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+        meta[new_images_key] = []
+
+        screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
+        all_screenshots = []
+
+        for i, file in enumerate(filelist):
+            filename_pattern = f"{filename}*.png"
+            existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+            if len(existing_screens) < multi_screens:
+                if meta.get('debug'):
+                    console.print("[yellow]The image host of exsting images is not supported.")
+                    console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
+
+                if meta['type'] == "BDMV":
+                    s = multiprocessing.Process(
+                        target=prep.disc_screenshots,
+                        args=(f"FILE_{img_host_index}", meta['bdinfo'], folder_id, base_dir,
+                              meta.get('vapoursynth', False), [], meta.get('ffdebug', False), img_host_index)
+                    )
+                elif meta['type'] == "DVD":
+                    s = multiprocessing.Process(
+                        target=prep.dvd_screenshots,
+                        args=(meta, img_host_index, img_host_index)
+                    )
+                else:
+                    s = multiprocessing.Process(
+                        target=prep.screenshots,
+                        args=(file, f"{filename}", meta['uuid'], base_dir,
+                              meta, multi_screens + 1, True, None)
+                    )
+
+                s.start()
+                while s.is_alive():
+                    await asyncio.sleep(1)
+
+                existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+
+            all_screenshots.extend(existing_screens)
+
+        if all_screenshots:
+            while True:
+                current_img_host_key = f'img_host_{img_host_index}'
+                current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+
+                if not current_img_host:
+                    console.print("[red]No more image hosts left to try.")
+                    raise Exception("No valid image host found in the config.")
+
+                if current_img_host not in approved_image_hosts:
+                    console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at BHD, trying next host.")
+                    retry_mode = True
+                    images_reuploaded = True
+                    img_host_index += 1
+                    continue
+                else:
+                    meta['imghost'] = current_img_host
+                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+                    break
+            uploaded_images, _ = prep.upload_screens(meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode)
+
+            if uploaded_images:
+                meta[new_images_key] = uploaded_images
+        if meta['debug']:
+            for image in uploaded_images:
+                console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
+        if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta.get(new_images_key, [])):
+            console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
+            return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
+
+        return meta[new_images_key], False, images_reuploaded  # Return retry_mode and images_reuploaded
+
     async def get_cat_id(self, category_name):
         category_id = {
             'MOVIE': '1',
@@ -203,7 +325,10 @@ class BHD():
                             desc.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n")
                             desc.write("\n")
             desc.write(base.replace("[img]", "[img width=300]"))
-            images = meta['image_list']
+            if 'bhd_images_key' in meta:
+                images = meta['bhd_images_key']
+            else:
+                images = meta['image_list']
             if len(images) > 0:
                 desc.write("[center]")
                 for each in range(len(images[:int(meta['screens'])])):
