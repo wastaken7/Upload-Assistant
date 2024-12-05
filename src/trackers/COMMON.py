@@ -646,25 +646,25 @@ class COMMON():
             },
             {
                 "key": "remux",
-                "uuid_flag": "remux" in meta.get('uuid', '').lower(),
+                "uuid_flag": "remux" in meta.get('name', '').lower(),
                 "condition": lambda each: "remux" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'remux' mismatch: {each}"
             },
             {
                 "key": "uhd",
-                "uuid_flag": "uhd" in meta.get('uuid', '').lower(),
+                "uuid_flag": "uhd" in meta.get('name', '').lower(),
                 "condition": lambda each: "uhd" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'UHD' mismatch: {each}"
             },
             {
                 "key": "webdl",
-                "uuid_flag": "webdl" in meta.get('uuid', '').lower(),
-                "condition": lambda each: "webdl" in each.lower(),
+                "uuid_flag": "web-dl" in meta.get('name', '').lower(),
+                "condition": lambda each: "webdl" in each.lower() or "web-dl" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'WEBDL' mismatch: {each}"
             },
             {
                 "key": "hdtv",
-                "uuid_flag": "hdtv" in meta.get('uuid', '').lower(),
+                "uuid_flag": "hdtv" in meta.get('name', '').lower(),
                 "condition": lambda each: "hdtv" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
