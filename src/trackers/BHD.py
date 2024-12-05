@@ -37,7 +37,7 @@ class BHD():
         await self.upload_with_retry(meta, common)
 
     async def upload_with_retry(self, meta, common, img_host_index=1):
-        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost']
         images_reuploaded = False
 
         if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
