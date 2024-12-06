@@ -637,6 +637,7 @@ class COMMON():
         target_episode = meta.get("episode")
         target_resolution = meta.get("resolution")
         tag = meta.get("tag").lower()
+        is_dvd = meta['is_disc'] == "DVD"
 
         attribute_checks = [
             {
@@ -702,9 +703,10 @@ class COMMON():
                 log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
-            if target_resolution and target_resolution not in each:
-                log_exclusion(f"resolution '{target_resolution}' mismatch", each)
-                return True
+            if not is_dvd:
+                if target_resolution and target_resolution not in each:
+                    log_exclusion(f"resolution '{target_resolution}' mismatch", each)
+                    return True
 
             for check in attribute_checks:
                 if check["key"] == "repack":
@@ -716,9 +718,10 @@ class COMMON():
                     log_exclusion(f"{check['key']} mismatch", each)
                     return True
 
-            if not self.has_matching_hdr(file_hdr, target_hdr, meta):
-                log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
-                return True
+            if not is_dvd:
+                if not self.has_matching_hdr(file_hdr, target_hdr, meta):
+                    log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
+                    return True
 
             season_episode_match = self.is_season_episode_match(normalized, target_season, target_episode)
             if meta['debug']:
