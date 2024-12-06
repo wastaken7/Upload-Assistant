@@ -179,22 +179,26 @@ class BHD():
 
         for i, file in enumerate(filelist):
             filename_pattern = f"{filename}*.png"
-            existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+            dvd_screens = (glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png"))
+            if meta['is_disc'] == "DVD":
+                existing_screens = dvd_screens
+            else:
+                existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
             if len(existing_screens) < multi_screens:
                 if meta.get('debug'):
                     console.print("[yellow]The image host of exsting images is not supported.")
                     console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
 
-                if meta['type'] == "BDMV":
+                if meta['is_disc'] == "BDMV":
                     s = multiprocessing.Process(
                         target=prep.disc_screenshots,
                         args=(f"FILE_{img_host_index}", meta['bdinfo'], folder_id, base_dir,
                               meta.get('vapoursynth', False), [], meta.get('ffdebug', False), img_host_index)
                     )
-                elif meta['type'] == "DVD":
+                elif meta['is_disc'] == "DVD":
                     s = multiprocessing.Process(
                         target=prep.dvd_screenshots,
-                        args=(meta, img_host_index, img_host_index)
+                        args=(meta, 0, None)
                     )
                 else:
                     s = multiprocessing.Process(
