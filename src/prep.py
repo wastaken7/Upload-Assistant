@@ -2890,7 +2890,7 @@ class Prep():
                         console.print("[yellow]imgbb failed, trying next image host")
                         return {'status': 'failed', 'reason': 'imgbb upload failed'}
 
-                    img_url = response_data['data']['image']['url']
+                    img_url = response_data['data']['medium']['url']
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
                     if meta['debug']:
@@ -3068,7 +3068,6 @@ class Prep():
             "oeimg": 1,
             "ptscreens": 1,
             "lensdump": 1,
-            "imgbb": 1,
         }
         default_pool_size = os.cpu_count()
         pool_size = host_limits.get(img_host, default_pool_size)
