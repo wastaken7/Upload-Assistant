@@ -636,12 +636,13 @@ class COMMON():
         target_season = meta.get("season")
         target_episode = meta.get("episode")
         target_resolution = meta.get("resolution")
+        tag = meta.get("tag").lower()
 
         attribute_checks = [
             {
                 "key": "repack",
                 "uuid_flag": has_repack_in_uuid,
-                "condition": lambda each: meta['tag'] in each and has_repack_in_uuid and "repack" not in each.lower(),
+                "condition": lambda each: meta['tag'].lower() in each and has_repack_in_uuid and "repack" not in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result because it lacks 'repack' and matches tag '{meta['tag']}': {each}"
             },
             {
@@ -687,6 +688,12 @@ class COMMON():
                 console.log(f"[debug] Normalized dupe: {normalized}")
                 console.log(f"[debug] File HDR terms: {file_hdr}")
                 console.log(f"[debug] Target HDR terms: {target_hdr}")
+                console.log(f"[debug] TAG: {tag}")
+                console.log("[debug] Evaluating repack condition:")
+                console.log(f"  has_repack_in_uuid: {has_repack_in_uuid}")
+                console.log(f"  'repack' in each.lower(): {'repack' in each.lower()}")
+                console.log(f"[debug] meta['uuid']: {meta.get('uuid', '')}")
+                console.log(f"[debug] meta['tag']: {meta.get('tag', '').lower()}")
 
             if has_is_disc and each.lower().endswith(".m2ts"):
                 return False
@@ -700,13 +707,13 @@ class COMMON():
                 return True
 
             for check in attribute_checks:
-                if check["key"] == "repack" and check["condition"](each):
-                    if meta['debug']:
-                        console.log(f"[yellow]{check['exclude_msg'](each)}")
-                    return True
+                if check["key"] == "repack":
+                    if has_repack_in_uuid and "repack" not in normalized:
+                        if tag and tag in normalized:
+                            log_exclusion("missing 'repack'", each)
+                            return True
                 elif check["uuid_flag"] != check["condition"](each):
-                    if meta['debug']:
-                        console.log(f"[yellow]{check['exclude_msg'](each)}")
+                    log_exclusion(f"{check['key']} mismatch", each)
                     return True
 
             if not self.has_matching_hdr(file_hdr, target_hdr, meta):
@@ -742,7 +749,7 @@ class COMMON():
         Normalize a filename for easier matching.
         Retain season/episode information in the format SxxExx.
         """
-        normalized = filename.lower().replace("-", "").replace(" ", "").replace(".", "")
+        normalized = filename.lower().replace("-", " -").replace(" ", " ").replace(".", " ")
 
         return normalized
 
