@@ -2871,17 +2871,22 @@ class Prep():
             elif img_host == "imgbb":
                 url = "https://api.imgbb.com/1/upload"
                 try:
+                    with open(image, "rb") as img_file:
+                        encoded_image = base64.b64encode(img_file.read()).decode('utf8')
+
                     data = {
                         'key': config['DEFAULT']['imgbb_api'],
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                        'image': encoded_image,
                     }
+
                     response = requests.post(url, data=data, timeout=timeout)
+
                     if meta['debug']:
                         console.print(f"[yellow]Response status code: {response.status_code}")
                         console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
 
                     response_data = response.json()
-                    if response_data.get('status_code') != 200:
+                    if response.status_code != 200 or not response_data.get('success'):
                         console.print("[yellow]imgbb failed, trying next image host")
                         return {'status': 'failed', 'reason': 'imgbb upload failed'}
 
@@ -2891,9 +2896,16 @@ class Prep():
                     if meta['debug']:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
+                    return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+
                 except requests.exceptions.Timeout:
                     console.print("[red]Request timed out. The server took too long to respond.")
                     return {'status': 'failed', 'reason': 'Request timed out'}
+
+                except ValueError as e:  # JSON decoding error
+                    console.print(f"[red]Invalid JSON response: {e}")
+                    return {'status': 'failed', 'reason': 'Invalid JSON response'}
+
                 except requests.exceptions.RequestException as e:
                     console.print(f"[red]Request failed with error: {e}")
                     return {'status': 'failed', 'reason': str(e)}
