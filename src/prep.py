@@ -662,7 +662,7 @@ class Prep():
         else:
             meta['category'] = meta['category'].upper()
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
+            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'], meta)
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
             meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
         elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
@@ -3971,54 +3971,100 @@ class Prep():
             meta['aka'] = meta['aka'].replace(f"({meta['year']})", "").strip()
         return meta
 
-    async def search_tvmaze(self, filename, year, imdbID, tvdbID):
-        tvdbID = int(tvdbID)
+    async def search_tvmaze(self, filename, year, imdbID, tvdbID, meta):
+        if meta['debug']:
+            print(f"Starting search_tvmaze with filename: {filename}, year: {year}, imdbID: {imdbID}, tvdbID: {tvdbID}")
+
+        try:
+            tvdbID = int(tvdbID) if tvdbID is not None else 0
+        except ValueError:
+            print(f"Error: tvdbID is not a valid integer. Received: {tvdbID}")
+            tvdbID = 0
+
         tvmazeID = 0
-        lookup = False
-        show = None
+        results = []
+
         if imdbID is None:
             imdbID = '0'
-        if tvdbID is None:
-            tvdbID = 0
+        print(f"Processed inputs - imdbID: {imdbID}, tvdbID: {tvdbID}")
+
         if int(tvdbID) != 0:
-            params = {
-                "thetvdb": tvdbID
-            }
-            url = "https://api.tvmaze.com/lookup/shows"
-            lookup = True
-        elif int(imdbID) != 0:
-            params = {
-                "imdb": f"tt{imdbID}"
-            }
-            url = "https://api.tvmaze.com/lookup/shows"
-            lookup = True
-        else:
-            params = {
-                "q": filename
-            }
-            url = "https://api.tvmaze.com/search/shows"
-        resp = requests.get(url=url, params=params)
-        if resp.ok:
-            resp = resp.json()
-            if resp is None:
-                return tvmazeID, imdbID, tvdbID
-            if lookup is True:
-                show = resp
+            print(f"Searching TVmaze with TVDB ID: {tvdbID}")
+            tvdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID})
+            if tvdb_resp:
+                results.append(tvdb_resp)
+        if int(imdbID) != 0:
+            print(f"Searching TVmaze with IMDb ID: {imdbID}")
+            imdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"})
+            if imdb_resp:
+                results.append(imdb_resp)
+        print(f"Searching TVmaze with filename: {filename}")
+        search_resp = self._make_tvmaze_request("https://api.tvmaze.com/search/shows", {"q": filename})
+        if search_resp:
+            if isinstance(search_resp, list):
+                results.extend([each['show'] for each in search_resp if 'show' in each])
             else:
-                if year not in (None, ''):
-                    for each in resp:
-                        premier_date = each['show'].get('premiered', '')
-                        if premier_date is not None:
-                            if premier_date.startswith(str(year)):
-                                show = each['show']
-                elif len(resp) >= 1:
-                    show = resp[0]['show']
-            if show is not None:
-                tvmazeID = show.get('id')
-                if int(imdbID) == 0:
-                    if show.get('externals', {}).get('imdb', '0') is not None:
-                        imdbID = str(show.get('externals', {}).get('imdb', '0')).replace('tt', '')
-                if int(tvdbID) == 0:
-                    if show.get('externals', {}).get('tvdb', '0') is not None:
-                        tvdbID = show.get('externals', {}).get('tvdb', '0')
+                results.append(search_resp)
+
+        if year not in (None, ''):
+            print(f"Filtering results by year: {year}")
+            results = [show for show in results if show.get('premiered', '').startswith(str(year))]
+
+        seen = set()
+        unique_results = []
+        for show in results:
+            if show['id'] not in seen:
+                seen.add(show['id'])
+                unique_results.append(show)
+        results = unique_results
+
+        if not results:
+            print("No results found.")
+            return tvmazeID, imdbID, tvdbID
+
+        if meta['manual_date'] is not None:
+            print("Search results:")
+            for idx, show in enumerate(results):
+                console.print(f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])")
+                console.print(f"[yellow]   Premiered: {show.get('premiered', 'Unknown')}[/yellow]")
+                console.print(f"   Externals: {json.dumps(show.get('externals', {}), indent=2)}")
+
+            while True:
+                try:
+                    choice = int(input(f"Enter the number of the correct show (1-{len(results)}) or 0 to skip: "))
+                    if choice == 0:
+                        print("Skipping selection.")
+                        break
+                    if 1 <= choice <= len(results):
+                        selected_show = results[choice - 1]
+                        tvmazeID = selected_show.get('id')
+                        print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+                        break
+                    else:
+                        print(f"Invalid choice. Please choose a number between 1 and {len(results)}, or 0 to skip.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+        else:
+            if results:
+                selected_show = results[0]
+                tvmazeID = selected_show.get('id')
+                if meta['debug']:
+                    print(f"Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+            else:
+                print("No results to select from. Skipping.")
+        if meta['debug']:
+            print(f"Returning results - TVmaze ID: {tvmazeID}, IMDb ID: {imdbID}, TVDB ID: {tvdbID}")
         return tvmazeID, imdbID, tvdbID
+
+    def _make_tvmaze_request(self, url, params):
+        print(f"Requesting TVmaze API: {url} with params: {params}")
+        try:
+            resp = requests.get(url, params=params)
+            if resp.ok:
+                return resp.json()
+            else:
+                print(f"HTTP Request failed with status code: {resp.status_code}, response: {resp.text}")
+                return None
+        except Exception as e:
+            print(f"Error making TVmaze request: {e}")
+            return None
