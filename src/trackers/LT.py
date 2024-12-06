@@ -78,17 +78,28 @@ class LT():
         return resolution_id
 
     async def edit_name(self, meta):
-        lt_name = meta['name'].replace('Dubbed', '').replace('Dual-Audio', '').replace('  ', ' ').strip()
-        # Check if audio Spanish exists, if not append [SUBS] at the end
-        if meta['type'] != 'DISC':  # DISC don't have mediainfo
-            audio_language_list = meta['mediainfo']['media']['track'][0].get('Audio_Language_List', '')
-            if 'Spanish' not in audio_language_list and '[SUBS]' not in lt_name:
-                if not meta['tag']:
-                    lt_name += " [SUBS]"
+        lt_name = meta['name'].replace('Dual-Audio', '').replace('  ', ' ')
+        if meta['type'] != 'DISC':  # DISC don't have mediainfo    
+        #Check if is HYBRID (Copied from BLU.py)
+            if 'hybrid' in meta.get('uuid').lower():
+                if "repack" in meta.get('uuid').lower():
+                    lt_name = lt_name.replace('REPACK', 'Hybrid REPACK')
                 else:
-                    lt_name = lt_name.replace(meta['tag'], f" [SUBS]{meta['tag']}")
-        return lt_name
+                    lt_name = lt_name.replace(meta['resolution'], f"Hybrid {meta['resolution']}")
+        # Check if audio Spanish exists, if not append [SUBS] at the end
+            audios = [
+                audio for audio in meta['mediainfo']['media']['track'][2:]
+                if audio.get('@type') == 'Audio'
+                ]       
+            for audio in audios:
+                if audio.get('Language') in {'es-419', 'es'}:
+                    return lt_name
+                
+            if not meta.get('tag'):
+                return lt_name + " [SUBS]"
 
+            return lt_name.replace(meta['tag'], f" [SUBS]{meta['tag']}")
+                    
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
@@ -103,7 +114,6 @@ class LT():
             anon = 0
         else:
             anon = 1
-
         if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
