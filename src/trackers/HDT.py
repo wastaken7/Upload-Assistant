@@ -171,25 +171,48 @@ class HDT():
             url = "https://hd-torrents.net/upload.php"
             if meta['debug']:
                 console.print(url)
+                console.print("Data to be sent:", style="bold blue")
                 console.print(data)
-            else:
-                with requests.Session() as session:
-                    cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
+                console.print("Files being sent:", style="bold blue")
+                console.print(files)
+            with requests.Session() as session:
+                cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
 
-                    session.cookies.update(await common.parseCookieFile(cookiefile))
-                    up = session.post(url=url, data=data, files=files)
-                    torrentFile.close()
+                if meta['debug']:
+                    console.print(f"Cookie file path: {cookiefile}")
 
-                    # Match url to verify successful upload
-                    search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text).group(1)
-                    if search:
-                        # modding existing torrent for adding to client instead of downloading torrent from site.
-                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['HDT'].get('my_announce_url'), "")
-                    else:
-                        console.print(data)
-                        console.print("\n\n")
-                        console.print(up.text)
-                        raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
+                session.cookies.update(await common.parseCookieFile(cookiefile))
+
+                if meta['debug']:
+                    console.print(f"Session cookies: {session.cookies}")
+
+                up = session.post(url=url, data=data, files=files)
+                torrentFile.close()
+
+                # Debug response
+                if meta['debug']:
+                    console.print(f"Response URL: {up.url}")
+                    console.print(f"Response Status Code: {up.status_code}")
+                    console.print("Response Headers:", style="bold blue")
+                    console.print(up.headers)
+                    console.print("Response Text (truncated):", style="dim")
+                    console.print(up.text[:500] + "...")
+
+                # Match url to verify successful upload
+                search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text)
+                if search:
+                    torrent_id = search.group(1)
+                    if meta['debug']:
+                        console.print(f"Upload Successful: Torrent ID {torrent_id}", style="bold green")
+
+                    # Modding existing torrent for adding to client instead of downloading torrent from site
+                    await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['HDT'].get('my_announce_url'), "")
+                else:
+                    console.print(data)
+                    console.print("Failed to find download link in response text.", style="bold red")
+                    console.print("Response Data (full):", style="dim")
+                    console.print(up.text)
+                    raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
 
     async def search_existing(self, meta, disctype):
