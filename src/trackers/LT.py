@@ -79,31 +79,31 @@ class LT():
 
     async def edit_name(self, meta):
         lt_name = meta['name'].replace('Dual-Audio', '').replace('Dubbed', '').replace('  ', ' ').strip()
-        if meta['type'] != 'DISC':  # DISC don't have mediainfo    
-        #Check if is HYBRID (Copied from BLU.py)
+        if meta['type'] != 'DISC':  # DISC don't have mediainfo
+            # Check if is HYBRID (Copied from BLU.py)
             if 'hybrid' in meta.get('uuid').lower():
                 if "repack" in meta.get('uuid').lower():
                     lt_name = lt_name.replace('REPACK', 'Hybrid REPACK')
                 else:
                     lt_name = lt_name.replace(meta['resolution'], f"Hybrid {meta['resolution']}")
-        # Check if audio Spanish exists
-            #Get all the audios 'es-419' or 'es'
+            # Check if audio Spanish exists
+            # Get all the audios 'es-419' or 'es'
             audios = [
                 audio for audio in meta['mediainfo']['media']['track'][2:]
-                if audio.get('@type') == 'Audio' 
-                and audio.get('Language') in {'es-419', 'es'} 
+                if audio.get('@type') == 'Audio'
+                and audio.get('Language') in {'es-419', 'es'}
                 and "commentary" not in audio.get('Title').lower()
-                ]       
-            if len(audios) > 0: #If there is at least 1 audio spanish 
+                ]
+            if len(audios) > 0:  # If there is at least 1 audio spanish
                 lt_name = lt_name
-        #if not audio Spanish exists, add "[SUBS]"
+            # if not audio Spanish exists, add "[SUBS]"
             elif not meta.get('tag'):
                 lt_name = lt_name + " [SUBS]"
             else:
                 lt_name = lt_name.replace(meta['tag'], f" [SUBS]{meta['tag']}")
-        
+
         return lt_name
-                    
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
