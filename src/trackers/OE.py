@@ -240,11 +240,22 @@ class OE():
             if desc_header != "":
                 descfile.write(desc_header)
 
-            if not meta['is_disc']:
-                def process_languages(tracks):
-                    audio_languages = []
-                    subtitle_languages = []
+            def process_languages(tracks):
+                audio_languages = []
+                subtitle_languages = []
 
+                if meta['is_disc'] == "DVD":
+                    subtitle_lang = cli_ui.ask_string(
+                        'DVD subtitle language cannot be found, you must enter language if subtitles are present:'
+                    )
+                    if subtitle_lang:
+                        subtitle_languages.append(subtitle_lang)
+                    else:
+                        console.print("[yellow]No subtitle language added for DVD.[/yellow]")
+
+                    return audio_languages, subtitle_languages
+
+                if not meta['is_disc']:
                     for track in tracks:
                         if track.get('@type') == 'Audio':
                             language = track.get('Language')
@@ -254,7 +265,8 @@ class OE():
                                     audio_languages.append(audio_lang)
                                 else:
                                     audio_languages.append("")
-                        if track.get('@type') == 'Text':
+
+                        if track.get('@type') == 'Text' and meta['is_disc'] != "DVD":
                             language = track.get('Language')
                             if not language or language is None:
                                 subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
@@ -265,19 +277,22 @@ class OE():
 
                     return audio_languages, subtitle_languages
 
-                media_data = meta.get('mediainfo', {})
-                if media_data:
-                    tracks = media_data.get('media', {}).get('track', [])
-                    if tracks:
-                        audio_languages, subtitle_languages = process_languages(tracks)
-                        if audio_languages:
-                            descfile.write(f"Audio Language: {', '.join(audio_languages)}\n")
+            media_data = meta.get('mediainfo', {})
+            if media_data:
+                tracks = media_data.get('media', {}).get('track', [])
+                if tracks:
+                    audio_languages, subtitle_languages = process_languages(tracks)
 
-                        subtitle_tracks = [track for track in tracks if track.get('@type') == 'Text']
-                        if subtitle_tracks and subtitle_languages:
-                            descfile.write(f"Subtitle Language: {', '.join(subtitle_languages)}\n")
-                else:
-                    console.print("[red]No media information available in meta.[/red]")
+                    if meta['is_disc'] == "DVD" and subtitle_languages:
+                        descfile.write(f"DVD Subtitle Language: {', '.join(subtitle_languages)}\n")
+
+                    if audio_languages:
+                        descfile.write(f"Audio Language: {', '.join(audio_languages)}\n")
+
+                    if meta['is_disc'] != "DVD" and subtitle_languages:
+                        descfile.write(f"Subtitle Language: {', '.join(subtitle_languages)}\n")
+            else:
+                console.print("[red]No media information available in meta.[/red]")
 
             # Existing disc metadata handling
             bbcode = BBCODE()
