@@ -44,9 +44,10 @@ class ULCX():
         }.get(type, '0')
         return type_id
 
-    async def get_res_id(self, resolution):
-        if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
-            return None
+    async def get_res_id(self, resolution, type):
+        if type not in ['DISC']:
+            if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
+                return None
         resolution_id = {
             '8640p': '10',
             '4320p': '1',
@@ -67,7 +68,7 @@ class ULCX():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
-        resolution_id = await self.get_res_id(meta['resolution'])
+        resolution_id = await self.get_res_id(meta['resolution'], meta['type'])
         if resolution_id is None:
             console.print("Resolution is below 720p; skipping.")
             return
@@ -164,7 +165,7 @@ class ULCX():
             'tmdbId': meta['tmdb'],
             'categories[]': await self.get_cat_id(meta['category']),
             'types[]': await self.get_type_id(meta['type']),
-            'resolutions[]': await self.get_res_id(meta['resolution']),
+            'resolutions[]': await self.get_res_id(meta['resolution'], meta['type']),
             'name': ""
         }
         if meta.get('edition', "") != "":
