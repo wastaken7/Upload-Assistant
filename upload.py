@@ -3,7 +3,6 @@
 import requests
 from src.args import Args
 from src.clients import Clients
-from src.prep import Prep
 from src.trackers.COMMON import COMMON
 from src.trackers.HUNO import HUNO
 from src.trackers.BLU import BLU
@@ -79,6 +78,7 @@ except Exception:
     else:
         console.print(traceback.print_exc())
 
+from src.prep import Prep  # noqa E402
 client = Clients(config=config)
 parser = Args(config)
 
