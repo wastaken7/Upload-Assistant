@@ -662,7 +662,7 @@ class Prep():
         else:
             meta['category'] = meta['category'].upper()
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'], meta)
+            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
             meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
         elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
@@ -677,7 +677,7 @@ class Prep():
         else:
             meta = await self.tmdb_other_meta(meta)
         # Search tvmaze
-        meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0))
+        meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
         # If no imdb, search for it
         if meta.get('imdb_id', None) is None:
             meta['imdb_id'] = await self.search_imdb(filename, meta['search_year'])
