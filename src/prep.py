@@ -2871,29 +2871,41 @@ class Prep():
             elif img_host == "imgbb":
                 url = "https://api.imgbb.com/1/upload"
                 try:
+                    with open(image, "rb") as img_file:
+                        encoded_image = base64.b64encode(img_file.read()).decode('utf8')
+
                     data = {
                         'key': config['DEFAULT']['imgbb_api'],
-                        'image': base64.b64encode(open(image, "rb").read()).decode('utf8')
+                        'image': encoded_image,
                     }
+
                     response = requests.post(url, data=data, timeout=timeout)
+
                     if meta['debug']:
                         console.print(f"[yellow]Response status code: {response.status_code}")
                         console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
 
                     response_data = response.json()
-                    if response_data.get('status_code') != 200:
+                    if response.status_code != 200 or not response_data.get('success'):
                         console.print("[yellow]imgbb failed, trying next image host")
                         return {'status': 'failed', 'reason': 'imgbb upload failed'}
 
-                    img_url = response_data['data']['image']['url']
+                    img_url = response_data['data']['medium']['url']
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
                     if meta['debug']:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
+                    return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+
                 except requests.exceptions.Timeout:
                     console.print("[red]Request timed out. The server took too long to respond.")
                     return {'status': 'failed', 'reason': 'Request timed out'}
+
+                except ValueError as e:  # JSON decoding error
+                    console.print(f"[red]Invalid JSON response: {e}")
+                    return {'status': 'failed', 'reason': 'Invalid JSON response'}
+
                 except requests.exceptions.RequestException as e:
                     console.print(f"[red]Request failed with error: {e}")
                     return {'status': 'failed', 'reason': str(e)}
@@ -3052,13 +3064,10 @@ class Prep():
 
         upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[:images_needed]]
 
-        # Define host-specific limits
         host_limits = {
             "oeimg": 1,
             "ptscreens": 1,
             "lensdump": 1,
-            "imgbb": 1,
-            # Other hosts can use the default pool size
         }
         default_pool_size = os.cpu_count()
         pool_size = host_limits.get(img_host, default_pool_size)
@@ -3085,9 +3094,15 @@ class Prep():
             else:
                 console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
 
-        if len(successfully_uploaded) < 3 and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
-            console.print("[red]Less than 3 images were successfully uploaded. Aborting upload process.")
-            return
+        if len(successfully_uploaded) < meta.get('cutoff') and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+            img_host_num += 1
+            if f'img_host_{img_host_num}' in self.config['DEFAULT']:
+                meta['imghost'] = self.config['DEFAULT'][f'img_host_{img_host_num}']
+                console.print(f"[cyan]Switching to the next image host: {meta['imghost']}")
+                return self.upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
+            else:
+                console.print("[red]No more image hosts available. Aborting upload process.")
+                return meta['image_list'], len(meta['image_list'])
 
         new_images = []
         for upload in successfully_uploaded:
