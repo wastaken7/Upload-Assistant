@@ -3052,13 +3052,11 @@ class Prep():
 
         upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[:images_needed]]
 
-        # Define host-specific limits
         host_limits = {
             "oeimg": 1,
             "ptscreens": 1,
             "lensdump": 1,
             "imgbb": 1,
-            # Other hosts can use the default pool size
         }
         default_pool_size = os.cpu_count()
         pool_size = host_limits.get(img_host, default_pool_size)
@@ -3085,9 +3083,15 @@ class Prep():
             else:
                 console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
 
-        if len(successfully_uploaded) < 3 and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
-            console.print("[red]Less than 3 images were successfully uploaded. Aborting upload process.")
-            return
+        if len(successfully_uploaded) < meta.get('cutoff') and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+            img_host_num += 1
+            if f'img_host_{img_host_num}' in self.config['DEFAULT']:
+                meta['imghost'] = self.config['DEFAULT'][f'img_host_{img_host_num}']
+                console.print(f"[cyan]Switching to the next image host: {meta['imghost']}")
+                return self.upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
+            else:
+                console.print("[red]No more image hosts available. Aborting upload process.")
+                return meta['image_list'], len(meta['image_list'])
 
         new_images = []
         for upload in successfully_uploaded:
