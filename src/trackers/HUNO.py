@@ -235,7 +235,7 @@ class HUNO():
         return category_id
 
     async def get_type_id(self, meta):
-        type = meta['type']
+        type = meta.get('type').upper()
         video_encode = meta.get('video_encode')
 
         if type == 'REMUX':
