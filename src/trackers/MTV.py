@@ -187,6 +187,7 @@ class MTV():
         discs = meta.get('discs', [])  # noqa F841
         filelist = meta.get('video', [])
         filename = meta['filename']
+        path = meta['path']
 
         if isinstance(filelist, str):
             filelist = [filelist]
@@ -203,14 +204,15 @@ class MTV():
 
         for i, file in enumerate(filelist):
             filename_pattern = f"{filename}*.png"
-            dvd_screens = (glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png"))
+
             if meta['is_disc'] == "DVD":
-                existing_screens = dvd_screens
+                existing_screens = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png")
             else:
                 existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+
             if len(existing_screens) < multi_screens:
                 if meta.get('debug'):
-                    console.print("[yellow]The image host of exsting images is not supported.")
+                    console.print("[yellow]The image host of existing images is not supported.")
                     console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
 
                 if meta['is_disc'] == "BDMV":
@@ -222,12 +224,12 @@ class MTV():
                 elif meta['is_disc'] == "DVD":
                     s = multiprocessing.Process(
                         target=prep.dvd_screenshots,
-                        args=(meta, 0, None)
+                        args=(meta, 0, None, True)
                     )
                 else:
                     s = multiprocessing.Process(
                         target=prep.screenshots,
-                        args=(file, f"{filename}", meta['uuid'], base_dir,
+                        args=(path, f"{filename}", meta['uuid'], base_dir,
                               meta, multi_screens + 1, True, None)
                     )
 
@@ -235,41 +237,54 @@ class MTV():
                 while s.is_alive():
                     await asyncio.sleep(1)
 
-                existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
+                if meta['is_disc'] == "DVD":
+                    existing_screens = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png")
+                else:
+                    existing_screens = glob.glob(os.path.join(screenshots_dir, filename_pattern))
 
             all_screenshots.extend(existing_screens)
 
-        if all_screenshots:
-            while True:
-                current_img_host_key = f'img_host_{img_host_index}'
-                current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+        if not all_screenshots:
+            console.print("[red]No screenshots were generated or found. Please check the screenshot generation process.")
+            return [], True, images_reuploaded
 
-                if not current_img_host:
-                    console.print("[red]No more image hosts left to try.")
-                    raise Exception("No valid image host found in the config.")
+        uploaded_images = []
+        while True:
+            current_img_host_key = f'img_host_{img_host_index}'
+            current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
 
-                if current_img_host not in approved_image_hosts:
-                    console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at MTV, trying next host.")
-                    retry_mode = True
-                    images_reuploaded = True
-                    img_host_index += 1
-                    continue
-                else:
-                    meta['imghost'] = current_img_host
-                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
-                    break
-            uploaded_images, _ = prep.upload_screens(meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode)
+            if not current_img_host:
+                console.print("[red]No more image hosts left to try.")
+                raise Exception("No valid image host found in the config.")
 
-            if uploaded_images:
-                meta[new_images_key] = uploaded_images
+            if current_img_host not in approved_image_hosts:
+                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at MTV, trying next host.")
+                retry_mode = True
+                images_reuploaded = True
+                img_host_index += 1
+                continue
+            else:
+                meta['imghost'] = current_img_host
+                console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+                break
+
+        uploaded_images, _ = prep.upload_screens(
+            meta, multi_screens, img_host_index, 0, multi_screens,
+            all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
+        )
+
+        if uploaded_images:
+            meta[new_images_key] = uploaded_images
+
         if meta['debug']:
             for image in uploaded_images:
                 console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
+
         if not all(any(x in image['raw_url'] for x in approved_image_hosts) for image in meta.get(new_images_key, [])):
             console.print("[red]Unsupported image host detected, please use one of the approved image hosts")
             return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
-        return meta[new_images_key], False, images_reuploaded  # Return retry_mode and images_reuploaded
+        return meta[new_images_key], False, images_reuploaded
 
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()

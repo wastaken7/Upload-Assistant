@@ -635,7 +635,7 @@ class Prep():
         elif meta['is_disc'] == "DVD":
             if meta.get('edit', False) is False:
                 try:
-                    ds = multiprocessing.Process(target=self.dvd_screenshots, args=(meta, 0, None))
+                    ds = multiprocessing.Process(target=self.dvd_screenshots, args=(meta, 0, None, None))
                     ds.start()
                     while ds.is_alive() is True:
                         await asyncio.sleep(1)
@@ -1334,12 +1334,12 @@ class Prep():
             console.print(f"[red]Error capturing screenshot: {e}[/red]")
             return None
 
-    def dvd_screenshots(self, meta, disc_num, num_screens=None):
+    def dvd_screenshots(self, meta, disc_num, num_screens=None, retry_cap=None):
         if 'image_list' not in meta:
             meta['image_list'] = []
         existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
 
-        if len(existing_images) >= meta.get('cutoff'):
+        if len(existing_images) >= meta.get('cutoff') and not retry_cap:
             console.print("[yellow]There are already at least {} images in the image list. Skipping additional screenshots.".format(meta.get('cutoff')))
             return
 
@@ -1542,7 +1542,6 @@ class Prep():
         capture_results = []
         task_limit = int(meta.get('task_limit', os.cpu_count()))
 
-        capture_tasks = []
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
@@ -1559,7 +1558,7 @@ class Prep():
                                    desc="Capturing Screenshots"):
                     capture_results.append(result)
 
-            if capture_results and len(capture_results) > num_screens:
+            if capture_results and len(capture_results) > num_screens and not force_screenshots:
                 smallest = min(capture_results, key=os.path.getsize)
                 if meta['debug']:
                     console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
@@ -1646,21 +1645,34 @@ class Prep():
     def capture_screenshot(self, args):
         path, ss_time, image_path, width, height, w_sar, h_sar, loglevel = args
         try:
-            ff = ffmpeg.input(path, ss=ss_time)
+            # Validate inputs
+            if width <= 0 or height <= 0:
+                return "Error: Invalid width or height for scaling"
 
+            if ss_time < 0:
+                return f"Error: Invalid timestamp {ss_time}"
+
+            ff = ffmpeg.input(path, ss=ss_time)
             if w_sar != 1 or h_sar != 1:
                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
-            (
+            command = (
                 ff
                 .output(image_path, vframes=1, pix_fmt="rgb24")
                 .overwrite_output()
                 .global_args('-loglevel', loglevel)
-                .run()
             )
+
+            command.run()
+
+            if not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
+                return f"Error: Screenshot not generated or is empty at {image_path}"
+
             return image_path
+        except ffmpeg.Error as e:
+            return f"FFmpeg Error: {e.stderr.decode()}"
         except Exception as e:
-            return f"Error: {e}"
+            return f"Error: {str(e)}"
 
     def optimize_image_task(self, args):
         image, config = args
@@ -2893,6 +2905,7 @@ class Prep():
                     img_url = response_data['data']['medium']['url']
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
+
                     if meta['debug']:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
@@ -2929,7 +2942,7 @@ class Prep():
                         console.print("[yellow]ptscreens failed, trying next image host")
                         return {'status': 'failed', 'reason': 'ptscreens upload failed'}
 
-                    img_url = response_data['image']['thumb']['url']
+                    img_url = response_data['image']['medium']['url']
                     raw_url = response_data['image']['url']
                     web_url = response_data['image']['url_viewer']
                     if meta['debug']:
@@ -2957,7 +2970,7 @@ class Prep():
                         console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
 
                     response_data = response.json()
-                    if response_data.get('status_code') != 200:
+                    if response.status_code != 200 or not response_data.get('success'):
                         console.print("[yellow]OEimg failed, trying next image host")
                         return {'status': 'failed', 'reason': 'OEimg upload failed'}
 
