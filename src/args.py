@@ -128,8 +128,8 @@ class Args():
             if value not in (None, []):
                 if isinstance(value, list):
                     value2 = self.list_to_string(value)
-                    if key == 'type':
-                        meta[key] = value2.upper().replace('-', '')
+                    if key == 'manual_type':
+                        meta['manual_type'] = value2.upper().replace('-', '')
                     elif key == 'tag':
                         meta[key] = f"-{value2}"
                     elif key == 'screens':
