@@ -741,7 +741,7 @@ class PTP():
                                 meta[new_images_key] = []
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                                 if not new_screens:
-                                    ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens))
+                                    ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens, True))
                                     ds.start()
                                     while ds.is_alive() is True:
                                         await asyncio.sleep(1)

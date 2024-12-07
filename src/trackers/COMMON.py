@@ -164,7 +164,7 @@ class COMMON():
                                         await asyncio.sleep(1)
                                     new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 elif each['type'] == "DVD":
-                                    s = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens))
+                                    s = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens, True))
                                     s.start()
                                     while s.is_alive() is True:
                                         await asyncio.sleep(1)
