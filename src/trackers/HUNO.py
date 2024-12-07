@@ -150,7 +150,7 @@ class HUNO():
 
         basename = self.get_basename(meta)
         hc = meta.get('hardcoded-subs')
-        type = meta.get('type', "")
+        type = meta.get('type', "").upper()
         title = meta.get('title', "")
         alt_title = meta.get('aka', "")  # noqa F841
         year = meta.get('year', "")
