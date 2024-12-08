@@ -40,6 +40,9 @@ class BHD():
     async def upload_with_retry(self, meta, common, img_host_index=1):
         url_host_mapping = {
             "i.ibb.co": "imgbb",
+            "ptpimg.me": "ptpimg",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
         }
 
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost']
@@ -177,6 +180,9 @@ class BHD():
 
         url_host_mapping = {
             "i.ibb.co": "imgbb",
+            "ptpimg.me": "ptpimg",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
         }
 
         retry_mode = False
