@@ -41,8 +41,8 @@ class BHD():
         url_host_mapping = {
             "i.ibb.co": "imgbb",
             "ptpimg.me": "ptpimg",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
+            "img100.pixhost.to": "pixhost",
+            "images2.imgbox.com": "imgbox",
         }
 
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost']
@@ -181,8 +181,8 @@ class BHD():
         url_host_mapping = {
             "i.ibb.co": "imgbb",
             "ptpimg.me": "ptpimg",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
+            "img100.pixhost.to": "pixhost",
+            "images2.imgbox.com": "imgbox",
         }
 
         retry_mode = False
