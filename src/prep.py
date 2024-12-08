@@ -1380,7 +1380,7 @@ class Prep():
         def _is_vob_good(n, loops, num_screens):
             max_loops = 6
             fallback_duration = 300
-            voblength = fallback_duration
+            valid_tracks = []
 
             while loops < max_loops:
                 try:
@@ -1389,36 +1389,30 @@ class Prep():
                         output='JSON'
                     )
                     vob_mi = json.loads(vob_mi)
-                    if meta['debug']:
-                        console.print("[yellow]Analyzing VOB file:[/yellow]", main_set[n])
 
                     for track in vob_mi.get('media', {}).get('track', []):
-                        duration = track.get('Duration')
+                        duration = float(track.get('Duration', 0))
                         width = track.get('Width')
                         height = track.get('Height')
-                        if meta['debug']:
-                            console.print(f"Track {n}: Duration={duration}, Width={width}, Height={height}")
 
-                        if duration and width and height:
-                            if float(width) > 0 and float(height) > 0:
-                                voblength = float(duration)
-                                if meta['debug']:
-                                    console.print(f"[green]Valid track found: voblength={voblength}, n={n}[/green]")
-                                return voblength, n
+                        if duration > 1 and width and height:  # Minimum 1-second track
+                            valid_tracks.append({
+                                'duration': duration, 
+                                'track_index': n
+                            })
+
+                    if valid_tracks:
+                        # Sort by duration, take longest track
+                        longest_track = max(valid_tracks, key=lambda x: x['duration'])
+                        return longest_track['duration'], longest_track['track_index']
 
                 except Exception as e:
                     console.print(f"[red]Error parsing VOB {n}: {e}")
 
                 n = (n + 1) % len(main_set)
-                if n >= num_screens:
-                    n -= num_screens
                 loops += 1
-                if meta['debug']:
-                    console.print(f"[yellow]Retrying: loops={loops}, current voblength={voblength}[/yellow]")
 
-            if meta['debug']:
-                console.print(f"[red]Fallback triggered: returning fallback_duration={fallback_duration}[/red]")
-            return fallback_duration, n
+            return fallback_duration, 0
 
         main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
