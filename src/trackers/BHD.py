@@ -259,7 +259,7 @@ class BHD():
 
             if not current_img_host:
                 console.print("[red]No more image hosts left to try.")
-                raise Exception("No valid image host found in the config.")
+                return
 
             if current_img_host not in approved_image_hosts:
                 console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at BHD, trying next host.")
