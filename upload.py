@@ -820,25 +820,25 @@ def get_confirmation(meta):
         console.print("[bold red]DEBUG: True")
     console.print(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
     console.print()
-    cli_ui.info_section(cli_ui.yellow, "Database Info")
-    cli_ui.info(f"Title: {meta['title']} ({meta['year']})")
+    console.print("[bold yellow]Database Info[/bold yellow]")
+    console.print(f"[bold]Title:[/bold] {meta['title']} ({meta['year']})")
     console.print()
-    cli_ui.info(f"Overview: {meta['overview']}")
+    console.print(f"[bold]Overview:[/bold] {meta['overview']}")
     console.print()
-    cli_ui.info(f"Category: {meta['category']}")
+    console.print(f"[bold]Category:[/bold] {meta['category']}")
     if int(meta.get('tmdb', 0)) != 0:
-        cli_ui.info(f"TMDB: https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
+        console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
     if int(meta.get('imdb_id', '0')) != 0:
-        cli_ui.info(f"IMDB: https://www.imdb.com/title/tt{meta['imdb_id']}")
+        console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb_id']}")
     if int(meta.get('tvdb_id', '0')) != 0:
-        cli_ui.info(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
+        console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
     if int(meta.get('tvmaze_id', '0')) != 0:
-        cli_ui.info(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
+        console.print(f"[bold]TVMaze:[/bold] https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
     if int(meta.get('mal_id', 0)) != 0:
-        cli_ui.info(f"MAL : https://myanimelist.net/anime/{meta['mal_id']}")
+        console.print(f"[bold]MAL:[/bold] https://myanimelist.net/anime/{meta['mal_id']}")
     console.print()
     if int(meta.get('freeleech', '0')) != 0:
-        cli_ui.info(f"Freeleech: {meta['freeleech']}")
+        console.print(f"[bold]Freeleech:[/bold] {meta['freeleech']}")
     if meta['tag'] == "":
         tag = ""
     else:
@@ -848,14 +848,15 @@ def get_confirmation(meta):
     else:
         res = meta['resolution']
 
-    cli_ui.info(f"{res} / {meta['type']}{tag}")
+    console.print(f"{res} / {meta['type']}{tag}")
     if meta.get('personalrelease', False) is True:
-        cli_ui.info("Personal Release!")
+        console.print("[bold green]Personal Release![/bold green]")
     console.print()
     if meta.get('unattended', False) is False:
         get_missing(meta)
         ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) is True else ""  # \a rings the bell
-        cli_ui.info(ring_the_bell)
+        if ring_the_bell:
+            console.print(ring_the_bell)
 
         # Handle the 'keep_folder' logic based on 'is disc' and 'isdir'
         if meta.get('is disc', False) is True:
@@ -863,18 +864,19 @@ def get_confirmation(meta):
 
         if meta.get('keep_folder'):
             if meta['isdir']:
-                cli_ui.info_section(cli_ui.yellow, "Uploading with --keep-folder")
-                kf_confirm = cli_ui.ask_yes_no("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed?", default=False)
-                if not kf_confirm:
-                    cli_ui.info('Aborting...')
+                console.print("[bold yellow]Uploading with --keep-folder[/bold yellow]")
+                kf_confirm = input("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed? [y/N]: ").strip().lower()
+                if kf_confirm != 'y':
+                    console.print("[bold red]Aborting...[/bold red]")
                     exit()
 
-        cli_ui.info_section(cli_ui.yellow, "Is this correct?")
-        cli_ui.info(f"Name: {meta['name']}")
-        confirm = cli_ui.ask_yes_no("Correct?", default=False)
+        console.print("[bold yellow]Is this correct?[/bold yellow]")
+        console.print(f"[bold]Name:[/bold] {meta['name']}")
+        confirm_input = input("Correct? [y/N]: ").strip().lower()
+        confirm = confirm_input == 'y'
 
     else:
-        cli_ui.info(f"Name: {meta['name']}")
+        console.print(f"[bold]Name:[/bold] {meta['name']}")
         confirm = True
 
     return confirm
