@@ -1849,10 +1849,13 @@ class Prep():
                     meta['imdb_id'] = str(int(imdb_id.replace('tt', ''))).zfill(7)
             else:
                 meta['imdb_id'] = str(meta['imdb']).replace('tt', '').zfill(7)
-            if meta.get('tvdb_id', '0') in ['', ' ', None, 'None', '0']:
-                meta['tvdb_id'] = external.get('tvdb_id', '0')
-                if meta['tvdb_id'] in ["", None, " ", "None"]:
-                    meta['tvdb_id'] = '0'
+            if meta.get('tvdb_manual'):
+                meta['tvdb_id'] = meta['tvdb_manual']
+            else:
+                if meta.get('tvdb_id', '0') in ['', ' ', None, 'None', '0']:
+                    meta['tvdb_id'] = external.get('tvdb_id', '0')
+                    if meta['tvdb_id'] in ["", None, " ", "None"]:
+                        meta['tvdb_id'] = '0'
             try:
                 videos = movie.videos()
                 for each in videos.get('results', []):
@@ -1899,10 +1902,13 @@ class Prep():
                     meta['imdb_id'] = str(int(imdb_id.replace('tt', ''))).zfill(7)
             else:
                 meta['imdb_id'] = str(int(meta['imdb'].replace('tt', ''))).zfill(7)
-            if meta.get('tvdb_id', '0') in ['', ' ', None, 'None', '0']:
-                meta['tvdb_id'] = external.get('tvdb_id', '0')
-                if meta['tvdb_id'] in ["", None, " ", "None"]:
-                    meta['tvdb_id'] = '0'
+            if meta.get('tvdb_manual'):
+                meta['tvdb_id'] = meta['tvdb_manual']
+            else:
+                if meta.get('tvdb_id', '0') in ['', ' ', None, 'None', '0']:
+                    meta['tvdb_id'] = external.get('tvdb_id', '0')
+                    if meta['tvdb_id'] in ["", None, " ", "None"]:
+                        meta['tvdb_id'] = '0'
             try:
                 videos = tv.videos()
                 for each in videos.get('results', []):
@@ -4021,7 +4027,7 @@ class Prep():
 
         if year not in (None, ''):
             print(f"Filtering results by year: {year}")
-            results = [show for show in results if show.get('premiered', '').startswith(str(year))]
+            results = [show for show in results if str(show.get('premiered', '')).startswith(str(year))]
 
         seen = set()
         unique_results = []
@@ -4035,7 +4041,16 @@ class Prep():
             print("No results found.")
             return tvmazeID, imdbID, tvdbID
 
-        if meta['manual_date'] is not None:
+        if meta.get('tvmaze_manual'):
+            tvmaze_manual_id = int(meta['tvmaze_manual'])
+            selected_show = next((show for show in results if show['id'] == tvmaze_manual_id), None)
+            if selected_show:
+                tvmazeID = selected_show['id']
+                if meta['debug']:
+                    print(f"Selected manual show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+            else:
+                print(f"Manual TVmaze ID {tvmaze_manual_id} not found in results.")
+        elif meta['manual_date'] is not None:
             print("Search results:")
             for idx, show in enumerate(results):
                 console.print(f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])")
@@ -4050,7 +4065,7 @@ class Prep():
                         break
                     if 1 <= choice <= len(results):
                         selected_show = results[choice - 1]
-                        tvmazeID = selected_show.get('id')
+                        tvmazeID = selected_show['id']
                         print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
                         break
                     else:
@@ -4058,13 +4073,11 @@ class Prep():
                 except ValueError:
                     print("Invalid input. Please enter a number.")
         else:
-            if results:
-                selected_show = results[0]
-                tvmazeID = selected_show.get('id')
-                if meta['debug']:
-                    print(f"Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
-            else:
-                print("No results to select from. Skipping.")
+            selected_show = results[0]
+            tvmazeID = selected_show['id']
+            if meta['debug']:
+                print(f"Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+
         if meta['debug']:
             print(f"Returning results - TVmaze ID: {tvmazeID}, IMDb ID: {imdbID}, TVDB ID: {tvdbID}")
         return tvmazeID, imdbID, tvdbID
