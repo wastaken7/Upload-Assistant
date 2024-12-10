@@ -213,10 +213,8 @@ class DiscParse():
             os.chdir(path)
             files = glob("VTS_*.VOB")
             files.sort()
-            # Switch to ordered dictionary
             filesdict = OrderedDict()
             main_set = []
-            # Use ordered dictionary in place of list of lists
             for file in files:
                 trimmed = file[4:]
                 if trimmed[:2] not in filesdict:
@@ -224,16 +222,32 @@ class DiscParse():
                 filesdict[trimmed[:2]].append(trimmed)
             main_set_duration = 0
             for vob_set in filesdict.values():
-                # Parse media info for this VOB set
-                vob_set_mi = MediaInfo.parse(f"VTS_{vob_set[0][:2]}_0.IFO", output='JSON')
-                vob_set_mi = json.loads(vob_set_mi)
-                vob_set_duration = vob_set_mi['media']['track'][1]['Duration']
+                try:
+                    vob_set_mi = MediaInfo.parse(f"VTS_{vob_set[0][:2]}_0.IFO", output='JSON')
+                    vob_set_mi = json.loads(vob_set_mi)
+                    tracks = vob_set_mi.get('media', {}).get('track', [])
+                    if len(tracks) > 1:
+                        vob_set_duration = tracks[1].get('Duration', "Unknown")
+                    else:
+                        console.print("Warning: Expected track[1] is missing.")
+                        vob_set_duration = "Unknown"
 
-                # If the duration of the new vob set > main set by more than 10% then it's our new main set
+                except Exception as e:
+                    console.print(f"Error processing VOB set: {e}")
+                    vob_set_duration = "Unknown"
+
+                if vob_set_duration == "Unknown" or not vob_set_duration.replace('.', '', 1).isdigit():
+                    console.print(f"Skipping VOB set due to invalid duration: {vob_set_duration}")
+                    continue
+
+                vob_set_duration_float = float(vob_set_duration)
+
+                # If the duration of the new vob set > main set by more than 10%, it's the new main set
                 # This should make it so TV shows pick the first episode
-                if (float(vob_set_duration) * 1.00) > (float(main_set_duration) * 1.10) or len(main_set) < 1:
+                if (vob_set_duration_float * 1.00) > (float(main_set_duration) * 1.10) or len(main_set) < 1:
                     main_set = vob_set
-                    main_set_duration = vob_set_duration
+                    main_set_duration = vob_set_duration_float
+
             each['main_set'] = main_set
             set = main_set[0][:2]
             each['vob'] = vob = f"{path}/VTS_{set}_1.VOB"
