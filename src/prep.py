@@ -1397,7 +1397,7 @@ class Prep():
 
                         if duration > 1 and width and height:  # Minimum 1-second track
                             valid_tracks.append({
-                                'duration': duration, 
+                                'duration': duration,
                                 'track_index': n
                             })
 
@@ -3999,20 +3999,24 @@ class Prep():
 
         if imdbID is None:
             imdbID = '0'
-        print(f"Processed inputs - imdbID: {imdbID}, tvdbID: {tvdbID}")
+        if meta['debug']:
+            print(f"Processed inputs - imdbID: {imdbID}, tvdbID: {tvdbID}")
 
         if int(tvdbID) != 0:
-            print(f"Searching TVmaze with TVDB ID: {tvdbID}")
-            tvdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID})
+            if meta['debug']:
+                print(f"Searching TVmaze with TVDB ID: {tvdbID}")
+            tvdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}, meta)
             if tvdb_resp:
                 results.append(tvdb_resp)
         if int(imdbID) != 0:
-            print(f"Searching TVmaze with IMDb ID: {imdbID}")
-            imdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"})
+            if meta['debug']:
+                print(f"Searching TVmaze with IMDb ID: {imdbID}")
+            imdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"}, meta)
             if imdb_resp:
                 results.append(imdb_resp)
-        print(f"Searching TVmaze with filename: {filename}")
-        search_resp = self._make_tvmaze_request("https://api.tvmaze.com/search/shows", {"q": filename})
+        if meta['debug']:
+            print(f"Searching TVmaze with filename: {filename}")
+        search_resp = self._make_tvmaze_request("https://api.tvmaze.com/search/shows", {"q": filename}, meta)
         if search_resp:
             if isinstance(search_resp, list):
                 results.extend([each['show'] for each in search_resp if 'show' in each])
@@ -4020,7 +4024,8 @@ class Prep():
                 results.append(search_resp)
 
         if year not in (None, ''):
-            print(f"Filtering results by year: {year}")
+            if meta['debug']:
+                print(f"Filtering results by year: {year}")
             results = [show for show in results if str(show.get('premiered', '')).startswith(str(year))]
 
         seen = set()
@@ -4032,7 +4037,8 @@ class Prep():
         results = unique_results
 
         if not results:
-            print("No results found.")
+            if meta['debug']:
+                print("No results found.")
             return tvmazeID, imdbID, tvdbID
 
         if meta.get('tvmaze_manual'):
@@ -4040,8 +4046,7 @@ class Prep():
             selected_show = next((show for show in results if show['id'] == tvmaze_manual_id), None)
             if selected_show:
                 tvmazeID = selected_show['id']
-                if meta['debug']:
-                    print(f"Selected manual show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+                print(f"Selected manual show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
             else:
                 print(f"Manual TVmaze ID {tvmaze_manual_id} not found in results.")
         elif meta['manual_date'] is not None:
@@ -4076,8 +4081,9 @@ class Prep():
             print(f"Returning results - TVmaze ID: {tvmazeID}, IMDb ID: {imdbID}, TVDB ID: {tvdbID}")
         return tvmazeID, imdbID, tvdbID
 
-    def _make_tvmaze_request(self, url, params):
-        print(f"Requesting TVmaze API: {url} with params: {params}")
+    def _make_tvmaze_request(self, url, params, meta):
+        if meta['debug']:
+            print(f"Requesting TVmaze API: {url} with params: {params}")
         try:
             resp = requests.get(url, params=params)
             if resp.ok:
