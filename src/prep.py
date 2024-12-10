@@ -1540,38 +1540,62 @@ class Prep():
         capture_results = []
         task_limit = int(meta.get('task_limit', os.cpu_count()))
 
-        for i in range(num_screens + 1):
+        existing_images = 0
+        for i in range(num_screens):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
-            if not os.path.exists(image_path) or meta.get('retake', False):
-                capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
-            elif meta['debug']:
-                console.print(f"[yellow]Skipping existing screenshot: {image_path}")
+            if os.path.exists(image_path) and not meta.get('retake', False):
+                existing_images += 1
 
-        if not capture_tasks:
-            console.print("[yellow]All screenshots already exist. Skipping capture process.")
+        if existing_images == num_screens and not meta.get('retake', False):
+            console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         else:
-            if use_tqdm():
-                with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
+            for i in range(num_screens + 1):
+                image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
+                if not os.path.exists(image_path) or meta.get('retake', False):
+                    capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
+                elif meta['debug']:
+                    console.print(f"[yellow]Skipping existing screenshot: {image_path}")
+
+            if not capture_tasks:
+                console.print("[yellow]All screenshots already exist. Skipping capture process.")
+            else:
+                if use_tqdm():
+                    with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
+                        with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                            for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
+                                capture_results.append(result)
+                                pbar.update(1)
+                else:
+                    console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
                     with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                        for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
+                        for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
                             capture_results.append(result)
+                            console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
+
+                if capture_results and (len(capture_results) + existing_images) > num_screens and not force_screenshots:
+                    smallest = min(capture_results, key=os.path.getsize)
+                    if meta['debug']:
+                        console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
+                    os.remove(smallest)
+                    capture_results.remove(smallest)
+
+        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
+        optimize_results = []
+        if optimize_tasks:
+            if use_tqdm():
+                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
+                    with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                        for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
+                            optimize_results.append(result)
                             pbar.update(1)
             else:
-                console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
-                with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                    for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
-                        capture_results.append(result)
-                        console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
-
-            if capture_results and len(capture_results) > num_screens and not force_screenshots:
-                smallest = min(capture_results, key=os.path.getsize)
-                if meta['debug']:
-                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
-                os.remove(smallest)
-                capture_results.remove(smallest)
+                with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                    for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
+                        optimize_results.append(result)
+                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
 
         valid_results = []
-        for image_path in capture_results:
+        for image_path in optimize_results:
             if "Error" in image_path:
                 console.print(f"[red]{image_path}")
                 continue
@@ -1603,22 +1627,7 @@ class Prep():
             else:
                 valid_results.append(image_path)
 
-        optimize_tasks = [(result, self.config) for result in valid_results if "Error" not in result]
-        optimize_results = []
-        if optimize_tasks:
-            if use_tqdm():
-                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
-                    with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                        for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
-                            optimize_results.append(result)
-                            pbar.update(1)
-            else:
-                with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                    for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
-                        optimize_results.append(result)
-                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
-
-        for image_path in optimize_results:
+        for image_path in valid_results:
             img_dict = {
                 'img_url': image_path,
                 'raw_url': image_path,
