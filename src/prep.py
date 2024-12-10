@@ -1477,6 +1477,10 @@ class Prep():
             return None
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
+        def use_tqdm():
+            """Check if the environment supports TTY (interactive progress bar)."""
+            return sys.stdout.isatty()
+
         if meta['debug']:
             start_time = time.time()
         if 'image_list' not in meta:
@@ -1493,33 +1497,33 @@ class Prep():
         if num_screens <= 0:
             return
 
-        with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", encoding='utf-8') as f:
-            mi = json.load(f)
-            video_track = mi['media']['track'][1]
-            length = video_track.get('Duration', mi['media']['track'][0]['Duration'])
-            width = float(video_track.get('Width'))
-            height = float(video_track.get('Height'))
-            par = float(video_track.get('PixelAspectRatio', 1))
-            dar = float(video_track.get('DisplayAspectRatio'))
-            frame_rate = float(video_track.get('FrameRate', 24.0))
+        try:
+            with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", encoding='utf-8') as f:
+                mi = json.load(f)
+                video_track = mi['media']['track'][1]
+                length = video_track.get('Duration', mi['media']['track'][0]['Duration'])
+                width = float(video_track.get('Width'))
+                height = float(video_track.get('Height'))
+                par = float(video_track.get('PixelAspectRatio', 1))
+                dar = float(video_track.get('DisplayAspectRatio'))
+                frame_rate = float(video_track.get('FrameRate', 24.0))
 
-            if par == 1:
-                sar = w_sar = h_sar = 1
-            elif par < 1:
-                new_height = dar * height
-                sar = width / new_height
-                w_sar = 1
-                h_sar = sar
-            else:
-                sar = w_sar = par
-                h_sar = 1
-            length = round(float(length))
+                if par == 1:
+                    sar = w_sar = h_sar = 1
+                elif par < 1:
+                    new_height = dar * height
+                    sar = width / new_height
+                    w_sar = 1
+                    h_sar = sar
+                else:
+                    sar = w_sar = par
+                    h_sar = 1
+                length = round(float(length))
+        except (FileNotFoundError, KeyError, ValueError) as e:
+            console.print(f"[red]Error processing MediaInfo.json: {e}")
+            return
 
-        if meta.get('ffdebug', False):
-            loglevel = 'verbose'
-        else:
-            loglevel = 'quiet'
-
+        loglevel = 'verbose' if meta.get('ffdebug', False) else 'quiet'
         os.chdir(f"{base_dir}/tmp/{folder_id}")
 
         if manual_frames:
@@ -1546,11 +1550,18 @@ class Prep():
         if not capture_tasks:
             console.print("[yellow]All screenshots already exist. Skipping capture process.")
         else:
-            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                for result in tqdm(pool.imap_unordered(self.capture_screenshot, capture_tasks),
-                                   total=len(capture_tasks),
-                                   desc="Capturing Screenshots"):
-                    capture_results.append(result)
+            if use_tqdm():
+                with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
+                    with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                        for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
+                            capture_results.append(result)
+                            pbar.update(1)
+            else:
+                console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
+                with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                    for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
+                        capture_results.append(result)
+                        console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
 
             if capture_results and len(capture_results) > num_screens and not force_screenshots:
                 smallest = min(capture_results, key=os.path.getsize)
@@ -1559,17 +1570,8 @@ class Prep():
                 os.remove(smallest)
                 capture_results.remove(smallest)
 
-        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
-        optimize_results = []
-        if optimize_tasks:
-            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                for result in tqdm(pool.imap_unordered(self.optimize_image_task, optimize_tasks),
-                                   total=len(optimize_tasks),
-                                   desc="Optimizing Images"):
-                    optimize_results.append(result)
-
         valid_results = []
-        for image_path in optimize_results:
+        for image_path in capture_results:
             if "Error" in image_path:
                 console.print(f"[red]{image_path}")
                 continue
@@ -1601,7 +1603,22 @@ class Prep():
             else:
                 valid_results.append(image_path)
 
-        for image_path in valid_results:
+        optimize_tasks = [(result, self.config) for result in valid_results if "Error" not in result]
+        optimize_results = []
+        if optimize_tasks:
+            if use_tqdm():
+                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
+                    with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                        for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
+                            optimize_results.append(result)
+                            pbar.update(1)
+            else:
+                with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                    for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
+                        optimize_results.append(result)
+                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
+
+        for image_path in optimize_results:
             img_dict = {
                 'img_url': image_path,
                 'raw_url': image_path,
@@ -1609,8 +1626,7 @@ class Prep():
             }
             meta['image_list'].append(img_dict)
 
-        valid_results_count = len(valid_results)
-        console.print(f"[green]Successfully captured {valid_results_count} screenshots.")
+        console.print(f"[green]Successfully captured {len(optimize_results)} screenshots.")
 
         if meta['debug']:
             finish_time = time.time()
@@ -3039,8 +3055,13 @@ class Prep():
             }
 
     def upload_screens(self, meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
+        def use_tqdm():
+            """Check if the environment supports TTY (interactive progress bar)."""
+            return sys.stdout.isatty()
+
         if meta['debug']:
             upload_start_time = time.time()
+
         import nest_asyncio
         nest_asyncio.apply()
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
@@ -3078,7 +3099,7 @@ class Prep():
         upload_tasks = [(image, img_host, self.config, meta) for image in image_glob[:images_needed]]
 
         host_limits = {
-            "oeimg": 1,
+            "oeimg": 6,
             "ptscreens": 1,
             "lensdump": 1,
         }
@@ -3087,13 +3108,22 @@ class Prep():
 
         try:
             with Pool(processes=max(1, min(len(upload_tasks), pool_size))) as pool:
-                results = list(
-                    tqdm(
-                        pool.imap_unordered(self.upload_image_task, upload_tasks),
-                        total=len(upload_tasks),
-                        desc=f"Uploading Images to {img_host}"
+                if use_tqdm():
+                    results = list(
+                        tqdm(
+                            pool.imap_unordered(self.upload_image_task, upload_tasks),
+                            total=len(upload_tasks),
+                            desc=f"Uploading Images to {img_host}",
+                            ascii=True,
+                            dynamic_ncols=False
+                        )
                     )
-                )
+                else:
+                    console.print(f"[blue]Non-TTY environment detected. Progress bar disabled. Uploading images to {img_host}.")
+                    results = []
+                    for i, result in enumerate(pool.imap_unordered(self.upload_image_task, upload_tasks), 1):
+                        results.append(result)
+                        console.print(f"Uploaded {i}/{len(upload_tasks)} images to {img_host}")
         except KeyboardInterrupt:
             console.print("[red]Upload process interrupted by user. Exiting...")
             pool.terminate()
