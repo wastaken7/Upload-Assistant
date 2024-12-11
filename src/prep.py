@@ -17,7 +17,6 @@ try:
     import traceback
     from src.discparse import DiscParse
     import multiprocessing
-    from multiprocessing import Pool
     from multiprocessing import get_context
     from tqdm import tqdm
     import os
@@ -147,7 +146,10 @@ class Prep():
                                 image = Image.open(BytesIO(image_content))
                                 vertical_resolution = image.height
                                 lower_bound = expected_vertical_resolution * 0.70  # 30% below
-                                upper_bound = expected_vertical_resolution * 1.00
+                                if meta['is_disc'] == "DVD":
+                                    upper_bound = expected_vertical_resolution * 1.30
+                                else:
+                                    upper_bound = expected_vertical_resolution * 1.00
 
                                 if not (lower_bound <= vertical_resolution <= upper_bound):
                                     console.print(
@@ -1263,14 +1265,21 @@ class Prep():
                 for i in range(num_screens + 1)
             ]
 
-            with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                capture_results = list(
-                    tqdm(
-                        pool.imap_unordered(self.capture_disc_task, capture_tasks),
-                        total=len(capture_tasks),
-                        desc="Capturing Screenshots"
+            with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                try:
+                    capture_results = list(
+                        tqdm(
+                            pool.imap_unordered(self.capture_disc_task, capture_tasks),
+                            total=len(capture_tasks),
+                            desc="Capturing Screenshots",
+                            ascii=True,
+                            dynamic_ncols=False
+                        )
                     )
-                )
+                finally:
+                    pool.close()
+                    pool.join()
+
             if capture_results:
                 if len(capture_tasks) > num_screens:
                     smallest = min(capture_results, key=os.path.getsize)
@@ -1280,14 +1289,20 @@ class Prep():
                     capture_results.remove(smallest)
             optimized_results = []
             optimize_tasks = [(result, self.config) for result in capture_results if result and os.path.exists(result)]
-            with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                optimized_results = list(
-                    tqdm(
-                        pool.imap_unordered(self.optimize_image_task, optimize_tasks),
-                        total=len(optimize_tasks),
-                        desc="Optimizing Images"
+            with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                try:
+                    optimized_results = list(
+                        tqdm(
+                            pool.imap_unordered(self.optimize_image_task, optimize_tasks),
+                            total=len(optimize_tasks),
+                            desc="Optimizing Images",
+                            ascii=True,
+                            dynamic_ncols=False
+                        )
                     )
-                )
+                finally:
+                    pool.close()
+                    pool.join()
 
             valid_results = []
             for image_path in optimized_results:
@@ -1432,8 +1447,12 @@ class Prep():
             input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
             tasks.append((input_file, image, ss_times[i], meta, width, height, w_sar, h_sar))
 
-        with Pool(processes=min(num_screens + 1, task_limit)) as pool:
-            results = list(tqdm(pool.imap_unordered(self.capture_dvd_screenshot, tasks), total=len(tasks), desc="Capturing Screenshots"))
+        with get_context("spawn").Pool(processes=min(num_screens + 1, task_limit)) as pool:
+            try:
+                results = list(tqdm(pool.imap_unordered(self.capture_dvd_screenshot, tasks), total=len(tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False))
+            finally:
+                pool.close()
+                pool.join()
 
         if len(glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*")) > num_screens:
             smallest = None
@@ -1456,31 +1475,105 @@ class Prep():
 
         optimize_tasks = [(image, self.config) for image in results if image and os.path.exists(image)]
 
-        with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-            optimize_results = list(  # noqa F841
-                tqdm(
-                    pool.imap_unordered(self.optimize_image_task, optimize_tasks),
-                    total=len(optimize_tasks),
-                    desc="Optimizing Images"
+        with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+            try:
+                optimize_results = list(  # noqa F841
+                    tqdm(
+                        pool.imap_unordered(self.optimize_image_task, optimize_tasks),
+                        total=len(optimize_tasks),
+                        desc="Optimizing Images",
+                        ascii=True,
+                        dynamic_ncols=False
+                    )
                 )
-            )
+            finally:
+                pool.close()
+                pool.join()
 
-        valid_results_count = len([r for r in results if r])
-        console.print(f"[green]Successfully captured {valid_results_count - 1} screenshots.")
+        valid_results = []
+        retry_attempts = 3
+
+        for image in optimize_results:
+            if "Error" in image:
+                console.print(f"[red]{image}")
+                continue
+
+            retry_cap = False
+            image_size = os.path.getsize(image)
+            if image_size <= 120000:
+                console.print(f"[yellow]Image {image} is incredibly small, retaking.")
+                retry_cap = True
+                time.sleep(1)
+
+            if retry_cap:
+                for attempt in range(1, retry_attempts + 1):
+                    console.print(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
+                    try:
+                        os.remove(image)
+                    except Exception as e:
+                        console.print(f"[red]Failed to delete {image}: {e}[/red]")
+                        break
+
+                    image_index = int(image.rsplit('-', 1)[-1].split('.')[0])
+                    input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[image_index % len(main_set)]}"
+                    adjusted_time = random.uniform(0, voblength)
+
+                    try:
+                        self.capture_dvd_screenshot((input_file, image, adjusted_time, meta, width, height, w_sar, h_sar))
+                        retaken_size = os.path.getsize(image)
+
+                        if retaken_size > 75000:
+                            console.print(f"[green]Successfully retaken screenshot for: {image} ({retaken_size} bytes)[/green]")
+                            valid_results.append(image)
+                            break
+                        else:
+                            console.print(f"[red]Retaken image {image} is still too small. Retrying...[/red]")
+                    except Exception as e:
+                        console.print(f"[red]Error capturing screenshot for {input_file} at {adjusted_time}: {e}[/red]")
+
+                else:
+                    console.print(f"[red]All retry attempts failed for {image}. Skipping.[/red]")
+            else:
+                valid_results.append(image)
+
+        for image in valid_results:
+            img_dict = {
+                'img_url': image,
+                'raw_url': image,
+                'web_url': image
+            }
+            meta['image_list'].append(img_dict)
+
+        console.print(f"[green]Successfully captured {len(optimize_results)} screenshots.")
 
     def capture_dvd_screenshot(self, task):
         input_file, image, seek_time, meta, width, height, w_sar, h_sar = task
+
         if os.path.exists(image):
+            console.print(f"[green]Screenshot already exists: {image}[/green]")
             return image
+
         try:
             loglevel = 'verbose' if meta.get('ffdebug', False) else 'quiet'
+            media_info = MediaInfo.parse(input_file)
+            video_duration = next((track.duration for track in media_info.tracks if track.track_type == "Video"), None)
+
+            if video_duration and seek_time > video_duration:
+                seek_time = max(0, video_duration - 1)
+
             ff = ffmpeg.input(input_file, ss=seek_time)
             if w_sar != 1 or h_sar != 1:
                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
-            ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel).run()
-            return image if os.path.exists(image) else None
-        except Exception as e:
-            console.print(f"[red]Error capturing screenshot for {input_file}: {str(e)}")
+
+            ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').run()
+            if os.path.exists(image):
+                return image
+            else:
+                console.print(f"[red]Screenshot creation failed for {image}[/red]")
+                return None
+
+        except ffmpeg.Error as e:
+            console.print(f"[red]Error capturing screenshot for {input_file} at {seek_time}s: {e.stderr.decode()}[/red]")
             return None
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
@@ -1658,7 +1751,7 @@ class Prep():
             }
             meta['image_list'].append(img_dict)
 
-        console.print(f"[green]Successfully captured {len(optimize_results)} screenshots.")
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
         if meta['debug']:
             finish_time = time.time()
@@ -3139,17 +3232,21 @@ class Prep():
         pool_size = host_limits.get(img_host, default_pool_size)
 
         try:
-            with Pool(processes=max(1, min(len(upload_tasks), pool_size))) as pool:
+            with get_context("spawn").Pool(processes=max(1, min(len(upload_tasks), pool_size))) as pool:
                 if use_tqdm():
-                    results = list(
-                        tqdm(
-                            pool.imap_unordered(self.upload_image_task, upload_tasks),
-                            total=len(upload_tasks),
-                            desc=f"Uploading Images to {img_host}",
-                            ascii=True,
-                            dynamic_ncols=False
+                    try:
+                        results = list(
+                            tqdm(
+                                pool.imap_unordered(self.upload_image_task, upload_tasks),
+                                total=len(upload_tasks),
+                                desc=f"Uploading Images to {img_host}",
+                                ascii=True,
+                                dynamic_ncols=False
+                            )
                         )
-                    )
+                    finally:
+                        pool.close()
+                        pool.join()
                 else:
                     console.print(f"[blue]Non-TTY environment detected. Progress bar disabled. Uploading images to {img_host}.")
                     results = []
