@@ -18,6 +18,7 @@ try:
     from src.discparse import DiscParse
     import multiprocessing
     from multiprocessing import Pool
+    from multiprocessing import get_context
     from tqdm import tqdm
     import os
     import re
@@ -1561,7 +1562,7 @@ class Prep():
             else:
                 if use_tqdm():
                     with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
-                        with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                        with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                             try:
                                 for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
                                     capture_results.append(result)
@@ -1571,7 +1572,7 @@ class Prep():
                                 pool.join()
                 else:
                     console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
-                    with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
+                    with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                         try:
                             for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
                                 capture_results.append(result)
@@ -1592,7 +1593,7 @@ class Prep():
         if optimize_tasks:
             if use_tqdm():
                 with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
-                    with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                    with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
                         try:
                             for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
                                 optimize_results.append(result)
@@ -1601,7 +1602,7 @@ class Prep():
                             pool.close()
                             pool.join()
             else:
-                with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
+                with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
                     try:
                         for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
                             optimize_results.append(result)
