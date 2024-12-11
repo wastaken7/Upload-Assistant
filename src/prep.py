@@ -4144,9 +4144,6 @@ class Prep():
         return meta
 
     async def search_tvmaze(self, filename, year, imdbID, tvdbID, meta):
-        if meta['debug']:
-            print(f"Starting search_tvmaze with filename: {filename}, year: {year}, imdbID: {imdbID}, tvdbID: {tvdbID}")
-
         try:
             tvdbID = int(tvdbID) if tvdbID is not None else 0
         except ValueError:
@@ -4158,23 +4155,15 @@ class Prep():
 
         if imdbID is None:
             imdbID = '0'
-        if meta['debug']:
-            print(f"Processed inputs - imdbID: {imdbID}, tvdbID: {tvdbID}")
 
         if int(tvdbID) != 0:
-            if meta['debug']:
-                print(f"Searching TVmaze with TVDB ID: {tvdbID}")
             tvdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}, meta)
             if tvdb_resp:
                 results.append(tvdb_resp)
         if int(imdbID) != 0:
-            if meta['debug']:
-                print(f"Searching TVmaze with IMDb ID: {imdbID}")
             imdb_resp = self._make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"}, meta)
             if imdb_resp:
                 results.append(imdb_resp)
-        if meta['debug']:
-            print(f"Searching TVmaze with filename: {filename}")
         search_resp = self._make_tvmaze_request("https://api.tvmaze.com/search/shows", {"q": filename}, meta)
         if search_resp:
             if isinstance(search_resp, list):
@@ -4183,8 +4172,6 @@ class Prep():
                 results.append(search_resp)
 
         if year not in (None, ''):
-            if meta['debug']:
-                print(f"Filtering results by year: {year}")
             results = [show for show in results if str(show.get('premiered', '')).startswith(str(year))]
 
         seen = set()
