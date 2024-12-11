@@ -737,9 +737,9 @@ class COMMON():
                 log_exclusion("season/episode mismatch", each)
                 return True
 
-            if normalized_encoder and normalized_encoder not in normalized:
+            if normalized_encoder and normalized_encoder in normalized:
                 log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
-                return True
+                return False
 
             console.log(f"[debug] Passed all checks: {each}")
             return False
