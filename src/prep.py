@@ -1227,12 +1227,17 @@ class Prep():
 
         os.chdir(f"{base_dir}/tmp/{folder_id}")
         existing_screens = glob.glob(f"{sanitized_filename}-*.png")
-        if len(existing_screens) >= num_screens:
-            console.print('[bold green]Reusing screenshots')
+        total_existing = len(existing_screens) + len(existing_images)
+        num_screens = max(0, self.screens - total_existing)
+
+        if num_screens == 0:
+            console.print('[bold green]Reusing existing screenshots. No additional screenshots needed.')
             return
 
-        console.print("[bold yellow]Saving Screens...")
+        if meta['debug']:
+            console.print(f"[bold yellow]Saving Screens... Total needed: {self.screens}, Existing: {total_existing}, To capture: {num_screens}")
         capture_results = []
+        capture_tasks = []
         task_limit = int(meta.get('task_limit', os.cpu_count()))
 
         if use_vs:
@@ -1245,11 +1250,12 @@ class Prep():
                 loglevel = 'quiet'
 
             ss_times = self.valid_ss_time([], num_screens + 1, length)
+            existing_indices = {int(p.split('-')[-1].split('.')[0]) for p in existing_screens}
             capture_tasks = [
                 (
                     file,
                     ss_times[i],
-                    os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png"),
+                    os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{len(existing_indices) + i}.png"),
                     keyframe,
                     loglevel
                 )
@@ -1265,13 +1271,13 @@ class Prep():
                     )
                 )
             if capture_results:
-                if len(capture_results) > num_screens:
+                if len(capture_tasks) > num_screens:
                     smallest = min(capture_results, key=os.path.getsize)
                     if meta['debug']:
                         console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)[/yellow]")
                     os.remove(smallest)
                     capture_results.remove(smallest)
-
+            optimized_results = []
             optimize_tasks = [(result, self.config) for result in capture_results if result and os.path.exists(result)]
             with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
                 optimized_results = list(
@@ -1316,7 +1322,7 @@ class Prep():
                 }
                 meta['image_list'].append(img_dict)
 
-        console.print(f"[green]Successfully captured {len(meta['image_list'])} screenshots.")
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
     def capture_disc_task(self, task):
         file, ss_time, image_path, keyframe, loglevel = task
