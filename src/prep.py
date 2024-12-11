@@ -3228,7 +3228,7 @@ class Prep():
             "ptscreens": 1,
             "lensdump": 1,
         }
-        default_pool_size = os.cpu_count()
+        default_pool_size = int(meta.get('task_limit', os.cpu_count()))
         pool_size = host_limits.get(img_host, default_pool_size)
 
         try:
