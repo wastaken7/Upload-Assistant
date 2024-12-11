@@ -1562,15 +1562,23 @@ class Prep():
                 if use_tqdm():
                     with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
                         with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                            for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
-                                capture_results.append(result)
-                                pbar.update(1)
+                            try:
+                                for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
+                                    capture_results.append(result)
+                                    pbar.update(1)
+                            finally:
+                                pool.close()
+                                pool.join()
                 else:
                     console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
                     with Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                        for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
-                            capture_results.append(result)
-                            console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
+                        try:
+                            for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
+                                capture_results.append(result)
+                                console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
+                        finally:
+                            pool.close()
+                            pool.join()
 
                 if capture_results and (len(capture_results) + existing_images) > num_screens and not force_screenshots:
                     smallest = min(capture_results, key=os.path.getsize)
@@ -1585,14 +1593,22 @@ class Prep():
             if use_tqdm():
                 with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
                     with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                        for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
-                            optimize_results.append(result)
-                            pbar.update(1)
+                        try:
+                            for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
+                                optimize_results.append(result)
+                                pbar.update(1)
+                        finally:
+                            pool.close()
+                            pool.join()
             else:
                 with Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                    for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
-                        optimize_results.append(result)
-                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
+                    try:
+                        for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
+                            optimize_results.append(result)
+                            console.print(f"Optimized {i}/{len(optimize_tasks)} images")
+                    finally:
+                        pool.close()
+                        pool.join()
 
         valid_results = []
         for image_path in optimize_results:
