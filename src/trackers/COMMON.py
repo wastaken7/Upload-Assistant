@@ -479,6 +479,10 @@ class COMMON():
                 mal = attributes.get('mal_id')
                 imdb = attributes.get('imdb_id')
                 infohash = attributes.get('info_hash')
+                tmdb = None if tmdb == 0 else tmdb
+                tvdb = None if tvdb == 0 else tvdb
+                mal = None if mal == 0 else mal
+                imdb = None if imdb == 0 else imdb
             else:
                 # Handle response when searching by ID
                 if id and not data:
@@ -492,7 +496,10 @@ class COMMON():
                     mal = attributes.get('mal_id')
                     imdb = attributes.get('imdb_id')
                     infohash = attributes.get('info_hash')
-
+                    tmdb = None if tmdb == 0 else tmdb
+                    tvdb = None if tvdb == 0 else tvdb
+                    mal = None if mal == 0 else mal
+                    imdb = None if imdb == 0 else imdb
                     # Handle file name extraction
                     files = attributes.get('files', [])
                     if files:
@@ -730,9 +737,9 @@ class COMMON():
                 log_exclusion("season/episode mismatch", each)
                 return True
 
-            if normalized_encoder and normalized_encoder not in normalized:
+            if normalized_encoder and normalized_encoder in normalized:
                 log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
-                return True
+                return False
 
             console.log(f"[debug] Passed all checks: {each}")
             return False
