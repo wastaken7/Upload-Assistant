@@ -18,7 +18,7 @@ try:
     from src.discparse import DiscParse
     import multiprocessing
     from multiprocessing import Pool
-    from multiprocessing import get_context
+    from concurrent.futures import ProcessPoolExecutor, as_completed
     from tqdm import tqdm
     import os
     import re
@@ -1562,24 +1562,27 @@ class Prep():
             else:
                 if use_tqdm():
                     with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
-                        with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                            try:
-                                for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
+                        with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
+                            futures = {executor.submit(self.capture_screenshot, *task): task for task in capture_tasks}
+                            for future in as_completed(futures):
+                                try:
+                                    result = future.result()
                                     capture_results.append(result)
+                                except Exception as e:
+                                    console.print(f"[red]Error during screenshot capture: {e}")
+                                finally:
                                     pbar.update(1)
-                            finally:
-                                pool.close()
-                                pool.join()
                 else:
                     console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
-                    with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                        try:
-                            for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
+                    with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
+                        futures = {executor.submit(self.capture_screenshot, *task): task for task in capture_tasks}
+                        for i, future in enumerate(as_completed(futures), 1):
+                            try:
+                                result = future.result()
                                 capture_results.append(result)
                                 console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
-                        finally:
-                            pool.close()
-                            pool.join()
+                            except Exception as e:
+                                console.print(f"[red]Error during screenshot capture: {e}")
 
                 if capture_results and (len(capture_results) + existing_images) > num_screens and not force_screenshots:
                     smallest = min(capture_results, key=os.path.getsize)
@@ -1588,28 +1591,32 @@ class Prep():
                     os.remove(smallest)
                     capture_results.remove(smallest)
 
+        # Optimization process
         optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
         optimize_results = []
         if optimize_tasks:
             if use_tqdm():
                 with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
-                    with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                        try:
-                            for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
+                    with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
+                        futures = {executor.submit(self.optimize_image_task, *task): task for task in optimize_tasks}
+                        for future in as_completed(futures):
+                            try:
+                                result = future.result()
                                 optimize_results.append(result)
+                            except Exception as e:
+                                console.print(f"[red]Error during image optimization: {e}")
+                            finally:
                                 pbar.update(1)
-                        finally:
-                            pool.close()
-                            pool.join()
             else:
-                with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                    try:
-                        for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
+                with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
+                    futures = {executor.submit(self.optimize_image_task, *task): task for task in optimize_tasks}
+                    for i, future in enumerate(as_completed(futures), 1):
+                        try:
+                            result = future.result()
                             optimize_results.append(result)
                             console.print(f"Optimized {i}/{len(optimize_tasks)} images")
-                    finally:
-                        pool.close()
-                        pool.join()
+                        except Exception as e:
+                            console.print(f"[red]Error during image optimization: {e}")
 
         valid_results = []
         for image_path in optimize_results:
