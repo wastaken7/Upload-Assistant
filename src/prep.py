@@ -1661,18 +1661,27 @@ class Prep():
                 console.print("[yellow]All screenshots already exist. Skipping capture process.")
             else:
                 if use_tqdm():
-                    with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
+                    with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as result:
                         with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
                             futures = [executor.submit(self.capture_screenshot, task) for task in capture_tasks]
+
                             for future in as_completed(futures):
-                                capture_results.append(future.result())
-                                pbar.update(1)
+                                result = future.result()
+                                if isinstance(result, str) and result.startswith("Error"):
+                                    console.print(f"[red]Error during screenshot capture: {result}")
+                                else:
+                                    capture_results.append(result)
                 else:
                     console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
                     with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
                         futures = [executor.submit(self.capture_screenshot, task) for task in capture_tasks]
-                        for i, future in enumerate(as_completed(futures), 1):
-                            capture_results.append(future.result())
+
+                        for future in as_completed(futures):
+                            result = future.result()
+                            if isinstance(result, str) and result.startswith("Error"):
+                                console.print(f"[red]Error during screenshot capture: {result}")
+                            else:
+                                capture_results.append(result)
                             console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
 
                 if capture_results and (len(capture_results) + existing_images) > num_screens and not force_screenshots:
@@ -1682,22 +1691,30 @@ class Prep():
                     os.remove(smallest)
                     capture_results.remove(smallest)
 
-        optimize_tasks = [(result, self.config) for result in capture_results if "Error" not in result]
+        optimize_tasks = [(result, self.config) for result in capture_results if isinstance(result, str)]
         optimize_results = []
         if optimize_tasks:
             if use_tqdm():
-                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
+                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as result:
                     with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
                         futures = [executor.submit(self.optimize_image_task, task) for task in optimize_tasks]
+
                         for future in as_completed(futures):
-                            optimize_results.append(future.result())
-                            pbar.update(1)
+                            result = future.result()
+                            if isinstance(result, str) and result.startswith("Error"):
+                                console.print(f"[red]Error during image optimization: {result}")
+                            else:
+                                optimize_results.append(result)
             else:
                 with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
                     futures = [executor.submit(self.optimize_image_task, task) for task in optimize_tasks]
-                    for i, future in enumerate(as_completed(futures), 1):
-                        optimize_results.append(future.result())
-                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
+
+                    for future in as_completed(futures):
+                        result = future.result()
+                        if isinstance(result, str) and result.startswith("Error"):
+                            console.print(f"[red]Error during image optimization: {result}")
+                        else:
+                            optimize_results.append(result)
 
         valid_results = []
         for image_path in optimize_results:
