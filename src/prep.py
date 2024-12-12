@@ -19,6 +19,7 @@ try:
     import multiprocessing
     from multiprocessing import get_context
     from tqdm import tqdm
+    from concurrent.futures import ProcessPoolExecutor, as_completed
     import os
     import re
     import math
@@ -1661,24 +1662,18 @@ class Prep():
             else:
                 if use_tqdm():
                     with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True, dynamic_ncols=False) as pbar:
-                        with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                            try:
-                                for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
-                                    capture_results.append(result)
-                                    pbar.update(1)
-                            finally:
-                                pool.close()
-                                pool.join()
+                        with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
+                            futures = [executor.submit(self.capture_screenshot, task) for task in capture_tasks]
+                            for future in as_completed(futures):
+                                capture_results.append(future.result())
+                                pbar.update(1)
                 else:
                     console.print("[blue]Non-TTY environment detected. Progress bar disabled.")
-                    with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
-                        try:
-                            for i, result in enumerate(pool.imap_unordered(self.capture_screenshot, capture_tasks), 1):
-                                capture_results.append(result)
-                                console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
-                        finally:
-                            pool.close()
-                            pool.join()
+                    with ProcessPoolExecutor(max_workers=min(len(capture_tasks), task_limit)) as executor:
+                        futures = [executor.submit(self.capture_screenshot, task) for task in capture_tasks]
+                        for i, future in enumerate(as_completed(futures), 1):
+                            capture_results.append(future.result())
+                            console.print(f"Processed {i}/{len(capture_tasks)} screenshots")
 
                 if capture_results and (len(capture_results) + existing_images) > num_screens and not force_screenshots:
                     smallest = min(capture_results, key=os.path.getsize)
@@ -1692,23 +1687,17 @@ class Prep():
         if optimize_tasks:
             if use_tqdm():
                 with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True, dynamic_ncols=False) as pbar:
-                    with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                        try:
-                            for result in pool.imap_unordered(self.optimize_image_task, optimize_tasks):
-                                optimize_results.append(result)
-                                pbar.update(1)
-                        finally:
-                            pool.close()
-                            pool.join()
+                    with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
+                        futures = [executor.submit(self.optimize_image_task, task) for task in optimize_tasks]
+                        for future in as_completed(futures):
+                            optimize_results.append(future.result())
+                            pbar.update(1)
             else:
-                with get_context("spawn").Pool(processes=min(len(optimize_tasks), task_limit)) as pool:
-                    try:
-                        for i, result in enumerate(pool.imap_unordered(self.optimize_image_task, optimize_tasks), 1):
-                            optimize_results.append(result)
-                            console.print(f"Optimized {i}/{len(optimize_tasks)} images")
-                    finally:
-                        pool.close()
-                        pool.join()
+                with ProcessPoolExecutor(max_workers=min(len(optimize_tasks), task_limit)) as executor:
+                    futures = [executor.submit(self.optimize_image_task, task) for task in optimize_tasks]
+                    for i, future in enumerate(as_completed(futures), 1):
+                        optimize_results.append(future.result())
+                        console.print(f"Optimized {i}/{len(optimize_tasks)} images")
 
         valid_results = []
         for image_path in optimize_results:
