@@ -2512,8 +2512,12 @@ class Prep():
         return tag
 
     def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
-        with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-            mi = json.load(f)
+        try:
+            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+                mi = json.load(f)
+        except Exception:
+            if meta['debug']:
+                console.print("No mediainfo.json")
         resolution = meta['resolution']
         try:
             try:
