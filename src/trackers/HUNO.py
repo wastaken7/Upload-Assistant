@@ -7,6 +7,7 @@ import os
 import re
 import platform
 import bencodepy
+import cli_ui
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -136,7 +137,9 @@ class HUNO():
         if language == "zxx":
             language = "Silent"
         elif not language:
-            language = "Unknown"  # Default if no language is found
+            language = cli_ui.ask_string('No audio language present, you must enter one:')
+            if not language:
+                language = "Unknown"
 
         return f'{codec} {channels} {language}'
 
