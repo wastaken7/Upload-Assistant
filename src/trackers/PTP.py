@@ -804,7 +804,7 @@ class PTP():
                             meta[new_images_key] = []
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if not new_screens:
-                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
+                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None))
                                 s.start()
                                 while s.is_alive() is True:
                                     await asyncio.sleep(3)
