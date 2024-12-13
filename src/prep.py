@@ -1780,8 +1780,6 @@ class Prep():
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-        console.print(f"[green]Successfully processed {len(valid_results)} screenshots in total.")
-
         for image_path in valid_results:
             img_dict = {
                 'img_url': image_path,
