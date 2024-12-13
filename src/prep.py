@@ -710,9 +710,9 @@ class Prep():
         meta['3D'] = self.is_3d(mi, bdinfo)
         if meta.get('manual_source', None):
             meta['source'] = meta['manual_source']
-            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
         else:
-            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
+            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
@@ -2511,7 +2511,9 @@ class Prep():
             tag = ""
         return tag
 
-    def get_source(self, type, video, path, is_disc, meta):
+    def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
+        with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+            mi = json.load(f)
         resolution = meta['resolution']
         try:
             try:
@@ -2546,6 +2548,17 @@ class Prep():
                             system = "NTSC"
                     except Exception:
                         system = ""
+                    if system == "":
+                        try:
+                            framerate = mi['media']['track'][1].get('FrameRate', '')
+                            if framerate == "25":
+                                system = "PAL"
+                            elif framerate:
+                                system = "NTSC"
+                            else:
+                                system = ""
+                        except Exception:
+                            system = ""
                 finally:
                     if system is None:
                         system = ""
