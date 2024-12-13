@@ -4242,7 +4242,8 @@ class Prep():
             if resp.ok:
                 return resp.json()
             else:
-                print(f"HTTP Request failed with status code: {resp.status_code}, response: {resp.text}")
+                if meta['debug']:
+                    print(f"HTTP Request failed with status code: {resp.status_code}, response: {resp.text}")
                 return None
         except Exception as e:
             print(f"Error making TVmaze request: {e}")
