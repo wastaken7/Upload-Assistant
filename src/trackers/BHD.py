@@ -405,6 +405,10 @@ class BHD():
             console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
             meta['skipping'] = "BHD"
             return
+        if meta['type'] == "DVDRIP":
+            console.print("[bold red]No DVDRIP at BHD, skipping upload[/bold red]")
+            meta['skipping'] = "BHD"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on site...")
         category = meta['category']
