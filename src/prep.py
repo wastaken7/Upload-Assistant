@@ -429,8 +429,8 @@ class Prep():
         base_dir = meta['base_dir']
         meta['saved_description'] = False
 
+        folder_id = os.path.basename(meta['path'])
         if meta.get('uuid', None) is None:
-            folder_id = os.path.basename(meta['path'])
             meta['uuid'] = folder_id
         if not os.path.exists(f"{base_dir}/tmp/{meta['uuid']}"):
             Path(f"{base_dir}/tmp/{meta['uuid']}").mkdir(parents=True, exist_ok=True)
