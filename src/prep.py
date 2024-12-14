@@ -2501,14 +2501,26 @@ class Prep():
 
     def get_tag(self, video, meta):
         try:
-            tag = guessit(video)['release_group']
-            tag = f"-{tag}"
-        except Exception:
+            parsed = guessit(video)
+            release_group = parsed.get('release_group')
+
+            if meta['is_disc'] == "BDMV":
+                if release_group:
+                    if f"-{release_group}" not in video:
+                        if meta['debug']:
+                            console.print(f"[warning] Invalid release group format: {release_group}")
+                        release_group = None
+
+            tag = f"-{release_group}" if release_group else ""
+        except Exception as e:
+            console.print(f"Error while parsing: {e}")
             tag = ""
+
         if tag == "-":
             tag = ""
-        if tag[1:].lower() in ["nogroup", 'nogrp']:
+        if tag[1:].lower() in ["nogroup", "nogrp"]:
             tag = ""
+
         return tag
 
     def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
