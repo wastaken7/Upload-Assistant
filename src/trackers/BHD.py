@@ -383,12 +383,18 @@ class BHD():
             else:
                 images = meta['image_list']
             if len(images) > 0:
-                desc.write("[center]")
+                desc.write("[align=center]")
                 for each in range(len(images[:int(meta['screens'])])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
-                    desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]")
-                desc.write("[/center]")
+                    if (each == len(images) - 1):
+                        desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]")
+                    elif (each + 1) % 2 == 0:
+                        desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]\n")
+                        desc.write("\n")
+                    else:
+                        desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url] ")
+                desc.write("[/align]")
             desc.write(self.signature)
             desc.close()
         return
@@ -397,6 +403,10 @@ class BHD():
         bhd_name = await self.edit_name(meta)
         if any(phrase in bhd_name.lower() for phrase in ("-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi", "-ncmt", "-tdd", "-flux", "-crfw", "-sonny", "-zr-", "-mkvultra", "-rpg", "-w4nk3r", "-irobot", "-beyondhd")):
             console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
+            meta['skipping'] = "BHD"
+            return
+        if meta['type'] == "DVDRIP":
+            console.print("[bold red]No DVDRIP at BHD, skipping upload[/bold red]")
             meta['skipping'] = "BHD"
             return
         dupes = []

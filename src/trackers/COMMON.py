@@ -239,7 +239,7 @@ class COMMON():
                             if not new_screens:
                                 if meta['debug']:
                                     console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
-                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens + 1, True, None))
+                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None))
                                 s.start()
                                 while s.is_alive():
                                     await asyncio.sleep(1)

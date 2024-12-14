@@ -115,30 +115,46 @@ class HUNO():
         if dual:
             language = "DUAL"
         else:
-            if not meta['is_disc']:
-                # Read the MEDIAINFO.txt file
+            if meta['is_disc'] == "BDMV":
+                summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
+                with open(summary_path, 'r', encoding='utf-8') as f:
+                    summary_text = f.read()
+
+                audio_tracks = re.findall(r'Audio:\s*(.+)', summary_text)
+                if audio_tracks:
+                    first_audio = audio_tracks[0]
+                    language_match = re.search(r'([A-Za-z]+)\s*/', first_audio)
+                    if language_match:
+                        language = language_match.group(1).strip()
+                    else:
+                        print("DEBUG: No language found in the first audio track.")
+
+            else:
                 media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
                 with open(media_info_path, 'r', encoding='utf-8') as f:
                     media_info_text = f.read()
 
-                # Extract the first audio section
-                first_audio_section = re.search(r'Audio\s+ID\s+:\s+2(.*?)\n\n', media_info_text, re.DOTALL)
-                if not first_audio_section:  # Fallback in case of a different structure
-                    first_audio_section = re.search(r'Audio(.*?)Text', media_info_text, re.DOTALL)
+                audio_sections = re.findall(r'Audio\s+.*?(?=\n\n|Text|Menu|$)', media_info_text, re.DOTALL)
+                if audio_sections:
+                    first_audio_section = audio_sections[0]
+                    language_match = re.search(r'Language\s*:\s*(\w+.*)', first_audio_section)
 
-                if first_audio_section:
-                    # Extract language information from the first audio track
-                    language_match = re.search(r'Language\s*:\s*(.+)', first_audio_section.group(1))
                     if language_match:
                         language = language_match.group(1).strip()
-                        language = re.sub(r'\(.+\)', '', language)  # Remove text in parentheses
+                        language = re.sub(r'\(.+\)', '', language)
+                    else:
+                        print("DEBUG: No Language match found in the first audio section.")
+                else:
+                    print("DEBUG: No Audio sections found in MEDIAINFO.txt.")
 
-        # Handle special cases
         if language == "zxx":
             language = "Silent"
         elif not language:
-            language = cli_ui.ask_string('No audio language present, you must enter one:')
-            if not language:
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                language = cli_ui.ask_string('No audio language present, you must enter one:')
+                if not language:
+                    language = "Unknown"
+            else:
                 language = "Unknown"
 
         return f'{codec} {channels} {language}'
