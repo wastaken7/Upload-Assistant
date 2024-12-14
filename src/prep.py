@@ -1409,8 +1409,8 @@ class Prep():
             return
 
         if num_screens is None:
-            num_screens = self.screens
-        if num_screens == 0 or (len(meta.get('image_list', [])) >= num_screens and disc_num == 0):
+            num_screens = self.screens - len(existing_images)
+        if num_screens == 0 or (len(meta.get('image_list', [])) >= self.screens and disc_num == 0):
             return
 
         if len(glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-*.png")) >= num_screens:
@@ -1608,7 +1608,11 @@ class Prep():
             if w_sar != 1 or h_sar != 1:
                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
-            ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').run()
+            try:
+                ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').run()
+            except ffmpeg._run.Error as e:
+                stderr_output = e.stderr.decode() if e.stderr else "No stderr output available"
+                console.print(f"[red]Error capturing screenshot for {input_file} at {seek_time}s: {stderr_output}[/red]")
             if os.path.exists(image):
                 return image
             else:
@@ -4337,7 +4341,8 @@ class Prep():
             if resp.ok:
                 return resp.json()
             else:
-                print(f"HTTP Request failed with status code: {resp.status_code}, response: {resp.text}")
+                if meta['debug']:
+                    print(f"HTTP Request failed with status code: {resp.status_code}, response: {resp.text}")
                 return None
         except Exception as e:
             print(f"Error making TVmaze request: {e}")
