@@ -1579,8 +1579,8 @@ class Prep():
                 console.print(f"[red]Screenshot creation failed for {image}[/red]")
                 return None
 
-        except ffmpeg.Error as e:
-            console.print(f"[red]Error capturing screenshot for {input_file} at {seek_time}s: {e.stderr.decode()}[/red]")
+        except Exception as e:
+            console.print(f"[red]Error capturing screenshot for {input_file} at {seek_time}s: {e}[/red]")
             return None
 
     def screenshots(self, path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
@@ -1811,8 +1811,6 @@ class Prep():
                 return f"Error: Screenshot not generated or is empty at {image_path}"
 
             return image_path
-        except ffmpeg.Error as e:
-            return f"FFmpeg Error: {e.stderr.decode()}"
         except Exception as e:
             return f"Error: {str(e)}"
 
