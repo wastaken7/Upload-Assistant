@@ -2279,8 +2279,11 @@ class Prep():
             additional = track.get('Format_AdditionalFeatures', '')
 
             format_settings = track.get('Format_Settings', '')
+            if not isinstance(format_settings, str):
+                format_settings = ""
             if format_settings in ['Explicit']:
                 format_settings = ""
+            format_profile = track.get('Format_Profile', '')
             # Channels
             channels = track.get('Channels_Original', track.get('Channels'))
             if not str(channels).isnumeric():
@@ -2405,9 +2408,6 @@ class Prep():
             codec = audio.get(format, "") + audio_extra.get(additional, "")
             extra = format_extra.get(additional, "")
 
-        format_settings = track.get('Format_Settings', '')
-        if not isinstance(format_settings, str):
-            format_settings = ""
         format_settings = format_settings_extra.get(format_settings, "")
         if format_settings == "EX" and chan == "5.1":
             format_settings = "EX"
@@ -2421,7 +2421,7 @@ class Prep():
             if additional and additional.endswith("X"):
                 codec = "DTS:X"
                 chan = f"{int(channels) - 1}.1"
-        format_profile = track.get('Format_Profile', '')
+
         if format == "MPEG Audio":
             if format_profile == "Layer 2":
                 codec = "MP2"
