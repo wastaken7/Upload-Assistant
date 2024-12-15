@@ -947,6 +947,9 @@ class Prep():
                         "ID": track.get("ID", {}),
                         "UniqueID": track.get("UniqueID", {}),
                         "Format": track.get("Format", {}),
+                        "Format_Version": track.get("Format_Version", {}),
+                        "Format_Profile": track.get("Format_Profile", {}),
+                        "Format_Settings": track.get("Format_Settings", {}),
                         "Format_Commercial_IfAny": track.get("Format_Commercial_IfAny", {}),
                         "Format_Settings_Endianness": track.get("Format_Settings_Endianness", {}),
                         "Format_AdditionalFeatures": track.get("Format_AdditionalFeatures", {}),
@@ -2402,6 +2405,9 @@ class Prep():
             codec = audio.get(format, "") + audio_extra.get(additional, "")
             extra = format_extra.get(additional, "")
 
+        format_settings = track.get('Format_Settings', '')
+        if not isinstance(format_settings, str):
+            format_settings = ""
         format_settings = format_settings_extra.get(format_settings, "")
         if format_settings == "EX" and chan == "5.1":
             format_settings = "EX"
@@ -2415,8 +2421,12 @@ class Prep():
             if additional and additional.endswith("X"):
                 codec = "DTS:X"
                 chan = f"{int(channels) - 1}.1"
+        format_profile = track.get('Format_Profile', '')
         if format == "MPEG Audio":
-            codec = track.get('CodecID_Hint', '')
+            if format_profile == "Layer 2":
+                codec = "MP2"
+            else:
+                codec = track.get('CodecID_Hint', '')
 
         audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
         audio = ' '.join(audio.split())
