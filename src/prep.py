@@ -1241,13 +1241,16 @@ class Prep():
         os.chdir(f"{base_dir}/tmp/{folder_id}")
         existing_screens = glob.glob(f"{sanitized_filename}-*.png")
         total_existing = len(existing_screens) + len(existing_images)
-        num_screens = max(0, self.screens - total_existing)
+        if not force_screenshots:
+            num_screens = max(0, self.screens - total_existing)
+        else:
+            num_screens = num_screens
 
-        if num_screens == 0:
+        if num_screens == 0 and not force_screenshots:
             console.print('[bold green]Reusing existing screenshots. No additional screenshots needed.')
             return
 
-        if meta['debug']:
+        if meta['debug'] and not force_screenshots:
             console.print(f"[bold yellow]Saving Screens... Total needed: {self.screens}, Existing: {total_existing}, To capture: {num_screens}")
         capture_results = []
         capture_tasks = []
@@ -1315,30 +1318,66 @@ class Prep():
                     pool.join()
 
             valid_results = []
+            remaining_retakes = []
             for image_path in optimized_results:
-                retake = False
-                if not os.path.exists(image_path):
+                if "Error" in image_path:
+                    console.print(f"[red]{image_path}")
                     continue
 
+                retake = False
                 image_size = os.path.getsize(image_path)
                 if image_size <= 75000:
                     console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
                     retake = True
-                elif image_size <= 31000000 and self.img_host == "imgbb":
+                    time.sleep(1)
+                elif image_size <= 31000000 and self.img_host == "imgbb" and not retake:
                     pass
-                elif image_size <= 10000000 and self.img_host in ["imgbox", "pixhost"]:
+                elif image_size <= 10000000 and self.img_host in ["imgbox", "pixhost"] and not retake:
                     pass
-                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"]:
+                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and not retake:
                     pass
-                else:
+                elif not retake:
                     console.print("[red]Image too large for your image host, retaking.")
                     retake = True
+                    time.sleep(1)
 
                 if retake:
-                    console.print(f"[yellow]Retaking screenshot for: {image_path}[/yellow]")
-                    capture_tasks.append((file, None, image_path, keyframe, loglevel))
+                    retry_attempts = 3
+                    for attempt in range(1, retry_attempts + 1):
+                        console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
+                        try:
+                            os.remove(image_path)
+                            random_time = random.uniform(0, length)
+                            self.capture_disc_task((file, random_time, image_path, keyframe, loglevel))
+                            self.optimize_image_task((image_path, config))
+                            new_size = os.path.getsize(image_path)
+                            valid_image = False
+
+                            if new_size > 75000 and new_size <= 31000000 and self.img_host == "imgbb":
+                                console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                                valid_image = True
+                            elif new_size > 75000 and new_size <= 10000000 and self.img_host in ["imgbox", "pixhost"]:
+                                console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                                valid_image = True
+                            elif new_size > 75000 and self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"]:
+                                console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                                valid_image = True
+
+                            if valid_image:
+                                valid_results.append(image_path)
+                                break
+                            else:
+                                console.print(f"[red]Retaken image {image_path} does not meet the size requirements for {self.img_host}. Retrying...[/red]")
+                        except Exception as e:
+                            console.print(f"[red]Error retaking screenshot for {image_path}: {e}[/red]")
+                    else:
+                        console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
+                        remaining_retakes.append(image_path)
                 else:
                     valid_results.append(image_path)
+
+            if remaining_retakes:
+                console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
             for image_path in valid_results:
                 img_dict = {

@@ -86,8 +86,6 @@ class COMMON():
 
             # Handle multiple discs case
             elif len(discs) > 1:
-                if multi_screens == 0:
-                    multi_screens = 2
                 # Initialize retry_count if not already set
                 if 'retry_count' not in meta:
                     meta['retry_count'] = 0
@@ -108,7 +106,7 @@ class COMMON():
                         if meta['debug']:
                             console.print("[yellow]Using original uploaded images for first disc")
                         images = meta['image_list']
-                        for img_index in range(min(multi_screens, len(images))):
+                        for img_index in range(len(images[:int(meta['screens'])])):
                             web_url = images[img_index]['web_url']
                             raw_url = images[img_index]['raw_url']
                             image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
