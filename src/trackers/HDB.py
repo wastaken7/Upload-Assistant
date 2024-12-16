@@ -236,6 +236,7 @@ class HDB():
 
             # Create a new torrent with piece size explicitly set to 16 MiB
             new_torrent = prep.CustomTorrent(
+                meta=meta,
                 path=Path(meta['path']),
                 trackers=["https://fake.tracker"],
                 source="L4G",

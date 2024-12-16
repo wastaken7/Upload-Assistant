@@ -619,9 +619,6 @@ class PTP():
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
-        if multi_screens < 2:
-            multi_screens = 2
-            console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
             images = meta['image_list']
@@ -659,6 +656,9 @@ class PTP():
             elif len(discs) > 1:
                 if 'retry_count' not in meta:
                     meta['retry_count'] = 0
+                if multi_screens < 2:
+                    multi_screens = 2
+                    console.print("[yellow]PTP requires at least 2 screenshots for multi disc content, overriding config")
                 for i, each in enumerate(discs):
                     new_images_key = f'new_images_disc_{i}'
                     if each['type'] == "BDMV":
@@ -776,6 +776,9 @@ class PTP():
 
             # Handle multiple files case
             elif len(filelist) > 1:
+                if multi_screens < 2:
+                    multi_screens = 2
+                    console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
                 for i in range(len(filelist)):
                     file = filelist[i]
                     if i == 0:
@@ -986,6 +989,7 @@ class PTP():
             from src.prep import Prep
             prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
             new_torrent = prep.CustomTorrent(
+                meta=meta,
                 path=Path(meta['path']),
                 trackers=[self.announce_url],
                 source="L4G",
