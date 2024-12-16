@@ -947,6 +947,9 @@ class Prep():
                         "ID": track.get("ID", {}),
                         "UniqueID": track.get("UniqueID", {}),
                         "Format": track.get("Format", {}),
+                        "Format_Version": track.get("Format_Version", {}),
+                        "Format_Profile": track.get("Format_Profile", {}),
+                        "Format_Settings": track.get("Format_Settings", {}),
                         "Format_Commercial_IfAny": track.get("Format_Commercial_IfAny", {}),
                         "Format_Settings_Endianness": track.get("Format_Settings_Endianness", {}),
                         "Format_AdditionalFeatures": track.get("Format_AdditionalFeatures", {}),
@@ -1238,13 +1241,16 @@ class Prep():
         os.chdir(f"{base_dir}/tmp/{folder_id}")
         existing_screens = glob.glob(f"{sanitized_filename}-*.png")
         total_existing = len(existing_screens) + len(existing_images)
-        num_screens = max(0, self.screens - total_existing)
+        if not force_screenshots:
+            num_screens = max(0, self.screens - total_existing)
+        else:
+            num_screens = num_screens
 
-        if num_screens == 0:
+        if num_screens == 0 and not force_screenshots:
             console.print('[bold green]Reusing existing screenshots. No additional screenshots needed.')
             return
 
-        if meta['debug']:
+        if meta['debug'] and not force_screenshots:
             console.print(f"[bold yellow]Saving Screens... Total needed: {self.screens}, Existing: {total_existing}, To capture: {num_screens}")
         capture_results = []
         capture_tasks = []
@@ -2346,8 +2352,11 @@ class Prep():
             additional = track.get('Format_AdditionalFeatures', '')
 
             format_settings = track.get('Format_Settings', '')
+            if not isinstance(format_settings, str):
+                format_settings = ""
             if format_settings in ['Explicit']:
                 format_settings = ""
+            format_profile = track.get('Format_Profile', '')
             # Channels
             channels = track.get('Channels_Original', track.get('Channels'))
             if not str(channels).isnumeric():
@@ -2485,8 +2494,12 @@ class Prep():
             if additional and additional.endswith("X"):
                 codec = "DTS:X"
                 chan = f"{int(channels) - 1}.1"
+
         if format == "MPEG Audio":
-            codec = track.get('CodecID_Hint', '')
+            if format_profile == "Layer 2":
+                codec = "MP2"
+            else:
+                codec = track.get('CodecID_Hint', '')
 
         audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
         audio = ' '.join(audio.split())
