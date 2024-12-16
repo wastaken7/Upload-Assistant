@@ -697,6 +697,7 @@ class Prep():
             tracks = meta.get('mediainfo').get('media', {}).get('track', [])  # Get all tracks
             bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 else ''  # Get video bitrate if available
             bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 else ''  # For old MediaInfo (< 24.x where video bitrate is empty, use 'OverallBitRate' instead)
+            meta['episode_title'] = ""
             if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000):
                 meta['service'] = "CR"
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()):  # Only assign if at least one bitrate is present, otherwise leave it to user
