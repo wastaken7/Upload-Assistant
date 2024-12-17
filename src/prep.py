@@ -768,6 +768,9 @@ class Prep():
             )
             return
 
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+            json.dump(meta, f, indent=4)
+
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
