@@ -88,7 +88,7 @@ class Prep():
             sys.exit(1)
 
     async def check_images_concurrently(self, imagelist, meta):
-        approved_image_hosts = ['ptpimg', 'imgbox']
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         invalid_host_found = False  # Track if any image is on a non-approved host
 
         # Ensure meta['image_sizes'] exists
