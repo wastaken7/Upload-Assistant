@@ -773,6 +773,8 @@ class Prep():
             console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
             return
 
+        meta['we_are_uploading'] = True
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 

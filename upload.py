@@ -463,211 +463,239 @@ async def do_the_thing(base_dir):
 
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         await process_meta(meta, base_dir)
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
+        if 'we_are_uploading' not in meta:
+            console.print("we are not uploading.......")
+            if meta.get('queue') is not None:
+                processed_files_count += 1
+                console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                if not meta['debug']:
+                    if log_file:
+                        save_processed_file(log_file, path)
 
-        ####################################
-        #######  Upload to Trackers  #######  # noqa #F266
-        ####################################
-        common = COMMON(config=config)
-        tracker_setup = TRACKER_SETUP(config=config)
-        enabled_trackers = tracker_setup.trackers_enabled(meta)
+        else:
+            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
 
-        async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
-            modq, draft = None, None
+            ####################################
+            #######  Upload to Trackers  #######  # noqa #F266
+            ####################################
 
-            tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
+            common = COMMON(config=config)
+            tracker_setup = TRACKER_SETUP(config=config)
+            enabled_trackers = tracker_setup.trackers_enabled(meta)
+            print("Enabled Trackers:", enabled_trackers)
+            print("API Trackers:", api_trackers)
 
-            # Handle BHD specific draft/live logic
-            if tracker_class.tracker == 'BHD' and tracker_caps.get('draft_live'):
-                draft_int = await tracker_class.get_live(meta)
-                draft = "Draft" if draft_int == 0 else "Live"
+            async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
+                modq, draft = None, None
 
-            # Handle mod_q and draft for other trackers
-            else:
-                if tracker_caps.get('mod_q'):
-                    modq = await tracker_class.get_flag(meta, 'modq')
-                    modq = 'Yes' if modq else 'No'
-                if tracker_caps.get('draft'):
-                    draft = await tracker_class.get_flag(meta, 'draft')
-                    draft = 'Yes' if draft else 'No'
+                tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
 
-            return modq, draft
+                # Handle BHD specific draft/live logic
+                if tracker_class.tracker == 'BHD' and tracker_caps.get('draft_live'):
+                    draft_int = await tracker_class.get_live(meta)
+                    draft = "Draft" if draft_int == 0 else "Live"
 
-        for tracker in enabled_trackers:
-            disctype = meta.get('disctype', None)
-            tracker = tracker.replace(" ", "").upper().strip()
-            if meta['name'].endswith('DUPE?'):
-                meta['name'] = meta['name'].replace(' DUPE?', '')
+                # Handle mod_q and draft for other trackers
+                else:
+                    if tracker_caps.get('mod_q'):
+                        modq = await tracker_class.get_flag(meta, 'modq')
+                        modq = 'Yes' if modq else 'No'
+                    if tracker_caps.get('draft'):
+                        draft = await tracker_class.get_flag(meta, 'draft')
+                        draft = 'Yes' if draft else 'No'
 
-            if meta['debug']:
-                debug = "(DEBUG)"
-            else:
-                debug = ""
+                return modq, draft
 
-            if tracker in api_trackers:
-                tracker_class = tracker_class_map[tracker](config=config)
-                tracker_status = meta.get('tracker_status', {})
-                for tracker, status in tracker_status.items():
-                    upload_status = status.get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+            for tracker in enabled_trackers:
+                disctype = meta.get('disctype', None)
+                tracker = tracker.replace(" ", "").upper().strip()
+                if meta['name'].endswith('DUPE?'):
+                    meta['name'] = meta['name'].replace(' DUPE?', '')
 
-                    if upload_status:
-                        # Get mod_q, draft, or draft/live depending on the tracker
-                        modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                if meta['debug']:
+                    debug = "(DEBUG)"
+                else:
+                    debug = ""
 
-                        # Print mod_q and draft info if relevant
-                        if modq is not None:
-                            console.print(f"(modq: {modq})")
-                        if draft is not None:
-                            console.print(f"(draft: {draft})")
+                if tracker in api_trackers:
+                    tracker_class = tracker_class_map[tracker](config=config)
+                    tracker_status = meta.get('tracker_status', {})
+                    upload_to_tracker = cli_ui.ask_yes_no(
+                        f"Upload to {tracker_class.tracker}? {debug}",
+                        default=meta['unattended']
+                    )
+                    if upload_to_tracker:
+                        for tracker, status in tracker_status.items():
+                            upload_status = status.get('upload', False)
+                            console.print(f"[red]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/red]")
 
-                        console.print(f"Uploading to {tracker_class.tracker}")
+                            if upload_status:
+                                # Get mod_q, draft, or draft/live depending on the tracker
+                                modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
-                        await tracker_class.upload(meta, disctype)
-                        await asyncio.sleep(0.5)
-                        perm = config['DEFAULT'].get('get_permalink', False)
-                        if perm:
-                            # need a wait so we don't race the api
-                            await asyncio.sleep(5)
-                            await tracker_class.search_torrent_page(meta, disctype)
-                            await asyncio.sleep(0.5)
-                        await client.add_to_client(meta, tracker_class.tracker)
+                                # Print mod_q and draft info if relevant
+                                if modq is not None:
+                                    console.print(f"(modq: {modq})")
+                                if draft is not None:
+                                    console.print(f"(draft: {draft})")
 
-            if tracker in other_api_trackers:
-                tracker_class = tracker_class_map[tracker](config=config)
-                tracker_status = meta.get('tracker_status', {})
-                for tracker, status in tracker_status.items():
-                    upload_status = status.get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                                console.print(f"Uploading to {tracker_class.tracker}")
 
-                    if upload_status:
-                        # Get mod_q, draft, or draft/live depending on the tracker
-                        modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
-
-                        # Print mod_q and draft info if relevant
-                        if modq is not None:
-                            console.print(f"(modq: {modq})")
-                        if draft is not None:
-                            console.print(f"(draft: {draft})")
-
-                        console.print(f"Uploading to {tracker_class.tracker}")
-
-                        # Perform the existing checks for dupes except TL
-                        if tracker != "TL":
-                            if tracker == "RTF":
-                                await tracker_class.api_test(meta)
-                            # Proceed with upload if the meta is set to upload
-                            if tracker == "TL" or upload_status:
                                 await tracker_class.upload(meta, disctype)
-                                if tracker == 'SN':
-                                    await asyncio.sleep(16)
                                 await asyncio.sleep(0.5)
+                                perm = config['DEFAULT'].get('get_permalink', False)
+                                if perm:
+                                    # need a wait so we don't race the api
+                                    await asyncio.sleep(5)
+                                    await tracker_class.search_torrent_page(meta, disctype)
+                                    await asyncio.sleep(0.5)
                                 await client.add_to_client(meta, tracker_class.tracker)
 
-            if tracker in http_trackers:
-                tracker_class = tracker_class_map[tracker](config=config)
-                tracker_status = meta.get('tracker_status', {})
-                for tracker, status in tracker_status.items():
-                    upload_status = status.get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                if tracker in other_api_trackers:
+                    tracker_class = tracker_class_map[tracker](config=config)
+                    tracker_status = meta.get('tracker_status', {})
+                    upload_to_tracker = cli_ui.ask_yes_no(
+                        f"Upload to {tracker_class.tracker}? {debug}",
+                        default=meta['unattended']
+                    )
+                    if upload_to_tracker:
+                        for tracker, status in tracker_status.items():
+                            upload_status = status.get('upload', False)
+                            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
 
-                    if upload_status:
-                        console.print(f"Uploading to {tracker}")
+                            if upload_status:
+                                # Get mod_q, draft, or draft/live depending on the tracker
+                                modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
-                        if await tracker_class.validate_credentials(meta) is True:
-                            await tracker_class.upload(meta, disctype)
-                            await asyncio.sleep(0.5)
-                            await client.add_to_client(meta, tracker_class.tracker)
+                                # Print mod_q and draft info if relevant
+                                if modq is not None:
+                                    console.print(f"(modq: {modq})")
+                                if draft is not None:
+                                    console.print(f"(draft: {draft})")
 
-            if tracker == "MANUAL":
-                if meta['unattended']:
-                    do_manual = True
-                else:
-                    do_manual = cli_ui.ask_yes_no("Get files for manual upload?", default=True)
-                if do_manual:
-                    for manual_tracker in enabled_trackers:
-                        if manual_tracker != 'MANUAL':
-                            manual_tracker = manual_tracker.replace(" ", "").upper().strip()
-                            tracker_class = tracker_class_map[manual_tracker](config=config)
-                            if manual_tracker in api_trackers:
-                                await common.unit3d_edit_desc(meta, tracker_class.tracker, tracker_class.signature)
-                            else:
-                                await tracker_class.edit_desc(meta)
-                    url = await prep.package(meta)
-                    if url is False:
-                        console.print(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta['uuid']}")
+                                console.print(f"Uploading to {tracker_class.tracker}")
+
+                                # Perform the existing checks for dupes except TL
+                                if tracker != "TL":
+                                    if tracker == "RTF":
+                                        await tracker_class.api_test(meta)
+                                    # Proceed with upload if the meta is set to upload
+                                    if tracker == "TL" or upload_status:
+                                        await tracker_class.upload(meta, disctype)
+                                        if tracker == 'SN':
+                                            await asyncio.sleep(16)
+                                        await asyncio.sleep(0.5)
+                                        await client.add_to_client(meta, tracker_class.tracker)
+
+                if tracker in http_trackers:
+                    tracker_class = tracker_class_map[tracker](config=config)
+                    tracker_status = meta.get('tracker_status', {})
+                    upload_to_tracker = cli_ui.ask_yes_no(
+                        f"Upload to {tracker_class.tracker}? {debug}",
+                        default=meta['unattended']
+                    )
+                    if upload_to_tracker:
+                        for tracker, status in tracker_status.items():
+                            upload_status = status.get('upload', False)
+                            console.print(f"[blue]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/blue]")
+
+                            if upload_status:
+                                console.print(f"Uploading to {tracker}")
+
+                                if await tracker_class.validate_credentials(meta) is True:
+                                    await tracker_class.upload(meta, disctype)
+                                    await asyncio.sleep(0.5)
+                                    await client.add_to_client(meta, tracker_class.tracker)
+
+                if tracker == "MANUAL":
+                    if meta['unattended']:
+                        do_manual = True
                     else:
-                        console.print(f"[green]{meta['name']}")
-                        console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
+                        do_manual = cli_ui.ask_yes_no("Get files for manual upload?", default=True)
+                    if do_manual:
+                        for manual_tracker in enabled_trackers:
+                            if manual_tracker != 'MANUAL':
+                                manual_tracker = manual_tracker.replace(" ", "").upper().strip()
+                                tracker_class = tracker_class_map[manual_tracker](config=config)
+                                if manual_tracker in api_trackers:
+                                    await common.unit3d_edit_desc(meta, tracker_class.tracker, tracker_class.signature)
+                                else:
+                                    await tracker_class.edit_desc(meta)
+                        url = await prep.package(meta)
+                        if url is False:
+                            console.print(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta['uuid']}")
+                        else:
+                            console.print(f"[green]{meta['name']}")
+                            console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
-            if tracker == "THR":
-                tracker_status = meta.get('tracker_status', {})
-                for tracker, status in tracker_status.items():
-                    upload_status = status.get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                if tracker == "THR":
+                    tracker_status = meta.get('tracker_status', {})
+                    for tracker, status in tracker_status.items():
+                        upload_status = status.get('upload', False)
+                        print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                    if upload_status:
-                        console.print("Uploading to THR")
-                        # nable to get IMDB id/Youtube Link
-                        if meta.get('imdb_id', '0') == '0':
-                            imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                            meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                        if meta.get('youtube', None) is None:
-                            youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
-                            meta['youtube'] = youtube
-                        thr = THR(config=config)
-                        try:
-                            with requests.Session() as session:
-                                console.print("[yellow]Logging in to THR")
-                                session = thr.login(session)
-                                await thr.upload(session, meta, disctype)
-                                await asyncio.sleep(0.5)
-                                await client.add_to_client(meta, "THR")
-                        except Exception:
-                            console.print(traceback.format_exc())
+                        if upload_status:
+                            console.print("Uploading to THR")
+                            # nable to get IMDB id/Youtube Link
+                            if meta.get('imdb_id', '0') == '0':
+                                imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                                meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                            if meta.get('youtube', None) is None:
+                                youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
+                                meta['youtube'] = youtube
+                            thr = THR(config=config)
+                            try:
+                                with requests.Session() as session:
+                                    console.print("[yellow]Logging in to THR")
+                                    session = thr.login(session)
+                                    await thr.upload(session, meta, disctype)
+                                    await asyncio.sleep(0.5)
+                                    await client.add_to_client(meta, "THR")
+                            except Exception:
+                                console.print(traceback.format_exc())
 
-            if tracker == "PTP":
-                tracker_status = meta.get('tracker_status', {})
-                for tracker, status in tracker_status.items():
-                    upload_status = status.get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                if tracker == "PTP":
+                    tracker_status = meta.get('tracker_status', {})
+                    for tracker, status in tracker_status.items():
+                        upload_status = status.get('upload', False)
+                        print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                    if upload_status:
-                        console.print(f"Uploading to {tracker}")
-                        if meta.get('imdb_id', '0') == '0':
-                            imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                            meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                        ptp = PTP(config=config)
-                        try:
-                            console.print("[yellow]Searching for Group ID")
-                            groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
-                            if groupID is None:
-                                console.print("[yellow]No Existing Group found")
-                                if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
-                                    youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
-                                    meta['youtube'] = youtube
-                                meta['upload'] = True
-                            else:
-                                console.print("[yellow]Searching for Existing Releases")
-                                dupes = await ptp.search_existing(groupID, meta, disctype)
-                                dupes = await common.filter_dupes(dupes, meta)
+                        if upload_status:
+                            console.print(f"Uploading to {tracker}")
+                            if meta.get('imdb_id', '0') == '0':
+                                imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                                meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                            ptp = PTP(config=config)
+                            try:
+                                console.print("[yellow]Searching for Group ID")
+                                groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
+                                if groupID is None:
+                                    console.print("[yellow]No Existing Group found")
+                                    if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
+                                        youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                                        meta['youtube'] = youtube
+                                    meta['upload'] = True
+                                else:
+                                    console.print("[yellow]Searching for Existing Releases")
+                                    dupes = await ptp.search_existing(groupID, meta, disctype)
+                                    dupes = await common.filter_dupes(dupes, meta)
 
-                            if meta.get('imdb_info', {}) == {}:
-                                meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
-                            if meta['upload'] is True:
-                                ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                                await ptp.upload(meta, ptpUrl, ptpData, disctype)
-                                await asyncio.sleep(5)
-                                await client.add_to_client(meta, "PTP")
-                        except Exception:
-                            console.print(traceback.format_exc())
+                                if meta.get('imdb_info', {}) == {}:
+                                    meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
+                                if meta['upload'] is True:
+                                    ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
+                                    await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                                    await asyncio.sleep(5)
+                                    await client.add_to_client(meta, "PTP")
+                            except Exception:
+                                console.print(traceback.format_exc())
 
-        if meta.get('queue') is not None:
-            processed_files_count += 1
-            console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
-            if not meta['debug']:
-                if log_file:
-                    save_processed_file(log_file, path)
+            if meta.get('queue') is not None:
+                processed_files_count += 1
+                console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                if not meta['debug']:
+                    if log_file:
+                        save_processed_file(log_file, path)
 
 
 if __name__ == '__main__':
