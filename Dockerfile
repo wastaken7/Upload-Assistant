@@ -11,6 +11,7 @@ RUN apt-get update && \
     mktorrent \
     rustc \
     mono-complete && \
+    nano && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up a virtual environment to isolate our Python dependencies
