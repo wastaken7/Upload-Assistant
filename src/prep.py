@@ -12,6 +12,8 @@ from src.trackers.TIK import TIK  # noqa F401
 from src.trackers.COMMON import COMMON
 from src.clients import Clients
 from data.config import config
+from src.uphelper import UploadHelper
+from src.trackersetup import TRACKER_SETUP, tracker_class_map
 
 try:
     import traceback
@@ -618,46 +620,6 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
-        if 'manual_frames' not in meta:
-            meta['manual_frames'] = {}
-        manual_frames = meta['manual_frames']
-        # Take Screenshots
-        if meta['is_disc'] == "BDMV":
-            if meta.get('edit', False) is False:
-                if meta.get('vapoursynth', False) is True:
-                    use_vs = True
-                else:
-                    use_vs = False
-                try:
-                    ds = multiprocessing.Process(target=self.disc_screenshots, args=(meta, filename, bdinfo, meta['uuid'], base_dir, use_vs, meta.get('image_list', []), meta.get('ffdebug', False), None))
-                    ds.start()
-                    while ds.is_alive() is True:
-                        await asyncio.sleep(1)
-                except KeyboardInterrupt:
-                    ds.terminate()
-        elif meta['is_disc'] == "DVD":
-            if meta.get('edit', False) is False:
-                try:
-                    ds = multiprocessing.Process(target=self.dvd_screenshots, args=(meta, 0, None, None))
-                    ds.start()
-                    while ds.is_alive() is True:
-                        await asyncio.sleep(1)
-                except KeyboardInterrupt:
-                    ds.terminate()
-        else:
-            if meta.get('edit', False) is False:
-                try:
-                    s = multiprocessing.Process(
-                        target=self.screenshots,
-                        args=(videopath, filename, meta['uuid'], base_dir, meta),  # Positional arguments
-                        kwargs={'manual_frames': manual_frames}  # Keyword argument
-                    )
-                    s.start()
-                    while s.is_alive() is True:
-                        await asyncio.sleep(3)
-                except KeyboardInterrupt:
-                    s.terminate()
-
         meta['tmdb'] = meta.get('tmdb_manual', None)
         meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
@@ -733,6 +695,84 @@ class Prep():
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
         else:
             meta['edition'] = ""
+
+        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
+        parser = Args(config)
+        helper = UploadHelper()
+        confirm = helper.get_confirmation(meta)
+        while confirm is False:
+            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            editargs = (meta['path'],) + tuple(editargs.split())
+            if meta.get('debug', False):
+                editargs += ("--debug",)
+            meta, help, before_args = parser.parse(editargs, meta)
+            meta['edit'] = True
+            meta = await self.gather_prep(meta=meta, mode='cli')
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+                json.dump(meta, f, indent=4)
+            meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
+            confirm = helper.get_confirmation(meta)
+
+        common = COMMON(config=config)
+        tracker_setup = TRACKER_SETUP(config=config)
+        enabled_trackers = tracker_setup.trackers_enabled(meta)
+
+        for tracker_name in enabled_trackers:
+            disctype = meta.get('disctype', None)
+            tracker_name = tracker_name.replace(" ", "").upper().strip()
+
+            if meta['name'].endswith('DUPE?'):
+                meta['name'] = meta['name'].replace(' DUPE?', '')
+
+            if tracker_name in tracker_class_map:
+                tracker_class = tracker_class_map[tracker_name](config=config)
+                if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
+                    console.print("we're banned")
+                dupes = await tracker_class.search_existing(meta, disctype)
+                if 'skipping' not in meta or meta['skipping'] is None:
+                    dupes = await common.filter_dupes(dupes, meta)
+                    meta = helper.dupe_check(dupes, meta)
+                meta['skipping'] = None
+
+        if 'manual_frames' not in meta:
+            meta['manual_frames'] = {}
+        manual_frames = meta['manual_frames']
+        # Take Screenshots
+        if meta['is_disc'] == "BDMV":
+            if meta.get('edit', False) is False:
+                if meta.get('vapoursynth', False) is True:
+                    use_vs = True
+                else:
+                    use_vs = False
+                try:
+                    ds = multiprocessing.Process(target=self.disc_screenshots, args=(meta, filename, bdinfo, meta['uuid'], base_dir, use_vs, meta.get('image_list', []), meta.get('ffdebug', False), None))
+                    ds.start()
+                    while ds.is_alive() is True:
+                        await asyncio.sleep(1)
+                except KeyboardInterrupt:
+                    ds.terminate()
+        elif meta['is_disc'] == "DVD":
+            if meta.get('edit', False) is False:
+                try:
+                    ds = multiprocessing.Process(target=self.dvd_screenshots, args=(meta, 0, None, None))
+                    ds.start()
+                    while ds.is_alive() is True:
+                        await asyncio.sleep(1)
+                except KeyboardInterrupt:
+                    ds.terminate()
+        else:
+            if meta.get('edit', False) is False:
+                try:
+                    s = multiprocessing.Process(
+                        target=self.screenshots,
+                        args=(videopath, filename, meta['uuid'], base_dir, meta),  # Positional arguments
+                        kwargs={'manual_frames': manual_frames}  # Keyword argument
+                    )
+                    s.start()
+                    while s.is_alive() is True:
+                        await asyncio.sleep(3)
+                except KeyboardInterrupt:
+                    s.terminate()
 
         # WORK ON THIS
         meta.get('stream', False)
