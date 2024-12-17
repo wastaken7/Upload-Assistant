@@ -761,6 +761,13 @@ class Prep():
         if meta['debug']:
             console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
 
+        meta['skip_uploading'] = int(self.config['DEFAULT'].get('tracker_pass_checks', 1))
+        if successful_trackers <= meta['skip_uploading']:
+            console.print(
+                f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]"
+            )
+            return
+
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
