@@ -10,7 +10,7 @@ RUN apt-get update && \
     cargo \
     mktorrent \
     rustc \
-    mono-complete && \
+    mono-complete \
     nano && \
     rm -rf /var/lib/apt/lists/*
 
