@@ -620,6 +620,7 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
+        console.print("[yellow]Building meta data.....")
         meta['tmdb'] = meta.get('tmdb_manual', None)
         meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
@@ -767,10 +768,8 @@ class Prep():
             console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
 
         meta['skip_uploading'] = int(self.config['DEFAULT'].get('tracker_pass_checks', 1))
-        if successful_trackers <= meta['skip_uploading']:
-            console.print(
-                f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]"
-            )
+        if successful_trackers < meta['skip_uploading']:
+            console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
             return
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
