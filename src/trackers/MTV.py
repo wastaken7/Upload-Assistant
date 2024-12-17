@@ -45,7 +45,7 @@ class MTV():
         await self.upload_with_retry(meta, cookiefile, common)
 
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
-        approved_image_hosts = ['ptpimg', 'imgbox']
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         images_reuploaded = False
 
         if all(any(host in image['raw_url'] for host in approved_image_hosts) for image in meta['image_list']):
@@ -179,7 +179,7 @@ class MTV():
 
     async def handle_image_upload(self, meta, img_host_index=1, approved_image_hosts=None, file=None):
         if approved_image_hosts is None:
-            approved_image_hosts = ['ptpimg', 'imgbox']
+            approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
 
         retry_mode = False
         images_reuploaded = False

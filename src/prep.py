@@ -697,6 +697,7 @@ class Prep():
             tracks = meta.get('mediainfo').get('media', {}).get('track', [])  # Get all tracks
             bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 else ''  # Get video bitrate if available
             bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 else ''  # For old MediaInfo (< 24.x where video bitrate is empty, use 'OverallBitRate' instead)
+            meta['episode_title'] = ""
             if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000):
                 meta['service'] = "CR"
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()):  # Only assign if at least one bitrate is present, otherwise leave it to user
@@ -3476,7 +3477,10 @@ class Prep():
         source = meta.get('source', "")
         uhd = meta.get('uhd', "")
         hdr = meta.get('hdr', "")
-        episode_title = meta.get('episode_title', '')
+        if meta.get('manual_episode_title'):
+            episode_title = meta.get('manual_episode_title')
+        else:
+            episode_title = meta.get('episode_title', '')
         if meta.get('is_disc', "") == "BDMV":  # Disk
             video_codec = meta.get('video_codec', "")
             region = meta.get('region', "")
@@ -3785,7 +3789,12 @@ class Prep():
             meta['season_int'] = season_int
             meta['episode_int'] = episode_int
 
-            meta['episode_title_storage'] = guessit(video, {"excludes": "part"}).get('episode_title', '')
+            # Manual episode title
+            if meta['manual_episode_title'] == "":
+                meta['episode_title_storage'] = meta.get('manual_episode_title')
+            else:
+                meta['episode_title_storage'] = guessit(video, {"excludes": "part"}).get('episode_title', '')
+
             if meta['season'] == "S00" or meta['episode'] == "E00":
                 meta['episode_title'] = meta['episode_title_storage']
 
