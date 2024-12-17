@@ -729,7 +729,7 @@ class Prep():
 
             if tracker_name in tracker_class_map:
                 tracker_class = tracker_class_map[tracker_name](config=config)
-                tracker_status[tracker_name] = {'banned': False, 'skipped': False, 'dupe': False}
+                tracker_status[tracker_name] = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False}
 
                 if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                     console.print(f"[red]Tracker '{tracker_name}' is banned. Skipping.[/red]")
@@ -749,15 +749,20 @@ class Prep():
 
                 if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
                     console.print(f"[green]Tracker '{tracker_name}' passed both checks.[/green]")
+                    tracker_status[tracker_name]['upload'] = True
                     successful_trackers += 1
+
+        meta['tracker_status'] = tracker_status
+
         if meta['debug']:
             console.print("\n[bold]Tracker Processing Summary:[/bold]")
         for t_name, status in tracker_status.items():
             banned_status = 'Yes' if status['banned'] else 'No'
             skipped_status = 'Yes' if status['skipped'] else 'No'
             dupe_status = 'Yes' if status['dupe'] else 'No'
+            upload_status = 'Yes' if status['upload'] else 'No'
             if meta['debug']:
-                console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status}")
+                console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
         if meta['debug']:
             console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
 
