@@ -4,48 +4,8 @@ import requests
 from src.args import Args
 from src.clients import Clients
 from src.trackers.COMMON import COMMON
-from src.trackers.HUNO import HUNO
-from src.trackers.BLU import BLU
-from src.trackers.BHD import BHD
-from src.trackers.AITHER import AITHER
-from src.trackers.STC import STC
-from src.trackers.R4E import R4E
 from src.trackers.THR import THR
-from src.trackers.STT import STT
-from src.trackers.HP import HP
 from src.trackers.PTP import PTP
-from src.trackers.SN import SN
-from src.trackers.ACM import ACM
-from src.trackers.HDB import HDB
-from src.trackers.LCD import LCD
-from src.trackers.TTG import TTG
-from src.trackers.LST import LST
-from src.trackers.FL import FL
-from src.trackers.LT import LT
-from src.trackers.NBL import NBL
-from src.trackers.ANT import ANT
-from src.trackers.PTER import PTER
-from src.trackers.MTV import MTV
-from src.trackers.JPTV import JPTV
-from src.trackers.TL import TL
-from src.trackers.HDT import HDT
-from src.trackers.RF import RF
-from src.trackers.OE import OE
-from src.trackers.BHDTV import BHDTV
-from src.trackers.RTF import RTF
-from src.trackers.OTW import OTW
-from src.trackers.FNP import FNP
-from src.trackers.CBR import CBR
-from src.trackers.UTP import UTP
-from src.trackers.AL import AL
-from src.trackers.SHRI import SHRI
-from src.trackers.TIK import TIK
-from src.trackers.TVC import TVC
-from src.trackers.PSS import PSS
-from src.trackers.ULCX import ULCX
-from src.trackers.SPD import SPD
-from src.trackers.YOINK import YOINK
-from src.trackers.PTT import PTT
 import json
 from pathlib import Path
 import asyncio
@@ -58,6 +18,7 @@ import cli_ui
 import traceback
 import click
 import re
+from src.trackersetup import TRACKER_SETUP, tracker_class_map, api_trackers, other_api_trackers, http_trackers, tracker_capabilities
 
 from src.console import console
 from rich.markdown import Markdown
@@ -500,59 +461,13 @@ async def do_the_thing(base_dir):
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         await process_meta(meta, base_dir)
         prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
-        if meta.get('trackers', None) is not None:
-            trackers = meta['trackers']
-        else:
-            trackers = config['TRACKERS']['default_trackers']
-        if "," in trackers:
-            trackers = trackers.split(',')
-        confirm = get_confirmation(meta)
-        while confirm is False:
-            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
-            editargs = (meta['path'],) + tuple(editargs.split())
-            if meta.get('debug', False):
-                editargs += ("--debug",)
-            meta, help, before_args = parser.parse(editargs, meta)
-            meta['edit'] = True
-            meta = await prep.gather_prep(meta=meta, mode='cli')
-            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-                json.dump(meta, f, indent=4)
-            meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
-            confirm = get_confirmation(meta)
 
-        if isinstance(trackers, str):
-            trackers = trackers.split(',')
-        trackers = [s.strip().upper() for s in trackers]
-        if meta.get('manual', False):
-            trackers.insert(0, "MANUAL")
         ####################################
         #######  Upload to Trackers  #######  # noqa #F266
         ####################################
         common = COMMON(config=config)
-        api_trackers = [
-            'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT',
-            'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'STC', 'STT', 'TIK', 'ULCX', 'UTP', 'YOINK', 'PTT'
-        ]
-        other_api_trackers = [
-            'ANT', 'BHDTV', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TVC'
-        ]
-        http_trackers = [
-            'FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'
-        ]
-        tracker_class_map = {
-            'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
-            'FNP': FNP, 'FL': FL, 'HDB': HDB, 'HDT': HDT, 'HP': HP, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
-            'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
-            'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SPD': SPD, 'STC': STC, 'STT': STT, 'THR': THR,
-            'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'PTT': PTT,
-        }
-
-        tracker_capabilities = {
-            'AITHER': {'mod_q': True, 'draft': False},
-            'BHD': {'draft_live': True},
-            'BLU': {'mod_q': True, 'draft': False},
-            'LST': {'mod_q': True, 'draft': True}
-        }
+        tracker_setup = TRACKER_SETUP(config=config)
+        enabled_trackers = tracker_setup.trackers_enabled(meta)
 
         async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
             modq, draft = None, None
@@ -575,7 +490,7 @@ async def do_the_thing(base_dir):
 
             return modq, draft
 
-        for tracker in trackers:
+        for tracker in enabled_trackers:
             disctype = meta.get('disctype', None)
             tracker = tracker.replace(" ", "").upper().strip()
             if meta['name'].endswith('DUPE?'):
@@ -588,124 +503,77 @@ async def do_the_thing(base_dir):
 
             if tracker in api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
+                tracker_status = meta.get('tracker_status', {})
+                for tracker, status in tracker_status.items():
+                    upload_status = status.get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                if meta['unattended']:
-                    upload_to_tracker = True
-                else:
-                    try:
-                        upload_to_tracker = cli_ui.ask_yes_no(
-                            f"Upload to {tracker_class.tracker}? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
+                    if upload_status:
+                        # Get mod_q, draft, or draft/live depending on the tracker
+                        modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
-                if upload_to_tracker:
-                    # Get mod_q, draft, or draft/live depending on the tracker
-                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                        # Print mod_q and draft info if relevant
+                        if modq is not None:
+                            console.print(f"(modq: {modq})")
+                        if draft is not None:
+                            console.print(f"(draft: {draft})")
 
-                    # Print mod_q and draft info if relevant
-                    if modq is not None:
-                        console.print(f"(modq: {modq})")
-                    if draft is not None:
-                        console.print(f"(draft: {draft})")
+                        console.print(f"Uploading to {tracker_class.tracker}")
 
-                    console.print(f"Uploading to {tracker_class.tracker}")
-
-                    # Check if the group is banned for the tracker
-                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
-                        continue
-
-                    dupes = await tracker_class.search_existing(meta, disctype)
-                    if 'skipping' not in meta or meta['skipping'] is None:
-                        dupes = await common.filter_dupes(dupes, meta)
-                        meta = dupe_check(dupes, meta)
-
-                        # Proceed with upload if the meta is set to upload
-                        if meta.get('upload', False):
-                            await tracker_class.upload(meta, disctype)
-                            perm = config['DEFAULT'].get('get_permalink', False)
-                            if perm:
-                                # need a wait so we don't race the api
-                                await asyncio.sleep(5)
-                                await tracker_class.search_torrent_page(meta, disctype)
-                                await asyncio.sleep(0.5)
-                            await client.add_to_client(meta, tracker_class.tracker)
-                    meta['skipping'] = None
+                        await tracker_class.upload(meta, disctype)
+                        await asyncio.sleep(0.5)
+                        perm = config['DEFAULT'].get('get_permalink', False)
+                        if perm:
+                            # need a wait so we don't race the api
+                            await asyncio.sleep(5)
+                            await tracker_class.search_torrent_page(meta, disctype)
+                            await asyncio.sleep(0.5)
+                        await client.add_to_client(meta, tracker_class.tracker)
 
             if tracker in other_api_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
+                tracker_status = meta.get('tracker_status', {})
+                for tracker, status in tracker_status.items():
+                    upload_status = status.get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                if meta['unattended']:
-                    upload_to_tracker = True
-                else:
-                    try:
-                        upload_to_tracker = cli_ui.ask_yes_no(
-                            f"Upload to {tracker_class.tracker}? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
+                    if upload_status:
+                        # Get mod_q, draft, or draft/live depending on the tracker
+                        modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
-                if upload_to_tracker:
-                    # Get mod_q, draft, or draft/live depending on the tracker
-                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                        # Print mod_q and draft info if relevant
+                        if modq is not None:
+                            console.print(f"(modq: {modq})")
+                        if draft is not None:
+                            console.print(f"(draft: {draft})")
 
-                    # Print mod_q and draft info if relevant
-                    if modq is not None:
-                        console.print(f"(modq: {modq})")
-                    if draft is not None:
-                        console.print(f"(draft: {draft})")
+                        console.print(f"Uploading to {tracker_class.tracker}")
 
-                    console.print(f"Uploading to {tracker_class.tracker}")
-
-                    # Check if the group is banned for the tracker
-                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
-                        continue
-
-                    # Perform the existing checks for dupes except TL
-                    if tracker != "TL":
-                        if tracker == "RTF":
-                            await tracker_class.api_test(meta)
-
-                        dupes = await tracker_class.search_existing(meta, disctype)
-                        if 'skipping' not in meta or meta['skipping'] is None:
-                            dupes = await common.filter_dupes(dupes, meta)
-                            meta = dupe_check(dupes, meta)
-
-                    if 'skipping' not in meta or meta['skipping'] is None:
-                        # Proceed with upload if the meta is set to upload
-                        if tracker == "TL" or meta.get('upload', False):
-                            await tracker_class.upload(meta, disctype)
-                            if tracker == 'SN':
-                                await asyncio.sleep(16)
-                            await client.add_to_client(meta, tracker_class.tracker)
-                    meta['skipping'] = None
+                        # Perform the existing checks for dupes except TL
+                        if tracker != "TL":
+                            if tracker == "RTF":
+                                await tracker_class.api_test(meta)
+                            # Proceed with upload if the meta is set to upload
+                            if tracker == "TL" or upload_status:
+                                await tracker_class.upload(meta, disctype)
+                                if tracker == 'SN':
+                                    await asyncio.sleep(16)
+                                await asyncio.sleep(0.5)
+                                await client.add_to_client(meta, tracker_class.tracker)
 
             if tracker in http_trackers:
                 tracker_class = tracker_class_map[tracker](config=config)
+                tracker_status = meta.get('tracker_status', {})
+                for tracker, status in tracker_status.items():
+                    upload_status = status.get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                if meta['unattended']:
-                    upload_to_tracker = True
-                else:
-                    try:
-                        upload_to_tracker = cli_ui.ask_yes_no(
-                            f"Upload to {tracker_class.tracker}? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
+                    if upload_status:
+                        console.print(f"Uploading to {tracker}")
 
-                if upload_to_tracker:
-                    console.print(f"Uploading to {tracker}")
-                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
-                        continue
-                    if await tracker_class.validate_credentials(meta) is True:
-                        dupes = await tracker_class.search_existing(meta, disctype)
-                        dupes = await common.filter_dupes(dupes, meta)
-                        meta = dupe_check(dupes, meta)
-                        if meta['upload'] is True:
+                        if await tracker_class.validate_credentials(meta) is True:
                             await tracker_class.upload(meta, disctype)
+                            await asyncio.sleep(0.5)
                             await client.add_to_client(meta, tracker_class.tracker)
 
             if tracker == "MANUAL":
@@ -714,7 +582,7 @@ async def do_the_thing(base_dir):
                 else:
                     do_manual = cli_ui.ask_yes_no("Get files for manual upload?", default=True)
                 if do_manual:
-                    for manual_tracker in trackers:
+                    for manual_tracker in enabled_trackers:
                         if manual_tracker != 'MANUAL':
                             manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                             tracker_class = tracker_class_map[manual_tracker](config=config)
@@ -730,83 +598,66 @@ async def do_the_thing(base_dir):
                         console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
             if tracker == "THR":
-                if meta['unattended']:
-                    upload_to_thr = True
-                else:
-                    try:
-                        upload_to_ptp = cli_ui.ask_yes_no(
-                            f"Upload to THR? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
-                if upload_to_thr:
-                    console.print("Uploading to THR")
-                    # nable to get IMDB id/Youtube Link
-                    if meta.get('imdb_id', '0') == '0':
-                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                        meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                    if meta.get('youtube', None) is None:
-                        youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
-                        meta['youtube'] = youtube
-                    thr = THR(config=config)
-                    try:
-                        with requests.Session() as session:
-                            console.print("[yellow]Logging in to THR")
-                            session = thr.login(session)
-                            console.print("[yellow]Searching for Dupes")
-                            dupes = thr.search_existing(session, disctype, meta.get('imdb_id'))
-                            dupes = await common.filter_dupes(dupes, meta)
-                            meta = dupe_check(dupes, meta)
-                            if meta['upload'] is True:
+                tracker_status = meta.get('tracker_status', {})
+                for tracker, status in tracker_status.items():
+                    upload_status = status.get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+
+                    if upload_status:
+                        console.print("Uploading to THR")
+                        # nable to get IMDB id/Youtube Link
+                        if meta.get('imdb_id', '0') == '0':
+                            imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                            meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                        if meta.get('youtube', None) is None:
+                            youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
+                            meta['youtube'] = youtube
+                        thr = THR(config=config)
+                        try:
+                            with requests.Session() as session:
+                                console.print("[yellow]Logging in to THR")
+                                session = thr.login(session)
                                 await thr.upload(session, meta, disctype)
+                                await asyncio.sleep(0.5)
                                 await client.add_to_client(meta, "THR")
-                    except Exception:
-                        console.print(traceback.format_exc())
+                        except Exception:
+                            console.print(traceback.format_exc())
 
             if tracker == "PTP":
-                if meta['unattended']:
-                    upload_to_ptp = True
-                else:
-                    try:
-                        upload_to_ptp = cli_ui.ask_yes_no(
-                            f"Upload to {tracker}? {debug}",
-                            default=meta['unattended']
-                        )
-                    except (KeyboardInterrupt, EOFError):
-                        sys.exit(1)  # Exit immediately
+                tracker_status = meta.get('tracker_status', {})
+                for tracker, status in tracker_status.items():
+                    upload_status = status.get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                if upload_to_ptp:  # Ensure the variable is defined before this check
-                    console.print(f"Uploading to {tracker}")
-                    if meta.get('imdb_id', '0') == '0':
-                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                        meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                    ptp = PTP(config=config)
-                    if check_banned_group("PTP", ptp.banned_groups, meta):
-                        continue
-                    try:
-                        console.print("[yellow]Searching for Group ID")
-                        groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
-                        if groupID is None:
-                            console.print("[yellow]No Existing Group found")
-                            if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
-                                youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
-                                meta['youtube'] = youtube
-                            meta['upload'] = True
-                        else:
-                            console.print("[yellow]Searching for Existing Releases")
-                            dupes = await ptp.search_existing(groupID, meta, disctype)
-                            dupes = await common.filter_dupes(dupes, meta)
-                            meta = dupe_check(dupes, meta)
-                        if meta.get('imdb_info', {}) == {}:
-                            meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
-                        if meta['upload'] is True:
-                            ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                            await ptp.upload(meta, ptpUrl, ptpData, disctype)
-                            await asyncio.sleep(5)
-                            await client.add_to_client(meta, "PTP")
-                    except Exception:
-                        console.print(traceback.format_exc())
+                    if upload_status:
+                        console.print(f"Uploading to {tracker}")
+                        if meta.get('imdb_id', '0') == '0':
+                            imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                            meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                        ptp = PTP(config=config)
+                        try:
+                            console.print("[yellow]Searching for Group ID")
+                            groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
+                            if groupID is None:
+                                console.print("[yellow]No Existing Group found")
+                                if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
+                                    youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                                    meta['youtube'] = youtube
+                                meta['upload'] = True
+                            else:
+                                console.print("[yellow]Searching for Existing Releases")
+                                dupes = await ptp.search_existing(groupID, meta, disctype)
+                                dupes = await common.filter_dupes(dupes, meta)
+
+                            if meta.get('imdb_info', {}) == {}:
+                                meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
+                            if meta['upload'] is True:
+                                ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
+                                await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                                await asyncio.sleep(5)
+                                await client.add_to_client(meta, "PTP")
+                        except Exception:
+                            console.print(traceback.format_exc())
 
         if meta.get('queue') is not None:
             processed_files_count += 1
@@ -814,164 +665,6 @@ async def do_the_thing(base_dir):
             if not meta['debug']:
                 if log_file:
                     save_processed_file(log_file, path)
-
-
-def get_confirmation(meta):
-    if meta['debug'] is True:
-        console.print("[bold red]DEBUG: True")
-    console.print(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
-    console.print()
-    console.print("[bold yellow]Database Info[/bold yellow]")
-    console.print(f"[bold]Title:[/bold] {meta['title']} ({meta['year']})")
-    console.print()
-    console.print(f"[bold]Overview:[/bold] {meta['overview']}")
-    console.print()
-    console.print(f"[bold]Category:[/bold] {meta['category']}")
-    if int(meta.get('tmdb', 0)) != 0:
-        console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
-    if int(meta.get('imdb_id', '0')) != 0:
-        console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb_id']}")
-    if int(meta.get('tvdb_id', '0')) != 0:
-        console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
-    if int(meta.get('tvmaze_id', '0')) != 0:
-        console.print(f"[bold]TVMaze:[/bold] https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
-    if int(meta.get('mal_id', 0)) != 0:
-        console.print(f"[bold]MAL:[/bold] https://myanimelist.net/anime/{meta['mal_id']}")
-    console.print()
-    if int(meta.get('freeleech', '0')) != 0:
-        console.print(f"[bold]Freeleech:[/bold] {meta['freeleech']}")
-    if meta['tag'] == "":
-        tag = ""
-    else:
-        tag = f" / {meta['tag'][1:]}"
-    if meta['is_disc'] == "DVD":
-        res = meta['source']
-    else:
-        res = meta['resolution']
-
-    console.print(f"{res} / {meta['type']}{tag}")
-    if meta.get('personalrelease', False) is True:
-        console.print("[bold green]Personal Release![/bold green]")
-    console.print()
-    if meta.get('unattended', False) is False:
-        get_missing(meta)
-        ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) is True else ""  # \a rings the bell
-        if ring_the_bell:
-            console.print(ring_the_bell)
-
-        # Handle the 'keep_folder' logic based on 'is disc' and 'isdir'
-        if meta.get('is disc', False) is True:
-            meta['keep_folder'] = False  # Ensure 'keep_folder' is False if 'is disc' is True
-
-        if meta.get('keep_folder'):
-            if meta['isdir']:
-                console.print("[bold yellow]Uploading with --keep-folder[/bold yellow]")
-                kf_confirm = input("You specified --keep-folder. Uploading in folders might not be allowed. Are you sure you want to proceed? [y/N]: ").strip().lower()
-                if kf_confirm != 'y':
-                    console.print("[bold red]Aborting...[/bold red]")
-                    exit()
-
-        console.print("[bold yellow]Is this correct?[/bold yellow]")
-        console.print(f"[bold]Name:[/bold] {meta['name']}")
-        confirm_input = input("Correct? [y/N]: ").strip().lower()
-        confirm = confirm_input == 'y'
-
-    else:
-        console.print(f"[bold]Name:[/bold] {meta['name']}")
-        confirm = True
-
-    return confirm
-
-
-def dupe_check(dupes, meta):
-    if not dupes:
-        console.print("[green]No dupes found")
-        meta['upload'] = True
-        return meta
-    else:
-        console.print()
-        dupe_text = "\n".join(dupes)
-        console.print()
-        cli_ui.info_section(cli_ui.bold, "Check if these are actually dupes!")
-        cli_ui.info(dupe_text)
-        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-            if meta.get('dupe', False) is False:
-                upload = cli_ui.ask_yes_no("Upload Anyways?", default=False)
-            else:
-                upload = True
-        else:
-            if meta.get('dupe', False) is False:
-                console.print("[red]Found potential dupes. Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
-                upload = False
-            else:
-                console.print("[yellow]Found potential dupes. --skip-dupe-check was passed. Uploading anyways")
-                upload = True
-        console.print()
-        if upload is False:
-            meta['upload'] = False
-        else:
-            meta['upload'] = True
-            for each in dupes:
-                if each == meta['name']:
-                    meta['name'] = f"{meta['name']} DUPE?"
-
-        return meta
-
-
-# Return True if banned group
-def check_banned_group(tracker, banned_group_list, meta):
-    if meta['tag'] == "":
-        return False
-    else:
-        q = False
-        for tag in banned_group_list:
-            if isinstance(tag, list):
-                if meta['tag'][1:].lower() == tag[0].lower():
-                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                    console.print(f"[bold red]NOTE: [bold yellow]{tag[1]}")
-                    q = True
-            else:
-                if meta['tag'][1:].lower() == tag.lower():
-                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                    q = True
-        if q:
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                if not cli_ui.ask_yes_no(cli_ui.red, "Upload Anyways?", default=False):
-                    return True
-            else:
-                return True
-    return False
-
-
-def get_missing(meta):
-    info_notes = {
-        'edition': 'Special Edition/Release',
-        'description': "Please include Remux/Encode Notes if possible (either here or edit your upload)",
-        'service': "WEB Service e.g.(AMZN, NF)",
-        'region': "Disc Region",
-        'imdb': 'IMDb ID (tt1234567)',
-        'distributor': "Disc Distributor e.g.(BFI, Criterion, etc)"
-    }
-    missing = []
-    if meta.get('imdb_id', '0') == '0':
-        meta['imdb_id'] = '0'
-        meta['potential_missing'].append('imdb_id')
-    if len(meta['potential_missing']) > 0:
-        for each in meta['potential_missing']:
-            if str(meta.get(each, '')).replace(' ', '') in ["", "None", "0"]:
-                if each == "imdb_id":
-                    each = 'imdb'
-                missing.append(f"--{each} | {info_notes.get(each)}")
-    if missing != []:
-        cli_ui.info_section(cli_ui.yellow, "Potentially missing information:")
-        for each in missing:
-            if each.split('|')[0].replace('--', '').strip() in ["imdb"]:
-                cli_ui.info(cli_ui.red, each)
-            else:
-                cli_ui.info(each)
-
-    console.print()
-    return
 
 
 if __name__ == '__main__':
