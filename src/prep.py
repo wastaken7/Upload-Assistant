@@ -717,6 +717,9 @@ class Prep():
         tracker_setup = TRACKER_SETUP(config=config)
         enabled_trackers = tracker_setup.trackers_enabled(meta)
 
+        tracker_status = {}
+        successful_trackers = 0
+
         for tracker_name in enabled_trackers:
             disctype = meta.get('disctype', None)
             tracker_name = tracker_name.replace(" ", "").upper().strip()
@@ -726,13 +729,37 @@ class Prep():
 
             if tracker_name in tracker_class_map:
                 tracker_class = tracker_class_map[tracker_name](config=config)
+                tracker_status[tracker_name] = {'banned': False, 'skipped': False, 'dupe': False}
+
                 if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
-                    console.print("we're banned")
+                    console.print(f"[red]Tracker '{tracker_name}' is banned. Skipping.[/red]")
+                    tracker_status[tracker_name]['banned'] = True
+                    continue
+
                 dupes = await tracker_class.search_existing(meta, disctype)
                 if 'skipping' not in meta or meta['skipping'] is None:
                     dupes = await common.filter_dupes(dupes, meta)
-                    meta = helper.dupe_check(dupes, meta)
+                    meta, is_dupe = helper.dupe_check(dupes, meta)
+                    if is_dupe:
+                        console.print(f"[yellow]Tracker '{tracker_name}' has confirmed dupes.[/yellow]")
+                        tracker_status[tracker_name]['dupe'] = True
+                elif meta['skipping']:
+                    tracker_status[tracker_name]['skipped'] = True
                 meta['skipping'] = None
+
+                if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
+                    console.print(f"[green]Tracker '{tracker_name}' passed both checks.[/green]")
+                    successful_trackers += 1
+        if meta['debug']:
+            console.print("\n[bold]Tracker Processing Summary:[/bold]")
+        for t_name, status in tracker_status.items():
+            banned_status = 'Yes' if status['banned'] else 'No'
+            skipped_status = 'Yes' if status['skipped'] else 'No'
+            dupe_status = 'Yes' if status['dupe'] else 'No'
+            if meta['debug']:
+                console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status}")
+        if meta['debug']:
+            console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
 
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
