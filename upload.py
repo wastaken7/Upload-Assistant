@@ -520,92 +520,61 @@ async def do_the_thing(base_dir):
                 if tracker in api_trackers:
                     tracker_class = tracker_class_map[tracker](config=config)
                     tracker_status = meta.get('tracker_status', {})
-                    upload_to_tracker = cli_ui.ask_yes_no(
-                        f"Upload to {tracker_class.tracker}? {debug}",
-                        default=meta['unattended']
-                    )
-                    if upload_to_tracker:
-                        for tracker, status in tracker_status.items():
-                            upload_status = status.get('upload', False)
-                            console.print(f"[red]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/red]")
+                    upload_status = tracker_status.get(tracker, {}).get('upload', False)
+                    console.print(f"[red]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/red]")
 
-                            if upload_status:
-                                # Get mod_q, draft, or draft/live depending on the tracker
-                                modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                    if upload_status:
+                        modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
 
-                                # Print mod_q and draft info if relevant
-                                if modq is not None:
-                                    console.print(f"(modq: {modq})")
-                                if draft is not None:
-                                    console.print(f"(draft: {draft})")
+                        if modq is not None:
+                            console.print(f"(modq: {modq})")
+                        if draft is not None:
+                            console.print(f"(draft: {draft})")
 
-                                console.print(f"Uploading to {tracker_class.tracker}")
+                        console.print(f"Uploading to {tracker_class.tracker}")
 
-                                await tracker_class.upload(meta, disctype)
-                                await asyncio.sleep(0.5)
-                                perm = config['DEFAULT'].get('get_permalink', False)
-                                if perm:
-                                    # need a wait so we don't race the api
-                                    await asyncio.sleep(5)
-                                    await tracker_class.search_torrent_page(meta, disctype)
-                                    await asyncio.sleep(0.5)
-                                await client.add_to_client(meta, tracker_class.tracker)
+                        await tracker_class.upload(meta, disctype)
+                        await asyncio.sleep(0.5)
+                        perm = config['DEFAULT'].get('get_permalink', False)
+                        if perm:
+                            # need a wait so we don't race the api
+                            await asyncio.sleep(5)
+                            await tracker_class.search_torrent_page(meta, disctype)
+                            await asyncio.sleep(0.5)
+                        await client.add_to_client(meta, tracker_class.tracker)
 
                 if tracker in other_api_trackers:
                     tracker_class = tracker_class_map[tracker](config=config)
                     tracker_status = meta.get('tracker_status', {})
-                    upload_to_tracker = cli_ui.ask_yes_no(
-                        f"Upload to {tracker_class.tracker}? {debug}",
-                        default=meta['unattended']
-                    )
-                    if upload_to_tracker:
-                        for tracker, status in tracker_status.items():
-                            upload_status = status.get('upload', False)
-                            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
+                    upload_status = tracker_status.get(tracker, {}).get('upload', False)
+                    console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
 
-                            if upload_status:
-                                # Get mod_q, draft, or draft/live depending on the tracker
-                                modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                    if upload_status:
+                        console.print(f"Uploading to {tracker_class.tracker}")
 
-                                # Print mod_q and draft info if relevant
-                                if modq is not None:
-                                    console.print(f"(modq: {modq})")
-                                if draft is not None:
-                                    console.print(f"(draft: {draft})")
-
-                                console.print(f"Uploading to {tracker_class.tracker}")
-
-                                # Perform the existing checks for dupes except TL
-                                if tracker != "TL":
-                                    if tracker == "RTF":
-                                        await tracker_class.api_test(meta)
-                                    # Proceed with upload if the meta is set to upload
-                                    if tracker == "TL" or upload_status:
-                                        await tracker_class.upload(meta, disctype)
-                                        if tracker == 'SN':
-                                            await asyncio.sleep(16)
-                                        await asyncio.sleep(0.5)
-                                        await client.add_to_client(meta, tracker_class.tracker)
+                        if tracker != "TL":
+                            if tracker == "RTF":
+                                await tracker_class.api_test(meta)
+                            if tracker == "TL" or upload_status:
+                                await tracker_class.upload(meta, disctype)
+                                if tracker == 'SN':
+                                    await asyncio.sleep(16)
+                                await asyncio.sleep(0.5)
+                                await client.add_to_client(meta, tracker_class.tracker)
 
                 if tracker in http_trackers:
                     tracker_class = tracker_class_map[tracker](config=config)
                     tracker_status = meta.get('tracker_status', {})
-                    upload_to_tracker = cli_ui.ask_yes_no(
-                        f"Upload to {tracker_class.tracker}? {debug}",
-                        default=meta['unattended']
-                    )
-                    if upload_to_tracker:
-                        for tracker, status in tracker_status.items():
-                            upload_status = status.get('upload', False)
-                            console.print(f"[blue]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/blue]")
+                    upload_status = tracker_status.get(tracker, {}).get('upload', False)
+                    console.print(f"[blue]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/blue]")
 
-                            if upload_status:
-                                console.print(f"Uploading to {tracker}")
+                    if upload_status:
+                        console.print(f"Uploading to {tracker}")
 
-                                if await tracker_class.validate_credentials(meta) is True:
-                                    await tracker_class.upload(meta, disctype)
-                                    await asyncio.sleep(0.5)
-                                    await client.add_to_client(meta, tracker_class.tracker)
+                        if await tracker_class.validate_credentials(meta) is True:
+                            await tracker_class.upload(meta, disctype)
+                            await asyncio.sleep(0.5)
+                            await client.add_to_client(meta, tracker_class.tracker)
 
                 if tracker == "MANUAL":
                     if meta['unattended']:
