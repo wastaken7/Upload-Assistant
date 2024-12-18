@@ -164,7 +164,7 @@ class BHD():
                         data['imdb_id'] = 1
                         response = requests.post(url=url, files=files, data=data, headers=headers)
                         response = response.json()
-                    elif response['satus_message'].startswith('Invalid name value'):
+                    elif response['status_message'].startswith('Invalid name value'):
                         console.print(f"[bold yellow]Submitted Name: {bhd_name}")
                 console.print(response)
             except Exception:
