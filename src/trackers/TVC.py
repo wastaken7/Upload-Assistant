@@ -292,7 +292,7 @@ class TVC():
         # https://tvchaosuk.com/api/torrents/filter?api_token=<API_key>&tmdb=138108
 
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on TVC...")
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdb': meta['tmdb'],

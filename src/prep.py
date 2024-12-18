@@ -750,7 +750,7 @@ class Prep():
                 meta['skipping'] = None
 
                 if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
-                    console.print(f"[green]Tracker '{tracker_name}' passed both checks.[/green]")
+                    console.print(f"[green]Tracker '{tracker_name}' passed all checks.[/green]")
                     tracker_status[tracker_name]['upload'] = True
                     successful_trackers += 1
 

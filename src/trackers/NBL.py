@@ -85,7 +85,7 @@ class NBL():
             meta['skipping'] = "NBL"
             return
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on NBL...")
         if int(meta.get('tvmaze_id', 0)) != 0:
             search_term = {'tvmaze': int(meta['tvmaze_id'])}
         elif int(meta.get('imdb_id', '0').replace('tt', '')) == 0:

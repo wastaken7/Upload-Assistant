@@ -410,7 +410,7 @@ class BHD():
             meta['skipping'] = "BHD"
             return
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on BHD...")
         category = meta['category']
         if category == 'MOVIE':
             tmdbID = "movie"
