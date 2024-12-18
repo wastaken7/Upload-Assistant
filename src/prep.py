@@ -643,7 +643,8 @@ class Prep():
         else:
             meta = await self.tmdb_other_meta(meta)
         # Search tvmaze
-        meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
+        if meta['category'] == "TV":
+            meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
         # If no imdb, search for it
         if meta.get('imdb_id', None) is None:
             meta['imdb_id'] = await self.search_imdb(filename, meta['search_year'])
@@ -654,7 +655,8 @@ class Prep():
         else:
             if not meta['tag'].startswith('-') and meta['tag'] != "":
                 meta['tag'] = f"-{meta['tag']}"
-        meta = await self.get_season_episode(video, meta)
+        if meta['category'] == "TV":
+            meta = await self.get_season_episode(video, meta)
         meta = await self.tag_override(meta)
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo').get('media', {}).get('track', [])  # Get all tracks
