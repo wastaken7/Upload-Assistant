@@ -623,6 +623,8 @@ class Prep():
         console.print("[yellow]Building meta data.....")
         if meta['debug']:
             meta_start_time = time.time()
+        if meta.get('manual_language'):
+            meta['original_langauge'] = meta.get('manual_language').lower()
         meta['tmdb'] = meta.get('tmdb_manual', None)
         meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
@@ -2176,7 +2178,7 @@ class Prep():
             except Exception:
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
-            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'], meta)
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -2230,7 +2232,7 @@ class Prep():
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
             # meta['aka'] = f" AKA {response['original_name']}"
-            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'], meta)
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -2474,7 +2476,7 @@ class Prep():
             if meta.get('dual_audio', False):
                 dual = "Dual-Audio"
             else:
-                if meta.get('original_language', '') != 'en':
+                if not meta.get('original_language', '').startswith('en'):
                     eng, orig = False, False
                     try:
                         for t in tracks:
@@ -4225,7 +4227,7 @@ class Prep():
             return False
         return
 
-    async def get_imdb_aka_api(self, imdb_id):
+    async def get_imdb_aka_api(self, imdb_id, meta):
         if imdb_id == "0":
             return "", None
         if not imdb_id.startswith("tt"):
@@ -4269,7 +4271,10 @@ class Prep():
         # Extract relevant fields from the response
         aka = title_data.get("originalTitleText", {}).get("text", "")
         is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
-        original_language = None
+        if meta.get('manual_language'):
+            original_language = meta.get('manual_language')
+        else:
+            original_language = None
 
         if not is_original and aka:
             aka = f" AKA {aka}"
@@ -4464,6 +4469,8 @@ class Prep():
                         if name_id.startswith('nm'):
                             imdb_info['directors'].append(name_id)
                     break
+            if meta.get('manual_language'):
+                imdb_info['original_langauge'] = meta.get('manual_language')
 
         if not title_data:
             imdb_info = {
