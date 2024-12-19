@@ -1,10 +1,9 @@
 name: Create and publish Docker images
 
 on:
-  push:
-    branches:
-      - master
-      - development
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 env:
@@ -43,30 +42,19 @@ jobs:
         run: |
           REPO_NAME=${{ env.IMAGE_NAME }} 
           echo "LOWER_CASE_REPO_NAME=${REPO_NAME,,}" >> $GITHUB_ENV
-          
-      - name: Get short commit id
-        id: get_short_commit_id
-        run: |
-          echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Set image name based on branch
-        id: set_image_name
+      - name: Get release version
+        id: get_release_version
         run: |
-          if [ "${{ github.ref_name }}" == "master" ]; then
-            IMAGE_TAG="master"
-          elif [ "${{ github.ref_name }}" == "develop" ]; then
-            IMAGE_TAG="develop"
-          else
-            IMAGE_TAG="${{ github.ref_name }}"
-          fi
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
-          
+          RELEASE_VERSION=${{ github.event.release.tag_name }}
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.IMAGE_TAG }}, ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.RELEASE_VERSION }}, ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
