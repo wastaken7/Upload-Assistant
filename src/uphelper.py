@@ -10,13 +10,14 @@ class UploadHelper:
         if not dupes:
             console.print("[green]No dupes found")
             meta['upload'] = True
-            return meta
+            return meta, False
         else:
             console.print()
             dupe_text = "\n".join([d['name'] if isinstance(d, dict) else d for d in dupes])
             console.print()
             cli_ui.info_section(cli_ui.bold, "Check if these are actually dupes!")
             cli_ui.info(dupe_text)
+
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                 if meta.get('dupe', False) is False:
                     upload = cli_ui.ask_yes_no("Upload Anyways?", default=False)
@@ -29,9 +30,11 @@ class UploadHelper:
                 else:
                     console.print("[yellow]Found potential dupes. --skip-dupe-check was passed. Uploading anyways")
                     upload = True
+
             console.print()
             if upload is False:
                 meta['upload'] = False
+                return meta, True
             else:
                 meta['upload'] = True
                 for each in dupes:
@@ -39,7 +42,7 @@ class UploadHelper:
                     if each_name == meta['name']:
                         meta['name'] = f"{meta['name']} DUPE?"
 
-            return meta
+                return meta, False
 
     def get_confirmation(self, meta):
         if meta['debug'] is True:
