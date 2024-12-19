@@ -4430,44 +4430,43 @@ class Prep():
             response = requests.post(url, json=query, headers=headers)
             data = response.json()
 
-            title_data = data.get("data", {}).get("title", {})
-            if not title_data:
-                return meta
-
-            imdb_info['imdbID'] = imdbID
-            imdb_info['title'] = title_data.get('titleText', {}).get('text', '')
-            imdb_info['year'] = title_data.get('releaseYear', {}).get('year', '')
-            original_title = title_data.get('originalTitleText', {}).get('text', '')
-            if not original_title or original_title == imdb_info['title']:
-                original_title = imdb_info['title']
-            imdb_info['aka'] = original_title
-            imdb_info['type'] = title_data.get('titleType', {}).get('id')
-            runtime_data = title_data.get('runtime', {})
-            runtime_seconds = runtime_data.get('seconds', 0)
-            if runtime_seconds:
-                runtime_minutes = runtime_seconds // 60
-            else:
-                runtime_minutes = 0
-
-            imdb_info['runtime'] = str(runtime_minutes)
-            imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '')
-            if not imdb_info['cover']:
-                imdb_info['cover'] = meta.get('poster', '')
-            imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '')
-            genres = title_data.get('titleGenres', {}).get('genres', [])
-            genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
-            imdb_info['genres'] = ', '.join(genre_list)
-            imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A')
-            imdb_info['directors'] = []
-            principal_credits = title_data.get('principalCredits', [])
+        title_data = data.get("data", {}).get("title", {})
+        if not title_data:
+            return meta
+        imdb_info['imdbID'] = imdbID
+        imdb_info['title'] = title_data.get('titleText', {}).get('text', '') or ''
+        imdb_info['year'] = title_data.get('releaseYear', {}).get('year', '') or ''
+        original_title = title_data.get('originalTitleText', {}).get('text', '')
+        if not original_title or original_title == imdb_info['title']:
+            original_title = imdb_info['title']
+        imdb_info['aka'] = original_title
+        imdb_info['type'] = title_data.get('titleType', {}).get('id', '')
+        runtime_data = title_data.get('runtime', {})
+        runtime_seconds = runtime_data.get('seconds', 0)
+        runtime_minutes = runtime_seconds // 60 if runtime_seconds else 0
+        imdb_info['runtime'] = str(runtime_minutes)
+        imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '')
+        imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '') or 'No plot available'
+        title_genres = title_data.get('titleGenres')
+        if title_genres and isinstance(title_genres, dict):
+            genres = title_genres.get('genres', [])
+        else:
+            genres = []
+        genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
+        imdb_info['genres'] = ', '.join(genre_list) or ''
+        imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A')
+        imdb_info['directors'] = []
+        principal_credits = title_data.get('principalCredits', [])
+        if principal_credits and isinstance(principal_credits, list):
             for pc in principal_credits:
                 category_text = pc.get('category', {}).get('text', '')
                 if 'Direct' in category_text:
                     credits = pc.get('credits', [])
-                    for c in credits:
-                        name_id = c.get('name', {}).get('id', '')
-                        if name_id.startswith('nm'):
-                            imdb_info['directors'].append(name_id)
+                    if credits and isinstance(credits, list):
+                        for c in credits:
+                            name_id = c.get('name', {}).get('id', '')
+                            if name_id.startswith('nm'):
+                                imdb_info['directors'].append(name_id)
                     break
             if meta.get('manual_language'):
                 imdb_info['original_langauge'] = meta.get('manual_language')
