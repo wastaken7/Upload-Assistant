@@ -4472,8 +4472,12 @@ class Prep():
         imdb_info['aka'] = original_title
         imdb_info['type'] = title_data.get('titleType', {}).get('id', '')
         runtime_data = title_data.get('runtime', {})
-        runtime_seconds = runtime_data.get('seconds', 0)
-        runtime_minutes = runtime_seconds // 60 if runtime_seconds else 0
+        if runtime_data and isinstance(runtime_data, dict):
+            runtime_seconds = runtime_data.get('seconds', 0)
+            runtime_minutes = runtime_seconds // 60 if runtime_seconds else 0
+        else:
+            runtime_seconds = 0
+            runtime_minutes = 0
         imdb_info['runtime'] = str(runtime_minutes)
         imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '')
         imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '') or 'No plot available'
@@ -4495,7 +4499,7 @@ class Prep():
                     if credits and isinstance(credits, list):
                         for c in credits:
                             name_id = c.get('name', {}).get('id', '')
-                            if name_id.startswith('nm'):
+                            if name_id and name_id.startswith('nm'):
                                 imdb_info['directors'].append(name_id)
                     break
             if meta.get('manual_language'):
