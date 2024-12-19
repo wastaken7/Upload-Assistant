@@ -599,65 +599,33 @@ async def do_the_thing(base_dir):
 
                 if tracker == "THR":
                     tracker_status = meta.get('tracker_status', {})
-                    for tracker, status in tracker_status.items():
-                        upload_status = status.get('upload', False)
-                        print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                    upload_status = tracker_status.get(tracker, {}).get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                        if upload_status:
-                            console.print("Uploading to THR")
-                            # nable to get IMDB id/Youtube Link
-                            if meta.get('imdb_id', '0') == '0':
-                                imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                                meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                            if meta.get('youtube', None) is None:
-                                youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
-                                meta['youtube'] = youtube
-                            thr = THR(config=config)
-                            try:
-                                with requests.Session() as session:
-                                    console.print("[yellow]Logging in to THR")
-                                    session = thr.login(session)
-                                    await thr.upload(session, meta, disctype)
-                                    await asyncio.sleep(0.5)
-                                    await client.add_to_client(meta, "THR")
-                            except Exception:
-                                console.print(traceback.format_exc())
+                    if upload_status:
+                        thr = THR(config=config)
+                        try:
+                            with requests.Session() as session:
+                                console.print("[yellow]Logging in to THR")
+                                session = thr.login(session)
+                                await thr.upload(session, meta, disctype)
+                                await asyncio.sleep(0.5)
+                                await client.add_to_client(meta, "THR")
+                        except Exception:
+                            console.print(traceback.format_exc())
 
                 if tracker == "PTP":
                     tracker_status = meta.get('tracker_status', {})
-                    for tracker, status in tracker_status.items():
-                        upload_status = status.get('upload', False)
-                        print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                    upload_status = tracker_status.get(tracker, {}).get('upload', False)
+                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
 
-                        if upload_status:
-                            console.print(f"Uploading to {tracker}")
-                            if meta.get('imdb_id', '0') == '0':
-                                imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                                meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
-                            ptp = PTP(config=config)
-                            try:
-                                console.print("[yellow]Searching for Group ID")
-                                groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
-                                if groupID is None:
-                                    console.print("[yellow]No Existing Group found")
-                                    if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
-                                        youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
-                                        meta['youtube'] = youtube
-                                    meta['upload'] = True
-                                else:
-                                    console.print("[yellow]Searching for Existing Releases")
-                                    dupes = await ptp.search_existing(groupID, meta, disctype)
-                                    dupes = await common.filter_dupes(dupes, meta)
-
-                                if meta.get('imdb_info', {}) == {}:
-                                    meta['imdb_info'] = await prep.get_imdb_info(meta['imdb_id'], meta)
-                                if meta['upload'] is True:
-                                    ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                                    await ptp.upload(meta, ptpUrl, ptpData, disctype)
-                                    await asyncio.sleep(5)
-                                    await client.add_to_client(meta, "PTP")
-                            except Exception:
-                                console.print(traceback.format_exc())
+                    if upload_status:
+                        ptp = PTP(config=config)
+                        groupID = meta['ptp_groupID']
+                        ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
+                        await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                        await asyncio.sleep(5)
+                        await client.add_to_client(meta, "PTP")
 
             if meta.get('queue') is not None:
                 processed_files_count += 1

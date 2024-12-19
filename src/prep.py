@@ -737,12 +737,34 @@ class Prep():
                 tracker_class = tracker_class_map[tracker_name](config=config)
                 tracker_status[tracker_name] = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False}
 
+                if tracker_name in {"THR", "PTP"}:
+                    if meta.get('imdb_id', '0') == '0':
+                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                        meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                if tracker_name == "PTP":
+                    console.print("[yellow]Searching for Group ID")
+                    ptp = PTP(config=config)
+                    groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
+                    if groupID is None:
+                        console.print("[yellow]No Existing Group found")
+                        if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
+                            youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                            meta['youtube'] = youtube
+                    meta['ptp_groupID'] = groupID
+
+                if tracker_name == "THR":
+                    youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
+                    meta['youtube'] = youtube
+
                 if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
                     console.print(f"[red]Tracker '{tracker_name}' is banned. Skipping.[/red]")
                     tracker_status[tracker_name]['banned'] = True
                     continue
 
-                dupes = await tracker_class.search_existing(meta, disctype)
+                if tracker_name not in {"THR", "PTP", "MANUAL"}:
+                    dupes = await tracker_class.search_existing(meta, disctype)
+                elif tracker_name == "PTP":
+                    dupes = await ptp.search_existing(groupID, meta, disctype)
                 if 'skipping' not in meta or meta['skipping'] is None:
                     dupes = await common.filter_dupes(dupes, meta)
                     meta, is_dupe = helper.dupe_check(dupes, meta)
@@ -751,6 +773,9 @@ class Prep():
                         tracker_status[tracker_name]['dupe'] = True
                 elif meta['skipping']:
                     tracker_status[tracker_name]['skipped'] = True
+                if meta.get('skipping') is None and not is_dupe and tracker_name == "PTP":
+                    if meta.get('imdb_info', {}) == {}:
+                        meta['imdb_info'] = self.get_imdb_info_api(meta['imdb_id'], meta)
                 meta['skipping'] = None
 
                 if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
