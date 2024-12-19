@@ -761,7 +761,7 @@ class Prep():
                     tracker_status[tracker_name]['banned'] = True
                     continue
 
-                if tracker_name not in {"THR", "PTP", "MANUAL"}:
+                if tracker_name not in {"THR", "PTP"}:
                     dupes = await tracker_class.search_existing(meta, disctype)
                 elif tracker_name == "PTP":
                     dupes = await ptp.search_existing(groupID, meta, disctype)
@@ -782,6 +782,9 @@ class Prep():
                     console.print(f"[green]Tracker '{tracker_name}' passed all checks.[/green]")
                     tracker_status[tracker_name]['upload'] = True
                     successful_trackers += 1
+        else:
+            if tracker_name == "MANUAL":
+                successful_trackers += 1
 
         meta['tracker_status'] = tracker_status
 
@@ -4183,7 +4186,7 @@ class Prep():
                 generic.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
             if meta['tvdb_id'] != "0":
                 generic.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
-            if meta['tvmaze_id'] != "0":
+            if "tvmaze_id" in meta and meta['tvmaze_id'] != "0":
                 generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}\n")
             poster_img = f"{meta['base_dir']}/tmp/{meta['uuid']}/POSTER.png"
             if meta.get('poster', None) not in ['', None] and not os.path.exists(poster_img):
