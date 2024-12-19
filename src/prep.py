@@ -57,6 +57,7 @@ try:
     import io
     from io import BytesIO
     import sys
+    import httpx
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
     console.print('[bold red]Missing Module Found. Please reinstall required dependancies.')
@@ -621,19 +622,29 @@ class Prep():
             console.print("Skipping existing search as meta already populated")
 
         console.print("[yellow]Building meta data.....")
+        if meta['debug']:
+            meta_start_time = time.time()
         meta['tmdb'] = meta.get('tmdb_manual', None)
         meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = self.get_cat(video)
         else:
             meta['category'] = meta['category'].upper()
+        meta_middle33_time = time.time()
+        console.print(f"before tmdb processing {meta_middle33_time - meta_start_time:.2f} seconds")
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
             meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
+        meta_middle34_time = time.time()
+        console.print(f"get_tmdb_imdb_from_mediainfo processing {meta_middle34_time - meta_start_time:.2f} seconds")
         if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
             meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
+            meta_middle36_time = time.time()
+            console.print(f"get_tmdb_id processing {meta_middle36_time - meta_start_time:.2f} seconds")
         elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
             meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
             meta = await self.get_tmdb_from_imdb(meta, filename)
+            meta_middle35_time = time.time()
+            console.print(f"get_tmdb_from_imdb processing {meta_middle35_time - meta_start_time:.2f} seconds")
         else:
             meta['tmdb_manual'] = meta.get('tmdb', None)
 
@@ -646,10 +657,16 @@ class Prep():
         if meta['category'] == "TV":
             meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
         # If no imdb, search for it
+        meta_middle_time = time.time()
+        console.print(f"Metadata middle processed in {meta_middle_time - meta_start_time:.2f} seconds")
         if meta.get('imdb_id', None) is None:
             meta['imdb_id'] = await self.search_imdb(filename, meta['search_year'])
+        meta_middle1_time = time.time()
+        console.print(f"Metadata middle1 processed in {meta_middle1_time - meta_middle_time:.2f} seconds")
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
-            meta['imdb_info'] = await self.get_imdb_info(meta['imdb_id'], meta)
+            meta['imdb_info'] = await self.get_imdb_info_api(meta['imdb_id'], meta)
+        meta_middle2_time = time.time()
+        console.print(f"Metadata middle2 processed in {meta_middle2_time - meta_middle_time:.2f} seconds")
         if meta.get('tag', None) is None:
             meta['tag'] = self.get_tag(video, meta)
         else:
@@ -668,6 +685,7 @@ class Prep():
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()):  # Only assign if at least one bitrate is present, otherwise leave it to user
                 meta['service'] = "HIDI"
         meta['video'] = video
+        console.print("Original Lnguage:", meta['original_language'])
         meta['audio'], meta['channels'], meta['has_commentary'] = self.get_audio_v2(mi, meta, bdinfo)
         if meta['tag'][1:].startswith(meta['channels']):
             meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
@@ -703,6 +721,9 @@ class Prep():
             meta['edition'] = ""
 
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
+        if meta['debug']:
+            meta_finish_time = time.time()
+            console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
         parser = Args(config)
         helper = UploadHelper()
         confirm = helper.get_confirmation(meta)
@@ -2055,11 +2076,13 @@ class Prep():
         if len(info['movie_results']) >= 1:
             meta['category'] = "MOVIE"
             meta['tmdb'] = info['movie_results'][0]['id']
+            meta['original_language'] = info['movie_results'][0].get('original_language')
         elif len(info['tv_results']) >= 1:
             meta['category'] = "TV"
             meta['tmdb'] = info['tv_results'][0]['id']
+            meta['original_language'] = info['tv_results'][0].get('original_language')
         else:
-            imdb_info = await self.get_imdb_info(imdb_id.replace('tt', ''), meta)
+            imdb_info = await self.get_imdb_info_api(imdb_id.replace('tt', ''), meta)
             title = imdb_info.get("title")
             if title is None:
                 title = filename
@@ -2169,7 +2192,7 @@ class Prep():
             except Exception:
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
-            meta['aka'], original_language = await self.get_imdb_aka(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'])
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -2223,7 +2246,7 @@ class Prep():
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
             # meta['aka'] = f" AKA {response['original_name']}"
-            meta['aka'], original_language = await self.get_imdb_aka(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'])
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -4218,21 +4241,97 @@ class Prep():
             return False
         return
 
-    async def get_imdb_aka(self, imdb_id):
+    async def get_imdb_aka_api(self, imdb_id):
+        start_time = time.time()
         if imdb_id == "0":
             return "", None
+        if not imdb_id.startswith("tt"):
+            imdb_id = f"tt{imdb_id}"
+        url = "https://api.graphql.imdb.com/"
+        query = {
+            "query": f"""
+                query {{
+                    title(id: "{imdb_id}") {{
+                        id
+                        titleText {{
+                            text
+                            isOriginalTitle
+                        }}
+                        originalTitleText {{
+                            text
+                        }}
+                        countriesOfOrigin {{
+                            countries {{
+                                id
+                            }}
+                        }}
+                    }}
+                }}
+            """
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=query)
+
+        if response.status_code != 200:
+            console.print(f"Failed to fetch data: {response.status_code}, {response.text}")
+            return "", None
+
+        try:
+            data = response.json()
+            console.print("json data:", data)
+        except json.JSONDecodeError:
+            console.print("Error parsing JSON response")
+            return "", None
+
+        # Check if `data` and `title` exist
+        title_data = data.get("data", {}).get("title")
+        if title_data is None:
+            console.print("Title data is missing from response")
+            return "", None
+
+        # Extract relevant fields from the response
+        aka = title_data.get("originalTitleText", {}).get("text", "")
+        is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
+        original_language = None
+
+        console.print("title_data:", title_data)
+        console.print("original title:", aka)
+        console.print("is_original:", is_original)
+
+        if not is_original and aka:
+            aka = f" AKA {aka}"
+            console.print("aka", aka)
+        finish_time = time.time()
+        console.print(f"IMDB AKA with API processed in {finish_time - start_time:.4f} seconds")
+        return aka, original_language
+
+    async def get_imdb_aka(self, imdb_id):
+        start_time = time.time()
+        if imdb_id == "0":
+            return "", None
+        if not imdb_id.startswith("tt"):
+            imdb_id = f"tt{imdb_id}"
         ia = Cinemagoer()
         result = ia.get_movie(imdb_id.replace('tt', ''))
-
+        console.print("result:", result)
         original_language = result.get('language codes')
+        console.print("original language list:", original_language)
         if isinstance(original_language, list):
             if len(original_language) > 1:
                 original_language = None
             elif len(original_language) == 1:
                 original_language = original_language[0]
         aka = result.get('original title', result.get('localized title', "")).replace(' - IMDb', '').replace('\u00ae', '')
+        console.print("AKA:", aka)
         if aka != "":
             aka = f" AKA {aka}"
+        finish_time = time.time()
+        console.print(f"IMDB AKA with Cinemagoer processed in {finish_time - start_time:.4f} seconds")
         return aka, original_language
 
     async def get_dvd_size(self, discs, manual_dvds):
@@ -4288,6 +4387,138 @@ class Prep():
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")
         return season, episode
 
+    async def get_imdb_info_api(self, imdbID, meta):
+        imdb_info = {}
+
+        if imdbID == "0":
+            return "", None
+        else:
+            if not imdbID.startswith("tt"):
+                imdbIDtt = f"tt{imdbID}"
+            query = {
+                "query": f"""
+                query GetTitleInfo {{
+                  title(id: "{imdbIDtt}") {{
+                    id
+                    titleText {{
+                      text
+                      isOriginalTitle
+                    }}
+                    originalTitleText {{
+                      text
+                    }}
+                    releaseYear {{
+                      year
+                    }}
+                    titleType {{
+                      id
+                    }}
+                    plot {{
+                      plotText {{
+                        plainText
+                      }}
+                    }}
+                    ratingsSummary {{
+                      aggregateRating
+                      voteCount
+                    }}
+                    primaryImage {{
+                      url
+                    }}
+                    runtime {{
+                      displayableProperty {{
+                        value {{
+                          plainText
+                        }}
+                      }}
+                      seconds
+                    }}
+                    titleGenres {{
+                      genres {{
+                        genre {{
+                          text
+                        }}
+                      }}
+                    }}
+                    principalCredits {{
+                      category {{
+                        text
+                        id
+                      }}
+                      credits {{
+                        name {{
+                          id
+                          nameText {{
+                            text
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+                """
+            }
+
+            url = "https://api.graphql.imdb.com/"
+            headers = {"Content-Type": "application/json"}
+
+            response = requests.post(url, json=query, headers=headers)
+            data = response.json()
+
+            title_data = data.get("data", {}).get("title", {})
+            if not title_data:
+                return meta
+
+            imdb_info['imdbID'] = imdbID
+            imdb_info['title'] = title_data.get('titleText', {}).get('text', '')
+            imdb_info['year'] = title_data.get('releaseYear', {}).get('year', '')
+            original_title = title_data.get('originalTitleText', {}).get('text', '')
+            if not original_title or original_title == imdb_info['title']:
+                original_title = imdb_info['title']
+            imdb_info['aka'] = original_title
+            imdb_info['type'] = title_data.get('titleType', {}).get('id')
+            runtime_data = title_data.get('runtime', {})
+            runtime_seconds = runtime_data.get('seconds', 0)
+            if runtime_seconds:
+                runtime_minutes = runtime_seconds // 60
+            else:
+                runtime_minutes = 0
+
+            imdb_info['runtime'] = str(runtime_minutes)
+            imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '')
+            if not imdb_info['cover']:
+                imdb_info['cover'] = meta.get('poster', '')
+            imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '')
+            genres = title_data.get('titleGenres', {}).get('genres', [])
+            genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
+            imdb_info['genres'] = ', '.join(genre_list)
+            imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A')
+            imdb_info['directors'] = []
+            principal_credits = title_data.get('principalCredits', [])
+            for pc in principal_credits:
+                category_text = pc.get('category', {}).get('text', '')
+                if 'Direct' in category_text:
+                    credits = pc.get('credits', [])
+                    for c in credits:
+                        name_id = c.get('name', {}).get('id', '')
+                        if name_id.startswith('nm'):
+                            imdb_info['directors'].append(name_id)
+                    break
+
+        if not title_data:
+            imdb_info = {
+                'title': meta['title'],
+                'year': meta['year'],
+                'aka': '',
+                'type': None,
+                'runtime': meta.get('runtime', '60'),
+                'cover': meta.get('poster'),
+            }
+            if len(meta.get('tmdb_directors', [])) >= 1:
+                imdb_info['directors'] = meta['tmdb_directors']
+        console.print("imdb_info:", imdb_info)
+        return imdb_info
+
     async def get_imdb_info(self, imdbID, meta):
         imdb_info = {}
         if int(str(imdbID).replace('tt', '')) != 0:
@@ -4326,7 +4557,7 @@ class Prep():
             }
             if len(meta.get('tmdb_directors', [])) >= 1:
                 imdb_info['directors'] = meta['tmdb_directors']
-
+        console.print("imdb_info:", imdb_info)
         return imdb_info
 
     async def search_imdb(self, filename, search_year):
@@ -4340,7 +4571,7 @@ class Prep():
         return imdbID
 
     async def imdb_other_meta(self, meta):
-        imdb_info = meta['imdb_info'] = await self.get_imdb_info(meta['imdb_id'], meta)
+        imdb_info = meta['imdb_info'] = await self.get_imdb_info_api(meta['imdb_id'], meta)
         meta['title'] = imdb_info['title']
         meta['year'] = imdb_info['year']
         meta['aka'] = imdb_info['aka']
