@@ -86,6 +86,11 @@ config = {
         # Needs a 5 second wait to ensure the API is updated
         "get_permalink": False,
 
+        # How many trackers need to pass successfull checking to continue with the upload process
+        # Default = 1. If 1 (or more) tracker/s pass banned_group and dupe checking, uploading will continue
+        # If less than the number of trackers pass the checking, exit immediately.
+        "tracker_pass_checks": "1",
+
     },
 
     "TRACKERS": {

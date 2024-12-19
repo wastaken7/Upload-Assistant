@@ -320,7 +320,7 @@ class HDB():
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on HDB...")
         url = "https://hdbits.org/api/torrents"
         data = {
             'username': self.username,

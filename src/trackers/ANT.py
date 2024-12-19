@@ -147,7 +147,7 @@ class ANT():
             meta['skipping'] = "ANT"
             return
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on ANT...")
         params = {
             'apikey': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             't': 'search',

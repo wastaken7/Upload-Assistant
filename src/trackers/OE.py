@@ -279,7 +279,6 @@ class OE():
                 else:
                     console.print("[red]No media information available in meta.[/red]")
 
-            # Existing disc metadata handling
             bbcode = BBCODE()
             if meta.get('discs', []) != []:
                 discs = meta['discs']
@@ -322,7 +321,7 @@ class OE():
             meta['skipping'] = "OE"
             return
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on OE...")
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],

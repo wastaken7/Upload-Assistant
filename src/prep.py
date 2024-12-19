@@ -12,6 +12,8 @@ from src.trackers.TIK import TIK  # noqa F401
 from src.trackers.COMMON import COMMON
 from src.clients import Clients
 from data.config import config
+from src.uphelper import UploadHelper
+from src.trackersetup import TRACKER_SETUP, tracker_class_map
 
 try:
     import traceback
@@ -429,8 +431,8 @@ class Prep():
         base_dir = meta['base_dir']
         meta['saved_description'] = False
 
+        folder_id = os.path.basename(meta['path'])
         if meta.get('uuid', None) is None:
-            folder_id = os.path.basename(meta['path'])
             meta['uuid'] = folder_id
         if not os.path.exists(f"{base_dir}/tmp/{meta['uuid']}"):
             Path(f"{base_dir}/tmp/{meta['uuid']}").mkdir(parents=True, exist_ok=True)
@@ -618,6 +620,205 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
+        console.print("[yellow]Building meta data.....")
+        if meta['debug']:
+            meta_start_time = time.time()
+        if meta.get('manual_language'):
+            meta['original_langauge'] = meta.get('manual_language').lower()
+        meta['tmdb'] = meta.get('tmdb_manual', None)
+        meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
+        if meta.get('category', None) is None:
+            meta['category'] = self.get_cat(video)
+        else:
+            meta['category'] = meta['category'].upper()
+        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
+            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
+        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
+            meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
+        elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
+            meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
+            meta = await self.get_tmdb_from_imdb(meta, filename)
+        else:
+            meta['tmdb_manual'] = meta.get('tmdb', None)
+
+        # If no tmdb, use imdb for meta
+        if int(meta['tmdb']) == 0:
+            meta = await self.imdb_other_meta(meta)
+        else:
+            meta = await self.tmdb_other_meta(meta)
+        # Search tvmaze
+        if meta['category'] == "TV":
+            meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
+        else:
+            meta.setdefault('tvmaze_id', '0')
+        # If no imdb, search for it
+        if meta.get('imdb_id', None) is None:
+            meta['imdb_id'] = await self.search_imdb(filename, meta['search_year'])
+        if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
+            meta['imdb_info'] = await self.get_imdb_info_api(meta['imdb_id'], meta)
+        if meta.get('tag', None) is None:
+            meta['tag'] = self.get_tag(video, meta)
+        else:
+            if not meta['tag'].startswith('-') and meta['tag'] != "":
+                meta['tag'] = f"-{meta['tag']}"
+        if meta['category'] == "TV":
+            meta = await self.get_season_episode(video, meta)
+        meta = await self.tag_override(meta)
+        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
+            tracks = meta.get('mediainfo').get('media', {}).get('track', [])  # Get all tracks
+            bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 else ''  # Get video bitrate if available
+            bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 else ''  # For old MediaInfo (< 24.x where video bitrate is empty, use 'OverallBitRate' instead)
+            meta['episode_title'] = ""
+            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000):
+                meta['service'] = "CR"
+            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()):  # Only assign if at least one bitrate is present, otherwise leave it to user
+                meta['service'] = "HIDI"
+        meta['video'] = video
+        meta['audio'], meta['channels'], meta['has_commentary'] = self.get_audio_v2(mi, meta, bdinfo)
+        if meta['tag'][1:].startswith(meta['channels']):
+            meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
+        if meta.get('no_tag', False):
+            meta['tag'] = ""
+        meta['3D'] = self.is_3d(mi, bdinfo)
+        if meta.get('manual_source', None):
+            meta['source'] = meta['manual_source']
+            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+        else:
+            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+        if meta.get('service', None) in (None, ''):
+            meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
+        elif meta.get('service'):
+            services = self.get_service(get_services_only=True)
+            meta['service_longname'] = max((k for k, v in services.items() if v == meta['service']), key=len, default=meta['service'])
+        meta['uhd'] = self.get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
+        meta['hdr'] = self.get_hdr(mi, bdinfo)
+        meta['distributor'] = self.get_distributor(meta['distributor'])
+        if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
+            meta['region'] = self.get_region(bdinfo, meta.get('region', None))
+            meta['video_codec'] = self.get_video_codec(bdinfo)
+            if meta['tag'][1:].startswith(meta['region']):
+                meta['tag'] = meta['tag'].replace(f"-{meta['region']}", '')
+        else:
+            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = self.get_video_encode(mi, meta['type'], bdinfo)
+        if meta.get('no_edition') is False:
+            meta['edition'], meta['repack'] = self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
+            if "REPACK" in meta.get('edition', ""):
+                meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
+                meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
+        else:
+            meta['edition'] = ""
+
+        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
+        if meta['debug']:
+            meta_finish_time = time.time()
+            console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
+        parser = Args(config)
+        helper = UploadHelper()
+        confirm = helper.get_confirmation(meta)
+        while confirm is False:
+            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            editargs = (meta['path'],) + tuple(editargs.split())
+            if meta.get('debug', False):
+                editargs += ("--debug",)
+            meta, help, before_args = parser.parse(editargs, meta)
+            meta['edit'] = True
+            meta = await self.gather_prep(meta=meta, mode='cli')
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+                json.dump(meta, f, indent=4)
+            meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
+            confirm = helper.get_confirmation(meta)
+
+        common = COMMON(config=config)
+        tracker_setup = TRACKER_SETUP(config=config)
+        enabled_trackers = tracker_setup.trackers_enabled(meta)
+
+        tracker_status = {}
+        successful_trackers = 0
+
+        for tracker_name in enabled_trackers:
+            disctype = meta.get('disctype', None)
+            tracker_name = tracker_name.replace(" ", "").upper().strip()
+
+            if meta['name'].endswith('DUPE?'):
+                meta['name'] = meta['name'].replace(' DUPE?', '')
+
+            if tracker_name in tracker_class_map:
+                tracker_class = tracker_class_map[tracker_name](config=config)
+                tracker_status[tracker_name] = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False}
+
+                if tracker_name in {"THR", "PTP"}:
+                    if meta.get('imdb_id', '0') == '0':
+                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
+                        meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                if tracker_name == "PTP":
+                    console.print("[yellow]Searching for Group ID")
+                    ptp = PTP(config=config)
+                    groupID = await ptp.get_group_by_imdb(meta['imdb_id'])
+                    if groupID is None:
+                        console.print("[yellow]No Existing Group found")
+                        if meta.get('youtube', None) is None or "youtube" not in str(meta.get('youtube', '')):
+                            youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                            meta['youtube'] = youtube
+                    meta['ptp_groupID'] = groupID
+
+                if tracker_name == "THR":
+                    youtube = cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)")
+                    meta['youtube'] = youtube
+
+                if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta):
+                    console.print(f"[red]Tracker '{tracker_name}' is banned. Skipping.[/red]")
+                    tracker_status[tracker_name]['banned'] = True
+                    continue
+
+                if tracker_name not in {"THR", "PTP"}:
+                    dupes = await tracker_class.search_existing(meta, disctype)
+                elif tracker_name == "PTP":
+                    dupes = await ptp.search_existing(groupID, meta, disctype)
+                if 'skipping' not in meta or meta['skipping'] is None:
+                    dupes = await common.filter_dupes(dupes, meta)
+                    meta, is_dupe = helper.dupe_check(dupes, meta)
+                    if is_dupe:
+                        console.print(f"[yellow]Tracker '{tracker_name}' has confirmed dupes.[/yellow]")
+                        tracker_status[tracker_name]['dupe'] = True
+                elif meta['skipping']:
+                    tracker_status[tracker_name]['skipped'] = True
+                if meta.get('skipping') is None and not is_dupe and tracker_name == "PTP":
+                    if meta.get('imdb_info', {}) == {}:
+                        meta['imdb_info'] = self.get_imdb_info_api(meta['imdb_id'], meta)
+                meta['skipping'] = None
+
+                if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
+                    console.print(f"[green]Tracker '{tracker_name}' passed all checks.[/green]")
+                    tracker_status[tracker_name]['upload'] = True
+                    successful_trackers += 1
+        else:
+            if tracker_name == "MANUAL":
+                successful_trackers += 1
+
+        meta['tracker_status'] = tracker_status
+
+        if meta['debug']:
+            console.print("\n[bold]Tracker Processing Summary:[/bold]")
+        for t_name, status in tracker_status.items():
+            banned_status = 'Yes' if status['banned'] else 'No'
+            skipped_status = 'Yes' if status['skipped'] else 'No'
+            dupe_status = 'Yes' if status['dupe'] else 'No'
+            upload_status = 'Yes' if status['upload'] else 'No'
+            if meta['debug']:
+                console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
+        if meta['debug']:
+            console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
+
+        meta['skip_uploading'] = int(self.config['DEFAULT'].get('tracker_pass_checks', 1))
+        if successful_trackers < meta['skip_uploading']:
+            console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
+            return
+
+        meta['we_are_uploading'] = True
+
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+            json.dump(meta, f, indent=4)
+
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
@@ -657,83 +858,6 @@ class Prep():
                         await asyncio.sleep(3)
                 except KeyboardInterrupt:
                     s.terminate()
-
-        meta['tmdb'] = meta.get('tmdb_manual', None)
-        meta['type'] = self.get_type(video, meta['scene'], meta['is_disc'], meta)
-        if meta.get('category', None) is None:
-            meta['category'] = self.get_cat(video)
-        else:
-            meta['category'] = meta['category'].upper()
-        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-            meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
-        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-            meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
-        elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
-            meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
-            meta = await self.get_tmdb_from_imdb(meta, filename)
-        else:
-            meta['tmdb_manual'] = meta.get('tmdb', None)
-
-        # If no tmdb, use imdb for meta
-        if int(meta['tmdb']) == 0:
-            meta = await self.imdb_other_meta(meta)
-        else:
-            meta = await self.tmdb_other_meta(meta)
-        # Search tvmaze
-        meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await self.search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
-        # If no imdb, search for it
-        if meta.get('imdb_id', None) is None:
-            meta['imdb_id'] = await self.search_imdb(filename, meta['search_year'])
-        if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
-            meta['imdb_info'] = await self.get_imdb_info(meta['imdb_id'], meta)
-        if meta.get('tag', None) is None:
-            meta['tag'] = self.get_tag(video, meta)
-        else:
-            if not meta['tag'].startswith('-') and meta['tag'] != "":
-                meta['tag'] = f"-{meta['tag']}"
-        meta = await self.get_season_episode(video, meta)
-        meta = await self.tag_override(meta)
-        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
-            tracks = meta.get('mediainfo').get('media', {}).get('track', [])  # Get all tracks
-            bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 else ''  # Get video bitrate if available
-            bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 else ''  # For old MediaInfo (< 24.x where video bitrate is empty, use 'OverallBitRate' instead)
-            meta['episode_title'] = ""
-            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000):
-                meta['service'] = "CR"
-            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()):  # Only assign if at least one bitrate is present, otherwise leave it to user
-                meta['service'] = "HIDI"
-        meta['video'] = video
-        meta['audio'], meta['channels'], meta['has_commentary'] = self.get_audio_v2(mi, meta, bdinfo)
-        if meta['tag'][1:].startswith(meta['channels']):
-            meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
-        if meta.get('no_tag', False):
-            meta['tag'] = ""
-        meta['3D'] = self.is_3d(mi, bdinfo)
-        if meta.get('manual_source', None):
-            meta['source'] = meta['manual_source']
-            _, meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
-        else:
-            meta['source'], meta['type'] = self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta)
-        if meta.get('service', None) in (None, ''):
-            meta['service'], meta['service_longname'] = self.get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
-        elif meta.get('service'):
-            services = self.get_service(get_services_only=True)
-            meta['service_longname'] = max((k for k, v in services.items() if v == meta['service']), key=len, default=meta['service'])
-        meta['uhd'] = self.get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
-        meta['hdr'] = self.get_hdr(mi, bdinfo)
-        meta['distributor'] = self.get_distributor(meta['distributor'])
-        if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
-            meta['region'] = self.get_region(bdinfo, meta.get('region', None))
-            meta['video_codec'] = self.get_video_codec(bdinfo)
-        else:
-            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = self.get_video_encode(mi, meta['type'], bdinfo)
-        if meta.get('no_edition') is False:
-            meta['edition'], meta['repack'] = self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
-            if "REPACK" in meta.get('edition', ""):
-                meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
-                meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
-        else:
-            meta['edition'] = ""
 
         # WORK ON THIS
         meta.get('stream', False)
@@ -1416,8 +1540,8 @@ class Prep():
             return
 
         if num_screens is None:
-            num_screens = self.screens
-        if num_screens == 0 or (len(meta.get('image_list', [])) >= num_screens and disc_num == 0):
+            num_screens = self.screens - len(existing_images)
+        if num_screens == 0 or (len(meta.get('image_list', [])) >= self.screens and disc_num == 0):
             return
 
         if len(glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-*.png")) >= num_screens:
@@ -1615,7 +1739,11 @@ class Prep():
             if w_sar != 1 or h_sar != 1:
                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
-            ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').run()
+            try:
+                ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').run()
+            except ffmpeg._run.Error as e:
+                stderr_output = e.stderr.decode() if e.stderr else "No stderr output available"
+                console.print(f"[red]Error capturing screenshot for {input_file} at {seek_time}s: {stderr_output}[/red]")
             if os.path.exists(image):
                 return image
             else:
@@ -1761,6 +1889,7 @@ class Prep():
                         pool.join()
 
         valid_results = []
+        remaining_retakes = []
         for image_path in optimize_results:
             if "Error" in image_path:
                 console.print(f"[red]{image_path}")
@@ -1779,19 +1908,48 @@ class Prep():
                     pass
                 elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and not retake:
                     pass
-                elif self.img_host == "freeimage.host":
-                    console.print("[bold red]Support for freeimage.host has been removed. Please remove it from your config.")
-                    exit()
                 elif not retake:
                     console.print("[red]Image too large for your image host, retaking.")
                     retake = True
                     time.sleep(1)
 
             if retake:
-                console.print(f"[yellow]Retaking screenshot for: {image_path}[/yellow]")
-                capture_tasks.append(image_path)
+                retry_attempts = 3
+                for attempt in range(1, retry_attempts + 1):
+                    console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
+                    try:
+                        os.remove(image_path)
+                        random_time = random.uniform(0, length)
+                        self.capture_screenshot((path, random_time, image_path, width, height, w_sar, h_sar, loglevel))
+                        self.optimize_image_task((image_path, config))
+                        new_size = os.path.getsize(image_path)
+                        valid_image = False
+
+                        if new_size > 75000 and new_size <= 31000000 and self.img_host == "imgbb":
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+                        elif new_size > 75000 and new_size <= 10000000 and self.img_host in ["imgbox", "pixhost"]:
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+                        elif new_size > 75000 and self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"]:
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+
+                        if valid_image:
+                            valid_results.append(image_path)
+                            break
+                        else:
+                            console.print(f"[red]Retaken image {image_path} does not meet the size requirements for {self.img_host}. Retrying...[/red]")
+                    except Exception as e:
+                        console.print(f"[red]Error retaking screenshot for {image_path}: {e}[/red]")
+                else:
+                    console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
+                    remaining_retakes.append(image_path)
             else:
                 valid_results.append(image_path)
+
+        if remaining_retakes:
+            console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
         for image_path in valid_results:
             img_dict = {
@@ -1934,11 +2092,13 @@ class Prep():
         if len(info['movie_results']) >= 1:
             meta['category'] = "MOVIE"
             meta['tmdb'] = info['movie_results'][0]['id']
+            meta['original_language'] = info['movie_results'][0].get('original_language')
         elif len(info['tv_results']) >= 1:
             meta['category'] = "TV"
             meta['tmdb'] = info['tv_results'][0]['id']
+            meta['original_language'] = info['tv_results'][0].get('original_language')
         else:
-            imdb_info = await self.get_imdb_info(imdb_id.replace('tt', ''), meta)
+            imdb_info = await self.get_imdb_info_api(imdb_id.replace('tt', ''), meta)
             title = imdb_info.get("title")
             if title is None:
                 title = filename
@@ -2048,7 +2208,7 @@ class Prep():
             except Exception:
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
-            meta['aka'], original_language = await self.get_imdb_aka(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'], meta)
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -2102,7 +2262,7 @@ class Prep():
                 console.print('[yellow]Unable to grab videos from TMDb.')
 
             # meta['aka'] = f" AKA {response['original_name']}"
-            meta['aka'], original_language = await self.get_imdb_aka(meta['imdb_id'])
+            meta['aka'], original_language = await self.get_imdb_aka_api(meta['imdb_id'], meta)
             if original_language is not None:
                 meta['original_language'] = original_language
             else:
@@ -2346,7 +2506,7 @@ class Prep():
             if meta.get('dual_audio', False):
                 dual = "Dual-Audio"
             else:
-                if meta.get('original_language', '') != 'en':
+                if not meta.get('original_language', '').startswith('en'):
                     eng, orig = False, False
                     try:
                         for t in tracks:
@@ -2483,17 +2643,35 @@ class Prep():
 
     def get_tag(self, video, meta):
         try:
-            tag = guessit(video)['release_group']
-            tag = f"-{tag}"
-        except Exception:
+            parsed = guessit(video)
+            release_group = parsed.get('release_group')
+
+            if meta['is_disc'] == "BDMV":
+                if release_group:
+                    if f"-{release_group}" not in video:
+                        if meta['debug']:
+                            console.print(f"[warning] Invalid release group format: {release_group}")
+                        release_group = None
+
+            tag = f"-{release_group}" if release_group else ""
+        except Exception as e:
+            console.print(f"Error while parsing: {e}")
             tag = ""
+
         if tag == "-":
             tag = ""
-        if tag[1:].lower() in ["nogroup", 'nogrp']:
+        if tag[1:].lower() in ["nogroup", "nogrp"]:
             tag = ""
+
         return tag
 
-    def get_source(self, type, video, path, is_disc, meta):
+    def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
+        try:
+            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+                mi = json.load(f)
+        except Exception:
+            if meta['debug']:
+                console.print("No mediainfo.json")
         resolution = meta['resolution']
         try:
             try:
@@ -2528,6 +2706,17 @@ class Prep():
                             system = "NTSC"
                     except Exception:
                         system = ""
+                    if system == "":
+                        try:
+                            framerate = mi['media']['track'][1].get('FrameRate', '')
+                            if framerate == "25":
+                                system = "PAL"
+                            elif framerate:
+                                system = "NTSC"
+                            else:
+                                system = ""
+                        except Exception:
+                            system = ""
                 finally:
                     if system is None:
                         system = ""
@@ -4008,7 +4197,7 @@ class Prep():
                 generic.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
             if meta['tvdb_id'] != "0":
                 generic.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
-            if meta['tvmaze_id'] != "0":
+            if "tvmaze_id" in meta and meta['tvmaze_id'] != "0":
                 generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}\n")
             poster_img = f"{meta['base_dir']}/tmp/{meta['uuid']}/POSTER.png"
             if meta.get('poster', None) not in ['', None] and not os.path.exists(poster_img):
@@ -4068,12 +4257,67 @@ class Prep():
             return False
         return
 
+    async def get_imdb_aka_api(self, imdb_id, meta):
+        if imdb_id == "0":
+            return "", None
+        if not imdb_id.startswith("tt"):
+            imdb_id = f"tt{imdb_id}"
+        url = "https://api.graphql.imdb.com/"
+        query = {
+            "query": f"""
+                query {{
+                    title(id: "{imdb_id}") {{
+                        id
+                        titleText {{
+                            text
+                            isOriginalTitle
+                        }}
+                        originalTitleText {{
+                            text
+                        }}
+                        countriesOfOrigin {{
+                            countries {{
+                                id
+                            }}
+                        }}
+                    }}
+                }}
+            """
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, headers=headers, json=query)
+        data = response.json()
+
+        # Check if `data` and `title` exist
+        title_data = data.get("data", {}).get("title")
+        if title_data is None:
+            console.print("Title data is missing from response")
+            return "", None
+
+        # Extract relevant fields from the response
+        aka = title_data.get("originalTitleText", {}).get("text", "")
+        is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
+        if meta.get('manual_language'):
+            original_language = meta.get('manual_language')
+        else:
+            original_language = None
+
+        if not is_original and aka:
+            aka = f" AKA {aka}"
+
+        return aka, original_language
+
     async def get_imdb_aka(self, imdb_id):
         if imdb_id == "0":
             return "", None
+        if not imdb_id.startswith("tt"):
+            imdb_id = f"tt{imdb_id}"
         ia = Cinemagoer()
         result = ia.get_movie(imdb_id.replace('tt', ''))
-
         original_language = result.get('language codes')
         if isinstance(original_language, list):
             if len(original_language) > 1:
@@ -4138,6 +4382,138 @@ class Prep():
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")
         return season, episode
 
+    async def get_imdb_info_api(self, imdbID, meta):
+        imdb_info = {}
+
+        if imdbID == "0":
+            return "", None
+        else:
+            if not imdbID.startswith("tt"):
+                imdbIDtt = f"tt{imdbID}"
+            query = {
+                "query": f"""
+                query GetTitleInfo {{
+                  title(id: "{imdbIDtt}") {{
+                    id
+                    titleText {{
+                      text
+                      isOriginalTitle
+                    }}
+                    originalTitleText {{
+                      text
+                    }}
+                    releaseYear {{
+                      year
+                    }}
+                    titleType {{
+                      id
+                    }}
+                    plot {{
+                      plotText {{
+                        plainText
+                      }}
+                    }}
+                    ratingsSummary {{
+                      aggregateRating
+                      voteCount
+                    }}
+                    primaryImage {{
+                      url
+                    }}
+                    runtime {{
+                      displayableProperty {{
+                        value {{
+                          plainText
+                        }}
+                      }}
+                      seconds
+                    }}
+                    titleGenres {{
+                      genres {{
+                        genre {{
+                          text
+                        }}
+                      }}
+                    }}
+                    principalCredits {{
+                      category {{
+                        text
+                        id
+                      }}
+                      credits {{
+                        name {{
+                          id
+                          nameText {{
+                            text
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+                """
+            }
+
+            url = "https://api.graphql.imdb.com/"
+            headers = {"Content-Type": "application/json"}
+
+            response = requests.post(url, json=query, headers=headers)
+            data = response.json()
+
+        title_data = data.get("data", {}).get("title", {})
+        if not title_data:
+            return meta
+        imdb_info['imdbID'] = imdbID
+        imdb_info['title'] = title_data.get('titleText', {}).get('text', '') or ''
+        imdb_info['year'] = title_data.get('releaseYear', {}).get('year', '') or ''
+        original_title = title_data.get('originalTitleText', {}).get('text', '')
+        if not original_title or original_title == imdb_info['title']:
+            original_title = imdb_info['title']
+        imdb_info['aka'] = original_title
+        imdb_info['type'] = title_data.get('titleType', {}).get('id', '')
+        runtime_data = title_data.get('runtime', {})
+        runtime_seconds = runtime_data.get('seconds', 0)
+        runtime_minutes = runtime_seconds // 60 if runtime_seconds else 0
+        imdb_info['runtime'] = str(runtime_minutes)
+        imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '')
+        imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '') or 'No plot available'
+        title_genres = title_data.get('titleGenres')
+        if title_genres and isinstance(title_genres, dict):
+            genres = title_genres.get('genres', [])
+        else:
+            genres = []
+        genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
+        imdb_info['genres'] = ', '.join(genre_list) or ''
+        imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A')
+        imdb_info['directors'] = []
+        principal_credits = title_data.get('principalCredits', [])
+        if principal_credits and isinstance(principal_credits, list):
+            for pc in principal_credits:
+                category_text = pc.get('category', {}).get('text', '')
+                if 'Direct' in category_text:
+                    credits = pc.get('credits', [])
+                    if credits and isinstance(credits, list):
+                        for c in credits:
+                            name_id = c.get('name', {}).get('id', '')
+                            if name_id.startswith('nm'):
+                                imdb_info['directors'].append(name_id)
+                    break
+            if meta.get('manual_language'):
+                imdb_info['original_langauge'] = meta.get('manual_language')
+
+        if not title_data:
+            imdb_info = {
+                'title': meta['title'],
+                'year': meta['year'],
+                'aka': '',
+                'type': None,
+                'runtime': meta.get('runtime', '60'),
+                'cover': meta.get('poster'),
+            }
+            if len(meta.get('tmdb_directors', [])) >= 1:
+                imdb_info['directors'] = meta['tmdb_directors']
+        return imdb_info
+
     async def get_imdb_info(self, imdbID, meta):
         imdb_info = {}
         if int(str(imdbID).replace('tt', '')) != 0:
@@ -4176,7 +4552,6 @@ class Prep():
             }
             if len(meta.get('tmdb_directors', [])) >= 1:
                 imdb_info['directors'] = meta['tmdb_directors']
-
         return imdb_info
 
     async def search_imdb(self, filename, search_year):
@@ -4190,7 +4565,7 @@ class Prep():
         return imdbID
 
     async def imdb_other_meta(self, meta):
-        imdb_info = meta['imdb_info'] = await self.get_imdb_info(meta['imdb_id'], meta)
+        imdb_info = meta['imdb_info'] = await self.get_imdb_info_api(meta['imdb_id'], meta)
         meta['title'] = imdb_info['title']
         meta['year'] = imdb_info['year']
         meta['aka'] = imdb_info['aka']

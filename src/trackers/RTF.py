@@ -100,7 +100,7 @@ class RTF():
             meta['skipping'] = "RTF"
             return
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on RTF...")
         headers = {
             'accept': 'application/json',
             'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
