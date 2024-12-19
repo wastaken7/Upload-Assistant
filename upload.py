@@ -19,6 +19,7 @@ import traceback
 import click
 import re
 from src.trackersetup import TRACKER_SETUP, tracker_class_map, api_trackers, other_api_trackers, http_trackers, tracker_capabilities
+import time
 
 from src.console import console
 from rich.markdown import Markdown
@@ -216,9 +217,6 @@ async def process_meta(meta, base_dir):
     if not meta:
         return
     else:
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-            json.dump(meta, f, indent=4)
-        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 3))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
@@ -460,7 +458,8 @@ async def do_the_thing(base_dir):
 
         except Exception as e:
             console.print(f"[red]Failed to load metadata for path '{path}': {e}")
-
+        if meta['debug']:
+            upload_start_time = time.time()
         console.print(f"[green]Gathering info for {os.path.basename(path)}")
         await process_meta(meta, base_dir)
         if 'we_are_uploading' not in meta:
@@ -482,8 +481,6 @@ async def do_the_thing(base_dir):
             common = COMMON(config=config)
             tracker_setup = TRACKER_SETUP(config=config)
             enabled_trackers = tracker_setup.trackers_enabled(meta)
-            print("Enabled Trackers:", enabled_trackers)
-            print("API Trackers:", api_trackers)
 
             async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
                 modq, draft = None, None
@@ -532,7 +529,9 @@ async def do_the_thing(base_dir):
                             console.print(f"(draft: {draft})")
 
                         console.print(f"Uploading to {tracker_class.tracker}")
-
+                        if meta['debug']:
+                            upload_finish_time = time.time()
+                            console.print(f"Upload from Audionut UA processed in {upload_finish_time - upload_start_time:.2f} seconds")
                         await tracker_class.upload(meta, disctype)
                         await asyncio.sleep(0.5)
                         perm = config['DEFAULT'].get('get_permalink', False)
