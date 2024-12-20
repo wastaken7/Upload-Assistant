@@ -768,7 +768,7 @@ class Prep():
                     tracker_status[tracker_name]['banned'] = True
                     continue
 
-                if tracker_name not in {"THR", "PTP"}:
+                if tracker_name not in {"THR", "PTP", "TL"}:
                     dupes = await tracker_class.search_existing(meta, disctype)
                 elif tracker_name == "PTP":
                     dupes = await ptp.search_existing(groupID, meta, disctype)
