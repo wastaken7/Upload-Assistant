@@ -46,6 +46,52 @@ class MTV():
         await self.upload_with_retry(meta, cookiefile, common)
 
     async def upload_with_retry(self, meta, cookiefile, common, img_host_index=1):
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        if not os.path.exists(torrent_file_path):
+            torrent_filename = "BASE"
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+            torrent = Torrent.read(torrent_path)
+
+            if torrent.piece_size > 8388608:
+                tracker_config = self.config['TRACKERS'].get(MTV, {})
+                if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
+                    console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+
+                    meta['max_piece_size'] = '8'
+                    if meta['is_disc']:
+                        include = []
+                        exclude = []
+                    else:
+                        include = ["*.mkv", "*.mp4", "*.ts"]
+                        exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+
+                    from src.prep import Prep
+                    prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
+                    new_torrent = prep.CustomTorrent(
+                        meta=meta,
+                        path=Path(meta['path']),
+                        trackers=["https://fake.tracker"],
+                        source="L4G",
+                        private=True,
+                        exclude_globs=exclude,  # Ensure this is always a list
+                        include_globs=include,  # Ensure this is always a list
+                        creation_date=datetime.now(),
+                        comment="Created by L4G's Upload Assistant",
+                        created_by="L4G's Upload Assistant"
+                    )
+
+                    new_torrent.piece_size = 8 * 1024 * 1024
+                    new_torrent.validate_piece_size()
+                    new_torrent.generate(callback=prep.torf_cb, interval=5)
+                    new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
+
+                    torrent_filename = "MTV"
+
+                    await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
+                else:
+                    console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
+                    return
+
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         url_host_mapping = {
             "i.ibb.co": "imgbb",
@@ -91,47 +137,6 @@ class MTV():
             if image_list is None:
                 console.print("[red]All image hosts failed. Please check your configuration.")
                 return
-
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        if not os.path.exists(torrent_file_path):
-            torrent_filename = "BASE"
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
-            torrent = Torrent.read(torrent_path)
-
-            if torrent.piece_size > 8388608:
-                console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-
-                meta['max_piece_size'] = '8'
-                if meta['is_disc']:
-                    include = []
-                    exclude = []
-                else:
-                    include = ["*.mkv", "*.mp4", "*.ts"]
-                    exclude = ["*.*", "*sample.mkv", "!sample*.*"]
-
-                from src.prep import Prep
-                prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-                new_torrent = prep.CustomTorrent(
-                    meta=meta,
-                    path=Path(meta['path']),
-                    trackers=["https://fake.tracker"],
-                    source="L4G",
-                    private=True,
-                    exclude_globs=exclude,  # Ensure this is always a list
-                    include_globs=include,  # Ensure this is always a list
-                    creation_date=datetime.now(),
-                    comment="Created by L4G's Upload Assistant",
-                    created_by="L4G's Upload Assistant"
-                )
-
-                new_torrent.piece_size = 8 * 1024 * 1024
-                new_torrent.validate_piece_size()
-                new_torrent.generate(callback=prep.torf_cb, interval=5)
-                new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
-
-                torrent_filename = "MTV"
-
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
 
         cat_id = await self.get_cat_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
