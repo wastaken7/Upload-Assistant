@@ -713,6 +713,11 @@ class COMMON():
                     log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
 
+            if is_dvd:
+                if any(str(res) in each for res in [1080, 720, 2160]):
+                    log_exclusion(f"resolution '{target_resolution}' mismatch", each)
+                    return True
+
             for check in attribute_checks:
                 if check["key"] == "repack":
                     if has_repack_in_uuid and "repack" not in normalized:
@@ -735,9 +740,10 @@ class COMMON():
                 log_exclusion("season/episode mismatch", each)
                 return True
 
-            if normalized_encoder and normalized_encoder in normalized:
-                log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
-                return False
+            if not is_dvd:
+                if normalized_encoder and normalized_encoder in normalized:
+                    log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
+                    return False
 
             console.log(f"[debug] Passed all checks: {each}")
             return False
