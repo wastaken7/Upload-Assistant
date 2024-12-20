@@ -4413,6 +4413,8 @@ class Prep():
         else:
             if not imdbID.startswith("tt"):
                 imdbIDtt = f"tt{imdbID}"
+            else:
+                imdbIDtt = imdbID
             query = {
                 "query": f"""
                 query GetTitleInfo {{
@@ -4493,7 +4495,7 @@ class Prep():
         if not original_title or original_title == imdb_info['title']:
             original_title = imdb_info['title']
         imdb_info['aka'] = original_title
-        imdb_info['type'] = title_data.get('titleType', {}).get('id', '')
+        imdb_info['type'] = title_data.get('titleType', {}).get('id', '') or ''
         runtime_data = title_data.get('runtime', {})
         if runtime_data and isinstance(runtime_data, dict):
             runtime_seconds = runtime_data.get('seconds', 0)
@@ -4502,7 +4504,7 @@ class Prep():
             runtime_seconds = 0
             runtime_minutes = 0
         imdb_info['runtime'] = str(runtime_minutes)
-        imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '')
+        imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '') or ''
         imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '') or 'No plot available'
         title_genres = title_data.get('titleGenres')
         if title_genres and isinstance(title_genres, dict):
@@ -4511,7 +4513,7 @@ class Prep():
             genres = []
         genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
         imdb_info['genres'] = ', '.join(genre_list) or ''
-        imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A')
+        imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A') or ''
         imdb_info['directors'] = []
         principal_credits = title_data.get('principalCredits', [])
         if principal_credits and isinstance(principal_credits, list):
