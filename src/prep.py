@@ -696,8 +696,6 @@ class Prep():
         if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
             meta['region'] = self.get_region(bdinfo, meta.get('region', None))
             meta['video_codec'] = self.get_video_codec(bdinfo)
-            if meta['tag'][1:].startswith(meta['region']):
-                meta['tag'] = meta['tag'].replace(f"-{meta['region']}", '')
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = self.get_video_encode(mi, meta['type'], bdinfo)
         if meta.get('no_edition') is False:
