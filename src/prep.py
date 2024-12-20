@@ -3914,7 +3914,7 @@ class Prep():
             meta['episode_int'] = episode_int
 
             # Manual episode title
-            if meta['manual_episode_title'] == "":
+            if 'manual_episode_title' in meta and meta['manual_episode_title'] == "":
                 meta['episode_title_storage'] = meta.get('manual_episode_title')
             else:
                 meta['episode_title_storage'] = guessit(video, {"excludes": "part"}).get('episode_title', '')
