@@ -810,8 +810,8 @@ class Prep():
                 if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
                     console.print(f"[green]Tracker '{tracker_name}' passed all checks.[/green]")
                     if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                        cli_ui.ask_yes_no(f"Passed all tracker checks, upload to {tracker_name}?", default=False)
-                        tracker_status[tracker_name]['upload'] = False
+                        user_confirmed = cli_ui.ask_yes_no(f"Passed all tracker checks, upload to {tracker_name}?", default=False)
+                        tracker_status[tracker_name]['upload'] = user_confirmed
                     else:
                         tracker_status[tracker_name]['upload'] = True
                         successful_trackers += 1
