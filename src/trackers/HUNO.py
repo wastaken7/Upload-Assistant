@@ -150,12 +150,7 @@ class HUNO():
         if language == "zxx":
             language = "Silent"
         elif not language:
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                language = cli_ui.ask_string('No audio language present, you must enter one:')
-                if not language:
-                    language = "Unknown"
-            else:
-                language = "Unknown"
+            language = cli_ui.ask_string('No audio language present, you must enter one:')
 
         return f'{codec} {channels} {language}'
 
