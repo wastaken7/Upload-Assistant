@@ -210,8 +210,9 @@ class HDB():
             if each == "EXIT":
                 console.print("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
                 return
-        if "Dual-Audio" in meta['audio'] and meta['is_disc'] not in ("BDMV", "HDDVD", "DVD"):
-            console.print("[bold red]Dual-Audio Encodes are not allowed")
+        if "Dual-Audio" in meta['audio']:
+            if not (meta['anime'] or meta['is_disc']):
+                console.print("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
             return
 
         # Download new .torrent from site
