@@ -705,7 +705,6 @@ class Prep():
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
         else:
             meta['edition'] = ""
-
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
         if meta['debug']:
             meta_finish_time = time.time()
@@ -782,6 +781,10 @@ class Prep():
                     tracker_status[tracker_name]['skipped'] = True
                 if tracker_name == "MTV":
                     tracker_config = self.config['TRACKERS'].get(tracker_name, {})
+                    if str(tracker_config.get('prefer_mtv_torrent', 'false')).lower() == "true":
+                        meta['prefer_small_pieces'] = True
+                    else:
+                        meta['prefer_small_pieces'] = False
                     if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
                         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
                         if not os.path.exists(torrent_path):
@@ -2659,7 +2662,6 @@ class Prep():
         try:
             parsed = guessit(video)
             release_group = parsed.get('release_group')
-
             if meta['is_disc'] == "BDMV":
                 if release_group:
                     if f"-{release_group}" not in video:

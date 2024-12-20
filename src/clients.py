@@ -67,6 +67,7 @@ class Clients():
             default_torrent_client = meta['client']
         if meta.get('client', None) == 'none' or default_torrent_client == 'none':
             return None
+
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         torrent_storage_dir = client.get('torrent_storage_dir')
         torrent_client = client.get('torrent_client', '').lower()
@@ -77,33 +78,66 @@ class Clients():
         if not os.path.exists(str(torrent_storage_dir)) and torrent_client != "watch":
             console.print(f"[bold red]Invalid torrent_storage_dir path: [bold yellow]{torrent_storage_dir}")
 
-        torrenthash = None
+        prefer_small_pieces = meta.get('prefer_small_pieces', False)
+        best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
+
+        # Iterate through pre-specified hashes
         for hash_key in ['torrenthash', 'ext_torrenthash']:
             hash_value = meta.get(hash_key)
             if hash_value:
                 valid, torrent_path = await self.is_valid_torrent(
                     meta, f"{torrent_storage_dir}/{hash_value}.torrent",
-                    hash_value, torrent_client, print_err=True
+                    hash_value, torrent_client, client, print_err=True
                 )
                 if valid:
-                    torrenthash = hash_value
-                    break
+                    if not prefer_small_pieces:
+                        console.print(f"[green]Found a valid torrent: [bold yellow]{hash_value}")
+                        return torrent_path
 
-        if torrent_client == 'qbit' and not torrenthash and client.get('enable_search'):
-            torrenthash = await self.search_qbit_for_torrent(meta, client)
+                    # Get piece size and update the best match
+                    torrent = Torrent.read(torrent_path)
+                    piece_size = torrent.piece_size
+                    if piece_size <= 8388608:
+                        console.print(f"[green]Found a valid torrent with preferred piece size: [bold yellow]{hash_value}")
+                        return torrent_path
 
-        if torrenthash:
-            torrent_path = f"{torrent_storage_dir}/{torrenthash}.torrent"
-            valid2, torrent_path = await self.is_valid_torrent(
-                meta, torrent_path, torrenthash, torrent_client, print_err=False
-            )
-            if valid2:
-                return torrent_path
+                    if best_match is None or piece_size < best_match['piece_size']:
+                        best_match = {'torrenthash': hash_value, 'torrent_path': torrent_path, 'piece_size': piece_size}
+                        console.print(f"[yellow]Storing valid torrent as best match: [bold yellow]{hash_value}")
+
+        # Search the client if no pre-specified hash matches
+        if torrent_client == 'qbit' and client.get('enable_search'):
+            found_hash = await self.search_qbit_for_torrent(meta, client)
+            if found_hash:
+                valid, torrent_path = await self.is_valid_torrent(
+                    meta, f"{torrent_storage_dir}/{found_hash}.torrent", found_hash, torrent_client, client, print_err=False
+                )
+                if valid:
+                    # Continue checking other torrents if `prefer_small_pieces` is enabled
+                    if not prefer_small_pieces:
+                        console.print(f"[green]Found a valid torrent from client search: [bold yellow]{found_hash}")
+                        return torrent_path
+
+                    # Get piece size and update the best match
+                    torrent = Torrent.read(torrent_path)
+                    piece_size = torrent.piece_size
+                    if piece_size <= 8388608:
+                        console.print(f"[green]Found a valid torrent with preferred piece size from client search: [bold yellow]{found_hash}")
+                        return torrent_path
+
+                    if best_match is None or piece_size < best_match['piece_size']:
+                        best_match = {'torrenthash': found_hash, 'torrent_path': torrent_path, 'piece_size': piece_size}
+                        console.print(f"[yellow]Storing valid torrent from client search as best match: [bold yellow]{found_hash}")
+
+        # Use best match if no preferred torrent found
+        if prefer_small_pieces and best_match:
+            console.print(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}")
+            return best_match['torrent_path']
 
         console.print("[bold yellow]No Valid .torrent found")
         return None
 
-    async def is_valid_torrent(self, meta, torrent_path, torrenthash, torrent_client, print_err=False):
+    async def is_valid_torrent(self, meta, torrent_path, torrenthash, torrent_client, client, print_err=False):
         valid = False
         wrong_file = False
 
@@ -174,15 +208,27 @@ class Clients():
             if os.path.exists(torrent_path):
                 try:
                     reuse_torrent = Torrent.read(torrent_path)
+                    torrent_storage_dir_valid = torrent_path
+                    torrent_file_size_kib = os.path.getsize(torrent_storage_dir_valid) / 1024
                     if meta['debug']:
-                        console.log(f"Checking piece size and count: pieces={reuse_torrent.pieces}, piece_size={reuse_torrent.piece_size}")
+                        console.log(f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={reuse_torrent.piece_size}, size={torrent_file_size_kib}")
 
                     # Piece size and count validations
-                    if (reuse_torrent.pieces >= 7000 and reuse_torrent.piece_size < 8388608) or (reuse_torrent.pieces >= 4000 and reuse_torrent.piece_size < 4194304):
-                        console.print("[bold yellow]Too many pieces exist in current hash. REHASHING")
+                    if not meta.get('prefer_small_pieces', False):
+                        if reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8388608:
+                            console.print("[bold yellow]Too many pieces detected")
+                            valid = False
+                        elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4194304:
+                            console.print("[bold yellow]Too many pieces detected")
+                            valid = False
+                    elif reuse_torrent.pieces >= 12000:
+                        console.print("[bold yellow]Too many pieces detected")
                         valid = False
                     elif reuse_torrent.piece_size < 32768:
                         console.print("[bold yellow]Piece size too small to reuse")
+                        valid = False
+                    elif torrent_file_size_kib > 250:
+                        console.print("[bold yellow]Torrent file size exceeds 250 KiB")
                         valid = False
                     elif wrong_file:
                         console.print("[bold red] Provided .torrent has files that were not expected")
@@ -203,17 +249,25 @@ class Clients():
     async def search_qbit_for_torrent(self, meta, client):
         console.print("[green]Searching qbittorrent for an existing .torrent")
         torrent_storage_dir = client.get('torrent_storage_dir', None)
+
         if meta['debug']:
             if torrent_storage_dir:
                 console.print(f"Torrent storage directory found: {torrent_storage_dir}")
             else:
                 console.print("No torrent storage directory found.")
+
         if torrent_storage_dir is None and client.get("torrent_client", None) != "watch":
             console.print(f"[bold red]Missing torrent_storage_dir for {self.config['DEFAULT']['default_torrent_client']}")
             return None
 
         try:
-            qbt_client = qbittorrentapi.Client(host=client['qbit_url'], port=client['qbit_port'], username=client['qbit_user'], password=client['qbit_pass'], VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True))
+            qbt_client = qbittorrentapi.Client(
+                host=client['qbit_url'],
+                port=client['qbit_port'],
+                username=client['qbit_user'],
+                password=client['qbit_pass'],
+                VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
+            )
             qbt_client.auth_log_in()
             if meta['debug']:
                 console.print("We logged into qbittorrent")
@@ -224,7 +278,7 @@ class Clients():
             console.print("[bold red]APIConnectionError: INCORRECT HOST/PORT")
             return None
 
-        # Remote path map if needed
+        # Remote path mapping if needed
         remote_path_map = False
         local_path, remote_path = await self.remote_path_map(meta)
         if local_path.lower() in meta['path'].lower() and local_path.lower() != remote_path.lower():
@@ -234,46 +288,49 @@ class Clients():
                 console.print(f"Local path: {local_path}")
                 console.print(f"Remote path: {remote_path}")
 
+        # Iterate through torrents and evaluate
+        best_match = None
         torrents = qbt_client.torrents.info()
         for torrent in torrents:
             try:
                 torrent_path = torrent.get('content_path', f"{torrent.save_path}{torrent.name}")
-                # console.print("Trying torrent_paths")
             except AttributeError:
                 if meta['debug']:
                     console.print(torrent)
                     console.print_exception()
                 continue
+                # Apply remote-to-local path mapping
             if remote_path_map:
-                # Replace remote path with local path only if not already mapped
                 if not torrent_path.startswith(local_path):
                     torrent_path = torrent_path.replace(remote_path, local_path)
-                    if meta['debug']:
-                        console.print("Replaced paths round 2:", torrent_path)
-
-                # Check if the local path was accidentally duplicated and correct it
                 if torrent_path.startswith(f"{local_path}/{local_path.split('/')[-1]}"):
                     torrent_path = torrent_path.replace(f"{local_path}/{local_path.split('/')[-1]}", local_path)
-                    if meta['debug']:
-                        console.print("Corrected duplicate in torrent path round 2:", torrent_path)
-
-                # Standardize path separators for the local OS
                 torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
-                if meta['debug']:
-                    console.print("Final torrent path after remote mapping round 2:", torrent_path)
 
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
-                if torrent_path.lower() == meta['filelist'][0].lower() and len(torrent.files) == len(meta['filelist']):
-                    valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
-                    if valid:
-                        console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
-                        return torrent.hash
+                if torrent_path.lower() != meta['filelist'][0].lower() or len(torrent.files) != len(meta['filelist']):
+                    continue
 
-            elif os.path.normpath(meta['path']).lower() == os.path.normpath(torrent_path).lower():
-                valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', print_err=False)
-                if valid:
-                    console.print(f"[green]Found a matching .torrent with hash: [bold yellow]{torrent.hash}")
-                    return torrent.hash
+            elif os.path.normpath(meta['path']).lower() != os.path.normpath(torrent_path).lower():
+                continue
+
+                # Check piece size if prefer_small_pieces is enabled
+            torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent.hash}.torrent")
+            torrent_data = Torrent.read(torrent_file_path)
+            piece_size = torrent_data.piece_size
+            if meta.get('prefer_small_pieces', False):
+                if best_match is None or piece_size < best_match['piece_size']:
+                    valid, torrent_path = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', client, print_err=False)
+                    if valid:
+                        best_match = {'hash': torrent.hash, 'torrent_path': torrent_path, 'piece_size': piece_size}
+            else:
+                return torrent.hash
+
+        # Return the best match if prefer_small_pieces is enabled and no direct match was found
+        if best_match:
+            console.print(f"[green]Using best match torrent with hash: {best_match['hash']}")
+            return best_match['hash']
+
         return None
 
     def rtorrent(self, path, torrent_path, torrent, meta, local_path, remote_path, client):
