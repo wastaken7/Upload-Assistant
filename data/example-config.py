@@ -216,7 +216,8 @@ config = {
             'announce_url': "get from https://www.morethantv.me/upload.php",
             # 'anon': False,
             # 'otp_uri' : 'OTP URI, read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format'
-            'skip_if_rehash': False  # Skip uploading to MTV if it would require a torrent rehash because existing piece size > 8 MiB
+            'skip_if_rehash': False,  # Skip uploading to MTV if it would require a torrent rehash because existing piece size > 8 MiB
+            'prefer_mtv_torrent': False,  # Iterate over found torrents and prefer MTV suitable torrents if found.
         },
         "NBL": {
             "api_key": "NBL api key",

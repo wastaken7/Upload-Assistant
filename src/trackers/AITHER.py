@@ -28,7 +28,7 @@ class AITHER():
         self.search_url = 'https://aither.cc/api/torrents/filter'
         self.upload_url = 'https://aither.cc/api/torrents/upload'
         self.torrent_url = 'https://aither.cc/api/torrents/'
-        self.signature = "\n[center][url=https://aither.cc/forums/topics/1349/posts/24958]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [
             '4K4U', 'afm72', 'AROMA', 'Bandi', 'BiTOR', 'Bluespots', 'Chivaman', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'FreetheFish', 'Garshasp', 'Ghost', 'Grym', 'Hi10', 'HiQVE', 'ImE', 'ION10',
             'iVy', 'Judas', 'LAMA', 'Langbard', 'LION', 'MeGusta', 'MONOLITH', 'Natty', 'nikt0', 'noxxus', 'OEPlus', 'OFT', 'OsC', 'Panda', 'PYC', 'QxR', 'r00t', 'Ralphy', 'RARBG', 'RCVR', 'RetroPeeps',

@@ -27,7 +27,7 @@ class PTT():
         self.source_flag = 'PTT'
         self.upload_url = 'https://polishtorrent.top/api/torrents/upload'
         self.search_url = 'https://polishtorrent.top/api/torrents/filter'
-        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by L4G's Upload Assistant[/url][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = ['ViP', 'BiRD', 'M@RTiNU$', 'inTGrity', 'CiNEMAET', 'MusicET', 'TeamET', 'R2D2']
         pass
 

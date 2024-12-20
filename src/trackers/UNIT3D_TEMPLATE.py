@@ -31,7 +31,7 @@ class UNIT3D_TEMPLATE():
         self.source_flag = 'Source flag for .torrent'
         self.upload_url = 'https://domain.tld/api/torrents/upload'
         self.search_url = 'https://domain.tld/api/torrents/filter'
-        self.signature = None
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
 

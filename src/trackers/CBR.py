@@ -27,7 +27,7 @@ class CBR():
         self.search_url = 'https://capybarabr.com/api/torrents/filter'
         self.torrent_url = 'https://capybarabr.com/api/torrents/'
         self.upload_url = 'https://capybarabr.com/api/torrents/upload'
-        self.signature = "\n[center][img]https://i.ibb.co/tYNzwgd/thanks-cbr.png[/img][/center]"
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
 
