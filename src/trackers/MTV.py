@@ -87,10 +87,10 @@ class MTV():
 
                     torrent_filename = "MTV"
 
-                    await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
                 else:
                     console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
                     return
+            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
 
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         url_host_mapping = {
