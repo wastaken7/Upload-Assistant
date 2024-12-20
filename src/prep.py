@@ -805,19 +805,22 @@ class Prep():
                 if meta.get('skipping') is None and not is_dupe and tracker_name == "PTP":
                     if meta.get('imdb_info', {}) == {}:
                         meta['imdb_info'] = self.get_imdb_info_api(meta['imdb_id'], meta)
-
-                if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
-                    console.print(f"[green]Tracker '{tracker_name}' passed all checks.[/green]")
-                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                        edit_choice = input("Enter 'y' to upload, or press Enter to skip uploading:")
-                        if edit_choice.lower() == 'y':
+                if not meta['debug']:
+                    if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
+                        console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            edit_choice = input("Enter 'y' to upload, or press enter to skip uploading:")
+                            if edit_choice.lower() == 'y':
+                                tracker_status[tracker_name]['upload'] = True
+                                successful_trackers += 1
+                            else:
+                                tracker_status[tracker_name]['upload'] = False
+                        else:
                             tracker_status[tracker_name]['upload'] = True
                             successful_trackers += 1
-                        else:
-                            tracker_status[tracker_name]['upload'] = False
-                    else:
-                        tracker_status[tracker_name]['upload'] = True
-                        successful_trackers += 1
+                else:
+                    tracker_status[tracker_name]['upload'] = True
+                    successful_trackers += 1
                 meta['skipping'] = None
         else:
             if tracker_name == "MANUAL":

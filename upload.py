@@ -518,7 +518,7 @@ async def do_the_thing(base_dir):
                     tracker_class = tracker_class_map[tracker](config=config)
                     tracker_status = meta.get('tracker_status', {})
                     upload_status = tracker_status.get(tracker, {}).get('upload', False)
-                    console.print(f"[red]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/red]")
+                    console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
 
                     if upload_status:
                         modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
@@ -565,7 +565,7 @@ async def do_the_thing(base_dir):
                     tracker_class = tracker_class_map[tracker](config=config)
                     tracker_status = meta.get('tracker_status', {})
                     upload_status = tracker_status.get(tracker, {}).get('upload', False)
-                    console.print(f"[blue]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/blue]")
+                    console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
 
                     if upload_status:
                         console.print(f"Uploading to {tracker}")
@@ -599,7 +599,7 @@ async def do_the_thing(base_dir):
                 if tracker == "THR":
                     tracker_status = meta.get('tracker_status', {})
                     upload_status = tracker_status.get(tracker, {}).get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                    print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
 
                     if upload_status:
                         thr = THR(config=config)
@@ -616,7 +616,7 @@ async def do_the_thing(base_dir):
                 if tracker == "PTP":
                     tracker_status = meta.get('tracker_status', {})
                     upload_status = tracker_status.get(tracker, {}).get('upload', False)
-                    print(f"Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}")
+                    print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[yellow]")
 
                     if upload_status:
                         ptp = PTP(config=config)
