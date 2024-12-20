@@ -780,6 +780,22 @@ class Prep():
                         tracker_status[tracker_name]['dupe'] = True
                 elif meta['skipping']:
                     tracker_status[tracker_name]['skipped'] = True
+                if tracker_name == "MTV":
+                    tracker_config = self.config['TRACKERS'].get(tracker_name, {})
+                    if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
+                        torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+                        if not os.path.exists(torrent_path):
+                            check_torrent = await client.find_existing_torrent(meta)
+                            if check_torrent:
+                                console.print(f"[yellow]Existing torrent found on {check_torrent}[/yellow]")
+                                self.create_base_from_existing_torrent(check_torrent, meta['base_dir'], meta['uuid'])
+                                torrent = Torrent.read(torrent_path)
+                                if torrent.piece_size > 8388608:
+                                    tracker_status[tracker_name]['skipped'] = True
+                        elif os.path.exists(torrent_path):
+                            torrent = Torrent.read(torrent_path)
+                            if torrent.piece_size > 8388608:
+                                tracker_status[tracker_name]['skipped'] = True
                 if meta.get('skipping') is None and not is_dupe and tracker_name == "PTP":
                     if meta.get('imdb_info', {}) == {}:
                         meta['imdb_info'] = self.get_imdb_info_api(meta['imdb_id'], meta)
