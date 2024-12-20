@@ -4409,16 +4409,36 @@ class Prep():
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")
         return season, episode
 
+    def safe_get(self, data, path, default=None):
+        for key in path:
+            if isinstance(data, dict):
+                data = data.get(key, default)
+            else:
+                return default
+        return data
+
     async def get_imdb_info_api(self, imdbID, meta):
-        imdb_info = {}
+        imdb_info = {
+            'title': meta['title'],
+            'year': meta['year'],
+            'aka': '',
+            'type': None,
+            'runtime': meta.get('runtime', '60'),
+            'cover': meta.get('poster'),
+        }
+        if len(meta.get('tmdb_directors', [])) >= 1:
+            imdb_info['directors'] = meta['tmdb_directors']
 
         if imdbID == "0":
-            return "", None
+            return imdb_info
         else:
-            if not imdbID.startswith("tt"):
-                imdbIDtt = f"tt{imdbID}"
-            else:
-                imdbIDtt = imdbID
+            try:
+                if not imdbID.startswith("tt"):
+                    imdbIDtt = f"tt{imdbID}"
+                else:
+                    imdbIDtt = imdbID
+            except Exception:
+                return imdb_info
             query = {
                 "query": f"""
                 query GetTitleInfo {{
@@ -4489,62 +4509,42 @@ class Prep():
             response = requests.post(url, json=query, headers=headers)
             data = response.json()
 
-        title_data = data.get("data", {}).get("title", {})
-        if not title_data:
-            return meta
+        if response.status_code != 200:
+            return imdb_info
+
+        title_data = self.safe_get(data, ["data", "title"], {})
+        if not data or "data" not in data or "title" not in data["data"]:
+            return imdb_info
+
         imdb_info['imdbID'] = imdbID
-        imdb_info['title'] = title_data.get('titleText', {}).get('text', '') or ''
-        imdb_info['year'] = title_data.get('releaseYear', {}).get('year', '') or ''
-        original_title = title_data.get('originalTitleText', {}).get('text', '')
-        if not original_title or original_title == imdb_info['title']:
-            original_title = imdb_info['title']
-        imdb_info['aka'] = original_title
-        imdb_info['type'] = title_data.get('titleType', {}).get('id', '') or ''
-        runtime_data = title_data.get('runtime', {})
-        if runtime_data and isinstance(runtime_data, dict):
-            runtime_seconds = runtime_data.get('seconds', 0)
-            runtime_minutes = runtime_seconds // 60 if runtime_seconds else 0
-        else:
-            runtime_seconds = 0
-            runtime_minutes = 0
-        imdb_info['runtime'] = str(runtime_minutes)
-        imdb_info['cover'] = title_data.get('primaryImage', {}).get('url', '') or meta.get('poster', '') or ''
-        imdb_info['plot'] = title_data.get('plot', {}).get('plotText', {}).get('plainText', '') or 'No plot available'
-        title_genres = title_data.get('titleGenres')
-        if title_genres and isinstance(title_genres, dict):
-            genres = title_genres.get('genres', [])
-        else:
-            genres = []
-        genre_list = [g.get('genre', {}).get('text', '') for g in genres if g.get('genre', {}).get('text')]
-        imdb_info['genres'] = ', '.join(genre_list) or ''
-        imdb_info['rating'] = title_data.get('ratingsSummary', {}).get('aggregateRating', 'N/A') or ''
+        imdb_info['title'] = self.safe_get(title_data, ['titleText', 'text'], meta['title'])
+        imdb_info['year'] = self.safe_get(title_data, ['releaseYear', 'year'], meta['year'])
+        original_title = self.safe_get(title_data, ['originalTitleText', 'text'], '')
+        imdb_info['aka'] = original_title if original_title and original_title != imdb_info['title'] else imdb_info['title']
+        imdb_info['type'] = self.safe_get(title_data, ['titleType', 'id'], None)
+        runtime_seconds = self.safe_get(title_data, ['runtime', 'seconds'], 0)
+        imdb_info['runtime'] = str(runtime_seconds // 60 if runtime_seconds else 60)
+        imdb_info['cover'] = self.safe_get(title_data, ['primaryImage', 'url'], meta.get('poster', ''))
+        imdb_info['plot'] = self.safe_get(title_data, ['plot', 'plotText', 'plainText'], 'No plot available')
+        genres = self.safe_get(title_data, ['titleGenres', 'genres'], [])
+        genre_list = [self.safe_get(g, ['genre', 'text'], '') for g in genres]
+        imdb_info['genres'] = ', '.join(filter(None, genre_list))
+        imdb_info['rating'] = self.safe_get(title_data, ['ratingsSummary', 'aggregateRating'], 'N/A')
         imdb_info['directors'] = []
-        principal_credits = title_data.get('principalCredits', [])
-        if principal_credits and isinstance(principal_credits, list):
+        principal_credits = self.safe_get(title_data, ['principalCredits'], [])
+        if isinstance(principal_credits, list):
             for pc in principal_credits:
-                category_text = pc.get('category', {}).get('text', '')
+                category_text = self.safe_get(pc, ['category', 'text'], '')
                 if 'Direct' in category_text:
-                    credits = pc.get('credits', [])
-                    if credits and isinstance(credits, list):
-                        for c in credits:
-                            name_id = c.get('name', {}).get('id', '')
-                            if name_id and name_id.startswith('nm'):
-                                imdb_info['directors'].append(name_id)
+                    credits = self.safe_get(pc, ['credits'], [])
+                    for c in credits:
+                        name_id = self.safe_get(c, ['name', 'id'], '')
+                        if name_id.startswith('nm'):
+                            imdb_info['directors'].append(name_id)
                     break
             if meta.get('manual_language'):
                 imdb_info['original_langauge'] = meta.get('manual_language')
 
-        if not title_data:
-            imdb_info = {
-                'title': meta['title'],
-                'year': meta['year'],
-                'aka': '',
-                'type': None,
-                'runtime': meta.get('runtime', '60'),
-                'cover': meta.get('poster'),
-            }
-            if len(meta.get('tmdb_directors', [])) >= 1:
-                imdb_info['directors'] = meta['tmdb_directors']
         return imdb_info
 
     async def get_imdb_info(self, imdbID, meta):
