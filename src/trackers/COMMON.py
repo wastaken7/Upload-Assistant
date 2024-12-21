@@ -700,6 +700,7 @@ class COMMON():
                 console.log(f"  'repack' in each.lower(): {'repack' in each.lower()}")
                 console.log(f"[debug] meta['uuid']: {meta.get('uuid', '')}")
                 console.log(f"[debug] meta['tag']: {meta.get('tag', '').lower()}")
+                console.log(f"[debug] normalized encoder: {normalized_encoder}")
 
             if has_is_disc and each.lower().endswith(".m2ts"):
                 return False
@@ -741,7 +742,7 @@ class COMMON():
                 return True
 
             if not is_dvd:
-                if normalized_encoder and normalized_encoder in normalized:
+                if normalized_encoder and normalized_encoder in each:
                     log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
                     return False
 
