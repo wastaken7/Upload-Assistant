@@ -820,6 +820,9 @@ class COMMON():
         file_hdr_simple = simplify_hdr(file_hdr)
         target_hdr_simple = simplify_hdr(target_hdr)
 
+        if file_hdr_simple == {"DV", "HDR"} or file_hdr_simple == {"HDR", "DV"}:
+            file_hdr_simple = {"HDR"}
+
         return file_hdr_simple == target_hdr_simple
 
     class MediaInfoParser:
