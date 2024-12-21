@@ -154,10 +154,28 @@ class BBCODE:
 
         # Catch Stray Images and Prepare Image List
         imagelist = []
-        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc)
-        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc)
+        excluded_urls = set()
+
+        source_encode_comps = re.findall(r"\[comparison=Source, Encode\][\s\S]*", desc, flags=re.IGNORECASE)
+        source_vs_encode_sections = re.findall(r"Source Vs Encode:[\s\S]*", desc, flags=re.IGNORECASE)
+        specific_cases = source_encode_comps + source_vs_encode_sections
+
+        # Extract URLs and update excluded_urls
+        for block in specific_cases:
+            urls = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", block, flags=re.IGNORECASE)
+            excluded_urls.update(urls)
+            desc = desc.replace(block, '')
+
+        # General [comparison=...] handling
+        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc, flags=re.IGNORECASE)
+        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc, flags=re.IGNORECASE)
         comps.extend(hides)
         nocomp = desc
+
+        # Exclude URLs from exculed array fom `nocomp`
+        for url in excluded_urls:
+            nocomp = nocomp.replace(url, '')
+
         comp_placeholders = []
 
         # Replace comparison/hide tags with placeholder because sometimes uploaders use comp images as loose images
@@ -172,12 +190,12 @@ class BBCODE:
 
         # Extract loose images and add to imagelist as dictionaries
         loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
-        if loose_images:
-            for img_url in loose_images:
+        for img_url in loose_images:
+            if img_url not in excluded_urls:  # Only include URLs not part of excluded sections
                 image_dict = {
                     'img_url': img_url,
                     'raw_url': img_url,
-                    'web_url': img_url  # Since there is no distinction here, use the same URL for all
+                    'web_url': img_url
                 }
                 imagelist.append(image_dict)
                 desc = desc.replace(img_url, '')
