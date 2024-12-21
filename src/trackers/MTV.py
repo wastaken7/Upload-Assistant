@@ -59,7 +59,7 @@ class MTV():
             torrent = Torrent.read(torrent_path)
 
             if torrent.piece_size > 8388608:
-                tracker_config = self.config['TRACKERS'].get(MTV, {})
+                tracker_config = self.config['TRACKERS'].get(self.tracker, {})
                 if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
                     console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
 
