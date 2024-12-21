@@ -641,7 +641,7 @@ class COMMON():
         target_season = meta.get("season")
         target_episode = meta.get("episode")
         target_resolution = meta.get("resolution")
-        tag = meta.get("tag").lower()
+        tag = meta.get("tag").lower().replace("-", " ")
         is_dvd = meta['is_disc'] == "DVD"
         web_dl = meta.get('type') == "WEBDL"
 
@@ -762,7 +762,7 @@ class COMMON():
         Normalize a filename for easier matching.
         Retain season/episode information in the format SxxExx.
         """
-        normalized = filename.lower().replace("-", " -").replace(" ", " ").replace(".", " ")
+        normalized = filename.lower().replace("-", " ").replace(" ", " ").replace(".", " ")
 
         return normalized
 
