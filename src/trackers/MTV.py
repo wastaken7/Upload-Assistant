@@ -40,6 +40,12 @@ class MTV():
         ]
         pass
 
+    def match_host(self, hostname, approved_hosts):
+        for approved_host in approved_hosts:
+            if hostname == approved_host or hostname.endswith(f".{approved_host}"):
+                return approved_host
+        return hostname
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
@@ -94,18 +100,17 @@ class MTV():
 
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         url_host_mapping = {
-            "i.ibb.co": "imgbb",
+            "ibb.co": "imgbb",
             "ptpimg.me": "ptpimg",
-            "images2.imgbox.com": "imgbox",
+            "imgbox.com": "imgbox",
         }
-        images_reuploaded = False
 
-        normalized_approved_hosts = set(approved_image_hosts + list(url_host_mapping.keys()))  # noqa F841
         for image in meta['image_list']:
             raw_url = image['raw_url']
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = url_host_mapping.get(hostname, hostname)
+            mapped_host = self.match_host(hostname, url_host_mapping.keys())
+            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
             if meta['debug']:
                 if mapped_host in approved_image_hosts:
                     console.print(f"[green]URL '{raw_url}' is correctly matched to approved host '{mapped_host}'.")
@@ -113,7 +118,10 @@ class MTV():
                     console.print(f"[red]URL '{raw_url}' is not recognized as part of an approved host.")
 
         if all(
-            url_host_mapping.get(urlparse(image['raw_url']).netloc, urlparse(image['raw_url']).netloc) in approved_image_hosts
+            url_host_mapping.get(
+                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+            ) in approved_image_hosts
             for image in meta['image_list']
         ):
             console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
@@ -208,9 +216,9 @@ class MTV():
             approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
 
         url_host_mapping = {
-            "i.ibb.co": "imgbb",
+            "ibb.co": "imgbb",
             "ptpimg.me": "ptpimg",
-            "images2.imgbox.com": "imgbox",
+            "imgbox.com": "imgbox",
         }
 
         retry_mode = False
@@ -316,13 +324,22 @@ class MTV():
             raw_url = image['raw_url']
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = url_host_mapping.get(hostname, hostname)
+            mapped_host = self.match_host(hostname, url_host_mapping.keys())
+            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
 
             if mapped_host not in approved_image_hosts:
                 console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
                 return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
-        return meta[new_images_key], False, images_reuploaded
+        if all(
+            url_host_mapping.get(
+                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+            ) in approved_image_hosts
+            for image in meta[new_images_key]
+        ):
+
+            return meta[new_images_key], False, images_reuploaded
 
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
