@@ -822,6 +822,8 @@ class COMMON():
 
         if file_hdr_simple == {"DV", "HDR"} or file_hdr_simple == {"HDR", "DV"}:
             file_hdr_simple = {"HDR"}
+            if target_hdr_simple == {"DV", "HDR"} or target_hdr_simple == {"HDR", "DV"}:
+                target_hdr_simple = {"HDR"}
 
         return file_hdr_simple == target_hdr_simple
 
