@@ -2703,7 +2703,6 @@ class Prep():
         except Exception:
             if meta['debug']:
                 console.print("No mediainfo.json")
-        resolution = meta['resolution']
         try:
             try:
                 source = guessit(video)['source']
@@ -2737,10 +2736,10 @@ class Prep():
                             system = "NTSC"
                     except Exception:
                         system = ""
-                    if system == "":
+                    if system == "" or system is None:
                         try:
                             framerate = mi['media']['track'][1].get('FrameRate', '')
-                            if framerate == "25":
+                            if '25' in framerate or '50' in framerate:
                                 system = "PAL"
                             elif framerate:
                                 system = "NTSC"
@@ -2766,11 +2765,6 @@ class Prep():
                 source = "Web"
             if source == "Ultra HDTV":
                 source = "UHDTV"
-            if type == "DVDRIP":
-                if resolution in [540, 576]:
-                    source = "PAL"
-                else:
-                    source = "NTSC"
         except Exception:
             console.print(traceback.format_exc())
             source = "BluRay"
