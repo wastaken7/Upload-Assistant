@@ -643,6 +643,7 @@ class COMMON():
         target_resolution = meta.get("resolution")
         tag = meta.get("tag").lower()
         is_dvd = meta['is_disc'] == "DVD"
+        web_dl = meta.get('type') == "WEBDL"
 
         attribute_checks = [
             {
@@ -662,12 +663,6 @@ class COMMON():
                 "uuid_flag": "uhd" in meta.get('name', '').lower(),
                 "condition": lambda each: "uhd" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'UHD' mismatch: {each}"
-            },
-            {
-                "key": "webdl",
-                "uuid_flag": "web-dl" in meta.get('name', '').lower(),
-                "condition": lambda each: "webdl" in each.lower() or "web-dl" in each.lower(),
-                "exclude_msg": lambda each: f"Excluding result due to 'WEBDL' mismatch: {each}"
             },
             {
                 "key": "hdtv",
@@ -745,6 +740,9 @@ class COMMON():
                 if normalized_encoder and normalized_encoder in each:
                     log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
                     return False
+
+            if web_dl and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
+                return False
 
             console.log(f"[debug] Passed all checks: {each}")
             return False
