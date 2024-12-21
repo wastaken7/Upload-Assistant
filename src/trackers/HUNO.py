@@ -291,6 +291,10 @@ class HUNO():
             console.print('[bold red]Only x265/HEVC encodes are allowed')
             meta['skipping'] = "HUNO"
             return
+        if meta['type'] == "DVDRIP":
+            console.print('[bold red]DVDRIPs are not allowed')
+            meta['skipping'] = "HUNO"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on HUNO...")
 
