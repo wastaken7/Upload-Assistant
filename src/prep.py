@@ -3312,7 +3312,7 @@ class Prep():
                         console.print("[yellow]imgbb failed, trying next image host")
                         return {'status': 'failed', 'reason': 'imgbb upload failed'}
 
-                    img_url = response_data['data']['medium']['url']
+                    img_url = response_data['data'].get('medium', {}).get('url') or response_data['data']['thumb']['url']
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
