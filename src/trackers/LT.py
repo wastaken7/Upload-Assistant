@@ -27,7 +27,7 @@ class LT():
         self.source_flag = 'Lat-Team "Poder Latino"'
         self.upload_url = 'https://lat-team.com/api/torrents/upload'
         self.search_url = 'https://lat-team.com/api/torrents/filter'
-        self.signature = ''
+        self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
 
@@ -78,7 +78,7 @@ class LT():
         return resolution_id
 
     async def edit_name(self, meta):
-        lt_name = meta['name'].replace('Dual-Audio', '').replace('Dubbed', '').replace('  ', ' ').strip()
+        lt_name = meta['name'].replace('Dual-Audio', '').replace('Dubbed', '').replace(meta['aka'], '').replace('  ', ' ').strip()
         if meta['type'] != 'DISC':  # DISC don't have mediainfo
             # Check if is HYBRID (Copied from BLU.py)
             if 'hybrid' in meta.get('uuid').lower():
@@ -86,6 +86,9 @@ class LT():
                     lt_name = lt_name.replace('REPACK', 'Hybrid REPACK')
                 else:
                     lt_name = lt_name.replace(meta['resolution'], f"Hybrid {meta['resolution']}")
+            # Check if original language is "es" if true replace title for AKA if available
+            if meta.get('original_language') == 'es' and meta.get('aka') != "":
+                lt_name = lt_name.replace(meta.get('title'), meta.get('aka').replace('AKA', '')).strip()
             # Check if audio Spanish exists
             # Get all the audios 'es-419' or 'es'
             audios = [
@@ -191,7 +194,7 @@ class LT():
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        console.print("[yellow]Searching for existing torrents on site...")
+        console.print("[yellow]Searching for existing torrents on LT...")
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
