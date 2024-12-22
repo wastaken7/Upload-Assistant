@@ -26,7 +26,7 @@ from rich.markdown import Markdown
 from rich.style import Style
 
 
-cli_ui.setup(color='always', title="L4G's Upload Assistant")
+cli_ui.setup(color='always', title="Audionut's Upload Assistant")
 
 base_dir = os.path.abspath(os.path.dirname(__file__))
 

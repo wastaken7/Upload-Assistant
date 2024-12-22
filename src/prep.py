@@ -425,6 +425,10 @@ class Prep():
         task_limit = self.config['DEFAULT'].get('task_limit', "0")
         if int(task_limit) > 0:
             meta['task_limit'] = task_limit
+        meta['tone_map'] = self.config['DEFAULT'].get('tone_map', False)
+        tone_task_limit = self.config['DEFAULT'].get('tone_task_limit', "0")
+        if int(tone_task_limit) > 0:
+            meta['tone_task_limit'] = tone_task_limit
         meta['mode'] = mode
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
@@ -1408,9 +1412,19 @@ class Prep():
 
         if meta['debug'] and not force_screenshots:
             console.print(f"[bold yellow]Saving Screens... Total needed: {self.screens}, Existing: {total_existing}, To capture: {num_screens}")
-        capture_results = []
+
+        tone_map = meta.get('tone_map', False)
+        if tone_map and "HDR" in meta['hdr']:
+            hdr_tonemap = True
+        else:
+            hdr_tonemap = False
+
         capture_tasks = []
-        task_limit = int(meta.get('task_limit', os.cpu_count()))
+        capture_results = []
+        if hdr_tonemap:
+            task_limit = int(meta.get('tone_task_limit'))
+        else:
+            task_limit = int(meta.get('task_limit', os.cpu_count()))
 
         if use_vs:
             from src.vs import vs_screengn
@@ -1429,7 +1443,8 @@ class Prep():
                     ss_times[i],
                     os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{len(existing_indices) + i}.png"),
                     keyframe,
-                    loglevel
+                    loglevel,
+                    hdr_tonemap
                 )
                 for i in range(num_screens + 1)
             ]
@@ -1504,7 +1519,7 @@ class Prep():
                         try:
                             os.remove(image_path)
                             random_time = random.uniform(0, length)
-                            self.capture_disc_task((file, random_time, image_path, keyframe, loglevel))
+                            self.capture_disc_task((file, random_time, image_path, keyframe, loglevel, hdr_tonemap))
                             self.optimize_image_task((image_path, config))
                             new_size = os.path.getsize(image_path)
                             valid_image = False
@@ -1546,17 +1561,33 @@ class Prep():
         console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
     def capture_disc_task(self, task):
-        file, ss_time, image_path, keyframe, loglevel = task
+        file, ss_time, image_path, keyframe, loglevel, hdr_tonemap = task
         try:
-            (
-                ffmpeg
-                .input(file, ss=ss_time, skip_frame=keyframe)
+            ff = ffmpeg.input(file, ss=ss_time, skip_frame=keyframe)
+
+            if hdr_tonemap:
+                ff = (
+                    ff
+                    .filter('zscale', transfer='linear')
+                    .filter('tonemap', tonemap='mobius', desat=8.0)
+                    .filter('zscale', transfer='bt709')
+                    .filter('format', 'rgb24')
+                )
+
+            command = (
+                ff
                 .output(image_path, vframes=1, pix_fmt="rgb24")
                 .overwrite_output()
                 .global_args('-loglevel', loglevel)
-                .run()
             )
+
+            command.run(capture_stdout=True, capture_stderr=True)
+
             return image_path
+        except ffmpeg.Error as e:
+            error_output = e.stderr.decode('utf-8')
+            console.print(f"[red]FFmpeg error capturing screenshot: {error_output}[/red]")
+            return None
         except Exception as e:
             console.print(f"[red]Error capturing screenshot: {e}[/red]")
             return None
@@ -1845,9 +1876,18 @@ class Prep():
         else:
             ss_times = self.valid_ss_time([], num_screens + 1, length)
 
+        tone_map = meta.get('tone_map', False)
+        if tone_map and "HDR" in meta['hdr']:
+            hdr_tonemap = True
+        else:
+            hdr_tonemap = False
+
         capture_tasks = []
         capture_results = []
-        task_limit = int(meta.get('task_limit', os.cpu_count()))
+        if hdr_tonemap:
+            task_limit = int(meta.get('tone_task_limit'))
+        else:
+            task_limit = int(meta.get('task_limit', os.cpu_count()))
 
         existing_images = 0
         for i in range(num_screens):
@@ -1861,7 +1901,7 @@ class Prep():
             for i in range(num_screens + 1):
                 image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
                 if not os.path.exists(image_path) or meta.get('retake', False):
-                    capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel))
+                    capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap))
                 elif meta['debug']:
                     console.print(f"[yellow]Skipping existing screenshot: {image_path}")
 
@@ -1873,7 +1913,10 @@ class Prep():
                         with get_context("spawn").Pool(processes=min(len(capture_tasks), task_limit)) as pool:
                             try:
                                 for result in pool.imap_unordered(self.capture_screenshot, capture_tasks):
-                                    capture_results.append(result)
+                                    if isinstance(result, str) and result.startswith("Error:"):
+                                        console.print(f"[red]Capture Error: {result}")
+                                    else:
+                                        capture_results.append(result)
                                     pbar.update(1)
                             finally:
                                 pool.close()
@@ -1951,7 +1994,7 @@ class Prep():
                     try:
                         os.remove(image_path)
                         random_time = random.uniform(0, length)
-                        self.capture_screenshot((path, random_time, image_path, width, height, w_sar, h_sar, loglevel))
+                        self.capture_screenshot((path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap))
                         self.optimize_image_task((image_path, config))
                         new_size = os.path.getsize(image_path)
                         valid_image = False
@@ -2017,9 +2060,8 @@ class Prep():
         return ss_times
 
     def capture_screenshot(self, args):
-        path, ss_time, image_path, width, height, w_sar, h_sar, loglevel = args
+        path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
         try:
-            # Validate inputs
             if width <= 0 or height <= 0:
                 return "Error: Invalid width or height for scaling"
 
@@ -2030,14 +2072,31 @@ class Prep():
             if w_sar != 1 or h_sar != 1:
                 ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
+            if hdr_tonemap:
+                ff = (
+                    ff
+                    .filter('zscale', transfer='linear')
+                    .filter('tonemap', tonemap='mobius', desat=8.0)
+                    .filter('zscale', transfer='bt709')
+                    .filter('format', 'rgb24')
+                )
+
             command = (
                 ff
-                .output(image_path, vframes=1, pix_fmt="rgb24")
+                .output(
+                    image_path,
+                    vframes=1,
+                    pix_fmt="rgb24"
+                )
                 .overwrite_output()
                 .global_args('-loglevel', loglevel)
             )
 
-            command.run()
+            try:
+                command.run(capture_stdout=True, capture_stderr=True)
+            except ffmpeg.Error as e:
+                error_output = e.stderr.decode('utf-8')
+                return f"Error: {error_output}"
 
             if not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
                 return f"Error: Screenshot not generated or is empty at {image_path}"
@@ -3662,7 +3721,7 @@ class Prep():
             console.log(f"CATEGORY: {meta['category']}")
             console.log(f"TYPE: {meta['type']}")
             console.log("[cyan]get_name meta:")
-            console.log(meta)
+            # console.log(meta)
 
         # YAY NAMING FUN
         if meta['category'] == "MOVIE":  # MOVIE SPECIFIC

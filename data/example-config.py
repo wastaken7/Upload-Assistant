@@ -25,6 +25,11 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Tonemap HDR screenshots and set task limit when tonemapping
+        # When tonemapping, out of memory errors are more likely to occur with higher task limits
+        "tone_map": False,
+        "tone_task_limit": "1",
+
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
         # description, skip creating and uploading any further screenshots.
@@ -32,7 +37,8 @@ config = {
 
         # multi processing task limit
         # When capturing/optimizing images, limit to this many concurrent tasks
-        # defaults to 'os.cpu_count()'
+        # Causes issues on UNIX based OS when task_limit > 1
+        # defaults to os.cpu_count() if thiss value not set
         "task_limit": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
