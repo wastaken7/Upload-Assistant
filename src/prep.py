@@ -426,7 +426,6 @@ class Prep():
         if int(task_limit) > 0:
             meta['task_limit'] = task_limit
         meta['mode'] = mode
-        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
         meta['saved_description'] = False

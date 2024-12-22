@@ -211,7 +211,7 @@ async def process_meta(meta, base_dir):
         if str(ua).lower() == "true":
             meta['unattended'] = True
             console.print("[yellow]Running in Auto Mode")
-
+    meta['base_dir'] = base_dir
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     meta = await prep.gather_prep(meta=meta, mode='cli')
     if not meta:
