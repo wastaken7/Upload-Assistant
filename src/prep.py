@@ -1387,6 +1387,7 @@ class Prep():
         sanitized_filename = self.sanitize_filename(filename)
         length = 0
         file = None
+        frame_rate = None
         for each in bdinfo['files']:
             int_length = sum(int(float(x)) * 60 ** i for i, x in enumerate(reversed(each['length'].split(':'))))
             if int_length > length:
@@ -1395,6 +1396,14 @@ class Prep():
                     for name in files:
                         if name.lower() == each['file'].lower():
                             file = os.path.join(root, name)
+
+        if 'video' in bdinfo and bdinfo['video']:
+            fps_string = bdinfo['video'][0].get('fps', None)
+            if fps_string:
+                try:
+                    frame_rate = float(fps_string.split(' ')[0])  # Extract and convert to float
+                except ValueError:
+                    console.print("[red]Error: Unable to parse frame rate from bdinfo['video'][0]['fps']")
 
         keyframe = 'nokey' if "VC-1" in bdinfo['video'][0]['codec'] or bdinfo['video'][0]['hdr_dv'] != "" else 'none'
 
@@ -1435,7 +1444,7 @@ class Prep():
             else:
                 loglevel = 'quiet'
 
-            ss_times = self.valid_ss_time([], num_screens + 1, length)
+            ss_times = self.valid_ss_time([], num_screens + 1, length, frame_rate)
             existing_indices = {int(p.split('-')[-1].split('.')[0]) for p in existing_screens}
             capture_tasks = [
                 (
@@ -1625,6 +1634,7 @@ class Prep():
                 dar = float(track.display_aspect_ratio)
                 width = float(track.width)
                 height = float(track.height)
+                frame_rate = float(track.frame_rate)
         if par < 1:
             new_height = dar * height
             sar = width / new_height
@@ -1675,7 +1685,7 @@ class Prep():
         main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
         os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         voblength, n = _is_vob_good(0, 0, num_screens)
-        ss_times = self.valid_ss_time([], num_screens + 1, voblength)
+        ss_times = self.valid_ss_time([], num_screens + 1, voblength, frame_rate)
         tasks = []
         task_limit = int(meta.get('task_limit', os.cpu_count()))
         for i in range(num_screens + 1):
@@ -1867,14 +1877,22 @@ class Prep():
         os.chdir(f"{base_dir}/tmp/{folder_id}")
 
         if manual_frames:
-            manual_frames = [int(frame) for frame in manual_frames]
+            if meta['debug']:
+                console.print(f"[yellow]Using manual frames: {manual_frames}")
+            manual_frames = [int(frame) for frame in manual_frames.split(',')]
             ss_times = [frame / frame_rate for frame in manual_frames]
-
-            if len(ss_times) < num_screens:
-                random_times = self.valid_ss_time(ss_times, num_screens - len(ss_times), length)
-                ss_times.extend(random_times)
         else:
-            ss_times = self.valid_ss_time([], num_screens + 1, length)
+            ss_times = []
+
+        ss_times = self.valid_ss_time(
+            ss_times,
+            num_screens,
+            length,
+            frame_rate,
+            exclusion_zone=500
+        )
+        if meta['debug']:
+            console.print(f"[green]Final list of frames for screenshots: {ss_times}")
 
         tone_map = meta.get('tone_map', False)
         if tone_map and "HDR" in meta['hdr']:
@@ -2039,25 +2057,38 @@ class Prep():
             finish_time = time.time()
             console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
-    def valid_ss_time(self, ss_times, num_screens, length, manual_frames=None):
-        if manual_frames:
-            ss_times.extend(manual_frames[:num_screens])  # Use only as many as needed
-            console.print(f"[green]Using provided manual frame numbers for screenshots: {ss_times}")
-            return ss_times
+    def valid_ss_time(self, ss_times, num_screens, length, frame_rate, exclusion_zone=None):
+        total_screens = num_screens + 1
+        exclusion_zone = exclusion_zone or length / 10 / total_screens
+        result_times = ss_times.copy()
+        attempts = 0
+        max_attempts = 100
 
-        # Generate random times if manual frames are not provided
-        while len(ss_times) < num_screens:
+        while len(result_times) < total_screens and attempts < max_attempts:
+            attempts += 1
             valid_time = True
-            sst = random.randint(round(length / 5), round(4 * length / 5))  # Adjust range for more spread out times
-            for each in ss_times:
-                tolerance = length / 10 / num_screens
-                if abs(sst - each) <= tolerance:
+            frame = random.randint(round(length / 5), round(4 * length / 5))
+            time = frame / frame_rate
+
+            for existing_time in result_times:
+                if abs(frame - existing_time * frame_rate) <= exclusion_zone:
                     valid_time = False
                     break
-            if valid_time:
-                ss_times.append(sst)
 
-        return ss_times
+            if valid_time:
+                result_times.append(time)
+
+        if len(result_times) < total_screens:
+            remaining = total_screens - len(result_times)
+            start_frame = round(length / 5)
+            end_frame = round(4 * length / 5)
+            step = (end_frame - start_frame) / (remaining + 1)
+
+            for i in range(remaining):
+                frame = start_frame + step * (i + 1)
+                result_times.append(frame / frame_rate)
+
+        return sorted(result_times)
 
     def capture_screenshot(self, args):
         path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
