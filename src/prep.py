@@ -714,8 +714,18 @@ class Prep():
             console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
         parser = Args(config)
         helper = UploadHelper()
+        common = COMMON(config=config)
+        tracker_setup = TRACKER_SETUP(config=config)
+        enabled_trackers = tracker_setup.trackers_enabled(meta)
+        if "saved_trackers" not in meta:
+            meta['trackers'] = enabled_trackers
+        else:
+            meta['trackers'] = meta['saved_trackers']
         confirm = helper.get_confirmation(meta)
         while confirm is False:
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+                json.dump(meta, f, indent=4)
+            meta['saved_trackers'] = meta['trackers']
             editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
             editargs = (meta['path'],) + tuple(editargs.split())
             if meta.get('debug', False):
@@ -723,19 +733,13 @@ class Prep():
             meta, help, before_args = parser.parse(editargs, meta)
             meta['edit'] = True
             meta = await self.gather_prep(meta=meta, mode='cli')
-            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-                json.dump(meta, f, indent=4)
             meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
             confirm = helper.get_confirmation(meta)
-
-        common = COMMON(config=config)
-        tracker_setup = TRACKER_SETUP(config=config)
-        enabled_trackers = tracker_setup.trackers_enabled(meta)
 
         tracker_status = {}
         successful_trackers = 0
 
-        for tracker_name in enabled_trackers:
+        for tracker_name in meta['trackers']:
             disctype = meta.get('disctype', None)
             tracker_name = tracker_name.replace(" ", "").upper().strip()
 
