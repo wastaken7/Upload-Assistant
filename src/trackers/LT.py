@@ -95,7 +95,7 @@ class LT():
                 audio for audio in meta['mediainfo']['media']['track'][2:]
                 if audio.get('@type') == 'Audio'
                 and audio.get('Language') in {'es-419', 'es'}
-                and "commentary" not in audio.get('Title').lower()
+                and "commentary" not in str(audio.get('Title', '')).lower()
                 ]
             if len(audios) > 0:  # If there is at least 1 audio spanish
                 lt_name = lt_name
