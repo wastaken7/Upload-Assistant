@@ -1303,60 +1303,60 @@ class Prep():
         base = os.path.splitext(base)[0]
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
+        if 'scene' not in meta:
+            try:
+                response = requests.get(url, timeout=30)
+                response_json = response.json()
 
-        try:
-            response = requests.get(url, timeout=30)
-            response_json = response.json()
+                if int(response_json.get('resultsCount', 0)) > 0:
+                    first_result = response_json['results'][0]
+                    meta['scene_name'] = first_result['release']
+                    video = f"{first_result['release']}.mkv"
+                    scene = True
+                    if scene and meta.get('isdir', False) and meta.get('queue') is not None:
+                        meta['keep_folder'] = True
 
-            if int(response_json.get('resultsCount', 0)) > 0:
-                first_result = response_json['results'][0]
-                meta['scene_name'] = first_result['release']
-                video = f"{first_result['release']}.mkv"
-                scene = True
-                if scene and meta.get('isdir', False) and meta.get('queue') is not None:
-                    meta['keep_folder'] = True
+                    # NFO Download Handling
+                    if first_result.get("hasNFO") == "yes":
+                        try:
+                            release = first_result['release']
+                            release_lower = release.lower()
+                            nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
 
-                # NFO Download Handling
-                if first_result.get("hasNFO") == "yes":
+                            # Define path and create directory
+                            save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                            os.makedirs(save_path, exist_ok=True)
+                            nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+
+                            # Download the NFO file
+                            nfo_response = requests.get(nfo_url, timeout=30)
+                            if nfo_response.status_code == 200:
+                                with open(nfo_file_path, 'wb') as f:
+                                    f.write(nfo_response.content)
+                                    meta['nfo'] = True
+                                    meta['auto_nfo'] = True
+                                console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                            else:
+                                console.print("[yellow]NFO file not available for download.")
+                        except Exception as e:
+                            console.print("[yellow]Failed to download NFO file:", e)
+
+                    # IMDb Handling
                     try:
-                        release = first_result['release']
-                        release_lower = release.lower()
-                        nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
+                        r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
+                        r = r.json()
 
-                        # Define path and create directory
-                        save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
-                        os.makedirs(save_path, exist_ok=True)
-                        nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
-
-                        # Download the NFO file
-                        nfo_response = requests.get(nfo_url, timeout=30)
-                        if nfo_response.status_code == 200:
-                            with open(nfo_file_path, 'wb') as f:
-                                f.write(nfo_response.content)
-                                meta['nfo'] = True
-                                meta['auto_nfo'] = True
-                            console.print(f"[green]NFO downloaded to {nfo_file_path}")
-                        else:
-                            console.print("[yellow]NFO file not available for download.")
+                        if r['releases'] != [] and imdb is None:
+                            imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
+                        console.print(f"[green]SRRDB: Matched to {first_result['release']}")
                     except Exception as e:
-                        console.print("[yellow]Failed to download NFO file:", e)
+                        console.print("[yellow]Failed to fetch IMDb information:", e)
 
-                # IMDb Handling
-                try:
-                    r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
-                    r = r.json()
+                else:
+                    console.print("[yellow]SRRDB: No match found")
 
-                    if r['releases'] != [] and imdb is None:
-                        imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
-                    console.print(f"[green]SRRDB: Matched to {first_result['release']}")
-                except Exception as e:
-                    console.print("[yellow]Failed to fetch IMDb information:", e)
-
-            else:
-                console.print("[yellow]SRRDB: No match found")
-
-        except Exception as e:
-            console.print("[yellow]SRRDB: No match found, or request has timed out", e)
+            except Exception as e:
+                console.print("[yellow]SRRDB: No match found, or request has timed out", e)
 
         return video, scene, imdb
 
