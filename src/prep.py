@@ -2059,36 +2059,36 @@ class Prep():
 
     def valid_ss_time(self, ss_times, num_screens, length, frame_rate, exclusion_zone=None):
         total_screens = num_screens + 1
-        exclusion_zone = exclusion_zone or length / 10 / total_screens
+
+        if exclusion_zone is None:
+            exclusion_zone = max(length / (3 * total_screens), length / 15)
+
         result_times = ss_times.copy()
-        attempts = 0
-        max_attempts = 100
+        section_size = (round(4 * length / 5) - round(length / 5)) / total_screens * 1.3
+        section_starts = [round(length / 5) + i * (section_size * 0.9) for i in range(total_screens)]
 
-        while len(result_times) < total_screens and attempts < max_attempts:
-            attempts += 1
-            valid_time = True
-            frame = random.randint(round(length / 5), round(4 * length / 5))
-            time = frame / frame_rate
+        for section_index in range(total_screens):
+            valid_time = False
+            attempts = 0
+            start_frame = round(section_starts[section_index] * frame_rate)
+            end_frame = round((section_starts[section_index] + section_size) * frame_rate)
 
-            for existing_time in result_times:
-                if abs(frame - existing_time * frame_rate) <= exclusion_zone:
-                    valid_time = False
-                    break
+            while not valid_time and attempts < 50:
+                attempts += 1
+                frame = random.randint(start_frame, end_frame)
+                time = frame / frame_rate
 
-            if valid_time:
-                result_times.append(time)
+                if all(abs(frame - existing_time * frame_rate) > exclusion_zone * frame_rate for existing_time in result_times):
+                    result_times.append(time)
+                    valid_time = True
 
-        if len(result_times) < total_screens:
-            remaining = total_screens - len(result_times)
-            start_frame = round(length / 5)
-            end_frame = round(4 * length / 5)
-            step = (end_frame - start_frame) / (remaining + 1)
+            if not valid_time:
+                midpoint_frame = (start_frame + end_frame) // 2
+                result_times.append(midpoint_frame / frame_rate)
 
-            for i in range(remaining):
-                frame = start_frame + step * (i + 1)
-                result_times.append(frame / frame_rate)
+        result_times = sorted(result_times)
 
-        return sorted(result_times)
+        return result_times
 
     def capture_screenshot(self, args):
         path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
