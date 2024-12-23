@@ -49,9 +49,11 @@ class BHD():
             "ptpimg.me": "ptpimg",
             "pixhost.to": "pixhost",
             "imgbox.com": "imgbox",
+            "beyondhd.co": "bhd",
+            "imagebam.com": "bam",
         }
 
-        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost']
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bhd', 'bam']
 
         for image in meta['image_list']:
             raw_url = image['raw_url']
