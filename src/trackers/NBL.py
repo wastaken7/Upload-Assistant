@@ -84,6 +84,10 @@ class NBL():
             console.print("[red]Only TV Is allowed at NBL")
             meta['skipping'] = "NBL"
             return
+        if meta.get('is_disc') is not None:
+            console.print('[bold red]This site does not allow raw discs')
+            meta['skipping'] = "NBL"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on NBL...")
         if int(meta.get('tvmaze_id', 0)) != 0:
