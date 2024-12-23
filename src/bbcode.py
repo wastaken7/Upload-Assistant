@@ -70,6 +70,7 @@ class BBCODE:
 
         elif is_disc == "BDMV":
             desc = re.sub(r"\[mediainfo\][\s\S]*?\[\/mediainfo\]", "", desc)
+            desc = re.sub(r"DISC INFO:[\s\S]*?(\n\n|$)", "", desc, flags=re.IGNORECASE)
             desc = re.sub(r"Disc Title:[\s\S]*?(\n\n|$)", "", desc, flags=re.IGNORECASE)
             desc = re.sub(r"Disc Size:[\s\S]*?(\n\n|$)", "", desc, flags=re.IGNORECASE)
             desc = re.sub(r"Protection:[\s\S]*?(\n\n|$)", "", desc, flags=re.IGNORECASE)
