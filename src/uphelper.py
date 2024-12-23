@@ -6,7 +6,7 @@ console = Console()
 
 
 class UploadHelper:
-    def dupe_check(self, dupes, meta):
+    def dupe_check(self, dupes, meta, tracker_name):
         if not dupes:
             console.print("[green]No dupes found")
             meta['upload'] = True
@@ -15,12 +15,13 @@ class UploadHelper:
             console.print()
             dupe_text = "\n".join([d['name'] if isinstance(d, dict) else d for d in dupes])
             console.print()
-            cli_ui.info_section(cli_ui.bold, "Check if these are actually dupes!")
+            cli_ui.info_section(cli_ui.bold, f"Check if these are actually dupes from {tracker_name}!")
             cli_ui.info(dupe_text)
 
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                 if meta.get('dupe', False) is False:
-                    upload = cli_ui.ask_yes_no("Upload Anyways?", default=False)
+                    print()
+                    upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                 else:
                     upload = True
             else:

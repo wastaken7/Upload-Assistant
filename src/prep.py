@@ -780,9 +780,10 @@ class Prep():
                     dupes = await ptp.search_existing(groupID, meta, disctype)
                 if 'skipping' not in meta or meta['skipping'] is None:
                     dupes = await common.filter_dupes(dupes, meta)
-                    meta, is_dupe = helper.dupe_check(dupes, meta)
+                    meta, is_dupe = helper.dupe_check(dupes, meta, tracker_name)
                     if is_dupe:
-                        console.print(f"[yellow]Tracker '{tracker_name}' has confirmed dupes.[/yellow]")
+                        console.print(f"[red]Skipping upload on {tracker_name}[/red]")
+                        print()
                         tracker_status[tracker_name]['dupe'] = True
                 elif meta['skipping']:
                     tracker_status[tracker_name]['skipped'] = True
