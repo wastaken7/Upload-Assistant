@@ -248,6 +248,8 @@ class Args():
                 meta[key] = ""
             elif key in ["manual_episode_title"]:
                 meta[key] = value
+            elif key in ["tvmaze_manual"]:
+                meta[key] = value
             else:
                 meta[key] = meta.get(key, None)
             if key in ('trackers'):
