@@ -39,6 +39,7 @@ from src.trackers.PSS import PSS
 from src.trackers.ULCX import ULCX
 from src.trackers.SPD import SPD
 from src.trackers.YOINK import YOINK
+from src.trackers.HHD import HHD
 import cli_ui
 from src.console import console
 
@@ -91,7 +92,7 @@ class TRACKER_SETUP:
 
 tracker_class_map = {
     'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
-    'FNP': FNP, 'FL': FL, 'HDB': HDB, 'HDT': HDT, 'HP': HP, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
+    'FNP': FNP, 'FL': FL, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HP': HP, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
     'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
     'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SPD': SPD, 'STC': STC, 'STT': STT, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK,
@@ -105,7 +106,7 @@ tracker_capabilities = {
 }
 
 api_trackers = {
-    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT',
+    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'HHD', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT',
     'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'STC', 'STT', 'TIK', 'ULCX', 'UTP', 'YOINK'
 }
 
