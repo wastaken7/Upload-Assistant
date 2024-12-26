@@ -7,6 +7,7 @@ import platform
 import bencodepy
 import os
 import glob
+import httpx
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -28,7 +29,13 @@ class OTW():
         self.upload_url = 'https://oldtoons.world/api/torrents/upload'
         self.search_url = 'https://oldtoons.world/api/torrents/filter'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
-        self.banned_groups = [""]
+        self.banned_groups = [
+            '[Oj]', '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8', 'CrEwSaDe', 'd3g', 'DeadFish', 'DNL', 'ELiTE', 'eSc', 'FaNGDiNG0', 'FGT', 'Flights',
+            'FRDS', 'FUM', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'Leffe', 'LEGi0N', 'LOAD', 'MeGusta', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'nikt0', 'NOIVTC', 'OFT',
+            'nSD', 'PiRaTeS', 'playBD', 'PlaySD', 'playXD', 'PRODJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi', 'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'Telly', 'TM',
+            'TRiToN', 'UPiNSMOKE', 'URANiME', 'WAF', 'x0r', 'xRed', 'XS', 'YIFY', 'ZKBL', 'ZmN', 'ZMNT', 'AOC',
+            ['EVO', 'Raw Content Only'], ['TERMiNAL', 'Raw Content Only'], ['ViSION', 'Note the capitalization and characters used'], ['CMRG', 'Raw Content Only']
+        ]
         pass
 
     async def get_cat_id(self, category_name):
@@ -166,20 +173,30 @@ class OTW():
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + f" {meta['edition']}"
         try:
-            response = requests.get(url=self.search_url, params=params)
-            response = response.json()
-            for each in response['data']:
-                result = [each][0]['attributes']['name']
-                # difference = SequenceMatcher(None, meta['clean_name'], result).ratio()
-                # if difference >= 0.05:
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url=self.search_url, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data['data']:
+                        result = [each][0]['attributes']['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes
 
     async def search_torrent_page(self, meta, disctype):
+        if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
+            console.print('[bold red]Content not allowed.')
+            meta['skipping'] = "OTW"
+            return
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
         Name = meta['name']
         quoted_name = f'"{Name}"'
