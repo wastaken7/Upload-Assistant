@@ -97,7 +97,7 @@ class RTF():
             return []
 
         if datetime.date.today().year - meta['year'] <= 9:
-            console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
+            console.print("[red]Content must be older than 10 Years to upload at RTF")
             meta['skipping'] = "RTF"
             return []
 

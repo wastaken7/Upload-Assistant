@@ -262,6 +262,7 @@ class THR():
         imdb_id = imdb_id.replace('tt', '')
         search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes = []
+        console.print("[yellow]Searching for existing torrents on THR...")
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

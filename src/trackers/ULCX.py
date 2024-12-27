@@ -158,7 +158,7 @@ class ULCX():
 
     async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed.')
+            console.print('[bold red]Concerts not allowed at ULCX.')
             meta['skipping'] = "ULCX"
             return
         dupes = []

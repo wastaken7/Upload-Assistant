@@ -319,11 +319,7 @@ class OE():
 
     async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed.')
-            meta['skipping'] = "OE"
-            return
-        if meta['is_disc'] == "DVD":
-            console.print('[bold red]Skipping DVD')
+            console.print('[bold red]Concerts not allowed at OE.')
             meta['skipping'] = "OE"
             return
         dupes = []

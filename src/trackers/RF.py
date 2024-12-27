@@ -168,11 +168,11 @@ class RF():
     async def search_existing(self, meta, disctype):
         disallowed_keywords = {'XXX', 'Erotic'}
         if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
-            console.print('[bold red]Erotic not allowed.')
+            console.print('[bold red]Erotic not allowed at RF.')
             meta['skipping'] = "RF"
             return
         if meta.get('category') == "TV":
-            console.print('[bold red]This site only ALLOWS Movies.')
+            console.print('[bold red]RF only ALLOWS Movies.')
             meta['skipping'] = "RF"
             return
         dupes = []

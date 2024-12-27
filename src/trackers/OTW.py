@@ -163,7 +163,7 @@ class OTW():
 
     async def search_existing(self, meta, disctype):
         if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
-            console.print('[bold red]Content not allowed.')
+            console.print('[bold red]This content is not allowed at OTW.')
             meta['skipping'] = "OTW"
             return
         dupes = []

@@ -86,7 +86,7 @@ class NBL():
             return []
 
         if meta.get('is_disc') is not None:
-            console.print('[bold red]This site does not allow raw discs')
+            console.print('[bold red]NBL does not allow raw discs')
             meta['skipping'] = "NBL"
             return []
 
