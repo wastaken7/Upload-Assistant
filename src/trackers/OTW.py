@@ -160,6 +160,10 @@ class OTW():
         open_torrent.close()
 
     async def search_existing(self, meta, disctype):
+        if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
+            console.print('[bold red]Content not allowed.')
+            meta['skipping'] = "OTW"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on OTW...")
         params = {
@@ -193,10 +197,6 @@ class OTW():
         return dupes
 
     async def search_torrent_page(self, meta, disctype):
-        if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
-            console.print('[bold red]Content not allowed.')
-            meta['skipping'] = "OTW"
-            return
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
         Name = meta['name']
         quoted_name = f'"{Name}"'
