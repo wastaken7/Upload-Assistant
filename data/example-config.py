@@ -25,10 +25,8 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
-        # Tonemap HDR screenshots and set task limit when tonemapping
-        # When tonemapping, out of memory errors are more likely to occur with higher task limits
+        # Tonemap HDR screenshots
         "tone_map": False,
-        "tone_task_limit": "1",
 
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
@@ -36,10 +34,9 @@ config = {
         "cutoff_screens": "3",
 
         # multi processing task limit
-        # When capturing/optimizing images, limit to this many concurrent tasks
-        # Causes issues on UNIX based OS when task_limit > 1
-        # defaults to os.cpu_count() if thiss value not set
-        "task_limit": "1",
+        # When capturing/optimizing/uploading images, limit to this many concurrent tasks
+        # defaults to os.cpu_count() if this value not set
+        # "task_limit": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
@@ -87,10 +84,6 @@ config = {
 
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
-
-        # Run an API search after upload to find the permalink and insert as comment in torrent
-        # Needs a 5 second wait to ensure the API is updated
-        "get_permalink": False,
 
         # How many trackers need to pass successfull checking to continue with the upload process
         # Default = 1. If 1 (or more) tracker/s pass banned_group and dupe checking, uploading will continue

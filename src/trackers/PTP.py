@@ -7,10 +7,10 @@ from pathlib import Path
 from str2bool import str2bool
 import json
 import glob
-import multiprocessing
 import platform
 import pickle
 import click
+import httpx
 from pymediainfo import MediaInfo
 from src.trackers.COMMON import COMMON
 from src.bbcode import BBCODE
@@ -18,6 +18,9 @@ from src.exceptions import *  # noqa F403
 from src.console import console
 from torf import Torrent
 from datetime import datetime
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+from src.uploadscreens import upload_screens
+from src.torrentcreate import CustomTorrent, torf_cb
 
 
 class PTP():
@@ -229,8 +232,9 @@ class PTP():
                 meta['description'] = ptp_desc
                 meta['saved_description'] = True
         else:
-            meta['description'] = ptp_desc
-            meta['saved_description'] = True
+            if not meta['is_disc']:
+                meta['description'] = ptp_desc
+                meta['saved_description'] = True
 
         return desc, imagelist
 
@@ -330,6 +334,7 @@ class PTP():
         elif meta['resolution'] in ["2160p", "4320p", "8640p"]:
             quality = "Ultra High Definition"
 
+        # Prepare request parameters and headers
         params = {
             'id': groupID,
         }
@@ -339,19 +344,33 @@ class PTP():
             'User-Agent': self.user_agent
         }
         url = 'https://passthepopcorn.me/torrents.php'
-        response = requests.get(url=url, headers=headers, params=params)
-        await asyncio.sleep(1)
-        existing = []
+
         try:
-            response = response.json()
-            torrents = response.get('Torrents', [])
-            if len(torrents) != 0:
-                for torrent in torrents:
-                    if torrent.get('Quality') == quality and quality is not None:
-                        existing.append(f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}")
-        except Exception:
-            console.print("[red]An error has occured trying to find existing releases")
-        return existing
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+                await asyncio.sleep(1)  # Mimic server-friendly delay
+                if response.status_code == 200:
+                    existing = []
+                    try:
+                        data = response.json()
+                        torrents = data.get('Torrents', [])
+                        for torrent in torrents:
+                            if torrent.get('Quality') == quality and quality is not None:
+                                existing.append(f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}")
+                    except ValueError:
+                        console.print("[red]Failed to parse JSON response from API.")
+                    return existing
+                else:
+                    console.print(f"[bold red]HTTP request failed with status code {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while trying to find existing releases.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
+
+        return []
 
     async def ptpimg_url_rehost(self, image_url):
         payload = {
@@ -621,8 +640,6 @@ class PTP():
         return desc
 
     async def edit_desc(self, meta):
-        from src.prep import Prep
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
 
@@ -694,14 +711,13 @@ class PTP():
                                 meta[new_images_key] = []
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if not new_screens:
-                                    use_vs = meta.get('vapoursynth', False)
-                                    ds = multiprocessing.Process(target=prep.disc_screenshots, args=(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True))
-                                    ds.start()
-                                    while ds.is_alive() is True:
-                                        await asyncio.sleep(1)
-                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                                if new_screens:
-                                    uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    try:
+                                        disc_screenshots(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
+                                    except Exception as e:
+                                        print(f"Error during BDMV screenshot capture: {e}")
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                                if new_screens and not meta.get('skip_imghost_upload', False):
+                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -747,13 +763,15 @@ class PTP():
                                 meta[new_images_key] = []
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                                 if not new_screens:
-                                    ds = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens, True))
-                                    ds.start()
-                                    while ds.is_alive() is True:
-                                        await asyncio.sleep(1)
-                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
-                                if new_screens:
-                                    uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    try:
+                                        dvd_screenshots(
+                                            meta, i, multi_screens, True
+                                        )
+                                    except Exception as e:
+                                        print(f"Error during DVD screenshot capture: {e}")
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
+                                if new_screens and not meta.get('skip_imghost_upload', False):
+                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -813,13 +831,14 @@ class PTP():
                             meta[new_images_key] = []
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if not new_screens:
-                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None))
-                                s.start()
-                                while s.is_alive() is True:
-                                    await asyncio.sleep(3)
-                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                            if new_screens:
-                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                try:
+                                    screenshots(
+                                        file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None)
+                                except Exception as e:
+                                    print(f"Error during generic screenshot capture: {e}")
+                            new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                            if new_screens and not meta.get('skip_imghost_upload', False):
+                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -980,10 +999,6 @@ class PTP():
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
             console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
 
-            # Import Prep and regenerate the torrent with 16 MiB piece size limit
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-
             if meta['is_disc']:
                 include = []
                 exclude = []
@@ -991,10 +1006,7 @@ class PTP():
                 include = ["*.mkv", "*.mp4", "*.ts"]
                 exclude = ["*.*", "*sample.mkv", "!sample*.*"]
 
-            # Create a new torrent with piece size explicitly set to 8 MiB
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-            new_torrent = prep.CustomTorrent(
+            new_torrent = CustomTorrent(
                 meta=meta,
                 path=Path(meta['path']),
                 trackers=[self.announce_url],
@@ -1013,7 +1025,7 @@ class PTP():
 
             # Validate and write the new torrent
             new_torrent.validate_piece_size()
-            new_torrent.generate(callback=prep.torf_cb, interval=5)
+            new_torrent.generate(callback=torf_cb, interval=5)
             new_torrent.write(torrent_path, overwrite=True)
 
         # Proceed with the upload process

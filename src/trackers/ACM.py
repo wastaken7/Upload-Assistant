@@ -8,6 +8,7 @@ from str2bool import str2bool
 from src.trackers.COMMON import COMMON
 from src.console import console
 import bencodepy
+import httpx
 
 
 class ACM():
@@ -281,15 +282,21 @@ class ACM():
         }
         # Adding Name to search seems to override tmdb
         try:
-            response = requests.get(url=self.search_url, params=params)
-            response = response.json()
-            for each in response['data']:
-                result = [each][0]['attributes']['name']
-                # difference = SequenceMatcher(None, meta['clean_name'], result).ratio()
-                # if difference >= 0.05:
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url=self.search_url, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data['data']:
+                        result = [each][0]['attributes']['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes

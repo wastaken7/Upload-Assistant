@@ -4,11 +4,13 @@ import os
 import asyncio
 import requests
 import platform
+import httpx
 from str2bool import str2bool
 from pymediainfo import MediaInfo
 from pathlib import Path
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.torrentcreate import create_torrent
 
 
 class ANT():
@@ -69,11 +71,8 @@ class ANT():
         # Trigger regeneration automatically if size constraints aren't met
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
-
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
             meta['max_piece_size'] = '256'  # 256 MiB
-            prep.create_torrent(meta, Path(meta['path']), "ANT")
+            create_torrent(meta, Path(meta['path']), "ANT")
             torrent_filename = "ANT"
 
         await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -145,7 +144,7 @@ class ANT():
         if meta.get('category') == "TV":
             console.print('[bold red]This site only ALLOWS Movies.')
             meta['skipping'] = "ANT"
-            return
+            return []
         dupes = []
         console.print("[yellow]Searching for existing torrents on ANT...")
         params = {
@@ -157,18 +156,28 @@ class ANT():
             params['tmdb'] = meta['tmdb']
         elif int(meta['imdb_id'].replace('tt', '')) != 0:
             params['imdb'] = meta['imdb_id']
+
         try:
-            response = requests.get(url='https://anthelion.me/api', params=params)
-            response = response.json()
-            for each in response['item']:
-                largest = [each][0]['files'][0]
-                for file in [each][0]['files']:
-                    if int(file['size']) > int(largest['size']):
-                        largest = file
-                result = largest['name']
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url='https://anthelion.me/api', params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data.get('item', []):
+                        # Find the largest file
+                        largest = each['files'][0]
+                        for file in each['files']:
+                            if int(file['size']) > int(largest['size']):
+                                largest = file
+                        result = largest['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes

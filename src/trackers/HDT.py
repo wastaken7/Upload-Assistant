@@ -3,6 +3,7 @@ import asyncio
 import re
 import os
 import cli_ui
+import httpx
 from str2bool import str2bool
 from bs4 import BeautifulSoup
 from unidecode import unidecode
@@ -217,13 +218,16 @@ class HDT():
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        with requests.Session() as session:
-            common = COMMON(config=self.config)
-            cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
-            session.cookies.update(await common.parseCookieFile(cookiefile))
+        console.print("[yellow]Searching for existing torrents on HDT...")
 
-            search_url = "https://hd-torrents.net/torrents.php"
-            csrfToken = await self.get_csrfToken(session, search_url)
+        common = COMMON(config=self.config)
+        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
+        cookies = await common.parseCookieFile(cookiefile)
+
+        search_url = "https://hd-torrents.net/torrents.php"
+
+        async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+            csrfToken = await self.get_csrfToken(client, search_url)
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
                     'csrfToken': csrfToken,
@@ -240,13 +244,26 @@ class HDT():
                     'options': '3'
                 }
 
-            r = session.get(search_url, params=params)
-            await asyncio.sleep(0.5)
-            soup = BeautifulSoup(r.text, 'html.parser')
-            find = soup.find_all('a', href=True)
-            for each in find:
-                if each['href'].startswith('details.php?id='):
-                    dupes.append(each.text)
+            try:
+                response = await client.get(search_url, params=params)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    find = soup.find_all('a', href=True)
+                    for each in find:
+                        if each['href'].startswith('details.php?id='):
+                            dupes.append(each.text)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+                await asyncio.sleep(0.5)
+
+            except httpx.TimeoutException:
+                console.print("[bold red]Request timed out while searching for existing torrents.")
+            except httpx.RequestError as e:
+                console.print(f"[bold red]An error occurred while making the request: {e}")
+            except Exception as e:
+                console.print(f"[bold red]Unexpected error: {e}")
+                await asyncio.sleep(0.5)
 
         return dupes
 

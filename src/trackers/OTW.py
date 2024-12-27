@@ -4,7 +4,6 @@ import asyncio
 import requests
 from str2bool import str2bool
 import platform
-import bencodepy
 import os
 import glob
 import httpx
@@ -151,6 +150,9 @@ class OTW():
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
                 console.print(response.json())
+                # adding torrent link to comment of torrent file
+                t_id = response.json()['data'].split(".")[1].split("/")[3]
+                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://oldtoons.world/torrents/" + t_id)
             except Exception:
                 console.print("It may have uploaded, go check")
                 return
@@ -195,42 +197,3 @@ class OTW():
             await asyncio.sleep(5)
 
         return dupes
-
-    async def search_torrent_page(self, meta, disctype):
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        Name = meta['name']
-        quoted_name = f'"{Name}"'
-
-        params = {
-            'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
-            'name': quoted_name
-        }
-
-        try:
-            response = requests.get(url=self.search_url, params=params)
-            response.raise_for_status()
-            response_data = response.json()
-
-            if response_data['data'] and isinstance(response_data['data'], list):
-                details_link = response_data['data'][0]['attributes'].get('details_link')
-
-                if details_link:
-                    with open(torrent_file_path, 'rb') as open_torrent:
-                        torrent_data = open_torrent.read()
-
-                    torrent = bencodepy.decode(torrent_data)
-                    torrent[b'comment'] = details_link.encode('utf-8')
-                    updated_torrent_data = bencodepy.encode(torrent)
-
-                    with open(torrent_file_path, 'wb') as updated_torrent_file:
-                        updated_torrent_file.write(updated_torrent_data)
-
-                    return details_link
-                else:
-                    return None
-            else:
-                return None
-
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred during the request: {e}")
-            return None

@@ -94,21 +94,20 @@ class RTF():
         if any(keyword in meta['keywords'] for keyword in disallowed_keywords):
             console.print('[bold red]XXX not allowed.')
             meta['skipping'] = "RTF"
-            return
+            return []
+
         if datetime.date.today().year - meta['year'] <= 9:
             console.print("[red]ERROR: Not uploading!\nMust be older than 10 Years as per rules")
             meta['skipping'] = "RTF"
-            return
+            return []
+
         dupes = []
         console.print("[yellow]Searching for existing torrents on RTF...")
         headers = {
             'accept': 'application/json',
             'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
         }
-
-        params = {
-            'includingDead': '1'
-        }
+        params = {'includingDead': '1'}
 
         if meta['imdb_id'] != "0":
             params['imdbId'] = meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + meta['imdb_id']
@@ -116,13 +115,23 @@ class RTF():
             params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')
 
         try:
-            response = requests.get(url=self.search_url, params=params, headers=headers)
-            response = response.json()
-            for each in response:
-                result = [each][0]['name']
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(self.search_url, params=params, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data:
+                        result = each['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
             await asyncio.sleep(5)
 
         return dupes

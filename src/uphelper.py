@@ -6,19 +6,19 @@ console = Console()
 
 
 class UploadHelper:
-    def dupe_check(self, dupes, meta, tracker_name):
+    async def dupe_check(self, dupes, meta, tracker_name):
         if not dupes:
             console.print("[green]No dupes found")
             meta['upload'] = True
             return meta, False
         else:
-            console.print()
-            dupe_text = "\n".join([d['name'] if isinstance(d, dict) else d for d in dupes])
-            console.print()
-            cli_ui.info_section(cli_ui.bold, f"Check if these are actually dupes from {tracker_name}!")
-            cli_ui.info(dupe_text)
-
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                console.print()
+                dupe_text = "\n".join([d['name'] if isinstance(d, dict) else d for d in dupes])
+                console.print()
+                cli_ui.info_section(cli_ui.bold, f"Check if these are actually dupes from {tracker_name}!")
+                cli_ui.info(dupe_text)
+                console.print()
                 if meta.get('dupe', False) is False:
                     print()
                     upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
@@ -26,18 +26,16 @@ class UploadHelper:
                     upload = True
             else:
                 if meta.get('dupe', False) is False:
-                    console.print("[red]Found potential dupes. Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
+                    console.print(f"[red]Found potential dupes on {tracker_name}. Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
                     upload = False
                 else:
-                    console.print("[yellow]Found potential dupes. --skip-dupe-check was passed. Uploading anyways")
+                    console.print(f"[yellow]Found potential dupes on {tracker_name}. --skip-dupe-check was passed. Uploading anyways")
                     upload = True
 
             console.print()
             if upload is False:
-                meta['upload'] = False
                 return meta, True
             else:
-                meta['upload'] = True
                 for each in dupes:
                     each_name = each['name'] if isinstance(each, dict) else each
                     if each_name == meta['name']:
@@ -45,7 +43,7 @@ class UploadHelper:
 
                 return meta, False
 
-    def get_confirmation(self, meta):
+    async def get_confirmation(self, meta):
         if meta['debug'] is True:
             console.print("[bold red]DEBUG: True")
         console.print(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
@@ -76,7 +74,7 @@ class UploadHelper:
             console.print("[bold green]Personal Release![/bold green]")
         console.print()
         if meta.get('unattended', False) is False:
-            self.get_missing(meta)
+            await self.get_missing(meta)
             ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) is True else ""
             if ring_the_bell:
                 console.print(ring_the_bell)
@@ -100,7 +98,7 @@ class UploadHelper:
 
         return confirm
 
-    def get_missing(self, meta):
+    async def get_missing(self, meta):
         info_notes = {
             'edition': 'Special Edition/Release',
             'description': "Please include Remux/Encode Notes if possible",

@@ -9,11 +9,9 @@ import base64
 import shutil
 import os
 import traceback
-
+import httpx
 from src.trackers.COMMON import COMMON
 
-
-# from pprint import pprint
 
 class SPD():
 
@@ -141,13 +139,23 @@ class SPD():
             params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')
 
         try:
-            response = requests.get(url=self.search_url, params=params, headers=headers)
-            response = response.json()
-            for each in response:
-                result = [each][0]['name']
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = client.get(url=self.search_url, params=params, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data:
+                        result = [each][0]['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
             await asyncio.sleep(5)
 
         return dupes

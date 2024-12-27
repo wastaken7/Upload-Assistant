@@ -6,14 +6,15 @@ from difflib import SequenceMatcher
 from str2bool import str2bool
 import os
 import platform
-import hashlib
 import bencodepy
 import glob
-import multiprocessing
+import httpx
+import re
 from urllib.parse import urlparse
-
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+from src.uploadscreens import upload_screens
 
 
 class BHD():
@@ -123,7 +124,6 @@ class BHD():
         if os.path.exists(torrent_file):
             open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
             files['file'] = open_torrent.read()
-            open_torrent.close()
 
         data = {
             'name': bhd_name,
@@ -164,6 +164,7 @@ class BHD():
         }
 
         url = self.upload_url + self.config['TRACKERS'][self.tracker]['api_key'].strip()
+        details_link = {}
         if meta['debug'] is False:
             response = requests.post(url=url, files=files, data=data, headers=headers)
             try:
@@ -177,13 +178,38 @@ class BHD():
                         response = response.json()
                     elif response['status_message'].startswith('Invalid name value'):
                         console.print(f"[bold yellow]Submitted Name: {bhd_name}")
+
+                if 'status_message' in response:
+                    match = re.search(r"https://beyond-hd\.me/torrent/download/.*\.(\d+)\.", response['status_message'])
+                    if match:
+                        torrent_id = match.group(1)
+                        details_link = f"https://beyond-hd.me/details/{torrent_id}"
+                    else:
+                        console.print("[yellow]No valid details link found in status_message.")
+
                 console.print(response)
-            except Exception:
+            except Exception as e:
                 console.print("It may have uploaded, go check")
+                console.print(f"Error: {e}")
                 return
         else:
             console.print("[cyan]Request Data:")
             console.print(data)
+
+        if details_link:
+            try:
+                open_torrent.seek(0)
+                torrent_data = open_torrent.read()
+                torrent = bencodepy.decode(torrent_data)
+                torrent[b'comment'] = details_link.encode('utf-8')
+                with open(torrent_file, 'wb') as updated_torrent_file:
+                    updated_torrent_file.write(bencodepy.encode(torrent))
+
+                console.print(f"Torrent file updated with comment: {details_link}")
+            except Exception as e:
+                console.print(f"Error while editing the torrent file: {e}")
+
+        open_torrent.close()
 
     async def handle_image_upload(self, meta, img_host_index=1, approved_image_hosts=None, file=None):
         if approved_image_hosts is None:
@@ -203,15 +229,12 @@ class BHD():
         filelist = meta.get('video', [])
         filename = meta['filename']
         path = meta['path']
-
         if isinstance(filelist, str):
             filelist = [filelist]
 
         multi_screens = int(self.config['DEFAULT'].get('screens', 6))
         base_dir = meta['base_dir']
         folder_id = meta['uuid']
-        from src.prep import Prep
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         meta[new_images_key] = []
 
         screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
@@ -229,28 +252,24 @@ class BHD():
                 if meta.get('debug'):
                     console.print("[yellow]The image host of existing images is not supported.")
                     console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
-
                 if meta['is_disc'] == "BDMV":
-                    s = multiprocessing.Process(
-                        target=prep.disc_screenshots,
-                        args=(f"FILE_{img_host_index}", meta['bdinfo'], folder_id, base_dir,
-                              meta.get('vapoursynth', False), [], meta.get('ffdebug', False), img_host_index)
-                    )
+                    try:
+                        disc_screenshots(meta, filename, meta['bdinfo'], folder_id, base_dir, meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
+                    except Exception as e:
+                        print(f"Error during BDMV screenshot capture: {e}")
                 elif meta['is_disc'] == "DVD":
-                    s = multiprocessing.Process(
-                        target=prep.dvd_screenshots,
-                        args=(meta, 0, None, True)
-                    )
+                    try:
+                        dvd_screenshots(
+                            meta, 0, None, True
+                        )
+                    except Exception as e:
+                        print(f"Error during DVD screenshot capture: {e}")
                 else:
-                    s = multiprocessing.Process(
-                        target=prep.screenshots,
-                        args=(path, f"{filename}", meta['uuid'], base_dir,
-                              meta, multi_screens + 1, True, None)
-                    )
-
-                s.start()
-                while s.is_alive():
-                    await asyncio.sleep(1)
+                    try:
+                        screenshots(
+                            path, filename, meta['uuid'], base_dir, meta, multi_screens, True, None)
+                    except Exception as e:
+                        print(f"Error during generic screenshot capture: {e}")
 
                 if meta['is_disc'] == "DVD":
                     existing_screens = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png")
@@ -263,57 +282,60 @@ class BHD():
             console.print("[red]No screenshots were generated or found. Please check the screenshot generation process.")
             return [], True, images_reuploaded
 
-        uploaded_images = []
-        while True:
-            current_img_host_key = f'img_host_{img_host_index}'
-            current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
+        if not meta.get('skip_imghost_upload', False):
+            uploaded_images = []
+            while True:
+                current_img_host_key = f'img_host_{img_host_index}'
+                current_img_host = self.config.get('DEFAULT', {}).get(current_img_host_key)
 
-            if not current_img_host:
-                console.print("[red]No more image hosts left to try.")
-                return
+                if not current_img_host:
+                    console.print("[red]No more image hosts left to try.")
+                    return
 
-            if current_img_host not in approved_image_hosts:
-                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at BHD, trying next host.")
-                retry_mode = True
-                images_reuploaded = True
-                img_host_index += 1
-                continue
-            else:
-                meta['imghost'] = current_img_host
-                console.print(f"[green]Uploading to approved host '{current_img_host}'.")
-                break
+                if current_img_host not in approved_image_hosts:
+                    console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at BHD, trying next host.")
+                    retry_mode = True
+                    images_reuploaded = True
+                    img_host_index += 1
+                    continue
+                else:
+                    meta['imghost'] = current_img_host
+                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+                    break
 
-        uploaded_images, _ = prep.upload_screens(
-            meta, multi_screens, img_host_index, 0, multi_screens,
-            all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
-        )
+            uploaded_images, _ = upload_screens(
+                meta, multi_screens, img_host_index, 0, multi_screens,
+                all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
+            )
 
-        if uploaded_images:
-            meta[new_images_key] = uploaded_images
+            if uploaded_images:
+                meta[new_images_key] = uploaded_images
 
-        if meta['debug']:
-            for image in uploaded_images:
-                console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
+            if meta['debug']:
+                for image in uploaded_images:
+                    console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
 
-        for image in meta.get(new_images_key, []):
-            raw_url = image['raw_url']
-            parsed_url = urlparse(raw_url)
-            hostname = parsed_url.netloc
-            mapped_host = self.match_host(hostname, url_host_mapping.keys())
-            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
+            for image in meta.get(new_images_key, []):
+                raw_url = image['raw_url']
+                parsed_url = urlparse(raw_url)
+                hostname = parsed_url.netloc
+                mapped_host = self.match_host(hostname, url_host_mapping.keys())
+                mapped_host = url_host_mapping.get(mapped_host, mapped_host)
 
-            if mapped_host not in approved_image_hosts:
-                console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
-                return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
+                if mapped_host not in approved_image_hosts:
+                    console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
+                    return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
-        if all(
-            url_host_mapping.get(
-                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
-                self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
-            ) in approved_image_hosts
-            for image in meta[new_images_key]
-        ):
+            if all(
+                url_host_mapping.get(
+                    self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+                    self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
+                ) in approved_image_hosts
+                for image in meta[new_images_key]
+            ):
 
+                return meta[new_images_key], False, images_reuploaded
+        else:
             return meta[new_images_key], False, images_reuploaded
 
     async def get_cat_id(self, category_name):
@@ -421,29 +443,34 @@ class BHD():
 
     async def search_existing(self, meta, disctype):
         bhd_name = await self.edit_name(meta)
-        if any(phrase in bhd_name.lower() for phrase in ("-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi", "-ncmt", "-tdd", "-flux", "-crfw", "-sonny", "-zr-", "-mkvultra", "-rpg", "-w4nk3r", "-irobot", "-beyondhd")):
+        if any(phrase in bhd_name.lower() for phrase in (
+            "-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi",
+            "-ncmt", "-tdd", "-flux", "-crfw", "-sonny", "-zr-", "-mkvultra",
+            "-rpg", "-w4nk3r", "-irobot", "-beyondhd"
+        )):
             console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
             meta['skipping'] = "BHD"
-            return
+            return []
         if meta['type'] == "DVDRIP":
             console.print("[bold red]No DVDRIP at BHD, skipping upload[/bold red]")
             meta['skipping'] = "BHD"
-            return
+            return []
+
         dupes = []
         console.print("[yellow]Searching for existing torrents on BHD...")
         category = meta['category']
+        tmdbID = "movie" if category == 'MOVIE' else "tv"
         if category == 'MOVIE':
-            tmdbID = "movie"
             category = "Movies"
-        if category == "TV":
-            tmdbID = "tv"
+        elif category == "TV":
+            category = "TV"
+
         data = {
             'action': 'search',
             'tmdb_id': f"{tmdbID}/{meta['tmdb']}",
             'categories': category,
-            'types': await self.get_type(meta),
+            'types': await self.get_type(meta)
         }
-        # Search all releases if SD
         if meta['sd'] == 1:
             data['categories'] = None
             data['types'] = None
@@ -451,21 +478,29 @@ class BHD():
             if meta.get('tv_pack', 0) == 1:
                 data['pack'] = 1
             data['search'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
+
         url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
         try:
-            response = requests.post(url=url, data=data)
-            response = response.json()
-            if response.get('status_code') == 1:
-                for each in response['results']:
-                    result = each['name']
-                    difference = SequenceMatcher(None, meta['clean_name'].replace('DD+', 'DDP'), result).ratio()
-                    if difference >= 0.05:
-                        dupes.append(result)
-            else:
-                console.print(f"[yellow]{response.get('status_message')}")
-                await asyncio.sleep(5)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Most likely the site is down.')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(url, params=data)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('status_code') == 1:
+                        for each in data['results']:
+                            result = each['name']
+                            difference = SequenceMatcher(None, meta['clean_name'].replace('DD+', 'DDP'), result).ratio()
+                            if difference >= 0.05:
+                                dupes.append(result)
+                    else:
+                        console.print(f"[bold red]Failed to search torrents. API Error: {data.get('message', 'Unknown Error')}")
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes
@@ -541,48 +576,3 @@ class BHD():
         if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
             name = name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
         return name
-
-    async def search_torrent_page(self, meta, disctype):
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
-        with open(torrent_file_path, 'rb') as open_torrent:
-            torrent_data = open_torrent.read()
-        torrent = bencodepy.decode(torrent_data)
-        info_dict = torrent[b'info']
-        bencoded_info = bencodepy.encode(info_dict)
-        info_hash = hashlib.sha1(bencoded_info).hexdigest()
-        # console.print(f"Info Hash: {info_hash}")
-
-        params = {
-            'action': 'search',
-            'info_hash': info_hash
-        }
-        url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
-        try:
-            response = requests.post(url=url, json=params)
-            response_data = response.json()
-            # console.print(f"[yellow]Response Data: {response_data}")
-
-            if response_data.get('total_results') == 1:
-                for each in response_data['results']:
-                    details_link = f"https://beyond-hd.me/details/{each['id']}"
-
-                if details_link:
-                    with open(torrent_file_path, 'rb') as open_torrent:
-                        torrent_data = open_torrent.read()
-
-                    torrent = bencodepy.decode(torrent_data)
-                    torrent[b'comment'] = details_link.encode('utf-8')
-                    updated_torrent_data = bencodepy.encode(torrent)
-
-                    with open(torrent_file_path, 'wb') as updated_torrent_file:
-                        updated_torrent_file.write(updated_torrent_data)
-
-                    return details_link
-                else:
-                    return None
-            else:
-                return None
-
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred during the request: {e}")
-            return None

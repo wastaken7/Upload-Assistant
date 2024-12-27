@@ -9,6 +9,7 @@ from unidecode import unidecode
 from urllib.parse import urlparse
 import cli_ui
 from bs4 import BeautifulSoup
+import httpx
 
 from src.trackers.COMMON import COMMON
 from src.exceptions import *  # noqa F403
@@ -192,32 +193,46 @@ class FL():
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        with requests.Session() as session:
-            cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
-            with open(cookiefile, 'rb') as cf:
-                session.cookies.update(pickle.load(cf))
+        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
 
-            search_url = "https://filelist.io/browse.php"
-            if int(meta['imdb_id'].replace('tt', '')) != 0:
-                params = {
-                    'search': meta['imdb_id'],
-                    'cat': await self.get_category_id(meta),
-                    'searchin': '3'
-                }
-            else:
-                params = {
-                    'search': meta['title'],
-                    'cat': await self.get_category_id(meta),
-                    'searchin': '0'
-                }
+        with open(cookiefile, 'rb') as cf:
+            cookies = pickle.load(cf)
 
-            r = session.get(search_url, params=params)
+        search_url = "https://filelist.io/browse.php"
+
+        if int(meta['imdb_id'].replace('tt', '')) != 0:
+            params = {
+                'search': meta['imdb_id'],
+                'cat': await self.get_category_id(meta),
+                'searchin': '3'
+            }
+        else:
+            params = {
+                'search': meta['title'],
+                'cat': await self.get_category_id(meta),
+                'searchin': '0'
+            }
+
+        try:
+            async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+                response = await client.get(search_url, params=params)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    find = soup.find_all('a', href=True)
+                    for each in find:
+                        if each['href'].startswith('details.php?id=') and "&" not in each['href']:
+                            dupes.append(each['title'])
+                else:
+                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                await asyncio.sleep(0.5)
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(0.5)
-            soup = BeautifulSoup(r.text, 'html.parser')
-            find = soup.find_all('a', href=True)
-            for each in find:
-                if each['href'].startswith('details.php?id=') and "&" not in each['href']:
-                    dupes.append(each['title'])
 
         return dupes
 

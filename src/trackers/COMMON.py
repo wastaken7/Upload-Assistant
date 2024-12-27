@@ -7,11 +7,11 @@ import click
 import sys
 import glob
 from pymediainfo import MediaInfo
-import multiprocessing
-import asyncio
 
 from src.bbcode import BBCODE
 from src.console import console
+from src.uploadscreens import upload_screens
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 
 
 class COMMON():
@@ -40,8 +40,6 @@ class COMMON():
             Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{meta['clean_name']}.torrent", overwrite=True)
 
     async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header=""):
-        from src.prep import Prep
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         char_limit = int(self.config['DEFAULT'].get('charLimit', 14000))
@@ -113,85 +111,86 @@ class COMMON():
                             descfile.write(image_str)
                         descfile.write("[/center]\n\n")
                     else:
-                        # Check if screenshots exist for the current disc key
-                        if new_images_key in meta and meta[new_images_key]:
-                            if meta['debug']:
-                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
-                            descfile.write("[center]")
-                            if each['type'] == "BDMV":
-                                descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each['type'] == "DVD":
-                                descfile.write(f"{each['name']}:\n")
-                                descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
-                            descfile.write("[/center]\n\n")
-                            # Use existing URLs from meta to write to descfile
-                            descfile.write("[center]")
-                            for img in meta[new_images_key]:
-                                web_url = img['web_url']
-                                raw_url = img['raw_url']
-                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                                descfile.write(image_str)
-                            descfile.write("[/center]\n\n")
-                        else:
-                            # Increment retry_count for tracking but use unique disc keys for each disc
-                            meta['retry_count'] += 1
-                            meta[new_images_key] = []
-                            descfile.write("[center]")
-                            if each['type'] == "BDMV":
-                                descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each['type'] == "DVD":
-                                descfile.write(f"{each['name']}:\n")
-                                descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
-                            descfile.write("[/center]\n\n")
-                            # Check if new screenshots already exist before running prep.screenshots
-                            if each['type'] == "BDMV":
-                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                            elif each['type'] == "DVD":
-                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
-                            if not new_screens:
+                        if multi_screens != 0:
+                            # Check if screenshots exist for the current disc key
+                            if new_images_key in meta and meta[new_images_key]:
                                 if meta['debug']:
-                                    console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
-                                # Run prep.screenshots if no screenshots are present
-                                if each['type'] == "BDMV":
-                                    use_vs = meta.get('vapoursynth', False)
-                                    s = multiprocessing.Process(target=prep.disc_screenshots, args=(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True))
-                                    s.start()
-                                    while s.is_alive():
-                                        await asyncio.sleep(1)
-                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                                elif each['type'] == "DVD":
-                                    s = multiprocessing.Process(target=prep.dvd_screenshots, args=(meta, i, multi_screens, True))
-                                    s.start()
-                                    while s.is_alive() is True:
-                                        await asyncio.sleep(1)
-                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
-
-                            if new_screens:
-                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
-
-                                # Append each uploaded image's data to `meta[new_images_key]`
-                                for img in uploaded_images:
-                                    meta[new_images_key].append({
-                                        'img_url': img['img_url'],
-                                        'raw_url': img['raw_url'],
-                                        'web_url': img['web_url']
-                                    })
-
-                                # Write new URLs to descfile
+                                    console.print(f"[yellow]Found needed image URLs for {new_images_key}")
                                 descfile.write("[center]")
-                                for img in uploaded_images:
+                                if each['type'] == "BDMV":
+                                    descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                                elif each['type'] == "DVD":
+                                    descfile.write(f"{each['name']}:\n")
+                                    descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                    descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                                descfile.write("[/center]\n\n")
+                                # Use existing URLs from meta to write to descfile
+                                descfile.write("[center]")
+                                for img in meta[new_images_key]:
                                     web_url = img['web_url']
                                     raw_url = img['raw_url']
                                     image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                     descfile.write(image_str)
                                 descfile.write("[/center]\n\n")
+                            else:
+                                # Increment retry_count for tracking but use unique disc keys for each disc
+                                meta['retry_count'] += 1
+                                meta[new_images_key] = []
+                                descfile.write("[center]")
+                                if each['type'] == "BDMV":
+                                    descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
+                                elif each['type'] == "DVD":
+                                    descfile.write(f"{each['name']}:\n")
+                                    descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                    descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                                descfile.write("[/center]\n\n")
+                                # Check if new screenshots already exist before running prep.screenshots
+                                if each['type'] == "BDMV":
+                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                                elif each['type'] == "DVD":
+                                    new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
+                                if not new_screens:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
+                                    # Run prep.screenshots if no screenshots are present
+                                    if each['type'] == "BDMV":
+                                        use_vs = meta.get('vapoursynth', False)
+                                        try:
+                                            disc_screenshots(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
+                                        except Exception as e:
+                                            print(f"Error during BDMV screenshot capture: {e}")
+                                        new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                                    if each['type'] == "DVD":
+                                        try:
+                                            dvd_screenshots(meta, i, multi_screens, True)
+                                        except Exception as e:
+                                            print(f"Error during DVD screenshot capture: {e}")
+                                        new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
 
-                            # Save the updated meta to `meta.json` after upload
-                            meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
-                            with open(meta_filename, 'w') as f:
-                                json.dump(meta, f, indent=4)
+                                if new_screens and not meta.get('skip_imghost_upload', False):
+                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+
+                                    # Append each uploaded image's data to `meta[new_images_key]`
+                                    for img in uploaded_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img['img_url'],
+                                            'raw_url': img['raw_url'],
+                                            'web_url': img['web_url']
+                                        })
+
+                                    # Write new URLs to descfile
+                                    descfile.write("[center]")
+                                    for img in uploaded_images:
+                                        web_url = img['web_url']
+                                        raw_url = img['raw_url']
+                                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
+                                        descfile.write(image_str)
+                                    descfile.write("[/center]\n\n")
+
+                                # Save the updated meta to `meta.json` after upload
+                                meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+                                with open(meta_filename, 'w') as f:
+                                    json.dump(meta, f, indent=4)
 
             # Handle single file case
             if len(filelist) == 1:
@@ -229,25 +228,24 @@ class COMMON():
                     if i > 0:
                         new_images_key = f'new_images_file_{i}'
                         if new_images_key not in meta or not meta[new_images_key]:
-                            # Proceed with image generation if not already present
                             meta[new_images_key] = []
+                            # Proceed with image generation if not already present
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
 
                             # If no screenshots exist, create them
                             if not new_screens:
                                 if meta['debug']:
                                     console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
-                                s = multiprocessing.Process(target=prep.screenshots, args=(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None))
-                                s.start()
-                                while s.is_alive():
-                                    await asyncio.sleep(1)
+                            try:
+                                screenshots(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None)
+                            except Exception as e:
+                                print(f"Error during generic screenshot capture: {e}")
 
-                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
+                            new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
 
                             # Upload generated screenshots
-                            if new_screens:
-                                uploaded_images, _ = prep.upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
-                                meta[new_images_key] = []
+                            if new_screens and not meta.get('skip_imghost_upload', False):
+                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -618,13 +616,13 @@ class COMMON():
             return ""
         return ptgen
 
-    async def filter_dupes(self, dupes, meta):
+    async def filter_dupes(self, dupes, meta, tracker_name):
         """
         Filter duplicates by applying exclusion rules. Only non-excluded entries are returned.
         Everything is a dupe, until it matches a criteria to be excluded.
         """
         if meta['debug']:
-            console.log("[cyan]Pre-filtered dupes")
+            console.log(f"[cyan]Pre-filtered dupes from {tracker_name}")
             console.log(dupes)
 
         new_dupes = []
@@ -633,11 +631,11 @@ class COMMON():
         video_encode = meta.get("video_encode")
         if video_encode is not None:
             has_encoder_in_name = video_encode.lower()
-            normalized_encoder = self.normalize_filename(has_encoder_in_name)
+            normalized_encoder = await self.normalize_filename(has_encoder_in_name)
         else:
             normalized_encoder = False
         has_is_disc = bool(meta.get('is_disc', False))
-        target_hdr = self.refine_hdr_terms(meta.get("hdr"))
+        target_hdr = await self.refine_hdr_terms(meta.get("hdr"))
         target_season = meta.get("season")
         target_episode = meta.get("episode")
         target_resolution = meta.get("resolution")
@@ -672,17 +670,17 @@ class COMMON():
             },
         ]
 
-        def log_exclusion(reason, item):
+        async def log_exclusion(reason, item):
             if meta['debug']:
                 console.log(f"[yellow]Excluding result due to {reason}: {item}")
 
-        def process_exclusion(each):
+        async def process_exclusion(each):
             """
             Determine if an entry should be excluded.
             Returns True if the entry should be excluded, otherwise allowed as dupe.
             """
-            normalized = self.normalize_filename(each)
-            file_hdr = self.refine_hdr_terms(normalized)
+            normalized = await self.normalize_filename(each)
+            file_hdr = await self.refine_hdr_terms(normalized)
 
             if meta['debug']:
                 console.log(f"[debug] Evaluating dupe: {each}")
@@ -701,63 +699,63 @@ class COMMON():
                 return False
 
             if has_is_disc and re.search(r'\.\w{2,4}$', each):
-                log_exclusion("file extension mismatch (is_disc=True)", each)
+                await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
             if not is_dvd:
                 if target_resolution and target_resolution not in each:
-                    log_exclusion(f"resolution '{target_resolution}' mismatch", each)
+                    await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
 
             if is_dvd:
                 if any(str(res) in each for res in [1080, 720, 2160]):
-                    log_exclusion(f"resolution '{target_resolution}' mismatch", each)
+                    await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
 
             for check in attribute_checks:
                 if check["key"] == "repack":
                     if has_repack_in_uuid and "repack" not in normalized:
                         if tag and tag in normalized:
-                            log_exclusion("missing 'repack'", each)
+                            await log_exclusion("missing 'repack'", each)
                             return True
                 elif check["uuid_flag"] != check["condition"](each):
-                    log_exclusion(f"{check['key']} mismatch", each)
+                    await log_exclusion(f"{check['key']} mismatch", each)
                     return True
 
             if not is_dvd:
-                if not self.has_matching_hdr(file_hdr, target_hdr, meta):
-                    log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
+                if not await self.has_matching_hdr(file_hdr, target_hdr, meta):
+                    await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                     return True
 
-            season_episode_match = self.is_season_episode_match(normalized, target_season, target_episode)
-            if meta['debug']:
-                console.log(f"[debug] Season/Episode match result: {season_episode_match}")
-            if not season_episode_match:
-                log_exclusion("season/episode mismatch", each)
-                return True
+            if meta.get('category') == "TV":
+                season_episode_match = await self.is_season_episode_match(normalized, target_season, target_episode)
+                if meta['debug']:
+                    console.log(f"[debug] Season/Episode match result: {season_episode_match}")
+                if not season_episode_match:
+                    await log_exclusion("season/episode mismatch", each)
+                    return True
 
             if not is_dvd:
                 if normalized_encoder and normalized_encoder in each:
-                    log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
+                    await log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
                     return False
 
             if web_dl and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
                 return False
 
-            console.log(f"[debug] Passed all checks: {each}")
+            if meta['debug']:
+                console.log(f"[debug] Passed all checks: {each}")
             return False
 
         for each in dupes:
-            console.log(f"[debug] Evaluating dupe: {each}")
-            if not process_exclusion(each):
+            if not await process_exclusion(each):
                 new_dupes.append(each)
 
-        if meta['debug']:
-            console.log(f"[cyan]Final dupes: {new_dupes}")
+        console.log(f"[cyan]Final dupes on {tracker_name}: {new_dupes}")
 
         return new_dupes
 
-    def normalize_filename(self, filename):
+    async def normalize_filename(self, filename):
         """
         Normalize a filename for easier matching.
         Retain season/episode information in the format SxxExx.
@@ -766,7 +764,7 @@ class COMMON():
 
         return normalized
 
-    def is_season_episode_match(self, filename, target_season, target_episode):
+    async def is_season_episode_match(self, filename, target_season, target_episode):
         """
         Check if the filename matches the given season and episode.
         """
@@ -786,7 +784,7 @@ class COMMON():
             return episode_pattern in filename
         return True
 
-    def refine_hdr_terms(self, hdr):
+    async def refine_hdr_terms(self, hdr):
         """
         Normalize HDR terms for consistent comparison.
         Simplifies all HDR entries to 'HDR' and DV entries to 'DV'.
@@ -801,7 +799,7 @@ class COMMON():
             terms.add("HDR")
         return terms
 
-    def has_matching_hdr(self, file_hdr, target_hdr, meta):
+    async def has_matching_hdr(self, file_hdr, target_hdr, meta):
         """
         Check if the HDR terms match or are compatible.
         """

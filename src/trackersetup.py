@@ -98,13 +98,6 @@ tracker_class_map = {
     'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK,
 }
 
-tracker_capabilities = {
-    'AITHER': {'mod_q': True, 'draft': False},
-    'BHD': {'draft_live': True},
-    'BLU': {'mod_q': True, 'draft': False},
-    'LST': {'mod_q': True, 'draft': True}
-}
-
 api_trackers = {
     'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'HHD', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT',
     'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'STC', 'STT', 'TIK', 'ULCX', 'UTP', 'YOINK'

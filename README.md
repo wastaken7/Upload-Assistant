@@ -18,7 +18,7 @@ A simple tool to take the work out of uploading.
   - Can re-use existing torrents instead of hashing new
   - Generates proper name for your upload using Mediainfo/BDInfo and TMDb/IMDb conforming to site rules
   - Checks for existing releases already on site
-  - Uploads to ACM/Aither/AL/ANT/BHD/BHDTV/BLU/CBR/FNP/FL/HDB/HDT/HP/HUNO/JPTV/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RTF/SHRI/SN/SPD/STC/STT/TLC/THR/TL/TVC/TTG/ULCX/UTP/YOINK
+  - Uploads to ACM/Aither/AL/ANT/BHD/BHDTV/BLU/CBR/FNP/FL/HDB/HDT/HHD/HP/HUNO/JPTV/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RTF/SHRI/SN/SPD/STC/STT/TLC/THR/TL/TVC/TTG/ULCX/UTP/YOINK
   - Adds to your client with fast resume, seeding instantly (rtorrent/qbittorrent/deluge/watch folder)
   - ALL WITH MINIMAL INPUT!
   - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs

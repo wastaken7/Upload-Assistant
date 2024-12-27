@@ -7,6 +7,7 @@ import json
 import glob
 from str2bool import str2bool
 import pickle
+import httpx
 from unidecode import unidecode
 from urllib.parse import urlparse
 from src.trackers.COMMON import COMMON
@@ -63,27 +64,38 @@ class PTER():
         dupes = []
         common = COMMON(config=self.config)
         cookiefile = f"{meta['base_dir']}/data/cookies/PTER.txt"
-        if os.path.exists(cookiefile):
-            with requests.Session() as session:
-                session.cookies.update(await common.parseCookieFile(cookiefile))
-                if int(meta['imdb_id'].replace('tt', '')) != 0:
-                    imdb = f"tt{meta['imdb_id']}"
-                else:
-                    imdb = ""
-                source = await self.get_type_medium_id(meta)
-                search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
-                r = session.get(search_url)
-                soup = BeautifulSoup(r.text, 'lxml')
-                rows = soup.select('table.torrents > tr:has(table.torrentname)')
-                for row in rows:
-                    text = row.select_one('a[href^="details.php?id="]')
-                    if text is not None:
-                        release = text.attrs['title']
-                    if release:
-                        dupes.append(release)
-        else:
+        if not os.path.exists(cookiefile):
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
+        cookies = await common.parseCookieFile(cookiefile)
+        imdb = f"tt{meta['imdb_id']}" if int(meta['imdb_id'].replace('tt', '')) != 0 else ""
+        source = await self.get_type_medium_id(meta)
+        search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
+
+        try:
+            async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+                response = await client.get(search_url)
+
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'lxml')
+                    rows = soup.select('table.torrents > tr:has(table.torrentname)')
+                    for row in rows:
+                        text = row.select_one('a[href^="details.php?id="]')
+                        if text is not None:
+                            release = text.attrs.get('title', '')
+                            if release:
+                                dupes.append(release)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
+
         return dupes
 
     async def get_type_category_id(self, meta):

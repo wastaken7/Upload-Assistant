@@ -8,6 +8,7 @@ import cli_ui
 import os
 from src.bbcode import BBCODE
 import json
+import httpx
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -300,18 +301,21 @@ class TVC():
         }
 
         try:
-            response = requests.get(url=self.search_url, params=params)
-            response = response.json()
-            if "message" in response and response["message"] == "No Torrents Found":
-                return
-            else:
-                for each in response['data']:
-                    result = [each][0]['attributes']['name']
-                    dupes.append(result)
-        except Exception:
-            console.print(response)
-            console.print(self.search_url, params)
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url=self.search_url, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data['data']:
+                        result = [each][0]['attributes']['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes

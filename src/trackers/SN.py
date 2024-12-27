@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import requests
 import asyncio
+import httpx
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -124,34 +125,42 @@ class SN():
     async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on SN...")
-
         params = {
             'api_key': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
 
-        # using title if IMDB id does not exist to search
+        # Determine search parameters based on metadata
         if meta['imdb_id'] == 0:
             if meta['category'] == 'TV':
-                params['filter'] = meta['title'] + f"{meta.get('season', '')}{meta.get('episode', '')}" + " " + meta['resolution']
+                params['filter'] = f"{meta['title']}{meta.get('season', '')}{meta.get('episode', '')} {meta['resolution']}"
             else:
                 params['filter'] = meta['title']
         else:
-            # using IMDB_id to search if it exists.
+            params['media_ref'] = f"tt{meta['imdb_id']}"
             if meta['category'] == 'TV':
-                params['media_ref'] = f"tt{meta['imdb_id']}"
-                params['filter'] = f"{meta.get('season', '')}{meta.get('episode', '')}" + " " + meta['resolution']
+                params['filter'] = f"{meta.get('season', '')}{meta.get('episode', '')} {meta['resolution']}"
             else:
-                params['media_ref'] = f"tt{meta['imdb_id']}"
                 params['filter'] = meta['resolution']
 
         try:
-            response = requests.get(url=self.search_url, params=params)
-            response = response.json()
-            for i in response['data']:
-                result = i['name']
-                dupes.append(result)
-        except Exception:
-            console.print('[red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(self.search_url, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    for i in data.get('data', []):
+                        result = i.get('name')
+                        if result:
+                            dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
             await asyncio.sleep(5)
 
         return dupes

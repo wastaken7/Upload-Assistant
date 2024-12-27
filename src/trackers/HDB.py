@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import json
 import glob
+import httpx
 from unidecode import unidecode
 from urllib.parse import urlparse, quote
 from src.trackers.COMMON import COMMON
@@ -12,6 +13,7 @@ from src.exceptions import *  # noqa F403
 from src.console import console
 from datetime import datetime
 from torf import Torrent
+from src.torrentcreate import CustomTorrent, torf_cb
 
 
 class HDB():
@@ -224,11 +226,7 @@ class HDB():
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
             console.print("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
 
-            # Import Prep and regenerate the torrent with 16 MiB piece size limit
-            from src.prep import Prep
-            prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-
-            if meta['is_disc'] == 1:
+            if meta['is_disc']:
                 include = []
                 exclude = []
             else:
@@ -236,7 +234,7 @@ class HDB():
                 exclude = ["*.*", "*sample.mkv", "!sample*.*"]
 
             # Create a new torrent with piece size explicitly set to 16 MiB
-            new_torrent = prep.CustomTorrent(
+            new_torrent = CustomTorrent(
                 meta=meta,
                 path=Path(meta['path']),
                 trackers=["https://fake.tracker"],
@@ -255,7 +253,7 @@ class HDB():
 
             # Validate and write the new torrent
             new_torrent.validate_piece_size()
-            new_torrent.generate(callback=prep.torf_cb, interval=5)
+            new_torrent.generate(callback=torf_cb, interval=5)
             new_torrent.write(torrent_path, overwrite=True)
 
         # Proceed with the upload process
@@ -322,6 +320,7 @@ class HDB():
     async def search_existing(self, meta, disctype):
         dupes = []
         console.print("[yellow]Searching for existing torrents on HDB...")
+
         url = "https://hdbits.org/api/torrents"
         data = {
             'username': self.username,
@@ -331,18 +330,33 @@ class HDB():
             'medium': await self.get_type_medium_id(meta),
             'search': meta['resolution']
         }
+
+        # Add IMDb and TVDB IDs if available
         if int(meta.get('imdb_id', '0').replace('tt', '0')) != 0:
             data['imdb'] = {'id': meta['imdb_id']}
         if int(meta.get('tvdb_id', '0')) != 0:
             data['tvdb'] = {'id': meta['tvdb_id']}
+
         try:
-            response = requests.get(url=url, data=json.dumps(data))
-            response = response.json()
-            for each in response['data']:
-                result = each['name']
-                dupes.append(result)
-        except Exception:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your passkey is incorrect')
+            # Send POST request with JSON body
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(url, json=data)
+
+                if response.status_code == 200:
+                    response_data = response.json()
+                    for each in response_data.get('data', []):
+                        result = each['name']
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print("[bold red]Unexpected error occurred while searching torrents.")
+            console.print(str(e))
             await asyncio.sleep(5)
 
         return dupes

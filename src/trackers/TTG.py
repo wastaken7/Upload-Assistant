@@ -5,6 +5,7 @@ import asyncio
 import re
 import os
 import cli_ui
+import httpx
 from str2bool import str2bool
 from unidecode import unidecode
 from urllib.parse import urlparse
@@ -179,31 +180,49 @@ class TTG():
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        with requests.Session() as session:
-            cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
-            with open(cookiefile, 'rb') as cf:
-                session.cookies.update(pickle.load(cf))
+        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
+        if not os.path.exists(cookiefile):
+            console.print("[bold red]Cookie file not found: TTG.pkl")
+            return []
+        with open(cookiefile, 'rb') as cf:
+            cookies = pickle.load(cf)
 
-            if int(meta['imdb_id'].replace('tt', '')) != 0:
-                imdb = f"imdb{meta['imdb_id'].replace('tt', '')}"
-            else:
-                imdb = ""
-            if meta.get('is_disc', '') == "BDMV":
-                res_type = f"{meta['resolution']} Blu-ray"
-            elif meta.get('is_disc', '') == "DVD":
-                res_type = "DVD"
-            else:
-                res_type = meta['resolution']
-            search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
-            r = session.get(search_url)
-            await asyncio.sleep(0.5)
-            soup = BeautifulSoup(r.text, 'html.parser')
-            find = soup.find_all('a', href=True)
-            for each in find:
-                if each['href'].startswith('/t/'):
-                    release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
-                    if release:
-                        dupes.append(release.group(3))
+        if int(meta['imdb_id'].replace('tt', '')) != 0:
+            imdb = f"imdb{meta['imdb_id'].replace('tt', '')}"
+        else:
+            imdb = ""
+        if meta.get('is_disc', '') == "BDMV":
+            res_type = f"{meta['resolution']} Blu-ray"
+        elif meta.get('is_disc', '') == "DVD":
+            res_type = "DVD"
+        else:
+            res_type = meta['resolution']
+
+        search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
+
+        try:
+            async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+                response = await client.get(search_url)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    find = soup.find_all('a', href=True)
+                    for each in find:
+                        if each['href'].startswith('/t/'):
+                            release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
+                            if release:
+                                dupes.append(release.group(3))
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+                await asyncio.sleep(0.5)
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
 
         return dupes
 

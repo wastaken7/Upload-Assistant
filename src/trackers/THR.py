@@ -8,8 +8,9 @@ import cli_ui
 import os
 import re
 import platform
+import httpx
+from bs4 import BeautifulSoup
 from unidecode import unidecode
-
 from src.console import console
 
 
@@ -257,19 +258,33 @@ class THR():
             desc.close()
         return pronfo
 
-    def search_existing(self, session, imdb_id, disctype):
-        from bs4 import BeautifulSoup
+    async def search_existing(self, session, imdb_id, disctype):
         imdb_id = imdb_id.replace('tt', '')
         search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
-        search = session.get(search_url)
-        soup = BeautifulSoup(search.text, 'html.parser')
         dupes = []
-        for link in soup.find_all('a', href=True):
-            if link['href'].startswith('details.php'):
-                if link.get('onmousemove', False):
-                    dupe = link['onmousemove'].split("','/images")
-                    dupe = dupe[0].replace("return overlibImage('", "")
-                    dupes.append(dupe)
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(search_url)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    for link in soup.find_all('a', href=True):
+                        if link['href'].startswith('details.php'):
+                            if link.get('onmousemove', False):
+                                dupe = link['onmousemove'].split("','/images")[0]
+                                dupe = dupe.replace("return overlibImage('", "")
+                                dupes.append(dupe)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out while searching for existing torrents.")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            console.print_exception()
+
         return dupes
 
     def login(self, session):

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# import discord
 import asyncio
 import requests
 from guessit import guessit
+import httpx
 
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -83,20 +83,23 @@ class NBL():
         if meta['category'] != 'TV':
             console.print("[red]Only TV Is allowed at NBL")
             meta['skipping'] = "NBL"
-            return
+            return []
+
         if meta.get('is_disc') is not None:
             console.print('[bold red]This site does not allow raw discs')
             meta['skipping'] = "NBL"
-            return
+            return []
+
         dupes = []
         console.print("[yellow]Searching for existing torrents on NBL...")
+
         if int(meta.get('tvmaze_id', 0)) != 0:
             search_term = {'tvmaze': int(meta['tvmaze_id'])}
-        elif int(meta.get('imdb_id', '0').replace('tt', '')) == 0:
+        elif int(meta.get('imdb_id', '0').replace('tt', '')) != 0:
             search_term = {'imdb': meta.get('imdb_id', '0').replace('tt', '')}
         else:
             search_term = {'series': meta['title']}
-        json = {
+        payload = {
             'jsonrpc': '2.0',
             'id': 1,
             'method': 'getTorrents',
@@ -105,30 +108,38 @@ class NBL():
                 search_term
             ]
         }
+
         try:
-            response = requests.get(url=self.search_url, json=json)
-            response = response.json()
-            for each in response['result']['items']:
-                if meta['resolution'] in each['tags']:
-                    if meta.get('tv_pack', 0) == 1:
-                        if each['cat'] == "Season" and int(guessit(each['rls_name']).get('season', '1')) == int(meta.get('season_int')):
-                            dupes.append(each['rls_name'])
-                    elif int(guessit(each['rls_name']).get('episode', '0')) == int(meta.get('episode_int')):
-                        dupes.append(each['rls_name'])
-        except requests.exceptions.JSONDecodeError:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(self.search_url, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data['result']['items']:
+                        if meta['resolution'] in each['tags']:
+                            if meta.get('tv_pack', 0) == 1:
+                                if each['cat'] == "Season" and int(guessit(each['rls_name']).get('season', '1')) == int(meta.get('season_int')):
+                                    dupes.append(each['rls_name'])
+                            elif int(guessit(each['rls_name']).get('episode', '0')) == int(meta.get('episode_int')):
+                                dupes.append(each['rls_name'])
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+        except httpx.HTTPStatusError as e:
+            console.print(f"[bold red]HTTP error occurred: {e}")
+        except httpx.RequestError as e:
+            console.print(f"[bold red]An error occurred while making the request: {e}")
+        except httpx.JSONDecodeError:
             console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
             await asyncio.sleep(5)
         except KeyError as e:
-            console.print(response)
-            console.print("\n\n\n")
-            if e.args[0] == 'result':
+            console.print(f"[bold red]Unexpected KeyError: {e}")
+            if 'result' not in response.json():
                 console.print(f"Search Term: {search_term}")
                 console.print('[red]NBL API Returned an unexpected response, please manually check for dupes')
                 dupes.append("ERROR: PLEASE CHECK FOR EXISTING RELEASES MANUALLY")
-                await asyncio.sleep(5)
-            else:
-                console.print_exception()
-        except Exception:
+            await asyncio.sleep(5)
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
             console.print_exception()
 
         return dupes
