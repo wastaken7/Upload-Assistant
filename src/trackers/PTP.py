@@ -307,11 +307,17 @@ class PTP():
             "history", "horror", "martial.arts", "musical", "mystery", "performance", "philosophy", "politics", "romance",
             "sci.fi", "short", "silent", "sport", "thriller", "video.art", "war", "western"
         ]
+
         if not isinstance(check_against, list):
             check_against = [check_against]
+        normalized_check_against = [
+            x.lower().replace(' ', '').replace('-', '') for x in check_against if isinstance(x, str)
+        ]
         for each in ptp_tags:
-            if any(each.replace('.', '') in x for x in check_against.lower().replace(' ', '').replace('-', '')):
+            clean_tag = each.replace('.', '')
+            if any(clean_tag in item for item in normalized_check_against):
                 tags.append(each)
+
         return tags
 
     async def search_existing(self, groupID, meta, disctype):
