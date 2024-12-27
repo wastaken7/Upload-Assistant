@@ -812,7 +812,7 @@ class Prep():
                                     tracker_status[tracker_name]['skipped'] = True
                 if meta.get('skipping') is None and not is_dupe and tracker_name == "PTP":
                     if meta.get('imdb_info', {}) == {}:
-                        meta['imdb_info'] = self.get_imdb_info_api(meta['imdb_id'], meta)
+                        meta['imdb_info'] = await self.get_imdb_info_api(meta['imdb_id'], meta)
                 if not meta['debug']:
                     if not tracker_status[tracker_name]['banned'] and not tracker_status[tracker_name]['skipped'] and not tracker_status[tracker_name]['dupe']:
                         console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
