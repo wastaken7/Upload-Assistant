@@ -173,8 +173,12 @@ async def handle_queue(path, meta, paths, base_dir):
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
                 existing_queue = json.load(f)
+            log_file_proccess = await get_log_file(base_dir, meta['queue'])
+            processed_files = await load_processed_files(log_file_proccess)
+            queued = [file for file in existing_queue if file not in processed_files]
             console.print(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
-            console.print(f"[cyan]The queue log contains {len(existing_queue)} items.[/cyan]")
+            console.print(f"[cyan]The queue log contains {len(existing_queue)} total items.[/cyan]")
+            console.print(f"[cyan]{len(queued)} items are unprocessed.[/cyan]")
             console.print("[cyan]Do you want to edit, discard, or keep the existing queue?[/cyan]")
             edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
 
