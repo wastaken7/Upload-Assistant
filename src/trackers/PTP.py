@@ -232,9 +232,8 @@ class PTP():
                 meta['description'] = ptp_desc
                 meta['saved_description'] = True
         else:
-            if not meta['is_disc']:
-                meta['description'] = ptp_desc
-                meta['saved_description'] = True
+            meta['description'] = ptp_desc
+            meta['saved_description'] = True
 
         return desc, imagelist
 
