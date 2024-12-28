@@ -136,6 +136,7 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                 groupID = meta.get('ptp_groupID', None)
                 ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
                 await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                await asyncio.sleep(5)
                 await client.add_to_client(meta, "PTP")
 
     # Process all trackers concurrently
