@@ -643,6 +643,7 @@ class COMMON():
         tag = meta.get("tag").lower().replace("-", " ")
         is_dvd = meta['is_disc'] == "DVD"
         web_dl = meta.get('type') == "WEBDL"
+        target_source = meta.get("source")
 
         attribute_checks = [
             {
@@ -686,6 +687,8 @@ class COMMON():
             if meta['debug']:
                 console.log(f"[debug] Evaluating dupe: {each}")
                 console.log(f"[debug] Normalized dupe: {normalized}")
+                console.log(f"[debug] Target resolution: {target_resolution}")
+                console.log(f"[debug] Target source: {target_source}")
                 console.log(f"[debug] File HDR terms: {file_hdr}")
                 console.log(f"[debug] Target HDR terms: {target_hdr}")
                 console.log(f"[debug] TAG: {tag}")
@@ -703,10 +706,22 @@ class COMMON():
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
-            if not is_dvd:
+            if not is_dvd or not target_source.includes("DVD"):
+                skip_resolution_check = True
+            else:
+                skip_resolution_check = False
+
+            # Only check the resolution if skipping is not required
+            if not skip_resolution_check:
                 if target_resolution and target_resolution not in each:
                     await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
+                if not await self.has_matching_hdr(file_hdr, target_hdr, meta):
+                    await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
+                    return True
+                if normalized_encoder and normalized_encoder in each:
+                    await log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
+                    return False
 
             if is_dvd:
                 if any(str(res) in each for res in [1080, 720, 2160]):
@@ -723,11 +738,6 @@ class COMMON():
                     await log_exclusion(f"{check['key']} mismatch", each)
                     return True
 
-            if not is_dvd:
-                if not await self.has_matching_hdr(file_hdr, target_hdr, meta):
-                    await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
-                    return True
-
             if meta.get('category') == "TV":
                 season_episode_match = await self.is_season_episode_match(normalized, target_season, target_episode)
                 if meta['debug']:
@@ -735,11 +745,6 @@ class COMMON():
                 if not season_episode_match:
                     await log_exclusion("season/episode mismatch", each)
                     return True
-
-            if not is_dvd:
-                if normalized_encoder and normalized_encoder in each:
-                    await log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
-                    return False
 
             if web_dl and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
                 return False
