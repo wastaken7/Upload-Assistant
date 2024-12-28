@@ -318,7 +318,8 @@ class COMMON():
                     descfile.write("[/spoiler][/center]\n")
                     char_count += len("[/spoiler][/center]\n")
 
-            console.print(f"[yellow]Total characters written to description: {char_count}")
+            if char_count >= 1:
+                console.print(f"[yellow]Total characters written to description: {char_count}")
 
             # Append signature if provided
             if signature:
