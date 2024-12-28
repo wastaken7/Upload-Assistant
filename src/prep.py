@@ -608,29 +608,30 @@ class Prep():
                         meta['keep_folder'] = True
 
                     # NFO Download Handling
-                    if first_result.get("hasNFO") == "yes":
-                        try:
-                            release = first_result['release']
-                            release_lower = release.lower()
-                            nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
+                    if not meta.get('nfo'):
+                        if first_result.get("hasNFO") == "yes":
+                            try:
+                                release = first_result['release']
+                                release_lower = release.lower()
+                                nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
 
-                            # Define path and create directory
-                            save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
-                            os.makedirs(save_path, exist_ok=True)
-                            nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+                                # Define path and create directory
+                                save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                                os.makedirs(save_path, exist_ok=True)
+                                nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
 
-                            # Download the NFO file
-                            nfo_response = requests.get(nfo_url, timeout=30)
-                            if nfo_response.status_code == 200:
-                                with open(nfo_file_path, 'wb') as f:
-                                    f.write(nfo_response.content)
-                                    meta['nfo'] = True
-                                    meta['auto_nfo'] = True
-                                console.print(f"[green]NFO downloaded to {nfo_file_path}")
-                            else:
-                                console.print("[yellow]NFO file not available for download.")
-                        except Exception as e:
-                            console.print("[yellow]Failed to download NFO file:", e)
+                                # Download the NFO file
+                                nfo_response = requests.get(nfo_url, timeout=30)
+                                if nfo_response.status_code == 200:
+                                    with open(nfo_file_path, 'wb') as f:
+                                        f.write(nfo_response.content)
+                                        meta['nfo'] = True
+                                        meta['auto_nfo'] = True
+                                    console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                                else:
+                                    console.print("[yellow]NFO file not available for download.")
+                            except Exception as e:
+                                console.print("[yellow]Failed to download NFO file:", e)
 
                     # IMDb Handling
                     try:
@@ -1383,7 +1384,7 @@ class Prep():
             if meta['debug']:
                 console.print(f"specified_dir_path: {specified_dir_path}")
             if meta.get('nfo') and not content_written:
-                if meta['auto_nfo'] is True:
+                if 'auto_nfo' in meta and meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
                 else:
