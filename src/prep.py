@@ -1176,6 +1176,9 @@ class Prep():
         type = meta.get('type', "").upper()
         title = meta.get('title', "")
         alt_title = meta.get('aka', "")
+        if alt_title != "":
+            if not alt_title.startswith("AKA "):
+                alt_title = f"AKA {alt_title}"
         year = meta.get('year', "")
         if meta.get('manual_year') > 0:
             year = meta.get('manual_year')
