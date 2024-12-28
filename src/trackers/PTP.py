@@ -408,7 +408,7 @@ class PTP():
             elif imdbType == "comedy":
                 ptpType = "Stand-up Comedy"
             elif imdbType == "concert":
-                ptpType = "Concert"
+                ptpType = "Live Performance"
         else:
             keywords = meta.get("keywords", "").lower()
             tmdb_type = meta.get("tmdb_type", "movie").lower()
@@ -424,7 +424,7 @@ class PTP():
             elif "stand-up comedy" in keywords:
                 ptpType = "Stand-up Comedy"
             elif "concert" in keywords:
-                ptpType = "Concert"
+                ptpType = "Live Performance"
         if ptpType is None:
             if meta.get('mode', 'discord') == 'cli':
                 ptpTypeList = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
