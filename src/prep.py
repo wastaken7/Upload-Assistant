@@ -1379,19 +1379,18 @@ class Prep():
 
             base_dir = meta['base_dir']
             uuid = meta['uuid']
-            current_dir_path = "*.nfo"
+            path = meta['path']
             specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+            source_dir_path = os.path.join(path, "*.nfo")
             if meta['debug']:
                 console.print(f"specified_dir_path: {specified_dir_path}")
+                console.print(f"sourcedir_path: {source_dir_path}")
             if meta.get('nfo') and not content_written:
                 if 'auto_nfo' in meta and meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
                 else:
-                    nfo_files = glob.glob(current_dir_path)
-                if meta['debug']:
-                    console.print(f"Glob current_dir_path matches: {glob.glob(current_dir_path)}")
-                    console.print(f"Glob specified_dir_path matches: {glob.glob(specified_dir_path)}")
+                    nfo_files = glob.glob(source_dir_path)
                 if not nfo_files:
                     console.print("NFO was set but no nfo file was found")
                     description.write("\n")
