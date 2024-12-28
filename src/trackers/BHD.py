@@ -75,7 +75,6 @@ class BHD():
             ) in approved_image_hosts
             for image in meta['image_list']
         ):
-            console.print("[green]Images are already hosted on an approved image host. Skipping re-upload.")
             image_list = meta['image_list']
         else:
             images_reuploaded = False
