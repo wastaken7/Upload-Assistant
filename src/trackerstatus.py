@@ -44,7 +44,7 @@ async def process_all_trackers(meta):
                         meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
 
             if tracker_name == "PTP":
-                console.print("[yellow]Searching for Group ID")
+                console.print("[yellow]Searching for Group ID on PTP")
                 ptp = PTP(config=config)
                 groupID = await ptp.get_group_by_imdb(local_meta['imdb_id'])
                 if groupID is None:
