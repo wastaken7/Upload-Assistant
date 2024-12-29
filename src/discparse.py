@@ -98,6 +98,41 @@ class DiscParse():
 
         return discs, discs[0]['bdinfo']
 
+    def parse_bdinfo_files(self, files):
+        """
+        Parse the FILES section of the BDInfo input.
+        Handles filenames with markers like "(1)" and variable spacing.
+        """
+        bdinfo_files = []
+        for line in files.splitlines():
+            line = line.strip()  # Remove leading/trailing whitespace
+            if not line:  # Skip empty lines
+                continue
+
+            try:
+                # Split the line manually by whitespace and account for variable columns
+                parts = line.split()
+                if len(parts) < 5:  # Ensure the line has enough columns
+                    continue
+
+                # Handle cases where the file name has additional markers like "(1)"
+                if parts[1].startswith("(") and ")" in parts[1]:
+                    file_name = f"{parts[0]} {parts[1]}"  # Combine file name and marker
+                    parts = [file_name] + parts[2:]  # Rebuild parts with corrected file name
+                else:
+                    file_name = parts[0]
+
+                m2ts = {
+                    "file": file_name,
+                    "length": parts[2],  # Length is the 3rd column
+                }
+                bdinfo_files.append(m2ts)
+
+            except Exception as e:
+                print(f"Failed to process bdinfo line: {line} -> {e}")
+
+        return bdinfo_files
+
     def parse_bdinfo(self, bdinfo_input, files, path):
         bdinfo = dict()
         bdinfo['video'] = list()
@@ -186,8 +221,8 @@ class DiscParse():
                 split1 = l.split(':', 1)[1]
                 split2 = split1.split('/')
                 bdinfo['subtitles'].append(split2[0].strip())
-        files = files.splitlines()
-        bdinfo['files'] = []
+        files = self.parse_bdinfo_files(files)
+        bdinfo['files'] = files
         for line in files:
             try:
                 stripped = line.split()

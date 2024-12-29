@@ -228,7 +228,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
             os.chdir(os.path.dirname(video))
         media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
         filtered_media_info = "\n".join(
-            line for line in media_info.splitlines() 
+            line for line in media_info.splitlines()
             if not line.strip().startswith("ReportBy")
         )
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
