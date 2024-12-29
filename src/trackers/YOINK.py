@@ -24,7 +24,7 @@ class YOINK():
     def __init__(self, config):
         self.config = config
         self.tracker = 'YOINK'
-        self.source_flag = 'YOINK'
+        self.source_flag = 'YOiNKED'
         self.upload_url = 'https://yoinked.org/api/torrents/upload'
         self.search_url = 'https://yoinked.org/api/torrents/filter'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
