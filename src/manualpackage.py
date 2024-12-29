@@ -5,12 +5,13 @@ import json
 import urllib.parse
 import re
 from torf import Torrent
-from glob import glob
+import glob
 from src.console import console
 from src.uploadscreens import upload_screens
+from data.config import config
 
 
-async def package(self, meta):
+async def package(meta):
     if meta['tag'] == "":
         tag = ""
     else:
@@ -41,10 +42,11 @@ async def package(self, meta):
                     r.raw.decode_content = True
                     with open(poster_img, 'wb') as f:
                         shutil.copyfileobj(r.raw, f)
-                    poster, dummy = await upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
-                    poster = poster[0]
-                    generic.write(f"TMDB Poster: {poster.get('raw_url', poster.get('img_url'))}\n")
-                    meta['rehosted_poster'] = poster.get('raw_url', poster.get('img_url'))
+                    if not meta.get('skip_imghost_upload', False):
+                        poster, dummy = upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
+                        poster = poster[0]
+                        generic.write(f"TMDB Poster: {poster.get('raw_url', poster.get('img_url'))}\n")
+                        meta['rehosted_poster'] = poster.get('raw_url', poster.get('img_url'))
                     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as metafile:
                         json.dump(meta, metafile, indent=4)
                         metafile.close()
@@ -72,7 +74,7 @@ async def package(self, meta):
             manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", os.path.basename(meta['path']))
             Torrent.copy(base_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/{manual_name}.torrent", overwrite=True)
             # shutil.copy(os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"), os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['name'].replace(' ', '.')}.torrent").replace(' ', '.'))
-        filebrowser = self.config['TRACKERS'].get('MANUAL', {}).get('filebrowser', None)
+        filebrowser = config['TRACKERS'].get('MANUAL', {}).get('filebrowser', None)
         shutil.make_archive(archive, 'tar', f"{meta['base_dir']}/tmp/{meta['uuid']}")
         if filebrowser is not None:
             url = '/'.join(s.strip('/') for s in (filebrowser, f"/tmp/{meta['uuid']}"))
