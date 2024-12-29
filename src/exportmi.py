@@ -227,10 +227,14 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
         if not isdir:
             os.chdir(os.path.dirname(video))
         media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+        filtered_media_info = "\n".join(
+            line for line in media_info.splitlines() 
+            if not line.strip().startswith("ReportBy")
+        )
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
-            export.write(media_info)
+            export.write(filtered_media_info)
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8') as export_cleanpath:
-            export_cleanpath.write(media_info.replace(video, os.path.basename(video)))
+            export_cleanpath.write(filtered_media_info.replace(video, os.path.basename(video)))
         console.print("[bold green]MediaInfo Exported.")
 
     if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt"):
