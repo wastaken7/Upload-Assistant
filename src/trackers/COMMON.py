@@ -644,6 +644,7 @@ class COMMON():
         is_dvd = meta['is_disc'] == "DVD"
         web_dl = meta.get('type') == "WEBDL"
         target_source = meta.get("source")
+        is_sd = meta.get('sd')
 
         attribute_checks = [
             {
@@ -723,10 +724,14 @@ class COMMON():
                     await log_exclusion(f"Encoder '{has_encoder_in_name}' mismatch", each)
                     return False
 
-            if is_dvd:
+            if is_dvd and not tracker_name == "BHD":
                 if any(str(res) in each for res in [1080, 720, 2160]):
                     await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
+
+            if is_sd == 1 and tracker_name == "BHD":
+                if any(str(res) in each for res in [1080, 720, 2160]):
+                    return False
 
             for check in attribute_checks:
                 if check["key"] == "repack":

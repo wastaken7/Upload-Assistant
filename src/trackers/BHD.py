@@ -463,12 +463,16 @@ class BHD():
             category = "Movies"
         elif category == "TV":
             category = "TV"
+        if meta['is_disc'] == "DVD":
+            type = None
+        else:
+            type = await self.get_type(meta)
 
         data = {
             'action': 'search',
             'tmdb_id': f"{tmdbID}/{meta['tmdb']}",
             'categories': category,
-            'types': await self.get_type(meta)
+            'types': type
         }
         if meta['sd'] == 1:
             data['categories'] = None
