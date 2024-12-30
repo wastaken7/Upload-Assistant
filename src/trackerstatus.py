@@ -67,7 +67,6 @@ async def process_all_trackers(meta):
                 dupes = await common.filter_dupes(dupes, local_meta, tracker_name)
                 local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
                 if is_dupe:
-                    console.print(f"[red]Skipping upload on {tracker_name}[/red]")
                     local_tracker_status['dupe'] = True
             elif local_meta['skipping']:
                 local_tracker_status['skipped'] = True

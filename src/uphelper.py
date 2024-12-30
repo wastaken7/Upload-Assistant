@@ -8,7 +8,8 @@ console = Console()
 class UploadHelper:
     async def dupe_check(self, dupes, meta, tracker_name):
         if not dupes:
-            console.print("[green]No dupes found")
+            if meta['debug']:
+                console.print(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             meta['upload'] = True
             return meta, False
         else:

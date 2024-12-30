@@ -47,7 +47,8 @@ class Clients():
 
         local_path, remote_path = await self.remote_path_map(meta)
 
-        console.print(f"[bold green]Adding to {torrent_client}")
+        if meta['debug']:
+            console.print(f"[bold green]Adding to {torrent_client}")
         if torrent_client.lower() == "rtorrent":
             self.rtorrent(meta['path'], torrent_path, torrent, meta, local_path, remote_path, client)
         elif torrent_client == "qbit":
@@ -113,14 +114,15 @@ class Clients():
                     meta, f"{torrent_storage_dir}/{found_hash}.torrent", found_hash, torrent_client, client, print_err=False
                 )
                 if valid:
+                    torrent = Torrent.read(torrent_path)
+                    piece_size = torrent.piece_size
+                    piece_in_mib = int(piece_size) / 1024 / 1024
                     # Continue checking other torrents if `prefer_small_pieces` is enabled
                     if not prefer_small_pieces:
-                        console.print(f"[green]Found a valid torrent from client search: [bold yellow]{found_hash}")
+                        (f"[green]Found a valid torrent with piece size[/green] [bold yellow]{piece_in_mib}[/bold yellow] [green]MiB and hash[/green] [bold yellow]{found_hash}[/bold yellow]")
                         return torrent_path
 
                     # Get piece size and update the best match
-                    torrent = Torrent.read(torrent_path)
-                    piece_size = torrent.piece_size
                     if piece_size <= 8388608:
                         console.print(f"[green]Found a valid torrent with preferred piece size from client search: [bold yellow]{found_hash}")
                         return torrent_path
@@ -409,7 +411,8 @@ class Clients():
             password=client['qbit_pass'],
             VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
         )
-        console.print("[bold yellow]Adding and rechecking torrent")
+        if meta['debug']:
+            console.print("[bold yellow]Adding and rechecking torrent")
 
         try:
             qbt_client.auth_log_in()
@@ -461,7 +464,8 @@ class Clients():
         if meta.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=meta['qbit_tag'], torrent_hashes=torrent.infohash)
 
-        console.print(f"Added to: {path}")
+        if meta['debug']:
+            console.print(f"Added to: {path}")
 
     def deluge(self, path, torrent_path, torrent, local_path, remote_path, client, meta):
         client = DelugeRPCClient(client['deluge_url'], int(client['deluge_port']), client['deluge_user'], client['deluge_pass'])

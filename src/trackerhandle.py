@@ -54,14 +54,14 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             tracker_class = tracker_class_map[tracker](config=config)
             tracker_status = meta.get('tracker_status', {})
             upload_status = tracker_status.get(tracker, {}).get('upload', False)
-            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
+            color = "green" if upload_status else "red"
+            console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
                 modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
-                if modq is not None:
+                if modq == "Yes":
                     console.print(f"(modq: {modq})")
-                if draft is not None:
+                if draft == "Yes":
                     console.print(f"(draft: {draft})")
-                console.print(f"Uploading to {tracker_class.tracker}")
                 await tracker_class.upload(meta, disctype)
                 await client.add_to_client(meta, tracker_class.tracker)
 
@@ -69,24 +69,23 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             tracker_class = tracker_class_map[tracker](config=config)
             tracker_status = meta.get('tracker_status', {})
             upload_status = tracker_status.get(tracker, {}).get('upload', False)
-            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
+            color = "green" if upload_status else "red"
+            console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                console.print(f"Uploading to {tracker_class.tracker}")
-                if tracker != "TL":
-                    if tracker == "RTF":
-                        await tracker_class.api_test(meta)
-                    if tracker == "TL" or upload_status:
-                        await tracker_class.upload(meta, disctype)
-                        if tracker == 'SN':
-                            await asyncio.sleep(16)
-                        await client.add_to_client(meta, tracker_class.tracker)
+                if tracker == "RTF":
+                    await tracker_class.api_test(meta)
+                await tracker_class.upload(meta, disctype)
+                if tracker == 'SN':
+                    await asyncio.sleep(16)
+                await client.add_to_client(meta, tracker_class.tracker)
 
         elif tracker in http_trackers:
             tracker_class = tracker_class_map[tracker](config=config)
             tracker_status = meta.get('tracker_status', {})
             upload_status = tracker_status.get(tracker, {}).get('upload', False)
+            color = "green" if upload_status else "red"
+            console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                console.print(f"Uploading to {tracker}")
                 if await tracker_class.validate_credentials(meta) is True:
                     await tracker_class.upload(meta, disctype)
                     await client.add_to_client(meta, tracker_class.tracker)
@@ -115,7 +114,8 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
         elif tracker == "THR":
             tracker_status = meta.get('tracker_status', {})
             upload_status = tracker_status.get(tracker, {}).get('upload', False)
-            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
+            color = "green" if upload_status else "red"
+            console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
                 thr = THR(config=config)
                 try:
@@ -130,7 +130,8 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
         elif tracker == "PTP":
             tracker_status = meta.get('tracker_status', {})
             upload_status = tracker_status.get(tracker, {}).get('upload', False)
-            console.print(f"[yellow]Tracker: {tracker}, Upload: {'Yes' if upload_status else 'No'}[/yellow]")
+            color = "green" if upload_status else "red"
+            console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
                 ptp = PTP(config=config)
                 groupID = meta.get('ptp_groupID', None)
