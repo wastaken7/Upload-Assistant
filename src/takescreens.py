@@ -583,7 +583,7 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
             height = float(video_track.get('Height'))
             par = float(video_track.get('PixelAspectRatio', 1))
             dar = float(video_track.get('DisplayAspectRatio'))
-            frame_rate = float(video_track.get('FrameRate', 24.0))
+            frame_rate = float(video_track.get('FrameRate', 24.0)) if isinstance(video_track.get('FrameRate'), str) else 24.0
 
             if par == 1:
                 sar = w_sar = h_sar = 1
