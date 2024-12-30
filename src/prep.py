@@ -358,6 +358,8 @@ class Prep():
             meta['trackers'] = enabled_trackers
         else:
             meta['trackers'] = meta['saved_trackers']
+        if meta.get('edit', False):
+            meta['edit'] = False
         confirm = await helper.get_confirmation(meta)
         while confirm is False:
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
