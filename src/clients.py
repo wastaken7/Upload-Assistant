@@ -324,7 +324,9 @@ class Clients():
                     if valid:
                         best_match = {'hash': torrent.hash, 'torrent_path': torrent_path, 'piece_size': piece_size}
             else:
-                return torrent.hash
+                valid, _ = await self.is_valid_torrent(meta, f"{torrent_storage_dir}/{torrent.hash}.torrent", torrent.hash, 'qbit', client, print_err=False)
+                if valid:
+                    return torrent.hash
 
         # Return the best match if prefer_small_pieces is enabled and no direct match was found
         if best_match:
