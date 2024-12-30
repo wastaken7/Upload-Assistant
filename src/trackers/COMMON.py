@@ -707,7 +707,7 @@ class COMMON():
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
-            if not is_dvd or not target_source.includes("DVD"):
+            if is_dvd or target_source.includes("DVD"):
                 skip_resolution_check = True
             else:
                 skip_resolution_check = False
