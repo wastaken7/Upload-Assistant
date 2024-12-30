@@ -100,10 +100,15 @@ async def process_all_trackers(meta):
                 if local_meta.get('imdb_info', {}) == {}:
                     meta['imdb_info'] = await get_imdb_info_api(local_meta['imdb_id'], local_meta)
 
+            we_already_asked = local_meta.get('we_asked', False)
+
             if not local_meta['debug']:
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
                     console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
-                    if not local_meta['unattended'] or (local_meta['unattended'] and local_meta.get('unattended-confirm', False)):
+                    if (
+                        not local_meta['unattended']
+                        or (local_meta['unattended'] and local_meta.get('unattended-confirm', False))
+                    ) and not we_already_asked:
                         edit_choice = "y" if local_meta['unattended'] else input("Enter 'y' to upload, or press enter to skip uploading:")
                         if edit_choice.lower() == 'y':
                             local_tracker_status['upload'] = True
@@ -116,6 +121,7 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['upload'] = True
                 successful_trackers += 1
+            meta['we_asked'] = False
 
         return tracker_name, local_tracker_status
 

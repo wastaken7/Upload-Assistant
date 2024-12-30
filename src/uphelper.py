@@ -22,8 +22,10 @@ class UploadHelper:
                 if meta.get('dupe', False) is False:
                     print()
                     upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                    meta['we_asked'] = True
                 else:
                     upload = True
+                    meta['we_asked'] = False
             else:
                 if meta.get('dupe', False) is False:
                     console.print(f"[red]Found potential dupes on {tracker_name}. Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
