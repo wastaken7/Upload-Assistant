@@ -170,6 +170,16 @@ class HUNO():
         year = meta.get('year', "")
         resolution = meta.get('resolution', "")
         audio = self.get_audio(meta)
+        if meta['is_disc'] == 'BDMV':
+            bdinfo = meta.get('bdinfo', {})
+            audio_tracks = bdinfo.get("audio", [])
+            languages = {track.get("language", "") for track in audio_tracks if "language" in track}
+            if len(languages) > 1:
+                cli_ui.info(f"Multiple audio languages detected: {', '.join(languages)}")
+                cli_ui.ask_yes_no("Is this a dual audio release?", default=True)
+                audio = "Dual" if cli_ui.yes_no else audio
+            else:
+                audio = audio
         service = meta.get('service', "")
         season = meta.get('season', "")
         episode = meta.get('episode', "")
