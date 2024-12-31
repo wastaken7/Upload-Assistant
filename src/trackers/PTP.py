@@ -915,9 +915,46 @@ class PTP():
         await self.edit_desc(meta)
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "r", encoding='utf-8').read()
         ptp_subtitles = self.get_subtitles(meta)
+        no_audio_found = False
+        english_audio = False
+        if meta['is_disc'] == 'BDMV':
+            bdinfo = meta.get('bdinfo', {})
+            audio_tracks = bdinfo.get("audio", [])
+            if audio_tracks:
+                first_language = audio_tracks[0].get("language", "").lower()
+                if not first_language:
+                    no_audio_found = True
+                elif first_language.startswith("en"):
+                    english_audio = True
+                else:
+                    english_audio = False
+        else:
+            mediainfo = meta.get('mediainfo', {})
+            audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
+            if audio_tracks:
+                first_language = audio_tracks[0].get("Language", "").lower()
+                if not first_language:
+                    no_audio_found = True
+                elif first_language.startswith("en"):
+                    english_audio = True
+                else:
+                    english_audio = False
+
         ptp_trumpable = None
-        if not any(x in [3, 50] for x in ptp_subtitles) or meta['hardcoded-subs']:
+        if meta['debug']:
+            console.print("ptp_subtitles", ptp_subtitles)
+        if meta['hardcoded-subs']:
             ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+        elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
+            cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
+            if cli_ui.ask_yes_no("Mark trumpable?", default=True):
+                ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+        elif not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
+            cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
+            if cli_ui.ask_yes_no("Mark trumpable?", default=True):
+                ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+        if meta['debug']:
+            console.print("ptp_trumpable", ptp_trumpable)
         data = {
             "submit": "true",
             "remaster_year": "",
