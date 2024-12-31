@@ -166,6 +166,11 @@ class OTW():
             console.print('[bold red]This content is not allowed at OTW.')
             meta['skipping'] = "OTW"
             return
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy'}
+        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
+            console.print('[bold red]Adult animation not allowed at OTW.')
+            meta['skipping'] = "RTF"
+            return []
         dupes = []
         console.print("[yellow]Searching for existing torrents on OTW...")
         params = {
