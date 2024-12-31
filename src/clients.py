@@ -210,10 +210,12 @@ class Clients():
             if os.path.exists(torrent_path):
                 try:
                     reuse_torrent = Torrent.read(torrent_path)
+                    piece_size = reuse_torrent.piece_size
+                    piece_in_mib = int(piece_size) / 1024 / 1024
                     torrent_storage_dir_valid = torrent_path
-                    torrent_file_size_kib = os.path.getsize(torrent_storage_dir_valid) / 1024
+                    torrent_file_size_kib = round(os.path.getsize(torrent_storage_dir_valid) / 1024, 2)
                     if meta['debug']:
-                        console.log(f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={reuse_torrent.piece_size}, size={torrent_file_size_kib}")
+                        console.log(f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB")
 
                     # Piece size and count validations
                     if not meta.get('prefer_small_pieces', False):
