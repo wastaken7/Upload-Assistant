@@ -536,7 +536,7 @@ class PTP():
             "English Softsubs Exist (Mislabeled)": None,
             "Hardcoded Subs (Non-English)": "OTHER"
         }
-        opts = cli_ui.select_choices("English subtitles not found. Please select any/all applicable options:", choices=list(trumpable_values.keys()))
+        opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys()))
         trumpable = []
         if opts:
             for t, v in trumpable_values.items():
