@@ -94,6 +94,10 @@ class SN():
             try:
                 if response.json().get('success'):
                     console.print(response.json())
+                    if 'link' in response.json():
+                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.json()['link']))
+                    else:
+                        console.print("[red]No Link in Response")
                 else:
                     console.print("[red]Did not upload successfully")
                     console.print(response.json())
