@@ -53,7 +53,7 @@ async def get_imdb_aka_api(imdb_id, meta):
     else:
         original_language = None
 
-    if not is_original and aka:
+    if is_original and aka:
         aka = f" AKA {aka}"
 
     return aka, original_language
