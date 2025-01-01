@@ -294,7 +294,7 @@ class HDT():
         else:
             return False
 
-    async def get_csrf_token(session: httpx.AsyncClient, url: str):
+    async def get_csrf_token(self, session: httpx.AsyncClient, url: str):
         response = await session.get(url)  # Make an asynchronous GET request
         html_content = response.text  # Get the response content (httpx handles it without extra await)
         soup = BeautifulSoup(html_content, 'html.parser')
