@@ -921,7 +921,7 @@ class PTP():
             bdinfo = meta.get('bdinfo', {})
             audio_tracks = bdinfo.get("audio", [])
             if audio_tracks:
-                first_language = audio_tracks[0].get("language", "").lower()
+                first_language = str(audio_tracks[0].get("language", "")).lower()
                 if not first_language:
                     no_audio_found = True
                 elif first_language.startswith("en"):
@@ -932,7 +932,7 @@ class PTP():
             mediainfo = meta.get('mediainfo', {})
             audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
             if audio_tracks:
-                first_language = audio_tracks[0].get("Language", "").lower()
+                first_language = str(audio_tracks[0].get("language", "")).lower()
                 if not first_language:
                     no_audio_found = True
                 elif first_language.startswith("en"):
