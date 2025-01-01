@@ -227,7 +227,7 @@ class HDT():
         search_url = "https://hd-torrents.net/torrents.php"
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
-            csrfToken = await self.get_csrf_Token(client, search_url)
+            csrfToken = await self.get_csrf_token(client, search_url)
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
                     'csrfToken': csrfToken,
