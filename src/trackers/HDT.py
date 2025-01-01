@@ -227,7 +227,7 @@ class HDT():
         search_url = "https://hd-torrents.net/torrents.php"
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
-            csrfToken = await self.get_csrfToken(client, search_url)
+            csrfToken = await self.get_csrf_Token(client, search_url)
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
                     'csrfToken': csrfToken,
@@ -298,8 +298,8 @@ class HDT():
         response = await session.get(url)  # Make an asynchronous GET request
         html_content = response.text  # Get the response content (httpx handles it without extra await)
         soup = BeautifulSoup(html_content, 'html.parser')
-        csrf_token = soup.find('input', {'name': 'csrfToken'}).get('value')
-        return csrf_token
+        csrfToken = soup.find('input', {'name': 'csrfToken'}).get('value')
+        return csrfToken
 
     async def edit_desc(self, meta):
         # base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
