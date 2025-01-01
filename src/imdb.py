@@ -69,20 +69,8 @@ async def safe_get(data, path, default=None):
 
 
 async def get_imdb_info_api(imdbID, meta):
-    imdb_info = {
-        'title': meta['title'],
-        'year': meta['year'],
-        'aka': '',
-        'type': None,
-        'runtime': meta.get('runtime', '60'),
-        'cover': meta.get('poster'),
-    }
-    if len(meta.get('tmdb_directors', [])) >= 1:
-        imdb_info['directors'] = meta['tmdb_directors']
-
-    if imdbID == "0":
-        return imdb_info
-    else:
+    imdb_info = {}
+    if imdbID != "0":
         try:
             if not imdbID.startswith("tt"):
                 imdbIDtt = f"tt{imdbID}"
@@ -160,41 +148,52 @@ async def get_imdb_info_api(imdbID, meta):
         response = requests.post(url, json=query, headers=headers)
         data = response.json()
 
-    if response.status_code != 200:
-        return imdb_info
+        if response.status_code != 200:
+            return imdb_info
 
-    title_data = await safe_get(data, ["data", "title"], {})
-    if not data or "data" not in data or "title" not in data["data"]:
-        return imdb_info
+        title_data = await safe_get(data, ["data", "title"], {})
+        if not data or "data" not in data or "title" not in data["data"]:
+            return imdb_info
 
-    imdb_info['imdbID'] = imdbID
-    imdb_info['title'] = await safe_get(title_data, ['titleText', 'text'], meta['title'])
-    imdb_info['year'] = await safe_get(title_data, ['releaseYear', 'year'], meta['year'])
-    original_title = await safe_get(title_data, ['originalTitleText', 'text'], '')
-    imdb_info['aka'] = original_title if original_title and original_title != imdb_info['title'] else imdb_info['title']
-    imdb_info['type'] = await safe_get(title_data, ['titleType', 'id'], None)
-    runtime_seconds = await safe_get(title_data, ['runtime', 'seconds'], 0)
-    imdb_info['runtime'] = str(runtime_seconds // 60 if runtime_seconds else 60)
-    imdb_info['cover'] = await safe_get(title_data, ['primaryImage', 'url'], meta.get('poster', ''))
-    imdb_info['plot'] = await safe_get(title_data, ['plot', 'plotText', 'plainText'], 'No plot available')
-    genres = await safe_get(title_data, ['titleGenres', 'genres'], [])
-    genre_list = [await safe_get(g, ['genre', 'text'], '') for g in genres]
-    imdb_info['genres'] = ', '.join(filter(None, genre_list))
-    imdb_info['rating'] = await safe_get(title_data, ['ratingsSummary', 'aggregateRating'], 'N/A')
-    imdb_info['directors'] = []
-    principal_credits = await safe_get(title_data, ['principalCredits'], [])
-    if isinstance(principal_credits, list):
-        for pc in principal_credits:
-            category_text = await safe_get(pc, ['category', 'text'], '')
-            if 'Direct' in category_text:
-                credits = await safe_get(pc, ['credits'], [])
-                for c in credits:
-                    name_id = await safe_get(c, ['name', 'id'], '')
-                    if name_id.startswith('nm'):
-                        imdb_info['directors'].append(name_id)
-                break
-        if meta.get('manual_language'):
-            imdb_info['original_langauge'] = meta.get('manual_language')
+        imdb_info['imdbID'] = imdbID
+        imdb_info['title'] = await safe_get(title_data, ['titleText', 'text'], meta['title'])
+        imdb_info['year'] = await safe_get(title_data, ['releaseYear', 'year'], meta['year'])
+        original_title = await safe_get(title_data, ['originalTitleText', 'text'], '')
+        imdb_info['aka'] = original_title if original_title and original_title != imdb_info['title'] else imdb_info['title']
+        imdb_info['type'] = await safe_get(title_data, ['titleType', 'id'], None)
+        runtime_seconds = await safe_get(title_data, ['runtime', 'seconds'], 0)
+        imdb_info['runtime'] = str(runtime_seconds // 60 if runtime_seconds else 60)
+        imdb_info['cover'] = await safe_get(title_data, ['primaryImage', 'url'], meta.get('poster', ''))
+        imdb_info['plot'] = await safe_get(title_data, ['plot', 'plotText', 'plainText'], 'No plot available')
+        genres = await safe_get(title_data, ['titleGenres', 'genres'], [])
+        genre_list = [await safe_get(g, ['genre', 'text'], '') for g in genres]
+        imdb_info['genres'] = ', '.join(filter(None, genre_list))
+        imdb_info['rating'] = await safe_get(title_data, ['ratingsSummary', 'aggregateRating'], 'N/A')
+        imdb_info['directors'] = []
+        principal_credits = await safe_get(title_data, ['principalCredits'], [])
+        if isinstance(principal_credits, list):
+            for pc in principal_credits:
+                category_text = await safe_get(pc, ['category', 'text'], '')
+                if 'Direct' in category_text:
+                    credits = await safe_get(pc, ['credits'], [])
+                    for c in credits:
+                        name_id = await safe_get(c, ['name', 'id'], '')
+                        if name_id.startswith('nm'):
+                            imdb_info['directors'].append(name_id)
+                    break
+            if meta.get('manual_language'):
+                imdb_info['original_langauge'] = meta.get('manual_language')
+    else:
+        imdb_info = {
+            'title': meta.get('title', ''),
+            'year': meta.get('year', ''),
+            'aka': '',
+            'type': None,
+            'runtime': meta.get('runtime', '60'),
+            'cover': meta.get('poster, '),
+        }
+        if len(meta.get('tmdb_directors', [])) >= 1:
+            imdb_info['directors'] = meta['tmdb_directors']
 
     return imdb_info
 
