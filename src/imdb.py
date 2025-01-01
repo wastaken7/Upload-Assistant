@@ -190,7 +190,7 @@ async def get_imdb_info_api(imdbID, meta):
             'aka': '',
             'type': None,
             'runtime': meta.get('runtime', '60'),
-            'cover': meta.get('poster, '),
+            'cover': meta.get('poster', ''),
         }
         if len(meta.get('tmdb_directors', [])) >= 1:
             imdb_info['directors'] = meta['tmdb_directors']
