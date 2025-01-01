@@ -294,12 +294,12 @@ class HDT():
         else:
             return False
 
-    async def get_csrfToken(self, session, url):
-        r = session.get(url)
-        await asyncio.sleep(0.5)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        csrfToken = soup.find('input', {'name': 'csrfToken'}).get('value')
-        return csrfToken
+    async def get_csrf_token(session: httpx.AsyncClient, url: str):
+        response = await session.get(url)  # Make an asynchronous GET request
+        html_content = response.text  # Get the response content (httpx handles it without extra await)
+        soup = BeautifulSoup(html_content, 'html.parser')
+        csrf_token = soup.find('input', {'name': 'csrfToken'}).get('value')
+        return csrf_token
 
     async def edit_desc(self, meta):
         # base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
