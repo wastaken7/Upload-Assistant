@@ -33,6 +33,10 @@ async def process_all_trackers(meta):
         if local_meta['name'].endswith('DUPE?'):
             local_meta['name'] = local_meta['name'].replace(' DUPE?', '')
 
+        if tracker_name == "MANUAL":
+            local_tracker_status['upload'] = True
+            successful_trackers += 1
+
         if tracker_name in tracker_class_map:
             tracker_class = tracker_class_map[tracker_name](config=config)
             if tracker_name in {"THR", "PTP"}:
