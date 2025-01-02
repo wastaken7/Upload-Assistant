@@ -433,6 +433,9 @@ class Clients():
             if os.path.normpath(am_config).lower() in os.path.normpath(path).lower() and am_config.strip() != "":
                 auto_management = True
         qbt_category = client.get("qbit_cat") if not meta.get("qbit_cat") else meta.get('qbit_cat')
+        if meta['debug']:
+            console.print("client.get('qbit_cat'):", client.get('qbit_cat'))
+            console.print("qbt_category:", qbt_category)
         content_layout = client.get('content_layout', 'Original')
 
         # Add the torrent
