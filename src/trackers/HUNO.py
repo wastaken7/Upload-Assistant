@@ -177,7 +177,7 @@ class HUNO():
             if len(languages) > 1:
                 cli_ui.info(f"Multiple audio languages detected: {', '.join(languages)}")
                 cli_ui.ask_yes_no("Is this a dual audio release?", default=True)
-                audio = "Dual" if cli_ui.ask_yes_no else audio
+                audio = f"{audio} DUAL" if cli_ui.ask_yes_no else audio
             else:
                 audio = audio
         service = meta.get('service', "")
