@@ -48,12 +48,15 @@ async def get_imdb_aka_api(imdb_id, meta):
     # Extract relevant fields from the response
     aka = title_data.get("originalTitleText", {}).get("text", "")
     is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
+    title_text = title_data.get("titleText", {}).get("text", "")
     if meta.get('manual_language'):
         original_language = meta.get('manual_language')
     else:
         original_language = None
 
-    if is_original and aka:
+    if title_text != aka:
+        aka = f" AKA {aka}"
+    elif is_original and aka:
         aka = f" AKA {aka}"
 
     return aka, original_language
