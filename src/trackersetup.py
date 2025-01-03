@@ -1,3 +1,4 @@
+from src.trackers.AR import AR
 from src.trackers.HUNO import HUNO
 from src.trackers.BLU import BLU
 from src.trackers.BHD import BHD
@@ -92,7 +93,7 @@ class TRACKER_SETUP:
 
 
 tracker_class_map = {
-    'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
+    'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
     'FNP': FNP, 'FL': FL, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HP': HP, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
     'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
     'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'STT': STT, 'THR': THR,
@@ -109,5 +110,5 @@ other_api_trackers = {
 }
 
 http_trackers = {
-    'FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'
+    'AR', 'FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'
 }
