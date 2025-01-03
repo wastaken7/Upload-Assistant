@@ -14,8 +14,8 @@ from src.console import console
 from src.trackers.COMMON import COMMON
 from pymediainfo import MediaInfo
 
+
 class AR():
-    
     def __init__(self, config):
         self.config = config
         self.session = None
@@ -29,7 +29,6 @@ class AR():
         self.user_agent = f'UA ({platform.system()} {platform.release()})'
         self.signature = None
         self.banned_groups = []
-
 
     async def get_type(self, meta):
 
@@ -75,7 +74,7 @@ class AR():
                     '1080p': '1',
                     '1080i': '1',
                     '720p': '1',
-            }.get(meta['resolution'], '0')
+                }.get(meta['resolution'], '0')
 
         if meta['category'] == "MOVIE":
             if meta['sd']:
@@ -89,7 +88,7 @@ class AR():
                     '1080p': '8',
                     '1080i': '8',
                     '720p': '8',
-            }.get(meta['resolution'], '7')
+                }.get(meta['resolution'], '7')
 
     async def start_session(self):
         if self.session is not None:
@@ -255,10 +254,6 @@ class AR():
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 for image in meta['image_list']:
                     if image['raw_url'] is not None:
-                        # UA does not save Thumbnail images IBB. Thumbnails display much better on AR
-                        # if 'thumb_url' in image:
-                        #     description += "[url=" + image['raw_url'] + "][img]" + image['thumb_url'] + "[/img][/url]"
-                        # else:
                         description += "[url=" + image['raw_url'] + "][img]" + image['img_url'] + "[/img][/url]"
             if 'youtube' in meta:
                 description += "\n\n" + subheading + "Youtube" + heading_end + "\n" + str(meta['youtube'])
@@ -301,7 +296,6 @@ class AR():
         path = next(iter(meta['filelist']), meta['path'])
         return os.path.basename(path)
 
-    # a broad search
     async def search_existing(self, meta, DISCTYPE):
         await self.validate_credentials(meta)
         dupes = {}
@@ -334,11 +328,9 @@ class AR():
 
                 results = json_response.get('response', {}).get('results', [])
                 if not results:
-                    console.print("[yellow]No results found.")
                     return dupes
 
                 group_names = [result['groupName'] for result in results if 'groupName' in result]
-                console.print(f"[blue]Found {len(group_names)} group names.")
 
                 if group_names:
                     dupes = group_names
@@ -399,16 +391,7 @@ class AR():
         tags = ""
         if meta['imdb_id'] != "0":
             tags += f"tt{meta.get('imdb_id', '')}, "
-        # no special chars can be used in tags. all of the below wont work.
-        # if meta['tmdb'] != "0":
-        #     tags += f"TMDB:{str(meta['category'].lower())}/{str(meta['tmdb'])}, "
-        # if meta['tvdb_id'] != "0":
-        #     tags += f"TVDB:{str(meta['tvdb_id'])}, "
-        # if meta['tvmaze_id'] != "0":
-        #     tags += f"TVMaze:{str(meta['tvmaze_id'])}, "
-        # if meta['mal_id'] != 0:
-        #     tags += f"MyAnimeList:{str(meta['mal_id'])}, "
-        # imdb_id = meta.get('imdb_id', '')
+        # no special chars can be used in tags. keep to minimum working tags only.
         tags += f"{genres}, "
 
         # Get initial response and extract auth key
@@ -469,7 +452,8 @@ class AR():
                                     if match is None:
                                         console.print(response.url)
                                         console.print(data)
-                                        raise UploadException(f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
+                                        raise UploadException(  # noqa F405
+                                            f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
 
                                     # having UA add the torrent link as a comment.
                                     if match:
