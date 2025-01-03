@@ -8,7 +8,6 @@ import platform
 import re
 import rich.prompt as Prompt
 import urllib.parse
-import httpx
 from src.exceptions import *  # noqa F403
 from bs4 import BeautifulSoup
 from src.console import console
