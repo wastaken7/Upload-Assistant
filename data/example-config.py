@@ -286,6 +286,10 @@ config = {
             "api_key": "SN",
             "announce_url": "https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce",
         },
+        "SP": {
+            "api_key": "SeedPool API KEY",
+            "announce_url": "https://seedpool.org/announce/<PASSKEY>",
+        },
         "SPD": {
             "api_key": "SPEEDAPP API KEY",
             "announce_url": "https://ramjet.speedapp.io/<PASSKEY>/announce",
