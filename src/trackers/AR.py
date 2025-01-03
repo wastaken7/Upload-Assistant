@@ -252,9 +252,11 @@ class AR():
             description += self.get_links(meta, subheading, heading_end)
             if meta['image_list'] is not None:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
+                description += "[align=center]"
                 for image in meta['image_list']:
                     if image['raw_url'] is not None:
                         description += "[url=" + image['raw_url'] + "][img]" + image['img_url'] + "[/img][/url]"
+                description += "[/align]"
             if 'youtube' in meta:
                 description += "\n\n" + subheading + "Youtube" + heading_end + "\n" + str(meta['youtube'])
 
