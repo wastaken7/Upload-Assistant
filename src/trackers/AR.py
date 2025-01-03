@@ -190,7 +190,7 @@ class AR():
 
     def get_links(self, movie, subheading, heading_end):
         description = ""
-        description += "\n\n" + subheading + "Links" + heading_end + "\n"
+        description += "\n" + subheading + "Links" + heading_end + "\n"
         if movie['imdb_id'] != "0":
             description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
         if movie['tmdb'] != "0":
