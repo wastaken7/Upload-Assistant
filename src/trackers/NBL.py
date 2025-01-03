@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import asyncio
+import json
 import requests
 from guessit import guessit
 import httpx
@@ -113,31 +113,39 @@ class NBL():
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(self.search_url, json=payload)
                 if response.status_code == 200:
-                    data = response.json()
-                    for each in data['result']['items']:
-                        if meta['resolution'] in each['tags']:
-                            if meta.get('tv_pack', 0) == 1:
-                                if each['cat'] == "Season" and int(guessit(each['rls_name']).get('season', '1')) == int(meta.get('season_int')):
-                                    dupes.append(each['rls_name'])
-                            elif int(guessit(each['rls_name']).get('episode', '0')) == int(meta.get('episode_int')):
-                                dupes.append(each['rls_name'])
+                    if response.headers.get('Content-Type') == 'application/json':
+                        try:
+                            data = response.json()
+                            for each in data.get('result', {}).get('items', []):
+                                if meta['resolution'] in each.get('tags', []):
+                                    if meta.get('tv_pack', 0) == 1:
+                                        if (
+                                            each.get('cat') == "Season"
+                                            and int(guessit(each.get('rls_name', '')).get('season', '1')) == int(meta.get('season_int'))
+                                        ):
+                                            dupes.append(each['rls_name'])
+                                    elif int(guessit(each.get('rls_name', '')).get('episode', '0')) == int(meta.get('episode_int')):
+                                        dupes.append(each['rls_name'])
+                        except json.JSONDecodeError:
+                            console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
+                            meta['skipping'] = "NBL"
+                    else:
+                        console.print("[bold yellow]Response is not JSON. Skipping this API call.")
+                        meta['skipping'] = "NBL"
                 else:
                     console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    meta['skipping'] = "NBL"
 
-        except httpx.HTTPStatusError as e:
-            console.print(f"[bold red]HTTP error occurred: {e}")
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 5 seconds")
         except httpx.RequestError as e:
             console.print(f"[bold red]An error occurred while making the request: {e}")
-        except httpx.JSONDecodeError:
-            console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
-            await asyncio.sleep(5)
+            meta['skipping'] = "NBL"
         except KeyError as e:
             console.print(f"[bold red]Unexpected KeyError: {e}")
             if 'result' not in response.json():
-                console.print(f"Search Term: {search_term}")
-                console.print('[red]NBL API Returned an unexpected response, please manually check for dupes')
+                console.print("[red]NBL API returned an unexpected response. Please manually check for dupes.")
                 dupes.append("ERROR: PLEASE CHECK FOR EXISTING RELEASES MANUALLY")
-            await asyncio.sleep(5)
         except Exception as e:
             console.print(f"[bold red]Unexpected error: {e}")
             console.print_exception()

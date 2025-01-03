@@ -5,6 +5,7 @@ import asyncio
 import requests
 import platform
 import httpx
+import json
 from str2bool import str2bool
 from pymediainfo import MediaInfo
 from pathlib import Path
@@ -161,21 +162,31 @@ class ANT():
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(url='https://anthelion.me/api', params=params)
                 if response.status_code == 200:
-                    data = response.json()
-                    for each in data.get('item', []):
-                        # Find the largest file
-                        largest = each['files'][0]
-                        for file in each['files']:
-                            if int(file['size']) > int(largest['size']):
-                                largest = file
-                        result = largest['name']
-                        dupes.append(result)
+                    if response.headers.get('Content-Type') == 'application/json':
+                        try:
+                            data = response.json()
+                            for each in data.get('item', []):
+                                # Find the largest file
+                                largest = each['files'][0]
+                                for file in each['files']:
+                                    if int(file['size']) > int(largest['size']):
+                                        largest = file
+                                result = largest['name']
+                                dupes.append(result)
+                        except json.JSONDecodeError:
+                            console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
+                            meta['skipping'] = "ANT"
+                    else:
+                        console.print("[bold yellow]Response is not JSON. Skipping this API call.")
+                        meta['skipping'] = "ANT"
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                    meta['skipping'] = "ANT"
         except httpx.TimeoutException:
             console.print("[bold red]Request timed out after 5 seconds")
         except httpx.RequestError as e:
             console.print(f"[bold red]Unable to search for existing torrents: {e}")
+            meta['skipping'] = "ANT"
         except Exception as e:
             console.print(f"[bold red]Unexpected error: {e}")
             await asyncio.sleep(5)
