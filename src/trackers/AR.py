@@ -211,6 +211,7 @@ class AR():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w') as descfile:
             description = ""
             description += heading + str(meta['name']) + heading_end + "\n\n" + "\n\n"
+            description += self.get_links(meta, subheading, heading_end)
             if meta.get('discs', []) != []:
                 discs = meta['discs']
                 if len(discs) >= 2:
@@ -249,7 +250,6 @@ class AR():
             if meta['genres']:
                 description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta['genres'])
 
-            description += self.get_links(meta, subheading, heading_end)
             if meta['image_list'] is not None:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 description += "[align=center]"
