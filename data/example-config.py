@@ -92,11 +92,20 @@ config = {
 
     },
 
+    # these are used for DB links on AR
+    "IMAGES": {
+        "imdb_75": 'https://i.imgur.com/Mux5ObG.png',
+        "tmdb_75": 'https://i.imgur.com/r3QzUbk.png',
+        "tvdb_75": 'https://i.imgur.com/UWtUme4.png',
+        "tvmaze_75": 'https://i.imgur.com/ZHEF5nE.png',
+        "mal_75": 'https://i.imgur.com/PBfdP3M.png'
+    },
+
     "TRACKERS": {
         # Which trackers do you want to upload to?
         # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
-        "default_trackers": "ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK",
+        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -123,6 +132,12 @@ config = {
             "api_key": "ANT api key",
             "announce_url": "https://anthelion.me/announce/customannounceurl",
             # "anon" : False
+        },
+        "AR": {
+            "username": "<USERNAME>",
+            "password": "<PASSWORD>",
+            "announce_url": "http://tracker.alpharatio.cc:2710/PASSKEY/announce",
+            # "anon" : "False"
         },
         "BHD": {
             "api_key": "BHD api key",
