@@ -15,6 +15,7 @@ from src.trackers.COMMON import COMMON
 from pymediainfo import MediaInfo
 
 class AR():
+    
     def __init__(self, config):
         self.config = config
         self.session = None
