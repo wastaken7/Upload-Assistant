@@ -210,8 +210,7 @@ class AR():
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w') as descfile:
             description = ""
-            description += heading + str(meta['name']) + heading_end + "\n\n" + "\n\n"
-            description += self.get_links(meta, subheading, heading_end)
+            description += heading + str(meta['name']) + heading_end + "\n\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
             if meta.get('discs', []) != []:
                 discs = meta['discs']
                 if len(discs) >= 2:
