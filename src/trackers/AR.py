@@ -275,59 +275,6 @@ class AR():
             descfile.close()
         return
 
-    async def get_cat_id(self, meta, for_search=False):
-        category_name = meta.get('category')
-        resolution = meta.get('resolution', '')
-        category_id = {
-            'MOVIE': '8',
-            'TV': '1',
-        }.get(category_name, '0')
-
-        if for_search:  # Why not same for search!?
-            if category_name == 'MOVIE':
-                if meta.get('sd'):
-                    category_id = '8'
-                elif meta.get('is_disc'):
-                    category_id = '15'
-                elif resolution in ('8640p', '4320p', '2160p'):
-                    category_id = '10'
-                else:
-                    category_id = '9'
-            elif category_name == 'TV':
-                if meta.get('sd'):
-                    category_id = '5' if meta.get('tv_pack') else '1'
-                elif meta.get('is_disc'):
-                    category_id = '15'
-                elif resolution in ('8640p', '4320p', '2160p'):
-                    category_id = '7' if meta.get('tv_pack') else '3'
-                elif meta.get('tv_pack'):
-                    category_id = '6'
-                else:
-                    category_id = '2'
-        else:
-            if category_name == 'MOVIE':
-                if meta.get('sd'):
-                    category_id = '7'
-                elif meta.get('is_disc'):
-                    category_id = '14'
-                elif resolution in ('8640p', '4320p', '2160p'):
-                    category_id = '9'
-                else:
-                    category_id = '8'
-            elif category_name == 'TV':
-                if meta.get('sd'):
-                    category_id = '4' if meta.get('tv_pack') else '0'
-                elif meta.get('is_disc'):
-                    category_id = '14'
-                elif resolution in ('8640p', '4320p', '2160p'):
-                    category_id = '6' if meta.get('tv_pack') else '2'
-                elif meta.get('tv_pack'):
-                    category_id = '5'
-                else:
-                    category_id = '1'
-
-        return category_id
-
     def get_language_tag(self, meta):
         lang_tag = ""
         has_eng_audio = False
@@ -364,7 +311,6 @@ class AR():
     async def search_existing(self, meta, DISCTYPE):
         await self.validate_credentials(meta)
         dupes = {}
-        category_id = await self.get_cat_id(meta, for_search=True)
 
         # Combine title and year
         title = str(meta.get('title', '')).strip()
@@ -529,8 +475,7 @@ class AR():
                                     if match is None:
                                         console.print(response.url)
                                         console.print(data)
-                                        raise UploadException(
-                                            f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
+                                        raise UploadException(f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
 
                                     # having UA add the torrent link as a comment.
                                     if match:
@@ -549,4 +494,3 @@ class AR():
         else:
             console.print("[cyan]Request Data:")
             console.print(data)
-
