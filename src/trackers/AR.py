@@ -190,7 +190,7 @@ class AR():
 
     def get_links(self, movie, subheading, heading_end):
         description = ""
-        description += "\n\n" + subheading + "Links" + heading_end + "\n"
+        description += "\n" + subheading + "Links" + heading_end + "\n"
         if movie['imdb_id'] != "0":
             description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
         if movie['tmdb'] != "0":
@@ -210,7 +210,7 @@ class AR():
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w') as descfile:
             description = ""
-            description += heading + str(meta['name']) + heading_end + "\n\n" + "\n\n"
+            description += heading + str(meta['name']) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
             if meta.get('discs', []) != []:
                 discs = meta['discs']
                 if len(discs) >= 2:
@@ -249,7 +249,6 @@ class AR():
             if meta['genres']:
                 description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta['genres'])
 
-            description += self.get_links(meta, subheading, heading_end)
             if meta['image_list'] is not None:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 description += "[align=center]"
