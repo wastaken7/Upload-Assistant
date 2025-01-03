@@ -77,7 +77,6 @@ class AR():
                     '720p': '1',
             }.get(meta['resolution'], '0')
 
-
         if meta['category'] == "MOVIE":
             if meta['sd']:
                 return '7'
@@ -91,7 +90,6 @@ class AR():
                     '1080i': '8',
                     '720p': '8',
             }.get(meta['resolution'], '7')
-
 
     async def start_session(self):
         if self.session is not None:
@@ -133,7 +131,6 @@ class AR():
             console.print("Login failed. Check your credentials.")
             return False
         return True
-
 
     async def login(self, meta):
         data = {
@@ -192,7 +189,6 @@ class AR():
         console.print("Failed to reuse session after retries. Either try again or delete the cookie.")
         return False
 
-
     def get_links(self, movie, subheading, heading_end):
         description = ""
         description += "\n\n" + subheading + "Links" + heading_end + "\n"
@@ -233,7 +229,7 @@ class AR():
             else:
                 # Beautify MediaInfo for AR using custom template
                 video = meta['filelist'][0]
-                #using custom mediainfo template.
+                # using custom mediainfo template.
                 # can not use full media info as sometimes its more than max chars per post.
                 mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/summary-mediainfo.csv")
                 if os.path.exists(mi_template):
@@ -258,16 +254,16 @@ class AR():
             if meta['image_list'] is not None:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 for image in meta['image_list']:
-                    if image['raw_url'] != None:
-                            # UA does not save Thumbnail images IBB. Thumbnails display much better on AR
-                            # if 'thumb_url' in image:
-                            #     description += "[url=" + image['raw_url'] + "][img]" + image['thumb_url'] + "[/img][/url]"
-                            # else:
-                            description += "[url=" + image['raw_url'] + "][img]" + image['img_url'] + "[/img][/url]"
+                    if image['raw_url'] is not None:
+                        # UA does not save Thumbnail images IBB. Thumbnails display much better on AR
+                        # if 'thumb_url' in image:
+                        #     description += "[url=" + image['raw_url'] + "][img]" + image['thumb_url'] + "[/img][/url]"
+                        # else:
+                        description += "[url=" + image['raw_url'] + "][img]" + image['img_url'] + "[/img][/url]"
             if 'youtube' in meta:
                 description += "\n\n" + subheading + "Youtube" + heading_end + "\n" + str(meta['youtube'])
 
-            #adding extra description if passed
+            # adding extra description if passed
             if len(base) > 2:
                 description += "\n\n" + subheading + "Notes" + heading_end + "\n" + str(base)
 
@@ -305,9 +301,7 @@ class AR():
         path = next(iter(meta['filelist']), meta['path'])
         return os.path.basename(path)
 
-
-    # this can be improved upon as AR also provides search results in JSON format using AJAX.
-    # example https://alpharatio.cc/ajax.php?action=browse&searchstr=Conan+2018.04.11
+    # a broad search
     async def search_existing(self, meta, DISCTYPE):
         await self.validate_credentials(meta)
         dupes = {}
