@@ -75,7 +75,7 @@ class AR():
                     '1080p': '1',
                     '1080i': '1',
                     '720p': '1',
-            }.get( meta['resolution'], '0')
+            }.get(meta['resolution'], '0')
 
 
         if meta['category'] == "MOVIE":
@@ -90,7 +90,7 @@ class AR():
                     '1080p': '8',
                     '1080i': '8',
                     '720p': '8',
-            }.get( meta['resolution'], '7')
+            }.get(meta['resolution'], '7')
 
 
     async def start_session(self):
