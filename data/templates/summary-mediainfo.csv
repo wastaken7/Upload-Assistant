@@ -1,0 +1,7 @@
+General;FILENAME.......: %FileName%\nCONTAINER......: %Format%\nSIZE...........: %FileSize_String3%\nRUNTIME........: %Duration_String2%\n
+Video;VIDEO CODEC....: %Format%$if(%Encoded_Library%,\, %Encoded_Library%)$if(%HDR_Format/String%,\, %HDR_Format/String%)$if(%transfer_characteristics%,\, %transfer_characteristics%)\nRESOLUTION.....: %Width%x%Height%\nBITRATE........: %BitRate/String%\nFRAMERATE......: %FrameRate% fps\n
+Audio;AUDIO..........: %Format_Commercial%(%Format%), %Channel(s)/String%, %SamplingRate/String%, %BitRate/String%, %Language/String%$if(%Title%, \(%Title%\),)\n
+Text;%Language_String%
+Text_Begin;SUBTITLES......: 
+Text_Middle;,
+Text_End;
