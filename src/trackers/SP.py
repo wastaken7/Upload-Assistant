@@ -22,7 +22,7 @@ class SP():
     def __init__(self, config):
         self.config = config
         self.tracker = 'SP'
-        self.source_flag = 'Seedpool.org'
+        self.source_flag = 'seedpool.org'
         self.upload_url = 'https://seedpool.org/api/torrents/upload'
         self.search_url = 'https://seedpool.org/api/torrents/filter'
         self.torrent_url = 'https://seedpool.org/torrents'
@@ -30,30 +30,28 @@ class SP():
         self.banned_groups = [""]
         pass
 
-    async def get_cat_id(self, meta_or_category):
-        # Determine if we received the full meta dictionary or just the category string
-        if isinstance(meta_or_category, dict):
-            category_name = meta_or_category.get('category', '').upper()
-            release_title = meta_or_category.get('name', '')
-            mal_id = meta_or_category.get('mal_id', 0)
-            tv_pack = meta_or_category.get('tv_pack', 0)
-        elif isinstance(meta_or_category, str):
-            category_name = meta_or_category.upper()
-            release_title = ''
-            mal_id = 0
-            tv_pack = 0
-        else:
-            raise TypeError("Expected 'meta_or_category' to be a dictionary or string.")
+    # Change from base: Requires the full meta dictionary to determine category
+    async def get_cat_id(self, meta):
+        if not isinstance(meta, dict):
+            raise TypeError('meta must be a dict when passed to Seedpool get_cat_id')
+
+        category_name = meta.get('category', '').upper()
+        release_title = meta.get('name', '')
+        mal_id = meta.get('mal_id', 0)
+        tv_pack = meta.get('tv_pack', 0)
 
         # Custom SEEDPOOL category logic
+        # Anime
         if mal_id != 0:
-            return '6'  # Anime
+            return '6'
 
-        if category_name == 'TV':
-            if tv_pack != 0:
-                return '13'  # Boxset
-            if self.contains_sports_patterns(release_title):
-                return '8'  # Sports
+        # Boxset
+        if tv_pack != 0:
+            return '13'
+
+        # Sports
+        if self.contains_sports_patterns(release_title):
+            return '8'
 
         # Default category logic
         category_id = {
@@ -106,7 +104,7 @@ class SP():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(meta['category'])
+        cat_id = await self.get_cat_id(meta)
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
@@ -190,7 +188,7 @@ class SP():
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
-            'categories[]': await self.get_cat_id(meta['category']),
+            'categories[]': await self.get_cat_id(meta),
             'types[]': await self.get_type_id(meta['type']),
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
