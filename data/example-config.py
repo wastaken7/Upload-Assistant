@@ -68,7 +68,8 @@ config = {
         # Any other files past this limit will be hidden/added all within a spoiler tag.
         "fileLimit": "2",
 
-        # Absolute limit on processed files in packs. You might not want to upload images for a large number of episodes
+        # Absolute limit on processed files in packs.
+        # You might not want to process screens/mediainfo for 40 episodes in a season pack.
         "processLimit": "10",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
@@ -77,7 +78,7 @@ config = {
         # Enable lossless PNG Compression (True/False)
         "optimize_images": True,
 
-        # Use only half available CPU cores to avoid memory allocation errors
+        # Use only half available CPU cores to avoid memory allocation errors on some seedboxes.
         # Only when using lossless compression
         "shared_seedbox": False,
 
@@ -88,7 +89,7 @@ config = {
         "sfx_on_prompt": True,
 
         # How many trackers need to pass successfull checking to continue with the upload process
-        # Default = 1. If 1 (or more) tracker/s pass banned_group and dupe checking, uploading will continue
+        # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
         # If less than the number of trackers pass the checking, exit immediately.
         "tracker_pass_checks": "1",
 
@@ -105,8 +106,8 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK
-        # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
+        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK
+        # Remove the trackers from the default_trackers list that are not used, to save being asked everytime about tracker you do not have access too.
         "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK",
 
         "ACM": {
@@ -384,14 +385,15 @@ config = {
 
     # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
     # Should use the qbit API, but will also use the torrent_storage_dir to find suitable hashes
-    # If you find issue, use the "--debug" argument to print out some related details
+    # If you find issue, especially in local/remote path mapping, use the "--debug" argument to print out some related details
     "TORRENT_CLIENTS": {
         # Name your torrent clients here, for example, this example is named "Client1" and is set as default_torrent_client above
         # All options relate to the webui, make sure you have the webui secured if it has WAN access
+        # **DO NOT** modify torrent_client name, eg: "qbit"
         # See https://github.com/Audionut/Upload-Assistant/wiki
         "Client1": {
             "torrent_client": "qbit",
-            # "enable_search": True,
+            "enable_search": True,
             "qbit_url": "http://127.0.0.1",
             "qbit_port": "8080",
             "qbit_user": "username",
