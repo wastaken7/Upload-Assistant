@@ -12,6 +12,7 @@ config = {
         "lensdump_api": "lensdump api key",
         "ptscreens_api": "ptscreens api key",
         "oeimg_api": "oeimg api key",
+        "dalexni_api": "dalexni api key",
 
         # Order of image hosts, and backup image hosts
         "img_host_1": "imgbb",
@@ -21,6 +22,7 @@ config = {
         "img_host_5": "lensdump",
         "img_host_6": "ptscreens",
         "img_host_7": "oeimg",
+        "img_host_8": "dalexni",
 
         # Number of screenshots to capture
         "screens": "6",
@@ -105,7 +107,7 @@ config = {
         # Which trackers do you want to upload to?
         # Available tracker: ACM, AITHER, AL, ANT, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime
-        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK",
+        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HP, HUNO, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, STT, THR, TIK, TL, ULCX, UTP, YOINK",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -174,6 +176,10 @@ config = {
             "api_key": "FNP api key",
             "announce_url": "https://fearnopeer.com/announce/customannounceurl",
             # "anon" : "False"
+        },
+        "FRIKI": {
+            "api_key": "FRIKI API KEY",
+            "announce_url": "https://frikibar.com/announce/<PASSKEY>",
         },
         "HDB": {
             "useAPI": False,  # Set to True if using HDB for automatic ID searching

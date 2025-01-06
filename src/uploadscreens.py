@@ -72,15 +72,48 @@ def upload_image_task(args):
                 }
 
                 response = requests.post(url, data=data, timeout=timeout)
-
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response.status_code != 200 or not response_data.get('success'):
                     console.print("[yellow]imgbb failed, trying next image host")
                     return {'status': 'failed', 'reason': 'imgbb upload failed'}
+
+                img_url = response_data['data'].get('medium', {}).get('url') or response_data['data']['thumb']['url']
+                raw_url = response_data['data']['image']['url']
+                web_url = response_data['data']['url_viewer']
+
+                if meta['debug']:
+                    console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+                return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+
+            except requests.exceptions.Timeout:
+                console.print("[red]Request timed out. The server took too long to respond.")
+                return {'status': 'failed', 'reason': 'Request timed out'}
+
+            except ValueError as e:  # JSON decoding error
+                console.print(f"[red]Invalid JSON response: {e}")
+                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+
+            except requests.exceptions.RequestException as e:
+                console.print(f"[red]Request failed with error: {e}")
+                return {'status': 'failed', 'reason': str(e)}
+
+        elif img_host == "dalexni":
+            url = "https://dalexni.com/1/upload"
+            try:
+                with open(image, "rb") as img_file:
+                    encoded_image = base64.b64encode(img_file.read()).decode('utf8')
+
+                data = {
+                    'key': config['DEFAULT']['dalexni_api'],
+                    'image': encoded_image,
+                }
+
+                response = requests.post(url, data=data, timeout=timeout)
+                response_data = response.json()
+                if response.status_code != 200 or not response_data.get('success'):
+                    console.print("[yellow]DALEXNI failed, trying next image host")
+                    return {'status': 'failed', 'reason': 'DALEXNI upload failed'}
 
                 img_url = response_data['data'].get('medium', {}).get('url') or response_data['data']['thumb']['url']
                 raw_url = response_data['data']['image']['url']
@@ -113,10 +146,6 @@ def upload_image_task(args):
                     'X-API-Key': config['DEFAULT']['ptscreens_api']
                 }
                 response = requests.post(url, headers=headers, files=files, timeout=timeout)
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response_data.get('status_code') != 200:
                     console.print("[yellow]ptscreens failed, trying next image host")
@@ -145,10 +174,6 @@ def upload_image_task(args):
                     'X-API-Key': config['DEFAULT']['oeimg_api'],
                 }
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response.status_code != 200 or not response_data.get('success'):
                     console.print("[yellow]OEimg failed, trying next image host")
