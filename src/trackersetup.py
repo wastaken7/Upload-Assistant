@@ -132,15 +132,16 @@ class TRACKER_SETUP:
             return True
 
     async def check_banned_group(self, tracker, banned_group_list, meta):
+        result = False
         if not meta['tag']:
-            return False
+            result = False
 
         if tracker.upper() == "AITHER":
             # Dynamically fetch banned groups for AITHER
             file_path = await self.get_banned_groups(meta, tracker)
             if not file_path:
                 console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
-                return False
+                result = False
 
             # Load the banned groups from the file
             try:
@@ -150,29 +151,25 @@ class TRACKER_SETUP:
                     banned_group_list.extend(data.get("banned_groups", "").split(", "))
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
-                return False
+                result = False
             except json.JSONDecodeError:
                 console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                return False
+                result = False
 
-        q = False
         for tag in banned_group_list:
             if isinstance(tag, list):
                 if meta['tag'][1:].lower() == tag[0].lower():
                     console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     console.print(f"[bold red]NOTE: [bold yellow]{tag[1]}")
                     await asyncio.sleep(5)
-                    q = True
+                    result = True
             else:
                 if meta['tag'][1:].lower() == tag.lower():
                     console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     await asyncio.sleep(5)
-                    q = True
+                    result = True
 
-        if q:
-            return True
-        else:
-            return True
+        return result
 
 
 tracker_class_map = {

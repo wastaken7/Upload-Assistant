@@ -58,8 +58,11 @@ async def process_all_trackers(meta):
                         meta['youtube'] = youtube
                 meta['ptp_groupID'] = groupID
 
-            if await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta):
+            result = await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta)
+            if result:
                 local_tracker_status['banned'] = True
+            else:
+                local_tracker_status['banned'] = False
 
             if tracker_name not in {"THR", "PTP", "TL"}:
                 dupes = await tracker_class.search_existing(local_meta, disctype)
