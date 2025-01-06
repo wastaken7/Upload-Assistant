@@ -191,16 +191,28 @@ class AR():
     def get_links(self, movie, subheading, heading_end):
         description = ""
         description += "\n" + subheading + "Links" + heading_end + "\n"
-        if movie['imdb_id'] != "0":
-            description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
-        if movie['tmdb'] != "0":
-            description += f" [URL=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/URL]"
-        if movie['tvdb_id'] != "0":
-            description += f" [URL=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/URL]"
-        if movie['tvmaze_id'] != "0":
-            description += f" [URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/URL]"
-        if movie['mal_id'] != 0:
-            description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/URL]"
+        if 'IMAGES' in self.config:
+            if movie['imdb_id'] != "0":
+                description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
+            if movie['tmdb'] != "0":
+                description += f" [URL=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/URL]"
+            if movie['tvdb_id'] != "0":
+                description += f" [URL=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/URL]"
+            if movie['tvmaze_id'] != "0":
+                description += f" [URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/URL]"
+            if movie['mal_id'] != 0:
+                description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/URL]"
+        else:
+            if movie['imdb_id'] != "0":
+                description += f"https://www.imdb.com/title/tt{movie['imdb_id']}"
+            if movie['tmdb'] != "0":
+                description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
+            if movie['tvdb_id'] != "0":
+                description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
+            if movie['tvmaze_id'] != "0":
+                description += f"\n[URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
+            if movie['mal_id'] != 0:
+                description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
         return description
 
     async def edit_desc(self, meta):
@@ -249,7 +261,7 @@ class AR():
             if meta['genres']:
                 description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta['genres'])
 
-            if meta['image_list'] is not None:
+            if meta['image_list'] is not None and len(meta['image_list']) > 0:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 description += "[align=center]"
                 for image in meta['image_list']:
@@ -412,6 +424,10 @@ class AR():
         else:
             # name must have . instead of spaces
             ar_name = meta['name'].replace(' ', ".").replace("'", '').replace(':', '')
+
+        if meta['tag'] == "":
+            # replacing spaces with . as per rules
+            ar_name += "-NoGRP"
 
         data = {
             "submit": "true",
