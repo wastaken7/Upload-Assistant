@@ -93,7 +93,6 @@ class TRACKER_SETUP:
                 response = await client.get(url, headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    console.print("Response Data:", data)
                     await self.write_banned_groups_to_file(file_path, data)
                     return file_path
                 else:
@@ -140,7 +139,7 @@ class TRACKER_SETUP:
             # Dynamically fetch banned groups for AITHER
             file_path = await self.get_banned_groups(meta, tracker)
             if not file_path:
-                console.print(f"[bold red]Failed to load banned groups for tracker '{tracker}'.")
+                console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
                 return False
 
             # Load the banned groups from the file
@@ -150,10 +149,10 @@ class TRACKER_SETUP:
                     data = json.loads(content)
                     banned_group_list.extend(data.get("banned_groups", "").split(", "))
             except FileNotFoundError:
-                console.print(f"[bold red]Banned group file for tracker '{tracker}' not found.")
+                console.print(f"[bold red]Banned group file for '{tracker}' not found.")
                 return False
             except json.JSONDecodeError:
-                console.print(f"[bold red]Failed to parse banned group file for tracker '{tracker}'.")
+                console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
                 return False
 
         q = False
