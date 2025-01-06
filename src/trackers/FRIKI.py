@@ -5,7 +5,6 @@ import requests
 import platform
 from str2bool import str2bool
 import httpx
-import re
 from src.trackers.COMMON import COMMON
 from src.console import console
 

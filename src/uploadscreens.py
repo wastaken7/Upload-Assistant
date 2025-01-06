@@ -72,11 +72,6 @@ def upload_image_task(args):
                 }
 
                 response = requests.post(url, data=data, timeout=timeout)
-
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response.status_code != 200 or not response_data.get('success'):
                     console.print("[yellow]imgbb failed, trying next image host")
@@ -115,11 +110,6 @@ def upload_image_task(args):
                 }
 
                 response = requests.post(url, data=data, timeout=timeout)
-
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response.status_code != 200 or not response_data.get('success'):
                     console.print("[yellow]DALEXNI failed, trying next image host")
@@ -156,10 +146,6 @@ def upload_image_task(args):
                     'X-API-Key': config['DEFAULT']['ptscreens_api']
                 }
                 response = requests.post(url, headers=headers, files=files, timeout=timeout)
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response_data.get('status_code') != 200:
                     console.print("[yellow]ptscreens failed, trying next image host")
@@ -188,10 +174,6 @@ def upload_image_task(args):
                     'X-API-Key': config['DEFAULT']['oeimg_api'],
                 }
                 response = requests.post(url, data=data, headers=headers, timeout=timeout)
-                if meta['debug']:
-                    console.print(f"[yellow]Response status code: {response.status_code}")
-                    console.print(f"[yellow]Response content: {response.content.decode('utf-8')}")
-
                 response_data = response.json()
                 if response.status_code != 200 or not response_data.get('success'):
                     console.print("[yellow]OEimg failed, trying next image host")
