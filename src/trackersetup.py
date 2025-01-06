@@ -43,8 +43,13 @@ from src.trackers.SPD import SPD
 from src.trackers.YOINK import YOINK
 from src.trackers.HHD import HHD
 from src.trackers.SP import SP
-import cli_ui
 from src.console import console
+import httpx
+import aiofiles
+import os
+import json
+from datetime import datetime, timedelta
+import asyncio
 
 
 class TRACKER_SETUP:
@@ -69,28 +74,106 @@ class TRACKER_SETUP:
             trackers.insert(0, "MANUAL")
         return trackers
 
-    def check_banned_group(self, tracker, banned_group_list, meta):
-        if meta['tag'] == "":
+    async def get_banned_groups(self, meta, tracker):
+        file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_banned_groups.json')
+
+        # Check if we need to update
+        if not await self.should_update(file_path):
+            return file_path
+
+        url = f'https://{tracker}.cc/api/blacklists/releasegroups'
+        headers = {
+            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        console.print("headers", headers)
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    console.print("Response Data:", data)
+                    await self.write_banned_groups_to_file(file_path, data)
+                    return file_path
+                else:
+                    console.print(f"Error: Received status code {response.status_code}")
+                    return None
+            except httpx.RequestError as e:
+                console.print(f"HTTP Request failed: {e}")
+                return None
+
+    async def write_banned_groups_to_file(self, file_path, json_data):
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            names = [item['name'] for item in json_data.get('data', [])]
+            names_csv = ', '.join(names)
+            file_content = {
+                "last_updated": datetime.now().strftime("%Y-%m-%d"),
+                "banned_groups": names_csv,
+                "raw_data": json_data
+            }
+            async with aiofiles.open(file_path, mode='w') as file:
+                await file.write(json.dumps(file_content, indent=4))
+            console.print(f"File '{file_path}' updated successfully with {len(names)} groups.")
+        except Exception as e:
+            console.print(f"An error occurred: {e}")
+
+    async def should_update(self, file_path):
+        try:
+            async with aiofiles.open(file_path, mode='r') as file:
+                content = await file.read()
+                data = json.loads(content)
+                last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
+                return datetime.now() >= last_updated + timedelta(weeks=1)
+        except FileNotFoundError:
+            return True
+        except Exception as e:
+            console.print(f"Error reading file: {e}")
+            return True
+
+    async def check_banned_group(self, tracker, banned_group_list, meta):
+        if not meta['tag']:
             return False
+
+        if tracker.upper() == "AITHER":
+            # Dynamically fetch banned groups for AITHER
+            file_path = await self.get_banned_groups(meta, tracker)
+            if not file_path:
+                console.print(f"[bold red]Failed to load banned groups for tracker '{tracker}'.")
+                return False
+
+            # Load the banned groups from the file
+            try:
+                async with aiofiles.open(file_path, mode='r') as file:
+                    content = await file.read()
+                    data = json.loads(content)
+                    banned_group_list.extend(data.get("banned_groups", "").split(", "))
+            except FileNotFoundError:
+                console.print(f"[bold red]Banned group file for tracker '{tracker}' not found.")
+                return False
+            except json.JSONDecodeError:
+                console.print(f"[bold red]Failed to parse banned group file for tracker '{tracker}'.")
+                return False
+
+        q = False
+        for tag in banned_group_list:
+            if isinstance(tag, list):
+                if meta['tag'][1:].lower() == tag[0].lower():
+                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
+                    console.print(f"[bold red]NOTE: [bold yellow]{tag[1]}")
+                    await asyncio.sleep(5)
+                    q = True
+            else:
+                if meta['tag'][1:].lower() == tag.lower():
+                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
+                    await asyncio.sleep(5)
+                    q = True
+
+        if q:
+            return True
         else:
-            q = False
-            for tag in banned_group_list:
-                if isinstance(tag, list):
-                    if meta['tag'][1:].lower() == tag[0].lower():
-                        console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                        console.print(f"[bold red]NOTE: [bold yellow]{tag[1]}")
-                        q = True
-                else:
-                    if meta['tag'][1:].lower() == tag.lower():
-                        console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                        q = True
-            if q:
-                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                    if not cli_ui.ask_yes_no(cli_ui.red, "Upload Anyways?", default=False):
-                        return True
-                else:
-                    return True
-        return False
+            return True
 
 
 tracker_class_map = {

@@ -4,6 +4,7 @@ data/tags.json
 data/cookies/*.txt
 data/cookies/*.pkl
 data/cookies/*.pickle
+data/banned/*.*
 *.mkv
 .vscode/
 __pycache__/

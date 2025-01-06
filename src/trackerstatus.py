@@ -58,8 +58,7 @@ async def process_all_trackers(meta):
                         meta['youtube'] = youtube
                 meta['ptp_groupID'] = groupID
 
-            if tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta):
-                console.print(f"[red]Tracker '{tracker_name}' is banned. Skipping.[/red]")
+            if await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta):
                 local_tracker_status['banned'] = True
 
             if tracker_name not in {"THR", "PTP", "TL"}:
