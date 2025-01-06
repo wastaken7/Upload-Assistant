@@ -87,7 +87,7 @@ class TRACKER_SETUP:
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
-        console.print("headers", headers)
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(url, headers=headers)
