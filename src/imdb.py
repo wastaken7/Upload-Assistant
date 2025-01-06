@@ -159,14 +159,14 @@ async def get_imdb_info_api(imdbID, meta):
             return imdb_info
 
         imdb_info['imdbID'] = imdbID
-        imdb_info['title'] = await safe_get(title_data, ['titleText', 'text'], meta['title'])
-        imdb_info['year'] = await safe_get(title_data, ['releaseYear', 'year'], meta['year'])
+        imdb_info['title'] = await safe_get(title_data, ['titleText', 'text'])
+        imdb_info['year'] = await safe_get(title_data, ['releaseYear', 'year'])
         original_title = await safe_get(title_data, ['originalTitleText', 'text'], '')
         imdb_info['aka'] = original_title if original_title and original_title != imdb_info['title'] else imdb_info['title']
         imdb_info['type'] = await safe_get(title_data, ['titleType', 'id'], None)
         runtime_seconds = await safe_get(title_data, ['runtime', 'seconds'], 0)
         imdb_info['runtime'] = str(runtime_seconds // 60 if runtime_seconds else 60)
-        imdb_info['cover'] = await safe_get(title_data, ['primaryImage', 'url'], meta.get('poster', ''))
+        imdb_info['cover'] = await safe_get(title_data, ['primaryImage', 'url'])
         imdb_info['plot'] = await safe_get(title_data, ['plot', 'plotText', 'plainText'], 'No plot available')
         genres = await safe_get(title_data, ['titleGenres', 'genres'], [])
         genre_list = [await safe_get(g, ['genre', 'text'], '') for g in genres]
