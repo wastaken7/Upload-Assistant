@@ -61,6 +61,10 @@ async def process_all_trackers(meta):
             if await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta):
                 local_tracker_status['banned'] = True
 
+            if tracker_name == "AITHER":
+                if await tracker_setup.get_torrent_claims(meta, tracker_class.tracker):
+                    local_tracker_status['banned'] = True
+
             if tracker_name not in {"THR", "PTP", "TL"}:
                 dupes = await tracker_class.search_existing(local_meta, disctype)
             elif tracker_name == "PTP":

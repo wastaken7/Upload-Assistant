@@ -171,8 +171,78 @@ class TRACKER_SETUP:
 
         if q:
             return True
-        else:
-            return True
+
+    async def write_internal_claims_to_file(self, file_path, data):
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            claims_data = data.get('data', [])
+            if not isinstance(claims_data, list):
+                console.print("The 'data' key is missing or not a list. Aborting.")
+                return
+
+            extracted_data = []
+            for item in claims_data:
+                if not isinstance(item, dict) or 'attributes' not in item:
+                    console.print(f"Skipping invalid item: {item}")
+                    continue
+
+                attributes = item['attributes']
+                extracted_data.append({
+                    "title": attributes.get('title', 'Unknown'),
+                    "season": attributes.get('season', 'Unknown'),
+                    "tmdb_id": attributes.get('tmdb_id', 'Unknown'),
+                    "resolutions": attributes.get('resolutions', []),
+                    "types": attributes.get('types', [])
+                })
+
+            if not extracted_data:
+                console.print("No valid claims found to write.")
+                return
+
+            titles_csv = ', '.join([data['title'] for data in extracted_data])
+
+            file_content = {
+                "last_updated": datetime.now().strftime("%Y-%m-%d"),
+                "titles_csv": titles_csv,
+                "extracted_data": extracted_data,
+                "raw_data": claims_data
+            }
+
+            async with aiofiles.open(file_path, mode='w') as file:
+                await file.write(json.dumps(file_content, indent=4))
+
+            console.print(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
+        except Exception as e:
+            console.print(f"An error occurred: {e}")
+
+    async def get_torrent_claims(self, meta, tracker):
+        file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_claimed_releases.json')
+
+        # Check if we need to update
+        if not await self.should_update(file_path):
+            return file_path
+
+        url = f'https://{tracker}.cc/api/internals/claim'
+        headers = {
+            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    console.print("Response Data:", data)
+                    await self.write_internal_claims_to_file(file_path, data)
+                    return file_path
+                else:
+                    console.print(f"Error: Received status code {response.status_code}")
+                    return None
+            except httpx.RequestError as e:
+                console.print(f"HTTP Request failed: {e}")
+                return None
 
 
 tracker_class_map = {
