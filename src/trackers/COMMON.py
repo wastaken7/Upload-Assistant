@@ -784,17 +784,22 @@ class COMMON():
         if target_season:
             target_season = int(str(target_season).lstrip('sS'))
         if target_episode:
-            target_episode = int(str(target_episode).lstrip('eE'))
+            # Split on 'E' to handle cases like '10E11'
+            target_episodes = [
+                int(ep) for ep in str(target_episode).lstrip('eE').split('E') if ep.isdigit()
+            ]
+        else:
+            target_episodes = []
 
         season_pattern = f"s{target_season:02}" if target_season else None
-        episode_pattern = f"e{target_episode:02}" if target_episode else None
+        episode_patterns = [f"e{ep:02}" for ep in target_episodes] if target_episodes else None
 
-        if season_pattern and episode_pattern:
-            return season_pattern in filename and episode_pattern in filename
+        if season_pattern and episode_patterns:
+            return season_pattern in filename and any(ep in filename for ep in episode_patterns)
         if season_pattern:
             return season_pattern in filename
-        if episode_pattern:
-            return episode_pattern in filename
+        if episode_patterns:
+            return any(ep in filename for ep in episode_patterns)
         return True
 
     async def refine_hdr_terms(self, hdr):
