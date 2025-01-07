@@ -113,24 +113,20 @@ class NBL():
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(self.search_url, json=payload)
                 if response.status_code == 200:
-                    if response.headers.get('Content-Type') == 'application/json':
-                        try:
-                            data = response.json()
-                            for each in data.get('result', {}).get('items', []):
-                                if meta['resolution'] in each.get('tags', []):
-                                    if meta.get('tv_pack', 0) == 1:
-                                        if (
-                                            each.get('cat') == "Season"
-                                            and int(guessit(each.get('rls_name', '')).get('season', '1')) == int(meta.get('season_int'))
-                                        ):
-                                            dupes.append(each['rls_name'])
-                                    elif int(guessit(each.get('rls_name', '')).get('episode', '0')) == int(meta.get('episode_int')):
+                    try:
+                        data = response.json()
+                        for each in data.get('result', {}).get('items', []):
+                            if meta['resolution'] in each.get('tags', []):
+                                if meta.get('tv_pack', 0) == 1:
+                                    if (
+                                        each.get('cat') == "Season"
+                                        and int(guessit(each.get('rls_name', '')).get('season', '1')) == int(meta.get('season_int'))
+                                    ):
                                         dupes.append(each['rls_name'])
-                        except json.JSONDecodeError:
-                            console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
-                            meta['skipping'] = "NBL"
-                    else:
-                        console.print("[bold yellow]Response is not JSON. Skipping this API call.")
+                                elif int(guessit(each.get('rls_name', '')).get('episode', '0')) == int(meta.get('episode_int')):
+                                    dupes.append(each['rls_name'])
+                    except json.JSONDecodeError:
+                        console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
                         meta['skipping'] = "NBL"
                 else:
                     console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")

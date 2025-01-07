@@ -162,22 +162,19 @@ class ANT():
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(url='https://anthelion.me/api', params=params)
                 if response.status_code == 200:
-                    if response.headers.get('Content-Type') == 'application/json':
-                        try:
-                            data = response.json()
-                            for each in data.get('item', []):
-                                # Find the largest file
-                                largest = each['files'][0]
-                                for file in each['files']:
-                                    if int(file['size']) > int(largest['size']):
-                                        largest = file
-                                result = largest['name']
-                                dupes.append(result)
-                        except json.JSONDecodeError:
-                            console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
-                            meta['skipping'] = "ANT"
-                    else:
-                        console.print("[bold yellow]Response is not JSON. Skipping this API call.")
+                    try:
+                        data = response.json()
+                        console.print("data", data)
+                        for each in data.get('item', []):
+                            # Find the largest file
+                            largest = each['files'][0]
+                            for file in each['files']:
+                                if int(file['size']) > int(largest['size']):
+                                    largest = file
+                            result = largest['name']
+                            dupes.append(result)
+                    except json.JSONDecodeError:
+                        console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
                         meta['skipping'] = "ANT"
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
