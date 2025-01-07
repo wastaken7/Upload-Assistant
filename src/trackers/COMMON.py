@@ -642,6 +642,7 @@ class COMMON():
         target_resolution = meta.get("resolution")
         tag = meta.get("tag").lower().replace("-", " ")
         is_dvd = meta['is_disc'] == "DVD"
+        is_dvdrip = meta['type'] == "DVDRIP"
         web_dl = meta.get('type') == "WEBDL"
         target_source = meta.get("source")
         is_sd = meta.get('sd')
@@ -707,7 +708,7 @@ class COMMON():
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
-            if is_dvd or "DVD" in target_source:
+            if is_dvd or "DVD" in target_source or is_dvdrip:
                 skip_resolution_check = True
             else:
                 skip_resolution_check = False
