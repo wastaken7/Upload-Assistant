@@ -141,12 +141,8 @@ class AITHER():
         source = meta.get('source', "")
 
         if name_type == "DVDRIP":
-            if meta.get('category') == "MOVIE":
-                aither_name = aither_name.replace(f"{meta['source']}{meta['video_encode']}", f"{resolution}", 1)
-                aither_name = aither_name.replace((meta['audio']), f"{meta['audio']} {video_encode}", 1)
-            else:
-                aither_name = aither_name.replace(f"{meta['source']}", f"{resolution}", 1)
-                aither_name = aither_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
+            aither_name = aither_name.replace(f"{meta['source']}", f"{resolution} {meta['source']}", 1)
+            aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
 
         if not meta['is_disc']:
 
