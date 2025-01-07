@@ -6,7 +6,6 @@ import re
 import os
 import cli_ui
 import httpx
-from str2bool import str2bool
 from unidecode import unidecode
 from urllib.parse import urlparse
 from src.trackers.COMMON import COMMON
@@ -100,7 +99,7 @@ class TTG():
         return type_id
 
     async def get_anon(self, anon):
-        if anon == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if anon == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 'no'
         else:
             anon = 'yes'

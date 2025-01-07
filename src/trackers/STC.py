@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import requests
-from str2bool import str2bool
 import platform
 import os
 import glob
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -37,7 +35,7 @@ class STC():
         type_id = await self.get_type_id(meta['type'], meta.get('tv_pack', 0), meta.get('sd', 0), meta.get('category', ""))
         resolution_id = await self.get_res_id(meta['resolution'])
         stc_name = await self.edit_name(meta)
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1

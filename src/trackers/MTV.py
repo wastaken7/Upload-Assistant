@@ -10,7 +10,6 @@ import cli_ui
 import pickle
 import re
 from pathlib import Path
-from str2bool import str2bool
 from src.trackers.COMMON import COMMON
 from datetime import datetime
 import glob
@@ -155,7 +154,10 @@ class MTV():
         group_desc = await self.edit_group_desc(meta)
         mtv_name = await self.edit_name(meta)
 
-        anon = 1 if meta['anon'] != 0 or bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) else 0
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
+            anon = 0
+        else:
+            anon = 1
 
         desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         desc = open(desc_path, 'r', encoding='utf-8').read()

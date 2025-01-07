@@ -2,13 +2,11 @@
 # import discord
 import asyncio
 import requests
-from str2bool import str2bool
 import os
 import re
 import platform
 import cli_ui
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -38,7 +36,7 @@ class HUNO():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1

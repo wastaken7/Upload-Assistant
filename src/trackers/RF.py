@@ -4,11 +4,9 @@ import asyncio
 import requests
 import platform
 import re
-from str2bool import str2bool
 import os
 import glob
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -42,7 +40,7 @@ class RF():
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         rf_name = await self.edit_name(meta)
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1

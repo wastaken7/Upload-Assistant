@@ -3,7 +3,6 @@
 import asyncio
 import requests
 from difflib import SequenceMatcher
-from str2bool import str2bool
 import os
 import platform
 import bencodepy
@@ -105,7 +104,7 @@ class BHD():
         tags = await self.get_tags(meta)
         custom, edition = await self.get_edition(meta, tags)
         bhd_name = await self.edit_name(meta)
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1
@@ -508,15 +507,17 @@ class BHD():
 
         return dupes
 
+    def _is_true(self, value):
+        """
+        Converts a value to a boolean. Returns True for "true", "1", "yes" (case-insensitive), and False otherwise.
+        """
+        return str(value).strip().lower() in {"true", "1", "yes"}
+
     async def get_live(self, meta):
         draft = self.config['TRACKERS'][self.tracker]['draft_default'].strip()
-        draft = bool(str2bool(str(draft)))  # 0 for send to draft, 1 for live
-        if draft:
-            draft_int = 0
-        else:
-            draft_int = 1
-        if meta['draft']:
-            draft_int = 0
+        draft_bool = self._is_true(draft)  # Convert to boolean (True for "true", False for "false")
+        draft_int = 0 if draft_bool or meta.get('draft') else 1
+
         return draft_int
 
     async def get_edition(self, meta, tags):

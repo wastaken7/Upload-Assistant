@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import json
 import glob
-from str2bool import str2bool
 import pickle
 import httpx
 from unidecode import unidecode
@@ -294,7 +293,7 @@ class PTER():
         return image_list
 
     async def get_anon(self, anon):
-        if anon == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if anon == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 'no'
         else:
             anon = 'yes'

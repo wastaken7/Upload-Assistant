@@ -3,7 +3,6 @@
 import asyncio
 import requests
 import platform
-from str2bool import str2bool
 import httpx
 import re
 from src.trackers.COMMON import COMMON
@@ -110,7 +109,7 @@ class SP():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1

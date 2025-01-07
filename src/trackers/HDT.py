@@ -4,7 +4,6 @@ import re
 import os
 import cli_ui
 import httpx
-from str2bool import str2bool
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 from pymediainfo import MediaInfo
@@ -163,7 +162,7 @@ class HDT():
                 data['season'] = 'false'
 
             # Anonymous check
-            if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+            if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
                 data['anonymous'] = 'false'
             else:
                 data['anonymous'] = 'true'

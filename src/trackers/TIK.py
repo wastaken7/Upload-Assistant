@@ -9,9 +9,7 @@ import sys
 import cli_ui
 import urllib.request
 import click
-from str2bool import str2bool
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -46,7 +44,7 @@ class TIK():
         modq = await self.get_flag(meta, 'modq')
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1

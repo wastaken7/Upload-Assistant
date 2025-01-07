@@ -19,7 +19,6 @@ pyoxipng
 rich
 Jinja2
 pyotp
-str2bool
 click
 aiohttp
 Pillow

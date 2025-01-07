@@ -2,13 +2,11 @@
 # import discord
 import asyncio
 import requests
-from str2bool import str2bool
 import tmdbsimple as tmdb
 import platform
 import os
 import glob
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -37,7 +35,7 @@ class R4E():
         type_id = await self.get_type_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         name = await self.edit_name(meta)
-        if meta['anon'] == 0 and bool(str2bool(str(self.config['TRACKERS']['R4E'].get('anon', "False")))) is False:
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
             anon = 0
         else:
             anon = 1
