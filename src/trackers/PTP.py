@@ -4,7 +4,6 @@ import asyncio
 import re
 import os
 from pathlib import Path
-from str2bool import str2bool
 import json
 import glob
 import platform
@@ -34,7 +33,7 @@ class PTP():
         self.announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
         self.username = config['TRACKERS']['PTP'].get('username', '').strip()
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
-        self.web_source = str2bool(str(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True)))
+        self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
         self.user_agent = f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
                               'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
@@ -83,6 +82,9 @@ class PTP():
             ("Ukrainian", "ukr", "uk"): 34,
             ("Vietnamese", "vie", "vi"): 25,
         }
+
+    def _is_true(self, value):
+        return str(value).strip().lower() in {"true", "1", "yes"}
 
     async def get_ptp_id_imdb(self, search_term, search_file_folder, meta):
         imdb_id = ptp_torrent_id = None
