@@ -21,7 +21,6 @@ try:
     from src.discparse import DiscParse
     import os
     import re
-    from str2bool import str2bool
     from guessit import guessit
     import ntpath
     from pathlib import Path
@@ -58,6 +57,9 @@ class Prep():
         self.config = config
         self.img_host = img_host.lower()
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
+
+    def _is_true(value):
+        return str(value).strip().lower() == "true"
 
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
@@ -1478,7 +1480,7 @@ class Prep():
                         else:
                             pass
                     elif key == 'personalrelease':
-                        meta[key] = bool(str2bool(str(value.get(key, 'False'))))
+                        meta[key] = self._is_true(value.get(key, "False"))
                     elif key == 'template':
                         meta['desc_template'] = value.get(key)
                     else:

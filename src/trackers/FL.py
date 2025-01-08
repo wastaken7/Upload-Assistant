@@ -2,7 +2,6 @@ import requests
 import asyncio
 import re
 import os
-from str2bool import str2bool
 import glob
 import pickle
 from unidecode import unidecode
@@ -10,7 +9,6 @@ from urllib.parse import urlparse
 import cli_ui
 from bs4 import BeautifulSoup
 import httpx
-
 from src.trackers.COMMON import COMMON
 from src.exceptions import *  # noqa F403
 from src.console import console
@@ -101,6 +99,9 @@ class FL():
         fl_name = fl_name.replace(' ', '.').replace('..', '.')
         return fl_name
 
+    def _is_true(value):
+        return str(value).strip().lower() in {"true", "1", "yes"}
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
@@ -155,7 +156,7 @@ class FL():
             if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
                 data['imdbid'] = meta.get('imdb_id', '').replace('tt', '')
                 data['description'] = meta['imdb_info'].get('genres', '')
-            if self.uploader_name not in ("", None) and bool(str2bool(str(self.config['TRACKERS'][self.tracker].get('anon', "False")))) is False:
+            if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
                 data['epenis'] = self.uploader_name
             if has_ro_audio:
                 data['materialro'] = 'on'
