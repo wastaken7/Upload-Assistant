@@ -3,7 +3,6 @@ import asyncio
 import re
 import os
 import cli_ui
-import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 from pymediainfo import MediaInfo
@@ -21,6 +20,7 @@ class HDT():
         self.username = config['TRACKERS'][self.tracker].get('username', '').strip()
         self.password = config['TRACKERS'][self.tracker].get('password', '').strip()
         self.signature = None
+        self.base_url = "https://hd-torrents.net"
         self.banned_groups = [""]
 
     async def get_category_id(self, meta):
@@ -168,65 +168,41 @@ class HDT():
                 data['anonymous'] = 'true'
 
             # Send
-            url = "https://hd-torrents.net/upload.php"
+            url = f"{self.base_url}/upload.php"
             if meta['debug']:
                 console.print(url)
-                console.print("Data to be sent:", style="bold blue")
                 console.print(data)
-                console.print("Files being sent:", style="bold blue")
-                console.print(files)
-            with requests.Session() as session:
-                cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
+            else:
+                with requests.Session() as session:
+                    cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
 
-                if meta['debug']:
-                    console.print(f"Cookie file path: {cookiefile}")
+                    session.cookies.update(await common.parseCookieFile(cookiefile))
+                    up = session.post(url=url, data=data, files=files)
+                    torrentFile.close()
 
-                session.cookies.update(await common.parseCookieFile(cookiefile))
-
-                if meta['debug']:
-                    console.print(f"Session cookies: {session.cookies}")
-
-                up = session.post(url=url, data=data, files=files)
-                torrentFile.close()
-
-                # Debug response
-                if meta['debug']:
-                    console.print(f"Response URL: {up.url}")
-                    console.print(f"Response Status Code: {up.status_code}")
-                    console.print("Response Headers:", style="bold blue")
-                    console.print(up.headers)
-                    console.print("Response Text (truncated):", style="dim")
-                    console.print(up.text[:500] + "...")
-
-                # Match url to verify successful upload
-                search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text)
-                if search:
-                    torrent_id = search.group(1)
-                    if meta['debug']:
-                        console.print(f"Upload Successful: Torrent ID {torrent_id}", style="bold green")
-
-                    # Modding existing torrent for adding to client instead of downloading torrent from site
-                    await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['HDT'].get('my_announce_url'), "")
-                else:
-                    console.print(data)
-                    console.print("Failed to find download link in response text.", style="bold red")
-                    console.print("Response Data (full):", style="dim")
-                    console.print(up.text)
-                    raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
+                    # Match url to verify successful upload
+                    search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text).group(1)
+                    if search:
+                        id = search
+                        # modding existing torrent for adding to client instead of downloading torrent from site.
+                        console.print(f"{self.base_url}/details.php?id=" + id)
+                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['HDT'].get('my_announce_url'), f"{self.base_url}/details.php?id=" + id)
+                    else:
+                        console.print(data)
+                        console.print("\n\n")
+                        console.print(up.text)
+                        raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        console.print("[yellow]Searching for existing torrents on HDT...")
+        with requests.Session() as session:
+            common = COMMON(config=self.config)
+            cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
+            session.cookies.update(await common.parseCookieFile(cookiefile))
 
-        common = COMMON(config=self.config)
-        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
-        cookies = await common.parseCookieFile(cookiefile)
-
-        search_url = "https://hd-torrents.net/torrents.php"
-
-        async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
-            csrfToken = await self.get_csrf_token(client, search_url)
+            search_url = f"{self.base_url}/torrents.php"
+            csrfToken = await self.get_csrfToken(session, search_url)
             if int(meta['imdb_id'].replace('tt', '')) != 0:
                 params = {
                     'csrfToken': csrfToken,
@@ -243,26 +219,13 @@ class HDT():
                     'options': '3'
                 }
 
-            try:
-                response = await client.get(search_url, params=params)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    find = soup.find_all('a', href=True)
-                    for each in find:
-                        if each['href'].startswith('details.php?id='):
-                            dupes.append(each.text)
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
-
-                await asyncio.sleep(0.5)
-
-            except httpx.TimeoutException:
-                console.print("[bold red]Request timed out while searching for existing torrents.")
-            except httpx.RequestError as e:
-                console.print(f"[bold red]An error occurred while making the request: {e}")
-            except Exception as e:
-                console.print(f"[bold red]Unexpected error: {e}")
-                await asyncio.sleep(0.5)
+            r = session.get(search_url, params=params)
+            await asyncio.sleep(0.5)
+            soup = BeautifulSoup(r.text, 'html.parser')
+            find = soup.find_all('a', href=True)
+            for each in find:
+                if each['href'].startswith('details.php?id='):
+                    dupes.append(each.text)
 
         return dupes
 
@@ -276,7 +239,7 @@ class HDT():
 
     async def validate_cookies(self, meta, cookiefile):
         common = COMMON(config=self.config)
-        url = "https://hd-torrents.net/index.php"
+        url = f"{self.base_url}/index.php"
         cookiefile = f"{meta['base_dir']}/data/cookies/HDT.txt"
         if os.path.exists(cookiefile):
             with requests.Session() as session:
@@ -293,14 +256,45 @@ class HDT():
         else:
             return False
 
-    async def get_csrf_token(self, session: httpx.AsyncClient, url: str):
-        response = await session.get(url)  # Make an asynchronous GET request
-        html_content = response.text  # Get the response content (httpx handles it without extra await)
-        soup = BeautifulSoup(html_content, 'html.parser')
+    async def get_csrfToken(self, session, url):
+        r = session.get(url)
+        await asyncio.sleep(0.5)
+        soup = BeautifulSoup(r.text, 'html.parser')
         csrfToken = soup.find('input', {'name': 'csrfToken'}).get('value')
         return csrfToken
 
+    def get_links(self, movie, subheading, heading_end):
+        description = ""
+        description += "\n" + subheading + "Links" + heading_end + "\n"
+        if 'IMAGES' in self.config:
+            if movie['imdb_id'] != "0":
+                description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
+            if movie['tmdb'] != "0":
+                description += f" [URL=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/URL]"
+            if movie['tvdb_id'] != "0":
+                description += f" [URL=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/URL]"
+            if movie['tvmaze_id'] != "0":
+                description += f" [URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/URL]"
+            if movie['mal_id'] != 0:
+                description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/URL]"
+        else:
+            if movie['imdb_id'] != "0":
+                description += f"https://www.imdb.com/title/tt{movie['imdb_id']}"
+            if movie['tmdb'] != "0":
+                description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
+            if movie['tvdb_id'] != "0":
+                description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
+            if movie['tvmaze_id'] != "0":
+                description += f"\n[URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
+            if movie['mal_id'] != 0:
+                description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
+
+        description += "\n\n"
+        return description
+
     async def edit_desc(self, meta):
+        subheading = "[COLOR=RED][size=4]"
+        heading_end = "[/size][/COLOR]"
         # base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', newline='', encoding='utf-8') as descfile:
             if meta['is_disc'] != 'BDMV':
@@ -320,6 +314,7 @@ class HDT():
                 with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8') as BD_SUMMARY:
                     descfile.write(f"""[left][font=consolas]\n{BD_SUMMARY.read()}\n[/font][/left]\n\n""")
 
+            descfile.write(self.get_links(meta, subheading, heading_end))
             # Add Screenshots
             images = meta['image_list']
             if len(images) > 0:
