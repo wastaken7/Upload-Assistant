@@ -140,6 +140,7 @@ config = {
             "username": "<USERNAME>",
             "password": "<PASSWORD>",
             "announce_url": "http://tracker.alpharatio.cc:2710/PASSKEY/announce",
+            # anon is not an option when uplaoding you need to change your privacy settings.
             # "anon" : "False"
         },
         "BHD": {
@@ -190,6 +191,8 @@ config = {
             # "anon": False,
             "img_rehost": True,
         },
+        # for HDT to work you need to export cookies from https://hd-torrent.net/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+        # cookies need to be in netscape format and need to be in data/cookies/HDT.txt
         "HDT": {
             "username": "username",
             "password": "password",
