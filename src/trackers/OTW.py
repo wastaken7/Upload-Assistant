@@ -38,6 +38,12 @@ class OTW():
         ]
         pass
 
+    def match_host(self, hostname, approved_hosts):
+        for approved_host in approved_hosts:
+            if hostname == approved_host or hostname.endswith(f".{approved_host}"):
+                return approved_host
+        return hostname
+
     async def get_cat_id(self, category_name):
         category_id = {
             'MOVIE': '1',
