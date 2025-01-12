@@ -711,6 +711,10 @@ class COMMON():
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
+            if is_sd == 1 and tracker_name == "BHD":
+                if any(str(res) in each for res in [1080, 720, 2160]):
+                    return False
+
             if is_dvd or "DVD" in target_source or is_dvdrip:
                 skip_resolution_check = True
             else:
@@ -732,10 +736,6 @@ class COMMON():
                 if any(str(res) in each for res in [1080, 720, 2160]):
                     await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                     return True
-
-            if is_sd == 1 and tracker_name == "BHD":
-                if any(str(res) in each for res in [1080, 720, 2160]):
-                    return False
 
             for check in attribute_checks:
                 if check["key"] == "repack":
