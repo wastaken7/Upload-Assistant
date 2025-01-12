@@ -317,8 +317,9 @@ class OE():
         return
 
     async def search_existing(self, meta, disctype):
-        if 'concert' in meta['keywords']:
-            console.print('[bold red]Concerts not allowed at OE.')
+        disallowed_keywords = {'XXX', 'softcore', 'concert'}
+        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
+            console.print('[bold red]Erotic not allowed at RF.')
             meta['skipping'] = "OE"
             return
         dupes = []

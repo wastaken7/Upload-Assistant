@@ -351,7 +351,7 @@ class OTW():
             console.print('[bold red]This content is not allowed at OTW.')
             meta['skipping'] = "OTW"
             return
-        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy'}
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy', 'sotcore'}
         if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
             console.print('[bold red]Adult animation not allowed at OTW.')
             meta['skipping'] = "RTF"
