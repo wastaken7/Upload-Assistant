@@ -366,7 +366,7 @@ class MTV():
                     img_url = image['img_url']
                     desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]")
 
-            desc.write(f"\n\n{base}")
+            desc.write(f"\n\n[hide]{base}[/hide]")
             desc.close()
         return
 
