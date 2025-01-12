@@ -39,7 +39,11 @@ class COMMON():
             new_torrent.metainfo['info']['source'] = source_flag
             Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{meta['clean_name']}.torrent", overwrite=True)
 
-    async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header=""):
+    async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header="", image_list=None):
+        if image_list is not None:
+            images = image_list
+        else:
+            images = meta['image_list']
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         char_limit = int(self.config['DEFAULT'].get('charLimit', 14000))
@@ -72,7 +76,6 @@ class COMMON():
                     descfile.write("[center]")
                     descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]\n\n")
                     descfile.write("[/center]")
-                images = meta['image_list']
                 if screenheader is not None:
                     descfile.write(screenheader + '\n')
                 descfile.write("[center]")
@@ -103,7 +106,6 @@ class COMMON():
                         # For the first disc, use images from `meta['image_list']`
                         if meta['debug']:
                             console.print("[yellow]Using original uploaded images for first disc")
-                        images = meta['image_list']
                         for img_index in range(len(images[:int(meta['screens'])])):
                             web_url = images[img_index]['web_url']
                             raw_url = images[img_index]['raw_url']
@@ -203,7 +205,6 @@ class COMMON():
                             if i == 0:
                                 filename = os.path.splitext(os.path.basename(file.strip()))[0]
                                 descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
-                images = meta['image_list']
                 if screenheader is not None:
                     descfile.write(screenheader + '\n')
                 descfile.write("[center]")
@@ -289,7 +290,6 @@ class COMMON():
                     # Write images if they exist
                     new_images_key = f'new_images_file_{i}'
                     if i == 0:  # For the first file, use 'image_list' key
-                        images = meta['image_list']
                         if images:
                             descfile.write("[center]")
                             char_count += len("[center]")
