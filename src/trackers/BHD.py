@@ -449,8 +449,8 @@ class BHD():
             console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
             meta['skipping'] = "BHD"
             return []
-        if meta['type'] == "DVDRIP":
-            console.print("[bold red]No DVDRIP at BHD, skipping upload[/bold red]")
+        if meta['sd'] and not (meta['is_disc'] or "REMUX" in meta['type'] or "WEBDL" in meta['type']):
+            console.print("[bold red]Modified SD content not allowed at BHD[/bold red]")
             meta['skipping'] = "BHD"
             return []
 
