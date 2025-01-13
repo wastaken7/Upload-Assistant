@@ -220,13 +220,13 @@ class Clients():
                     # Piece size and count validations
                     if not meta.get('prefer_small_pieces', False):
                         if reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8388608:
-                            console.print("[bold red]Too many pieces detected, Torrent needs to have less than 8000 pieces to be valid")
+                            console.print("[bold red]Torrent needs to have less than 8000 pieces with a 8 MiB piece size, regenerating")
                             valid = False
                         elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4194304:
-                            console.print("[bold red]Too many pieces detected, Torrent needs to have less than 5000 pieces to be valid")
+                            console.print("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size, regenerating")
                             valid = False
                     elif reuse_torrent.pieces >= 12000:
-                        console.print("[bold red]Too many pieces detected, Torrent needs to have less than 12000 pieces to be valid")
+                        console.print("[bold red]Torrent needs to have less than 12000 pieces to be valid, regenerating")
                         valid = False
                     elif reuse_torrent.piece_size < 32768:
                         console.print("[bold red]Piece size too small to reuse")
@@ -235,7 +235,7 @@ class Clients():
                         console.print("[bold red]Torrent file size exceeds 250 KiB")
                         valid = False
                     elif wrong_file:
-                        console.print("[bold red] Provided .torrent has files that were not expected")
+                        console.print("[bold red]Provided .torrent has files that were not expected")
                         valid = False
                     else:
                         console.print(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")

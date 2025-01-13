@@ -7,6 +7,7 @@ import httpx
 from urllib.parse import urlparse
 import glob
 import requests
+import json
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
@@ -37,6 +38,12 @@ class OTW():
             ['EVO', 'Raw Content Only'], ['TERMiNAL', 'Raw Content Only'], ['ViSION', 'Note the capitalization and characters used'], ['CMRG', 'Raw Content Only']
         ]
         pass
+
+    def match_host(self, hostname, approved_hosts):
+        for approved_host in approved_hosts:
+            if hostname == approved_host or hostname.endswith(f".{approved_host}"):
+                return approved_host
+        return hostname
 
     async def get_cat_id(self, category_name):
         category_id = {
@@ -86,6 +93,34 @@ class OTW():
 
         approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
 
+        reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "reuploaded_images.json")
+        reuploaded_images = []
+
+        if os.path.exists(reuploaded_images_path):
+            try:
+                with open(reuploaded_images_path, 'r') as f:
+                    reuploaded_images = json.load(f)
+            except Exception as e:
+                console.print(f"[red]Failed to load reuploaded images: {e}")
+
+        valid_reuploaded_images = []
+        for image in reuploaded_images:
+            raw_url = image['raw_url']
+            parsed_url = urlparse(raw_url)
+            hostname = parsed_url.netloc
+            mapped_host = self.match_host(hostname, url_host_mapping.keys())
+            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
+
+            if mapped_host in approved_image_hosts:
+                valid_reuploaded_images.append(image)
+            elif meta['debug']:
+                console.print(f"[red]URL '{raw_url}' from reuploaded_images.json is not recognized as an approved host.")
+
+        if valid_reuploaded_images:
+            meta['image_list'] = valid_reuploaded_images
+            console.print("[green]Using valid images from reuploaded_images.json.")
+            return meta['image_list'], False, False
+
         for image in meta['image_list']:
             raw_url = image['raw_url']
             parsed_url = urlparse(raw_url)
@@ -98,15 +133,13 @@ class OTW():
                 else:
                     console.print(f"[red]URL '{raw_url}' is not recognized as part of an approved host.")
 
-        if all(
+        if not all(
             url_host_mapping.get(
                 self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
                 self.match_host(urlparse(image['raw_url']).netloc, url_host_mapping.keys()),
             ) in approved_image_hosts
             for image in meta['image_list']
         ):
-            image_list = meta['image_list']
-        else:
             images_reuploaded = False
             while img_host_index <= len(approved_image_hosts):
                 image_list, retry_mode, images_reuploaded = await self.handle_image_upload(meta, img_host_index, approved_image_hosts)
@@ -130,7 +163,7 @@ class OTW():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
@@ -336,6 +369,31 @@ class OTW():
                 for image in meta[new_images_key]
             ):
 
+                if new_images_key in meta and isinstance(meta[new_images_key], list):
+                    output_file = os.path.join(screenshots_dir, "reuploaded_images.json")
+                    existing_data = []
+                    if os.path.exists(output_file):
+                        try:
+                            with open(output_file, 'r') as f:
+                                existing_data = json.load(f)
+                                if not isinstance(existing_data, list):
+                                    console.print(f"[red]Existing data in {output_file} is not a list. Resetting to an empty list.")
+                                    existing_data = []
+                        except Exception as e:
+                            console.print(f"[red]Failed to load existing data from {output_file}: {e}")
+
+                    updated_data = existing_data + meta[new_images_key]
+                    updated_data = [dict(s) for s in {tuple(d.items()) for d in updated_data}]
+
+                    try:
+                        with open(output_file, 'w') as f:
+                            json.dump(updated_data, f, indent=4)
+                        console.print(f"[green]Successfully updated reuploaded images in {output_file}.")
+                    except Exception as e:
+                        console.print(f"[red]Failed to save reuploaded images: {e}")
+                else:
+                    console.print("[red]new_images_key is not a valid key in meta or is not a list.")
+
                 return meta[new_images_key], False, images_reuploaded
         else:
             return meta[new_images_key], False, images_reuploaded
@@ -345,10 +403,14 @@ class OTW():
             console.print('[bold red]This content is not allowed at OTW.')
             meta['skipping'] = "OTW"
             return
-        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy'}
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy', 'softcore'}
         if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
             console.print('[bold red]Adult animation not allowed at OTW.')
-            meta['skipping'] = "RTF"
+            meta['skipping'] = "OTW"
+            return []
+        if meta['sd'] and 'BluRay' in meta['source']:
+            console.print("[bold red]SD content from HD source not allowed")
+            meta['skipping'] = "OTW"
             return []
         dupes = []
         console.print("[yellow]Searching for existing torrents on OTW...")
