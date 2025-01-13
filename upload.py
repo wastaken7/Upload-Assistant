@@ -187,7 +187,7 @@ async def do_the_thing(base_dir):
 
             if meta.get('delete_meta') and os.path.exists(meta_file):
                 os.remove(meta_file)
-                console.print("[bold green]Successfully deleted meta.json")
+                console.print("[bold red]Successfully deleted meta.json")
 
             if os.path.exists(meta_file):
                 with open(meta_file, "r") as f:
