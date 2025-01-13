@@ -23,9 +23,10 @@ class AR():
         self.source_flag = 'AlphaRatio'
         self.username = config['TRACKERS']['AR'].get('username', '').strip()
         self.password = config['TRACKERS']['AR'].get('password', '').strip()
-        self.login_url = 'https://alpharatio.cc/login.php'
-        self.upload_url = 'https://alpharatio.cc/upload.php'
-        self.search_url = 'https://alpharatio.cc/torrents.php'
+        self.base_url = 'https://alpharatio.cc'
+        self.login_url = f'{self.base_url}/login.php'
+        self.upload_url = f'{self.base_url}/upload.php'
+        self.search_url = f'{self.base_url}/torrents.php'
         self.user_agent = f'UA ({platform.system()} {platform.release()})'
         self.signature = None
         self.banned_groups = []
@@ -112,9 +113,9 @@ class AR():
             if await self.validate_login(response):
                 return True
         else:
-            console.print("No session file found. Attempting to log in...")
+            console.print("[yellow]No session file found. Attempting to log in...")
             if await self.login(meta):
-                console.print("Login successful, session file created.")
+                console.print("[green]Login successful, session file created.")
                 await self.save_session(meta)
                 return True
             else:
@@ -127,7 +128,7 @@ class AR():
 
     async def validate_login(self, response_text):
         if 'login.php?act=recover' in response_text:
-            console.print("Login failed. Check your credentials.")
+            console.print("[red]Login failed. Check your credentials.")
             return False
         return True
 
@@ -174,7 +175,7 @@ class AR():
 
                 # Validate the session by making a request after loading cookies
                 try:
-                    await self.session.get('https://alpharatio.cc/torrents.php')
+                    await self.session.get(f'{self.base_url}/torrents.php')
                     return True  # Session is valid
                 except Exception:
                     console.print("[yellow]Session might be invalid, retrying...")
@@ -185,7 +186,7 @@ class AR():
                 await self.start_session()  # Reinitialize the session
                 retry_count += 1
 
-        console.print("Failed to reuse session after retries. Either try again or delete the cookie.")
+        console.print(f"[red]Failed to reuse session after retries. Either try again or delete the cookie.")
         return False
 
     def get_links(self, movie, subheading, heading_end):
@@ -294,7 +295,7 @@ class AR():
                         if not has_eng_audio:
                             audio_lang = mi['media']['track'][2].get('Language_String', "").upper()
             except Exception as e:
-                print(f"Error: {e}")
+                console.print(f"[red]Error: {e}")
         else:
             for audio in meta['bdinfo']['audio']:
                 if audio['language'] == 'English':
@@ -317,13 +318,14 @@ class AR():
         title = str(meta.get('title', '')).strip()
         year = str(meta.get('year', '')).strip()
         if not title:
+            await self.close_session()
             console.print("[red]Title is missing.")
             return dupes
 
         search_query = f"{title} {year}".strip()  # Concatenate title and year
         search_query_encoded = urllib.parse.quote(search_query)
 
-        search_url = f"https://alpharatio.cc/ajax.php?action=browse&searchstr={search_query_encoded}"
+        search_url = f'{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}'
 
         if meta.get('debug', False):
             console.print(f"[blue]{search_url}")
@@ -331,16 +333,19 @@ class AR():
         try:
             async with self.session.get(search_url) as response:
                 if response.status != 200:
+                    await self.close_session()
                     console.print("[bold red]Request failed. Site May be down")
                     return dupes
 
                 json_response = await response.json()
                 if json_response.get('status') != 'success':
+                    await self.close_session()
                     console.print("[red]Invalid response status.")
                     return dupes
 
                 results = json_response.get('response', {}).get('results', [])
                 if not results:
+                    await self.close_session()
                     return dupes
 
                 group_names = [result['groupName'] for result in results if 'groupName' in result]
@@ -354,6 +359,7 @@ class AR():
             console.print(f"[red]Error occurred: {e}")
 
         console.print(f"[blue]{dupes}")
+        await self.close_session()
         return dupes
 
     def _has_existing_torrents(self, response_text):
@@ -391,7 +397,7 @@ class AR():
         while cover is None and not meta.get("unattended", False):
             cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
-                print("Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                console.print(f"[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
 
         # Tag Compilation
@@ -442,8 +448,8 @@ class AR():
         headers = {
             "User-Agent": self.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Origin": "https://alpharatio.cc",
-            "Referer": "https://alpharatio.cc/upload.php",
+            "Origin": f'{self.base_url}',
+            "Referer": f'{self.base_url}/upload.php',
             "Cookie": f"session={session_cookie.value}",
         }
 
@@ -464,9 +470,10 @@ class AR():
                             async with session.post(self.upload_url, data=form, headers=headers) as response:
                                 if response.status == 200:
                                     # URL format in case of successful upload: https://alpharatio.cc/torrents.php?id=2989202
-                                    print(f"printing url {response.url}")
+                                    console.print(f"[green]{response.url}")
                                     match = re.match(r".*?alpharatio\.cc/torrents\.php\?id=(\d+)", str(response.url))
                                     if match is None:
+                                        await self.close_session()
                                         console.print(response.url)
                                         console.print(data)
                                         raise UploadException(  # noqa F405
@@ -474,18 +481,21 @@ class AR():
 
                                     # having UA add the torrent link as a comment.
                                     if match:
+                                        await self.close_session()
                                         common = COMMON(config=self.config)
                                         await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
 
                                 else:
-                                    print("Upload failed. Response was not 200.")
+                                    console.print("[red]Upload failed. Response was not 200.")
                         except Exception:
+                            await self.close_session()
                             console.print("[red]Error! It may have uploaded, go check")
-                            console.print(data)
+                            console.print("[cyan]Request Data:")
                             console.print_exception()
                             return
             except FileNotFoundError:
-                print(f"File not found: {torrent_path}")
+                console.print(f"[red]File not found: {torrent_path}")
         else:
+            await self.close_session()
             console.print("[cyan]Request Data:")
             console.print(data)
