@@ -186,7 +186,7 @@ class AR():
                 await self.start_session()  # Reinitialize the session
                 retry_count += 1
 
-        console.print(f"[red]Failed to reuse session after retries. Either try again or delete the cookie.")
+        console.print("[red]Failed to reuse session after retries. Either try again or delete the cookie.")
         return False
 
     def get_links(self, movie, subheading, heading_end):
@@ -397,7 +397,7 @@ class AR():
         while cover is None and not meta.get("unattended", False):
             cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
-                console.print(f"[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
 
         # Tag Compilation
