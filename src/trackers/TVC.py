@@ -293,7 +293,7 @@ class TVC():
         dupes = []
 
         # UHD, Discs, HEVC and remux are not allowed on TVC. HEVC is also not allowed but that is changing it seems to i will leave it
-        if meta['resolution'] is '2160p' or  (meta['is_disc'] or "REMUX" in meta['type']) or meta['video_codec'] is 'HEVC':
+        if meta['resolution'] == '2160p' or (meta['is_disc'] or "REMUX" in meta['type']) or meta['video_codec'] == 'HEVC':
             console.print("[bold red]No UHD, Discs, HEVC or Remuxes allowed at TVC[/bold red]")
             meta['skipping'] = "TVC"
             return []
