@@ -58,7 +58,7 @@ class Prep():
         self.img_host = img_host.lower()
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
-    def _is_true(value):
+    def _is_true(self, value):
         return str(value).strip().lower() == "true"
 
     async def gather_prep(self, meta, mode):
