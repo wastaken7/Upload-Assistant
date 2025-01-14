@@ -2,6 +2,7 @@ import requests
 from difflib import SequenceMatcher
 from imdb import Cinemagoer
 from src.console import console
+from datetime import datetime
 
 
 async def get_imdb_aka_api(imdb_id, meta):
@@ -228,6 +229,16 @@ async def get_imdb_info_api(imdbID, meta):
                     }
                 }
                 imdb_info['episodes'].append(episode_info)
+
+            episodes = imdb_info.get('episodes', [])
+            current_year = datetime.now().year
+            release_years = [episode['release_year'] for episode in episodes if 'release_year' in episode and isinstance(episode['release_year'], int)]
+            if release_years:
+                closest_year = min(release_years, key=lambda year: abs(year - current_year))
+                meta['tv_year'] = closest_year
+            else:
+                meta['tv_year'] = None
+
     else:
         imdb_info = {
             'title': meta.get('title', ''),
