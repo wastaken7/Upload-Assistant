@@ -140,6 +140,31 @@ async def get_imdb_info_api(imdbID, meta):
                     }}
                     }}
                 }}
+                episodes {{
+                    episodes(first: 500) {{
+                    edges {{
+                        node {{
+                        id
+                        titleText {{
+                            text
+                        }}
+                        releaseYear {{
+                            year
+                        }}
+                        releaseDate {{
+                            year
+                            month
+                            day
+                        }}
+                        }}
+                    }}
+                    pageInfo {{
+                        hasNextPage
+                        hasPreviousPage
+                    }}
+                    total
+                    }}
+                }}
                 }}
             }}
             """
@@ -184,8 +209,25 @@ async def get_imdb_info_api(imdbID, meta):
                         if name_id.startswith('nm'):
                             imdb_info['directors'].append(name_id)
                     break
-            if meta.get('manual_language'):
-                imdb_info['original_langauge'] = meta.get('manual_language')
+        if meta.get('manual_language'):
+            imdb_info['original_langauge'] = meta.get('manual_language')
+        imdb_info['episodes'] = []
+        episodes_data = await safe_get(title_data, ['episodes', 'episodes'], None)
+        if episodes_data:
+            edges = await safe_get(episodes_data, ['edges'], [])
+            for edge in edges:
+                node = await safe_get(edge, ['node'], {})
+                episode_info = {
+                    'id': await safe_get(node, ['id'], ''),
+                    'title': await safe_get(node, ['titleText', 'text'], 'Unknown Title'),
+                    'release_year': await safe_get(node, ['releaseYear', 'year'], 'Unknown Year'),
+                    'release_date': {
+                        'year': await safe_get(node, ['releaseDate', 'year'], None),
+                        'month': await safe_get(node, ['releaseDate', 'month'], None),
+                        'day': await safe_get(node, ['releaseDate', 'day'], None),
+                    }
+                }
+                imdb_info['episodes'].append(episode_info)
     else:
         imdb_info = {
             'title': meta.get('title', ''),
@@ -197,7 +239,7 @@ async def get_imdb_info_api(imdbID, meta):
         }
         if len(meta.get('tmdb_directors', [])) >= 1:
             imdb_info['directors'] = meta['tmdb_directors']
-
+    console.print(imdb_info)
     return imdb_info
 
 
