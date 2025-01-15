@@ -28,7 +28,7 @@ class TVC():
         self.upload_url = 'https://tvchaosuk.com/api/torrents/upload'
         self.search_url = 'https://tvchaosuk.com/api/torrents/filter'
         self.signature = ""
-        self.banned_groups = ['']
+        self.banned_groups = []
         self.images = {
             "imdb_75": 'https://i.imgur.com/Mux5ObG.png',
             "tmdb_75": 'https://i.imgur.com/r3QzUbk.png',
@@ -291,6 +291,13 @@ class TVC():
         # https://tvchaosuk.com/api/torrents/filter?api_token=<API_key>&tmdb=138108
 
         dupes = []
+
+        # UHD, Discs, HEVC and remux are not allowed on TVC. HEVC is also not allowed but that is changing it seems to i will leave it
+        if meta['resolution'] == '2160p' or (meta['is_disc'] or "REMUX" in meta['type']) or meta['video_codec'] == 'HEVC':
+            console.print("[bold red]No UHD, Discs, HEVC or Remuxes allowed at TVC[/bold red]")
+            meta['skipping'] = "TVC"
+            return []
+
         console.print("[yellow]Searching for existing torrents on TVC...")
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
@@ -365,7 +372,7 @@ class TVC():
                 desc += "[color=orange][size=15]TMDB has No TV release info for this[/size][/color]" + "\n\n"
 
             if meta['category'] == 'TV' and meta['tv_pack'] != 1 and 'episode_overview' in meta:
-                desc += "[color=green][size=25]PLOT[/size][/color]" + "\n\n" + "[color=green][size=25]PLOT[/size][/color]\n" + "Episode Name: " + str(meta['episode_name']) + "\n" + str(meta['episode_overview'] + "\n\n")
+                desc += "\n\n" + "[color=green][size=25]PLOT[/size][/color]\n" + "Episode Name: " + str(meta['episode_name']) + "\n" + str(meta['episode_overview'] + "\n\n")
             else:
                 desc += "[color=green][size=25]PLOT[/size][/color]" + "\n" + str(meta['overview'] + "\n\n")
             # Max two screenshots as per rules
@@ -421,14 +428,11 @@ class TVC():
             meta['has_subs'] = 0
         for s in mi.get("media").get("track"):
             if s["@type"] == "Text":
-                if "Language_String" in s:
+                if "Language" in s:
                     if not subs_num <= 0:
-                        subs = subs + s["Language_String"] + ", "
-                        # checking if it has romanian subs as for data scene.
-                        if s["Language_String"] == "Romanian":
-                            # console.print("it has romanian subs", 'grey', 'on_green')
-                            meta['ro_sub'] = 1
-                        if str(s["Language_String"]).lower().__contains__("english"):
+                        subs = subs + s["Language"] + ", "
+                        # checking if it has english subs as for data scene.
+                        if str(s["Language"]).lower().__contains__("en"):
                             meta['eng_subs'] = 1
                         if str(s).lower().__contains__("sdh"):
                             meta['sdh_subs'] = 1
