@@ -102,7 +102,6 @@ class Args():
         parser.add_argument('-dm', '--delete-meta', action='store_true', required=False, dest='delete_meta', help="Delete only meta.json from tmp directory")
         parser.add_argument('-fl', '--freeleech', nargs='*', required=False, help="Freeleech Percentage", default=0, dest="freeleech")
         parser.add_argument('--infohash', nargs='*', required=False, help="V1 Info Hash")
-        meta = {}
         args, before_args = parser.parse_known_args(input)
         args = vars(args)
         # console.print(args)
