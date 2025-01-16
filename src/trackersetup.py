@@ -135,6 +135,7 @@ class TRACKER_SETUP:
         result = False
         if not meta['tag']:
             result = False
+            return result
 
         if tracker.upper() == "AITHER":
             # Dynamically fetch banned groups for AITHER
@@ -142,6 +143,7 @@ class TRACKER_SETUP:
             if not file_path:
                 console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
                 result = False
+                return result
 
             # Load the banned groups from the file
             try:
@@ -152,9 +154,11 @@ class TRACKER_SETUP:
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
                 result = False
+                return result
             except json.JSONDecodeError:
                 console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
                 result = False
+                return result
 
         for tag in banned_group_list:
             if isinstance(tag, list):
