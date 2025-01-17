@@ -187,6 +187,7 @@ config = {
             "api_key": "FRIKI API KEY",
             "announce_url": "https://frikibar.com/announce/<PASSKEY>",
         },
+        # for HDB you must have been granted uploading approval via Offers
         "HDB": {
             "useAPI": False,  # Set to True if using HDB for automatic ID searching or description parsing
             "username": "HDB username",
