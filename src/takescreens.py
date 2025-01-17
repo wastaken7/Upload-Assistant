@@ -228,7 +228,7 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
                         elif new_size > 75000 and new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
                             console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
                             valid_image = True
-                        elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
+                        elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg", "zipline"] for host in img_host):
                             console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
                             valid_image = True
 
@@ -724,7 +724,7 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
             elif any(host in ["imgbox", "pixhost"] for host in img_host) and image_size <= 10000000:
                 if meta['debug']:
                     console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-            elif any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
+            elif any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg", "zipline"] for host in img_host):
                 if meta['debug']:
                     console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
             else:

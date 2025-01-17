@@ -223,6 +223,51 @@ def upload_image_task(args):
                 raw_url = response_data['data']['image']['url']
                 web_url = response_data['data']['url_viewer']
 
+        elif img_host == "zipline":
+            url = config['DEFAULT'].get('zipline_url')
+            api_key = config['DEFAULT'].get('zipline_api_key')
+
+            if not url or not api_key:
+                console.print("[red]Error: Missing Zipline URL or API key in config.")
+                return {'status': 'failed', 'reason': 'Missing Zipline URL or API key'}
+
+            try:
+                with open(image, "rb") as img_file:
+                    files = {'file': img_file}
+                    headers = {
+                        'Authorization': f'{api_key}',
+                    }
+
+                    response = requests.post(url, files=files, headers=headers, timeout=timeout)
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        if 'files' in response_data:
+                            img_url = response_data['files'][0]
+                            raw_url = img_url.replace('/u/', '/r/')
+                            web_url = img_url.replace('/u/', '/r/')
+                            return {
+                                'status': 'success',
+                                'img_url': img_url,
+                                'raw_url': raw_url,
+                                'web_url': web_url
+                            }
+                        else:
+                            return {'status': 'failed', 'reason': 'No valid URL returned from Zipline'}
+
+                    else:
+                        return {'status': 'failed', 'reason': f"Zipline upload failed: {response.text}"}
+            except requests.exceptions.Timeout:
+                console.print("[red]Request timed out. The server took too long to respond.")
+                return {'status': 'failed', 'reason': 'Request timed out'}
+
+            except ValueError as e:  # JSON decoding error
+                console.print(f"[red]Invalid JSON response: {e}")
+                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+
+            except requests.exceptions.RequestException as e:
+                console.print(f"[red]Request failed with error: {e}")
+                return {'status': 'failed', 'reason': str(e)}
+
         if img_url and raw_url and web_url:
             return {
                 'status': 'success',

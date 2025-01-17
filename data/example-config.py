@@ -13,6 +13,9 @@ config = {
         "ptscreens_api": "ptscreens api key",
         "oeimg_api": "oeimg api key",
         "dalexni_api": "dalexni api key",
+        # custom zipline url
+        "zipline_url": "zipline URL",
+        "zipline_api_key": "zipline API KEY",
 
         # Order of image hosts, and backup image hosts
         "img_host_1": "imgbb",
@@ -23,6 +26,7 @@ config = {
         "img_host_6": "ptscreens",
         "img_host_7": "oeimg",
         "img_host_8": "dalexni",
+        "img_host_9": "zipline",
 
         # Number of screenshots to capture
         "screens": "6",
