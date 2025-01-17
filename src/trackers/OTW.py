@@ -26,7 +26,7 @@ class OTW():
     def __init__(self, config):
         self.config = config
         self.tracker = 'OTW'
-        self.source_flag = 'OLD'
+        self.source_flag = 'OTW'
         self.upload_url = 'https://oldtoons.world/api/torrents/upload'
         self.search_url = 'https://oldtoons.world/api/torrents/filter'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
