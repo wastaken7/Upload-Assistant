@@ -124,7 +124,7 @@ config = {
             # "internal_groups" : ["What", "Internal", "Groups", "Are", "You", "In"],
         },
         "AITHER": {
-            "useAPI": False,  # Set to True if using Aither for automatic ID searching
+            "useAPI": False,  # Set to True if using Aither for automatic ID searching or description parsing
             "api_key": "AITHER api key",
             "announce_url": "https://aither.cc/announce/customannounceurl",
             # "anon" : False,
@@ -161,7 +161,7 @@ config = {
             # "anon" : "False"
         },
         "BLU": {
-            "useAPI": False,  # Set to True if using BLU for automatic ID searching
+            "useAPI": False,  # Set to True if using BLU for automatic ID searching or description parsing
             "api_key": "BLU api key",
             "announce_url": "https://blutopia.cc/announce/customannounceurl",
             # "anon" : False,
@@ -188,7 +188,7 @@ config = {
             "announce_url": "https://frikibar.com/announce/<PASSKEY>",
         },
         "HDB": {
-            "useAPI": False,  # Set to True if using HDB for automatic ID searching
+            "useAPI": False,  # Set to True if using HDB for automatic ID searching or description parsing
             "username": "HDB username",
             "passkey": "HDB passkey",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
@@ -225,7 +225,7 @@ config = {
             # "anon" : False
         },
         "LST": {
-            "useAPI": False,  # Set to True if using LST for automatic ID searching
+            "useAPI": False,  # Set to True if using LST for automatic ID searching or description parsing
             "api_key": "LST api key",
             "announce_url": "https://lst.gg/announce/customannounceurl",
             # "anon" : False,
@@ -252,7 +252,7 @@ config = {
             "announce_url": "https://nebulance.io/customannounceurl",
         },
         "OE": {
-            "useAPI": False,  # Set to True if using OE for automatic ID searching
+            "useAPI": False,  # Set to True if using OE for automatic ID searching or description parsing
             "api_key": "OE api key",
             "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
             # "anon" : False
@@ -276,7 +276,7 @@ config = {
             # "anon": True,
         },
         "PTP": {
-            "useAPI": False,  # Set to True if using PTP for automatic ID searching
+            "useAPI": False,  # Set to True if using PTP for automatic ID searching or description parsing
             "add_web_source_to_desc": True,
             "ApiUser": "ptp api user",
             "ApiKey": 'ptp api key',
