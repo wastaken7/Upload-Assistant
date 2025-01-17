@@ -738,7 +738,7 @@ class COMMON():
                     await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                     return True
 
-                if len(dupes) == 1 and meta.get('is_disc') != "BDMV":
+                if len(dupes) == 1 and meta.get('is_disc') != "BDMV" and tracker_name == "AITHER":
                     if fileSize and "1080" in target_resolution:
                         target_size = fileSize
                         size = sized
