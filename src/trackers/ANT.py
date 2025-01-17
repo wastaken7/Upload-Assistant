@@ -163,7 +163,6 @@ class ANT():
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        console.print("data", data)
                         for each in data.get('item', []):
                             # Find the largest file
                             largest = each['files'][0]
