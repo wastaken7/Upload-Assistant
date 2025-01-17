@@ -124,7 +124,7 @@ class TRACKER_SETUP:
                 content = await file.read()
                 data = json.loads(content)
                 last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
-                return datetime.now() >= last_updated + timedelta(weeks=1)
+                return datetime.now() >= last_updated + timedelta(days=2)
         except FileNotFoundError:
             return True
         except Exception as e:
