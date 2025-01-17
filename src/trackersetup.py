@@ -304,7 +304,8 @@ class TRACKER_SETUP:
                     console.print(f"[red]Invalid TMDB ID format in meta: {tmdb_id}[/red]")
                     return False
 
-                seasonint = meta.get('season_int')
+                metaseason = meta.get('season_int')
+                seasonint = int(metaseason)
 
                 console.print(f"TMDB IDs to validate: {tmdb_id}")
                 file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker_name}_claimed_releases.json')
