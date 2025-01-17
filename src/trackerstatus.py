@@ -63,10 +63,8 @@ async def process_all_trackers(meta):
 
             if meta.get('category') == "TV" and tracker_name == "AITHER":
                 if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
-                    console.print(f"This is a claimed internal torrent at {tracker_name}")
                     local_tracker_status['skipped'] = True
                 else:
-                    console.print(f"No claims matched for this torrent at {tracker_name}")
                     local_tracker_status['skipped'] = False
 
             if tracker_name not in {"THR", "PTP", "TL"}:

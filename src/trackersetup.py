@@ -246,8 +246,6 @@ class TRACKER_SETUP:
                 return False
 
     async def check_tracker_claims(self, meta, tracker):
-        console.print("[bold blue]Starting tracker claims check...[/bold blue]")
-
         if isinstance(tracker, str):
             trackers = [tracker.strip().upper()]
         elif isinstance(tracker, list):
@@ -256,23 +254,15 @@ class TRACKER_SETUP:
             console.print("[red]Invalid trackers input format.[/red]")
             return False
 
-        console.print(f"Debug: Trackers to process = {trackers}")
-
         async def process_single_tracker(tracker_name):
-            console.print(f"[cyan]Processing tracker: {tracker_name}[/cyan]")
             try:
                 tracker_class = tracker_class_map.get(tracker_name.upper())
                 if not tracker_class:
                     console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
                     return False
 
-                console.print(f"Attempting to instantiate {tracker_name}...")
                 tracker_instance = tracker_class(self.config)
-
                 all_types = await tracker_instance.get_type_id()
-                type_mapping = {v: k for k, v in all_types.items()}
-                console.print(f"[green]Type mapping for {tracker_name}: {type_mapping}[/green]")
-
                 type_names = meta.get('type', [])
                 if isinstance(type_names, str):
                     type_names = [type_names]
@@ -282,9 +272,6 @@ class TRACKER_SETUP:
                     console.print("[yellow]Warning: Some types in meta not found in tracker type mapping.[/yellow]")
 
                 all_resolutions = await tracker_instance.get_res_id()
-                resolution_mapping = {v: k for k, v in all_resolutions.items()}
-                console.print(f"[green]Resolution mapping for {tracker_name}: {resolution_mapping}[/green]")
-
                 resolution_names = meta.get('resolution', [])
                 if isinstance(resolution_names, str):
                     resolution_names = [resolution_names]
@@ -306,8 +293,6 @@ class TRACKER_SETUP:
 
                 metaseason = meta.get('season_int')
                 seasonint = int(metaseason)
-
-                console.print(f"TMDB IDs to validate: {tmdb_id}")
                 file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker_name}_claimed_releases.json')
                 if not os.path.exists(file_path):
                     console.print(f"[red]No claim data file found for {tracker_name}[/red]")
@@ -329,10 +314,9 @@ class TRACKER_SETUP:
                         and all(res in api_resolutions for res in resolution_ids)
                         and all(typ in api_types for typ in type_ids)
                     ):
-                        console.print(f"[green]Match found: {title}, Season: {season}, TMDB ID: {api_tmdb_id}[/green]")
+                        console.print(f"[green]Claimed match found at [cyan]{tracker}: [yellow]{title}, Season: {season}, TMDB ID: {api_tmdb_id}[/green]")
                         return True
 
-                console.print("[yellow]No match found for the provided meta data.[/yellow]")
                 return False
 
             except Exception as e:
@@ -343,11 +327,6 @@ class TRACKER_SETUP:
 
         results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
         match_found = any(results)
-
-        if match_found:
-            console.print("[bold green]At least one match was found during tracker claims check.[/bold green]")
-        else:
-            console.print("[bold yellow]No matches were found during tracker claims check.[/bold yellow]")
 
         return match_found
 
