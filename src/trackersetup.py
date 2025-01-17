@@ -221,7 +221,8 @@ class TRACKER_SETUP:
 
         # Check if we need to update
         if not await self.should_update(file_path):
-            return file_path
+            await self.check_tracker_claims(meta, tracker)
+            return False  # No update needed, assume no match
 
         url = f'https://{tracker}.cc/api/internals/claim'
         headers = {
@@ -229,20 +230,125 @@ class TRACKER_SETUP:
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(url, headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    console.print("Response Data:", data)
                     await self.write_internal_claims_to_file(file_path, data)
-                    return file_path
+                    return await self.check_tracker_claims(meta, tracker)
                 else:
                     console.print(f"Error: Received status code {response.status_code}")
-                    return None
+                    return False
             except httpx.RequestError as e:
                 console.print(f"HTTP Request failed: {e}")
-                return None
+                return False
+
+    async def check_tracker_claims(self, meta, tracker):
+        console.print("[bold blue]Starting tracker claims check...[/bold blue]")
+
+        if isinstance(tracker, str):
+            trackers = [tracker.strip().upper()]
+        elif isinstance(tracker, list):
+            trackers = [s.upper() for s in tracker]
+        else:
+            console.print("[red]Invalid trackers input format.[/red]")
+            return False
+
+        console.print(f"Debug: Trackers to process = {trackers}")
+
+        async def process_single_tracker(tracker_name):
+            console.print(f"[cyan]Processing tracker: {tracker_name}[/cyan]")
+            try:
+                tracker_class = tracker_class_map.get(tracker_name.upper())
+                if not tracker_class:
+                    console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
+                    return False
+
+                console.print(f"Attempting to instantiate {tracker_name}...")
+                tracker_instance = tracker_class(self.config)
+
+                all_types = await tracker_instance.get_type_id()
+                type_mapping = {v: k for k, v in all_types.items()}
+                console.print(f"[green]Type mapping for {tracker_name}: {type_mapping}[/green]")
+
+                type_names = meta.get('type', [])
+                if isinstance(type_names, str):
+                    type_names = [type_names]
+
+                type_ids = [all_types.get(type_name) for type_name in type_names]
+                if None in type_ids:
+                    console.print("[yellow]Warning: Some types in meta not found in tracker type mapping.[/yellow]")
+
+                all_resolutions = await tracker_instance.get_res_id()
+                resolution_mapping = {v: k for k, v in all_resolutions.items()}
+                console.print(f"[green]Resolution mapping for {tracker_name}: {resolution_mapping}[/green]")
+
+                resolution_names = meta.get('resolution', [])
+                if isinstance(resolution_names, str):
+                    resolution_names = [resolution_names]
+
+                resolution_ids = [all_resolutions.get(res_name) for res_name in resolution_names]
+                if None in resolution_ids:
+                    console.print("[yellow]Warning: Some resolutions in meta not found in tracker resolution mapping.[/yellow]")
+
+                tmdb_id = meta.get('tmdb', [])
+                if isinstance(tmdb_id, int):
+                    tmdb_id = [tmdb_id]
+                elif isinstance(tmdb_id, str):
+                    tmdb_id = [int(tmdb_id)]
+                elif isinstance(tmdb_id, list):
+                    tmdb_id = [int(id) for id in tmdb_id]
+                else:
+                    console.print(f"[red]Invalid TMDB ID format in meta: {tmdb_id}[/red]")
+                    return False
+
+                seasonint = meta.get('season_int')
+
+                console.print(f"TMDB IDs to validate: {tmdb_id}")
+                file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker_name}_claimed_releases.json')
+                if not os.path.exists(file_path):
+                    console.print(f"[red]No claim data file found for {tracker_name}[/red]")
+                    return False
+
+                with open(file_path, 'r') as file:
+                    extracted_data = json.load(file).get('extracted_data', [])
+
+                for item in extracted_data:
+                    title = item.get('title')
+                    season = item.get('season')
+                    api_tmdb_id = item.get('tmdb_id')
+                    api_resolutions = item.get('resolutions', [])
+                    api_types = item.get('types', [])
+
+                    if (
+                        api_tmdb_id in tmdb_id
+                        and season == seasonint
+                        and all(res in api_resolutions for res in resolution_ids)
+                        and all(typ in api_types for typ in type_ids)
+                    ):
+                        console.print(f"[green]Match found: {title}, Season: {season}, TMDB ID: {api_tmdb_id}[/green]")
+                        return True
+
+                console.print("[yellow]No match found for the provided meta data.[/yellow]")
+                return False
+
+            except Exception as e:
+                console.print(f"[red]Error processing tracker {tracker_name}: {e}[/red]", highlight=True)
+                import traceback
+                console.print(traceback.format_exc())
+                return False
+
+        results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
+        match_found = any(results)
+
+        if match_found:
+            console.print("[bold green]At least one match was found during tracker claims check.[/bold green]")
+        else:
+            console.print("[bold yellow]No matches were found during tracker claims check.[/bold yellow]")
+
+        return match_found
 
 
 tracker_class_map = {
