@@ -69,7 +69,7 @@ async def process_all_trackers(meta):
             elif tracker_name == "PTP":
                 dupes = await ptp.search_existing(groupID, local_meta, disctype)
 
-            if 'skipping' not in local_meta or local_meta['skipping'] is None:
+            if 'skipping' not in local_meta or local_meta['skipping'] is None or not tracker_name == "TL":
                 dupes = await common.filter_dupes(dupes, local_meta, tracker_name)
                 local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
                 if is_dupe:
