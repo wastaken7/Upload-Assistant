@@ -192,20 +192,29 @@ class AITHER():
         }.get(category_name, '0')
         return category_id
 
-    async def get_type_id(self, type):
-        type_id = {
+    async def get_type_id(self, type=None, reverse=False):
+        type_mapping = {
             'DISC': '1',
             'REMUX': '2',
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6',
             'ENCODE': '3',
-            'DVDRIP': '3'
-        }.get(type, '0')
-        return type_id
+            'DVDRIP': '3',
+        }
 
-    async def get_res_id(self, resolution):
-        resolution_id = {
+        if reverse:
+            # Return a reverse mapping of type IDs to type names
+            return {v: k for k, v in type_mapping.items()}
+        elif type is not None:
+            # Return the specific type ID
+            return type_mapping.get(type, '0')
+        else:
+            # Return the full mapping
+            return type_mapping
+
+    async def get_res_id(self, resolution=None, reverse=False):
+        resolution_mapping = {
             '8640p': '10',
             '4320p': '1',
             '2160p': '2',
@@ -216,9 +225,18 @@ class AITHER():
             '576p': '6',
             '576i': '7',
             '480p': '8',
-            '480i': '9'
-        }.get(resolution, '10')
-        return resolution_id
+            '480i': '9',
+        }
+
+        if reverse:
+            # Return reverse mapping of IDs to resolutions
+            return {v: k for k, v in resolution_mapping.items()}
+        elif resolution is not None:
+            # Return the ID for the given resolution
+            return resolution_mapping.get(resolution, '10')  # Default to '10' for unknown resolutions
+        else:
+            # Return the full mapping
+            return resolution_mapping
 
     async def search_existing(self, meta, disctype):
         dupes = []
@@ -242,7 +260,10 @@ class AITHER():
                 if response.status_code == 200:
                     data = response.json()
                     for each in data['data']:
-                        result = [each][0]['attributes']['name']
+                        result = {
+                            'name': each['attributes']['name'],
+                            'size': each['attributes']['size']
+                        }
                         dupes.append(result)
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")

@@ -310,8 +310,15 @@ class BHD():
                     data = response.json()
                     if data.get('status_code') == 1:
                         for each in data['results']:
-                            result = each['name']
-                            difference = SequenceMatcher(None, meta['clean_name'].replace('DD+', 'DDP'), result).ratio()
+                            result = {
+                                'name': each['name'],
+                                'size': each['size']
+                            }
+                            difference = SequenceMatcher(
+                                None,
+                                meta['clean_name'].replace('DD+', 'DDP'),
+                                result['name']
+                            ).ratio()
                             if difference >= 0.05:
                                 dupes.append(result)
                     else:
