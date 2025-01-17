@@ -124,7 +124,7 @@ class TRACKER_SETUP:
                 content = await file.read()
                 data = json.loads(content)
                 last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
-                return datetime.now() >= last_updated + timedelta(weeks=1)
+                return datetime.now() >= last_updated + timedelta(days=2)
         except FileNotFoundError:
             return True
         except Exception as e:
@@ -174,6 +174,164 @@ class TRACKER_SETUP:
                     result = True
 
         return result
+
+    async def write_internal_claims_to_file(self, file_path, data):
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            claims_data = data.get('data', [])
+            if not isinstance(claims_data, list):
+                console.print("The 'data' key is missing or not a list. Aborting.")
+                return
+
+            extracted_data = []
+            for item in claims_data:
+                if not isinstance(item, dict) or 'attributes' not in item:
+                    console.print(f"Skipping invalid item: {item}")
+                    continue
+
+                attributes = item['attributes']
+                extracted_data.append({
+                    "title": attributes.get('title', 'Unknown'),
+                    "season": attributes.get('season', 'Unknown'),
+                    "tmdb_id": attributes.get('tmdb_id', 'Unknown'),
+                    "resolutions": attributes.get('resolutions', []),
+                    "types": attributes.get('types', [])
+                })
+
+            if not extracted_data:
+                console.print("No valid claims found to write.")
+                return
+
+            titles_csv = ', '.join([data['title'] for data in extracted_data])
+
+            file_content = {
+                "last_updated": datetime.now().strftime("%Y-%m-%d"),
+                "titles_csv": titles_csv,
+                "extracted_data": extracted_data,
+                "raw_data": claims_data
+            }
+
+            async with aiofiles.open(file_path, mode='w') as file:
+                await file.write(json.dumps(file_content, indent=4))
+
+            console.print(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
+        except Exception as e:
+            console.print(f"An error occurred: {e}")
+
+    async def get_torrent_claims(self, meta, tracker):
+        file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_claimed_releases.json')
+
+        # Check if we need to update
+        if not await self.should_update(file_path):
+            await self.check_tracker_claims(meta, tracker)
+            return False  # No update needed, assume no match
+
+        url = f'https://{tracker}.cc/api/internals/claim'
+        headers = {
+            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    await self.write_internal_claims_to_file(file_path, data)
+                    return await self.check_tracker_claims(meta, tracker)
+                else:
+                    console.print(f"Error: Received status code {response.status_code}")
+                    return False
+            except httpx.RequestError as e:
+                console.print(f"HTTP Request failed: {e}")
+                return False
+
+    async def check_tracker_claims(self, meta, tracker):
+        if isinstance(tracker, str):
+            trackers = [tracker.strip().upper()]
+        elif isinstance(tracker, list):
+            trackers = [s.upper() for s in tracker]
+        else:
+            console.print("[red]Invalid trackers input format.[/red]")
+            return False
+
+        async def process_single_tracker(tracker_name):
+            try:
+                tracker_class = tracker_class_map.get(tracker_name.upper())
+                if not tracker_class:
+                    console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
+                    return False
+
+                tracker_instance = tracker_class(self.config)
+                all_types = await tracker_instance.get_type_id()
+                type_names = meta.get('type', [])
+                if isinstance(type_names, str):
+                    type_names = [type_names]
+
+                type_ids = [all_types.get(type_name) for type_name in type_names]
+                if None in type_ids:
+                    console.print("[yellow]Warning: Some types in meta not found in tracker type mapping.[/yellow]")
+
+                all_resolutions = await tracker_instance.get_res_id()
+                resolution_names = meta.get('resolution', [])
+                if isinstance(resolution_names, str):
+                    resolution_names = [resolution_names]
+
+                resolution_ids = [all_resolutions.get(res_name) for res_name in resolution_names]
+                if None in resolution_ids:
+                    console.print("[yellow]Warning: Some resolutions in meta not found in tracker resolution mapping.[/yellow]")
+
+                tmdb_id = meta.get('tmdb', [])
+                if isinstance(tmdb_id, int):
+                    tmdb_id = [tmdb_id]
+                elif isinstance(tmdb_id, str):
+                    tmdb_id = [int(tmdb_id)]
+                elif isinstance(tmdb_id, list):
+                    tmdb_id = [int(id) for id in tmdb_id]
+                else:
+                    console.print(f"[red]Invalid TMDB ID format in meta: {tmdb_id}[/red]")
+                    return False
+
+                metaseason = meta.get('season_int')
+                seasonint = int(metaseason)
+                file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker_name}_claimed_releases.json')
+                if not os.path.exists(file_path):
+                    console.print(f"[red]No claim data file found for {tracker_name}[/red]")
+                    return False
+
+                with open(file_path, 'r') as file:
+                    extracted_data = json.load(file).get('extracted_data', [])
+
+                for item in extracted_data:
+                    title = item.get('title')
+                    season = item.get('season')
+                    api_tmdb_id = item.get('tmdb_id')
+                    api_resolutions = item.get('resolutions', [])
+                    api_types = item.get('types', [])
+
+                    if (
+                        api_tmdb_id in tmdb_id
+                        and season == seasonint
+                        and all(res in api_resolutions for res in resolution_ids)
+                        and all(typ in api_types for typ in type_ids)
+                    ):
+                        console.print(f"[green]Claimed match found at [cyan]{tracker}: [yellow]{title}, Season: {season}, TMDB ID: {api_tmdb_id}[/green]")
+                        return True
+
+                return False
+
+            except Exception as e:
+                console.print(f"[red]Error processing tracker {tracker_name}: {e}[/red]", highlight=True)
+                import traceback
+                console.print(traceback.format_exc())
+                return False
+
+        results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
+        match_found = any(results)
+
+        return match_found
 
 
 tracker_class_map = {
