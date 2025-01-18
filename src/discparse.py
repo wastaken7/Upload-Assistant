@@ -148,29 +148,50 @@ class DiscParse():
                                 result = result2.split("********************", 1)
                                 bd_summary = result[0].rstrip(" \n")
 
-                            with open(bdinfo_text, 'r') as f:  # Parse extended BDInfo
+                            with open(bdinfo_text, 'r') as f:
                                 text = f.read()
                                 result = text.split("[code]", 3)
                                 result2 = result[2].rstrip(" \n")
                                 result = result2.split("FILES:", 1)
                                 ext_bd_summary = result[0].rstrip(" \n")
 
-                            # Save summaries
+                            # Save summaries and bdinfo for each playlist
                             if idx == 0:
-                                with open(f"{save_dir}/BD_SUMMARY_{str(i).zfill(2)}.txt", 'w') as f:
-                                    f.write(bd_summary.strip())
-                                with open(f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}.txt", 'w') as f:
-                                    f.write(ext_bd_summary.strip())
-                                bdinfo = self.parse_bdinfo(bd_summary, files[1], path)
+                                summary_file = f"{save_dir}/BD_SUMMARY_{str(i).zfill(2)}.txt"
+                                extended_summary_file = f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}.txt"
+                            else:
+                                summary_file = f"{save_dir}/BD_SUMMARY_{str(i).zfill(2)}_{idx}.txt"
+                                extended_summary_file = f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}_{idx}.txt"
 
+                            with open(summary_file, 'w') as f:
+                                f.write(bd_summary.strip())
+                            with open(extended_summary_file, 'w') as f:
+                                f.write(ext_bd_summary.strip())
+
+                            bdinfo = self.parse_bdinfo(bd_summary, files[1], path)
+
+                            # Prompt user for custom label if conditions are met
+                            if len(selected_playlists) > 1:
+                                current_label = bdinfo.get('label', f"Playlist {idx}")
+                                console.print(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
+
+                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                    console.print("[bold green]You can create a custom Edition for this playlist.")
+                                    user_input = input(f"Enter a new Edition for playlist {playlist['file']} (or press Enter to keep the current label): ").strip()
+                                    if user_input:
+                                        bdinfo['edition'] = user_input
+                                        console.print(f"[bold green]Edition updated to: {bdinfo['edition']}")
+                                else:
+                                    console.print("[bold yellow]Unattended mode: Custom edition not added.")
+
+                            # Save to discs array
+                            if idx == 0:
                                 discs[i]['summary'] = bd_summary.strip()
                                 discs[i]['bdinfo'] = bdinfo
                                 discs[i]['playlists'] = selected_playlists
                             else:
-                                with open(f"{save_dir}/BD_SUMMARY_{str(i).zfill(2)}_{idx}.txt", 'w') as f:
-                                    f.write(bd_summary.strip())
-                                with open(f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}_{idx}.txt", 'w') as f:
-                                    f.write(ext_bd_summary.strip())
+                                discs[i][f'summary_{idx}'] = bd_summary.strip()
+                                discs[i][f'bdinfo_{idx}'] = bdinfo
 
                         except Exception:
                             console.print(traceback.format_exc())
