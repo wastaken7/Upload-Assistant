@@ -439,17 +439,20 @@ class COMMON():
         # Build the params for the API request
         params = {'api_token': self.config['TRACKERS'][tracker].get('api_key', '')}
 
-        # Determine the URL based on whether we're searching by file name or ID
+        # Determine the search method and add parameters accordingly
         if file_name:
-            url = f"{search_url}?file_name={file_name}"
+            params['file_name'] = file_name  # Add file_name to params
             console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+            url = search_url
         elif id:
-            url = f"{torrent_url}{id}?"
+            params['id'] = id  # Add id to params
+            url = f"{torrent_url}{id}"
             console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
             console.print("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, None, None
 
+        # Make the GET request with proper encoding handled by 'params'
         response = requests.get(url=url, params=params)
         # console.print(f"[blue]Raw API Response: {response}[/blue]")
 
