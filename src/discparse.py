@@ -29,12 +29,12 @@ class DiscParse():
 
             # Check if a BD_SUMMARY_EXT.txt already exists
             for file in os.listdir(save_dir):
-                if file.startswith("BD_SUMMARY_") and file.endswith(f"{str(i).zfill(5)}.txt"):
+                if file.startswith("BD_SUMMARY_") and file.endswith(f"{str(i).zfill(2)}.txt"):
                     bdinfo_text = os.path.join(save_dir, file)
 
             if bdinfo_text is None or meta_discs == []:
                 for file in os.listdir(save_dir):
-                    if file.endswith("_FULL.txt") and file.startswith(f"{str(i).zfill(5)}"):
+                    if file.endswith("_FULL.txt") and file.startswith(f"{str(i).zfill(2)}"):
                         bdinfo_text = os.path.abspath(os.path.join(save_dir, file))
                 else:
                     bdinfo_text = ""
