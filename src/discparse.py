@@ -179,7 +179,7 @@ class DiscParse():
 
                                     discs[i]['summary'] = bd_summary.strip()
                                     discs[i]['bdinfo'] = bdinfo
-                                    discs[i]['playlists'] = valid_playlists
+                                    discs[i]['playlists'] = selected_playlists
 
                                 except Exception:
                                     console.print(traceback.format_exc())
