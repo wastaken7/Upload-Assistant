@@ -25,7 +25,7 @@ class DiscParse():
 
         for i in range(len(discs)):
             bdinfo_text = None
-            path = os.path.abspath(discs[i]['path']).rstrip('\\BDMV')
+            path = os.path.abspath(discs[i]['path'])
 
             # Check if a BD_SUMMARY_EXT.txt already exists
             for file in os.listdir(save_dir):
@@ -38,7 +38,7 @@ class DiscParse():
                         bdinfo_text = os.path.abspath(os.path.join(save_dir, file))
                 else:
                     bdinfo_text = ""
-                    playlists_path = os.path.join(path, "BDMV", "PLAYLIST")
+                    playlists_path = os.path.join(path, "PLAYLIST")
 
                     if not os.path.exists(playlists_path):
                         console.print(f"[bold red]PLAYLIST directory not found for disc {path}")
