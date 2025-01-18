@@ -57,7 +57,7 @@ class DiscParse():
 
                                     duration = 0
                                     items = []  # Collect .m2ts file paths and sizes
-                                    stream_directory = os.path.join(path, "BDMV", "STREAM")
+                                    stream_directory = os.path.join(path, "STREAM")
                                     for item in playlist_data.play_items:
                                         duration += (item.outtime - item.intime) / 45000
                                         try:
