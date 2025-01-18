@@ -225,13 +225,13 @@ class Clients():
                         elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4194304:
                             console.print("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size, regenerating")
                             valid = False
-                    elif reuse_torrent.pieces >= 12000:
+                    elif 'max_piece_size' not in meta and reuse_torrent.pieces >= 12000:
                         console.print("[bold red]Torrent needs to have less than 12000 pieces to be valid, regenerating")
                         valid = False
                     elif reuse_torrent.piece_size < 32768:
                         console.print("[bold red]Piece size too small to reuse")
                         valid = False
-                    elif torrent_file_size_kib > 250:
+                    elif 'max_piece_size' not in meta and torrent_file_size_kib > 250:
                         console.print("[bold red]Torrent file size exceeds 250 KiB")
                         valid = False
                     elif wrong_file:
