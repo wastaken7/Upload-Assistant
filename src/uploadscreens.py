@@ -313,8 +313,12 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         existing_count = 0
     else:
         image_glob = glob.glob("*.png")
-        if 'POSTER.png' in image_glob:
-            image_glob.remove('POSTER.png')
+        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_files = set()
+        for pattern in unwanted_patterns:
+            unwanted_files.update(glob.glob(pattern))
+
+        image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
         if meta['debug']:
             console.print("image globs:", image_glob)
@@ -331,7 +335,10 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         console.print(f"[yellow]Skipping upload because enough images are already uploaded to {img_host}. Existing images: {existing_count}, Required: {total_screens}")
         return meta['image_list'], total_screens
 
-    upload_tasks = [(image, img_host, config, meta) for image in image_glob[:images_needed]]
+    upload_tasks = [
+        (index, image, img_host, config, meta)
+        for index, image in enumerate(image_glob[:images_needed])
+    ]
 
     host_limits = {
         "oeimg": 6,
@@ -344,15 +351,19 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
     max_workers = min(len(upload_tasks), pool_size, os.cpu_count())
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {executor.submit(upload_image_task, task): task for task in upload_tasks}
+        future_to_task = {
+            executor.submit(upload_image_task, task[1:]): task[0]  # task[0] is the index
+            for task in upload_tasks
+        }
 
         if sys.stdout.isatty():  # Check if running in terminal
             with tqdm(total=len(upload_tasks), desc="Uploading Screenshots", ascii=True) as pbar:
                 for future in as_completed(future_to_task):
+                    index = future_to_task[future]  # Get the index of the image
                     try:
                         result = future.result()
                         if result.get('status') == 'success':
-                            results.append(result)
+                            results.append((index, result))  # Append with index
                         else:
                             console.print(f"[red]{result}")
                     except Exception as e:
@@ -360,22 +371,25 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
                     pbar.update(1)
         else:
             for future in as_completed(future_to_task):
+                index = future_to_task[future]
                 result = future.result()
                 if not isinstance(result, str) or not result.startswith("Error"):
-                    results.append(result)
+                    results.append((index, result))  # Append with index
                 else:
                     console.print(f"[red]{result}")
 
-        # return meta['image_list'], len(meta['image_list'])
+    # Sort results by the original order
+    results.sort(key=lambda x: x[0])  # Sort by index
 
     successfully_uploaded = []
-    for result in results:
+    for index, result in results:
         if result['status'] == 'success':
-            successfully_uploaded.append(result)
+            successfully_uploaded.append((index, result))
         else:
             console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
 
-    if len(successfully_uploaded) < meta.get('cutoff') and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+    # Check if uploads are below the cutoff and retry with a new host if necessary
+    if len(successfully_uploaded) < meta.get('cutoff', 0) and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         img_host_num += 1
         if f'img_host_{img_host_num}' in config['DEFAULT']:
             meta['imghost'] = config['DEFAULT'][f'img_host_{img_host_num}']
@@ -385,8 +399,9 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
             console.print("[red]No more image hosts available. Aborting upload process.")
             return meta['image_list'], len(meta['image_list'])
 
+    # Insert uploaded images into the meta['image_list'] in the correct order
     new_images = []
-    for upload in successfully_uploaded:
+    for index, upload in successfully_uploaded:
         raw_url = upload['raw_url']
         new_image = {
             'img_url': upload['img_url'],
@@ -408,6 +423,7 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         upload_finish_time = time.time()
         print(f"Screenshot uploads processed in {upload_finish_time - upload_start_time:.4f} seconds")
 
+    # Return the results
     if using_custom_img_list:
         return new_images, len(new_images)
 
