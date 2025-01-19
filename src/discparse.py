@@ -80,19 +80,21 @@ class DiscParse():
                         duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
                         items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
                         console.print(f"[{idx}] {playlist['file']} - {duration_str} - {items_str}")
-                    console.print("[bold yellow]Enter playlist numbers separated by commas, or 'ALL' to select all:")
+                    console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, press enter to default to largest:")
 
                     user_input = input("Select playlists: ").strip()
 
                     if user_input.lower() == "all":
                         selected_playlists = valid_playlists
+                    elif user_input == "":
+                        selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
                     else:
                         try:
                             selected_indices = [int(x) for x in user_input.split(',')]
                             selected_playlists = [valid_playlists[idx] for idx in selected_indices if 0 <= idx < len(valid_playlists)]
                         except ValueError:
                             console.print("[bold red]Invalid input. Skipping playlist selection.")
-                            continue
+                            selected_playlists = []
                 else:
                     # Select the playlist with the largest total size
                     console.print("[yellow]Selecting the playlist with the largest size:")
