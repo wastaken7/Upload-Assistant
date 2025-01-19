@@ -441,11 +441,10 @@ class COMMON():
 
         # Determine the search method and add parameters accordingly
         if file_name:
-            params['file_name'] = file_name  # Add file_name to params
+            params['file_name'] = file_name   # Add file_name to params
             console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
-            params['id'] = id  # Add id to params
             url = f"{torrent_url}{id}"
             console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
