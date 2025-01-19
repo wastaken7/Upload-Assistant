@@ -313,8 +313,12 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         existing_count = 0
     else:
         image_glob = glob.glob("*.png")
-        if 'POSTER.png' in image_glob:
-            image_glob.remove('POSTER.png')
+        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_files = set()
+        for pattern in unwanted_patterns:
+            unwanted_files.update(glob.glob(pattern))
+
+        image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
         if meta['debug']:
             console.print("image globs:", image_glob)
