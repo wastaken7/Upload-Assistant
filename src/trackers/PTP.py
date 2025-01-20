@@ -654,6 +654,11 @@ class PTP():
                 each = discs[0]
                 new_screens = []
                 if each['type'] == "BDMV":
+                    bdinfo_keys = [key for key in each if key.startswith("bdinfo")]
+                    bdinfo = meta.get('bdinfo')
+                    if len(bdinfo_keys) > 1:
+                        edition = bdinfo.get("edition", "Unknown Edition")
+                        desc.write(f"[b]{edition}[/b]\n\n")
                     desc.write(f"[mediainfo]{each['summary']}[/mediainfo]\n\n")
                     base2ptp = self.convert_bbcode(base)
                     if base2ptp.strip() != "":
@@ -675,6 +680,59 @@ class PTP():
                         raw_url = meta['image_list'][img_index]['raw_url']
                         desc.write(f"[img]{raw_url}[/img]\n")
                     desc.write("\n")
+                screens = int(self.config['DEFAULT'].get('screens', 6))
+                if len(bdinfo_keys) > 1:
+                    if 'retry_count' not in meta:
+                        meta['retry_count'] = 0
+
+                    for i, key in enumerate(bdinfo_keys[1:], start=1):  # Skip the first bdinfo
+                        new_images_key = f'new_images_playlist_{i}'
+                        bdinfo = each[key]
+                        edition = bdinfo.get("edition", "Unknown Edition")
+
+                        # Find the corresponding summary for this bdinfo
+                        summary_key = f"summary_{i}" if i > 0 else "summary"
+                        summary = each.get(summary_key, "No summary available")
+
+                        if new_images_key in meta and meta[new_images_key]:
+                            desc.write(f"\n[b]{edition}[/b]\n\n")
+                            # Use the summary corresponding to the current bdinfo
+                            desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
+                            if meta['debug']:
+                                console.print("[yellow]Using original uploaded images for first disc")
+                            for img in meta[new_images_key]:
+                                raw_url = img['raw_url']
+                                desc.write(f"[img]{raw_url}[/img]\n")
+                        else:
+                            desc.write(f"\n[b]{edition}[/b]\n")
+                            # Use the summary corresponding to the current bdinfo
+                            desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
+                            meta['retry_count'] += 1
+                            meta[new_images_key] = []
+                            new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
+                            if not new_screens:
+                                use_vs = meta.get('vapoursynth', False)
+                                try:
+                                    disc_screenshots(meta, f"PLAYLIST_{i}", bdinfo, meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), screens, True)
+                                except Exception as e:
+                                    print(f"Error during BDMV screenshot capture: {e}")
+                                new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
+                            if new_screens and not meta.get('skip_imghost_upload', False):
+                                uploaded_images, _ = upload_screens(meta, screens, 1, 0, screens, new_screens, {new_images_key: meta[new_images_key]})
+                                for img in uploaded_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img['img_url'],
+                                        'raw_url': img['raw_url'],
+                                        'web_url': img['web_url']
+                                    })
+
+                                for img in uploaded_images:
+                                    raw_url = img['raw_url']
+                                    desc.write(f"[img]{raw_url}[/img]\n")
+
+                            meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+                            with open(meta_filename, 'w') as f:
+                                json.dump(meta, f, indent=4)
 
             # Handle multiple discs case
             elif len(discs) > 1:
