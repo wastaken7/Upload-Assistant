@@ -19,6 +19,7 @@ class DiscParse():
     Get and parse bdinfo
     """
     async def get_bdinfo(self, meta, discs, folder_id, base_dir, meta_discs):
+        use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
         save_dir = f"{base_dir}/tmp/{folder_id}"
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
@@ -74,7 +75,7 @@ class DiscParse():
                     continue
 
                 # Allow user to select playlists
-                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                if not meta['unattended'] or not use_largest or (meta['unattended'] and meta.get('unattended-confirm', False)):
                     while True:  # Loop until valid input is provided
                         console.print("[bold green]Available playlists:")
                         for idx, playlist in enumerate(valid_playlists):

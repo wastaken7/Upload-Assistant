@@ -26,3 +26,4 @@ tqdm
 urllib3
 httpx
 aiofiles
+pyparsebluray

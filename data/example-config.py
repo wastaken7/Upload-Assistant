@@ -97,6 +97,9 @@ config = {
         # If less than the number of trackers pass the checking, exit immediately.
         "tracker_pass_checks": "1",
 
+        # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
+        "use_largest_playlist": False,
+
     },
 
     # these are used for DB links on AR
