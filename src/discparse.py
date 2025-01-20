@@ -81,34 +81,37 @@ class DiscParse():
                             duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
                             items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
                             console.print(f"[{idx}] {playlist['file']} - {duration_str} - {items_str}")
-                        console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the biggest playlist:")
+                        if len(discs) == 1:
+                            console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the biggest playlist:")
 
-                        user_input = input("Select playlists: ").strip()
+                            user_input = input("Select playlists: ").strip()
 
-                        if user_input.lower() == "all":
-                            selected_playlists = valid_playlists
-                            break  # Exit the loop once valid input is handled
-                        elif user_input == "":
-                            # Select the playlist with the largest total size
-                            console.print("[yellow]Selecting the playlist with the largest size:")
-                            selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
-                            break  # Exit the loop once valid input is handled
-                        else:
-                            try:
-                                selected_indices = [int(x) for x in user_input.split(',')]
-                                selected_playlists = [valid_playlists[idx] for idx in selected_indices if 0 <= idx < len(valid_playlists)]
+                            if user_input.lower() == "all":
+                                selected_playlists = valid_playlists
                                 break  # Exit the loop once valid input is handled
-                            except ValueError:
-                                console.print("[bold red]Invalid input. Please try again.")
+                            elif user_input == "":
+                                # Select the playlist with the largest total size
+                                console.print("[yellow]Selecting the playlist with the largest size:")
+                                selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
+                                break  # Exit the loop once valid input is handled
+                            else:
+                                try:
+                                    selected_indices = [int(x) for x in user_input.split(',')]
+                                    selected_playlists = [valid_playlists[idx] for idx in selected_indices if 0 <= idx < len(valid_playlists)]
+                                    break  # Exit the loop once valid input is handled
+                                except ValueError:
+                                    console.print("[bold red]Invalid input. Please try again.")
+                        else:
+                            selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
+                            break
                 else:
                     # Select the playlist with the largest total size
-                    console.print("[yellow]Selecting the playlist with the largest size:")
                     selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
 
                 for idx, playlist in enumerate(selected_playlists):
                     console.print(f"[bold green]Scanning playlist {playlist['file']} with duration {int(playlist['duration'] // 3600)} hours {int((playlist['duration'] % 3600) // 60)} minutes {int(playlist['duration'] % 60)} seconds")
                     playlist_number = playlist['file'].replace(".mpls", "")
-                    playlist_report_path = os.path.join(save_dir, f"{playlist_number}_FULL.txt")
+                    playlist_report_path = os.path.join(save_dir, f"Disc{i + 1}_{playlist_number}_FULL.txt")
 
                     if os.path.exists(playlist_report_path):
                         bdinfo_text = playlist_report_path
@@ -177,14 +180,14 @@ class DiscParse():
 
                             bdinfo = self.parse_bdinfo(bd_summary, files[1], path)
 
-                            # Prompt user for custom label if conditions are met
+                            # Prompt user for custom edition if conditions are met
                             if len(selected_playlists) > 1:
                                 current_label = bdinfo.get('label', f"Playlist {idx}")
                                 console.print(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
 
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                                     console.print("[bold green]You can create a custom Edition for this playlist.")
-                                    user_input = input(f"Enter a new Edition for playlist {playlist['file']} (or press Enter to keep the current label): ").strip()
+                                    user_input = input(f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): ").strip()
                                     if user_input:
                                         bdinfo['edition'] = user_input
                                         console.print(f"[bold green]Edition updated to: {bdinfo['edition']}")
