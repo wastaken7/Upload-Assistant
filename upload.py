@@ -236,7 +236,7 @@ async def do_the_thing(base_dir):
 
 if __name__ == '__main__':
     pyver = platform.python_version_tuple()
-    if int(pyver[0]) != 3 or int(pyver[1]) < 8:
+    if int(pyver[0]) != 3 or int(pyver[1]) < 9:
         console.print("[bold red]Python version is too low. Please use Python 3.8 or higher.")
         sys.exit(1)
 
