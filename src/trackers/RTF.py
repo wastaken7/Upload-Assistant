@@ -90,7 +90,7 @@ class RTF():
             console.print(json_data)
 
     async def search_existing(self, meta, disctype):
-        disallowed_keywords = {'XXX', 'Erotic'}
+        disallowed_keywords = {'XXX', 'Erotic', 'softcore'}
         if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
             console.print('[bold red]Erotic not allowed at RTF.')
             meta['skipping'] = "RTF"

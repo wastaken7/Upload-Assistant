@@ -680,7 +680,6 @@ class PTP():
                         raw_url = meta['image_list'][img_index]['raw_url']
                         desc.write(f"[img]{raw_url}[/img]\n")
                     desc.write("\n")
-                screens = int(self.config['DEFAULT'].get('screens', 6))
                 if len(bdinfo_keys) > 1:
                     if 'retry_count' not in meta:
                         meta['retry_count'] = 0
@@ -713,12 +712,12 @@ class PTP():
                             if not new_screens:
                                 use_vs = meta.get('vapoursynth', False)
                                 try:
-                                    disc_screenshots(meta, f"PLAYLIST_{i}", bdinfo, meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), screens, True)
+                                    disc_screenshots(meta, f"PLAYLIST_{i}", bdinfo, meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
                                 except Exception as e:
                                     print(f"Error during BDMV screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = upload_screens(meta, screens, 1, 0, screens, new_screens, {new_images_key: meta[new_images_key]})
+                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
