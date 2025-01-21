@@ -44,17 +44,6 @@ class ITT():
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6',
-            'ENCODE': '3'
-        }.get(type, '0')
-        return type_id
-
-    async def get_type_id(self, type):
-        type_id = {
-            'DISC': '1', 
-            'REMUX': '2',
-            'WEBDL': '4', 
-            'WEBRIP': '5', 
-            'HDTV': '6',
             'ENCODE': '3',
             'DLMux': '27',
             'BDMux': '29',
@@ -62,10 +51,9 @@ class ITT():
             'DVDMux': '39',
             'BDRip': '25',
             'DVDRip': '24',
-            'Cinema-MD': '14',                       
+            'Cinema-MD': '14',
             }.get(type, '0')
         return type_id
-
 
     async def get_res_id(self, resolution):
         resolution_id = {
