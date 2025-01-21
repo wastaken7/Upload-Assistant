@@ -33,7 +33,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
 Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
 
 ## **Setup:**
-   - **REQUIRES AT LEAST PYTHON 3.8 AND PIP3**
+   - **REQUIRES AT LEAST PYTHON 3.9 AND PIP3**
    - Needs [mono](https://www.mono-project.com/) on linux systems for BDInfo
    - Also needs MediaInfo and ffmpeg installed on your system
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
