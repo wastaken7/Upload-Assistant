@@ -94,7 +94,7 @@ class TVC():
         resolution_id = await self.get_res_id(meta['tv_pack'] if 'tv_pack' in meta else 0, meta['resolution'])
         await self.unit3d_edit_desc(meta, self.tracker, self.signature)
 
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -310,13 +310,14 @@ class TVC():
                 response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     data = response.json()
-                    # there API for search is down and instead of returning results returns 404 which causes issues to iterate as its a string.
-                    # check can probably be removed when they get the API working again.
+                    # 404 catch when their api is down
                     if data['data'] != '404':
                         for each in data['data']:
                             print(each[0]['attributes']['name'])
                             result = each[0]['attributes']['name']
                             dupes.append(result)
+                    else:
+                        console.print("Search API is down, please check manually")
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
         except httpx.TimeoutException:
