@@ -99,7 +99,7 @@ class TTG():
         return type_id
 
     async def get_anon(self, anon):
-        if anon == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
+        if anon == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 'no'
         else:
             anon = 'yes'

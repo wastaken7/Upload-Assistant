@@ -77,7 +77,7 @@ class ANT():
 
         await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
         flags = await self.get_flags(meta)
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', "False"):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
