@@ -218,6 +218,11 @@ config = {
             "announce_url": "https://hawke.uno/announce/customannounceurl",
             # "anon" : False
         },
+        "ITT": {
+            "api_key": "ITT api key",
+            "announce_url": "https://itatorrents.xyz/announce/customannounceurl",
+            # "anon" : False
+        },                 
         "JPTV": {
             "api_key": "JPTV api key",
             "announce_url": "https://jptv.club/announce/customannounceurl",
