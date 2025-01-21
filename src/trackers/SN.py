@@ -43,7 +43,25 @@ class SN():
         cat_id = ""
         sub_cat_id = ""
         # cat_id = await self.get_cat_id(meta)
-        if meta['category'] == 'MOVIE':
+
+        # Anime
+        if meta.get('mal_id'):
+            cat_id = 7
+            sub_cat_id = 47
+
+            demographics_map = {
+                'Shounen': 27,
+                'Seinen': 28,
+                'Shoujo': 29,
+                'Josei': 30,
+                'Kodomo': 31,
+                'Mina': 47
+            }
+
+            demographic = meta.get('demographic', 'Mina')
+            sub_cat_id = demographics_map.get(demographic, sub_cat_id)
+
+        elif meta['category'] == 'MOVIE':
             cat_id = 1
             # sub cat is source so using source to get
             sub_cat_id = await self.get_type_id(meta['source'])

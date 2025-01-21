@@ -176,7 +176,8 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
     if desc not in [None, '0', '']:
         meta['description'] = desc
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-            description.write((desc or "") + "\n")
+            if len(desc) > 0:
+                description.write((desc or "") + "\n")
     if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
         meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
 
@@ -243,7 +244,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         meta['description'] = ptp_desc
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                            description.write((ptp_desc or "") + "\n")
+                            if len(ptp_desc) > 0:
+                                description.write((ptp_desc or "") + "\n")
 
                         if not meta.get('image_list'):
                             valid_images = await check_images_concurrently(ptp_imagelist, meta)
@@ -260,7 +262,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                     meta['description'] = ptp_desc
                     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                        description.write((ptp_desc or "") + "\n")
+                        if len(ptp_desc) > 0:
+                            description.write((ptp_desc or "") + "\n")
                     meta['saved_description'] = True
 
                     if not meta.get('image_list'):
@@ -283,7 +286,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                 meta['description'] = ptp_desc
                 with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                    description.write(ptp_desc + "\n")
+                    if len(ptp_desc) > 0:
+                        description.write(ptp_desc + "\n")
                 meta['saved_description'] = True
                 if not meta.get('image_list'):  # Only handle images if image_list is not already populated
                     valid_images = await check_images_concurrently(ptp_imagelist, meta)

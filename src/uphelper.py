@@ -56,7 +56,13 @@ class UploadHelper:
         console.print()
         console.print(f"[bold]Overview:[/bold] {meta['overview']}")
         console.print()
+        console.print(f"[bold]Genre:[/bold] {meta['genres']}")
+        console.print()
+        if meta.get('demographic') != 0:
+            console.print(f"[bold]Demographic:[/bold] {meta['demographic']}")
+            console.print()
         console.print(f"[bold]Category:[/bold] {meta['category']}")
+        console.print()
         if int(meta.get('tmdb', 0)) != 0:
             console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
         if int(meta.get('imdb_id', '0')) != 0:

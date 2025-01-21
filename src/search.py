@@ -81,7 +81,6 @@ class Search():
                 folders_total = folders_total + folders
         else:
             folders_total = await search_dir(config_dir)
-        return folders_total
 
         return folders_total
 

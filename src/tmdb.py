@@ -153,7 +153,7 @@ async def tmdb_other_meta(meta):
         meta['genres'] = await get_genres(response)
         meta['tmdb_directors'] = await get_directors(movie)
         if meta.get('anime', False) is False:
-            meta['mal_id'], meta['aka'], meta['anime'] = await get_anime(response, meta)
+            meta['mal_id'], meta['aka'], meta['anime'], meta['demographic'] = await get_anime(response, meta)
         if meta.get('mal') is not None:
             meta['mal_id'] = meta['mal']
         meta['poster'] = response.get('poster_path', "")
@@ -205,7 +205,7 @@ async def tmdb_other_meta(meta):
         meta['keywords'] = await get_keywords(tv)
         meta['genres'] = await get_genres(response)
         meta['tmdb_directors'] = await get_directors(tv)
-        meta['mal_id'], meta['aka'], meta['anime'] = await get_anime(response, meta)
+        meta['mal_id'], meta['aka'], meta['anime'], meta['demographic'] = await get_anime(response, meta)
         if meta.get('mal') is not None:
             meta['mal_id'] = meta['mal']
         meta['poster'] = response.get('poster_path', '')
@@ -271,11 +271,12 @@ async def get_anime(response, meta):
         alt_name = meta['aka']
     anime = False
     animation = False
+    demographic = ''
     for each in response['genres']:
         if each['id'] == 16:
             animation = True
     if response['original_language'] == 'ja' and animation is True:
-        romaji, mal_id, eng_title, season_year, episodes = await get_romaji(tmdb_name, meta.get('mal', None))
+        romaji, mal_id, eng_title, season_year, episodes, demographic = await get_romaji(tmdb_name, meta.get('mal', None))
         alt_name = f" AKA {romaji}"
 
         anime = True
@@ -287,7 +288,7 @@ async def get_anime(response, meta):
         mal_id = meta.get('mal_id')
     if meta.get('mal') is not None:
         mal_id = meta.get('mal')
-    return mal_id, alt_name, anime
+    return mal_id, alt_name, anime, demographic
 
 
 async def get_romaji(tmdb_name, mal):
@@ -311,6 +312,9 @@ async def get_romaji(tmdb_name, mal):
                     }
                     seasonYear
                     episodes
+                    tags {
+                        name
+                    }
                 }
             }
         }
@@ -336,6 +340,9 @@ async def get_romaji(tmdb_name, mal):
                     }
                     seasonYear
                     episodes
+                    tags {
+                        name
+                    }
                 }
             }
         }
@@ -347,9 +354,21 @@ async def get_romaji(tmdb_name, mal):
 
     # Make the HTTP Api request
     url = 'https://graphql.anilist.co'
+    demographic = 'Mina'  # Default to Mina if no tags are found
     try:
         response = requests.post(url, json={'query': query, 'variables': variables})
         json = response.json()
+
+        # console.print('Checking for demographic tags...')
+
+        demographics = ["Shounen", "Seinen", "Shoujo", "Josei", "Kodomo", "Mina"]
+
+        for tag in demographics:
+            if tag in response.text:
+                demographic = tag
+                # print(f"Found {tag} tag")
+                break
+
         media = json['data']['Page']['media']
     except Exception:
         console.print('[red]Failed to get anime specific info from anilist. Continuing without it...')
@@ -379,7 +398,7 @@ async def get_romaji(tmdb_name, mal):
         mal_id = mal
     if not episodes:
         episodes = 0
-    return romaji, mal_id, eng_title, season_year, episodes
+    return romaji, mal_id, eng_title, season_year, episodes, demographic
 
 
 async def get_tmdb_imdb_from_mediainfo(mediainfo, category, is_disc, tmdbid, imdbid):

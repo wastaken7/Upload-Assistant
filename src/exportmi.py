@@ -232,7 +232,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
             if not line.strip().startswith("ReportBy")
         )
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
-            export.write(filtered_media_info)
+            export.write(filtered_media_info.replace(video, os.path.basename(video)))
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", 'w', newline="", encoding='utf-8') as export_cleanpath:
             export_cleanpath.write(filtered_media_info.replace(video, os.path.basename(video)))
         console.print("[bold green]MediaInfo Exported.")
