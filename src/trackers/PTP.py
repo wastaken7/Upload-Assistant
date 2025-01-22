@@ -717,7 +717,7 @@ class PTP():
                                     print(f"Error during BDMV screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -775,7 +775,7 @@ class PTP():
                                         print(f"Error during BDMV screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -829,7 +829,7 @@ class PTP():
                                         print(f"Error during DVD screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                    uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -896,7 +896,7 @@ class PTP():
                                     print(f"Error during generic screenshot capture: {e}")
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, 2, new_screens, {new_images_key: meta[new_images_key]})
+                                uploaded_images, _ = upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
