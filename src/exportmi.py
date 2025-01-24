@@ -229,7 +229,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
         media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
         filtered_media_info = "\n".join(
             line for line in media_info.splitlines()
-            if not line.strip().startswith("ReportBy")
+            if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by ")
         )
         with open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8') as export:
             export.write(filtered_media_info.replace(video, os.path.basename(video)))
