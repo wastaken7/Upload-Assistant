@@ -178,13 +178,12 @@ class TRACKER_SETUP:
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            claims_data = data.get('data', [])
-            if not isinstance(claims_data, list):
-                console.print("The 'data' key is missing or not a list. Aborting.")
+            if not isinstance(data, list):
+                console.print("Invalid data format: expected a list of claims.")
                 return
 
             extracted_data = []
-            for item in claims_data:
+            for item in data:
                 if not isinstance(item, dict) or 'attributes' not in item:
                     console.print(f"Skipping invalid item: {item}")
                     continue
@@ -208,7 +207,7 @@ class TRACKER_SETUP:
                 "last_updated": datetime.now().strftime("%Y-%m-%d"),
                 "titles_csv": titles_csv,
                 "extracted_data": extracted_data,
-                "raw_data": claims_data
+                "raw_data": data
             }
 
             async with aiofiles.open(file_path, mode='w') as file:
@@ -223,8 +222,7 @@ class TRACKER_SETUP:
 
         # Check if we need to update
         if not await self.should_update(file_path):
-            await self.check_tracker_claims(meta, tracker)
-            return False  # No update needed, assume no match
+            return await self.check_tracker_claims(meta, tracker)
 
         url = f'https://{tracker}.cc/api/internals/claim'
         headers = {
@@ -233,19 +231,49 @@ class TRACKER_SETUP:
             'Accept': 'application/json'
         }
 
+        all_data = []
+        next_cursor = None
+
         async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url, headers=headers)
-                if response.status_code == 200:
-                    data = response.json()
-                    await self.write_internal_claims_to_file(file_path, data)
-                    return await self.check_tracker_claims(meta, tracker)
-                else:
-                    console.print(f"Error: Received status code {response.status_code}")
+            while True:
+                try:
+                    # Add query parameters for pagination
+                    params = {'cursor': next_cursor, 'per_page': 100} if next_cursor else {'per_page': 100}
+                    response = await client.get(url, headers=headers, params=params)
+
+                    if response.status_code == 200:
+                        response_json = response.json()
+                        page_data = response_json.get('data', [])
+                        if not isinstance(page_data, list):
+                            console.print(f"[red]Unexpected 'data' format: {type(page_data)}[/red]")
+                            return False
+
+                        all_data.extend(page_data)
+                        meta_info = response_json.get('meta', {})
+                        if not isinstance(meta_info, dict):
+                            console.print(f"[red]Unexpected 'meta' format: {type(meta_info)}[/red]")
+                            return False
+
+                        # Check if there is a next page
+                        next_cursor = meta_info.get('next_cursor')
+                        if not next_cursor:
+                            break  # Exit loop if there are no more pages
+                    else:
+                        console.print(f"[red]Error: Received status code {response.status_code}[/red]")
+                        return False
+
+                except httpx.RequestError as e:
+                    console.print(f"[red]HTTP Request failed: {e}[/red]")
                     return False
-            except httpx.RequestError as e:
-                console.print(f"HTTP Request failed: {e}")
-                return False
+                except Exception as e:
+                    console.print(f"[red]An unexpected error occurred: {e}[/red]")
+                    return False
+
+        if meta['debug']:
+            console.print("Total claims retrieved:", len(all_data))
+        await self.write_internal_claims_to_file(file_path, all_data)
+
+        return await self.check_tracker_claims(meta, tracker)
 
     async def check_tracker_claims(self, meta, tracker):
         if isinstance(tracker, str):
