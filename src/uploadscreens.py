@@ -9,6 +9,7 @@ import base64
 import time
 from tqdm import tqdm
 import sys
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -320,8 +321,16 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
 
         image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
+
+        # Sort `image_glob` by numeric suffix to ensure correct order
+        def extract_numeric_suffix(filename):
+            match = re.search(r"-(\d+)\.png$", filename)
+            return int(match.group(1)) if match else float('inf')  # Place non-matching files at the end
+
+        image_glob.sort(key=extract_numeric_suffix)
+
         if meta['debug']:
-            console.print("image globs:", image_glob)
+            console.print("image globs (sorted):", image_glob)
 
         existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
         existing_count = len(existing_images)

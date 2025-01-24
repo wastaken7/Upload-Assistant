@@ -113,6 +113,7 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
         existing_indices = {int(p.split('-')[-1].split('.')[0]) for p in existing_screens}
         capture_tasks = [
             (
+                i,
                 file,
                 ss_times[i],
                 os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{len(existing_indices) + i}.png"),
@@ -126,34 +127,38 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
         max_workers = min(len(capture_tasks), int(meta.get('task_limit', os.cpu_count())))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_task = {executor.submit(capture_disc_task, task): task for task in capture_tasks}
+            future_to_task = {executor.submit(capture_disc_task, task[1:]): task[0] for task in capture_tasks}
 
             if sys.stdout.isatty():  # Check if running in terminal
                 with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
                     for future in as_completed(future_to_task):
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            capture_results.append(result)
-                        else:
-                            console.print(f"[red]{result}")
+                        index = future_to_task[future]
+                        try:
+                            result = future.result()
+                            if not isinstance(result, str) or not result.startswith("Error"):
+                                capture_results.append((index, result))
+                            else:
+                                console.print(f"[red]{result}")
+                        except Exception as e:
+                            console.print(f"[red]Error during capture: {str(e)}")
                         pbar.update(1)
             else:
                 for future in as_completed(future_to_task):
-                    result = future.result()
-                    if not isinstance(result, str) or not result.startswith("Error"):
-                        capture_results.append(result)
-                    else:
-                        console.print(f"[red]{result}")
+                    index = future_to_task[future]
+                    try:
+                        result = future.result()
+                        if not isinstance(result, str) or not result.startswith("Error"):
+                            capture_results.append((index, result))
+                        else:
+                            console.print(f"[red]{result}")
+                    except Exception as e:
+                        console.print(f"[red]Error during capture: {str(e)}")
 
-        if capture_results and len(capture_results) > num_screens:
-            try:
-                smallest = min(capture_results, key=os.path.getsize)
-                if meta['debug']:
-                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
-                os.remove(smallest)
-                capture_results.remove(smallest)
-            except Exception as e:
-                console.print(f"[red]Error removing smallest image: {str(e)}")
+        # Sort results by the original index to match ss_times order
+        capture_results.sort(key=lambda x: x[0])
+
+        # Remove index for the final results (only keep the task results)
+        capture_results = [result[1] for result in capture_results]
 
         optimized_results = []
         optimize_tasks = [(result, config) for result in capture_results if result and os.path.exists(result)]
@@ -393,31 +398,55 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         for i in range(num_screens + 1):
             image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
             input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
-            if not os.path.exists(image) and not meta.get('retake', False):
-                capture_tasks.append((input_file, image, ss_times[i], meta, width, height, w_sar, h_sar))
+            if not os.path.exists(image) or meta.get('retake', False):
+                capture_tasks.append((
+                    i,
+                    input_file,
+                    image,
+                    ss_times[i],
+                    meta,
+                    width,
+                    height,
+                    w_sar,
+                    h_sar
+                ))
 
     capture_results = []
     max_workers = min(len(capture_tasks), int(meta.get('task_limit', os.cpu_count())))
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {executor.submit(capture_dvd_screenshot, task): task for task in capture_tasks}
+        future_to_task = {executor.submit(capture_dvd_screenshot, task[1:]): task[0] for task in capture_tasks}
 
         if sys.stdout.isatty():  # Check if running in terminal
             with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
                 for future in as_completed(future_to_task):
-                    result = future.result()
-                    if not isinstance(result, str) or not result.startswith("Error"):
-                        capture_results.append(result)
-                    else:
-                        console.print(f"[red]{result}")
+                    index = future_to_task[future]
+                    try:
+                        result = future.result()
+                        if not isinstance(result, str) or not result.startswith("Error"):
+                            capture_results.append((index, result))
+                        else:
+                            console.print(f"[red]{result}")
+                    except Exception as e:
+                        console.print(f"[red]Error during capture: {str(e)}")
                     pbar.update(1)
         else:
             for future in as_completed(future_to_task):
-                result = future.result()
-                if not isinstance(result, str) or not result.startswith("Error"):
-                    capture_results.append(result)
-                else:
-                    console.print(f"[red]{result}")
+                index = future_to_task[future]
+                try:
+                    result = future.result()
+                    if not isinstance(result, str) or not result.startswith("Error"):
+                        capture_results.append((index, result))
+                    else:
+                        console.print(f"[red]{result}")
+                except Exception as e:
+                    console.print(f"[red]Error during capture: {str(e)}")
+
+    # Sort results by the original index
+    capture_results.sort(key=lambda x: x[0])
+
+    # Extract the actual results (remove the index)
+    capture_results = [result[1] for result in capture_results]
 
     if capture_results and len(capture_results) > num_screens:
         smallest = None
@@ -609,7 +638,6 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         ss_times = [frame / frame_rate for frame in manual_frames]
     else:
         ss_times = valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
-
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
 
@@ -639,30 +667,55 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
-                capture_tasks.append((path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap))
+                capture_tasks.append((
+                    i,
+                    path,
+                    ss_times[i],
+                    image_path,
+                    width,
+                    height,
+                    w_sar,
+                    h_sar,
+                    loglevel,
+                    hdr_tonemap
+                ))
 
         capture_results = []
         max_workers = min(len(capture_tasks), int(meta.get('task_limit', os.cpu_count())))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_task = {executor.submit(capture_screenshot, task): task for task in capture_tasks}
+            future_to_task = {executor.submit(capture_screenshot, task[1:]): task[0] for task in capture_tasks}
 
             if sys.stdout.isatty():  # Check if running in terminal
                 with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
                     for future in as_completed(future_to_task):
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            capture_results.append(result)
-                        else:
-                            console.print(f"[red]{result}")
+                        index = future_to_task[future]
+                        try:
+                            result = future.result()
+                            if not isinstance(result, str) or not result.startswith("Error"):
+                                capture_results.append((index, result))
+                            else:
+                                console.print(f"[red]{result}")
+                        except Exception as e:
+                            console.print(f"[red]Error during capture: {str(e)}")
                         pbar.update(1)
             else:
                 for future in as_completed(future_to_task):
-                    result = future.result()
-                    if not isinstance(result, str) or not result.startswith("Error"):
-                        capture_results.append(result)
-                    else:
-                        console.print(f"[red]{result}")
+                    index = future_to_task[future]
+                    try:
+                        result = future.result()
+                        if not isinstance(result, str) or not result.startswith("Error"):
+                            capture_results.append((index, result))
+                        else:
+                            console.print(f"[red]{result}")
+                    except Exception as e:
+                        console.print(f"[red]Error during capture: {str(e)}")
+
+        # Sort results by the original index to ensure correct order
+        capture_results.sort(key=lambda x: x[0])
+
+        # Remove index from the final results
+        capture_results = [result[1] for result in capture_results]
 
     if capture_results and len(capture_results) > num_screens:
         try:
