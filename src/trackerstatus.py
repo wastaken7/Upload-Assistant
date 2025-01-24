@@ -80,7 +80,7 @@ async def process_all_trackers(meta):
                 local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
                 if is_dupe:
                     local_tracker_status['dupe'] = True
-            elif local_meta['skipping']:
+            elif 'skipping' in local_meta:
                 local_tracker_status['skipped'] = True
 
             if tracker_name == "MTV":
