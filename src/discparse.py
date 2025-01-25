@@ -453,21 +453,36 @@ class DiscParse():
                 if not longest_playlist:
                     raise ValueError("No valid playlists found with a duration longer than 10 minutes.")
 
-                # Extract the first EVO file from the longest playlist
+                # Extract the .EVO files from the longest playlist
                 primary_clips = longest_playlist.get("primaryClips", [])
                 if not primary_clips:
                     raise ValueError("No primary clips found in the longest playlist.")
 
-                first_clip_src = primary_clips[0].get("src")
-                if not first_clip_src:
-                    raise ValueError("No source found for the first clip in the longest playlist.")
+                evo_files = [os.path.abspath(f"{path}/{os.path.basename(clip.get('src').replace('.MAP', '.EVO'))}")
+                             for clip in primary_clips]
+                total_size = sum(os.path.getsize(evo) for evo in evo_files if os.path.exists(evo))
 
-                evo_file = os.path.basename(first_clip_src.replace(".MAP", ".EVO"))
-                evo_file_path = os.path.abspath(f"{path}/{evo_file}")
+                # Overwrite mediainfo File size and Duration
+                title_duration = longest_playlist.get("titleDuration", "00:00:00:00")
+                if evo_files:
+                    # Generate MediaInfo for the first EVO file
+                    first_evo_path = evo_files[0]
+                    original_mediainfo = MediaInfo.parse(first_evo_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
 
-                # Generate MediaInfo for the first EVO file
-                each['evo_mi'] = MediaInfo.parse(evo_file_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
-                each['largest_evo'] = evo_file_path
+                    # Overwrite File size and Duration in the mediainfo using regex
+                    modified_mediainfo = re.sub(
+                        r"File size\s+:\s+[^\r\n]+",
+                        f"File size                                : {total_size / (1024 ** 3):.2f} GiB",
+                        original_mediainfo
+                    )
+                    modified_mediainfo = re.sub(
+                        r"Duration\s+:\s+[^\r\n]+",
+                        f"Duration                                 : {self.format_duration(title_duration)}",
+                        modified_mediainfo
+                    )
+
+                    each['evo_mi'] = modified_mediainfo
+                    each['largest_evo'] = first_evo_path
 
             except (FileNotFoundError, ValueError, ET.ParseError) as e:
                 console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
@@ -493,6 +508,19 @@ class DiscParse():
                 each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
 
         return discs
+
+    def format_duration(self, timecode):
+        parts = timecode.split(":")
+        if len(parts) != 4:
+            return "Unknown duration"
+
+        hours, minutes, seconds, _ = map(int, parts)
+        duration = ""
+        if hours > 0:
+            duration += f"{hours} h "
+        if minutes > 0:
+            duration += f"{minutes} min"
+        return duration.strip()
 
     def parse_hddvd_playlist(self, file_path):
         titles = []
