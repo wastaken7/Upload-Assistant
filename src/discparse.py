@@ -431,7 +431,8 @@ class DiscParse():
                 # Define the playlist path
                 playlist_path = os.path.join(meta['path'], "ADV_OBJ")
                 xpl_files = glob(f"{playlist_path}/*.xpl")
-                console.print(f"Found {xpl_files} in {playlist_path}")
+                if meta['debug']:
+                    console.print(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
                     raise FileNotFoundError(f"No .xpl files found in {playlist_path}")
@@ -442,7 +443,8 @@ class DiscParse():
 
                 # Save playlist information in meta under HDDVD_PLAYLIST
                 meta["HDDVD_PLAYLIST"] = playlist_info
-                console.print("HDDVD_PLAYLIST", playlist_info)
+                if meta['debug']:
+                    console.print("HDDVD_PLAYLIST", playlist_info)
 
                 # Identify the longest playlist (based on titleDuration)
                 longest_playlist = max(
