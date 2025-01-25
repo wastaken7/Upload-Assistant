@@ -9,6 +9,7 @@ from collections import OrderedDict
 import json
 from pyparsebluray import mpls
 from xml.etree import ElementTree as ET
+import re
 from src.console import console
 from data.config import config
 
