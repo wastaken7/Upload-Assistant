@@ -426,42 +426,72 @@ class DiscParse():
             path = each.get('path')
             os.chdir(path)
 
-            # Define the playlist path
-            playlist_path = os.path.join(meta['path'], "ADV_OBJ")
-            xpl_files = glob(f"{playlist_path}/*.xpl")
-            console.print(f"Found {xpl_files} in {playlist_path}")
+            try:
+                # Define the playlist path
+                playlist_path = os.path.join(meta['path'], "ADV_OBJ")
+                xpl_files = glob(f"{playlist_path}/*.xpl")
+                console.print(f"Found {xpl_files} in {playlist_path}")
 
-            if not xpl_files:
-                print(f"No .xpl files found in {playlist_path}")
-                continue
+                if not xpl_files:
+                    raise FileNotFoundError(f"No .xpl files found in {playlist_path}")
 
-            # Use the first .xpl file found
-            playlist_file = xpl_files[0]
-            playlist_info = self.parse_hddvd_playlist(playlist_file)
+                # Use the first .xpl file found
+                playlist_file = xpl_files[0]
+                playlist_info = self.parse_hddvd_playlist(playlist_file)
 
-            # Save playlist information in meta under HDDVD_PLAYLIST
-            meta["HDDVD_PLAYLIST"] = playlist_info
-            console.print("HDDVD_PLAYLIST", playlist_info)
+                # Save playlist information in meta under HDDVD_PLAYLIST
+                meta["HDDVD_PLAYLIST"] = playlist_info
+                console.print("HDDVD_PLAYLIST", playlist_info)
 
-            # Identify the longest playlist (based on titleDuration)
-            longest_playlist = max(
-                playlist_info,
-                key=lambda x: self.timecode_to_seconds(x.get("titleDuration", "00:00:00:00")),
-                default=None
-            )
+                # Identify the longest playlist (based on titleDuration)
+                longest_playlist = max(
+                    playlist_info,
+                    key=lambda x: self.timecode_to_seconds(x.get("titleDuration", "00:00:00:00")),
+                    default=None
+                )
 
-            if longest_playlist:
+                if not longest_playlist:
+                    raise ValueError("No valid playlists found with a duration longer than 10 minutes.")
+
                 # Extract the first EVO file from the longest playlist
                 primary_clips = longest_playlist.get("primaryClips", [])
-                if primary_clips:
-                    first_clip_src = primary_clips[0].get("src")
-                    if first_clip_src:
-                        evo_file = os.path.basename(first_clip_src.replace(".MAP", ".EVO"))
-                        evo_file_path = os.path.abspath(f"{path}/{evo_file}")
+                if not primary_clips:
+                    raise ValueError("No primary clips found in the longest playlist.")
 
-                        # Generate MediaInfo for the first EVO file
-                        each['evo_mi'] = MediaInfo.parse(evo_file_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
-                        each['largest_evo'] = evo_file_path
+                first_clip_src = primary_clips[0].get("src")
+                if not first_clip_src:
+                    raise ValueError("No source found for the first clip in the longest playlist.")
+
+                evo_file = os.path.basename(first_clip_src.replace(".MAP", ".EVO"))
+                evo_file_path = os.path.abspath(f"{path}/{evo_file}")
+
+                # Generate MediaInfo for the first EVO file
+                each['evo_mi'] = MediaInfo.parse(evo_file_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
+                each['largest_evo'] = evo_file_path
+
+            except (FileNotFoundError, ValueError, ET.ParseError) as e:
+                console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
+
+                # Fallback to largest .EVO file
+                files = glob("*.EVO")
+                if not files:
+                    console.print("No EVO files found in the directory.")
+                    continue
+
+                size = 0
+                largest = files[0]
+
+                # Get largest file from files
+                for file in files:
+                    file_size = os.path.getsize(file)
+                    if file_size > size:
+                        largest = file
+                        size = file_size
+
+                # Generate MediaInfo for the largest EVO file
+                each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False, mediainfo_options={'inform_version': '1'})
+                each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
+
         return discs
 
     def parse_hddvd_playlist(self, file_path):
