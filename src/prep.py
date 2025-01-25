@@ -158,7 +158,7 @@ class Prep():
             else:
                 mi = meta['mediainfo']
             meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
-            meta['sd'] = self.is_sd(meta['resolution'])
+            meta['sd'] = await self.is_sd(meta['resolution'])
 
         else:
             videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
