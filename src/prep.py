@@ -497,7 +497,7 @@ class Prep():
             export_clean.write(discs[0]['ifo_mi'])
             export_clean.close()
         elif is_disc == "HDDVD":
-            discs = await parse.get_hddvd_info(discs)
+            discs = await parse.get_hddvd_info(discs, meta)
             export = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8')
             export.write(discs[0]['evo_mi'])
             export.close()

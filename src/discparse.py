@@ -8,6 +8,7 @@ from pymediainfo import MediaInfo
 from collections import OrderedDict
 import json
 from pyparsebluray import mpls
+from xml.etree import ElementTree as ET
 from src.console import console
 from data.config import config
 
@@ -420,19 +421,165 @@ class DiscParse():
             each['size'] = dvd_size
         return discs
 
-    async def get_hddvd_info(self, discs):
+    async def get_hddvd_info(self, discs, meta):
         for each in discs:
             path = each.get('path')
             os.chdir(path)
-            files = glob("*.EVO")
-            size = 0
-            largest = files[0]
-            # get largest file from files
-            for file in files:
-                file_size = os.path.getsize(file)
-                if file_size > size:
-                    largest = file
-                    size = file_size
-            each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False, mediainfo_options={'inform_version': '1'})
-            each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
+
+            # Define the playlist path
+            playlist_path = os.path.join(meta['path'], "ADV_OBJ")
+            xpl_files = glob(f"{playlist_path}/*.xpl")
+            console.print(f"Found {xpl_files} in {playlist_path}")
+
+            if not xpl_files:
+                print(f"No .xpl files found in {playlist_path}")
+                continue
+
+            # Use the first .xpl file found
+            playlist_file = xpl_files[0]
+            playlist_info = self.parse_hddvd_playlist(playlist_file)
+
+            # Save playlist information in meta under HDDVD_PLAYLIST
+            meta["HDDVD_PLAYLIST"] = playlist_info
+            console.print("HDDVD_PLAYLIST", playlist_info)
+
+            # Identify the longest playlist (based on titleDuration)
+            longest_playlist = max(
+                playlist_info,
+                key=lambda x: self.timecode_to_seconds(x.get("titleDuration", "00:00:00:00")),
+                default=None
+            )
+
+            if longest_playlist:
+                # Extract the first EVO file from the longest playlist
+                primary_clips = longest_playlist.get("primaryClips", [])
+                if primary_clips:
+                    first_clip_src = primary_clips[0].get("src")
+                    if first_clip_src:
+                        evo_file = os.path.basename(first_clip_src.replace(".MAP", ".EVO"))
+                        evo_file_path = os.path.abspath(f"{path}/{evo_file}")
+
+                        # Generate MediaInfo for the first EVO file
+                        each['evo_mi'] = MediaInfo.parse(evo_file_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
+                        each['largest_evo'] = evo_file_path
         return discs
+
+    def parse_hddvd_playlist(self, file_path):
+        titles = []
+        try:
+            # Parse the XML structure
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+
+            # Extract namespace
+            namespace = {'ns': 'http://www.dvdforum.org/2005/HDDVDVideo/Playlist'}
+
+            for title in root.findall(".//ns:Title", namespaces=namespace):
+                title_duration = title.get("titleDuration", "00:00:00:00")
+                duration_seconds = self.timecode_to_seconds(title_duration)
+
+                # Skip titles with a duration of 10 minutes or less
+                if duration_seconds <= 600:
+                    continue
+
+                title_data = {
+                    "titleNumber": title.get("titleNumber"),
+                    "titleDuration": title_duration,
+                    "displayName": title.get("displayName"),
+                    "onEnd": title.get("onEnd"),
+                    "alternativeSDDisplayMode": title.get("alternativeSDDisplayMode"),
+                    "primaryClips": [],
+                    "chapters": [],
+                    "audioTracks": [],
+                    "subtitleTracks": [],
+                    "applicationSegments": [],
+                }
+
+                # Extract PrimaryAudioVideoClip details
+                for clip in title.findall(".//ns:PrimaryAudioVideoClip", namespaces=namespace):
+                    clip_data = {
+                        "src": clip.get("src"),
+                        "titleTimeBegin": clip.get("titleTimeBegin"),
+                        "titleTimeEnd": clip.get("titleTimeEnd"),
+                        "seamless": clip.get("seamless"),
+                        "audioTracks": [],
+                        "subtitleTracks": [],
+                    }
+
+                    # Extract Audio tracks within PrimaryAudioVideoClip
+                    for audio in clip.findall(".//ns:Audio", namespaces=namespace):
+                        clip_data["audioTracks"].append({
+                            "track": audio.get("track"),
+                            "streamNumber": audio.get("streamNumber"),
+                            "mediaAttr": audio.get("mediaAttr"),
+                            "description": audio.get("description"),
+                        })
+
+                    # Extract Subtitle tracks within PrimaryAudioVideoClip
+                    for subtitle in clip.findall(".//ns:Subtitle", namespaces=namespace):
+                        clip_data["subtitleTracks"].append({
+                            "track": subtitle.get("track"),
+                            "streamNumber": subtitle.get("streamNumber"),
+                            "mediaAttr": subtitle.get("mediaAttr"),
+                            "description": subtitle.get("description"),
+                        })
+
+                    title_data["primaryClips"].append(clip_data)
+
+                # Extract ChapterList details
+                for chapter in title.findall(".//ns:ChapterList/ns:Chapter", namespaces=namespace):
+                    title_data["chapters"].append({
+                        "displayName": chapter.get("displayName"),
+                        "titleTimeBegin": chapter.get("titleTimeBegin"),
+                    })
+
+                # Extract TrackNavigationList details (AudioTracks and SubtitleTracks)
+                for audio_track in title.findall(".//ns:TrackNavigationList/ns:AudioTrack", namespaces=namespace):
+                    title_data["audioTracks"].append({
+                        "track": audio_track.get("track"),
+                        "langcode": audio_track.get("langcode"),
+                        "selectable": audio_track.get("selectable"),
+                    })
+
+                for subtitle_track in title.findall(".//ns:TrackNavigationList/ns:SubtitleTrack", namespaces=namespace):
+                    title_data["subtitleTracks"].append({
+                        "track": subtitle_track.get("track"),
+                        "langcode": subtitle_track.get("langcode"),
+                        "selectable": subtitle_track.get("selectable"),
+                    })
+
+                # Extract ApplicationSegment details
+                for app_segment in title.findall(".//ns:ApplicationSegment", namespaces=namespace):
+                    app_data = {
+                        "src": app_segment.get("src"),
+                        "titleTimeBegin": app_segment.get("titleTimeBegin"),
+                        "titleTimeEnd": app_segment.get("titleTimeEnd"),
+                        "sync": app_segment.get("sync"),
+                        "zOrder": app_segment.get("zOrder"),
+                        "resources": [],
+                    }
+
+                    # Extract ApplicationResource details
+                    for resource in app_segment.findall(".//ns:ApplicationResource", namespaces=namespace):
+                        app_data["resources"].append({
+                            "src": resource.get("src"),
+                            "size": resource.get("size"),
+                            "priority": resource.get("priority"),
+                            "multiplexed": resource.get("multiplexed"),
+                        })
+
+                    title_data["applicationSegments"].append(app_data)
+
+                # Add the fully extracted title data to the list
+                titles.append(title_data)
+
+        except ET.ParseError as e:
+            print(f"Error parsing XPL file: {e}")
+        return titles
+
+    def timecode_to_seconds(self, timecode):
+        parts = timecode.split(":")
+        if len(parts) != 4:
+            return 0
+        hours, minutes, seconds, frames = map(int, parts)
+        return hours * 3600 + minutes * 60 + seconds
