@@ -324,7 +324,7 @@ class HUNO():
             'name': ""
         }
         if meta['category'] == 'TV':
-            params['name'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
+            params['name'] = f"{meta.get('season', '')}"
         if meta.get('edition', "") != "":
             params['name'] + meta['edition']
         try:

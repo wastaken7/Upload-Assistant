@@ -160,6 +160,8 @@ class JPTV():
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }
+        if meta['category'] == 'TV':
+            params['name'] = params['name'] + f" {meta.get('season', '')}"
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + f" {meta['edition']}"
         if meta['debug']:

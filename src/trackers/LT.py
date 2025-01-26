@@ -205,7 +205,7 @@ class LT():
             'name': ""
         }
         if meta['category'] == 'TV':
-            params['name'] = params['name'] + f" {meta.get('season', '')}{meta.get('episode', '')}"
+            params['name'] = params['name'] + f" {meta.get('season', '')}"
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + f" {meta['edition']}"
         try:

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import requests
-from guessit import guessit
 import httpx
 
 from src.trackers.COMMON import COMMON
@@ -117,14 +116,7 @@ class NBL():
                         data = response.json()
                         for each in data.get('result', {}).get('items', []):
                             if meta['resolution'] in each.get('tags', []):
-                                if meta.get('tv_pack', 0) == 1:
-                                    if (
-                                        each.get('cat') == "Season"
-                                        and int(guessit(each.get('rls_name', '')).get('season', '1')) == int(meta.get('season_int'))
-                                    ):
-                                        dupes.append(each['rls_name'])
-                                elif int(guessit(each.get('rls_name', '')).get('episode', '0')) == int(meta.get('episode_int')):
-                                    dupes.append(each['rls_name'])
+                                dupes.append(each['rls_name'])
                     except json.JSONDecodeError:
                         console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
                         meta['skipping'] = "NBL"

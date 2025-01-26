@@ -298,9 +298,7 @@ class BHD():
             data['categories'] = None
             data['types'] = None
         if meta['category'] == 'TV':
-            if meta.get('tv_pack', 0) == 1:
-                data['pack'] = 1
-            data['search'] = f"{meta.get('season', '')}{meta.get('episode', '')}"
+            data['search'] = f"{meta.get('season', '')}"
 
         url = f"https://beyond-hd.me/api/torrents/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
         try:

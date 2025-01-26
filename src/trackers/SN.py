@@ -154,13 +154,13 @@ class SN():
         # Determine search parameters based on metadata
         if meta['imdb_id'] == 0:
             if meta['category'] == 'TV':
-                params['filter'] = f"{meta['title']}{meta.get('season', '')}{meta.get('episode', '')} {meta['resolution']}"
+                params['filter'] = f"{meta['title']}{meta.get('season', '')}"
             else:
                 params['filter'] = meta['title']
         else:
             params['media_ref'] = f"tt{meta['imdb_id']}"
             if meta['category'] == 'TV':
-                params['filter'] = f"{meta.get('season', '')}{meta.get('episode', '')} {meta['resolution']}"
+                params['filter'] = f"{meta.get('season', '')}"
             else:
                 params['filter'] = meta['resolution']
 
