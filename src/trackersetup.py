@@ -116,15 +116,23 @@ class TRACKER_SETUP:
     async def write_banned_groups_to_file(self, file_path, json_data):
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            names = [item['name'] for item in json_data.get('data', [])]
+
+            if not isinstance(json_data, list):
+                console.print("Invalid data format: expected a list of groups.")
+                return
+
+            # Extract 'name' values from the list
+            names = [item['name'] for item in json_data if isinstance(item, dict) and 'name' in item]
             names_csv = ', '.join(names)
             file_content = {
                 "last_updated": datetime.now().strftime("%Y-%m-%d"),
                 "banned_groups": names_csv,
                 "raw_data": json_data
             }
+
             async with aiofiles.open(file_path, mode='w') as file:
                 await file.write(json.dumps(file_content, indent=4))
+
             console.print(f"File '{file_path}' updated successfully with {len(names)} groups.")
         except Exception as e:
             console.print(f"An error occurred: {e}")
