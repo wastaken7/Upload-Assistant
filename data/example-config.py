@@ -253,7 +253,7 @@ config = {
         },
         "NBL": {
             "api_key": "NBL api key",
-            "announce_url": "https://nebulance.io/customannounceurl",
+            "announce_url": "https://tracker.nebulance.io/insertyourpasskeyhere/announce",
         },
         "OE": {
             "useAPI": False,  # Set to True if using OE for automatic ID searching or description parsing
