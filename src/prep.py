@@ -743,9 +743,9 @@ class Prep():
             if not str(channels).isnumeric():
                 channels = track.get('Channels')
             try:
-                channel_layout = track.get('ChannelLayout', '')
+                channel_layout = track.get('ChannelLayout', '') or track.get('ChannelLayout_Original', '') or track.get('ChannelPositions', '')
             except Exception:
-                channel_layout = track.get('ChannelLayout_Original', '')
+                channel_layout = ''
 
             if channel_layout and "LFE" in channel_layout:
                 chan = f"{int(channels) - 1}.1"
