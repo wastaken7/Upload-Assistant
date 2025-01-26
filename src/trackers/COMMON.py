@@ -55,7 +55,7 @@ class COMMON():
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
         try:
             screenheader = self.config['DEFAULT']['screenshot_header']
-        except Exception:
+        except ValueError:
             screenheader = None
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
@@ -169,9 +169,13 @@ class COMMON():
                             descfile.write(f"{each['name']}:\n")
                             descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]")
                             descfile.write(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
-                        # For the first disc, use images from `meta['image_list']`
+                        # For the first disc, use images from `meta['image_list']` and add screenheader if applicable
                         if meta['debug']:
                             console.print("[yellow]Using original uploaded images for first disc")
+                        if screenheader is not None:
+                            descfile.write("[/center]\n\n")
+                            descfile.write(screenheader + '\n')
+                            descfile.write("[center]")
                         for img_index in range(len(images[:int(meta['screens'])])):
                             web_url = images[img_index]['web_url']
                             raw_url = images[img_index]['raw_url']
@@ -355,8 +359,11 @@ class COMMON():
 
                     # Write images if they exist
                     new_images_key = f'new_images_file_{i}'
-                    if i == 0:  # For the first file, use 'image_list' key
+                    if i == 0:  # For the first file, use 'image_list' key and add screenheader if applicable
                         if images:
+                            if screenheader is not None:
+                                descfile.write(screenheader + '\n')
+                                char_count += len(screenheader + '\n')
                             descfile.write("[center]")
                             char_count += len("[center]")
                             for img_index in range(len(images)):
