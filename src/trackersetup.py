@@ -96,21 +96,61 @@ class TRACKER_SETUP:
             'Accept': 'application/json'
         }
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url, headers=headers)
-                if response.status_code == 200:
-                    data = response.json()
-                    await self.write_banned_groups_to_file(file_path, data)
-                    return file_path
-                elif response.status_code == 404:
-                    console.print(f"Error: Tracker '{tracker}' returned 404 for the banned groups API.")
-                else:
-                    console.print(f"Error: Received status code {response.status_code} for tracker '{tracker}'.")
-            except httpx.RequestError as e:
-                console.print(f"HTTP Request failed for tracker '{tracker}': {e}")
+        all_data = []
+        next_cursor = None
 
-        return None
+        async with httpx.AsyncClient() as client:
+            while True:
+                try:
+                    # Add query parameters for pagination
+                    params = {'cursor': next_cursor, 'per_page': 100} if next_cursor else {'per_page': 100}
+                    response = await client.get(url, headers=headers, params=params)
+
+                    if response.status_code == 200:
+                        response_json = response.json()
+
+                        if isinstance(response_json, list):
+                            # Directly add the list if it's the entire response
+                            all_data.extend(response_json)
+                            break  # No pagination in this case
+                        elif isinstance(response_json, dict):
+                            page_data = response_json.get('data', [])
+                            if not isinstance(page_data, list):
+                                console.print(f"[red]Unexpected 'data' format: {type(page_data)}[/red]")
+                                return None
+
+                            all_data.extend(page_data)
+                            meta_info = response_json.get('meta', {})
+                            if not isinstance(meta_info, dict):
+                                console.print(f"[red]Unexpected 'meta' format: {type(meta_info)}[/red]")
+                                return None
+
+                            # Check if there is a next page
+                            next_cursor = meta_info.get('next_cursor')
+                            if not next_cursor:
+                                break  # Exit loop if there are no more pages
+                        else:
+                            console.print(f"[red]Unexpected response format: {type(response_json)}[/red]")
+                            return None
+                    elif response.status_code == 404:
+                        console.print(f"Error: Tracker '{tracker}' returned 404 for the banned groups API.")
+                        return None
+                    else:
+                        console.print(f"Error: Received status code {response.status_code} for tracker '{tracker}'.")
+                        return None
+
+                except httpx.RequestError as e:
+                    console.print(f"[red]HTTP Request failed for tracker '{tracker}': {e}[/red]")
+                    return None
+                except Exception as e:
+                    console.print(f"[red]An unexpected error occurred: {e}[/red]")
+                    return None
+
+        if meta['debug']:
+            console.print("Total banned groups retrieved:", len(all_data))
+        await self.write_banned_groups_to_file(file_path, all_data)
+
+        return file_path
 
     async def write_banned_groups_to_file(self, file_path, json_data):
         try:
@@ -159,9 +199,10 @@ class TRACKER_SETUP:
             file_path = await self.get_banned_groups(meta, tracker)
             if not file_path:
                 console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
-                return result  # Early exit with False
+                result = False
+                return result
 
-            # Try to load the banned groups from the file
+            # Load the banned groups from the file
             try:
                 async with aiofiles.open(file_path, mode='r') as file:
                     content = await file.read()
@@ -171,10 +212,12 @@ class TRACKER_SETUP:
                         banned_group_list.extend(banned_groups.split(", "))
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
-                return result  # File not found, return False
+                result = False
+                return result
             except json.JSONDecodeError:
                 console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                return result  # Invalid JSON, return False
+                result = False
+                return result
 
         for tag in banned_group_list:
             if isinstance(tag, list):
@@ -188,6 +231,7 @@ class TRACKER_SETUP:
                     console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     await asyncio.sleep(5)
                     result = True
+
         return result
 
     async def write_internal_claims_to_file(self, file_path, data):
@@ -379,15 +423,15 @@ class TRACKER_SETUP:
 
 tracker_class_map = {
     'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
-    'FNP': FNP, 'FL': FL, 'FRIKI': FRIKI, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'JPTV': JPTV, 'LCD': LCD,
+    'FNP': FNP, 'FL': FL, 'FRIKI': FRIKI, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT, 'JPTV': JPTV, 'LCD': LCD,
     'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
-    'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'ITT': ITT, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
+    'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK,
 }
 
 api_trackers = {
-    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'JPTV', 'LCD', 'LST', 'LT',
-    'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'ITT', 'SP', 'STT', 'TIK', 'ULCX', 'UTP', 'YOINK'
+    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
+    'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'ULCX', 'UTP', 'YOINK'
 }
 
 other_api_trackers = {
