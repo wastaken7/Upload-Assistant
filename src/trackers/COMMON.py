@@ -771,6 +771,8 @@ class COMMON():
                 console.log(f"[debug] Target source: {target_source}")
                 console.log(f"[debug] File HDR terms: {file_hdr}")
                 console.log(f"[debug] Target HDR terms: {target_hdr}")
+                console.log(f"[debug] Target Season: {target_season}")
+                console.log(f"[debug] Target Episode: {target_episode}")
                 console.log(f"[debug] TAG: {tag}")
                 console.log("[debug] Evaluating repack condition:")
                 console.log(f"  has_repack_in_uuid: {has_repack_in_uuid}")
@@ -872,7 +874,6 @@ class COMMON():
         if target_season:
             target_season = int(str(target_season).lstrip('sS'))
         if target_episode:
-            # Split on 'E' to handle cases like '10E11'
             target_episodes = [
                 int(ep) for ep in str(target_episode).lstrip('eE').split('E') if ep.isdigit()
             ]
@@ -880,15 +881,26 @@ class COMMON():
             target_episodes = []
 
         season_pattern = f"s{target_season:02}" if target_season else None
-        episode_patterns = [f"e{ep:02}" for ep in target_episodes] if target_episodes else None
+        episode_patterns = [f"e{ep:02}" for ep in target_episodes] if target_episodes else []
 
+        # Determine if filename represents a season pack (no explicit episode pattern)
+        is_season_pack = not re.search(r"[eE]\d{2}", filename)
+
+        # Handle season packs: Match only the season
+        if is_season_pack:
+            if season_pattern:
+                return season_pattern in filename.lower()  # Only check season
+            return True  # No target season means no constraints
+
+        # Handle single episodes: Match both season and episodes
         if season_pattern and episode_patterns:
-            return season_pattern in filename and any(ep in filename for ep in episode_patterns)
+            return season_pattern in filename.lower() and any(ep in filename.lower() for ep in episode_patterns)
         if season_pattern:
-            return season_pattern in filename
+            return season_pattern in filename.lower()
         if episode_patterns:
-            return any(ep in filename for ep in episode_patterns)
-        return True
+            return any(ep in filename.lower() for ep in episode_patterns)
+
+        return False  # No match
 
     async def refine_hdr_terms(self, hdr):
         """
