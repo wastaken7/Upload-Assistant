@@ -55,7 +55,7 @@ class COMMON():
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
         try:
             screenheader = self.config['DEFAULT']['screenshot_header']
-        except ValueError:
+        except Exception:
             screenheader = None
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
