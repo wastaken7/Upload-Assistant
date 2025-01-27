@@ -30,7 +30,7 @@ class LST():
         self.banned_groups = []
         pass
 
-    async def get_cat_id(self, category_name, keywords, service):
+    async def get_cat_id(self, category_name):
         category_id = {
             'MOVIE': '1',
             'TV': '2',
@@ -68,7 +68,7 @@ class LST():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(meta['category'], meta.get('keywords', ''), meta.get('service', ''))
+        cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         modq = await self.get_flag(meta, 'modq')
@@ -195,7 +195,7 @@ class LST():
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
-            'categories[]': await self.get_cat_id(meta['category'], meta.get('keywords', ''), meta.get('service', '')),
+            'categories[]': await self.get_cat_id(meta['category']),
             'types[]': await self.get_type_id(meta['type']),
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
