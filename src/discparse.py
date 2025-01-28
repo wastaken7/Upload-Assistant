@@ -531,16 +531,24 @@ class DiscParse():
 
                 # Overwrite mediainfo File size and Duration
                 if evo_files:
-                    # Select the largest .EVO file
-                    largest_evo_path = max(
-                        evo_files,
-                        key=lambda evo: os.path.getsize(evo) if os.path.exists(evo) else 0
-                    )
-                    if not os.path.exists(largest_evo_path):
-                        raise FileNotFoundError(f"Largest .EVO file {largest_evo_path} does not exist.")
+                    # Filter out non-existent files
+                    existing_evo_files = [evo for evo in evo_files if os.path.exists(evo)]
+
+                    if len(existing_evo_files) >= 2:
+                        # Select the second .EVO file
+                        selected_evo_path = existing_evo_files[1]
+                    else:
+                        # Fallback to the largest file
+                        selected_evo_path = max(
+                            existing_evo_files,
+                            key=os.path.getsize
+                        )
+
+                    if not os.path.exists(selected_evo_path):
+                        raise FileNotFoundError(f"Selected .EVO file {selected_evo_path} does not exist.")
 
                     # Parse MediaInfo for the largest .EVO file
-                    original_mediainfo = MediaInfo.parse(largest_evo_path, output='STRING', full=False)
+                    original_mediainfo = MediaInfo.parse(selected_evo_path, output='STRING', full=False)
 
                     modified_mediainfo = re.sub(
                         r"File size\s+:\s+[^\r\n]+",
@@ -658,7 +666,7 @@ class DiscParse():
 
                     # Update the dictionary with the modified MediaInfo and file path
                     each['evo_mi'] = modified_mediainfo
-                    each['largest_evo'] = largest_evo_path
+                    each['largest_evo'] = selected_evo_path
 
                 # Save playlist information in meta under HDDVD_PLAYLIST
                 meta["HDDVD_PLAYLIST"] = selected_playlist
