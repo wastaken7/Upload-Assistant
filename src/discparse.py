@@ -409,10 +409,10 @@ class DiscParse():
             set = main_set[0][:2]
             each['vob'] = vob = f"{path}/VTS_{set}_1.VOB"
             each['ifo'] = ifo = f"{path}/VTS_{set}_0.IFO"
-            each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
-            each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
-            each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
-            each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False, mediainfo_options={'inform_version': '1'}).replace('\r\n', '\n')
+            each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False).replace('\r\n', '\n')
+            each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False).replace('\r\n', '\n')
+            each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False).replace('\r\n', '\n')
+            each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False).replace('\r\n', '\n')
 
             size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) / float(1 << 30)
             if size <= 7.95:
@@ -423,6 +423,7 @@ class DiscParse():
         return discs
 
     async def get_hddvd_info(self, discs, meta):
+        use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
         for each in discs:
             path = each.get('path')
             os.chdir(path)
@@ -441,38 +442,98 @@ class DiscParse():
                 playlist_file = xpl_files[0]
                 playlist_info = self.parse_hddvd_playlist(playlist_file)
 
-                # Save playlist information in meta under HDDVD_PLAYLIST
-                meta["HDDVD_PLAYLIST"] = playlist_info
-                if meta['debug']:
-                    console.print("HDDVD_PLAYLIST", playlist_info)
+                # Filter valid playlists (at least one clip with valid size)
+                valid_playlists = []
+                for playlist in playlist_info:
+                    primary_clips = playlist.get("primaryClips", [])
+                    evo_files = [os.path.abspath(f"{path}/{os.path.basename(clip.get('src').replace('.MAP', '.EVO'))}")
+                                 for clip in primary_clips]
+                    total_size = sum(os.path.getsize(evo) for evo in evo_files if os.path.exists(evo))
+                    if total_size > 0:
+                        playlist["totalSize"] = total_size
+                        playlist["evoFiles"] = evo_files
+                        valid_playlists.append(playlist)
 
-                # Identify the longest playlist (based on titleDuration)
-                longest_playlist = max(
-                    playlist_info,
-                    key=lambda x: self.timecode_to_seconds(x.get("titleDuration", "00:00:00:00")),
-                    default=None
-                )
+                if not valid_playlists:
+                    raise ValueError("No valid playlists found with accessible .EVO files.")
 
-                if not longest_playlist:
-                    raise ValueError("No valid playlists found with a duration longer than 10 minutes.")
+                if use_largest:
+                    console.print("[yellow]Auto-selecting the largest playlist based on size.")
+                    selected_playlists = [
+                        max(
+                            valid_playlists,
+                            key=lambda p: p["totalSize"]
+                        )
+                    ]
+                elif meta['unattended'] and not meta.get('unattended-confirm', False):
+                    console.print("[yellow]Unattended mode: Auto-selecting the largest playlist.")
+                    selected_playlists = [
+                        max(
+                            valid_playlists,
+                            key=lambda p: p["totalSize"]
+                        )
+                    ]
+                else:
+                    # Allow user to select playlists
+                    while True:
+                        console.print("[cyan]Available playlists:")
+                        for idx, playlist in enumerate(valid_playlists, start=1):
+                            duration = playlist.get("titleDuration", "Unknown")
+                            title_number = playlist.get("titleNumber", "")
+                            playlist_id = playlist.get("id", "")
+                            description = playlist.get("description", "")
+                            total_size = playlist.get("totalSize", 0)
+                            additional_info = []
+                            if playlist_id:
+                                additional_info.append(f"[yellow]ID:[/yellow] {playlist_id}")
+                            if description:
+                                additional_info.append(f"[yellow]Description:[/yellow] {description}")
+                            additional_info.append(f"[yellow]Size:[/yellow] {total_size / (1024 * 1024):.2f} MB")
+                            additional_info_str = ", ".join(additional_info)
+                            console.print(f"{idx}: Duration: {duration} Playlist: {title_number}" + (f" ({additional_info_str})" if additional_info else ""))
 
-                # Extract the .EVO files from the longest playlist
-                primary_clips = longest_playlist.get("primaryClips", [])
+                        user_input = input("Enter the number of the playlist you want to select: ").strip()
+
+                        try:
+                            selected_indices = [int(x) - 1 for x in user_input.split(",")]
+                            if any(i < 0 or i >= len(valid_playlists) for i in selected_indices):
+                                raise ValueError("Invalid playlist number.")
+
+                            selected_playlists = [valid_playlists[i] for i in selected_indices]
+                            break  # Exit the loop when valid input is provided
+                        except (ValueError, IndexError):
+                            console.print("[red]Invalid input. Please try again.")
+
+                # Extract the .EVO files from the selected playlists
+                primary_clips = []
+                for playlist in selected_playlists:
+                    primary_clips.extend(playlist.get("primaryClips", []))
+
+                # Validate that the correct EVO files are being used
+                for playlist in selected_playlists:
+                    expected_evo_files = playlist.get("evoFiles", [])
+                    if not expected_evo_files or any(not os.path.exists(evo) for evo in expected_evo_files):
+                        raise ValueError(f"Expected EVO files for playlist {playlist['id']} do not exist.")
+
+                    # Calculate the total size for the selected playlist
+                    playlist["totalSize"] = sum(os.path.getsize(evo) for evo in expected_evo_files if os.path.exists(evo))
+
+                    # Assign the valid EVO files
+                    playlist["evoFiles"] = expected_evo_files
+
                 if not primary_clips:
-                    raise ValueError("No primary clips found in the longest playlist.")
+                    raise ValueError("No primary clips found in the selected playlists.")
 
-                evo_files = [os.path.abspath(f"{path}/{os.path.basename(clip.get('src').replace('.MAP', '.EVO'))}")
-                             for clip in primary_clips]
-                total_size = sum(os.path.getsize(evo) for evo in evo_files if os.path.exists(evo))
+                selected_playlist = selected_playlists[0]  # Assuming you're working with the largest or user-selected playlist
+                evo_files = selected_playlist["evoFiles"]
+                total_size = selected_playlist["totalSize"]
 
                 # Overwrite mediainfo File size and Duration
-                title_duration = longest_playlist.get("titleDuration", "00:00:00:00")
                 if evo_files:
-                    # Generate MediaInfo for the first EVO file
                     first_evo_path = evo_files[0]
-                    original_mediainfo = MediaInfo.parse(first_evo_path, output='STRING', full=False, mediainfo_options={'inform_version': '1'})
+                    original_mediainfo = MediaInfo.parse(first_evo_path, output='STRING', full=False)
 
-                    # Overwrite File size and Duration in the mediainfo using regex
+                    # Modify the mediainfo to include size and duration
                     modified_mediainfo = re.sub(
                         r"File size\s+:\s+[^\r\n]+",
                         f"File size                                : {total_size / (1024 ** 3):.2f} GiB",
@@ -480,12 +541,15 @@ class DiscParse():
                     )
                     modified_mediainfo = re.sub(
                         r"Duration\s+:\s+[^\r\n]+",
-                        f"Duration                                 : {self.format_duration(title_duration)}",
+                        f"Duration                                 : {self.format_duration(selected_playlist['titleDuration'])}",
                         modified_mediainfo
                     )
 
                     each['evo_mi'] = modified_mediainfo
                     each['largest_evo'] = first_evo_path
+
+                # Save playlist information in meta under HDDVD_PLAYLIST
+                meta["HDDVD_PLAYLIST"] = selected_playlist
 
             except (FileNotFoundError, ValueError, ET.ParseError) as e:
                 console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
@@ -507,7 +571,7 @@ class DiscParse():
                         size = file_size
 
                 # Generate MediaInfo for the largest EVO file
-                each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False, mediainfo_options={'inform_version': '1'})
+                each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False)
                 each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
 
         return discs
@@ -545,6 +609,8 @@ class DiscParse():
 
                 title_data = {
                     "titleNumber": title.get("titleNumber"),
+                    "id": title.get("id"),
+                    "description": title.get("description"),
                     "titleDuration": title_duration,
                     "displayName": title.get("displayName"),
                     "onEnd": title.get("onEnd"),
