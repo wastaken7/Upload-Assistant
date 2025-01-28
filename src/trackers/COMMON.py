@@ -727,6 +727,7 @@ class COMMON():
         is_dvd = meta['is_disc'] == "DVD"
         is_dvdrip = meta['type'] == "DVDRIP"
         web_dl = meta.get('type') == "WEBDL"
+        is_hdtv = meta.get('type') == "HDTV"
         target_source = meta.get("source")
         is_sd = meta.get('sd')
 
@@ -748,12 +749,6 @@ class COMMON():
                 "uuid_flag": "uhd" in meta.get('name', '').lower(),
                 "condition": lambda each: "uhd" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'UHD' mismatch: {each}"
-            },
-            {
-                "key": "hdtv",
-                "uuid_flag": "hdtv" in meta.get('name', '').lower(),
-                "condition": lambda each: "hdtv" in each.lower(),
-                "exclude_msg": lambda each: f"Excluding result due to 'HDTV' mismatch: {each}"
             },
         ]
 
@@ -849,7 +844,7 @@ class COMMON():
                     await log_exclusion("season/episode mismatch", each)
                     return True
 
-            if web_dl and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
+            if (web_dl or is_hdtv) and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
                 return False
 
             if meta['debug']:
