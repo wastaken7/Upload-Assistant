@@ -599,6 +599,7 @@ class DiscParse():
                     title_data["audioTracks"].append({
                         "track": audio_track.get("track"),
                         "langcode": audio_track.get("langcode"),
+                        "description": audio_track.get("description"),
                         "selectable": audio_track.get("selectable"),
                     })
 
