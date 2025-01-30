@@ -655,6 +655,7 @@ class PTP():
             if len(discs) == 1:
                 each = discs[0]
                 new_screens = []
+                bdinfo_keys = []
                 if each['type'] == "BDMV":
                     bdinfo_keys = [key for key in each if key.startswith("bdinfo")]
                     bdinfo = meta.get('bdinfo')
