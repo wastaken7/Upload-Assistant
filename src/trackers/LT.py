@@ -88,11 +88,12 @@ class LT():
             if meta.get('original_language') == 'es' and meta.get('aka') != "":
                 lt_name = lt_name.replace(meta.get('title'), meta.get('aka').replace('AKA', '')).strip()
             # Check if audio Spanish exists
-            # Get all the audios 'es-419' or 'es'
             audios = [
                 audio for audio in meta['mediainfo']['media']['track'][2:]
                 if audio.get('@type') == 'Audio'
-                and audio.get('Language') in {'es-419', 'es'}
+                and audio.get('Language') in {'es-419', 'es', 'es-mx', 'es-ar', 'es-cl', 'es-ve', 'es-bo', 'es-co',
+                                              'es-cr', 'es-do', 'es-ec', 'es-sv', 'es-gt', 'es-hn', 'es-ni', 'es-pa',
+                                              'es-py', 'es-pe', 'es-pr', 'es-uy'}
                 and "commentary" not in str(audio.get('Title', '')).lower()
                 ]
             if len(audios) > 0:  # If there is at least 1 audio spanish
