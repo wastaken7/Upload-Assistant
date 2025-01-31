@@ -50,17 +50,15 @@ class FNP():
 
     async def get_res_id(self, resolution):
         resolution_id = {
-            '8640p': '10',
             '4320p': '1',
             '2160p': '2',
-            '1440p': '3',
             '1080p': '3',
-            '1080i': '4',
+            '1080i': '11',
             '720p': '5',
             '576p': '6',
-            '576i': '7',
+            '576i': '15',
             '480p': '8',
-            '480i': '9'
+            '480i': '14'
         }.get(resolution, '10')
         return resolution_id
 
