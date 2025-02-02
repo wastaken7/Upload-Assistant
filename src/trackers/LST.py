@@ -205,7 +205,7 @@ class LST():
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + f" {meta['edition']}"
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     data = response.json()
