@@ -178,6 +178,14 @@ class MTV():
             elif mi_dump:
                 desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
 
+            if (
+                meta.get('is_disc') == "DVD" and
+                isinstance(meta.get('discs'), list) and
+                len(meta['discs']) > 0 and
+                'vob_mi' in meta['discs'][0]
+            ):
+                desc.write("[mediainfo]" + meta['discs'][0]['vob_mi'] + "[/mediainfo]\n\n")
+
             if f'{self.tracker}_images_key' in meta:
                 images = meta[f'{self.tracker}_images_key']
             else:
