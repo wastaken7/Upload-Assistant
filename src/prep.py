@@ -183,6 +183,15 @@ class Prep():
         meta['filename'] = filename
         meta['bdinfo'] = bdinfo
 
+        # Check if there's a language restriction
+        if meta['has_languages'] is not None:
+            audio_languages = await self.get_audio_languages(mi, meta)
+            any_of_languages = meta['has_languages'].lower().split(",")
+            # We need to have user input languages and file must have audio tracks.
+            if len(any_of_languages) > 0 and len(audio_languages) > 0 and not set(any_of_languages).intersection(set(audio_languages)):
+                console.print(f"[red] None of the required languages ({meta['has_languages']}) is available on the file {audio_languages}")
+                return
+
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
@@ -412,7 +421,7 @@ class Prep():
             export_clean.write(discs[0]['ifo_mi'])
             export_clean.close()
         elif is_disc == "HDDVD":
-            discs = await parse.get_hddvd_info(discs)
+            discs = await parse.get_hddvd_info(discs, meta)
             export = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8')
             export.write(discs[0]['evo_mi'])
             export.close()
@@ -631,12 +640,20 @@ class Prep():
             track_num = 2
             tracks = mi.get('media', {}).get('track', [])
 
-            for i, t in enumerate(tracks):
-                if t.get('@type') != "Audio":
-                    continue
-                if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in (t.get('Title') or '').lower():
-                    track_num = i
-                    break
+            # Handle HD-DVD case
+            if meta.get('is_disc') == "HDDVD":
+                # Look for the first audio track
+                for i, t in enumerate(tracks):
+                    if t.get('@type') == "Audio":
+                        track_num = i
+                        break
+            else:
+                for i, t in enumerate(tracks):
+                    if t.get('@type') != "Audio":
+                        continue
+                    if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in (t.get('Title') or '').lower():
+                        track_num = i
+                        break
 
             track = tracks[track_num] if len(tracks) > track_num else {}
             format = track.get('Format', '')
@@ -1432,3 +1449,26 @@ class Prep():
             compact = str(manual_dvds)
 
         return compact
+
+    async def get_audio_languages(self, mi, meta):
+        tracks = mi.get('media', {}).get('track', [])
+
+        languages = []
+
+        for i, t in enumerate(tracks):
+            if t.get('@type') != "Audio":
+                continue
+
+            language = t.get('Language', '')
+            if meta['debug']:
+                console.print(f"DEBUG: Track {i} Language = {language} ({type(language)})")
+
+            if isinstance(language, str):  # Normal case
+                languages.append(language.lower())
+            elif isinstance(language, dict):  # Handle unexpected dict case
+                if 'value' in language:  # Check if a known key exists
+                    extracted = language['value']
+                    if isinstance(extracted, str):
+                        languages.append(extracted.lower())
+
+        return languages

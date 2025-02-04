@@ -8,6 +8,9 @@ from pymediainfo import MediaInfo
 from collections import OrderedDict
 import json
 from pyparsebluray import mpls
+from xml.etree import ElementTree as ET
+import re
+from langcodes import Language
 from src.console import console
 from data.config import config
 
@@ -420,19 +423,425 @@ class DiscParse():
             each['size'] = dvd_size
         return discs
 
-    async def get_hddvd_info(self, discs):
+    async def get_hddvd_info(self, discs, meta):
+        use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
         for each in discs:
             path = each.get('path')
             os.chdir(path)
-            files = glob("*.EVO")
-            size = 0
-            largest = files[0]
-            # get largest file from files
-            for file in files:
-                file_size = os.path.getsize(file)
-                if file_size > size:
-                    largest = file
-                    size = file_size
-            each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False, mediainfo_options={'inform_version': '1'})
-            each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
+
+            try:
+                # Define the playlist path
+                playlist_path = os.path.join(meta['path'], "ADV_OBJ")
+                xpl_files = glob(f"{playlist_path}/*.xpl")
+                if meta['debug']:
+                    console.print(f"Found {xpl_files} in {playlist_path}")
+
+                if not xpl_files:
+                    raise FileNotFoundError(f"No .xpl files found in {playlist_path}")
+
+                # Use the first .xpl file found
+                playlist_file = xpl_files[0]
+                playlist_info = self.parse_hddvd_playlist(playlist_file)
+
+                # Filter valid playlists (at least one clip with valid size)
+                valid_playlists = []
+                for playlist in playlist_info:
+                    primary_clips = playlist.get("primaryClips", [])
+                    evo_files = [os.path.abspath(f"{path}/{os.path.basename(clip.get('src').replace('.MAP', '.EVO'))}")
+                                 for clip in primary_clips]
+                    total_size = sum(os.path.getsize(evo) for evo in evo_files if os.path.exists(evo))
+                    if total_size > 0:
+                        playlist["totalSize"] = total_size
+                        playlist["evoFiles"] = evo_files
+                        valid_playlists.append(playlist)
+
+                if not valid_playlists:
+                    raise ValueError("No valid playlists found with accessible .EVO files.")
+
+                if use_largest:
+                    console.print("[yellow]Auto-selecting the largest playlist based on size.")
+                    selected_playlists = [
+                        max(
+                            valid_playlists,
+                            key=lambda p: p["totalSize"]
+                        )
+                    ]
+                elif meta['unattended'] and not meta.get('unattended-confirm', False):
+                    console.print("[yellow]Unattended mode: Auto-selecting the largest playlist.")
+                    selected_playlists = [
+                        max(
+                            valid_playlists,
+                            key=lambda p: p["totalSize"]
+                        )
+                    ]
+                else:
+                    # Allow user to select playlists
+                    while True:
+                        console.print("[cyan]Available playlists:")
+                        for idx, playlist in enumerate(valid_playlists, start=1):
+                            duration = playlist.get("titleDuration", "Unknown")
+                            title_number = playlist.get("titleNumber", "")
+                            playlist_id = playlist.get("id", "")
+                            description = playlist.get("description", "")
+                            total_size = playlist.get("totalSize", 0)
+                            additional_info = []
+                            if playlist_id:
+                                additional_info.append(f"[yellow]ID:[/yellow] {playlist_id}")
+                            if description:
+                                additional_info.append(f"[yellow]Description:[/yellow] {description}")
+                            additional_info.append(f"[yellow]Size:[/yellow] {total_size / (1024 * 1024):.2f} MB")
+                            additional_info_str = ", ".join(additional_info)
+                            console.print(f"{idx}: Duration: {duration} Playlist: {title_number}" + (f" ({additional_info_str})" if additional_info else ""))
+
+                        user_input = input("Enter the number of the playlist you want to select: ").strip()
+
+                        try:
+                            selected_indices = [int(x) - 1 for x in user_input.split(",")]
+                            if any(i < 0 or i >= len(valid_playlists) for i in selected_indices):
+                                raise ValueError("Invalid playlist number.")
+
+                            selected_playlists = [valid_playlists[i] for i in selected_indices]
+                            break  # Exit the loop when valid input is provided
+                        except (ValueError, IndexError):
+                            console.print("[red]Invalid input. Please try again.")
+
+                # Extract the .EVO files from the selected playlists
+                primary_clips = []
+                for playlist in selected_playlists:
+                    primary_clips.extend(playlist.get("primaryClips", []))
+
+                # Validate that the correct EVO files are being used
+                for playlist in selected_playlists:
+                    expected_evo_files = playlist.get("evoFiles", [])
+                    if not expected_evo_files or any(not os.path.exists(evo) for evo in expected_evo_files):
+                        raise ValueError(f"Expected EVO files for playlist {playlist['id']} do not exist.")
+
+                    # Calculate the total size for the selected playlist
+                    playlist["totalSize"] = sum(os.path.getsize(evo) for evo in expected_evo_files if os.path.exists(evo))
+
+                    # Assign the valid EVO files
+                    playlist["evoFiles"] = expected_evo_files
+
+                if not primary_clips:
+                    raise ValueError("No primary clips found in the selected playlists.")
+
+                selected_playlist = selected_playlists[0]  # Assuming you're working with the largest or user-selected playlist
+                evo_files = selected_playlist["evoFiles"]
+                total_size = selected_playlist["totalSize"]
+
+                # Overwrite mediainfo File size and Duration
+                if evo_files:
+                    # Filter out non-existent files
+                    existing_evo_files = [evo for evo in evo_files if os.path.exists(evo)]
+
+                    if len(existing_evo_files) >= 2:
+                        # Select the second .EVO file
+                        selected_evo_path = existing_evo_files[1]
+                    else:
+                        # Fallback to the largest file
+                        selected_evo_path = max(
+                            existing_evo_files,
+                            key=os.path.getsize
+                        )
+
+                    if not os.path.exists(selected_evo_path):
+                        raise FileNotFoundError(f"Selected .EVO file {selected_evo_path} does not exist.")
+
+                    # Parse MediaInfo for the largest .EVO file
+                    original_mediainfo = MediaInfo.parse(selected_evo_path, output='STRING', full=False)
+
+                    modified_mediainfo = re.sub(
+                        r"File size\s+:\s+[^\r\n]+",
+                        f"File size                                : {total_size / (1024 ** 3):.2f} GiB",
+                        original_mediainfo
+                    )
+                    modified_mediainfo = re.sub(
+                        r"Duration\s+:\s+[^\r\n]+",
+                        f"Duration                                 : {self.format_duration(selected_playlist['titleDuration'])}",
+                        modified_mediainfo
+                    )
+
+                    # Split MediaInfo into blocks for easier manipulation
+                    mediainfo_blocks = modified_mediainfo.replace("\r\n", "\n").split("\n\n")
+
+                    # Add language details to the correct "Audio #X" block
+                    audio_tracks = selected_playlist.get("audioTracks", [])
+                    for audio_track in audio_tracks:
+                        # Extract track information from the playlist
+                        track_number = int(audio_track.get("track", "1"))  # Ensure track number is an integer
+                        language = audio_track.get("language", "")
+                        langcode = audio_track.get("langcode", "")
+                        description = audio_track.get("description", "")
+
+                        # Debugging: Print the current audio track information
+                        console.print(f"[Debug] Processing Audio Track: {track_number}")
+                        console.print(f"        Language: {language}")
+                        console.print(f"        Langcode: {langcode}")
+
+                        # Find the corresponding "Audio #X" block in MediaInfo
+                        found_block = False
+                        for i, block in enumerate(mediainfo_blocks):
+                            # console.print(mediainfo_blocks)
+                            if re.match(rf"^\s*Audio #\s*{track_number}\b.*", block):  # Match the correct Audio # block
+                                found_block = True
+                                console.print(f"[Debug] Found matching MediaInfo block for Audio Track {track_number}.")
+
+                                # Check if Language is already present
+                                if language and not re.search(rf"Language\s+:\s+{re.escape(language)}", block):
+                                    # Locate "Compression mode" line
+                                    compression_mode_index = block.find("Compression mode")
+                                    if compression_mode_index != -1:
+                                        # Find the end of the "Compression mode" line
+                                        line_end = block.find("\n", compression_mode_index)
+                                        if line_end == -1:
+                                            line_end = len(block)  # If no newline, append to the end of the block
+
+                                        # Construct the new Language entry
+                                        language_entry = f"\nLanguage                                 : {language}"
+
+                                        # Insert the new entry
+                                        updated_block = (
+                                            block[:line_end]  # Up to the end of the "Compression mode"
+                                            + language_entry
+                                            + block[line_end:]  # Rest of the block
+                                        )
+                                        mediainfo_blocks[i] = updated_block
+                                        console.print(f"[Debug] Updated MediaInfo Block for Audio Track {track_number}:")
+                                        console.print(updated_block)
+                                break  # Stop processing once the correct block is modified
+
+                        # Debugging: Log if no matching block was found
+                        if not found_block:
+                            console.print(f"[Debug] No matching MediaInfo block found for Audio Track {track_number}.")
+
+                    # Add subtitle track languages to the correct "Text #X" block
+                    subtitle_tracks = selected_playlist.get("subtitleTracks", [])
+                    for subtitle_track in subtitle_tracks:
+                        track_number = int(subtitle_track.get("track", "1"))  # Ensure track number is an integer
+                        language = subtitle_track.get("language", "")
+                        langcode = subtitle_track.get("langcode", "")
+
+                        # Debugging: Print current subtitle track info
+                        console.print(f"[Debug] Processing Subtitle Track: {track_number}")
+                        console.print(f"        Language: {language}")
+                        console.print(f"        Langcode: {langcode}")
+
+                        # Find the corresponding "Text #X" block
+                        found_block = False
+                        for i, block in enumerate(mediainfo_blocks):
+                            if re.match(rf"^\s*Text #\s*{track_number}\b", block):  # Match the correct Text # block
+                                found_block = True
+                                console.print(f"[Debug] Found matching MediaInfo block for Subtitle Track {track_number}.")
+
+                                # Insert Language details if not already present
+                                if language and not re.search(rf"Language\s+:\s+{re.escape(language)}", block):
+                                    # Locate the "Format" line
+                                    format_index = block.find("Format")
+                                    if format_index != -1:
+                                        # Find the end of the "Format" line
+                                        insertion_point = block.find("\n", format_index)
+                                        if insertion_point == -1:
+                                            insertion_point = len(block)  # If no newline, append to the end of the block
+
+                                        # Construct the new Language entry
+                                        language_entry = f"\nLanguage                                 : {language}"
+
+                                        # Insert the new entry
+                                        updated_block = (
+                                            block[:insertion_point]  # Up to the end of the "Format" line
+                                            + language_entry
+                                            + block[insertion_point:]  # Rest of the block
+                                        )
+                                        mediainfo_blocks[i] = updated_block
+                                        console.print(f"[Debug] Updated MediaInfo Block for Subtitle Track {track_number}:")
+                                        console.print(updated_block)
+                                break  # Stop processing once the correct block is modified
+
+                        # Debugging: Log if no matching block was found
+                        if not found_block:
+                            console.print(f"[Debug] No matching MediaInfo block found for Subtitle Track {track_number}.")
+
+                    # Rejoin the modified MediaInfo blocks
+                    modified_mediainfo = "\n\n".join(mediainfo_blocks)
+
+                    # Update the dictionary with the modified MediaInfo and file path
+                    each['evo_mi'] = modified_mediainfo
+                    each['largest_evo'] = selected_evo_path
+
+                # Save playlist information in meta under HDDVD_PLAYLIST
+                meta["HDDVD_PLAYLIST"] = selected_playlist
+
+            except (FileNotFoundError, ValueError, ET.ParseError) as e:
+                console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
+
+                # Fallback to largest .EVO file
+                files = glob("*.EVO")
+                if not files:
+                    console.print("No EVO files found in the directory.")
+                    continue
+
+                size = 0
+                largest = files[0]
+
+                # Get largest file from files
+                for file in files:
+                    file_size = os.path.getsize(file)
+                    if file_size > size:
+                        largest = file
+                        size = file_size
+
+                # Generate MediaInfo for the largest EVO file
+                each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False)
+                each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
+
         return discs
+
+    def format_duration(self, timecode):
+        parts = timecode.split(":")
+        if len(parts) != 4:
+            return "Unknown duration"
+
+        hours, minutes, seconds, _ = map(int, parts)
+        duration = ""
+        if hours > 0:
+            duration += f"{hours} h "
+        if minutes > 0:
+            duration += f"{minutes} min"
+        return duration.strip()
+
+    def parse_hddvd_playlist(self, file_path):
+        titles = []
+        try:
+            # Parse the XML structure
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+
+            # Extract namespace
+            namespace = {'ns': 'http://www.dvdforum.org/2005/HDDVDVideo/Playlist'}
+
+            for title in root.findall(".//ns:Title", namespaces=namespace):
+                title_duration = title.get("titleDuration", "00:00:00:00")
+                duration_seconds = self.timecode_to_seconds(title_duration)
+
+                # Skip titles with a duration of 10 minutes or less
+                if duration_seconds <= 600:
+                    continue
+
+                title_data = {
+                    "titleNumber": title.get("titleNumber"),
+                    "id": title.get("id"),
+                    "description": title.get("description"),
+                    "titleDuration": title_duration,
+                    "displayName": title.get("displayName"),
+                    "onEnd": title.get("onEnd"),
+                    "alternativeSDDisplayMode": title.get("alternativeSDDisplayMode"),
+                    "primaryClips": [],
+                    "chapters": [],
+                    "audioTracks": [],
+                    "subtitleTracks": [],
+                    "applicationSegments": [],
+                }
+
+                # Extract PrimaryAudioVideoClip details
+                for clip in title.findall(".//ns:PrimaryAudioVideoClip", namespaces=namespace):
+                    clip_data = {
+                        "src": clip.get("src"),
+                        "titleTimeBegin": clip.get("titleTimeBegin"),
+                        "titleTimeEnd": clip.get("titleTimeEnd"),
+                        "seamless": clip.get("seamless"),
+                        "audioTracks": [],
+                        "subtitleTracks": [],
+                    }
+
+                    # Extract Audio tracks within PrimaryAudioVideoClip
+                    for audio in clip.findall(".//ns:Audio", namespaces=namespace):
+                        clip_data["audioTracks"].append({
+                            "track": audio.get("track"),
+                            "streamNumber": audio.get("streamNumber"),
+                            "mediaAttr": audio.get("mediaAttr"),
+                            "description": audio.get("description"),
+                        })
+
+                    # Extract Subtitle tracks within PrimaryAudioVideoClip
+                    for subtitle in clip.findall(".//ns:Subtitle", namespaces=namespace):
+                        clip_data["subtitleTracks"].append({
+                            "track": subtitle.get("track"),
+                            "streamNumber": subtitle.get("streamNumber"),
+                            "mediaAttr": subtitle.get("mediaAttr"),
+                            "description": subtitle.get("description"),
+                        })
+
+                    title_data["primaryClips"].append(clip_data)
+
+                # Extract ChapterList details
+                for chapter in title.findall(".//ns:ChapterList/ns:Chapter", namespaces=namespace):
+                    title_data["chapters"].append({
+                        "displayName": chapter.get("displayName"),
+                        "titleTimeBegin": chapter.get("titleTimeBegin"),
+                    })
+
+                # Extract TrackNavigationList details (AudioTracks and SubtitleTracks)
+                for audio_track in title.findall(".//ns:TrackNavigationList/ns:AudioTrack", namespaces=namespace):
+                    langcode = audio_track.get("langcode", "")
+                    # Extract the 2-letter language code before the colon
+                    langcode_short = langcode.split(":")[0] if ":" in langcode else langcode
+                    # Convert the short language code to the full language name
+                    language_name = Language.get(langcode_short).display_name()
+
+                    title_data["audioTracks"].append({
+                        "track": audio_track.get("track"),
+                        "langcode": langcode_short,
+                        "language": language_name,
+                        "description": audio_track.get("description"),
+                        "selectable": audio_track.get("selectable"),
+                    })
+
+                for subtitle_track in title.findall(".//ns:TrackNavigationList/ns:SubtitleTrack", namespaces=namespace):
+                    langcode = subtitle_track.get("langcode", "")
+                    # Extract the 2-letter language code before the colon
+                    langcode_short = langcode.split(":")[0] if ":" in langcode else langcode
+                    # Convert the short language code to the full language name
+                    language_name = Language.get(langcode_short).display_name()
+
+                    title_data["subtitleTracks"].append({
+                        "track": subtitle_track.get("track"),
+                        "langcode": langcode_short,
+                        "language": language_name,
+                        "selectable": subtitle_track.get("selectable"),
+                    })
+
+                # Extract ApplicationSegment details
+                for app_segment in title.findall(".//ns:ApplicationSegment", namespaces=namespace):
+                    app_data = {
+                        "src": app_segment.get("src"),
+                        "titleTimeBegin": app_segment.get("titleTimeBegin"),
+                        "titleTimeEnd": app_segment.get("titleTimeEnd"),
+                        "sync": app_segment.get("sync"),
+                        "zOrder": app_segment.get("zOrder"),
+                        "resources": [],
+                    }
+
+                    # Extract ApplicationResource details
+                    for resource in app_segment.findall(".//ns:ApplicationResource", namespaces=namespace):
+                        app_data["resources"].append({
+                            "src": resource.get("src"),
+                            "size": resource.get("size"),
+                            "priority": resource.get("priority"),
+                            "multiplexed": resource.get("multiplexed"),
+                        })
+
+                    title_data["applicationSegments"].append(app_data)
+
+                # Add the fully extracted title data to the list
+                titles.append(title_data)
+
+        except ET.ParseError as e:
+            print(f"Error parsing XPL file: {e}")
+        return titles
+
+    def timecode_to_seconds(self, timecode):
+        parts = timecode.split(":")
+        if len(parts) != 4:
+            return 0
+        hours, minutes, seconds, frames = map(int, parts)
+        return hours * 3600 + minutes * 60 + seconds
