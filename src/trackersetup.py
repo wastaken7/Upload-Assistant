@@ -382,7 +382,8 @@ class TRACKER_SETUP:
                     return False
 
                 metaseason = meta.get('season_int')
-                seasonint = int(metaseason)
+                if metaseason:
+                    seasonint = int(metaseason)
                 file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker_name}_claimed_releases.json')
                 if not os.path.exists(file_path):
                     console.print(f"[red]No claim data file found for {tracker_name}[/red]")
@@ -400,7 +401,7 @@ class TRACKER_SETUP:
 
                     if (
                         api_tmdb_id in tmdb_id
-                        and season == seasonint
+                        and (meta['category'] == "MOVIE" or season == seasonint)
                         and all(res in api_resolutions for res in resolution_ids)
                         and all(typ in api_types for typ in type_ids)
                     ):
