@@ -27,3 +27,4 @@ urllib3
 httpx
 aiofiles
 pyparsebluray
+langcodes

@@ -497,7 +497,7 @@ class Prep():
             export_clean.write(discs[0]['ifo_mi'])
             export_clean.close()
         elif is_disc == "HDDVD":
-            discs = await parse.get_hddvd_info(discs)
+            discs = await parse.get_hddvd_info(discs, meta)
             export = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'w', newline="", encoding='utf-8')
             export.write(discs[0]['evo_mi'])
             export.close()
@@ -716,12 +716,20 @@ class Prep():
             track_num = 2
             tracks = mi.get('media', {}).get('track', [])
 
-            for i, t in enumerate(tracks):
-                if t.get('@type') != "Audio":
-                    continue
-                if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in (t.get('Title') or '').lower():
-                    track_num = i
-                    break
+            # Handle HD-DVD case
+            if meta.get('is_disc') == "HDDVD":
+                # Look for the first audio track
+                for i, t in enumerate(tracks):
+                    if t.get('@type') == "Audio":
+                        track_num = i
+                        break
+            else:
+                for i, t in enumerate(tracks):
+                    if t.get('@type') != "Audio":
+                        continue
+                    if t.get('Language', '') == meta.get('original_language', '') and "commentary" not in (t.get('Title') or '').lower():
+                        track_num = i
+                        break
 
             track = tracks[track_num] if len(tracks) > track_num else {}
             format = track.get('Format', '')
