@@ -873,34 +873,33 @@ class COMMON():
         """
         Check if the filename matches the given season and episode.
         """
-        if target_season:
-            target_season = int(str(target_season).lstrip('sS'))
+        season_match = re.search(r'[sS](\d+)', str(target_season))
+        target_season = int(season_match.group(1)) if season_match else None
+
         if target_episode:
-            target_episodes = [
-                int(ep) for ep in str(target_episode).lstrip('eE').split('E') if ep.isdigit()
-            ]
+            episode_matches = re.findall(r'\d+', str(target_episode))
+            target_episodes = [int(ep) for ep in episode_matches]
         else:
             target_episodes = []
 
-        season_pattern = f"s{target_season:02}" if target_season else None
-        episode_patterns = [f"e{ep:02}" for ep in target_episodes] if target_episodes else []
+        season_pattern = rf"[sS]{target_season:02}" if target_season is not None else None
+        episode_patterns = [rf"[eE]{ep:02}" for ep in target_episodes] if target_episodes else []
 
         # Determine if filename represents a season pack (no explicit episode pattern)
-        is_season_pack = not re.search(r"[eE]\d{2}", filename)
+        is_season_pack = not re.search(r"[eE]\d{2}", filename, re.IGNORECASE)
 
-        # Handle season packs: Match only the season
-        if is_season_pack:
-            if season_pattern:
-                return season_pattern in filename.lower()  # Only check season
-            return True  # No target season means no constraints
+        # If `target_episode` is empty, match only season packs
+        if not target_episodes:
+            return bool(season_pattern and re.search(season_pattern, filename, re.IGNORECASE)) and is_season_pack
 
-        # Handle single episodes: Match both season and episodes
-        if season_pattern and episode_patterns:
-            return season_pattern in filename.lower() and any(ep in filename.lower() for ep in episode_patterns)
+        # If `target_episode` is provided, match both season packs and episode files
         if season_pattern:
-            return season_pattern in filename.lower()
-        if episode_patterns:
-            return any(ep in filename.lower() for ep in episode_patterns)
+            if is_season_pack:
+                return bool(re.search(season_pattern, filename, re.IGNORECASE))  # Match season pack
+            if episode_patterns:
+                return bool(re.search(season_pattern, filename, re.IGNORECASE)) and any(
+                    re.search(ep, filename, re.IGNORECASE) for ep in episode_patterns
+                )  # Match episode file
 
         return False  # No match
 
