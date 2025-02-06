@@ -312,6 +312,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             # Use get_info_from_torrent_id function if ID is found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
 
+            meta['imdb'] = str(imdb_id).zfill(7) if imdb else None
             meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
             meta['hdb_name'] = hdb_name
             found_match = True
@@ -324,6 +325,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             # Use search_filename function if ID is not found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
 
+            meta['imdb'] = str(imdb_id).zfill(7) if imdb else None
             meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
             meta['hdb_name'] = hdb_name
             if tracker_id:
@@ -332,15 +334,17 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
             if found_match:
                 if imdb or tvdb_id or hdb_name:
-                    console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
-                    if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
-                        console.print(f"[green]{tracker_name} data retained.[/green]")
-                    else:
-                        console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
-                        meta[tracker_key] = None
-                        meta['tvdb_id'] = None
-                        meta['hdb_name'] = None
-                        found_match = False
+                    if meta['unattended']:
+                        console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
+                        if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                            console.print(f"[green]{tracker_name} data retained.[/green]")
+                        else:
+                            console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                            meta[tracker_key] = None
+                            meta['tvdb_id'] = None
+                            meta['imdb'] = None
+                            meta['hdb_name'] = None
+                            found_match = False
                 else:
                     found_match = False
 
