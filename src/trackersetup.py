@@ -47,6 +47,7 @@ import httpx
 import aiofiles
 import os
 import json
+import cli_ui
 from datetime import datetime, timedelta
 import asyncio
 
@@ -231,6 +232,12 @@ class TRACKER_SETUP:
                     console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     await asyncio.sleep(5)
                     result = True
+
+        if result and (not meta['unattended'] or meta.get('unattended-confirm', False)):
+            if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                return True
+        else:
+            return True
 
         return result
 
