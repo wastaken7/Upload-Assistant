@@ -11,6 +11,7 @@ from io import BytesIO
 # Define expected amount of screenshots from the config
 expected_images = int(config['DEFAULT']['screens'])
 
+
 async def prompt_user_for_confirmation(message: str) -> bool:
     try:
         response = input(f"{message} (Y/n): ").strip().lower()
@@ -19,6 +20,7 @@ async def prompt_user_for_confirmation(message: str) -> bool:
         return False
     except EOFError:
         sys.exit(1)
+
 
 async def check_images_concurrently(imagelist, meta):
     approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
