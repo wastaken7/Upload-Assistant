@@ -93,12 +93,12 @@ async def check_images_concurrently(imagelist, meta):
                                 )
                                 return None
 
-                                meta['image_sizes'][img_url] = len(image_content)
-                                if meta['debug']:
-                                    console.print(
-                                        f"Valid image {img_url} with resolution {image.width}x{image.height} "
-                                        f"and size {len(image_content) / 1024:.2f} KiB"
-                                    )
+                            meta['image_sizes'][img_url] = len(image_content)
+                            if meta['debug']:
+                                console.print(
+                                    f"Valid image {img_url} with resolution {image.width}x{image.height} "
+                                    f"and size {len(image_content) / 1024:.2f} KiB"
+                                )
                         except Exception as e:
                             console.print(f"[red]Failed to process image {img_url}: {e}")
                             return None
