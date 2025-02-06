@@ -311,6 +311,7 @@ class AR():
         return os.path.basename(path)
 
     async def search_existing(self, meta, DISCTYPE):
+        console.print("[yellow]Searching for existing torrents on AR...")
         await self.validate_credentials(meta)
         dupes = {}
 
