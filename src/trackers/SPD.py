@@ -87,24 +87,32 @@ class SPD():
         if meta['debug'] is False:
             response = requests.request("POST", url=self.upload_url, json=data, headers=headers)
             try:
-                print(response.json())
-                # response = {'status': True, 'error': False, 'downloadUrl': '/api/torrent/383435/download', 'torrent': {'id': 383435, 'name': 'name-with-full-stops', 'slug': 'name-with-dashs', 'category_id': 3}}
-                # downloading the torrent from site as it adds a tonne of different trackers and the source is different all the time.
-                try:
-                    # torrent may not dl and may not provide error if machine is under load or network connection usage high.
-                    with requests.get(url=self.url + response.json()['downloadUrl'], stream=True, headers=headers) as r:
-                        # replacing L4g/torf created torrent so it will be added to the client.
-                        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent",
-                                  'wb') as f:
-                            shutil.copyfileobj(r.raw, f)
-                    # adding as comment link to torrent
-                    if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"):
-                        new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent")
-                        new_torrent.metainfo['comment'] = f"{self.url}/browse/{response.json()['torrent']['id']}"
-                        Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", overwrite=True)
-                except Exception:
-                    console.print(traceback.print_exc())
-                    console.print("[red]Unable to Download torrent, try manually")
+                if response.status_code == 200:
+                    # response = {'status': True, 'error': False, 'downloadUrl': '/api/torrent/383435/download', 'torrent': {'id': 383435, 'name': 'name-with-full-stops', 'slug': 'name-with-dashs', 'category_id': 3}}
+                    # downloading the torrent from site as it adds a tonne of different trackers and the source is different all the time.
+                    try:
+                        # torrent may not dl and may not provide error if machine is under load or network connection usage high.
+                        if 'downloadUrl' in response.json():
+                            with requests.get(url=self.url + response.json()['downloadUrl'], stream=True, headers=headers) as r:
+                                # replacing L4g/torf created torrent so it will be added to the client.
+                                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent",
+                                          'wb') as f:
+                                    shutil.copyfileobj(r.raw, f)
+                            # adding as comment link to torrent
+                            if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"):
+                                new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent")
+                                new_torrent.metainfo['comment'] = f"{self.url}/browse/{response.json()['torrent']['id']}"
+                                Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", overwrite=True)
+                        else:
+                            console.print("[bold red]No downloadUrl in response.")
+                            console.print("[bold red]Confirm it uploaded correctly and try to download manually")
+                            console.print({response.json()})
+                    except Exception:
+                        console.print(traceback.print_exc())
+                        console.print("[red]Unable to Download torrent, try manually")
+                        console.print({response.json()})
+                else:
+                    console.print(f"[bold red]Failed to upload got status code: {response.status_code}")
             except Exception:
                 console.print(traceback.print_exc())
                 console.print("[yellow]Unable to Download torrent, try manually")
@@ -139,8 +147,8 @@ class SPD():
             params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = client.get(url=self.search_url, params=params, headers=headers)
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url=self.search_url, params=params, headers=headers)
                 if response.status_code == 200:
                     data = response.json()
                     for each in data:

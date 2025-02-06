@@ -613,6 +613,22 @@ class Clients():
                         meta['blu'] = match.group(1)
                         console.print(f"[bold cyan]meta['blu'] set to ID: {meta['blu']}")
 
+                elif "https://hdbits.org" in comment:
+                    match = re.search(r'id=(\d+)', comment)
+                    if match:
+                        meta['hdb'] = match.group(1)
+                        console.print(f"[bold cyan]meta['hdb'] set to ID: {meta['hdb']}")
+
+                elif "https://broadcasthe.net" in comment:
+                    match = re.search(r'id=(\d+)', comment)
+                    if match:
+                        meta['btn'] = match.group(1)
+                        console.print(f"[bold cyan]meta['btn'] set to ID: {meta['btn']}")
+
+                elif "https://beyond-hd.me" in comment:
+                    meta['bhd'] = info_hash_v1
+                    console.print(f"[bold cyan]meta['bhd'] set to ID: {meta['bhd']}")
+
                 found = True
                 break
 

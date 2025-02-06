@@ -11,6 +11,7 @@ from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_fro
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
+from src.btnid import get_btn_torrents, get_bhd_torrents
 
 try:
     import traceback
@@ -206,6 +207,7 @@ class Prep():
                 description.write(description_text)
 
         client = Clients(config=config)
+        only_id = config['DEFAULT'].get('only_id', False)
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list'):
@@ -222,6 +224,8 @@ class Prep():
                     'lst': 'LST',
                     'oe': 'OE',
                     'tik': 'TIK',
+                    'btn': 'BTN',
+                    'bhd': 'BHD',
                 }
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)
@@ -235,7 +239,7 @@ class Prep():
                     tracker_instance = tracker_class_map[tracker_name](config=config)
                     try:
                         updated_meta, match = await update_metadata_from_tracker(
-                            tracker_name, tracker_instance, meta, search_term, search_file_folder
+                            tracker_name, tracker_instance, meta, search_term, search_file_folder, only_id
                         )
                         if match:
                             found_match = True
@@ -249,7 +253,22 @@ class Prep():
 
                 # If a specific tracker is found, process only that tracker
                 if specific_tracker:
-                    meta = await process_tracker(specific_tracker, meta)
+                    if specific_tracker == "BTN":
+                        btn_id = meta.get('btn')
+                        btn_api = config['DEFAULT'].get('btn_api')
+                        await get_btn_torrents(btn_api, btn_id, meta)
+                        if meta.get('imdb') is not None:
+                            found_match = True
+                    elif specific_tracker == "BHD":
+                        bhd_api = config['DEFAULT'].get('bhd_api')
+                        bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
+                        if not meta.get('infohash'):
+                            meta['infohash'] = meta['bhd']
+                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta)
+                        if meta.get('imdb') is not None:
+                            found_match = True
+                    else:
+                        meta = await process_tracker(specific_tracker, meta)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]

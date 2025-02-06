@@ -7,6 +7,12 @@ config = {
         # -----------------------
 
         "tmdb_api": "tmdb_api key",
+        # btn api key for infohash parsing
+        "btn_api": "btn_api key",
+        # bhd api/rss keys for infohash parsing
+        "bhd_api": "bhd api key",
+        "bhd_rss_key": "bhd rss key",
+        # image host api keys
         "imgbb_api": "imgbb api key",
         "ptpimg_api": "ptpimg api key",
         "lensdump_api": "lensdump api key",
@@ -99,6 +105,9 @@ config = {
 
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
+
+        # set true to only grab meta id's from trackers, not descriptions and images
+        "only_id": False,
 
     },
 
