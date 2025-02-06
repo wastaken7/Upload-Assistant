@@ -94,6 +94,9 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
 
 
 async def tmdb_other_meta(meta):
+    if meta['debug']:
+        console.print("tmdb id in tmdb_other", meta['tmdb'], meta['tmdb_manual'])
+        console.print("Category", meta['category'])
     if meta['tmdb'] == "0":
         try:
             title = guessit(meta['path'], {"excludes": ["country", "language"]})['title'].lower()
@@ -220,7 +223,7 @@ async def tmdb_other_meta(meta):
         if runtime == []:
             runtime = [60]
         meta['runtime'] = runtime[0]
-    if meta['poster'] not in (None, ''):
+    if meta.get('poster') not in (None, ''):
         meta['poster'] = f"https://image.tmdb.org/t/p/original{meta['poster']}"
 
     difference = SequenceMatcher(None, meta['title'].lower(), meta['aka'][5:].lower()).ratio()

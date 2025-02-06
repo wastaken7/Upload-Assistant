@@ -167,8 +167,12 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
 
     if tmdb not in [None, '0']:
         meta['tmdb_manual'] = tmdb
+        if meta['debug']:
+            console.print("set TMDB ID:", meta['tmdb_manual'])
     if imdb not in [None, '0']:
         meta['imdb'] = str(imdb).zfill(7)
+        if meta['debug']:
+            console.print("set IMDB ID:", meta['imdb'])
     if tvdb not in [None, '0']:
         meta['tvdb_id'] = tvdb
     if mal not in [None, '0']:
