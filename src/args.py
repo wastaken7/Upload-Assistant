@@ -61,6 +61,8 @@ class Args():
         parser.add_argument('-oe', '--oe', nargs='*', required=False, help="OE torrent id/link", type=str)
         parser.add_argument('-tik', '--tik', nargs='*', required=False, help="TIK torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs='*', required=False, help="HDB torrent id/link", type=str)
+        parser.add_argument('-btn', '--btn', nargs='*', required=False, help="BTN torrent id/link", type=str)
+        parser.add_argument('-bhd', '--bhd', nargs='*', required=False, help="BHD infohash", type=str)
         parser.add_argument('--foreign', dest='foreign', action='store_true', required=False, help="Set for TIK Foreign category")
         parser.add_argument('--opera', dest='opera', action='store_true', required=False, help="Set for TIK Opera & Musical category")
         parser.add_argument('--asian', dest='asian', action='store_true', required=False, help="Set for TIK Asian category")
@@ -233,6 +235,20 @@ class Args():
                                 console.print('[red]Continuing without -hdb')
                         else:
                             meta['hdb'] = value2
+
+                    elif key == 'btn':
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                meta['btn'] = urllib.parse.parse_qs(parsed.query)['id'][0]
+                            except Exception:
+                                console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
+                                console.print('[red]Continuing without -hdb')
+                        else:
+                            meta['btn'] = value2
+
+                    elif key == 'bhd':
+                        meta['bhd'] = value2
 
                     else:
                         meta[key] = value2
