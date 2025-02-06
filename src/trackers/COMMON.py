@@ -503,6 +503,7 @@ class COMMON():
         return False
 
     async def unit3d_torrent_info(self, tracker, torrent_url, search_url, meta, id=None, file_name=None):
+        only_id = self.config['DEFAULT'].get('only_id', False)
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist = []
 
@@ -595,7 +596,7 @@ class COMMON():
                     except (KeyboardInterrupt, EOFError):
                         sys.exit(1)
 
-            if description:
+            if description and not only_id:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 console.print(f"[green]Successfully grabbed description from {tracker}")

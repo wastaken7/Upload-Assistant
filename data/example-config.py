@@ -100,6 +100,9 @@ config = {
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
 
+        # set true to only grab meta id's from trackers, not descriptions and images
+        "only_id": False,
+
     },
 
     # these are used for DB links on AR
