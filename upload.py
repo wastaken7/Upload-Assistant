@@ -18,6 +18,10 @@ from src.trackerhandle import process_trackers
 from src.queuemanage import handle_queue
 from src.console import console
 from src.torrentcreate import create_torrent, create_random_torrents, create_base_from_existing_torrent
+from src.uphelper import UploadHelper
+from src.trackerstatus import process_all_trackers
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+
 
 cli_ui.setup(color='always', title="Audionut's Upload Assistant")
 
@@ -80,10 +84,81 @@ async def process_meta(meta, base_dir):
     meta['base_dir'] = base_dir
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     meta = await prep.gather_prep(meta=meta, mode='cli')
-    if not meta:
-        return
+    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+    parser = Args(config)
+    helper = UploadHelper()
+    if meta.get('trackers', None) is not None:
+        trackers = meta['trackers']
     else:
-        meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 3))
+        trackers = config['TRACKERS']['default_trackers']
+    if "," in trackers:
+        trackers = trackers.split(',')
+    meta['trackers'] = trackers
+    with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+        json.dump(meta, f, indent=4)
+        f.close()
+    confirm = await helper.get_confirmation(meta)
+    while confirm is False:
+        editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+        editargs = (meta['path'],) + tuple(editargs.split())
+        if meta.get('debug', False):
+            editargs += ("--debug",)
+        console.print("meta['trackers']:", meta['trackers'])
+        if meta.get('trackers', None) is not None:
+            editargs += ("--trackers", ', '.join(meta['trackers']))
+        console.print("editargs:", editargs)
+        meta, help, before_args = parser.parse(editargs, meta)
+        console.print("before_args:", before_args)
+        console.print("meta after parse:", meta)
+        meta['edit'] = True
+        meta = await prep.gather_prep(meta=meta, mode='cli')
+        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+        confirm = await helper.get_confirmation(meta)
+
+    successful_trackers = await process_all_trackers(meta)
+
+    meta['skip_uploading'] = int(config['DEFAULT'].get('tracker_pass_checks', 1))
+    if successful_trackers < meta['skip_uploading'] and not meta['debug']:
+        console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
+
+    else:
+        meta['we_are_uploading'] = True
+        filename = meta.get('title', None)
+        bdinfo = meta.get('bdinfo', None)
+        videopath = meta.get('path', None)
+        console.print(f"Processing {filename} for upload")
+        if 'manual_frames' not in meta:
+            meta['manual_frames'] = {}
+        manual_frames = meta['manual_frames']
+        # Take Screenshots
+        if meta['is_disc'] == "BDMV":
+            use_vs = meta.get('vapoursynth', False)
+            try:
+                disc_screenshots(
+                    meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
+                    meta.get('image_list', []), meta.get('ffdebug', False), None
+                )
+            except Exception as e:
+                print(f"Error during BDMV screenshot capture: {e}")
+
+        elif meta['is_disc'] == "DVD":
+            try:
+                dvd_screenshots(
+                    meta, 0, None, None
+                )
+            except Exception as e:
+                print(f"Error during DVD screenshot capture: {e}")
+
+        else:
+            try:
+                screenshots(
+                    videopath, filename, meta['uuid'], base_dir, meta,
+                    manual_frames=manual_frames  # Pass additional kwargs directly
+                )
+            except Exception as e:
+                print(f"Error during generic screenshot capture: {e}")
+
+        meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 0))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
                 meta['image_list'] = []
@@ -114,6 +189,9 @@ async def process_meta(meta, base_dir):
 
         if int(meta.get('randomized', 0)) >= 1:
             create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
+
+        if meta['saved_description'] is False:
+            meta = await prep.gen_desc(meta)
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
@@ -148,7 +226,7 @@ async def save_processed_file(log_file, file_path):
 
 
 async def do_the_thing(base_dir):
-    meta = {'base_dir': base_dir}
+    meta = dict()
     paths = []
     for each in sys.argv[1:]:
         if os.path.exists(each):

@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
-from src.args import Args
 from src.console import console
 from src.exceptions import *  # noqa: F403
 from src.clients import Clients
 from data.config import config
-from src.uphelper import UploadHelper
-from src.trackersetup import TRACKER_SETUP, tracker_class_map
-from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze
 from src.imdb import get_imdb_info_api, search_imdb, imdb_other_meta
 from src.trackermeta import update_metadata_from_tracker
@@ -14,7 +11,6 @@ from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_fro
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
-from src.trackerstatus import process_all_trackers
 from src.btnid import get_btn_torrents, get_bhd_torrents
 
 try:
@@ -34,7 +30,6 @@ try:
     import tmdbsimple as tmdb
     import time
     import itertools
-    import cli_ui
     import aiohttp
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
@@ -215,7 +210,6 @@ class Prep():
         only_id = config['DEFAULT'].get('only_id', False)
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
-        tracker_setup = TRACKER_SETUP(config=config)
         if not meta.get('image_list'):
             # Reuse information from trackers with fallback
             found_match = False
@@ -377,93 +371,15 @@ class Prep():
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
         else:
             meta['edition'] = ""
-        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
-        if meta['debug']:
-            meta_finish_time = time.time()
-            console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
-        parser = Args(config)
-        helper = UploadHelper()
-        enabled_trackers = tracker_setup.trackers_enabled(meta)
-        if "saved_trackers" not in meta:
-            meta['trackers'] = enabled_trackers
-        else:
-            meta['trackers'] = meta['saved_trackers']
-        if meta.get('edit', False):
-            meta['edit'] = False
-        confirm = await helper.get_confirmation(meta)
-        while confirm is False:
-            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-                json.dump(meta, f, indent=4)
-            meta['saved_trackers'] = meta['trackers']
-            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
-            editargs = (meta['path'],) + tuple(editargs.split())
-            if meta.get('debug', False):
-                editargs += ("--debug",)
-            meta, help, before_args = parser.parse(editargs, meta)
-            meta['edit'] = True
-            meta = await self.gather_prep(meta=meta, mode='cli')
-            meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await self.get_name(meta)
-            confirm = await helper.get_confirmation(meta)
 
-        if meta['debug']:
-            dupe_start_time = time.time()
-        successful_trackers = await process_all_trackers(meta)
-        if meta['debug']:
-            dupe_finish_time = time.time()
-            console.print(f"Dupe checking processed in {dupe_finish_time - dupe_start_time:.2f} seconds")
-
-        meta['skip_uploading'] = int(self.config['DEFAULT'].get('tracker_pass_checks', 1))
-        if not meta['debug']:
-            if successful_trackers < meta['skip_uploading']:
-                console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
-                return
-
-        meta['we_are_uploading'] = True
-
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-            json.dump(meta, f, indent=4)
-
-        if 'manual_frames' not in meta:
-            meta['manual_frames'] = {}
-        manual_frames = meta['manual_frames']
-        # Take Screenshots
-        if meta['is_disc'] == "BDMV":
-            if not meta.get('edit', False):
-                use_vs = meta.get('vapoursynth', False)
-                try:
-                    disc_screenshots(
-                        meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
-                        meta.get('image_list', []), meta.get('ffdebug', False), None
-                    )
-                except Exception as e:
-                    print(f"Error during BDMV screenshot capture: {e}")
-
-        elif meta['is_disc'] == "DVD":
-            if not meta.get('edit', False):
-                try:
-                    dvd_screenshots(
-                        meta, 0, None, None
-                    )
-                except Exception as e:
-                    print(f"Error during DVD screenshot capture: {e}")
-
-        else:
-            if not meta.get('edit', False):
-                try:
-                    screenshots(
-                        videopath, filename, meta['uuid'], base_dir, meta,
-                        manual_frames=manual_frames  # Pass additional kwargs directly
-                    )
-                except Exception as e:
-                    print(f"Error during generic screenshot capture: {e}")
-
-        # WORK ON THIS
         meta.get('stream', False)
         meta['stream'] = await self.stream_optimized(meta['stream'])
         meta.get('anon', False)
         meta['anon'] = self.is_anon(meta['anon'])
-        if meta['saved_description'] is False:
-            meta = await self.gen_desc(meta)
+        if meta['debug']:
+            meta_finish_time = time.time()
+            console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
+
         return meta
 
     """
