@@ -23,9 +23,6 @@ async def prompt_user_for_confirmation(message: str) -> bool:
 
 
 async def check_images_concurrently(imagelist, meta):
-    approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
-    invalid_host_found = False  # Track if any image is on a non-approved host
-
     # Ensure meta['image_sizes'] exists
     if 'image_sizes' not in meta:
         meta['image_sizes'] = {}
@@ -67,11 +64,6 @@ async def check_images_concurrently(imagelist, meta):
 
         # Verify the image link
         if await check_image_link(img_url):
-            # Check if the image is hosted on an approved image host
-            if not any(host in img_url for host in approved_image_hosts):
-                nonlocal invalid_host_found
-                invalid_host_found = True  # Mark that we found an invalid host
-
             async with aiohttp.ClientSession() as session:
                 async with session.get(img_url) as response:
                     if response.status == 200:
@@ -117,24 +109,6 @@ async def check_images_concurrently(imagelist, meta):
     valid_images = [image for image in results if image is not None]
     if expected_images < len(valid_images):
         valid_images = valid_images[:expected_images]
-
-    # Convert default_trackers string into a list
-    default_trackers = config['TRACKERS'].get('default_trackers', '')
-    trackers_list = [tracker.strip() for tracker in default_trackers.split(',')]
-
-    # Ensure meta['trackers'] is a list
-    if meta.get('trackers') is not None:
-        if isinstance(meta.get('trackers', ''), str):
-            meta['trackers'] = [tracker.strip() for tracker in meta['trackers'].split(',')]
-        if 'MTV' in meta.get('trackers', []):
-            if invalid_host_found:
-                console.print(
-                    "[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]"
-                )
-    # Issue warning if any valid image is on an unapproved host and MTV is in the trackers list
-    elif 'MTV' in trackers_list:
-        if invalid_host_found:
-            console.print("[red]Warning: Some images are not hosted on an MTV-approved image host. MTV will need new images later.[/red]")
 
     return valid_images
 
