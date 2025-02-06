@@ -619,6 +619,12 @@ class Clients():
                         meta['hdb'] = match.group(1)
                         console.print(f"[bold cyan]meta['hdb'] set to ID: {meta['hdb']}")
 
+                elif "https://broadcasthe.net" in comment:
+                    match = re.search(r'id=(\d+)', comment)
+                    if match:
+                        meta['btn'] = match.group(1)
+                        console.print(f"[bold cyan]meta['btn'] set to ID: {meta['btn']}")
+
                 found = True
                 break
 
