@@ -625,6 +625,10 @@ class Clients():
                         meta['btn'] = match.group(1)
                         console.print(f"[bold cyan]meta['btn'] set to ID: {meta['btn']}")
 
+                elif "https://beyond-hd.me" in comment:
+                    meta['bhd'] = info_hash_v1
+                    console.print(f"[bold cyan]meta['bhd'] set to ID: {meta['bhd']}")
+
                 found = True
                 break
 
