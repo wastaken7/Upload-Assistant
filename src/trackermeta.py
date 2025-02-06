@@ -334,7 +334,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
             if found_match:
                 if imdb or tvdb_id or hdb_name:
-                    if meta['unattended']:
+                    if not meta['unattended']:
                         console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
                         if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
                             console.print(f"[green]{tracker_name} data retained.[/green]")
