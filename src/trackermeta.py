@@ -8,6 +8,8 @@ from PIL import Image
 import io
 from io import BytesIO
 
+# Define expected amount of screenshots from the config
+expected_images = int(config['DEFAULT']['screens'])
 
 async def prompt_user_for_confirmation(message: str) -> bool:
     try:
@@ -17,9 +19,6 @@ async def prompt_user_for_confirmation(message: str) -> bool:
         return False
     except EOFError:
         sys.exit(1)
-
-# Define expected amount of screenshots from the config
-expected_images = int(config['DEFAULT']['screens'])
 
 async def check_images_concurrently(imagelist, meta):
     approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
@@ -92,6 +91,12 @@ async def check_images_concurrently(imagelist, meta):
                                 )
                                 return None
 
+                                meta['image_sizes'][img_url] = len(image_content)
+                                if meta['debug']:
+                                    console.print(
+                                        f"Valid image {img_url} with resolution {image.width}x{image.height} "
+                                        f"and size {len(image_content) / 1024:.2f} KiB"
+                                    )
                         except Exception as e:
                             console.print(f"[red]Failed to process image {img_url}: {e}")
                             return None
