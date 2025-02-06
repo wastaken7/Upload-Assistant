@@ -196,7 +196,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
     console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
 
 
-async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, search_term, search_file_folder):
+async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, search_term, search_file_folder, only_id=False):
     tracker_key = tracker_name.lower()
     manual_key = f"{tracker_key}_manual"
     found_match = False
@@ -230,8 +230,6 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             found_match = False
 
     elif tracker_name == "PTP":
-        from data.config import config
-        only_id = config['DEFAULT'].get('only_id', False)
         imdb_id = None
         if meta.get('ptp') is None:
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)

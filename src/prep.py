@@ -211,6 +211,7 @@ class Prep():
                 description.write(description_text)
 
         client = Clients(config=config)
+        only_id = config['DEFAULT'].get('only_id', False)
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         tracker_setup = TRACKER_SETUP(config=config)
@@ -241,7 +242,7 @@ class Prep():
                     tracker_instance = tracker_class_map[tracker_name](config=config)
                     try:
                         updated_meta, match = await update_metadata_from_tracker(
-                            tracker_name, tracker_instance, meta, search_term, search_file_folder
+                            tracker_name, tracker_instance, meta, search_term, search_file_folder, only_id
                         )
                         if match:
                             found_match = True
