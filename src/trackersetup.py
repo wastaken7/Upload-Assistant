@@ -44,7 +44,6 @@ from src.trackers.HHD import HHD
 from src.trackers.SP import SP
 from src.console import console
 import httpx
-import aiofiles
 import os
 import json
 import cli_ui
@@ -170,55 +169,59 @@ class TRACKER_SETUP:
                 "raw_data": json_data
             }
 
-            async with aiofiles.open(file_path, mode='w') as file:
-                await file.write(json.dumps(file_content, indent=4))
+            await asyncio.to_thread(self._write_file, file_path, file_content)
 
             console.print(f"File '{file_path}' updated successfully with {len(names)} groups.")
         except Exception as e:
             console.print(f"An error occurred: {e}")
 
+    def _write_file(self, file_path, data):
+        """ Blocking file write operation, runs in a background thread """
+        with open(file_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
+
     async def should_update(self, file_path):
         try:
-            async with aiofiles.open(file_path, mode='r') as file:
-                content = await file.read()
-                data = json.loads(content)
-                last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
-                return datetime.now() >= last_updated + timedelta(days=2)
+            content = await asyncio.to_thread(self._read_file, file_path)
+            data = json.loads(content)
+            last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
+            return datetime.now() >= last_updated + timedelta(days=2)
         except FileNotFoundError:
             return True
         except Exception as e:
             console.print(f"Error reading file: {e}")
             return True
 
+    def _read_file(self, file_path):
+        """ Helper function to read the file in a blocking thread """
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+
     async def check_banned_group(self, tracker, banned_group_list, meta):
         result = False
         if not meta['tag']:
-            result = False
-            return result
+            return False
 
         if tracker.upper() in ("AITHER", "LST"):
             file_path = await self.get_banned_groups(meta, tracker)
             if not file_path:
                 console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
-                result = False
-                return result
+                return False
 
             # Load the banned groups from the file
             try:
-                async with aiofiles.open(file_path, mode='r') as file:
-                    content = await file.read()
-                    data = json.loads(content)
-                    banned_groups = data.get("banned_groups", "")
-                    if banned_groups:
-                        banned_group_list.extend(banned_groups.split(", "))
+                content = await asyncio.to_thread(self._read_file, file_path)
+                data = json.loads(content)
+                banned_groups = data.get("banned_groups", "")
+                if banned_groups:
+                    return banned_groups.split(", ")
+                return []
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
-                result = False
-                return result
+                return False
             except json.JSONDecodeError:
                 console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                result = False
-                return result
+                return False
 
         for tag in banned_group_list:
             if isinstance(tag, list):
@@ -233,15 +236,15 @@ class TRACKER_SETUP:
                     await asyncio.sleep(5)
                     result = True
 
-        if result and (not meta['unattended'] or meta.get('unattended-confirm', False)):
-            if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+        if result:
+            if not meta['unattended'] or meta.get('unattended-confirm', False):
+                if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                    return False
                 return True
-        elif result:
-            return True
-        else:
-            return False
 
-        return result
+            return True
+
+        return False
 
     async def write_internal_claims_to_file(self, file_path, data):
         try:
@@ -279,8 +282,7 @@ class TRACKER_SETUP:
                 "raw_data": data
             }
 
-            async with aiofiles.open(file_path, mode='w') as file:
-                await file.write(json.dumps(file_content, indent=4))
+            await asyncio.to_thread(self._write_file, file_path, file_content)
 
             console.print(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
         except Exception as e:
