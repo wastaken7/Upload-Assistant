@@ -7,10 +7,11 @@ import requests
 import glob
 import base64
 import time
-from tqdm import tqdm
-import sys
+from rich.progress import Progress
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import concurrent.futures
+import gc
+import json
 
 
 def upload_image_task(args):
@@ -48,18 +49,33 @@ def upload_image_task(args):
                 'format': 'json',
                 'api_key': config['DEFAULT']['ptpimg_api']
             }
-            files = [('file-upload[0]', open(image, 'rb'))]
-            headers = {'referer': 'https://ptpimg.me/index.php'}
-            response = requests.post(
-                "https://ptpimg.me/upload.php", headers=headers, data=payload, files=files, timeout=timeout
-            )
-            response_data = response.json()
-            if response_data:
-                code = response_data[0]['code']
-                ext = response_data[0]['ext']
-                img_url = f"https://ptpimg.me/{code}.{ext}"
-                raw_url = img_url
-                web_url = img_url
+
+            with open(image, 'rb') as file:
+                files = [('file-upload[0]', file)]
+                headers = {'referer': 'https://ptpimg.me/index.php'}
+
+                try:
+                    response = requests.post(
+                        "https://ptpimg.me/upload.php", headers=headers, data=payload, files=files, timeout=timeout
+                    )
+                    response.raise_for_status()  # Raise an exception for HTTP errors
+                    response_data = response.json()
+
+                    if not response_data or not isinstance(response_data, list) or 'code' not in response_data[0]:
+                        return {'status': 'failed', 'reason': "Invalid JSON response from ptpimg"}
+
+                    code = response_data[0]['code']
+                    ext = response_data[0]['ext']
+                    img_url = f"https://ptpimg.me/{code}.{ext}"
+                    raw_url = img_url
+                    web_url = img_url
+
+                except requests.exceptions.Timeout:
+                    return {'status': 'failed', 'reason': 'Request timed out'}
+                except requests.exceptions.RequestException as e:
+                    return {'status': 'failed', 'reason': f"Request failed: {str(e)}"}
+                except json.JSONDecodeError:
+                    return {'status': 'failed', 'reason': 'Invalid JSON response from ptpimg'}
 
         elif img_host == "imgbb":
             url = "https://api.imgbb.com/1/upload"
@@ -291,15 +307,9 @@ def upload_image_task(args):
 
 
 def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
-    def use_tqdm():
-        """Check if the environment supports TTY (interactive progress bar)."""
-        return sys.stdout.isatty()
-
     if meta['debug']:
         upload_start_time = time.time()
 
-    import nest_asyncio
-    nest_asyncio.apply()
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
     initial_img_host = config['DEFAULT'][f'img_host_{img_host_num}']
     img_host = meta['imghost']
@@ -332,8 +342,8 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         if meta['debug']:
             console.print("image globs (sorted):", image_glob)
 
-        existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
-        existing_count = len(existing_images)
+    existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
+    existing_count = len(existing_images)
 
     if not retry_mode:
         images_needed = max(0, total_screens - existing_count)
@@ -349,66 +359,62 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         for index, image in enumerate(image_glob[:images_needed])
     ]
 
-    host_limits = {
-        "oeimg": 6,
-        "ptscreens": 1,
-        "lensdump": 1,
-    }
     default_pool_size = int(meta.get('task_limit', os.cpu_count()))
+    host_limits = {"oeimg": 6, "ptscreens": 1, "lensdump": 1}
     pool_size = host_limits.get(img_host, default_pool_size)
+    max_workers = min(len(upload_tasks), pool_size)
     results = []
-    max_workers = min(len(upload_tasks), pool_size, os.cpu_count())
+    executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    try:
         future_to_task = {
-            executor.submit(upload_image_task, task[1:]): task[0]  # task[0] is the index
+            executor.submit(upload_image_task, task[1:]): task[0]
             for task in upload_tasks
         }
 
-        if sys.stdout.isatty():  # Check if running in terminal
-            with tqdm(total=len(upload_tasks), desc="Uploading Screenshots", ascii=True) as pbar:
-                for future in as_completed(future_to_task):
-                    index = future_to_task[future]  # Get the index of the image
-                    try:
-                        result = future.result()
-                        if result.get('status') == 'success':
-                            results.append((index, result))  # Append with index
-                        else:
-                            console.print(f"[red]{result}")
-                    except Exception as e:
-                        console.print(f"[red]Error during upload: {str(e)}")
-                    pbar.update(1)
-        else:
-            for future in as_completed(future_to_task):
+        with Progress(disable=len(upload_tasks) == 0) as progress:
+            task = progress.add_task("Uploading Screenshots", total=len(upload_tasks))
+
+            for future in concurrent.futures.as_completed(future_to_task):
                 index = future_to_task[future]
-                result = future.result()
-                if not isinstance(result, str) or not result.startswith("Error"):
-                    results.append((index, result))  # Append with index
-                else:
-                    console.print(f"[red]{result}")
+                try:
+                    result = future.result()
+                    if result.get('status') == 'success':
+                        results.append((index, result))
+                    else:
+                        console.print(f"[red]{result}")
+                except Exception as e:
+                    console.print(f"[red]Error during upload: {str(e)}")
 
-    # Sort results by the original order
-    results.sort(key=lambda x: x[0])  # Sort by index
+                progress.update(task, advance=1)
 
-    successfully_uploaded = []
-    for index, result in results:
-        if result['status'] == 'success':
-            successfully_uploaded.append((index, result))
-        else:
-            console.print(f"[yellow]Failed to upload: {result.get('reason', 'Unknown error')}")
+        # Wait for all tasks to complete
+        concurrent.futures.wait(future_to_task.keys(), timeout=None)
 
-    # Check if uploads are below the cutoff and retry with a new host if necessary
+    finally:
+        executor.shutdown(wait=True)
+        del executor
+        gc.collect()
+
+    results.sort(key=lambda x: x[0])
+
+    successfully_uploaded = [(index, result) for index, result in results if result['status'] == 'success']
+
     if len(successfully_uploaded) < meta.get('cutoff', 0) and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         img_host_num += 1
         if f'img_host_{img_host_num}' in config['DEFAULT']:
             meta['imghost'] = config['DEFAULT'][f'img_host_{img_host_num}']
-            console.print(f"[cyan]Switching to the next image host: {meta['imghost']}")
+            console.print(f"[cyan]Switching to the next image host: {config['DEFAULT'][f'img_host_{img_host_num}']}[/cyan]")
+
+            del executor
+            gc.collect()
+
             return upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
+
         else:
             console.print("[red]No more image hosts available. Aborting upload process.")
             return meta['image_list'], len(meta['image_list'])
 
-    # Insert uploaded images into the meta['image_list'] in the correct order
     new_images = []
     for index, upload in successfully_uploaded:
         raw_url = upload['raw_url']
@@ -428,11 +434,10 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
                 meta['image_sizes'][raw_url] = image_size
 
     console.print(f"[green]Successfully uploaded {len(new_images)} images.")
-    if meta['debug']:
-        upload_finish_time = time.time()
-        print(f"Screenshot uploads processed in {upload_finish_time - upload_start_time:.4f} seconds")
 
-    # Return the results
+    if meta['debug']:
+        console.print(f"Screenshot uploads processed in {time.time() - upload_start_time:.4f} seconds")
+
     if using_custom_img_list:
         return new_images, len(new_images)
 

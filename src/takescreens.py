@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from tqdm import tqdm
 import os
 import re
 import glob
@@ -9,9 +8,9 @@ import random
 import json
 import sys
 import platform
+from rich.progress import Progress
 from pymediainfo import MediaInfo
 from src.console import console
-
 from data.config import config  # Import here to avoid dependency issues
 
 img_host = [
@@ -130,7 +129,9 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
             future_to_task = {executor.submit(capture_disc_task, task[1:]): task[0] for task in capture_tasks}
 
             if sys.stdout.isatty():  # Check if running in terminal
-                with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
+                with Progress() as progress:
+                    task = progress.add_task("Capturing Screenshots", total=len(capture_tasks))
+
                     for future in as_completed(future_to_task):
                         index = future_to_task[future]
                         try:
@@ -141,7 +142,8 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
                                 console.print(f"[red]{result}")
                         except Exception as e:
                             console.print(f"[red]Error during capture: {str(e)}")
-                        pbar.update(1)
+
+                        progress.update(task, advance=1)
             else:
                 for future in as_completed(future_to_task):
                     index = future_to_task[future]
@@ -168,7 +170,9 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
             future_to_task = {executor.submit(optimize_image_task, task): task for task in optimize_tasks}
 
             if sys.stdout.isatty():
-                with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True) as pbar:
+                with Progress() as progress:
+                    task = progress.add_task("Optimizing Images", total=len(optimize_tasks))
+
                     for future in as_completed(future_to_task):
                         try:
                             result = future.result()
@@ -178,7 +182,8 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
                                 console.print(f"[red]{result}")
                         except Exception as e:
                             console.print(f"[red]Error in optimization task: {str(e)}")
-                        pbar.update(1)
+
+                        progress.update(task, advance=1)
             else:
                 for future in as_completed(future_to_task):
                     try:
@@ -418,7 +423,9 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         future_to_task = {executor.submit(capture_dvd_screenshot, task[1:]): task[0] for task in capture_tasks}
 
         if sys.stdout.isatty():  # Check if running in terminal
-            with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
+            with Progress() as progress:
+                task = progress.add_task("Capturing Screenshots", total=len(capture_tasks))
+
                 for future in as_completed(future_to_task):
                     index = future_to_task[future]
                     try:
@@ -429,7 +436,8 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                             console.print(f"[red]{result}")
                     except Exception as e:
                         console.print(f"[red]Error during capture: {str(e)}")
-                    pbar.update(1)
+
+                    progress.update(task, advance=1)
         else:
             for future in as_completed(future_to_task):
                 index = future_to_task[future]
@@ -476,7 +484,9 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         future_to_task = {executor.submit(optimize_image_task, task): task for task in optimize_tasks}
 
         if sys.stdout.isatty():
-            with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True) as pbar:
+            with Progress() as progress:
+                task = progress.add_task("Optimizing Images", total=len(optimize_tasks))
+
                 for future in as_completed(future_to_task):
                     try:
                         result = future.result()
@@ -486,7 +496,8 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                             console.print(f"[red]{result}")
                     except Exception as e:
                         console.print(f"[red]Error in optimization task: {str(e)}")
-                    pbar.update(1)
+
+                    progress.update(task, advance=1)
         else:
             for future in as_completed(future_to_task):
                 try:
@@ -687,7 +698,9 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
             future_to_task = {executor.submit(capture_screenshot, task[1:]): task[0] for task in capture_tasks}
 
             if sys.stdout.isatty():  # Check if running in terminal
-                with tqdm(total=len(capture_tasks), desc="Capturing Screenshots", ascii=True) as pbar:
+                with Progress() as progress:
+                    task = progress.add_task("Capturing Screenshots", total=len(capture_tasks))
+
                     for future in as_completed(future_to_task):
                         index = future_to_task[future]
                         try:
@@ -698,7 +711,8 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
                                 console.print(f"[red]{result}")
                         except Exception as e:
                             console.print(f"[red]Error during capture: {str(e)}")
-                        pbar.update(1)
+
+                        progress.update(task, advance=1)
             else:
                 for future in as_completed(future_to_task):
                     index = future_to_task[future]
@@ -736,7 +750,9 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         future_to_task = {executor.submit(optimize_image_task, task): task for task in optimize_tasks}
 
         if sys.stdout.isatty():
-            with tqdm(total=len(optimize_tasks), desc="Optimizing Images", ascii=True) as pbar:
+            with Progress() as progress:
+                task = progress.add_task("Optimizing Images", total=len(optimize_tasks))
+
                 for future in as_completed(future_to_task):
                     try:
                         result = future.result()
@@ -746,7 +762,8 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
                             console.print(f"[red]{result}")
                     except Exception as e:
                         console.print(f"[red]Error in optimization task: {str(e)}")
-                    pbar.update(1)
+
+                    progress.update(task, advance=1)
         else:
             for future in as_completed(future_to_task):
                 try:
