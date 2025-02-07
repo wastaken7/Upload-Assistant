@@ -64,54 +64,55 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['banned'] = False
 
-            if tracker_name == "AITHER":
-                if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
-                    local_tracker_status['skipped'] = True
-                else:
-                    local_tracker_status['skipped'] = False
-
-            if tracker_name not in {"THR", "PTP", "TL"}:
-                dupes = await tracker_class.search_existing(local_meta, disctype)
-            elif tracker_name == "PTP":
-                dupes = await ptp.search_existing(groupID, local_meta, disctype)
-
-            if ('skipping' not in local_meta or local_meta['skipping'] is None) and tracker_name != "TL":
-                dupes = await common.filter_dupes(dupes, local_meta, tracker_name)
-                local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
-                if is_dupe:
-                    local_tracker_status['dupe'] = True
-            elif 'skipping' in local_meta:
-                local_tracker_status['skipped'] = True
-
-            if tracker_name == "MTV":
-                if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
-                    tracker_config = config['TRACKERS'].get(tracker_name, {})
-                    if str(tracker_config.get('prefer_mtv_torrent', 'false')).lower() == "true":
-                        local_meta['prefer_small_pieces'] = True
+            if not local_tracker_status['banned']:
+                if tracker_name == "AITHER":
+                    if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
+                        local_tracker_status['skipped'] = True
                     else:
-                        local_meta['prefer_small_pieces'] = False
-                    if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
-                        torrent_path = os.path.abspath(f"{local_meta['base_dir']}/tmp/{local_meta['uuid']}/BASE.torrent")
-                        if not os.path.exists(torrent_path):
-                            check_torrent = await client.find_existing_torrent(local_meta)
-                            if check_torrent:
-                                console.print(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
-                                await create_base_from_existing_torrent(check_torrent, local_meta['base_dir'], local_meta['uuid'])
+                        local_tracker_status['skipped'] = False
+
+                if tracker_name not in {"THR", "PTP", "TL"}:
+                    dupes = await tracker_class.search_existing(local_meta, disctype)
+                elif tracker_name == "PTP":
+                    dupes = await ptp.search_existing(groupID, local_meta, disctype)
+
+                if ('skipping' not in local_meta or local_meta['skipping'] is None) and tracker_name != "TL":
+                    dupes = await common.filter_dupes(dupes, local_meta, tracker_name)
+                    local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
+                    if is_dupe:
+                        local_tracker_status['dupe'] = True
+                elif 'skipping' in local_meta:
+                    local_tracker_status['skipped'] = True
+
+                if tracker_name == "MTV":
+                    if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
+                        tracker_config = config['TRACKERS'].get(tracker_name, {})
+                        if str(tracker_config.get('prefer_mtv_torrent', 'false')).lower() == "true":
+                            local_meta['prefer_small_pieces'] = True
+                        else:
+                            local_meta['prefer_small_pieces'] = False
+                        if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
+                            torrent_path = os.path.abspath(f"{local_meta['base_dir']}/tmp/{local_meta['uuid']}/BASE.torrent")
+                            if not os.path.exists(torrent_path):
+                                check_torrent = await client.find_existing_torrent(local_meta)
+                                if check_torrent:
+                                    console.print(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
+                                    await create_base_from_existing_torrent(check_torrent, local_meta['base_dir'], local_meta['uuid'])
+                                    torrent = Torrent.read(torrent_path)
+                                    if torrent.piece_size > 8388608:
+                                        console.print("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
+                                        local_tracker_status['skipped'] = True
+                            elif os.path.exists(torrent_path):
                                 torrent = Torrent.read(torrent_path)
                                 if torrent.piece_size > 8388608:
-                                    console.print("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
+                                    console.print("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
                                     local_tracker_status['skipped'] = True
-                        elif os.path.exists(torrent_path):
-                            torrent = Torrent.read(torrent_path)
-                            if torrent.piece_size > 8388608:
-                                console.print("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
-                                local_tracker_status['skipped'] = True
 
-            if local_meta.get('skipping') is None and not local_tracker_status['dupe'] and tracker_name == "PTP":
-                if local_meta.get('imdb_info', {}) == {}:
-                    meta['imdb_info'] = await get_imdb_info_api(local_meta['imdb_id'], local_meta)
+                if local_meta.get('skipping') is None and not local_tracker_status['dupe'] and tracker_name == "PTP":
+                    if local_meta.get('imdb_info', {}) == {}:
+                        meta['imdb_info'] = await get_imdb_info_api(local_meta['imdb_id'], local_meta)
 
-            we_already_asked = local_meta.get('we_asked', False)
+                we_already_asked = local_meta.get('we_asked', False)
 
             if not local_meta['debug']:
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:

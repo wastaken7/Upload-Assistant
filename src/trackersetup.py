@@ -236,8 +236,10 @@ class TRACKER_SETUP:
         if result and (not meta['unattended'] or meta.get('unattended-confirm', False)):
             if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
                 return True
-        else:
+        elif result:
             return True
+        else:
+            return False
 
         return result
 
