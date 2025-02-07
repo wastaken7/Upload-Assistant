@@ -103,13 +103,9 @@ async def process_meta(meta, base_dir):
         editargs = (meta['path'],) + tuple(editargs.split())
         if meta.get('debug', False):
             editargs += ("--debug",)
-        console.print("meta['trackers']:", meta['trackers'])
         if meta.get('trackers', None) is not None:
             editargs += ("--trackers", ', '.join(meta['trackers']))
-        console.print("editargs:", editargs)
         meta, help, before_args = parser.parse(editargs, meta)
-        console.print("before_args:", before_args)
-        console.print("meta after parse:", meta)
         meta['edit'] = True
         meta = await prep.gather_prep(meta=meta, mode='cli')
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
