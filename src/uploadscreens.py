@@ -7,7 +7,7 @@ import requests
 import glob
 import base64
 import time
-from tqdm import tqdm
+from rich.progress import Progress
 import sys
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -366,7 +366,9 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         }
 
         if sys.stdout.isatty():  # Check if running in terminal
-            with tqdm(total=len(upload_tasks), desc="Uploading Screenshots", ascii=True) as pbar:
+            with Progress() as progress:
+                task = progress.add_task("Uploading Screenshots", total=len(upload_tasks))
+
                 for future in as_completed(future_to_task):
                     index = future_to_task[future]  # Get the index of the image
                     try:
@@ -377,7 +379,8 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
                             console.print(f"[red]{result}")
                     except Exception as e:
                         console.print(f"[red]Error during upload: {str(e)}")
-                    pbar.update(1)
+
+                    progress.update(task, advance=1)
         else:
             for future in as_completed(future_to_task):
                 index = future_to_task[future]
