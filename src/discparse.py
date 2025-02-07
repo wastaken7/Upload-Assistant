@@ -32,7 +32,9 @@ class DiscParse():
         for i in range(len(discs)):
             bdinfo_text = None
             path = os.path.abspath(discs[i]['path'])
-
+            for file in os.listdir(save_dir):
+                if file == f"BD_SUMMARY_{str(i).zfill(2)}.txt":
+                    bdinfo_text = save_dir + "/" + file
             if bdinfo_text is None or meta_discs == []:
                 bdinfo_text = ""
                 playlists_path = os.path.join(path, "PLAYLIST")
