@@ -48,8 +48,9 @@ class OE():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        desc = await self.edit_desc(meta, self.tracker, self.signature)
-        if "SKIPPING" in desc:
+        await self.edit_desc(meta, self.tracker, self.signature)
+        if "oe_no_language" in meta:
+            console.print("[red]No language detected in MEDIAINFO.txt[/red]")
             return
         cat_id = await self.get_cat_id(meta['category'])
         if meta.get('type') == "DVDRIP":
@@ -259,7 +260,7 @@ class OE():
                                     else:
                                         audio_languages.append("")
                                 else:
-                                    return "SKIPPING"
+                                    meta['oe_no_language'] = True
                         if track.get('@type') == 'Text':
                             language = track.get('Language')
                             if not language or language is None:
@@ -270,7 +271,7 @@ class OE():
                                     else:
                                         subtitle_languages.append("")
                                 else:
-                                    return "SKIPPING"
+                                    meta['oe_no_language'] = True
 
                     return audio_languages, subtitle_languages
 
