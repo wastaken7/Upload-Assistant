@@ -11,6 +11,7 @@ from pyparsebluray import mpls
 from xml.etree import ElementTree as ET
 import re
 from langcodes import Language
+from collections import defaultdict
 from src.console import console
 from data.config import config
 
@@ -57,14 +58,28 @@ class DiscParse():
                                 duration = 0
                                 items = []  # Collect .m2ts file paths and sizes
                                 stream_directory = os.path.join(path, "STREAM")
+                                file_counts = defaultdict(int)  # Tracks the count of each .m2ts file
+                                file_sizes = {}  # Stores the size of each unique .m2ts file
+
                                 for item in playlist_data.play_items:
                                     duration += (item.outtime - item.intime) / 45000
                                     try:
                                         m2ts_file = os.path.join(stream_directory, item.clip_information_filename.strip() + ".m2ts")
-                                        size = os.path.getsize(m2ts_file) if os.path.exists(m2ts_file) else 0
-                                        items.append({"file": m2ts_file, "size": size})
+                                        if os.path.exists(m2ts_file):
+                                            size = os.path.getsize(m2ts_file)
+                                            file_counts[m2ts_file] += 1  # Increment the count
+                                            file_sizes[m2ts_file] = size  # Store individual file size
                                     except AttributeError as e:
                                         console.print(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
+
+                                # Process unique files with counts
+                                items = []
+                                for file, count in file_counts.items():
+                                    entry = {"file": file, "size": file_sizes[file]}  # Store individual size
+                                    if count > 1:
+                                        entry["file"] += f"*{count}"  # Append count to filename
+                                        entry["total_size"] = file_sizes[file] * count  # Calculate total size
+                                    items.append(entry)
 
                                 # Save playlists with duration >= 3 minutes
                                 if duration >= 180:
