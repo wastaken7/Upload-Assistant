@@ -193,15 +193,13 @@ class TRACKER_SETUP:
     async def check_banned_group(self, tracker, banned_group_list, meta):
         result = False
         if not meta['tag']:
-            result = False
-            return result
+            return False
 
         if tracker.upper() in ("AITHER", "LST"):
             file_path = await self.get_banned_groups(meta, tracker)
             if not file_path:
                 console.print(f"[bold red]Failed to load banned groups for '{tracker}'.")
-                result = False
-                return result
+                return False
 
             # Load the banned groups from the file
             try:
@@ -213,12 +211,10 @@ class TRACKER_SETUP:
                         banned_group_list.extend(banned_groups.split(", "))
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
-                result = False
-                return result
+                return False
             except json.JSONDecodeError:
                 console.print(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                result = False
-                return result
+                return False
 
         for tag in banned_group_list:
             if isinstance(tag, list):
@@ -233,15 +229,15 @@ class TRACKER_SETUP:
                     await asyncio.sleep(5)
                     result = True
 
-        if result and (not meta['unattended'] or meta.get('unattended-confirm', False)):
-            if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+        if result:
+            if not meta['unattended'] or meta.get('unattended-confirm', False):
+                if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                    return False
                 return True
-        elif result:
-            return True
-        else:
-            return False
 
-        return result
+            return True
+
+        return False
 
     async def write_internal_claims_to_file(self, file_path, data):
         try:
