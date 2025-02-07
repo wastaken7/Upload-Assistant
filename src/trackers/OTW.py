@@ -70,6 +70,13 @@ class OTW():
         }.get(resolution, '10')
         return resolution_id
 
+    async def edit_name(self, meta):
+        otw_name = meta['name']
+
+        otw_name = otw_name.replace(meta["aka"], '')
+
+        return otw_name
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         url_host_mapping = {
@@ -78,6 +85,8 @@ class OTW():
             "imgbox.com": "imgbox",
             "imagebam.com": "bam",
         }
+
+        otw_name = await self.edit_name(meta)
 
         approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
         result = await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
@@ -116,7 +125,7 @@ class OTW():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': otw_name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
