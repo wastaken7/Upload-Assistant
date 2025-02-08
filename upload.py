@@ -90,7 +90,8 @@ async def process_meta(meta, base_dir):
     if meta.get('trackers', None) is not None:
         trackers = meta['trackers']
     else:
-        trackers = config['TRACKERS']['default_trackers']
+        default_trackers = config['TRACKERS'].get('default_trackers', '')
+        trackers = [tracker.strip() for tracker in default_trackers.split(',')]
     if "," in trackers:
         trackers = trackers.split(',')
     meta['trackers'] = trackers
