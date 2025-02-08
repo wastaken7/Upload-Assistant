@@ -24,7 +24,7 @@ class SP():
         self.source_flag = 'seedpool.org'
         self.upload_url = 'https://seedpool.org/api/torrents/upload'
         self.search_url = 'https://seedpool.org/api/torrents/filter'
-        self.torrent_url = 'https://seedpool.org/torrents'
+        self.torrent_url = 'https://seedpool.org/torrents/'
         self.signature = None
         self.banned_groups = [""]
         pass
