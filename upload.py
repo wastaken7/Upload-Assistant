@@ -155,7 +155,7 @@ async def process_meta(meta, base_dir):
             except Exception as e:
                 print(f"Error during generic screenshot capture: {e}")
 
-        meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 0))
+        meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
                 meta['image_list'] = []
