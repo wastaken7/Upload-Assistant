@@ -174,7 +174,7 @@ class DiscParse():
                                 console.print(f"[bold red]No valid BDInfo file found for playlist {playlist_number}.")
                                 break
 
-                            with open(bdinfo_text, 'r') as f:
+                            with open(bdinfo_text, 'r', encoding="utf-8", errors="replace") as f:
                                 text = f.read()
                                 result = text.split("QUICK SUMMARY:", 2)
                                 files = result[0].split("FILES:", 2)[1].split("CHAPTERS:", 2)[0].split("-------------")
@@ -182,7 +182,7 @@ class DiscParse():
                                 result = result2.split("********************", 1)
                                 bd_summary = result[0].rstrip(" \n")
 
-                            with open(bdinfo_text, 'r') as f:
+                            with open(bdinfo_text, 'r', encoding="utf-8", errors="replace") as f:
                                 text = f.read()
                                 result = text.split("[code]", 3)
                                 result2 = result[2].rstrip(" \n")
@@ -197,9 +197,9 @@ class DiscParse():
                                 summary_file = f"{save_dir}/BD_SUMMARY_{str(i).zfill(2)}_{idx}.txt"
                                 extended_summary_file = f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}_{idx}.txt"
 
-                            with open(summary_file, 'w') as f:
+                            with open(summary_file, 'w', encoding="utf-8", errors="replace") as f:
                                 f.write(bd_summary.strip())
-                            with open(extended_summary_file, 'w') as f:
+                            with open(extended_summary_file, 'w', encoding="utf-8", errors="replace") as f:
                                 f.write(ext_bd_summary.strip())
 
                             bdinfo = self.parse_bdinfo(bd_summary, files[1], path)
