@@ -400,7 +400,7 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
 
     successfully_uploaded = [(index, result) for index, result in results if result['status'] == 'success']
 
-    if len(successfully_uploaded) < meta.get('cutoff', 0) and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+    if len(successfully_uploaded) < meta.get('cutoff', 1) and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         img_host_num += 1
         if f'img_host_{img_host_num}' in config['DEFAULT']:
             meta['imghost'] = config['DEFAULT'][f'img_host_{img_host_num}']
