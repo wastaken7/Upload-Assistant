@@ -214,8 +214,8 @@ class TRACKER_SETUP:
                 data = json.loads(content)
                 banned_groups = data.get("banned_groups", "")
                 if banned_groups:
-                    return banned_groups.split(", ")
-                return []
+                    banned_group_list = banned_groups.split(", ")
+
             except FileNotFoundError:
                 console.print(f"[bold red]Banned group file for '{tracker}' not found.")
                 return False
