@@ -652,10 +652,11 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
 
+    sanitized_filename = sanitize_filename(filename)
     existing_images = 0
     existing_image_paths = []
     for i in range(num_screens + 1):
-        image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
+        image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
         if os.path.exists(image_path) and not meta.get('retake', False):
             existing_images += 1
             existing_image_paths.append(image_path)
@@ -676,7 +677,7 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         return
     else:
         for i in range(num_screens + 1):
-            image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{filename}-{i}.png")
+            image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
                 capture_tasks.append((
                     i,
