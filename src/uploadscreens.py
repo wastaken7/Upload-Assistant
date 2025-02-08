@@ -342,8 +342,8 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         if meta['debug']:
             console.print("image globs (sorted):", image_glob)
 
-    existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
-    existing_count = len(existing_images)
+        existing_images = [img for img in meta['image_list'] if img.get('img_url') and img.get('web_url')]
+        existing_count = len(existing_images)
 
     if not retry_mode:
         images_needed = max(0, total_screens - existing_count)
