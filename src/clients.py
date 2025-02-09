@@ -72,7 +72,7 @@ class Clients():
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         torrent_storage_dir = client.get('torrent_storage_dir')
         torrent_client = client.get('torrent_client', '').lower()
-        prefer_small_pieces = meta.get('prefer_small_pieces', False)
+        prefer_small_pieces = self.config['TRACKERS'].get('MTV').get('prefer_mtv_torrent', False)
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
 
         # Iterate through pre-specified hashes
@@ -270,6 +270,7 @@ class Clients():
         return valid, torrent_path
 
     async def search_qbit_for_torrent(self, meta, client):
+        prefer_small_pieces = self.config['TRACKERS'].get('MTV').get('prefer_mtv_torrent', False)
         console.print("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get('torrent_storage_dir')
@@ -314,7 +315,11 @@ class Clients():
 
         for torrent in qbt_client.torrents.info():
             try:
-                torrent_path = torrent.get('content_path', f"{torrent.save_path}{torrent.name}")
+                # Correct way to access attributes
+                torrent_path = getattr(torrent, "content_path", None)
+
+                if torrent_path is None:  # If content_path is missing, use fallback
+                    torrent_path = torrent.name
             except AttributeError:
                 continue  # Ignore torrents with missing attributes
 
@@ -326,7 +331,8 @@ class Clients():
                 torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
 
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
-                if torrent_path.lower() != meta['filelist'][0].lower() or len(torrent.files) != len(meta['filelist']):
+                torrent_path = torrent.name
+                if torrent_path != meta['uuid'] or len(torrent.files) != len(meta['filelist']):
                     continue
 
             elif os.path.normpath(meta['path']).lower() != os.path.normpath(torrent_path).lower():
@@ -386,7 +392,8 @@ class Clients():
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
 
                 if valid:
-                    if meta.get('prefer_small_pieces', False):
+                    console.print("prefersmallpieces", prefer_small_pieces)
+                    if prefer_small_pieces:
                         # **Track best match based on piece size**
                         torrent_data = Torrent.read(torrent_file_path)
                         piece_size = torrent_data.piece_size

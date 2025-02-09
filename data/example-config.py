@@ -399,7 +399,6 @@ config = {
     },
 
     # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
-    # Should use the qbit API, but will also use the torrent_storage_dir to find suitable hashes
     # If you find issue, especially in local/remote path mapping, use the "--debug" argument to print out some related details
     "TORRENT_CLIENTS": {
         # Name your torrent clients here, for example, this example is named "Client1" and is set as default_torrent_client above
@@ -413,6 +412,7 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "username",
             "qbit_pass": "password",
+            # only set qBitTorrent torrent_storage_dir if API searching does not work
             # "torrent_storage_dir": "path/to/BT_backup folder"  ## use double-backslash on windows eg: "C:\\client\\backup"
 
             # Remote path mapping (docker/etc.) CASE SENSITIVE
