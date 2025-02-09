@@ -190,7 +190,10 @@ class SP():
             else:
                 name = meta['uuid']
         else:
-            name = meta['uuid']
+            if meta.get('is_disc') is True:
+                name = meta['name']
+            else:
+                name = meta['uuid']
         name, _ = os.path.splitext(name)
         return name
 
