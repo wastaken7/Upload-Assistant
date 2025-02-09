@@ -221,6 +221,7 @@ class MTV():
                 mtv_name = meta.get('scene_name')
             else:
                 mtv_name = meta['uuid']
+                mtv_name, _ = os.path.splitext(mtv_name)
         else:
             mtv_name = meta['name']
             prefix_removed = False
