@@ -22,11 +22,7 @@ def upload_image_task(args):
 
         if img_host == "imgbox":
             try:
-                # Call the asynchronous imgbox_upload function
-                loop = asyncio.get_event_loop()
-                image_list = loop.run_until_complete(
-                    imgbox_upload(os.getcwd(), [image], meta, return_dict={})
-                )
+                image_list = asyncio.run(imgbox_upload(os.getcwd(), [image], meta, return_dict={}))
                 if image_list and all(
                     'img_url' in img and 'raw_url' in img and 'web_url' in img for img in image_list
                 ):
