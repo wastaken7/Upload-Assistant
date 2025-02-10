@@ -300,42 +300,21 @@ class Clients():
         # Ensure extracted torrent directory exists
         os.makedirs(extracted_torrent_dir, exist_ok=True)
 
-        remote_path_map = False
-        local_path, remote_path = await self.remote_path_map(meta)
-        if local_path.lower() in meta['path'].lower() and local_path.lower() != remote_path.lower():
-            remote_path_map = True
-            if meta['debug']:
-                console.print("Remote path mapping found!")
-                console.print(f"Local path: {local_path}")
-                console.print(f"Remote path: {remote_path}")
-
         # **Step 1: Find correct torrents using content_path**
         best_match = None
         matching_torrents = []
 
         for torrent in qbt_client.torrents.info():
             try:
-                # Correct way to access attributes
-                torrent_path = getattr(torrent, "content_path", None)
-
-                if torrent_path is None:  # If content_path is missing, use fallback
-                    torrent_path = torrent.name
+                torrent_path = torrent.name
             except AttributeError:
                 continue  # Ignore torrents with missing attributes
 
-            if remote_path_map:
-                if not torrent_path.startswith(local_path):
-                    torrent_path = torrent_path.replace(remote_path, local_path)
-                if torrent_path.startswith(f"{local_path}/{local_path.split('/')[-1]}"):
-                    torrent_path = torrent_path.replace(f"{local_path}/{local_path.split('/')[-1]}", local_path)
-                torrent_path = torrent_path.replace(os.sep, '/').replace('/', os.sep)
-
             if meta['is_disc'] in ("", None) and len(meta['filelist']) == 1:
-                torrent_path = torrent.name
                 if torrent_path != meta['uuid'] or len(torrent.files) != len(meta['filelist']):
                     continue
 
-            elif os.path.normpath(meta['path']).lower() != os.path.normpath(torrent_path).lower():
+            elif meta['uuid'] != torrent_path:
                 continue
 
             if meta['debug']:
