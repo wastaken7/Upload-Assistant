@@ -49,6 +49,9 @@ class OE():
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta, self.tracker, self.signature)
+        if "oe_no_language" in meta:
+            console.print("[red]No language detected in MEDIAINFO.txt[/red]")
+            return
         cat_id = await self.get_cat_id(meta['category'])
         if meta.get('type') == "DVDRIP":
             meta['type'] = "ENCODE"
@@ -250,19 +253,25 @@ class OE():
                         if track.get('@type') == 'Audio':
                             language = track.get('Language')
                             if not language or language is None:
-                                audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
-                                if audio_lang:
-                                    audio_languages.append(audio_lang)
+                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                    audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
+                                    if audio_lang:
+                                        audio_languages.append(audio_lang)
+                                    else:
+                                        audio_languages.append("")
                                 else:
-                                    audio_languages.append("")
+                                    meta['oe_no_language'] = True
                         if track.get('@type') == 'Text':
                             language = track.get('Language')
                             if not language or language is None:
-                                subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
-                                if subtitle_lang:
-                                    subtitle_languages.append(subtitle_lang)
+                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                    subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
+                                    if subtitle_lang:
+                                        subtitle_languages.append(subtitle_lang)
+                                    else:
+                                        subtitle_languages.append("")
                                 else:
-                                    subtitle_languages.append("")
+                                    meta['oe_no_language'] = True
 
                     return audio_languages, subtitle_languages
 

@@ -31,6 +31,10 @@ class HUNO():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
+        huno_name = await self.get_name(meta)
+        if huno_name == "SKIPPED":
+            console.print("[bold red]Skipping upload to HUNO due to missing audio language")
+            return
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
@@ -51,7 +55,7 @@ class HUNO():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[HUNO]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name': await self.get_name(meta),
+            'name': huno_name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -120,9 +124,12 @@ class HUNO():
                 languages = {track.get("language", "") for track in audio_tracks if "language" in track}
 
                 if len(languages) > 1:
-                    cli_ui.info(f"Multiple audio languages detected: {', '.join(languages)}")
-                    if cli_ui.ask_yes_no("Is this a dual audio release?", default=True):
-                        language = "Dual"
+                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                        cli_ui.info(f"Multiple audio languages detected: {', '.join(languages)}")
+                        if cli_ui.ask_yes_no("Is this a dual audio release?", default=True):
+                            language = "Dual"
+                    else:
+                        language = "SKIPPED"
 
                 elif languages:
                     language = languages
@@ -171,7 +178,10 @@ class HUNO():
         if language == "zxx":
             language = "Silent"
         elif not language:
-            language = cli_ui.ask_string('No audio language present, you must enter one:')
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                language = cli_ui.ask_string('No audio language present, you must enter one:')
+            else:
+                language = "SKIPPED"
 
         return f'{codec} {channels} {language}'
 
@@ -191,6 +201,8 @@ class HUNO():
         year = meta.get('year', "")
         resolution = meta.get('resolution', "")
         audio = self.get_audio(meta)
+        if "SKIPPED" in audio:
+            return "SKIPPED"
         service = meta.get('service', "")
         season = meta.get('season', "")
         episode = meta.get('episode', "")
