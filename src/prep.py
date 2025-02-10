@@ -257,7 +257,7 @@ class Prep():
                         btn_id = meta.get('btn')
                         btn_api = config['DEFAULT'].get('btn_api')
                         await get_btn_torrents(btn_api, btn_id, meta)
-                        if meta.get('imdb') is not None:
+                        if meta.get('imdb_id') is not None:
                             found_match = True
                     elif specific_tracker == "BHD":
                         bhd_api = config['DEFAULT'].get('bhd_api')
@@ -265,7 +265,7 @@ class Prep():
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
                         await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta)
-                        if meta.get('imdb') is not None:
+                        if meta.get('imdb_id') is not None:
                             found_match = True
                     else:
                         meta = await process_tracker(specific_tracker, meta)
