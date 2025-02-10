@@ -19,7 +19,6 @@ img_host = [
     if key.startswith("img_host_1")
 ]
 screens = int(config['DEFAULT'].get('screens', 6))
-cutoff = int(config['DEFAULT'].get('cutoff_screens', 0))
 task_limit = config['DEFAULT'].get('task_limit', "0")
 if int(task_limit) > 0:
     task_limit = task_limit

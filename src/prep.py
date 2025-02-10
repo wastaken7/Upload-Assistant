@@ -58,7 +58,7 @@ class Prep():
         return str(value).strip().lower() == "true"
 
     async def gather_prep(self, meta, mode):
-        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
+        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
         task_limit = self.config['DEFAULT'].get('task_limit', "0")
         if int(task_limit) > 0:
             meta['task_limit'] = task_limit
