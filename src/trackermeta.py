@@ -161,8 +161,6 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(desc) > 0:
                 description.write((desc or "") + "\n")
-    if category.upper() in ['MOVIE', 'TV SHOW', 'FANRES']:
-        meta['category'] = 'TV' if category.upper() == 'TV SHOW' else category.upper()
 
     if not meta.get('image_list'):  # Only handle images if image_list is not already populated
         if imagelist:  # Ensure imagelist is not empty before setting
