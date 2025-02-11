@@ -77,7 +77,7 @@ class BBCODE:
 
         # Remove specific phrases
         desc = re.sub(
-            r"\[color=[^\]]+\]\[b\].*?\[/color\](?:\n[^\[]*)*(?=\n*\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])",
+            r"\[color=[^\]]+\]\[b\][^\n]*\[/color\](?:\n(?!\[color=#3774F6\]).+)*(?=\n*\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])",
             "",
             desc,
             flags=re.DOTALL
