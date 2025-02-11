@@ -207,7 +207,7 @@ class Prep():
                 description.write(description_text)
 
         client = Clients(config=config)
-        only_id = config['DEFAULT'].get('only_id', False)
+        only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list'):
