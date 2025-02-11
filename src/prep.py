@@ -264,7 +264,7 @@ class Prep():
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta)
+                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta, only_id)
                         if meta.get('imdb_id') is not None:
                             found_match = True
                     else:

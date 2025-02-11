@@ -36,6 +36,72 @@ class BBCODE:
     def __init__(self):
         pass
 
+    def clean_bhd_description(self, description):
+        # Unescape html
+        desc = html.unescape(description)
+        desc = desc.replace('\r\n', '\n')
+
+        # Remove size tags
+        desc = re.sub(r"\[size=.*?\]", "", desc)
+        desc = desc.replace("[/size]", "")
+        desc = desc.replace("<", "/")
+        desc = desc.replace("<", "\\")
+
+        imagelist = []
+
+        # Remove Images in IMG tags
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+
+        # Extract loose images and add to imagelist as dictionaries
+        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", desc, flags=re.IGNORECASE)
+        for img_url in loose_images:
+            image_dict = {
+                'img_url': img_url,
+                'raw_url': img_url,
+                'web_url': img_url
+            }
+            imagelist.append(image_dict)
+            desc = desc.replace(img_url, '')
+
+        # Now, remove matching URLs from [URL] tags
+        for img in imagelist:
+            img_url = re.escape(img['img_url'])
+            desc = re.sub(rf"\[URL={img_url}\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+            desc = re.sub(rf"\[URL={img_url}\]\[img[^\]]*\]{img_url}\[/img\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+
+        # Remove leftover [img] or [URL] tags in the description
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
+
+        # Remove specific phrases
+        desc = re.sub(r"\[color=[^\]]+\]\[b\].*?\[/color\](?:\r?\n|.)*?(?=\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])", "", desc, flags=re.DOTALL)
+        desc = re.sub(r"\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"(?i)\s*Screenshots:\s*", "", desc)
+        desc = re.sub(r"(?i)\s*\[b\]A BeyondHD Release\[/b\]\s*", "", desc)
+        desc = re.sub(r"\nWe are currently looking for.*", "", desc, flags=re.DOTALL)
+
+        # Strip trailing whitespace and newlines:
+        desc = desc.rstrip()
+
+        # Strip blank lines:
+        desc = desc.strip('\n')
+        desc = re.sub("\n\n+", "\n\n", desc)
+        while desc.startswith('\n'):
+            desc = desc.replace('\n', '', 1)
+        desc = desc.strip('\n')
+
+        if desc.replace('\n', '').strip() == '':
+            console.print("[yellow]Description is empty after cleaning.")
+            return "", imagelist
+
+        desc = re.sub(r"(________+)(?=\[i\])", r"\1\n", desc, count=1)
+
+        description = f"[code]{desc}[/code]"
+
+        return description, imagelist
+
     def clean_ptp_description(self, desc, is_disc):
         # console.print("[yellow]Cleaning PTP description...")
 
