@@ -72,23 +72,18 @@ class DiscParse():
                                     except AttributeError as e:
                                         console.print(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
 
-                                # Process unique files with counts
-                                items = []
-                                for file, count in file_counts.items():
-                                    entry = {"file": file, "size": file_sizes[file]}  # Store individual size
-                                    if count > 1:
-                                        entry["file"] += f"*{count}"  # Append count to filename
-                                        entry["total_size"] = file_sizes[file] * count  # Calculate total size
-                                    items.append(entry)
+                                # Process unique playlists with only one instance of each file
+                                if all(count == 1 for count in file_counts.values()):
+                                    items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
 
-                                # Save playlists with duration >= 3 minutes
-                                if duration >= 180:
-                                    valid_playlists.append({
-                                        "file": file_name,
-                                        "duration": duration,
-                                        "path": mpls_path,
-                                        "items": items
-                                    })
+                                    # Save playlists with duration >= 10 minutes
+                                    if duration >= 600:
+                                        valid_playlists.append({
+                                            "file": file_name,
+                                            "duration": duration,
+                                            "path": mpls_path,
+                                            "items": items
+                                        })
                         except Exception as e:
                             console.print(f"[bold red]Error parsing playlist {mpls_path}: {e}")
 
@@ -102,31 +97,35 @@ class DiscParse():
                 else:
                     # Allow user to select playlists
                     if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                        while True:  # Loop until valid input is provided
-                            console.print("[bold green]Available playlists:")
-                            for idx, playlist in enumerate(valid_playlists):
-                                duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
-                                items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
-                                console.print(f"[{idx}] {playlist['file']} - {duration_str} - {items_str}")
+                        if len(valid_playlists) == 1:
+                            console.print("[yellow]Only one valid playlist found. Automatically selecting.")
+                            selected_playlists = valid_playlists
+                        else:
+                            while True:  # Loop until valid input is provided
+                                console.print("[bold green]Available playlists:")
+                                for idx, playlist in enumerate(valid_playlists):
+                                    duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
+                                    items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
+                                    console.print(f"[{idx}] {playlist['file']} - {duration_str} - {items_str}")
 
-                            console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the biggest playlist:")
-                            user_input = input("Select playlists: ").strip()
+                                console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the biggest playlist:")
+                                user_input = input("Select playlists: ").strip()
 
-                            if user_input.lower() == "all":
-                                selected_playlists = valid_playlists
-                                break
-                            elif user_input == "":
-                                # Select the playlist with the largest total size
-                                console.print("[yellow]Selecting the playlist with the largest size:")
-                                selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
-                                break
-                            else:
-                                try:
-                                    selected_indices = [int(x) for x in user_input.split(',')]
-                                    selected_playlists = [valid_playlists[idx] for idx in selected_indices if 0 <= idx < len(valid_playlists)]
+                                if user_input.lower() == "all":
+                                    selected_playlists = valid_playlists
                                     break
-                                except ValueError:
-                                    console.print("[bold red]Invalid input. Please try again.")
+                                elif user_input == "":
+                                    # Select the playlist with the largest total size
+                                    console.print("[yellow]Selecting the playlist with the largest size:")
+                                    selected_playlists = [max(valid_playlists, key=lambda p: sum(item['size'] for item in p['items']))]
+                                    break
+                                else:
+                                    try:
+                                        selected_indices = [int(x) for x in user_input.split(',')]
+                                        selected_playlists = [valid_playlists[idx] for idx in selected_indices if 0 <= idx < len(valid_playlists)]
+                                        break
+                                    except ValueError:
+                                        console.print("[bold red]Invalid input. Please try again.")
                     else:
                         # Automatically select the largest playlist if unattended without confirmation
                         console.print("[yellow]Auto-selecting the largest playlist based on unattended configuration.")
