@@ -216,12 +216,15 @@ class MTV():
         return description
 
     async def edit_name(self, meta):
+        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         if meta['scene'] is True:
             if meta.get('scene_name') != "":
                 mtv_name = meta.get('scene_name')
             else:
                 mtv_name = meta['uuid']
-                mtv_name, _ = os.path.splitext(mtv_name)
+                base, ext = os.path.splitext(mtv_name)
+                if ext.lower() in KNOWN_EXTENSIONS:
+                    mtv_name = base
         else:
             mtv_name = meta['name']
             prefix_removed = False

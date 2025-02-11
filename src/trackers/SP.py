@@ -184,6 +184,7 @@ class SP():
         open_torrent.close()
 
     async def edit_name(self, meta):
+        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         if meta['scene'] is True:
             if meta.get('scene_name') != "":
                 name = meta.get('scene_name')
@@ -194,7 +195,10 @@ class SP():
                 name = meta['name']
             else:
                 name = meta['uuid']
-        name, _ = os.path.splitext(name)
+        base, ext = os.path.splitext(name)
+        if ext.lower() in KNOWN_EXTENSIONS:
+            name = base
+        console.print(f"[cyan]Name: {name}")
         return name
 
     async def search_existing(self, meta, disctype):
