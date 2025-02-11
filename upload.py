@@ -122,7 +122,7 @@ async def process_meta(meta, base_dir):
         meta['we_are_uploading'] = True
         filename = meta.get('title', None)
         bdinfo = meta.get('bdinfo', None)
-        videopath = meta.get('video', None)
+        videopath = meta.get('filelist', [None])[0]
         console.print(f"Processing {filename} for upload")
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
