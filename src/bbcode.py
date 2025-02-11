@@ -76,11 +76,16 @@ class BBCODE:
         desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
         # Remove specific phrases
-        desc = re.sub(r"\[color=[^\]]+\]\[b\].*?\[/color\](?:\r?\n|.)*?(?=\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])", "", desc, flags=re.DOTALL)
+        desc = re.sub(
+            r"\[color=[^\]]+\]\[b\].*?\[/color\](?:\n[^\[]*)*(?=\n*\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])",
+            "",
+            desc,
+            flags=re.DOTALL
+        )
         desc = re.sub(r"\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"(?i)\s*Screenshots:\s*", "", desc)
         desc = re.sub(r"(?i)\s*\[b\]A BeyondHD Release\[/b\]\s*", "", desc)
-        desc = re.sub(r"\nWe are currently looking for.*", "", desc, flags=re.DOTALL)
+        desc = re.sub(r"\nWe are currently looking for.*?(?=\[\/[a-z]+\])", "", desc, flags=re.DOTALL)
 
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()
