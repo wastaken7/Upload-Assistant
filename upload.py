@@ -114,7 +114,10 @@ async def process_meta(meta, base_dir):
 
     successful_trackers = await process_all_trackers(meta)
 
-    meta['skip_uploading'] = int(config['DEFAULT'].get('tracker_pass_checks', 1))
+    if meta.get('trackers_pass') is not None:
+        meta['skip_uploading'] = meta.get('trackers_pass')
+    else:
+        meta['skip_uploading'] = int(config['DEFAULT'].get('tracker_pass_checks', 1))
     if successful_trackers < meta['skip_uploading'] and not meta['debug']:
         console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). EXITING........[/red]")
 
