@@ -228,13 +228,13 @@ class COMMON():
                                     if each['type'] == "BDMV":
                                         use_vs = meta.get('vapoursynth', False)
                                         try:
-                                            disc_screenshots(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
+                                            await disc_screenshots(meta, f"FILE_{i}", each['bdinfo'], meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
                                         except Exception as e:
                                             print(f"Error during BDMV screenshot capture: {e}")
                                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                     if each['type'] == "DVD":
                                         try:
-                                            dvd_screenshots(meta, i, multi_screens, True)
+                                            await dvd_screenshots(meta, i, multi_screens, True)
                                         except Exception as e:
                                             print(f"Error during DVD screenshot capture: {e}")
                                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
@@ -308,7 +308,7 @@ class COMMON():
                                 if meta['debug']:
                                     console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
                             try:
-                                screenshots(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None)
+                                await screenshots(file, f"FILE_{i}", meta['uuid'], meta['base_dir'], meta, multi_screens, True, None)
                             except Exception as e:
                                 print(f"Error during generic screenshot capture: {e}")
 

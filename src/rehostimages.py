@@ -115,19 +115,19 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
             if meta['is_disc'] == "BDMV":
                 try:
-                    disc_screenshots(meta, filename, meta['bdinfo'], folder_id, base_dir, meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
+                    await disc_screenshots(meta, filename, meta['bdinfo'], folder_id, base_dir, meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
                 except Exception as e:
                     print(f"Error during BDMV screenshot capture: {e}")
             elif meta['is_disc'] == "DVD":
                 try:
-                    dvd_screenshots(
+                    await dvd_screenshots(
                         meta, 0, None, True
                     )
                 except Exception as e:
                     print(f"Error during DVD screenshot capture: {e}")
             else:
                 try:
-                    screenshots(
+                    await screenshots(
                         path, filename, meta['uuid'], base_dir, meta, multi_screens, True, None)
                 except Exception as e:
                     print(f"Error during generic screenshot capture: {e}")
