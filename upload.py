@@ -140,11 +140,11 @@ async def process_meta(meta, base_dir):
                     meta.get('image_list', []), meta.get('ffdebug', False), None
                 )
             except Exception as e:
-                print(f"Error during BDMV screenshot capture: {e}")
+                console.print(f"[red]Error during BDMV screenshot capture: {e}")
 
         elif meta['is_disc'] == "DVD":
             try:
-                dvd_screenshots(
+                await dvd_screenshots(
                     meta, 0, None, None
                 )
             except Exception as e:
@@ -152,7 +152,7 @@ async def process_meta(meta, base_dir):
 
         else:
             try:
-                screenshots(
+                await screenshots(
                     videopath, filename, meta['uuid'], base_dir, meta,
                     manual_frames=manual_frames  # Pass additional kwargs directly
                 )
