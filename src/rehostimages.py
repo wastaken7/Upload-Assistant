@@ -88,7 +88,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     new_images_key = f'{tracker}_images_key'
     discs = meta.get('discs', [])  # noqa F841
     filelist = meta.get('video', [])
-    filename = meta['filename']
+    filename = meta['title']
     path = meta['path']
     if isinstance(filelist, str):
         filelist = [filelist]
