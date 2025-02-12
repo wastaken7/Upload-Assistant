@@ -19,13 +19,13 @@ img_host = [
     if key.startswith("img_host_1")
 ]
 screens = int(config['DEFAULT'].get('screens', 6))
-task_limit = config['DEFAULT'].get('task_limit', "0")
-if int(task_limit) > 0:
-    task_limit = task_limit
+task_limit = config['DEFAULT'].get('process_limit', "0")
+
+try:
+    task_limit = int(task_limit)  # Convert to integer
+except ValueError:
+    task_limit = 0
 tone_map = config['DEFAULT'].get('tone_map', False)
-tone_task_limit = config['DEFAULT'].get('tone_task_limit', "0")
-if int(tone_task_limit) > 0:
-    tone_task_limit = tone_task_limit
 optimize_images = config['DEFAULT'].get('optimize_images', True)
 
 
@@ -151,7 +151,10 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             console.print("[red]No valid images found for optimization.[/red]")
             return []
 
-        num_workers = min(len(valid_images), os.cpu_count())  # Limit cores to number of tasks
+        # Dynamically determine the number of processes
+        num_tasks = len(valid_images)
+        max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
+        num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
         if meta['debug']:
             console.print(f"Using {num_workers} worker(s) for {len(valid_images)} image(s)")
 
@@ -193,8 +196,6 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
                     console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
                     try:
                         index = int(image_path.rsplit('-', 1)[-1].split('.')[0])
-                        console.print(f"[blue]DEBUG: Extracted index = {index} for {image_path}[/blue]")
-
                         if os.path.exists(image_path):
                             os.remove(image_path)
 
@@ -421,7 +422,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
         # Dynamically determine the number of processes
         num_tasks = len(valid_images)
-        max_cores = os.cpu_count() // 2
+        max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
         num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
 
         if num_workers == 0:
@@ -677,7 +678,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
         # Dynamically determine the number of processes
         num_tasks = len(valid_images)
-        max_cores = os.cpu_count() // 2
+        max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
         num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
 
         if num_workers == 0:
