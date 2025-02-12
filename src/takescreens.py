@@ -9,6 +9,8 @@ import json
 import sys
 import platform
 import asyncio
+import oxipng
+from multiprocessing import Pool
 from rich.progress import Progress
 from pymediainfo import MediaInfo
 from src.console import console
@@ -27,6 +29,7 @@ tone_map = config['DEFAULT'].get('tone_map', False)
 tone_task_limit = config['DEFAULT'].get('tone_task_limit', "0")
 if int(tone_task_limit) > 0:
     tone_task_limit = tone_task_limit
+optimize_images = config['DEFAULT'].get('optimize_images', True)
 
 
 async def sanitize_filename(filename):
@@ -250,7 +253,7 @@ async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel
         return None
 
 
-def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
+async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
     if 'image_list' not in meta:
         meta['image_list'] = []
     existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
@@ -294,7 +297,7 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         w_sar = sar
         h_sar = 1
 
-    def _is_vob_good(n, loops, num_screens):
+    async def _is_vob_good(n, loops, num_screens):
         max_loops = 6
         fallback_duration = 300
         valid_tracks = []
@@ -333,8 +336,8 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
     main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
-    voblength, n = _is_vob_good(0, 0, num_screens)
-    ss_times = valid_ss_time([], num_screens + 1, voblength, frame_rate)
+    voblength, n = await _is_vob_good(0, 0, num_screens)
+    ss_times = await valid_ss_time([], num_screens + 1, voblength, frame_rate)
     capture_tasks = []
     existing_images = 0
     existing_image_paths = []
@@ -492,7 +495,8 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                 adjusted_time = random.uniform(0, voblength)
 
                 try:
-                    capture_dvd_screenshot((input_file, image, adjusted_time, meta, width, height, w_sar, h_sar))
+                    await capture_dvd_screenshot((input_file, image, adjusted_time, meta, width, height, w_sar, h_sar))
+                    await optimize_image_task((image, config))
                     retaken_size = os.path.getsize(image)
 
                     if retaken_size > 75000:
@@ -515,7 +519,7 @@ def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
     console.print(f"[green]Successfully captured {len(optimize_results)} screenshots.")
 
 
-def capture_dvd_screenshot(task):
+async def capture_dvd_screenshot(task):
     input_file, image, seek_time, meta, width, height, w_sar, h_sar = task
 
     if os.path.exists(image):
@@ -550,7 +554,7 @@ def capture_dvd_screenshot(task):
         return None
 
 
-def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
+async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
     """Screenshot capture function using concurrent.futures"""
     if meta['debug']:
         start_time = time.time()
@@ -602,11 +606,11 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         manual_frames = [int(frame) for frame in manual_frames.split(',')]
         ss_times = [frame / frame_rate for frame in manual_frames]
     else:
-        ss_times = valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
+        ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
 
-    sanitized_filename = sanitize_filename(filename)
+    sanitized_filename = await sanitize_filename(filename)
     existing_images = 0
     existing_image_paths = []
     for i in range(num_screens + 1):
@@ -633,176 +637,140 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         for i in range(num_screens + 1):
             image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
             if not os.path.exists(image_path) or meta.get('retake', False):
-                capture_tasks.append((
-                    i,
-                    path,
-                    ss_times[i],
-                    image_path,
-                    width,
-                    height,
-                    w_sar,
-                    h_sar,
-                    loglevel,
-                    hdr_tonemap
-                ))
+                capture_tasks.append(
+                    capture_screenshot(
+                        (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap)
+                    )
+                )
 
         capture_results = []
-        max_workers = min(len(capture_tasks), int(meta.get('task_limit', os.cpu_count())))
+        results = await asyncio.gather(*capture_tasks)
+        filtered_results = [r for r in results if isinstance(r, tuple) and len(r) == 2]
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_task = {executor.submit(capture_screenshot, task[1:]): task[0] for task in capture_tasks}
+        if len(filtered_results) != len(results):
+            console.print(f"[yellow]Warning: {len(results) - len(filtered_results)} capture tasks returned invalid results.")
 
-            if sys.stdout.isatty():  # Check if running in terminal
-                with Progress() as progress:
-                    task = progress.add_task("Capturing Screenshots", total=len(capture_tasks))
+        filtered_results.sort(key=lambda x: x[0])  # Ensure order is preserved
+        capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
-                    for future in as_completed(future_to_task):
-                        index = future_to_task[future]
-                        try:
-                            result = future.result()
-                            if not isinstance(result, str) or not result.startswith("Error"):
-                                capture_results.append((index, result))
-                            else:
-                                console.print(f"[red]{result}")
-                        except Exception as e:
-                            console.print(f"[red]Error during capture: {str(e)}")
+        if capture_results and len(capture_results) > num_screens:
+            try:
+                smallest = min(capture_results, key=os.path.getsize)
+                if meta['debug']:
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
+                os.remove(smallest)
+                capture_results.remove(smallest)
+            except Exception as e:
+                console.print(f"[red]Error removing smallest image: {str(e)}")
 
-                        progress.update(task, advance=1)
-            else:
-                for future in as_completed(future_to_task):
-                    index = future_to_task[future]
-                    try:
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            capture_results.append((index, result))
-                        else:
-                            console.print(f"[red]{result}")
-                    except Exception as e:
-                        console.print(f"[red]Error during capture: {str(e)}")
+        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
-        # Sort results by the original index to ensure correct order
-        capture_results.sort(key=lambda x: x[0])
+        optimized_results = []
+        if meta['debug']:
+            start_opto_time = time.time()
 
-        # Remove index from the final results
-        capture_results = [result[1] for result in capture_results]
+        # Filter out non-existent files first
+        valid_images = [image for image in capture_results if os.path.exists(image)]
 
-    if capture_results and len(capture_results) > num_screens:
-        try:
-            smallest = min(capture_results, key=os.path.getsize)
-            if meta['debug']:
-                console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
-            os.remove(smallest)
-            capture_results.remove(smallest)
-        except Exception as e:
-            console.print(f"[red]Error removing smallest image: {str(e)}")
+        # Dynamically determine the number of processes
+        num_tasks = len(valid_images)
+        max_cores = os.cpu_count() // 2
+        num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
 
-    # Optimize images using ThreadPoolExecutor
-    optimize_results = []
-    optimize_tasks = [(result, config) for result in capture_results if result and os.path.exists(result)]
-    max_workers = min(len(optimize_tasks), int(meta.get('task_limit', os.cpu_count())))
-
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {executor.submit(optimize_image_task, task): task for task in optimize_tasks}
-
-        if sys.stdout.isatty():
-            with Progress() as progress:
-                task = progress.add_task("Optimizing Images", total=len(optimize_tasks))
-
-                for future in as_completed(future_to_task):
-                    try:
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            optimize_results.append(result)
-                        else:
-                            console.print(f"[red]{result}")
-                    except Exception as e:
-                        console.print(f"[red]Error in optimization task: {str(e)}")
-
-                    progress.update(task, advance=1)
+        if num_workers == 0:
+            print("[red]No valid images found for optimization.[/red]")
+            return
         else:
-            for future in as_completed(future_to_task):
-                try:
-                    result = future.result()
-                    if not isinstance(result, str) or not result.startswith("Error"):
-                        optimize_results.append(result)
-                    else:
-                        console.print(f"[red]{result}")
-                except Exception as e:
-                    console.print(f"[red]Error in optimization task: {str(e)}")
+            print("Now optimizing images")
 
-    valid_results = []
-    remaining_retakes = []
-    for image_path in optimize_results:
-        if "Error" in image_path:
-            console.print(f"[red]{image_path}")
-            continue
+        if meta['debug']:
+            print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
 
-        retake = False
-        image_size = os.path.getsize(image_path)
-        if not manual_frames:
-            if image_size <= 75000:
-                console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
-                retake = True
-            elif "imgbb" in img_host and image_size <= 31000000:
-                if meta['debug']:
-                    console.print(f"[green]Image {image_path} meets size requirements for imgbb.[/green]")
-            elif any(host in ["imgbox", "pixhost"] for host in img_host) and image_size <= 10000000:
-                if meta['debug']:
-                    console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-            elif any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg", "zipline"] for host in img_host):
-                if meta['debug']:
-                    console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
+        # Set up multiprocessing pool with the determined number of workers
+        with Pool(processes=num_workers) as pool:
+            optimized_results = pool.map(optimize_image_task, valid_images)
+
+        optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
+
+        print(f"[green]Successfully optimized {len(optimized_results)} images.")
+
+        if meta['debug']:
+            finish_opto_time = time.time()
+            print(f"Screenshots processed in {finish_opto_time - start_opto_time:.4f} seconds")
+
+        valid_results = []
+        remaining_retakes = []
+        for image_path in optimized_results:
+            if "Error" in image_path:
+                console.print(f"[red]{image_path}")
+                continue
+
+            retake = False
+            image_size = os.path.getsize(image_path)
+            if not manual_frames:
+                if image_size <= 75000:
+                    console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
+                    retake = True
+                elif "imgbb" in img_host and image_size <= 31000000:
+                    if meta['debug']:
+                        console.print(f"[green]Image {image_path} meets size requirements for imgbb.[/green]")
+                elif any(host in ["imgbox", "pixhost"] for host in img_host) and image_size <= 10000000:
+                    if meta['debug']:
+                        console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
+                elif any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg", "zipline"] for host in img_host):
+                    if meta['debug']:
+                        console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
+                else:
+                    console.print("[red]Image size does not meet requirements for your image host, retaking.")
+                    retake = True
+
+            if retake:
+                retry_attempts = 3
+                for attempt in range(1, retry_attempts + 1):
+                    console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
+                    try:
+                        os.remove(image_path)
+                        random_time = random.uniform(0, length)
+                        await capture_screenshot((path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap))
+                        await optimize_image_task((image_path, config))
+                        new_size = os.path.getsize(image_path)
+                        valid_image = False
+
+                        if "imgbb" in img_host and new_size > 75000 and new_size <= 31000000:
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+                        elif new_size > 75000 and new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+                        elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
+                            console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                            valid_image = True
+
+                        if valid_image:
+                            valid_results.append(image_path)
+                            break
+                        else:
+                            console.print(f"[red]Retaken image {image_path} does not meet the size requirements for {img_host}. Retrying...[/red]")
+                    except Exception as e:
+                        console.print(f"[red]Error retaking screenshot for {image_path}: {e}[/red]")
+                else:
+                    console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
+                    remaining_retakes.append(image_path)
             else:
-                console.print("[red]Image size does not meet requirements for your image host, retaking.")
-                retake = True
+                valid_results.append(image_path)
 
-        if retake:
-            retry_attempts = 3
-            for attempt in range(1, retry_attempts + 1):
-                console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
-                try:
-                    os.remove(image_path)
-                    random_time = random.uniform(0, length)
-                    capture_screenshot((path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap))
-                    optimize_image_task((image_path, config))
-                    new_size = os.path.getsize(image_path)
-                    valid_image = False
+        if remaining_retakes:
+            console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-                    if "imgbb" in img_host and new_size > 75000 and new_size <= 31000000:
-                        console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                        valid_image = True
-                    elif new_size > 75000 and new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
-                        console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                        valid_image = True
-                    elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
-                        console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                        valid_image = True
-
-                    if valid_image:
-                        valid_results.append(image_path)
-                        break
-                    else:
-                        console.print(f"[red]Retaken image {image_path} does not meet the size requirements for {img_host}. Retrying...[/red]")
-                except Exception as e:
-                    console.print(f"[red]Error retaking screenshot for {image_path}: {e}[/red]")
-            else:
-                console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
-                remaining_retakes.append(image_path)
-        else:
-            valid_results.append(image_path)
-
-    if remaining_retakes:
-        console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
-
-    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
     if meta['debug']:
         finish_time = time.time()
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
 
-def capture_screenshot(args):
-    path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
+async def capture_screenshot(args):
+    index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
     try:
         if width <= 0 or height <= 0:
             return "Error: Invalid width or height for scaling"
@@ -834,16 +802,13 @@ def capture_screenshot(args):
             .global_args('-loglevel', loglevel)
         )
 
-        try:
-            command.run(capture_stdout=True, capture_stderr=True)
-        except ffmpeg.Error as e:
-            error_output = e.stderr.decode('utf-8')
-            return f"Error: {error_output}"
-
-        if not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
-            return f"Error: Screenshot not generated or is empty at {image_path}"
-
-        return image_path
+        process = await asyncio.create_subprocess_exec(*command.compile(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await process.communicate()
+        if process.returncode == 0:
+            return (index, image_path)
+        else:
+            console.print(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
+            return (index, None)  # Ensure tuple format
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -882,28 +847,20 @@ async def valid_ss_time(ss_times, num_screens, length, frame_rate, exclusion_zon
     return result_times
 
 
-async def optimize_image_task(args):
-    image, config = args
+def optimize_image_task(image):
     try:
-        # Extract shared_seedbox and optimize_images from config
-        optimize_images = config['DEFAULT'].get('optimize_images', True)
-        shared_seedbox = config['DEFAULT'].get('shared_seedbox', True)
-
         if optimize_images:
-            if shared_seedbox:
-                # Limit the number of threads for oxipng
-                num_cores = os.cpu_count()
-                max_threads = max(1, num_cores // 2)  # Ensure at least 1 thread
-                os.environ['RAYON_NUM_THREADS'] = str(max_threads)
+            os.environ['RAYON_NUM_THREADS'] = '1'
+            if not os.path.exists(image):
+                print(f"ERROR: File not found - {image}")
+                return f"Error: File not found - {image}"
 
-            if os.path.exists(image):
-                pyver = platform.python_version_tuple()
-                if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
-                    import oxipng
-                if os.path.getsize(image) >= 16000000:
-                    oxipng.optimize(image, level=6)
-                else:
-                    oxipng.optimize(image, level=2)
-        return image  # Return image path if successful
-    except (KeyboardInterrupt, Exception) as e:
-        return f"Error: {e}"  # Return error message
+            pyver = platform.python_version_tuple()
+            if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
+                level = 6 if os.path.getsize(image) >= 16000000 else 2
+                oxipng.optimize(image, level=level)
+
+            return image
+    except Exception as e:
+        print(f"ERROR optimizing {image}: {e}")
+        return f"Error: {e}"
