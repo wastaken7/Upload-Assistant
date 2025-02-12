@@ -8,6 +8,7 @@ import random
 import json
 import sys
 import platform
+import asyncio
 from rich.progress import Progress
 from pymediainfo import MediaInfo
 from src.console import console
@@ -28,12 +29,12 @@ if int(tone_task_limit) > 0:
     tone_task_limit = tone_task_limit
 
 
-def sanitize_filename(filename):
+async def sanitize_filename(filename):
     # Replace invalid characters like colons with an underscore
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 
-def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None, force_screenshots=False):
+async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None, force_screenshots=False):
     if meta['debug']:
         start_time = time.time()
     if 'image_list' not in meta:
@@ -49,7 +50,7 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
     if num_screens == 0 or len(image_list) >= num_screens:
         return
 
-    sanitized_filename = sanitize_filename(filename)
+    sanitized_filename = await sanitize_filename(filename)
     length = 0
     file = None
     frame_rate = None
@@ -107,10 +108,10 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
         else:
             loglevel = 'quiet'
 
-        ss_times = valid_ss_time([], num_screens + 1, length, frame_rate)
+        ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate)
         existing_indices = {int(p.split('-')[-1].split('.')[0]) for p in existing_screens}
         capture_tasks = [
-            (
+            capture_disc_task(
                 i,
                 file,
                 ss_times[i],
@@ -122,77 +123,33 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
             for i in range(num_screens + 1)
         ]
 
-        max_workers = min(len(capture_tasks), int(meta.get('task_limit', os.cpu_count())))
+        results = await asyncio.gather(*capture_tasks)
+        filtered_results = [r for r in results if isinstance(r, tuple) and len(r) == 2]
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_task = {executor.submit(capture_disc_task, task[1:]): task[0] for task in capture_tasks}
+        if len(filtered_results) != len(results):
+            console.print(f"[yellow]Warning: {len(results) - len(filtered_results)} capture tasks returned invalid results.")
 
-            if sys.stdout.isatty():  # Check if running in terminal
-                with Progress() as progress:
-                    task = progress.add_task("Capturing Screenshots", total=len(capture_tasks))
+        filtered_results.sort(key=lambda x: x[0])  # Ensure order is preserved
+        capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
-                    for future in as_completed(future_to_task):
-                        index = future_to_task[future]
-                        try:
-                            result = future.result()
-                            if not isinstance(result, str) or not result.startswith("Error"):
-                                capture_results.append((index, result))
-                            else:
-                                console.print(f"[red]{result}")
-                        except Exception as e:
-                            console.print(f"[red]Error during capture: {str(e)}")
+        if capture_results and len(capture_results) > num_screens:
+            try:
+                smallest = min(capture_results, key=os.path.getsize)
+                if meta['debug']:
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
+                os.remove(smallest)
+                capture_results.remove(smallest)
+            except Exception as e:
+                console.print(f"[red]Error removing smallest image: {str(e)}")
 
-                        progress.update(task, advance=1)
-            else:
-                for future in as_completed(future_to_task):
-                    index = future_to_task[future]
-                    try:
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            capture_results.append((index, result))
-                        else:
-                            console.print(f"[red]{result}")
-                    except Exception as e:
-                        console.print(f"[red]Error during capture: {str(e)}")
-
-        # Sort results by the original index to match ss_times order
-        capture_results.sort(key=lambda x: x[0])
-
-        # Remove index for the final results (only keep the task results)
-        capture_results = [result[1] for result in capture_results]
+        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
         optimized_results = []
-        optimize_tasks = [(result, config) for result in capture_results if result and os.path.exists(result)]
-        max_workers = min(len(optimize_tasks), int(meta.get('task_limit', os.cpu_count())))
+        optimize_tasks = [optimize_image_task((results, config)) for results in capture_results if os.path.exists(results)]
+        optimized_results = await asyncio.gather(*optimize_tasks)
+        optimized_results = [res for res in optimized_results if not res.startswith("Error")]
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            future_to_task = {executor.submit(optimize_image_task, task): task for task in optimize_tasks}
-
-            if sys.stdout.isatty():
-                with Progress() as progress:
-                    task = progress.add_task("Optimizing Images", total=len(optimize_tasks))
-
-                    for future in as_completed(future_to_task):
-                        try:
-                            result = future.result()
-                            if not isinstance(result, str) or not result.startswith("Error"):
-                                optimized_results.append(result)
-                            else:
-                                console.print(f"[red]{result}")
-                        except Exception as e:
-                            console.print(f"[red]Error in optimization task: {str(e)}")
-
-                        progress.update(task, advance=1)
-            else:
-                for future in as_completed(future_to_task):
-                    try:
-                        result = future.result()
-                        if not isinstance(result, str) or not result.startswith("Error"):
-                            optimized_results.append(result)
-                        else:
-                            console.print(f"[red]{result}")
-                    except Exception as e:
-                        console.print(f"[red]Error in optimization task: {str(e)}")
+        console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
         valid_results = []
         remaining_retakes = []
@@ -226,8 +183,8 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
                     try:
                         os.remove(image_path)
                         random_time = random.uniform(0, length)
-                        capture_disc_task((file, random_time, image_path, keyframe, loglevel, hdr_tonemap))
-                        optimize_image_task((image_path, config))
+                        await capture_disc_task((file, random_time, image_path, keyframe, loglevel, hdr_tonemap))
+                        await optimize_image_task((image_path, config))
                         new_size = os.path.getsize(image_path)
                         valid_image = False
 
@@ -264,8 +221,7 @@ def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
 
-def capture_disc_task(task):
-    file, ss_time, image_path, keyframe, loglevel, hdr_tonemap = task
+async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap):
     try:
         ff = ffmpeg.input(file, ss=ss_time, skip_frame=keyframe)
         if hdr_tonemap:
@@ -276,22 +232,21 @@ def capture_disc_task(task):
                 .filter('zscale', transfer='bt709')
                 .filter('format', 'rgb24')
             )
-
         command = (
             ff
             .output(image_path, vframes=1, pix_fmt="rgb24")
             .overwrite_output()
             .global_args('-loglevel', loglevel)
         )
-        command.run(capture_stdout=True, capture_stderr=True)
-
-        return image_path
-    except ffmpeg.Error as e:
-        error_output = e.stderr.decode('utf-8')
-        console.print(f"[red]FFmpeg error capturing screenshot: {error_output}[/red]")
-        return None
+        process = await asyncio.create_subprocess_exec(*command.compile(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await process.communicate()
+        if process.returncode == 0:
+            return (index, image_path)
+        else:
+            console.print(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
+            return (index, None)  # Ensure tuple format
     except Exception as e:
-        console.print(f"[red]Error capturing screenshot: {e}[/red]")
+        console.print(f"[red]Error capturing screenshot: {e}")
         return None
 
 
@@ -846,40 +801,6 @@ def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, for
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
 
-def valid_ss_time(ss_times, num_screens, length, frame_rate, exclusion_zone=None):
-    total_screens = num_screens + 1
-
-    if exclusion_zone is None:
-        exclusion_zone = max(length / (3 * total_screens), length / 15)
-
-    result_times = ss_times.copy()
-    section_size = (round(4 * length / 5) - round(length / 5)) / total_screens * 1.3
-    section_starts = [round(length / 5) + i * (section_size * 0.9) for i in range(total_screens)]
-
-    for section_index in range(total_screens):
-        valid_time = False
-        attempts = 0
-        start_frame = round(section_starts[section_index] * frame_rate)
-        end_frame = round((section_starts[section_index] + section_size) * frame_rate)
-
-        while not valid_time and attempts < 50:
-            attempts += 1
-            frame = random.randint(start_frame, end_frame)
-            time = frame / frame_rate
-
-            if all(abs(frame - existing_time * frame_rate) > exclusion_zone * frame_rate for existing_time in result_times):
-                result_times.append(time)
-                valid_time = True
-
-        if not valid_time:
-            midpoint_frame = (start_frame + end_frame) // 2
-            result_times.append(midpoint_frame / frame_rate)
-
-    result_times = sorted(result_times)
-
-    return result_times
-
-
 def capture_screenshot(args):
     path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
     try:
@@ -927,7 +848,41 @@ def capture_screenshot(args):
         return f"Error: {str(e)}"
 
 
-def optimize_image_task(args):
+async def valid_ss_time(ss_times, num_screens, length, frame_rate, exclusion_zone=None):
+    total_screens = num_screens + 1
+
+    if exclusion_zone is None:
+        exclusion_zone = max(length / (3 * total_screens), length / 15)
+
+    result_times = ss_times.copy()
+    section_size = (round(4 * length / 5) - round(length / 5)) / total_screens * 1.3
+    section_starts = [round(length / 5) + i * (section_size * 0.9) for i in range(total_screens)]
+
+    for section_index in range(total_screens):
+        valid_time = False
+        attempts = 0
+        start_frame = round(section_starts[section_index] * frame_rate)
+        end_frame = round((section_starts[section_index] + section_size) * frame_rate)
+
+        while not valid_time and attempts < 50:
+            attempts += 1
+            frame = random.randint(start_frame, end_frame)
+            time = frame / frame_rate
+
+            if all(abs(frame - existing_time * frame_rate) > exclusion_zone * frame_rate for existing_time in result_times):
+                result_times.append(time)
+                valid_time = True
+
+        if not valid_time:
+            midpoint_frame = (start_frame + end_frame) // 2
+            result_times.append(midpoint_frame / frame_rate)
+
+    result_times = sorted(result_times)
+
+    return result_times
+
+
+async def optimize_image_task(args):
     image, config = args
     try:
         # Extract shared_seedbox and optimize_images from config
