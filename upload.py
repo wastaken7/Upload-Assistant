@@ -164,7 +164,7 @@ async def process_meta(meta, base_dir):
             if 'image_list' not in meta:
                 meta['image_list'] = []
             return_dict = {}
-            new_images, dummy_var = upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
+            new_images, dummy_var = await upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
 
         elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
             meta['image_list'] = []

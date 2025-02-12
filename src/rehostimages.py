@@ -164,7 +164,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 console.print(f"[green]Uploading to approved host '{current_img_host}'.")
                 break
 
-        uploaded_images, _ = upload_screens(
+        uploaded_images, _ = await upload_screens(
             meta, multi_screens, img_host_index, 0, multi_screens,
             all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
         )
