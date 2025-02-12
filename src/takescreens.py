@@ -148,8 +148,20 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
         optimized_results = []
-        optimize_tasks = [optimize_image_task((results, config)) for results in capture_results if os.path.exists(results)]
-        optimized_results = await asyncio.gather(*optimize_tasks)
+        optimized_results = []
+        valid_images = [image for image in capture_results if os.path.exists(image)]
+
+        if not valid_images:
+            console.print("[red]No valid images found for optimization.[/red]")
+            return []
+
+        num_workers = min(len(valid_images), os.cpu_count())  # Limit cores to number of tasks
+        if meta['debug']:
+            console.print(f"Using {num_workers} worker(s) for {len(valid_images)} image(s)")
+
+        with Pool(processes=num_workers) as pool:
+            optimized_results = pool.map(optimize_image_task, valid_images)
+
         optimized_results = [res for res in optimized_results if not res.startswith("Error")]
 
         console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
