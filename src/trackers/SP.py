@@ -208,7 +208,6 @@ class SP():
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
             'categories[]': await self.get_cat_id(meta),
-            'types[]': await self.get_type_id(meta['type']),
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }
