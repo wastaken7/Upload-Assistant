@@ -59,9 +59,11 @@ class AITHER():
         base_dir = meta['base_dir']
         uuid = meta['uuid']
         specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        bhd_dir_path = os.path.join(base_dir, "tmp", uuid, "bhd.nfo")
+        bhd_files = glob.glob(bhd_dir_path)
         nfo_files = glob.glob(specified_dir_path)
         nfo_file = None
-        if nfo_files:
+        if nfo_files and not bhd_files:
             nfo_file = open(nfo_files[0], 'rb')
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")

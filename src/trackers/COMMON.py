@@ -66,6 +66,14 @@ class COMMON():
             filelist = meta.get('filelist', [])
             desc = base
             desc = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
+            if not tracker == "AITHER":
+                desc = re.sub(r'\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]', '', desc, flags=re.DOTALL)
+            else:
+                if "framestor" in meta and meta['framestor']:
+                    desc = re.sub(r'\[center\]\[spoiler=FraMeSToR NFO:\]', '', desc, count=1)
+                    desc = re.sub(r'\[/spoiler\]\[/center\]', '', desc, count=1)
+                    desc = desc.replace("https://i.imgur.com/e9o0zpQ.png", "https://beyondhd.co/images/2017/11/30/c5802892418ee2046efba17166f0cad9.png")
+                    images = []
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             if comparison is False:

@@ -1,6 +1,7 @@
 import re
 import html
 import urllib.parse
+import os
 from src.console import console
 
 # Bold - KEEP
@@ -35,6 +36,76 @@ from src.console import console
 class BBCODE:
     def __init__(self):
         pass
+
+    def clean_bhd_description(self, description, meta):
+        # Unescape html
+        desc = html.unescape(description)
+        desc = desc.replace('\r\n', '\n')
+
+        if "framestor" in meta and meta['framestor']:
+            save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+            os.makedirs(save_path, exist_ok=True)
+            nfo_file_path = os.path.join(save_path, "bhd.nfo")
+            with open(nfo_file_path, 'w', encoding='utf-8') as f:
+                try:
+                    f.write(desc)
+                finally:
+                    f.close()
+            console.print(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
+            meta['nfo'] = True
+            meta['bhd_nfo'] = True
+
+        # Remove size tags
+        desc = re.sub(r"\[size=.*?\]", "", desc)
+        desc = desc.replace("[/size]", "")
+        desc = desc.replace("<", "/")
+        desc = desc.replace("<", "\\")
+
+        imagelist = []
+
+        # Remove Images in IMG tags
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+
+        # Extract loose images and add to imagelist as dictionaries
+        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", desc, flags=re.IGNORECASE)
+        for img_url in loose_images:
+            image_dict = {
+                'img_url': img_url,
+                'raw_url': img_url,
+                'web_url': img_url
+            }
+            imagelist.append(image_dict)
+            desc = desc.replace(img_url, '')
+
+        # Now, remove matching URLs from [URL] tags
+        for img in imagelist:
+            img_url = re.escape(img['img_url'])
+            desc = re.sub(rf"\[URL={img_url}\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+            desc = re.sub(rf"\[URL={img_url}\]\[img[^\]]*\]{img_url}\[/img\]\[/URL\]", '', desc, flags=re.IGNORECASE)
+
+        # Remove leftover [img] or [URL] tags in the description
+        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
+
+        # Strip trailing whitespace and newlines:
+        desc = desc.rstrip()
+
+        # Strip blank lines:
+        desc = desc.strip('\n')
+        desc = re.sub("\n\n+", "\n\n", desc)
+        while desc.startswith('\n'):
+            desc = desc.replace('\n', '', 1)
+        desc = desc.strip('\n')
+
+        if desc.replace('\n', '').strip() == '':
+            console.print("[yellow]Description is empty after cleaning.")
+            return "", imagelist
+
+        description = f"[code]{desc}[/code]"
+
+        return description, imagelist
 
     def clean_ptp_description(self, desc, is_disc):
         # console.print("[yellow]Cleaning PTP description...")
