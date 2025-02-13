@@ -1,6 +1,7 @@
 import re
 import html
 import urllib.parse
+import os
 from src.console import console
 
 # Bold - KEEP
@@ -36,10 +37,23 @@ class BBCODE:
     def __init__(self):
         pass
 
-    def clean_bhd_description(self, description):
+    def clean_bhd_description(self, description, meta):
         # Unescape html
         desc = html.unescape(description)
         desc = desc.replace('\r\n', '\n')
+
+        if "framestor" in meta and meta['framestor']:
+            save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+            os.makedirs(save_path, exist_ok=True)
+            nfo_file_path = os.path.join(save_path, "bhd.nfo")
+            with open(nfo_file_path, 'w', encoding='utf-8') as f:
+                try:
+                    f.write(desc)
+                finally:
+                    f.close()
+            console.print(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
+            meta['nfo'] = True
+            meta['bhd_nfo'] = True
 
         # Remove size tags
         desc = re.sub(r"\[size=.*?\]", "", desc)
@@ -75,18 +89,6 @@ class BBCODE:
         desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
-        # Remove specific phrases
-        desc = re.sub(
-            r"\[color=[^\]]+\]\[b\][^\n]*\[/color\](?:\n(?!\[color=#3774F6\]).+)*(?=\n*\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\])",
-            "",
-            desc,
-            flags=re.DOTALL
-        )
-        desc = re.sub(r"\[color=#3774F6\]\[b\]SCREENSHOTS\[/b\]\[/color\]", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"(?i)\s*Screenshots:\s*", "", desc)
-        desc = re.sub(r"(?i)\s*\[b\]A BeyondHD Release\[/b\]\s*", "", desc)
-        desc = re.sub(r"\nWe are currently looking for.*?(?=\[\/[a-z]+\])", "", desc, flags=re.DOTALL)
-
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()
 
@@ -100,8 +102,6 @@ class BBCODE:
         if desc.replace('\n', '').strip() == '':
             console.print("[yellow]Description is empty after cleaning.")
             return "", imagelist
-
-        desc = re.sub(r"(________+)(?=\[i\])", r"\1\n", desc, count=1)
 
         description = f"[code]{desc}[/code]"
 

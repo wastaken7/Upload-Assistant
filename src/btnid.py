@@ -55,7 +55,6 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
     async with httpx.AsyncClient() as client:
         response = await client.post(post_query_url, headers=headers, json=post_data)
         data = response.json()
-        print(data)
 
     if "results" in data and data["results"]:
         first_result = data["results"][0]
@@ -69,12 +68,11 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
         if not only_id and internal and ("framestor" in name or "flux" in name):
             bbcode = BBCODE()
             imagelist = []
-            description, imagelist = bbcode.clean_bhd_description(description)
+            if "framestor" in name:
+                meta['framestor'] = True
+            description, imagelist = bbcode.clean_bhd_description(description, meta)
             meta['description'] = description
             meta['image_list'] = imagelist
-            # meta['saved_description'] = True
-            print("description:", description)
-            print("imagelist:", imagelist)
 
     print("BHD IMDb ID:", meta.get("imdb_id"))
     print("BHD TMDb ID:", meta.get("tmdb_manual"))

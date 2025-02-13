@@ -1324,6 +1324,7 @@ class Prep():
         desclink = meta.get('desclink')
         descfile = meta.get('descfile')
         scene_nfo = False
+        bhd_nfo = False
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.seek(0)
@@ -1354,6 +1355,9 @@ class Prep():
                 if 'auto_nfo' in meta and meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
+                elif 'bhd_nfo' in meta and meta['bhd_nfo'] is True:
+                    nfo_files = glob.glob(specified_dir_path)
+                    bhd_nfo = True
                 else:
                     nfo_files = glob.glob(source_dir_path)
                 if not nfo_files:
@@ -1376,6 +1380,8 @@ class Prep():
 
                     if scene_nfo is True:
                         description.write(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
+                    elif bhd_nfo is True:
+                        description.write(f"[center][spoiler=FraMeSToR NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
                     else:
                         description.write(f"[code]{nfo_content}[/code]\n")
                     meta['description'] = "CUSTOM"
