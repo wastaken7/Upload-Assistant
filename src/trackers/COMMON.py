@@ -126,7 +126,7 @@ class COMMON():
                                 if not new_screens:
                                     use_vs = meta.get('vapoursynth', False)
                                     try:
-                                        disc_screenshots(meta, f"PLAYLIST_{i}", bdinfo, meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
+                                        await disc_screenshots(meta, f"PLAYLIST_{i}", bdinfo, meta['uuid'], meta['base_dir'], use_vs, [], meta.get('ffdebug', False), multi_screens, True)
                                     except Exception as e:
                                         print(f"Error during BDMV screenshot capture: {e}")
                                     new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
