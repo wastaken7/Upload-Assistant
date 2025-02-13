@@ -464,6 +464,24 @@ config = {
             # "local_path" : "/LocalPath",
             # "remote_path" : "/RemotePath"
         },
+
+        "transmission_sample": {
+            "torrent_client": "transmission",
+            "transmission_protocol": "http", # http or https
+            "transmission_username": "username",
+            "transmission_password": "password",
+            "transmission_host": "localhost",
+            "transmission_port": 9091,
+
+            # "transmission_path" : "/transmission/rpc"
+            # "torrent_storage_dir" : "path/to/config/torrents folder",
+            # "transmission_label" : "Add this label to all uploads"
+
+            # Remote path mapping (docker/etc.) CASE SENSITIVE
+            # "local_path" : "/LocalPath",
+            # "remote_path" : "/RemotePath"
+        },
+
         "watch_sample": {
             "torrent_client": "watch",
             "watch_folder": "/Path/To/Watch/Folder"

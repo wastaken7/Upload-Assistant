@@ -5,6 +5,7 @@ import bencode
 import os
 import qbittorrentapi
 from deluge_client import DelugeRPCClient
+import transmission_rpc
 import base64
 from pyrobase.parts import Bunch
 import errno
@@ -57,6 +58,8 @@ class Clients():
             if meta['type'] == "DISC":
                 path = os.path.dirname(meta['path'])  # noqa F841
             self.deluge(meta['path'], torrent_path, torrent, local_path, remote_path, client, meta)
+        elif torrent_client.lower() == "transmission":
+            self.transmission(meta['path'], torrent, local_path, remote_path, client, meta)
         elif torrent_client.lower() == "watch":
             shutil.copy(torrent_path, client['watch_folder'])
         return
@@ -491,6 +494,44 @@ class Clients():
                 console.print(f"[cyan]Path: {path}")
         else:
             console.print("[bold red]Unable to connect to deluge")
+
+    def transmission(self, path, torrent, local_path, remote_path, client, meta):
+        try:
+            tr_client = transmission_rpc.Client(
+                protocol=client['transmission_protocol'],
+                host=client['transmission_host'],
+                port=int(client['transmission_port']),
+                username=client['transmission_username'],
+                password=client['transmission_password'],
+                path=client.get('transmission_path', "/transmission/rpc")
+            )
+        except Exception as err:
+            print(f"[bold red]Unable to connect to transmission")
+            return
+        
+        console.print("Connected to Transmission")
+        # Remote path mount
+        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
+            path = path.replace(local_path, remote_path)
+            path = path.replace(os.sep, '/')
+
+        path = os.path.dirname(path)
+
+        if meta.get('transmission_label') is not None:
+            label = [meta['transmission_label']]
+        elif client.get('transmission_label', None) is not None:
+            label = [client['transmission_label']]
+        else:
+            label = None
+
+        tr_client.add_torrent(
+            torrent=torrent.dump(),
+            download_dir=path,
+            labels=label
+        )
+
+        if meta['debug']:
+            console.print(f"[cyan]Path: {path}")
 
     def add_fast_resume(self, metainfo, datapath, torrent):
         """ Add fast resume data to a metafile dict.
