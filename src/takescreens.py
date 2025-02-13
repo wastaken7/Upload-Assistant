@@ -75,7 +75,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
                 console.print("[red]Error: Unable to parse frame rate from bdinfo['video'][0]['fps']")
 
     keyframe = 'nokey' if "VC-1" in bdinfo['video'][0]['codec'] or bdinfo['video'][0]['hdr_dv'] != "" else 'none'
-    print(f"File: {file}, Length: {length}, Frame Rate: {frame_rate}")
+    if meta['debug']:
+        print(f"File: {file}, Length: {length}, Frame Rate: {frame_rate}")
     os.chdir(f"{base_dir}/tmp/{folder_id}")
     existing_screens = glob.glob(f"{sanitized_filename}-*.png")
     total_existing = len(existing_screens) + len(existing_images)
@@ -155,6 +156,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         num_tasks = len(valid_images)
         max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
         num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
+        console.print("[yellow]Opimizing images")
         if meta['debug']:
             console.print(f"Using {num_workers} worker(s) for {len(valid_images)} image(s)")
 
@@ -366,9 +368,6 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
             existing_images += 1
             existing_image_paths.append(image)
 
-    if meta['debug']:
-        console.print(f"Found {existing_images} existing screenshots")
-
     if existing_images == num_screens and not meta.get('retake', False):
         console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         capture_results = existing_image_paths
@@ -414,8 +413,6 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                 os.remove(smallest)
 
         optimized_results = []
-        if meta['debug']:
-            start_opto_time = time.time()
 
         # Filter out non-existent files first
         valid_images = [image for image in capture_results if os.path.exists(image)]
@@ -426,13 +423,13 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
 
         if num_workers == 0:
-            print("[red]No valid images found for optimization.[/red]")
+            console.print("[red]No valid images found for optimization.[/red]")
             return
         else:
-            print("Now optimizing images")
+            console.print("[yellow]Now optimizing images")
 
         if meta['debug']:
-            print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
+            console.print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
 
         # Set up multiprocessing pool with the determined number of workers
         with Pool(processes=num_workers) as pool:
@@ -440,11 +437,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
         optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
 
-        print(f"[green]Successfully optimized {len(optimized_results)} images.")
-
-        if meta['debug']:
-            finish_opto_time = time.time()
-            print(f"Screenshots processed in {finish_opto_time - start_opto_time:.4f} seconds")
+        console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
         valid_results = []
         remaining_retakes = []
@@ -623,9 +616,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             existing_images += 1
             existing_image_paths.append(image_path)
 
-    if meta['debug']:
-        console.print(f"Found {existing_images} existing screenshots")
-
     tone_map = meta.get('tone_map', False)
     if tone_map and "HDR" in meta['hdr']:
         hdr_tonemap = True
@@ -670,8 +660,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
         optimized_results = []
-        if meta['debug']:
-            start_opto_time = time.time()
 
         # Filter out non-existent files first
         valid_images = [image for image in capture_results if os.path.exists(image)]
@@ -682,13 +670,13 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
 
         if num_workers == 0:
-            print("[red]No valid images found for optimization.[/red]")
+            console.print("[red]No valid images found for optimization.[/red]")
             return
         else:
-            print("Now optimizing images")
+            console.print("[yellow]Now optimizing images")
 
         if meta['debug']:
-            print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
+            console.print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
 
         # Set up multiprocessing pool with the determined number of workers
         with Pool(processes=num_workers) as pool:
@@ -696,11 +684,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
         optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
 
-        print(f"[green]Successfully optimized {len(optimized_results)} images.")
-
-        if meta['debug']:
-            finish_opto_time = time.time()
-            print(f"Screenshots processed in {finish_opto_time - start_opto_time:.4f} seconds")
+        console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
         valid_results = []
         remaining_retakes = []
