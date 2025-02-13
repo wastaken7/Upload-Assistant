@@ -7,9 +7,7 @@ import requests
 import glob
 import base64
 import time
-from rich.progress import Progress
 import re
-import concurrent.futures
 import gc
 import json
 
@@ -302,7 +300,7 @@ def upload_image_task(args):
         }
 
 
-def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
+async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
     if meta['debug']:
         upload_start_time = time.time()
 
@@ -355,43 +353,32 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
         for index, image in enumerate(image_glob[:images_needed])
     ]
 
-    default_pool_size = int(meta.get('task_limit', os.cpu_count()))
+    default_pool_size = len(upload_tasks)
     host_limits = {"oeimg": 6, "ptscreens": 1, "lensdump": 1}
     pool_size = host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
+
     results = []
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+    semaphore = asyncio.Semaphore(max_workers)
 
-    try:
-        future_to_task = {
-            executor.submit(upload_image_task, task[1:]): task[0]
-            for task in upload_tasks
-        }
+    async def async_upload(task):
+        """Wrapper function to run upload_image_task with concurrency control."""
+        index, *task_args = task
+        async with semaphore:
+            try:
+                result = await asyncio.to_thread(upload_image_task, task_args)
 
-        with Progress(disable=len(upload_tasks) == 0) as progress:
-            task = progress.add_task("Uploading Screenshots", total=len(upload_tasks))
+                if result.get('status') == 'success':
+                    return (index, result)
+                else:
+                    console.print(f"[red]{result}")
+                    return None
+            except Exception as e:
+                console.print(f"[red]Error during upload: {str(e)}")
+                return None
 
-            for future in concurrent.futures.as_completed(future_to_task):
-                index = future_to_task[future]
-                try:
-                    result = future.result()
-                    if result.get('status') == 'success':
-                        results.append((index, result))
-                    else:
-                        console.print(f"[red]{result}")
-                except Exception as e:
-                    console.print(f"[red]Error during upload: {str(e)}")
-
-                progress.update(task, advance=1)
-
-        # Wait for all tasks to complete
-        concurrent.futures.wait(future_to_task.keys(), timeout=None)
-
-    finally:
-        executor.shutdown(wait=True)
-        del executor
-        gc.collect()
-
+    upload_results = await asyncio.gather(*[async_upload(task) for task in upload_tasks])
+    results = [res for res in upload_results if res is not None]
     results.sort(key=lambda x: x[0])
 
     successfully_uploaded = [(index, result) for index, result in results if result['status'] == 'success']
@@ -402,10 +389,9 @@ def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_lis
             meta['imghost'] = config['DEFAULT'][f'img_host_{img_host_num}']
             console.print(f"[cyan]Switching to the next image host: {config['DEFAULT'][f'img_host_{img_host_num}']}[/cyan]")
 
-            del executor
             gc.collect()
 
-            return upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
+            return await upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
 
         else:
             console.print("[red]No more image hosts available. Aborting upload process.")

@@ -135,16 +135,16 @@ async def process_meta(meta, base_dir):
         if meta['is_disc'] == "BDMV":
             use_vs = meta.get('vapoursynth', False)
             try:
-                disc_screenshots(
+                await disc_screenshots(
                     meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
                     meta.get('image_list', []), meta.get('ffdebug', False), None
                 )
             except Exception as e:
-                print(f"Error during BDMV screenshot capture: {e}")
+                console.print(f"[red]Error during BDMV screenshot capture: {e}")
 
         elif meta['is_disc'] == "DVD":
             try:
-                dvd_screenshots(
+                await dvd_screenshots(
                     meta, 0, None, None
                 )
             except Exception as e:
@@ -152,7 +152,7 @@ async def process_meta(meta, base_dir):
 
         else:
             try:
-                screenshots(
+                await screenshots(
                     videopath, filename, meta['uuid'], base_dir, meta,
                     manual_frames=manual_frames  # Pass additional kwargs directly
                 )
@@ -164,7 +164,7 @@ async def process_meta(meta, base_dir):
             if 'image_list' not in meta:
                 meta['image_list'] = []
             return_dict = {}
-            new_images, dummy_var = upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
+            new_images, dummy_var = await upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
 
         elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
             meta['image_list'] = []

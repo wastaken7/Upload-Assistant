@@ -88,7 +88,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     new_images_key = f'{tracker}_images_key'
     discs = meta.get('discs', [])  # noqa F841
     filelist = meta.get('video', [])
-    filename = meta['filename']
+    filename = meta['title']
     path = meta['path']
     if isinstance(filelist, str):
         filelist = [filelist]
@@ -115,19 +115,19 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 console.print(f"[yellow]Insufficient screenshots found: generating {multi_screens} screenshots.")
             if meta['is_disc'] == "BDMV":
                 try:
-                    disc_screenshots(meta, filename, meta['bdinfo'], folder_id, base_dir, meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
+                    await disc_screenshots(meta, filename, meta['bdinfo'], folder_id, base_dir, meta.get('vapoursynth', False), [], meta.get('ffdebug', False), multi_screens, True)
                 except Exception as e:
                     print(f"Error during BDMV screenshot capture: {e}")
             elif meta['is_disc'] == "DVD":
                 try:
-                    dvd_screenshots(
+                    await dvd_screenshots(
                         meta, 0, None, True
                     )
                 except Exception as e:
                     print(f"Error during DVD screenshot capture: {e}")
             else:
                 try:
-                    screenshots(
+                    await screenshots(
                         path, filename, meta['uuid'], base_dir, meta, multi_screens, True, None)
                 except Exception as e:
                     print(f"Error during generic screenshot capture: {e}")
@@ -164,7 +164,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 console.print(f"[green]Uploading to approved host '{current_img_host}'.")
                 break
 
-        uploaded_images, _ = upload_screens(
+        uploaded_images, _ = await upload_screens(
             meta, multi_screens, img_host_index, 0, multi_screens,
             all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
         )

@@ -46,9 +46,9 @@ config = {
         "cutoff_screens": "3",
 
         # multi processing task limit
-        # When capturing/optimizing/uploading images, limit to this many concurrent tasks
-        # defaults to os.cpu_count() if this value not set
-        # "task_limit": "1",
+        # When optimizing images, limit to this many concurrent tasks
+        # defaults to os.cpu_count() // 2 if this value not set
+        # "process_limit": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
@@ -87,10 +87,6 @@ config = {
 
         # Enable lossless PNG Compression (True/False)
         "optimize_images": True,
-
-        # Use only half available CPU cores to avoid memory allocation errors on some seedboxes.
-        # Only when using lossless compression
-        "shared_seedbox": False,
 
         # The name of your default torrent client, set in the torrent client sections below
         "default_torrent_client": "Client1",
