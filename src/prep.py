@@ -268,7 +268,7 @@ class Prep():
                         if meta.get('imdb_id') is not None:
                             found_match = True
                     else:
-                        meta = await process_tracker(specific_tracker, meta, only_id)
+                        meta = await process_tracker(specific_tracker, meta)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
