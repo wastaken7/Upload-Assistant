@@ -58,7 +58,7 @@ class Prep():
         return str(value).strip().lower() == "true"
 
     async def gather_prep(self, meta, mode):
-        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 3))
+        meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
         task_limit = self.config['DEFAULT'].get('task_limit', "0")
         if int(task_limit) > 0:
             meta['task_limit'] = task_limit
@@ -207,7 +207,7 @@ class Prep():
                 description.write(description_text)
 
         client = Clients(config=config)
-        only_id = config['DEFAULT'].get('only_id', False)
+        only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list'):
@@ -257,15 +257,15 @@ class Prep():
                         btn_id = meta.get('btn')
                         btn_api = config['DEFAULT'].get('btn_api')
                         await get_btn_torrents(btn_api, btn_id, meta)
-                        if meta.get('imdb') is not None:
+                        if meta.get('imdb_id') is not None:
                             found_match = True
                     elif specific_tracker == "BHD":
                         bhd_api = config['DEFAULT'].get('bhd_api')
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta)
-                        if meta.get('imdb') is not None:
+                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta, only_id)
+                        if meta.get('imdb_id') is not None:
                             found_match = True
                     else:
                         meta = await process_tracker(specific_tracker, meta)
@@ -1324,6 +1324,7 @@ class Prep():
         desclink = meta.get('desclink')
         descfile = meta.get('descfile')
         scene_nfo = False
+        bhd_nfo = False
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             description.seek(0)
@@ -1354,6 +1355,9 @@ class Prep():
                 if 'auto_nfo' in meta and meta['auto_nfo'] is True:
                     nfo_files = glob.glob(specified_dir_path)
                     scene_nfo = True
+                elif 'bhd_nfo' in meta and meta['bhd_nfo'] is True:
+                    nfo_files = glob.glob(specified_dir_path)
+                    bhd_nfo = True
                 else:
                     nfo_files = glob.glob(source_dir_path)
                 if not nfo_files:
@@ -1376,6 +1380,8 @@ class Prep():
 
                     if scene_nfo is True:
                         description.write(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
+                    elif bhd_nfo is True:
+                        description.write(f"[center][spoiler=FraMeSToR NFO:][code]{nfo_content}[/code][/spoiler][/center]\n")
                     else:
                         description.write(f"[code]{nfo_content}[/code]\n")
                     meta['description'] = "CUSTOM"

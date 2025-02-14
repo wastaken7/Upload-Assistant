@@ -5,6 +5,7 @@ import requests
 import platform
 import httpx
 import re
+import os
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -24,7 +25,7 @@ class SP():
         self.source_flag = 'seedpool.org'
         self.upload_url = 'https://seedpool.org/api/torrents/upload'
         self.search_url = 'https://seedpool.org/api/torrents/filter'
-        self.torrent_url = 'https://seedpool.org/torrents'
+        self.torrent_url = 'https://seedpool.org/torrents/'
         self.signature = None
         self.banned_groups = [""]
         pass
@@ -104,6 +105,7 @@ class SP():
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
+        name = await self.edit_name(meta)
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
@@ -124,7 +126,7 @@ class SP():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -181,6 +183,24 @@ class SP():
             console.print(data)
         open_torrent.close()
 
+    async def edit_name(self, meta):
+        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
+        if meta['scene'] is True:
+            if meta.get('scene_name') != "":
+                name = meta.get('scene_name')
+            else:
+                name = meta['uuid']
+        else:
+            if meta.get('is_disc') is True:
+                name = meta['name']
+            else:
+                name = meta['uuid']
+        base, ext = os.path.splitext(name)
+        if ext.lower() in KNOWN_EXTENSIONS:
+            name = base
+        console.print(f"[cyan]Name: {name}")
+        return name
+
     async def search_existing(self, meta, disctype):
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
@@ -188,7 +208,6 @@ class SP():
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
             'categories[]': await self.get_cat_id(meta),
-            'types[]': await self.get_type_id(meta['type']),
             'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }

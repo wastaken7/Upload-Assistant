@@ -1,5 +1,6 @@
 import httpx
 import uuid
+from src.bbcode import BBCODE
 
 
 async def generate_guid():
@@ -31,16 +32,16 @@ async def get_btn_torrents(btn_api, btn_id, meta):
         first_torrent = next(iter(torrents.values()), None)
         if first_torrent:
             if "ImdbID" in first_torrent:
-                meta["imdb"] = first_torrent["ImdbID"]
+                meta["imdb_id"] = first_torrent["ImdbID"]
             if "TvdbID" in first_torrent:
-                meta["tvdb"] = first_torrent["TvdbID"]
+                meta["tvdb_id"] = first_torrent["TvdbID"]
 
-    print("BTN IMDb ID:", meta.get("imdb"))
-    print("BTN TVDb ID:", meta.get("tvdb"))
+    print("BTN IMDb ID:", meta.get("imdb_id"))
+    print("BTN TVDb ID:", meta.get("tvdb_id"))
     return meta
 
 
-async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta):
+async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False):
     print("Fetching BHD data...")
     post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
     post_data = {
@@ -57,12 +58,23 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta):
 
     if "results" in data and data["results"]:
         first_result = data["results"][0]
+        name = first_result.get("name", "").lower()
+        internal = bool(first_result.get("internal", False))
+        description = first_result.get("description", "")
         imdb_id = first_result.get("imdb_id", "").replace("tt", "") if first_result.get("imdb_id") else None
         tmdb_id = first_result.get("tmdb_id", "") if first_result.get("tmdb_id") else None
-        meta["imdb"] = imdb_id
+        meta["imdb_id"] = imdb_id
         meta['category'], meta['tmdb_manual'] = await parse_tmdb_id(tmdb_id, meta.get('category'))
+        if not only_id and internal and ("framestor" in name or "flux" in name):
+            bbcode = BBCODE()
+            imagelist = []
+            if "framestor" in name:
+                meta['framestor'] = True
+            description, imagelist = bbcode.clean_bhd_description(description, meta)
+            meta['description'] = description
+            meta['image_list'] = imagelist
 
-    print("BHD IMDb ID:", meta.get("imdb"))
+    print("BHD IMDb ID:", meta.get("imdb_id"))
     print("BHD TMDb ID:", meta.get("tmdb_manual"))
     return meta
 

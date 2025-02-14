@@ -216,11 +216,15 @@ class MTV():
         return description
 
     async def edit_name(self, meta):
+        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         if meta['scene'] is True:
             if meta.get('scene_name') != "":
                 mtv_name = meta.get('scene_name')
             else:
                 mtv_name = meta['uuid']
+                base, ext = os.path.splitext(mtv_name)
+                if ext.lower() in KNOWN_EXTENSIONS:
+                    mtv_name = base
         else:
             mtv_name = meta['name']
             prefix_removed = False
@@ -419,7 +423,10 @@ class MTV():
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             console.print('[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.')
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+            else:
+                recreate = True
             if recreate is True:
                 if os.path.exists(cookiefile):
                     os.remove(cookiefile)

@@ -28,3 +28,4 @@ httpx
 aiofiles
 pyparsebluray
 langcodes
+transmission_rpc

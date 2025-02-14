@@ -46,9 +46,9 @@ config = {
         "cutoff_screens": "3",
 
         # multi processing task limit
-        # When capturing/optimizing/uploading images, limit to this many concurrent tasks
-        # defaults to os.cpu_count() if this value not set
-        # "task_limit": "1",
+        # When optimizing images, limit to this many concurrent tasks
+        # defaults to os.cpu_count() // 2 if this value not set
+        # "process_limit": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
         # Default is 350, ie [img=350]
@@ -80,17 +80,13 @@ config = {
 
         # Absolute limit on processed files in packs.
         # You might not want to process screens/mediainfo for 40 episodes in a season pack.
-        "processLimit": "10",
+        "processLimit": "5",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[center] SCREENSHOTS [/center]",
 
         # Enable lossless PNG Compression (True/False)
         "optimize_images": True,
-
-        # Use only half available CPU cores to avoid memory allocation errors on some seedboxes.
-        # Only when using lossless compression
-        "shared_seedbox": False,
 
         # The name of your default torrent client, set in the torrent client sections below
         "default_torrent_client": "Client1",
@@ -468,6 +464,24 @@ config = {
             # "local_path" : "/LocalPath",
             # "remote_path" : "/RemotePath"
         },
+
+        "transmission_sample": {
+            "torrent_client": "transmission",
+            "transmission_protocol": "http",  # http or https
+            "transmission_username": "username",
+            "transmission_password": "password",
+            "transmission_host": "localhost",
+            "transmission_port": 9091,
+
+            # "transmission_path" : "/transmission/rpc"
+            # "torrent_storage_dir" : "path/to/config/torrents folder",
+            # "transmission_label" : "Add this label to all uploads"
+
+            # Remote path mapping (docker/etc.) CASE SENSITIVE
+            # "local_path" : "/LocalPath",
+            # "remote_path" : "/RemotePath"
+        },
+
         "watch_sample": {
             "torrent_client": "watch",
             "watch_folder": "/Path/To/Watch/Folder"

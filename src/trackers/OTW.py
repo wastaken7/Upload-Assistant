@@ -89,8 +89,8 @@ class OTW():
         otw_name = await self.edit_name(meta)
 
         approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
-        result = await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
-        if result and meta.get('OTW_images_key'):
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
+        if 'OTW_images_key' in meta:
             image_list = meta['OTW_images_key']
         else:
             image_list = meta['image_list']
