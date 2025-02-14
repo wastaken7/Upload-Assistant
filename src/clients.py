@@ -505,10 +505,10 @@ class Clients():
                 password=client['transmission_password'],
                 path=client.get('transmission_path', "/transmission/rpc")
             )
-        except Exception as err:
-            print(f"[bold red]Unable to connect to transmission")
+        except Exception:
+            console.print("[bold red]Unable to connect to transmission")
             return
-        
+
         console.print("Connected to Transmission")
         # Remote path mount
         if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():

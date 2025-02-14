@@ -467,7 +467,7 @@ config = {
 
         "transmission_sample": {
             "torrent_client": "transmission",
-            "transmission_protocol": "http", # http or https
+            "transmission_protocol": "http",  # http or https
             "transmission_username": "username",
             "transmission_password": "password",
             "transmission_host": "localhost",
