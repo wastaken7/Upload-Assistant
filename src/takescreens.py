@@ -506,7 +506,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully captured {len(optimized_results)} screenshots.")
+    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
 
 async def capture_dvd_screenshot(task):
