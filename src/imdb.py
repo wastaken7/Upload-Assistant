@@ -3,6 +3,7 @@ from difflib import SequenceMatcher
 from imdb import Cinemagoer
 from src.console import console
 from datetime import datetime
+import json
 
 
 async def get_imdb_aka_api(imdb_id, meta):
@@ -252,7 +253,7 @@ async def get_imdb_info_api(imdbID, meta):
             imdb_info['directors'] = meta['tmdb_directors']
 
     if meta['debug']:
-        console.print(f"[cyan]IMDB Response: {imdb_info[:600]}...")
+        console.print(f"[cyan]IMDB Response: {json.dumps(imdb_info, indent=2)[:600]}...")
     return imdb_info
 
 

@@ -11,6 +11,7 @@ import anitopy
 from datetime import datetime
 from difflib import SequenceMatcher
 import requests
+import json
 
 
 async def get_tmdb_from_imdb(meta, filename):
@@ -115,7 +116,7 @@ async def tmdb_other_meta(meta):
         movie = tmdb.Movies(meta['tmdb'])
         response = movie.info()
         if meta['debug']:
-            console.print(f"[cyan]TMDB Response: {response[:600]}...")
+            console.print(f"[cyan]TMDB Response: {json.dumps(response, indent=2)[:600]}...")
         meta['title'] = response['title']
         if response['release_date']:
             meta['year'] = datetime.strptime(response['release_date'], '%Y-%m-%d').year
@@ -170,7 +171,7 @@ async def tmdb_other_meta(meta):
         tv = tmdb.TV(meta['tmdb'])
         response = tv.info()
         if meta['debug']:
-            console.print(f"[cyan]TMDB Response: {response[:600]}...")
+            console.print(f"[cyan]TMDB Response: {json.dumps(response, indent=2)[:600]}...")
         meta['title'] = response['name']
         if response['first_air_date']:
             meta['year'] = datetime.strptime(response['first_air_date'], '%Y-%m-%d').year
