@@ -182,9 +182,6 @@ class AITHER():
             aither_name = aither_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
             aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
-        if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
-            aither_name = aither_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
-
         return aither_name
 
     async def get_cat_id(self, category_name):
