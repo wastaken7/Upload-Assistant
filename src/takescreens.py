@@ -555,6 +555,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     """Screenshot capture function using concurrent.futures"""
     if meta['debug']:
         start_time = time.time()
+        console.print("Image Host:", img_host)
     if 'image_list' not in meta:
         meta['image_list'] = []
 
@@ -684,6 +685,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
         optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
 
+        if meta['debug']:
+            console.print("Optimized results:", optimized_results)
         console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
         valid_results = []
@@ -692,9 +695,11 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             if "Error" in image_path:
                 console.print(f"[red]{image_path}")
                 continue
-
             retake = False
             image_size = os.path.getsize(image_path)
+            if meta['debug']:
+                console.print("Image paths:", image_path)
+                console.print("Image sizes", image_size)
             if not manual_frames:
                 if image_size <= 75000:
                     console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
@@ -750,6 +755,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                     console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
                     remaining_retakes.append(image_path)
             else:
+                console.print("Validated result:", valid_results)
                 valid_results.append(image_path)
 
         if remaining_retakes:

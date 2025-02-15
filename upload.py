@@ -152,6 +152,8 @@ async def process_meta(meta, base_dir):
 
         else:
             try:
+                if meta['debug']:
+                    console.print(f"videopath: {videopath}, filename: {filename}, meta: {meta['uuid']}, base_dir: {base_dir}, manual_frames: {manual_frames}")
                 await screenshots(
                     videopath, filename, meta['uuid'], base_dir, meta,
                     manual_frames=manual_frames  # Pass additional kwargs directly
