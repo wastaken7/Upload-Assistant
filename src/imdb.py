@@ -252,7 +252,7 @@ async def get_imdb_info_api(imdbID, meta):
             imdb_info['directors'] = meta['tmdb_directors']
 
     if meta['debug']:
-        console.print(imdb_info)
+        console.print(f"[cyan]IMDB Response: {imdb_info[:600]}...")
     return imdb_info
 
 

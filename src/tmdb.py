@@ -115,7 +115,7 @@ async def tmdb_other_meta(meta):
         movie = tmdb.Movies(meta['tmdb'])
         response = movie.info()
         if meta['debug']:
-            console.print(f"[cyan]TMDB Response: {response}")
+            console.print(f"[cyan]TMDB Response: {response[:600]}...")
         meta['title'] = response['title']
         if response['release_date']:
             meta['year'] = datetime.strptime(response['release_date'], '%Y-%m-%d').year
@@ -170,7 +170,7 @@ async def tmdb_other_meta(meta):
         tv = tmdb.TV(meta['tmdb'])
         response = tv.info()
         if meta['debug']:
-            console.print(f"[cyan]TMDB Response: {response}")
+            console.print(f"[cyan]TMDB Response: {response[:600]}...")
         meta['title'] = response['name']
         if response['first_air_date']:
             meta['year'] = datetime.strptime(response['first_air_date'], '%Y-%m-%d').year
