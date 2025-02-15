@@ -271,6 +271,7 @@ async def do_the_thing(base_dir):
             if os.path.exists(meta_file):
                 with open(meta_file, "r") as f:
                     saved_meta = json.load(f)
+                    console.print("[yellow]Existing metadata file found, it holds cached values")
                     meta.update(await merge_meta(meta, saved_meta, path))
             else:
                 if meta['debug']:

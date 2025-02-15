@@ -210,7 +210,7 @@ class Prep():
         only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
-        if not meta.get('image_list'):
+        if not meta.get('image_list') and not meta.get('edit', False):
             # Reuse information from trackers with fallback
             found_match = False
 
