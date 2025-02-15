@@ -860,6 +860,8 @@ def optimize_image_task(image):
                 oxipng.optimize(image, level=level)
 
             return image
+        else:
+            return image
     except Exception as e:
         print(f"ERROR optimizing {image}: {e}")
         return f"Error: {e}"
