@@ -625,6 +625,7 @@ class COMMON():
                         meta['saved_description'] = True
                     elif edit_choice.lower() == 'd':
                         description = None
+                        imagelist = []
                         console.print("[yellow]Description discarded.[/yellow]")
                     else:
                         console.print("[green]Keeping the original description.[/green]")
