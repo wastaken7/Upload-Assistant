@@ -146,7 +146,7 @@ class SHRI():
             shareisland_name = shareisland_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
 
         if not meta['is_disc']:
-            
+
             def get_audio_lang(media_info_text=None):
                 if media_info_text:
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
@@ -172,9 +172,6 @@ class SHRI():
             shareisland_name = shareisland_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
             shareisland_name = shareisland_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
-        if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
-            shareisland_name = shareisland_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
-
         return shareisland_name
 
     async def get_cat_id(self, category_name):
@@ -195,13 +192,13 @@ class SHRI():
         }
 
         if reverse:
-#            # Return a reverse mapping of type IDs to type names
+            # Return a reverse mapping of type IDs to type names
             return {v: k for k, v in type_mapping.items()}
         elif type is not None:
-#            # Return the specific type ID
+            # Return the specific type ID
             return type_mapping.get(type, '0')
         else:
-#            # Return the full mapping
+            # Return the full mapping
             return type_mapping
 
     async def get_res_id(self, resolution=None, reverse=False):
