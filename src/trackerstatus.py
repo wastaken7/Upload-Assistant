@@ -87,10 +87,6 @@ async def process_all_trackers(meta):
                 if tracker_name == "MTV":
                     if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
                         tracker_config = config['TRACKERS'].get(tracker_name, {})
-                        if str(tracker_config.get('prefer_mtv_torrent', 'false')).lower() == "true":
-                            local_meta['prefer_small_pieces'] = True
-                        else:
-                            local_meta['prefer_small_pieces'] = False
                         if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
                             torrent_path = os.path.abspath(f"{local_meta['base_dir']}/tmp/{local_meta['uuid']}/BASE.torrent")
                             if not os.path.exists(torrent_path):
