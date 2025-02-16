@@ -111,7 +111,7 @@ class Clients():
                         with open(torrent_path, "wb") as f:
                             f.write(torrent_file_content)
 
-                        console.print(f"[green]✓ Successfully saved .torrent file: {torrent_path}")
+                        console.print(f"[green]Successfully saved .torrent file: {torrent_path}")
 
                     except qbittorrentapi.APIError as e:
                         console.print(f"[bold red]Failed to fetch .torrent from qBittorrent for hash {hash_value}: {e}")
@@ -292,7 +292,7 @@ class Clients():
                 VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
             )
             qbt_client.auth_log_in()
-            console.print("[green]We logged into qBittorrent")
+
         except qbittorrentapi.LoginFailed:
             console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
             return None
@@ -321,10 +321,10 @@ class Clients():
                 continue
 
             if meta['debug']:
-                console.print(f"[cyan]✓ Matched Torrent: {torrent.hash}")
-                console.print(f"  Name: {torrent.name}")
-                console.print(f"  Save Path: {torrent.save_path}")
-                console.print(f"  Content Path: {torrent_path}")
+                console.print(f"[cyan]Matched Torrent: {torrent.hash}")
+                console.print(f"Name: {torrent.name}")
+                console.print(f"Save Path: {torrent.save_path}")
+                console.print(f"Content Path: {torrent_path}")
 
             matching_torrents.append({'hash': torrent.hash, 'name': torrent.name})
 
@@ -364,7 +364,7 @@ class Clients():
                         with open(torrent_file_path, "wb") as f:
                             f.write(torrent_file_content)
                         if meta['debug']:
-                            console.print(f"[green]✓ Successfully saved .torrent file: {torrent_file_path}")
+                            console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
 
                     except qbittorrentapi.APIError as e:
                         console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
@@ -385,10 +385,10 @@ class Clients():
                                 'torrent_path': torrent_path if torrent_path else torrent_file_path,
                                 'piece_size': piece_size
                             }
-                            console.print(f"[green]✓ Updated best match: {best_match}")
+                            console.print(f"[green]Updated best match: {best_match}")
                     else:
                         # If `prefer_small_pieces` is False, return first valid torrent
-                        console.print(f"[green]✓ Returning first valid torrent: {torrent_hash}")
+                        console.print(f"[green]Returning first valid torrent: {torrent_hash}")
                         return torrent_hash
 
             except Exception as e:
