@@ -4,6 +4,7 @@ import asyncio
 import requests
 import platform
 import os
+import re
 import glob
 import httpx
 
@@ -19,65 +20,32 @@ class SHRI():
         Set type/category IDs
         Upload
     """
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'SHRI'
         self.source_flag = 'Shareisland'
-        self.upload_url = 'https://shareisland.org/api/torrents/upload'
         self.search_url = 'https://shareisland.org/api/torrents/filter'
+        self.upload_url = 'https://shareisland.org/api/torrents/upload'
+        self.torrent_url = 'https://shareisland.org/api/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
-        self.banned_groups = [""]
+        self.banned_groups = []
         pass
-
-    async def get_cat_id(self, category_name):
-        category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-        }.get(category_name, '0')
-        return category_id
-
-    async def get_type_id(self, type):
-        type_id = {
-            'DISC': '26',
-            'REMUX': '7',
-            'WEBDL': '27',
-            'WEBRIP': '27',
-            'HDTV': '6',
-            'ENCODE': '15'
-        }.get(type, '0')
-        return type_id
-
-    async def get_res_id(self, resolution):
-        resolution_id = {
-            '8640p': '10',
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
-        }.get(resolution, '10')
-        return resolution_id
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        modq = await self.get_flag(meta, 'modq')
+        name = await self.edit_name(meta)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
-
         if meta['bdinfo'] is not None:
             mi_dump = None
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
@@ -85,19 +53,22 @@ class SHRI():
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
             bd_dump = None
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
-        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        open_torrent = open(torrent_file_path, 'rb')
         files = {'torrent': open_torrent}
         base_dir = meta['base_dir']
         uuid = meta['uuid']
         specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        bhd_dir_path = os.path.join(base_dir, "tmp", uuid, "bhd.nfo")
+        bhd_files = glob.glob(bhd_dir_path)
         nfo_files = glob.glob(specified_dir_path)
         nfo_file = None
-        if nfo_files:
+        if nfo_files and not bhd_files:
             nfo_file = open(nfo_files[0], 'rb')
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -119,19 +90,8 @@ class SHRI():
             'free': 0,
             'doubleup': 0,
             'sticky': 0,
+            'mod_queue_opt_in': modq,
         }
-        # Internal
-        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
-            if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
-                data['internal'] = 1
-
-        if region_id != 0:
-            data['region_id'] = region_id
-        if distributor_id != 0:
-            data['distributor_id'] = distributor_id
-        if meta.get('category') == "TV":
-            data['season_number'] = meta.get('season_int', '0')
-            data['episode_number'] = meta.get('episode_int', '0')
         headers = {
             'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         }
@@ -139,6 +99,17 @@ class SHRI():
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip()
         }
 
+        # Internal
+        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
+            if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
+                data['internal'] = 1
+        if region_id != 0:
+            data['region_id'] = region_id
+        if distributor_id != 0:
+            data['distributor_id'] = distributor_id
+        if meta.get('category') == "TV":
+            data['season_number'] = meta.get('season_int', '0')
+            data['episode_number'] = meta.get('episode_int', '0')
         if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
@@ -154,9 +125,123 @@ class SHRI():
             console.print(data)
         open_torrent.close()
 
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag is not None:
+            return 1 if config_flag else 0
+
+        return 1 if meta.get(flag_name, False) else 0
+
+    async def edit_name(self, meta):
+        shareisland_name = meta['name']
+        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
+        resolution = meta.get('resolution')
+        video_codec = meta.get('video_codec')
+        video_encode = meta.get('video_encode')
+        name_type = meta.get('type', "")
+        source = meta.get('source', "")
+
+        if name_type == "DVDRIP":
+            shareisland_name = shareisland_name.replace(f"{meta['source']}", f"{resolution} {meta['source']}", 1)
+            shareisland_name = shareisland_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+
+        if not meta['is_disc']:
+            
+            def has_english_audio(media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    for language in audio_section:
+                        if language.lower().startswith('en'):  # Check if it's English
+                            return True
+                return False
+
+            def get_audio_lang(media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    languages = [lang.upper() for lang in audio_section]
+                    if "ITALIAN" in languages:
+                        return "ITALIAN"  # Priorità all'italiano
+                    return languages[0] if languages else ""
+                return ""
+
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
+
+                audio_lang = get_audio_lang(media_info_text=media_info_text)
+                if audio_lang:
+                    if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                        shareisland_name = shareisland_name.replace(str(meta['year']), f"{meta['year']} {audio_lang}", 1)
+                    else:
+                        shareisland_name = shareisland_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
+
+        if meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            shareisland_name = shareisland_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
+            shareisland_name = shareisland_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
+
+        if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
+            shareisland_name = shareisland_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}", 1)
+
+        return shareisland_name
+
+    async def get_cat_id(self, category_name):
+        category_id = {
+            'MOVIE': '1',
+            'TV': '2',
+        }.get(category_name, '0')
+        return category_id
+
+    async def get_type_id(self, type=None, reverse=False):
+        type_mapping = {
+            'DISC': '26',
+            'REMUX': '7',
+            'WEBDL': '27',
+            'WEBRIP': '15',
+            'HDTV': '6',
+            'ENCODE': '15',
+        }
+
+        if reverse:
+#            # Return a reverse mapping of type IDs to type names
+            return {v: k for k, v in type_mapping.items()}
+        elif type is not None:
+#            # Return the specific type ID
+            return type_mapping.get(type, '0')
+        else:
+#            # Return the full mapping
+            return type_mapping
+
+    async def get_res_id(self, resolution=None, reverse=False):
+        resolution_mapping = {
+            '8640p': '10',
+            '4320p': '1',
+            '2160p': '2',
+            '1440p': '3',
+            '1080p': '3',
+            '1080i': '4',
+            '720p': '5',
+            '576p': '6',
+            '576i': '7',
+            '480p': '8',
+            '480i': '9',
+        }
+
+        if reverse:
+            # Return reverse mapping of IDs to resolutions
+            return {v: k for k, v in resolution_mapping.items()}
+        elif resolution is not None:
+            # Return the ID for the given resolution
+            return resolution_mapping.get(resolution, '10')  # Default to '10' for unknown resolutions
+        else:
+            # Return the full mapping
+            return resolution_mapping
+
     async def search_existing(self, meta, disctype):
         dupes = []
-        console.print("[yellow]Searching for existing torrents on SHRI...")
+        console.print("[yellow]Searching for existing torrents on Shareisland...")
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
@@ -169,13 +254,17 @@ class SHRI():
             params['name'] = params['name'] + f" {meta.get('season', '')}"
         if meta.get('edition', "") != "":
             params['name'] = params['name'] + f" {meta['edition']}"
+
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     data = response.json()
                     for each in data['data']:
-                        result = [each][0]['attributes']['name']
+                        result = {
+                            'name': each['attributes']['name'],
+                            'size': each['attributes']['size']
+                        }
                         dupes.append(result)
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
