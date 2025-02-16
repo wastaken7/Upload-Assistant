@@ -534,7 +534,8 @@ class MTV():
         params = {
             't': 'search',
             'apikey': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
-            'q': ""
+            'q': "",
+            'limit': "100"
         }
 
         if meta['imdb_id'] not in ("0", "", None):
