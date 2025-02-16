@@ -147,21 +147,11 @@ class SHRI():
 
         if not meta['is_disc']:
             
-            def has_english_audio(media_info_text=None):
-                if media_info_text:
-                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    for language in audio_section:
-                        if language.lower().startswith('en'):  # Check if it's English
-                            return True
-                return False
-
             def get_audio_lang(media_info_text=None):
                 if media_info_text:
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    languages = [lang.upper() for lang in audio_section]
-                    if "ITALIAN" in languages:
-                        return "ITALIAN"  # Priorità all'italiano
-                    return languages[0] if languages else ""
+                    languages = sorted(set(lang.upper() for lang in audio_section))
+                    return " - ".join(languages) if languages else ""
                 return ""
 
             try:
