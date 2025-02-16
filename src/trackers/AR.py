@@ -251,7 +251,7 @@ class AR():
                     media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
                     description += (f"""[code]\n{media_info}\n[/code]\n""")
                     # adding full mediainfo as spoiler
-                    full_mediainfo = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r').read()
+                    full_mediainfo = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
                     description += f"[hide=FULL MEDIAINFO][code]{full_mediainfo}[/code][/hide]\n"
                 else:
                     console.print("[bold red]Couldn't find the MediaInfo template")
