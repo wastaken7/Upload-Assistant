@@ -27,7 +27,7 @@ async def get_season_episode(video, meta):
                         meta['manual_date'] = daily_match.group().replace('.', '-')
                     is_daily = True
                     guess_date = meta.get('manual_date', guessit(video).get('date')) if meta.get('manual_date') else guessit(video).get('date')
-                    season_int, episode_int = await daily_to_tmdb_season_episode(meta.get('tmdb'), guess_date)
+                    season_int, episode_int = await daily_to_tmdb_season_episode(meta.get('tmdb_id'), guess_date)
 
                     season = f"S{str(season_int).zfill(2)}"
                     episode = f"E{str(episode_int).zfill(2)}"

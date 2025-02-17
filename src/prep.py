@@ -286,29 +286,37 @@ class Prep():
         else:
             console.print("Skipping existing search as meta already populated")
 
+        if meta['debug']:
+            console.print("ID inputs into prep")
+            console.print("imdb_id:", meta.get("imdb_id"))
+            console.print("tvdb_id:", meta.get("tvdb_id"))
+            console.print("tmdb_id:", meta.get("tmdb_id"))
+            console.print("tmdb_manual:", meta.get("tmdb_manual"))
+            console.print("category:", meta.get("category"))
         console.print("[yellow]Building meta data.....")
         if meta['debug']:
             meta_start_time = time.time()
         if meta.get('manual_language'):
             meta['original_langauge'] = meta.get('manual_language').lower()
-        meta['tmdb'] = meta.get('tmdb_manual', None)
+        meta['tmdb_id'] = meta.get('tmdb_manual', None)
         meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = await self.get_cat(video)
         else:
             meta['category'] = meta['category'].upper()
-        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-            meta['category'], meta['tmdb'], meta['imdb'] = await get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])
-        if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
+        if meta.get('tmdb_id', None) is None and meta.get('imdb_id', None) is None:
+            meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id'])
+        if meta.get('tmdb_id', None) is None and meta.get('imdb_id', None) is None:
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
-        elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
-            meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
+        elif meta.get('imdb_id', None) is not None and meta.get('tmdb_manual', None) is None:
+            if meta['imdb_id'].startswith('tt'):
+                meta['imdb_id'] = meta['imdb_id'][2:]
             meta = await get_tmdb_from_imdb(meta, filename)
         else:
-            meta['tmdb_manual'] = meta.get('tmdb', None)
+            meta['tmdb_manual'] = meta.get('tmdb_id', None)
 
         # If no tmdb, use imdb for meta
-        if int(meta['tmdb']) == 0:
+        if int(meta['tmdb_id']) == 0:
             meta = await imdb_other_meta(meta)
         else:
             meta = await tmdb_other_meta(meta)
