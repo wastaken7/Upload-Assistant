@@ -5,7 +5,7 @@ from src.clients import Clients
 from data.config import config
 from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze
-from src.imdb import get_imdb_info_api, search_imdb, imdb_other_meta
+from src.imdb import get_imdb_info_api, search_imdb
 from src.trackermeta import update_metadata_from_tracker
 from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id
 from src.region import get_region, get_distributor, get_service
@@ -314,11 +314,8 @@ class Prep():
             meta = await get_tmdb_from_imdb(meta, filename)
         else:
             meta['tmdb_manual'] = meta.get('tmdb_id', None)
-
-        # If no tmdb, use imdb for meta
-        if int(meta['tmdb_id']) == 0:
-            meta = await imdb_other_meta(meta)
-        else:
+        # Get tmdb data
+        if int(meta['tmdb_id']) != 0:
             meta = await tmdb_other_meta(meta)
         # Search tvmaze
         if meta['category'] == "TV":
@@ -328,6 +325,7 @@ class Prep():
         # If no imdb, search for it
         if meta.get('imdb_id', None) is None:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
+        # Get imdb data
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
             meta['imdb_info'] = await get_imdb_info_api(meta['imdb_id'], meta)
         if meta.get('tag', None) is None:

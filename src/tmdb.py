@@ -28,23 +28,29 @@ async def get_tmdb_from_imdb(meta, filename):
         meta['category'] = "MOVIE"
         meta['tmdb_id'] = info['movie_results'][0]['id']
         meta['original_language'] = info['movie_results'][0].get('original_language')
+
     elif len(info['tv_results']) >= 1:
         meta['category'] = "TV"
         meta['tmdb_id'] = info['tv_results'][0]['id']
         meta['original_language'] = info['tv_results'][0].get('original_language')
+
     else:
         console.print("[yellow]TMDb was unable to find anything with that IMDb ID, checking TVDb...")
+
         # Check TVDb for an ID before falling back to searching IMDb
         tvdb_id = meta.get('tvdb_id')
         if tvdb_id:
             find_tvdb = tmdb.Find(id=str(tvdb_id))
             info_tvdb = find_tvdb.info(external_source="tvdb_id")
+            if meta['debug']:
+                console.print("TVDB INFO", info_tvdb)
 
             if len(info_tvdb['tv_results']) >= 1:
                 meta['category'] = "TV"
                 meta['tmdb_id'] = info_tvdb['tv_results'][0]['id']
                 meta['original_language'] = info_tvdb['tv_results'][0].get('original_language')
                 return meta
+
         # If TVDb also fails, proceed with searching IMDb
         imdb_info = await get_imdb_info_api(imdb_id.replace('tt', ''), meta)
         title = imdb_info.get("title") or filename
