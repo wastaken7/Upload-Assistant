@@ -299,6 +299,9 @@ class Prep():
         if meta.get('manual_language'):
             meta['original_langauge'] = meta.get('manual_language').lower()
         meta['tmdb_id'] = meta.get('tmdb_manual', None)
+        meta['imdb_id'] = meta.get('imdb_manual', None)
+        meta['mal_id'] = meta.get('mal_manual', None)
+        meta['tvdb_id'] = meta.get('tvdb_manual', None)
         meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = await self.get_cat(video)
@@ -317,17 +320,21 @@ class Prep():
         # Get tmdb data
         if int(meta['tmdb_id']) != 0:
             meta = await tmdb_other_meta(meta)
+        meta['tmdb'] = meta.get('tmdb_id', 0)
         # Search tvmaze
         if meta['category'] == "TV":
             meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
         else:
             meta.setdefault('tvmaze_id', '0')
+        meta['tvmaze'] = meta.get('tvmaze_id', 0)
+        meta['tvdb'] = meta.get('tvdb_id', 0)
         # If no imdb, search for it
         if meta.get('imdb_id', None) is None:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
         # Get imdb data
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
             meta['imdb_info'] = await get_imdb_info_api(meta['imdb_id'], meta)
+        meta['imdb'] = meta.get('imdb_id', 0)
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
         else:
