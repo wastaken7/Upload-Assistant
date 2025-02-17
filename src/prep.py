@@ -205,7 +205,10 @@ class Prep():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(description_text):
                 description.write(description_text)
-
+        meta['tmdb_id'] = meta.get('tmdb_manual', None)
+        meta['imdb_id'] = meta.get('imdb_manual', None)
+        meta['mal_id'] = meta.get('mal_manual', None)
+        meta['tvdb_id'] = meta.get('tvdb_manual', None)
         client = Clients(config=config)
         only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
         if meta.get('infohash') is not None:
@@ -298,10 +301,6 @@ class Prep():
             meta_start_time = time.time()
         if meta.get('manual_language'):
             meta['original_langauge'] = meta.get('manual_language').lower()
-        meta['tmdb_id'] = meta.get('tmdb_manual', None)
-        meta['imdb_id'] = meta.get('imdb_manual', None)
-        meta['mal_id'] = meta.get('mal_manual', None)
-        meta['tvdb_id'] = meta.get('tvdb_manual', None)
         meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
             meta['category'] = await self.get_cat(video)
