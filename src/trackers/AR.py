@@ -6,7 +6,7 @@ import os
 import pickle
 import platform
 import re
-import rich.prompt as Prompt
+from rich.prompt import Prompt
 import urllib.parse
 from src.exceptions import *  # noqa F403
 from bs4 import BeautifulSoup
