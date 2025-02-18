@@ -560,10 +560,10 @@ class COMMON():
                 mal = attributes.get('mal_id')
                 imdb = attributes.get('imdb_id')
                 infohash = attributes.get('info_hash')
-                tmdb = None if tmdb == 0 else tmdb
-                tvdb = None if tvdb == 0 else tvdb
-                mal = None if mal == 0 else mal
-                imdb = None if imdb == 0 else imdb
+                tmdb = 0 if tmdb == 0 else tmdb
+                tvdb = 0 if tvdb == 0 else tvdb
+                mal = 0 if mal == 0 else mal
+                imdb = 0 if imdb == 0 else imdb
             else:
                 # Handle response when searching by ID
                 if id and not data:
@@ -577,10 +577,10 @@ class COMMON():
                     mal = attributes.get('mal_id')
                     imdb = attributes.get('imdb_id')
                     infohash = attributes.get('info_hash')
-                    tmdb = None if tmdb == 0 else tmdb
-                    tvdb = None if tvdb == 0 else tvdb
-                    mal = None if mal == 0 else mal
-                    imdb = None if imdb == 0 else imdb
+                    tmdb = 0 if tmdb == 0 else tmdb
+                    tvdb = 0 if tvdb == 0 else tvdb
+                    mal = 0 if mal == 0 else mal
+                    imdb = 0 if imdb == 0 else imdb
                     # Handle file name extraction
                     files = attributes.get('files', [])
                     if files:
