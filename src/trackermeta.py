@@ -305,8 +305,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             # Use search_filename function if ID is not found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
 
-            meta['imdb_id'] = str(imdb).zfill(7) if imdb else 0
-            meta['tvdb_id'] = str(tvdb_id) if tvdb_id else 0
+            meta['imdb_id'] = str(imdb).zfill(7) if imdb else meta.get('imdb_id')
+            meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
             meta['hdb_name'] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id
