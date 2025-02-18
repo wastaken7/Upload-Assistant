@@ -64,7 +64,7 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
         imdb_id = first_result.get("imdb_id", "").replace("tt", "") if first_result.get("imdb_id") else None
         tmdb_id = first_result.get("tmdb_id", "") if first_result.get("tmdb_id") else None
         meta["imdb_id"] = imdb_id
-        meta['category'], meta['tmdb_manual'] = await parse_tmdb_id(tmdb_id, meta.get('category'))
+        meta['category'], meta['tmdb_id'] = await parse_tmdb_id(tmdb_id, meta.get('category'))
         if not only_id and internal and ("framestor" in name or "flux" in name):
             bbcode = BBCODE()
             imagelist = []
@@ -75,7 +75,7 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
             meta['image_list'] = imagelist
 
     print("BHD IMDb ID:", meta.get("imdb_id"))
-    print("BHD TMDb ID:", meta.get("tmdb_manual"))
+    print("BHD TMDb ID:", meta.get("tmdb_id"))
     return meta
 
 

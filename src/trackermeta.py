@@ -145,9 +145,9 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
     tmdb, imdb, tvdb, mal, desc, category, infohash, imagelist, filename, *rest = tracker_data
 
     if tmdb:
-        meta['tmdb_manual'] = tmdb
+        meta['tmdb_id'] = tmdb
         if meta['debug']:
-            console.print("set TMDB ID:", meta['tmdb_manual'])
+            console.print("set TMDB ID:", meta['tmdb_id'])
     if imdb:
         meta['imdb_id'] = str(imdb).zfill(7)
         if meta['debug']:
