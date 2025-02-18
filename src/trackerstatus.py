@@ -40,12 +40,20 @@ async def process_all_trackers(meta):
         if tracker_name in tracker_class_map:
             tracker_class = tracker_class_map[tracker_name](config=config)
             if tracker_name in {"THR", "PTP"}:
-                if local_meta.get('imdb_id', '0') == '0':
-                    imdb_id = "0" if local_meta['unattended'] else cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567)")
-                    if imdb_id == "":
-                        meta['imdb_id'] = "0"
+                if local_meta.get('imdb_id', 0) == 0:
+                    imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(
+                        "Unable to find IMDB id, please enter e.g.(tt1234567)"
+                    ).strip()
+
+                    if not imdb_id:
+                        meta['imdb_id'] = 0
                     else:
-                        meta['imdb_id'] = imdb_id.replace('tt', '').zfill(7)
+                        imdb_id = imdb_id.lower()
+                        if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
+                            meta['imdb_id'] = imdb_id[2:].zfill(7)
+                        else:
+                            cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
+                            meta['imdb_id'] = 0
 
             if tracker_name == "PTP":
                 console.print("[yellow]Searching for Group ID on PTP")
