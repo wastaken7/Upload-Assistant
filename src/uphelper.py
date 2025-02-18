@@ -63,15 +63,15 @@ class UploadHelper:
             console.print()
         console.print(f"[bold]Category:[/bold] {meta['category']}")
         console.print()
-        if int(meta.get('tmdb', 0)) != 0:
-            console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
-        if int(meta.get('imdb_id', 0)) != 0:
+        if int(meta.get('tmdb_id') or 0) != 0:
+            console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}")
+        if int(meta.get('imdb_id') or 0) != 0:
             console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb_id']}")
-        if int(meta.get('tvdb_id', 0)) != 0:
+        if int(meta.get('tvdb_id') or 0) != 0:
             console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
-        if int(meta.get('tvmaze_id', 0)) != 0:
+        if int(meta.get('tvmaze_id') or 0) != 0:
             console.print(f"[bold]TVMaze:[/bold] https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
-        if int(meta.get('mal_id', 0)) != 0:
+        if int(meta.get('mal_id') or 0) != 0:
             console.print(f"[bold]MAL:[/bold] https://myanimelist.net/anime/{meta['mal_id']}")
         console.print()
         if int(meta.get('freeleech', 0)) != 0:
