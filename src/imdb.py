@@ -7,7 +7,7 @@ import json
 
 
 async def get_imdb_aka_api(imdb_id, meta):
-    if imdb_id == "0":
+    if imdb_id == 0:
         return "", None
     if not str(imdb_id).startswith("tt"):
         imdb_id = f"tt{imdb_id}"
