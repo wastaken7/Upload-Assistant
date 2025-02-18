@@ -16,7 +16,7 @@ async def get_season_episode(video, meta):
         filelist = meta['filelist']
         meta['tv_pack'] = 0
         is_daily = False
-        if meta['anime'] is False:
+        if not meta.get('anime'):
             try:
                 daily_match = re.search(r"\d{4}[-\.]\d{2}[-\.]\d{2}", video)
                 if meta.get('manual_date') or daily_match:
@@ -82,11 +82,11 @@ async def get_season_episode(video, meta):
         else:
             # If Anime
             parsed = anitopy.parse(Path(video).name)
-            romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal', None))
+            romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal_id', 0))
             if mal_id:
                 meta['mal_id'] = mal_id
-            if meta.get('mal') is not None:
-                mal_id = meta.get('mal')
+            if meta.get('mal_id') != 0:
+                mal_id = meta.get('mal_id')
             if meta.get('tmdb_manual', None) is None:
                 year = parsed.get('anime_year', str(seasonYear))
                 meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])

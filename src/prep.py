@@ -205,12 +205,19 @@ class Prep():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(description_text):
                 description.write(description_text)
-        meta['tmdb_id'] = meta.get('tmdb_manual', None)
-        meta['imdb_id'] = meta.get('imdb_manual', None)
-        meta['mal_id'] = meta.get('mal_manual', None)
-        meta['tvdb_id'] = meta.get('tvdb_manual', None)
+
         client = Clients(config=config)
         only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
+        meta['tmdb_manual'] = meta.get('tmdb_manual') or 0
+        meta['tmdb_id'] = meta.get('tmdb_manual')
+        meta['imdb_manual'] = meta.get('imdb_manual') or 0
+        meta['imdb_id'] = meta.get('imdb_manual')
+        if str(meta.get('imdb_id', '')).startswith('tt'):
+            meta['imdb_id'] = meta['imdb_id'][2:]
+        meta['mal_manual'] = meta.get('mal_manual') or 0
+        meta['mal_id'] = meta.get('mal_manual')
+        meta['tvdb_manual'] = meta.get('tvdb_manual') or 0
+        meta['tvdb_id'] = meta.get('tvdb_manual')
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list') and not meta.get('edit', False):
@@ -260,7 +267,7 @@ class Prep():
                         btn_id = meta.get('btn')
                         btn_api = config['DEFAULT'].get('btn_api')
                         await get_btn_torrents(btn_api, btn_id, meta)
-                        if meta.get('imdb_id') is not None:
+                        if meta.get('imdb_id') != 0:
                             found_match = True
                     elif specific_tracker == "BHD":
                         bhd_api = config['DEFAULT'].get('bhd_api')
@@ -268,7 +275,7 @@ class Prep():
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
                         await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta, only_id)
-                        if meta.get('imdb_id') is not None:
+                        if meta.get('imdb_id') != 0:
                             found_match = True
                     else:
                         meta = await process_tracker(specific_tracker, meta)
@@ -294,7 +301,7 @@ class Prep():
             console.print("imdb_id:", meta.get("imdb_id"))
             console.print("tvdb_id:", meta.get("tvdb_id"))
             console.print("tmdb_id:", meta.get("tmdb_id"))
-            console.print("tmdb_manual:", meta.get("tmdb_manual"))
+            console.print("mal_id:", meta.get("mal_id"))
             console.print("category:", meta.get("category"))
         console.print("[yellow]Building meta data.....")
         if meta['debug']:
@@ -306,34 +313,28 @@ class Prep():
             meta['category'] = await self.get_cat(video)
         else:
             meta['category'] = meta['category'].upper()
-        if meta.get('tmdb_id', None) is None and meta.get('imdb_id', None) is None:
+        if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id'])
-        if meta.get('tmdb_id', None) is None and meta.get('imdb_id', None) is None:
+        if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
-        elif meta.get('imdb_id', None) is not None and meta.get('tmdb_manual', None) is None:
-            if meta['imdb_id'].startswith('tt'):
-                meta['imdb_id'] = meta['imdb_id'][2:]
+        elif meta.get('imdb_id') != 0 and meta.get('tmdb_manual') == 0:
             meta = await get_tmdb_from_imdb(meta, filename)
-        else:
-            meta['tmdb_manual'] = meta.get('tmdb_id', None)
         # Get tmdb data
         if int(meta['tmdb_id']) != 0:
             meta = await tmdb_other_meta(meta)
-        meta['tmdb'] = meta.get('tmdb_id', 0)
         # Search tvmaze
         if meta['category'] == "TV":
-            meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', '0'), meta.get('tvdb_id', 0), meta)
+            meta['tvmaze_id'], meta['imdb_id'], meta['tvdb_id'] = await search_tvmaze(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tvdb_id', 0), meta)
         else:
-            meta.setdefault('tvmaze_id', '0')
+            meta.setdefault('tvmaze_id', 0)
         meta['tvmaze'] = meta.get('tvmaze_id', 0)
-        meta['tvdb'] = meta.get('tvdb_id', 0)
         # If no imdb, search for it
-        if meta.get('imdb_id', None) is None:
+        if meta.get('imdb_id') == 0:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
         # Get imdb data
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
+            meta['imdb_id'] = str(meta.get('imdb_id')).zfill(7)
             meta['imdb_info'] = await get_imdb_info_api(meta['imdb_id'], meta)
-        meta['imdb'] = meta.get('imdb_id', 0)
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
         else:
@@ -388,6 +389,13 @@ class Prep():
         meta['stream'] = await self.stream_optimized(meta['stream'])
         meta.get('anon', False)
         meta['anon'] = self.is_anon(meta['anon'])
+
+        # return duplicate ids so I don't have to catch every site file
+        meta['tmdb'] = meta.get('tmdb_id')
+        meta['imdb'] = meta.get('imdb_id')
+        meta['mal'] = meta.get('mal_id')
+        meta['tvdb'] = meta.get('tvdb_id')
+
         if meta['debug']:
             meta_finish_time = time.time()
             console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
@@ -736,21 +744,21 @@ class Prep():
                                 if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
                                     eng = True
 
-                                if not audio_language.startswith("en") and audio_language.startswith(meta['original_language']) and "commentary" not in (t.get('Title') or '').lower():
+                                if not audio_language.startswith("en") and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
                                     orig = True
 
                                 variants = ['zh', 'cn', 'cmn', 'no', 'nb']
-                                if any(audio_language.startswith(var) for var in variants) and any(meta['original_language'].startswith(var) for var in variants):
+                                if any(audio_language.startswith(var) for var in variants) and any(meta.get('original_language').startswith(var) for var in variants):
                                     orig = True
 
-                            if isinstance(audio_language, str) and audio_language and audio_language != meta['original_language'] and not audio_language.startswith("en"):
+                            if isinstance(audio_language, str) and audio_language and audio_language != meta.get('original_language') and not audio_language.startswith("en"):
                                 audio_language = "und" if audio_language == "" else audio_language
                                 console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                                 time.sleep(5)
 
                         if eng and orig:
                             dual = "Dual-Audio"
-                        elif eng and not orig and meta['original_language'] not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
+                        elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
                             dual = "Dubbed"
                     except Exception:
                         console.print(traceback.format_exc())

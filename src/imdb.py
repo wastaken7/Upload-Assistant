@@ -75,7 +75,7 @@ async def safe_get(data, path, default=None):
 
 async def get_imdb_info_api(imdbID, meta):
     imdb_info = {}
-    if imdbID and imdbID != "0":
+    if imdbID and imdbID != 0:
         try:
             imdbIDtt = f"tt{imdbID}" if not str(imdbID).startswith("tt") else imdbID
         except Exception as e:

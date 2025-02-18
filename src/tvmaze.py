@@ -22,9 +22,6 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, meta):
         tvmazeID = 0
         results = []
 
-        if imdbID is None:
-            imdbID = '0'
-
         if meta['manual_date'] is None:
             if int(tvdbID) != 0:
                 tvdb_resp = await _make_tvmaze_request("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}, meta)

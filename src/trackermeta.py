@@ -144,19 +144,19 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
     # Unpack the expected 9 elements, ignoring any additional ones
     tmdb, imdb, tvdb, mal, desc, category, infohash, imagelist, filename, *rest = tracker_data
 
-    if tmdb not in [None, '0']:
+    if tmdb:
         meta['tmdb_manual'] = tmdb
         if meta['debug']:
             console.print("set TMDB ID:", meta['tmdb_manual'])
-    if imdb not in [None, '0']:
+    if imdb:
         meta['imdb_id'] = str(imdb).zfill(7)
         if meta['debug']:
             console.print("set IMDB ID:", meta['imdb_id'])
-    if tvdb not in [None, '0']:
+    if tvdb:
         meta['tvdb_id'] = tvdb
-    if mal not in [None, '0']:
+    if mal:
         meta['mal_id'] = mal
-    if desc not in [None, '0', '']:
+    if desc:
         meta['description'] = desc
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(desc) > 0:
@@ -215,8 +215,9 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
         if meta.get('ptp') is None:
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             if ptp_torrent_id:
-                meta['imdb_id'] = str(imdb_id).zfill(7) if imdb_id else None
-                console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb_id']}[/green]")
+                if imdb_id:
+                    meta['imdb_id'] = str(imdb_id).zfill(7)
+                    console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb_id']}[/green]")
 
                 if not meta['unattended']:
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
@@ -237,7 +238,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
                     else:
                         found_match = False
-                        meta['imdb_id'] = None
+                        meta['imdb_id'] = 0
 
                 else:
                     found_match = True
@@ -290,8 +291,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
 
             if imdb or tvdb_id:
-                meta['imdb_id'] = str(imdb).zfill(7) if imdb else None
-                meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
+                meta['imdb_id'] = str(imdb).zfill(7) if imdb else 0
+                meta['tvdb_id'] = str(tvdb_id) if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
                 found_match = True
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
@@ -304,8 +305,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             # Use search_filename function if ID is not found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
 
-            meta['imdb_id'] = str(imdb).zfill(7) if imdb else None
-            meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
+            meta['imdb_id'] = str(imdb).zfill(7) if imdb else 0
+            meta['tvdb_id'] = str(tvdb_id) if tvdb_id else 0
             meta['hdb_name'] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id
@@ -319,8 +320,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     else:
                         console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
                         meta[tracker_key] = None
-                        meta['tvdb_id'] = None
-                        meta['imdb_id'] = None
+                        meta['tvdb_id'] = 0
+                        meta['imdb_id'] = 0
                         meta['hdb_name'] = None
                         found_match = False
                 else:
