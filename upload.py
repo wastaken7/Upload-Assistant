@@ -230,8 +230,12 @@ async def save_processed_file(log_file, file_path):
 
 def reset_terminal():
     """Reset the terminal to a sane state."""
-    if os.name == "posix" and sys.stdin.isatty():
-        os.system("stty sane")
+    if os.name == "posix":
+        try:
+            if sys.stdin and sys.stdin.fileno() >= 0 and sys.stdin.isatty():
+                os.system("stty sane")
+        except (ValueError, OSError):
+            pass
 
 
 async def do_the_thing(base_dir):
@@ -331,7 +335,8 @@ async def do_the_thing(base_dir):
         reset_terminal()
 
     finally:
-        reset_terminal()
+        if not sys.stdin.closed:
+            reset_terminal()
 
 if __name__ == '__main__':
     pyver = platform.python_version_tuple()
