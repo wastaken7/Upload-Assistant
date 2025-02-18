@@ -317,7 +317,7 @@ class Prep():
             meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id'])
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
-        elif meta.get('imdb_id') != 0 and meta.get('tmdb_manual') == 0:
+        elif meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
             meta = await get_tmdb_from_imdb(meta, filename)
         # Get tmdb data
         if int(meta['tmdb_id']) != 0:

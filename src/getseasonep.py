@@ -87,7 +87,7 @@ async def get_season_episode(video, meta):
                 meta['mal_id'] = mal_id
             if meta.get('mal_id') != 0:
                 mal_id = meta.get('mal_id')
-            if meta.get('tmdb_manual', None) is None:
+            if meta.get('tmdb_id') == 0:
                 year = parsed.get('anime_year', str(seasonYear))
                 meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
             meta = await tmdb_other_meta(meta)
