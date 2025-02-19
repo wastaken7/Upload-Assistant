@@ -208,20 +208,16 @@ class Prep():
 
         client = Clients(config=config)
         only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
-        if meta.get('tmdb_id') != 0 and meta.get('tmdb_manual') != 0:
-            meta['tmdb_manual'] = meta.get('tmdb_manual') or 0
-            meta['tmdb_id'] = meta.get('tmdb_manual')
-        if meta.get('imdb_id') != 0 and meta.get('imdb_manual') != 0:
-            meta['imdb_manual'] = meta.get('imdb_manual') or 0
-            meta['imdb_id'] = meta.get('imdb_manual')
-            if str(meta.get('imdb_id', '')).startswith('tt'):
-                meta['imdb_id'] = meta['imdb_id'][2:]
-        if meta.get('mal_id') != 0 and meta.get('mal_manual') != 0:
-            meta['mal_manual'] = meta.get('mal_manual') or 0
-            meta['mal_id'] = meta.get('mal_manual')
-        if meta.get('tvdb_id') != 0 and meta.get('tvdb_manual') != 0:
-            meta['tvdb_manual'] = meta.get('tvdb_manual') or 0
-            meta['tvdb_id'] = meta.get('tvdb_manual')
+        meta['tmdb_manual'] = meta.get('tmdb_manual') or 0
+        meta['tmdb_id'] = meta.get('tmdb_manual')
+        meta['imdb_manual'] = meta.get('imdb_manual') or 0
+        meta['imdb_id'] = meta.get('imdb_manual')
+        if str(meta.get('imdb_id', '')).startswith('tt'):
+            meta['imdb_id'] = meta['imdb_id'][2:]
+        meta['mal_manual'] = meta.get('mal_manual') or 0
+        meta['mal_id'] = meta.get('mal_manual')
+        meta['tvdb_manual'] = meta.get('tvdb_manual') or 0
+        meta['tvdb_id'] = meta.get('tvdb_manual')
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list') and not meta.get('edit', False):
