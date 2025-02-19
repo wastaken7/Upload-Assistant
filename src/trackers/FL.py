@@ -327,7 +327,7 @@ class FL():
                 data = {
                     'mediainfo': open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r').read(),
                 }
-                if int(meta['imdb_id'].replace('tt', '')) != 0:
+                if int(meta['imdb_id']) != 0:
                     data['imdbURL'] = f"tt{meta['imdb_id']}"
                 screen_glob = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['filename']}-*.png")
                 files = []
