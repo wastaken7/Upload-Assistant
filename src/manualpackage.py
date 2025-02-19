@@ -27,11 +27,11 @@ async def package(meta):
         generic.write(f"{res} / {meta['type']}{tag}\n\n")
         generic.write(f"Category: {meta['category']}\n")
         generic.write(f"TMDB: https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}\n")
-        if meta['imdb_id'] != "0":
+        if meta['imdb_id'] != 0:
             generic.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
-        if meta['tvdb_id'] != "0":
+        if meta['tvdb_id'] != 0:
             generic.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
-        if "tvmaze_id" in meta and meta['tvmaze_id'] != "0":
+        if "tvmaze_id" in meta and meta['tvmaze_id'] != 0:
             generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}\n")
         poster_img = f"{meta['base_dir']}/tmp/{meta['uuid']}/POSTER.png"
         if meta.get('poster', None) not in ['', None] and not os.path.exists(poster_img):

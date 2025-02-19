@@ -132,12 +132,12 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
 
 
 async def tmdb_other_meta(meta):
-    if meta['tmdb_id'] == "0":
+    if meta['tmdb_id'] == 0:
         try:
             title = guessit(meta['path'], {"excludes": ["country", "language"]})['title'].lower()
             title = title.split('aka')[0]
             meta = await get_tmdb_id(guessit(title, {"excludes": ["country", "language"]})['title'], meta['search_year'], meta)
-            if meta['tmdb_id'] == "0":
+            if meta['tmdb_id'] == 0:
                 meta = await get_tmdb_id(title, "", meta, meta['category'])
         except Exception:
             if meta.get('mode', 'discord') == 'cli':
