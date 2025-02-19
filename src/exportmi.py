@@ -226,7 +226,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
         console.print("[bold yellow]Exporting MediaInfo...")
         if not isdir:
             os.chdir(os.path.dirname(video))
-        media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+        media_info = MediaInfo.parse(video, output="STRING", full=False)
         filtered_media_info = "\n".join(
             line for line in media_info.splitlines()
             if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by ")
@@ -238,7 +238,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text):
         console.print("[bold green]MediaInfo Exported.")
 
     if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MediaInfo.json.txt"):
-        media_info_json = MediaInfo.parse(video, output="JSON", mediainfo_options={'inform_version': '1'})
+        media_info_json = MediaInfo.parse(video, output="JSON")
         media_info_dict = json.loads(media_info_json)
         filtered_info = filter_mediainfo(media_info_dict)
         with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", 'w', encoding='utf-8') as export:
