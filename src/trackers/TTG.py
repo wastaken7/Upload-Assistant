@@ -150,8 +150,8 @@ class TTG():
 
             }
             url = "https://totheglory.im/takeupload.php"
-            if int(meta['imdb_id'].replace('tt', '')) != 0:
-                data['imdb_c'] = f"tt{meta.get('imdb_id', '').replace('tt', '')}"
+            if int(meta['imdb_id']) != 0:
+                data['imdb_c'] = f"tt{meta.get('imdb_id')}"
 
             # Submit
             if meta['debug']:
@@ -187,8 +187,8 @@ class TTG():
         with open(cookiefile, 'rb') as cf:
             cookies = pickle.load(cf)
 
-        if int(meta['imdb_id'].replace('tt', '')) != 0:
-            imdb = f"imdb{meta['imdb_id'].replace('tt', '')}"
+        if int(meta['imdb_id']) != 0:
+            imdb = f"imdb{meta['imdb_id']}"
         else:
             imdb = ""
         if meta.get('is_disc', '') == "BDMV":
@@ -301,7 +301,7 @@ class TTG():
             from src.bbcode import BBCODE
             from src.trackers.COMMON import COMMON
             common = COMMON(config=self.config)
-            if int(meta.get('imdb_id', '0').replace('tt', '')) != 0:
+            if int(meta.get('imdb_id')) != 0:
                 ptgen = await common.ptgen(meta)
                 if ptgen.strip() != '':
                     descfile.write(ptgen)

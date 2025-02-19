@@ -660,7 +660,7 @@ class COMMON():
         params = {}
         data = {}
         # get douban url
-        if int(meta.get('imdb_id', '0')) != 0:
+        if int(meta.get('imdb_id')) != 0:
             data['search'] = f"tt{meta['imdb_id']}"
             ptgen = requests.get(url, params=data)
             if ptgen.json()["error"] is not None:

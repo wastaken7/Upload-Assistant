@@ -412,7 +412,7 @@ class AR():
 
         # adding tags
         tags = ""
-        if meta['imdb_id'] != "0":
+        if meta['imdb_id'] != 0:
             tags += f"tt{meta.get('imdb_id', '')}, "
         # no special chars can be used in tags. keep to minimum working tags only.
         tags += f"{genres}, "

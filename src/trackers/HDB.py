@@ -286,8 +286,8 @@ class HDB():
             # If tv, submit tvdb_id/season/episode
             if meta.get('tvdb_id', 0) != 0:
                 data['tvdb'] = meta['tvdb_id']
-            if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
-                data['imdb'] = f"https://www.imdb.com/title/tt{meta.get('imdb_id', '').replace('tt', '')}/",
+            if int(meta.get('imdb_id')) != 0:
+                data['imdb'] = f"https://www.imdb.com/title/tt{meta.get('imdb_id')}/",
             if meta.get('category') == 'TV':
                 data['tvdb_season'] = int(meta.get('season_int', 1))
                 data['tvdb_episode'] = int(meta.get('episode_int', 1))
@@ -332,9 +332,9 @@ class HDB():
         }
 
         # Add IMDb and TVDB IDs if available
-        if int(meta.get('imdb_id', '0').replace('tt', '0')) != 0:
+        if int(meta.get('imdb_id')) != 0:
             data['imdb'] = {'id': meta['imdb_id']}
-        if int(meta.get('tvdb_id', '0')) != 0:
+        if int(meta.get('tvdb_id')) != 0:
             data['tvdb'] = {'id': meta['tvdb_id']}
 
         try:

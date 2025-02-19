@@ -83,7 +83,7 @@ class OE():
             'type_id': type_id,
             'resolution_id': resolution_id,
             'tmdb': meta['tmdb'],
-            'imdb': meta['imdb_id'].replace('tt', ''),
+            'imdb': meta['imdb_id'],
             'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,

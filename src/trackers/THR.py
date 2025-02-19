@@ -78,7 +78,7 @@ class THR():
             'name': thr_name,
             'descr': desc,
             'type': cat_id,
-            'url': f"https://www.imdb.com/title/tt{meta.get('imdb_id').replace('tt', '')}/",
+            'url': f"https://www.imdb.com/title/tt{meta.get('imdb_id')}/",
             'tube': meta.get('youtube', '')
         }
         headers = {
@@ -189,7 +189,7 @@ class THR():
             desc.write(f"{res} / {meta['type']}{tag}\n\n")
             desc.write(f"Category: {meta['category']}\n")
             desc.write(f"TMDB: https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}\n")
-            if meta['imdb_id'] != "0":
+            if meta['imdb_id'] != 0:
                 desc.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
             if meta['tvdb_id'] != "0":
                 desc.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
@@ -259,7 +259,6 @@ class THR():
         return pronfo
 
     async def search_existing(self, session, imdb_id, disctype):
-        imdb_id = imdb_id.replace('tt', '')
         search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes = []
         console.print("[yellow]Searching for existing torrents on THR...")

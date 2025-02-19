@@ -1043,7 +1043,7 @@ class PTP():
             data["internalrip"] = "on"
         # IF SPECIAL (idk how to check for this automatically)
             # data["special"] = "on"
-        if int(str(meta.get("imdb_id", "0")).replace('tt', '')) == 0:
+        if int(meta.get("imdb_id")) == 0:
             data["imdb"] = "0"
         else:
             data["imdb"] = meta["imdb_id"]
@@ -1053,7 +1053,7 @@ class PTP():
             if data["imdb"] == "0":
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
-                tinfo = await self.get_torrent_info(meta.get("imdb_id", "0"), meta)
+                tinfo = await self.get_torrent_info(meta.get("imdb_id"), meta)
             cover = meta["imdb_info"].get("cover")
             if cover is None:
                 cover = meta.get('poster')

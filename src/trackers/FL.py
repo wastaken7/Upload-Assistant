@@ -153,8 +153,8 @@ class FL():
                 'nfo': mi_dump
             }
 
-            if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
-                data['imdbid'] = meta.get('imdb_id', '').replace('tt', '')
+            if int(meta.get('imdb_id')) != 0:
+                data['imdbid'] = meta.get('imdb_id')
                 data['description'] = meta['imdb_info'].get('genres', '')
             if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
                 data['epenis'] = self.uploader_name
@@ -201,7 +201,7 @@ class FL():
 
         search_url = "https://filelist.io/browse.php"
 
-        if int(meta['imdb_id'].replace('tt', '')) != 0:
+        if int(meta['imdb_id']) != 0:
             params = {
                 'search': meta['imdb_id'],
                 'cat': await self.get_category_id(meta),

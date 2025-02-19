@@ -154,7 +154,7 @@ class ANT():
         }
         if str(meta['tmdb']) != "0":
             params['tmdb'] = meta['tmdb']
-        elif int(meta['imdb_id'].replace('tt', '')) != 0:
+        elif int(meta['imdb_id']) != 0:
             params['imdb'] = meta['imdb_id']
 
         try:

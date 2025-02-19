@@ -141,7 +141,7 @@ class SPD():
             'includingDead': '1'
         }
 
-        if meta['imdb_id'] != "0":
+        if meta['imdb_id'] != 0:
             params['imdbId'] = meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + meta['imdb_id']
         else:
             params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')

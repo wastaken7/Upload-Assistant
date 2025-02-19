@@ -152,7 +152,7 @@ class HDT():
                 data['DolbyVision'] = 'true'
 
             # IMDB
-            if int(meta.get('imdb_id', '').replace('tt', '')) != 0:
+            if int(meta.get('imdb_id')) != 0:
                 data['infosite'] = f"https://www.imdb.com/title/tt{meta['imdb_id']}/"
 
             # Full Season Pack
@@ -203,10 +203,11 @@ class HDT():
 
             search_url = f"{self.base_url}/torrents.php"
             csrfToken = await self.get_csrfToken(session, search_url)
-            if int(meta['imdb_id'].replace('tt', '')) != 0:
+            if int(meta['imdb_id']) != 0:
+                imdbID = f"tt{meta['imdb_id']}"
                 params = {
                     'csrfToken': csrfToken,
-                    'search': meta['imdb_id'],
+                    'search': imdbID,
                     'active': '0',
                     'options': '2',
                     'category[]': await self.get_category_id(meta)
