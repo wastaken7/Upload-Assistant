@@ -2,7 +2,7 @@ import asyncio
 import os
 from torf import Torrent
 from src.trackers.PTP import PTP
-from src.trackersetup import TRACKER_SETUP, tracker_class_map
+from src.trackersetup import TRACKER_SETUP, tracker_class_map, http_trackers
 from src.console import console
 from data.config import config
 from src.trackers.COMMON import COMMON
@@ -39,6 +39,8 @@ async def process_all_trackers(meta):
 
         if tracker_name in tracker_class_map:
             tracker_class = tracker_class_map[tracker_name](config=config)
+            if tracker_name in http_trackers:
+                await tracker_class.validate_credentials(meta)
             if tracker_name in {"THR", "PTP"}:
                 if local_meta.get('imdb_id', 0) == 0:
                     imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(
