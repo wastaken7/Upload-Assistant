@@ -140,6 +140,6 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                 await asyncio.sleep(5)
                 await client.add_to_client(meta, "PTP")
 
-    # Process all trackers concurrently
-    tasks = [process_single_tracker(tracker) for tracker in enabled_trackers]
-    await asyncio.gather(*tasks)
+    # Process each tracker sequentially
+    for tracker in enabled_trackers:
+        await process_single_tracker(tracker)
