@@ -124,7 +124,7 @@ config = {
 
         "ACM": {
             "api_key": "ACM api key",
-            "announce_url": "https://asiancinema.me/announce/customannounceurl",
+            "announce_url": "https://eiga.moi/announce/customannounceurl",
             # "anon" : False,
 
             # FOR INTERNAL USE ONLY:
