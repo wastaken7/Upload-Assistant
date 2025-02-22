@@ -539,11 +539,11 @@ class MTV():
         }
 
         if meta['imdb_id'] != 0:
-            params['imdbid'] = "tt" + meta['imdb_id']
+            params['imdbid'] = "tt" + str(meta['imdb_id'])
         elif meta['tmdb'] != 0:
-            params['tmdbid'] = meta['tmdb']
+            params['tmdbid'] = str(meta['tmdb'])
         elif meta['tvdb_id'] != 0:
-            params['tvdbid'] = meta['tvdb_id']
+            params['tvdbid'] = str(meta['tvdb_id'])
         else:
             params['q'] = meta['title'].replace(': ', ' ').replace('’', '').replace("'", '')
 
