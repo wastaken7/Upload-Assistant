@@ -65,23 +65,21 @@ class Clients():
         return
 
     async def find_existing_torrent(self, meta):
-        console.print("client", meta.get('client', None))
         if meta.get('client', None) is None:
             default_torrent_client = self.config['DEFAULT']['default_torrent_client']
-            console.print(f"default_torrent_client: {default_torrent_client}")
         else:
             default_torrent_client = meta['client']
         if meta.get('client', None) == 'none' or default_torrent_client == 'none':
             return None
 
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
-        console.print(f"client: {client}")
         torrent_storage_dir = client.get('torrent_storage_dir')
         torrent_client = client.get('torrent_client', '').lower()
-        console.print(f"torrent_client: {torrent_client}")
-        console.print("enable_search", client.get('enable_search'))
-        prefer_small_pieces = self.config['TRACKERS'].get('MTV').get('prefer_mtv_torrent', False)
-        console.print(f"prefer_small_pieces: {prefer_small_pieces}")
+        mtv_config = self.config['TRACKERS'].get('MTV')
+        if isinstance(mtv_config, dict):
+            prefer_small_pieces = mtv_config.get('prefer_mtv_torrent', False)
+        else:
+            prefer_small_pieces = False
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
 
         # Iterate through pre-specified hashes

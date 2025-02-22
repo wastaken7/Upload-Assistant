@@ -162,9 +162,6 @@ async def process_meta(meta, base_dir):
                 print(f"Error during generic screenshot capture: {e}")
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
-        console.print(f"Image list: {meta.get('image_list', [])}")
-        console.print("Cutoff: ", meta['cutoff'])
-        console.print("Skip imghost upload: ", meta.get('skip_imghost_upload', False))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
                 meta['image_list'] = []
@@ -177,21 +174,15 @@ async def process_meta(meta, base_dir):
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
-        console.print("rehash: ", meta.get('rehash', False))
-        console.print("nohash: ", meta.get('nohash', False))
-        console.print("randomized: ", meta.get('randomized', 0))
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
-        console.print("torrent_path: ", torrent_path)
         if not os.path.exists(torrent_path):
             reuse_torrent = None
             if meta.get('rehash', False) is False:
-                console.print("rehash is false")
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
 
             if meta['nohash'] is False and reuse_torrent is None:
-                console.print("nohash and resuse is false")
                 create_torrent(meta, Path(meta['path']), "BASE")
             if meta['nohash']:
                 meta['client'] = "none"
