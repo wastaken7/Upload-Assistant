@@ -280,7 +280,11 @@ class Clients():
         return valid, torrent_path
 
     async def search_qbit_for_torrent(self, meta, client):
-        prefer_small_pieces = self.config['TRACKERS'].get('MTV').get('prefer_mtv_torrent', False)
+        mtv_config = self.config['TRACKERS'].get('MTV')
+        if isinstance(mtv_config, dict):
+            prefer_small_pieces = mtv_config.get('prefer_mtv_torrent', False)
+        else:
+            prefer_small_pieces = False
         console.print("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get('torrent_storage_dir')
