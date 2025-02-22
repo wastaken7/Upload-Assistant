@@ -162,6 +162,9 @@ async def process_meta(meta, base_dir):
                 print(f"Error during generic screenshot capture: {e}")
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
+        console.print(f"Image list: {meta.get('image_list', [])}")
+        console.print("Cutoff: ", meta['cutoff'])
+        console.print("Skip imghost upload: ", meta.get('skip_imghost_upload', False))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
                 meta['image_list'] = []
@@ -174,15 +177,21 @@ async def process_meta(meta, base_dir):
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
+        console.print("rehash: ", meta.get('rehash', False))
+        console.print("nohash: ", meta.get('nohash', False))
+        console.print("randomized: ", meta.get('randomized', 0))
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        console.print("torrent_path: ", torrent_path)
         if not os.path.exists(torrent_path):
             reuse_torrent = None
             if meta.get('rehash', False) is False:
+                console.print("rehash is false")
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
 
             if meta['nohash'] is False and reuse_torrent is None:
+                console.print("nohash and resuse is false")
                 create_torrent(meta, Path(meta['path']), "BASE")
             if meta['nohash']:
                 meta['client'] = "none"
@@ -193,7 +202,9 @@ async def process_meta(meta, base_dir):
         if int(meta.get('randomized', 0)) >= 1:
             create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
 
-        if meta['saved_description'] is False:
+        if 'saved_description' in meta and meta['saved_description'] is False:
+            meta = await prep.gen_desc(meta)
+        else:
             meta = await prep.gen_desc(meta)
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
@@ -302,10 +313,11 @@ async def do_the_thing(base_dir):
 
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
             await process_meta(meta, base_dir)
+            console.print("Finished processing metadata")
 
             if 'we_are_uploading' not in meta:
                 console.print("we are not uploading.......")
-                if meta.get('queue') is not None:
+                if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
                     console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
                     if not meta['debug']:
@@ -313,8 +325,9 @@ async def do_the_thing(base_dir):
                             await save_processed_file(log_file, path)
 
             else:
+                console.print("let's upload.......")
                 await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
-                if meta.get('queue') is not None:
+                if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
                     console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
                     if not meta['debug']:

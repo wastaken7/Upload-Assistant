@@ -40,6 +40,7 @@ async def process_all_trackers(meta):
         local_tracker_status = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False}
         disctype = local_meta.get('disctype', None)
         tracker_name = tracker_name.replace(" ", "").upper().strip()
+        console.print(f"\n[bold yellow]Processing Tracker: {tracker_name}[/bold yellow]")
 
         if local_meta['name'].endswith('DUPE?'):
             local_meta['name'] = local_meta['name'].replace(' DUPE?', '')
