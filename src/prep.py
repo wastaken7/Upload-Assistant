@@ -343,16 +343,16 @@ class Prep():
         if meta['category'] == "TV":
             meta = await get_season_episode(video, meta)
         meta = await self.tag_override(meta)
-        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific, applicable to 1080p only
+        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
             bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 and not isinstance(tracks[1].get('BitRate', ''), dict) else ''  # Check that bitrate is not a dict
             bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 and not isinstance(tracks[0].get('OverallBitRate', ''), dict) else ''  # Check for old MediaInfo
             meta['episode_title'] = ""
-            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.get('resolution') == "1080p":
+            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.get('resolution') == "1080p": # 8Mbps for 1080p
                 meta['service'] = "CR"
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "1080p":  # Only assign if at least one bitrate is present, otherwise leave it to user
                 meta['service'] = "HIDI"
-            elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.get('resolution') == "720p":
+            elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.get('resolution') == "720p": # 4Mbps for 720p
                 meta['service'] = "CR"
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "720p":
                 meta['service'] = "HIDI"
