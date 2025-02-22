@@ -9,6 +9,7 @@ import cli_ui
 import httpx
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.rehostimages import check_hosts
 
 
 class HUNO():
@@ -35,6 +36,16 @@ class HUNO():
         if huno_name == "SKIPPED":
             console.print("[bold red]Skipping upload to HUNO due to missing audio language")
             return
+
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "ptpimg.me": "ptpimg",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "imagebam.com": "bam",
+        }
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bam']
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
