@@ -46,7 +46,11 @@ class HUNO():
         }
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bam']
         await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        if 'HUNO_images_key' in meta:
+            image_list = meta['HUNO_images_key']
+        else:
+            image_list = meta['image_list']
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
