@@ -385,7 +385,6 @@ class Clients():
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
 
                 if valid:
-                    console.print("prefersmallpieces", prefer_small_pieces)
                     if prefer_small_pieces:
                         # **Track best match based on piece size**
                         torrent_data = Torrent.read(torrent_file_path)
