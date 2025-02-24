@@ -689,6 +689,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         valid_images = [image for image in capture_results if os.path.exists(image)]
 
     except asyncio.CancelledError:
+        gc.collect()
         raise
     except Exception as e:
         console.print(f"[red]Error during screenshot capture: {e}[/red]")
@@ -766,21 +767,26 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                 console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
                 try:
                     index = int(image_path.rsplit('-', 1)[-1].split('.')[0])
+
                     if os.path.exists(image_path):
                         os.remove(image_path)
+
                     random_time = random.uniform(0, length)
                     screenshot_response = await capture_disc_task(
                         (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap)
                     )
 
+                    if not os.path.exists(screenshot_response):
+                        raise FileNotFoundError(f"Screenshot {screenshot_response} was not created successfully.")
+
                     optimize_image_task(screenshot_response)
                     new_size = os.path.getsize(screenshot_response)
                     valid_image = False
 
-                    if "imgbb" in img_host and new_size > 75000 and new_size <= 31000000:
+                    if "imgbb" in img_host and 75000 < new_size <= 31000000:
                         console.print(f"[green]Successfully retaken screenshot for: {screenshot_response} ({new_size} bytes)[/green]")
                         valid_image = True
-                    elif new_size > 75000 and new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
+                    elif 75000 < new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
                         console.print(f"[green]Successfully retaken screenshot for: {screenshot_response} ({new_size} bytes)[/green]")
                         valid_image = True
                     elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
@@ -789,14 +795,34 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
                     if valid_image:
                         valid_results.append(screenshot_response)
-                        break
+                        break  # Exit retry loop on success
                     else:
                         console.print(f"[red]Retaken image {screenshot_response} does not meet the size requirements for {img_host}. Retrying...[/red]")
+
+                except asyncio.CancelledError:
+                    gc.collect()
+                    raise  # Ensure cancellation propagates
+
+                except FileNotFoundError as e:
+                    console.print(f"[red]File error during screenshot retake: {e}[/red]")
+
+                except OSError as e:
+                    console.print(f"[red]OS error while processing {image_path}: {e}[/red]")
+
+                except ValueError as e:
+                    console.print(f"[red]Value error in screenshot retake process: {e}[/red]")
+
                 except Exception as e:
-                    console.print(f"[red]Error retaking screenshot for {image_path}: {e}[/red]")
+                    console.print(f"[red]Unexpected error retaking screenshot for {image_path}: {e}[/red]")
+
+                finally:
+                    gc.collect()
+
             else:
                 console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
                 remaining_retakes.append(image_path)
+                gc.collect()
+
         else:
             valid_results.append(image_path)
 
@@ -852,6 +878,7 @@ async def capture_screenshot(args):
             console.print(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
             return (index, None)  # Ensure tuple format
     except KeyboardInterrupt:
+        gc.collect()
         raise
     except Exception as e:
         return f"Error: {str(e)}"
@@ -898,6 +925,7 @@ async def worker_wrapper(image, executor):
         return await loop.run_in_executor(executor, optimize_image_task, image)  # Use ProcessPoolExecutor explicitly
     except KeyboardInterrupt:
         print(f"[red]Worker interrupted while processing {image}[/red]")
+        gc.collect()
         return None
     except Exception as e:
         print(f"[red]Worker error on {image}: {e}[/red]")

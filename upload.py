@@ -295,7 +295,6 @@ def reset_terminal():
 
 async def do_the_thing(base_dir):
     await asyncio.sleep(0.1)  # Ensure it's not racing
-    reset_terminal()
     meta = dict()
     paths = []
     for each in sys.argv[1:]:
