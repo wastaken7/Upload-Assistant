@@ -12,6 +12,7 @@ import shutil
 import cli_ui
 import traceback
 import time
+import gc
 from src.trackersetup import tracker_class_map, api_trackers, other_api_trackers, http_trackers
 from src.trackerhandle import process_trackers
 from src.queuemanage import handle_queue
@@ -131,41 +132,79 @@ async def process_meta(meta, base_dir):
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
         # Take Screenshots
-        if meta['is_disc'] == "BDMV":
-            use_vs = meta.get('vapoursynth', False)
-            try:
-                await disc_screenshots(
-                    meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
-                    meta.get('image_list', []), meta.get('ffdebug', False), None
-                )
-            except Exception as e:
-                console.print(f"[red]Error during BDMV screenshot capture: {e}")
+        try:
+            if meta['is_disc'] == "BDMV":
+                use_vs = meta.get('vapoursynth', False)
+                try:
+                    await disc_screenshots(
+                        meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
+                        meta.get('image_list', []), meta.get('ffdebug', False), None
+                    )
+                except asyncio.CancelledError:
+                    console.print("[red]Screenshot capture was cancelled. Cleaning up...[/red]")
+                    await cleanup_screenshot_temp_files(meta)  # Cleanup only on cancellation
+                    raise  # Ensure cancellation propagates properly
+                except Exception as e:
+                    console.print(f"[red]Error during BDMV screenshot capture: {e}[/red]", highlight=False)
+                    await cleanup_screenshot_temp_files(meta)  # Cleanup only on error
 
-        elif meta['is_disc'] == "DVD":
-            try:
-                await dvd_screenshots(
-                    meta, 0, None, None
-                )
-            except Exception as e:
-                print(f"Error during DVD screenshot capture: {e}")
+            elif meta['is_disc'] == "DVD":
+                try:
+                    await dvd_screenshots(
+                        meta, 0, None, None
+                    )
+                except asyncio.CancelledError:
+                    console.print("[red]DVD screenshot capture was cancelled. Cleaning up...[/red]")
+                    await cleanup_screenshot_temp_files(meta)
+                    raise
+                except Exception as e:
+                    console.print(f"[red]Error during DVD screenshot capture: {e}[/red]", highlight=False)
+                    await cleanup_screenshot_temp_files(meta)
 
-        else:
-            try:
-                if meta['debug']:
-                    console.print(f"videopath: {videopath}, filename: {filename}, meta: {meta['uuid']}, base_dir: {base_dir}, manual_frames: {manual_frames}")
-                await screenshots(
-                    videopath, filename, meta['uuid'], base_dir, meta,
-                    manual_frames=manual_frames  # Pass additional kwargs directly
-                )
-            except Exception as e:
-                print(f"Error during generic screenshot capture: {e}")
+            else:
+                try:
+                    if meta['debug']:
+                        console.print(f"videopath: {videopath}, filename: {filename}, meta: {meta['uuid']}, base_dir: {base_dir}, manual_frames: {manual_frames}")
+
+                    await screenshots(
+                        videopath, filename, meta['uuid'], base_dir, meta,
+                        manual_frames=manual_frames  # Pass additional kwargs directly
+                    )
+                except asyncio.CancelledError:
+                    console.print("[red]Generic screenshot capture was cancelled. Cleaning up...[/red]")
+                    await cleanup_screenshot_temp_files(meta)
+                    raise
+                except Exception as e:
+                    console.print(f"[red]Error during generic screenshot capture: {e}[/red]", highlight=False)
+                    await cleanup_screenshot_temp_files(meta)
+
+        except asyncio.CancelledError:
+            console.print("[red]Process was cancelled. Performing cleanup...[/red]")
+            await cleanup_screenshot_temp_files(meta)
+            raise
+        except Exception as e:
+            console.print(f"[red]Unexpected error occurred: {e}[/red]")
+            await cleanup_screenshot_temp_files(meta)
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
             if 'image_list' not in meta:
                 meta['image_list'] = []
             return_dict = {}
-            new_images, dummy_var = await upload_screens(meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict)
+            try:
+                new_images, dummy_var = await upload_screens(
+                    meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict
+                )
+            except asyncio.CancelledError:
+                console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
+                return
+            except Exception as e:
+                console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
+            finally:
+                # Cleanup
+                console.print("[yellow]Cleaning up resources...[/yellow]")
+                gc.collect()
+                console.print("[green]Upload process completed (with or without interruptions).[/green]")
 
         elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
             meta['image_list'] = []
@@ -199,6 +238,21 @@ async def process_meta(meta, base_dir):
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
+
+
+async def cleanup_screenshot_temp_files(meta):
+    """Cleanup temporary screenshot files to prevent orphaned files in case of failures."""
+    tmp_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+    if os.path.exists(tmp_dir):
+        try:
+            for file in os.listdir(tmp_dir):
+                file_path = os.path.join(tmp_dir, file)
+                if os.path.isfile(file_path) and file.endswith((".png", ".jpg")):
+                    os.remove(file_path)
+                    if meta['debug']:
+                        console.print(f"[yellow]Removed temporary screenshot file: {file_path}[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error cleaning up temporary screenshot files: {e}[/red]", highlight=False)
 
 
 async def get_log_file(base_dir, queue_name):
