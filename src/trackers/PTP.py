@@ -231,10 +231,10 @@ class PTP():
                 console.print("[yellow]Description discarded.[/yellow]")
             else:
                 console.print("[green]Keeping the original description.[/green]")
-                meta['description'] = ptp_desc
+                meta['description'] = desc
                 meta['saved_description'] = True
         else:
-            meta['description'] = ptp_desc
+            meta['description'] = desc
             meta['saved_description'] = True
 
         return desc, imagelist
