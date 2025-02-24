@@ -744,7 +744,7 @@ class Clients():
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['jptv'] = match.group(1)
-                        console.print(f"[bold cyan]meta['jptv'] set to ID: {meta['lst']}")
+                        console.print(f"[bold cyan]meta['jptv'] set to ID: {meta['jptv']}")
 
                 found = True
                 break
