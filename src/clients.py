@@ -740,6 +740,12 @@ class Clients():
                     meta['bhd'] = info_hash_v1
                     console.print(f"[bold cyan]meta['bhd'] set to ID: {meta['bhd']}")
 
+                elif "https://jptv.club" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['jptv'] = match.group(1)
+                        console.print(f"[bold cyan]meta['jptv'] set to ID: {meta['lst']}")
+
                 found = True
                 break
 
