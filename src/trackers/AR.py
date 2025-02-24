@@ -220,8 +220,10 @@ class AR():
         heading = "[COLOR=GREEN][size=6]"
         subheading = "[COLOR=RED][size=4]"
         heading_end = "[/size][/COLOR]"
-        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r').read()
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w') as descfile:
+        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
+        base = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', base, flags=re.DOTALL)
+        base = re.sub(r'\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]', '', base, flags=re.DOTALL)
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             description = ""
             if meta['is_disc'] == "BDMV":
                 description += heading + str(meta['name']) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "BDINFO" + heading_end + "\n"
