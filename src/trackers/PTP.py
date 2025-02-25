@@ -231,10 +231,10 @@ class PTP():
                 console.print("[yellow]Description discarded.[/yellow]")
             else:
                 console.print("[green]Keeping the original description.[/green]")
-                meta['description'] = ptp_desc
+                meta['description'] = desc
                 meta['saved_description'] = True
         else:
-            meta['description'] = ptp_desc
+            meta['description'] = desc
             meta['saved_description'] = True
 
         return desc, imagelist
@@ -650,6 +650,8 @@ class PTP():
             images = meta['image_list']
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])
+            if meta.get('jptv', False):
+                desc.write(f"This upload is a part of the JPTV.club upload contest. / https://jptv.club/torrents/{meta.get('jptv')}\n\n")
 
             # Handle single disc case
             if len(discs) == 1:

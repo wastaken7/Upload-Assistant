@@ -168,7 +168,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
             if valid_images:
                 meta['image_list'] = valid_images
                 if meta.get('image_list'):  # Double-check if image_list is set before handling it
-                    if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')) or meta['unattended']:
+                    if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik') or meta.get('jptv')) or meta['unattended']:
                         await handle_image_list(meta, tracker_name)
 
     if filename:
@@ -182,7 +182,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
     manual_key = f"{tracker_key}_manual"
     found_match = False
 
-    if tracker_name in ["BLU", "AITHER", "LST", "OE", "TIK"]:
+    if tracker_name in ["BLU", "AITHER", "LST", "OE", "TIK", "JPTV"]:
         if meta.get(tracker_key) is not None:
             console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = await COMMON(config).unit3d_torrent_info(

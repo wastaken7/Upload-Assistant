@@ -385,7 +385,6 @@ class Clients():
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
 
                 if valid:
-                    console.print("prefersmallpieces", prefer_small_pieces)
                     if prefer_small_pieces:
                         # **Track best match based on piece size**
                         torrent_data = Torrent.read(torrent_file_path)
@@ -740,6 +739,12 @@ class Clients():
                 elif "https://beyond-hd.me" in comment:
                     meta['bhd'] = info_hash_v1
                     console.print(f"[bold cyan]meta['bhd'] set to ID: {meta['bhd']}")
+
+                elif "https://jptv.club" in comment:
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        meta['jptv'] = match.group(1)
+                        console.print(f"[bold cyan]meta['jptv'] set to ID: {meta['jptv']}")
 
                 found = True
                 break

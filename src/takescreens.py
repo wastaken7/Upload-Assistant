@@ -22,7 +22,6 @@ img_host = [
     for key in sorted(config["DEFAULT"].keys())
     if key.startswith("img_host_1")
 ]
-screens = int(config['DEFAULT'].get('screens', 6))
 task_limit = config['DEFAULT'].get('process_limit', "0")
 cutoff = int(config['DEFAULT'].get('cutoff', 1))
 
@@ -40,6 +39,7 @@ async def sanitize_filename(filename):
 
 
 async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens=None, force_screenshots=False):
+    screens = meta['screens']
     if meta['debug']:
         start_time = time.time()
     if 'image_list' not in meta:
@@ -293,6 +293,7 @@ async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel
 
 
 async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
+    screens = meta['screens']
     if 'image_list' not in meta:
         meta['image_list'] = []
     existing_images = [img for img in meta['image_list'] if isinstance(img, dict) and img.get('img_url', '').startswith('http')]
@@ -586,7 +587,7 @@ async def capture_dvd_screenshot(task):
 
 
 async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=None, force_screenshots=False, manual_frames=None):
-    """Screenshot capture function using concurrent.futures"""
+    screens = meta['screens']
     if meta['debug']:
         start_time = time.time()
         console.print("Image Host:", img_host)
