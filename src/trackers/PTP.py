@@ -650,6 +650,8 @@ class PTP():
             images = meta['image_list']
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])
+            if meta.get('jptv', False):
+                desc.write(f"This upload is a part of the JPTV.club upload contest. / https://jptv.club/torrents/{meta.get('jptv')}\n\n")
 
             # Handle single disc case
             if len(discs) == 1:
