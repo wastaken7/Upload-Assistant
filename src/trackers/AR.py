@@ -211,7 +211,7 @@ class AR():
             if movie['tvdb_id'] != "0":
                 description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
             if movie['tvmaze_id'] != "0":
-                description += f"\n[URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
+                description += f"\nhttps://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
             if movie['mal_id'] != 0:
                 description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
         return description
