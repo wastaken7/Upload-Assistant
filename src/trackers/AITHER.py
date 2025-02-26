@@ -152,7 +152,10 @@ class AITHER():
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                     for i, language in enumerate(audio_section):
                         language = language.lower().strip()
-                        if language.lower().startswith('en'):  # Check if it's English
+                        if language.lower().startswith('en'):
+                            title_match = re.findall(r'Audio[\s\S]+?Title\s+:\s+(.+)', media_info_text)
+                            if title_match and "commentary" in title_match[i].lower():
+                                continue
                             return True
                 return False
 
