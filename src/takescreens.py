@@ -13,9 +13,11 @@ import sys
 import concurrent.futures
 import signal
 import gc
+import traceback
+import multiprocessing
 from pymediainfo import MediaInfo
 from src.console import console
-from data.config import config  # Import here to avoid dependency issues
+from data.config import config
 
 img_host = [
     config["DEFAULT"][key].lower()
@@ -640,6 +642,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         ss_times = [frame / frame_rate for frame in manual_frames]
     else:
         ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
+
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
 
@@ -663,12 +666,27 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         return existing_image_paths
 
+    num_capture = num_screens + 1 - existing_images_count
+    num_tasks = num_capture
+    max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
+    num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
+
+    if meta['debug']:
+        console.print(f"Using {num_workers} worker(s) for {num_capture} image(s)")
+
+    def handle_sigint(sig, frame):
+        console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
+        asyncio.create_task(kill_all_child_processes())
+        sys.exit(1)
+
+    signal.signal(signal.SIGINT, handle_sigint)
+
     capture_tasks = []
     for i in range(num_screens + 1):
         image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
-                capture_screenshot(
+                capture_screenshot(  # Direct async function call
                     (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False))
                 )
             )
@@ -679,49 +697,47 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         capture_results.sort(key=lambda x: x[0])
         capture_results = [r[1] for r in capture_results if r[1] is not None]
 
-        if len(capture_results) > num_screens:
-            smallest = min(capture_results, key=os.path.getsize)
-            if meta['debug']:
-                console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
-            os.remove(smallest)
-            capture_results.remove(smallest)
-
-        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
-        valid_images = [image for image in capture_results if os.path.exists(image)]
-
     except asyncio.CancelledError:
         gc.collect()
         raise
     except Exception as e:
         console.print(f"[red]Error during screenshot capture: {e}[/red]")
         return []
+    finally:
+        console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
-    num_tasks = len(valid_images)
-    num_workers = min(num_tasks, os.cpu_count() // 2 or 1)
+    console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
-    if num_workers == 0:
-        console.print("[red]No valid images found for optimization.[/red]")
-        return
+    if len(capture_results) > num_screens:
+        smallest = min(capture_results, key=os.path.getsize)
+        if meta['debug']:
+            console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
+        os.remove(smallest)
+        capture_results.remove(smallest)
 
-    console.print("[yellow]Now optimizing images")
-    if meta['debug']:
-        console.print(f"Using {num_workers} worker(s) for {len(valid_images)} image(s)")
+    valid_images = [image for image in capture_results if os.path.exists(image)]
 
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
+    console.print("[yellow]Now optimizing images...[/yellow]")
+
+    loop = asyncio.get_running_loop()
+    stop_event = asyncio.Event()
 
     def handle_sigint(sig, frame):
         console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
         executor.shutdown(wait=False)
-        asyncio.create_task(kill_all_child_processes())
-        sys.exit(1)
+        stop_event.set()
+        for task in asyncio.all_tasks(loop):
+            task.cancel()
 
     signal.signal(signal.SIGINT, handle_sigint)
 
     try:
-        optimized_results = await asyncio.gather(
-            *[worker_wrapper(image, executor) for image in valid_images],
-            return_exceptions=True
-        )
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+            # Start all tasks in parallel using worker_wrapper()
+            tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
+
+            # Wait for all tasks to complete
+            optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
     except KeyboardInterrupt:
         console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
         executor.shutdown(wait=False)
@@ -730,11 +746,14 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         sys.exit(1)
     finally:
         console.print("[yellow]Shutting down optimization workers...[/yellow]")
-        executor.shutdown(wait=True)
+        await asyncio.sleep(0.1)
+        await kill_all_child_processes()
+        executor.shutdown(wait=False)
         gc.collect()
 
+    # Filter out failed results
     optimized_results = [res for res in optimized_results if isinstance(res, str) and "Error" not in res]
-    console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
+    console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
 
     valid_results = []
     remaining_retakes = []
@@ -773,14 +792,14 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                         os.remove(image_path)
 
                     random_time = random.uniform(0, length)
-                    screenshot_response = await capture_disc_task(
+                    screenshot_response = await capture_screenshot(
                         (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap)
                     )
 
                     if not os.path.exists(screenshot_response):
                         raise FileNotFoundError(f"Screenshot {screenshot_response} was not created successfully.")
 
-                    optimize_image_task(screenshot_response)
+                    await optimize_image_task(screenshot_response)
                     new_size = os.path.getsize(screenshot_response)
                     valid_image = False
 
@@ -839,6 +858,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
 async def capture_screenshot(args):
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
+
     try:
         if width <= 0 or height <= 0:
             return "Error: Invalid width or height for scaling"
@@ -861,26 +881,29 @@ async def capture_screenshot(args):
 
         command = (
             ff
-            .output(
-                image_path,
-                vframes=1,
-                pix_fmt="rgb24"
-            )
+            .output(image_path, vframes=1, pix_fmt="rgb24")
             .overwrite_output()
             .global_args('-loglevel', loglevel)
         )
 
-        process = await asyncio.create_subprocess_exec(*command.compile(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        console.print(f"[blue]Spawned FFmpeg process with PID: {process.pid}")
-        stdout, stderr = await process.communicate()
+        process = await asyncio.create_subprocess_exec(
+            *command.compile(),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        # Ensure process completes and doesn't leak
+        try:
+            stdout, stderr = await process.communicate()
+        except asyncio.CancelledError:
+            process.kill()
+            raise
+
         if process.returncode == 0:
             return (index, image_path)
         else:
             console.print(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
-            return (index, None)  # Ensure tuple format
-    except KeyboardInterrupt:
-        gc.collect()
-        raise
+            return (index, None)
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -919,18 +942,21 @@ async def valid_ss_time(ss_times, num_screens, length, frame_rate, exclusion_zon
     return result_times
 
 
-async def worker_wrapper(image, executor):
+async def worker_wrapper(image, optimize_image_task, executor):
     """ Async wrapper to run optimize_image_task in a separate process """
     loop = asyncio.get_running_loop()
     try:
-        return await loop.run_in_executor(executor, optimize_image_task, image)  # Use ProcessPoolExecutor explicitly
+        return await loop.run_in_executor(executor, optimize_image_task, image)
     except KeyboardInterrupt:
-        print(f"[red]Worker interrupted while processing {image}[/red]")
+        console.print(f"[red]Worker interrupted while processing {image}[/red]")
         gc.collect()
         return None
     except Exception as e:
-        print(f"[red]Worker error on {image}: {e}[/red]")
+        console.print(f"[red]Worker error on {image}: {e}[/red]")
+        gc.collect()
         return f"Error: {e}"
+    finally:
+        gc.collect()
 
 
 async def kill_all_child_processes():
@@ -947,21 +973,31 @@ async def kill_all_child_processes():
 
 
 def optimize_image_task(image):
+    """Optimizes an image using oxipng in a separate process."""
     try:
         if optimize_images:
-            os.environ['RAYON_NUM_THREADS'] = '1'
+            if sys.platform.startswith("linux") or sys.platform == "darwin":
+                num_cores = multiprocessing.cpu_count()
+                max_threads = num_cores // 2
+                os.environ['RAYON_NUM_THREADS'] = str(max_threads)
             if not os.path.exists(image):
-                print(f"ERROR: File not found - {image}")
-                return f"Error: File not found - {image}"
+                error_msg = f"ERROR: File not found - {image}"
+                console.print(f"[red]{error_msg}[/red]")
+                return error_msg
 
             pyver = platform.python_version_tuple()
             if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
                 level = 6 if os.path.getsize(image) >= 16000000 else 2
+
+                # Run optimization directly in the process
                 oxipng.optimize(image, level=level)
 
             return image
         else:
             return image
+
     except Exception as e:
-        print(f"ERROR optimizing {image}: {e}")
-        return f"Error: {e}"
+        error_message = f"ERROR optimizing {image}: {e}"
+        console.print(f"[red]{error_message}[/red]")
+        console.print(traceback.format_exc())  # Print detailed traceback
+        return None
