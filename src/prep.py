@@ -739,7 +739,7 @@ class Prep():
                 if not meta.get('original_language', '').startswith('en'):
                     eng, orig = False, False
                     try:
-                        for t in tracks:
+                        for t in mi['media']['track']:
                             if t.get('@type') != "Audio":
                                 continue
 
