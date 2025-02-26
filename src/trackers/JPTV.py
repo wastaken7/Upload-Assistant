@@ -21,6 +21,7 @@ class JPTV():
         self.config = config
         self.tracker = 'JPTV'
         self.source_flag = 'jptv.club'
+        self.torrent_url = 'https://jptv.club/api/torrents/'
         self.upload_url = 'https://jptv.club/api/torrents/upload'
         self.search_url = 'https://jptv.club/api/torrents/filter'
         self.signature = None
