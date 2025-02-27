@@ -14,7 +14,7 @@ jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Changed from read to write to allow version commit
+      contents: write
       packages: write
 
     steps:
@@ -45,35 +45,31 @@ jobs:
           REPO_NAME=${{ env.IMAGE_NAME }} 
           echo "LOWER_CASE_REPO_NAME=${REPO_NAME,,}" >> $GITHUB_ENV
 
-      - name: Get release version or branch name
-        id: get_version_or_branch
+      - name: Get release version (only for release events)
+        if: github.event_name == 'release'
+        id: get_version
         run: |
-          if [ "${{ github.event_name }}" == "release" ]; then
-            RELEASE_VERSION=${{ github.event.release.tag_name }}
-            if [ -z "$RELEASE_VERSION" ]; then
-              echo "RELEASE_VERSION is empty. Please ensure a release tag is provided."
-              exit 1
-            fi
-            echo "VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            BRANCH_NAME=${{ github.ref_name }}
-            echo "VERSION=${BRANCH_NAME}" >> $GITHUB_ENV
-          else
-            echo "Unsupported event: ${{ github.event_name }}"
+          RELEASE_VERSION=${{ github.event.release.tag_name }}
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "Error: RELEASE_VERSION is empty. Ensure a valid release tag."
             exit 1
           fi
+          echo "VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
 
-      - name: Update version.py
+      - name: Update version.py (only on release)
+        if: github.event_name == 'release'
         run: |
           echo "__version__ = \"${{ env.VERSION }}\"" > data/version.py
 
-      - name: Commit version update
+      - name: Commit and push version update (only on release)
+        if: github.event_name == 'release'
         run: |
+          git checkout master  # Ensure we're on master branch
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add data/version.py
           git commit -m "Update version.py to ${{ env.VERSION }}"
-          git push
+          git push origin master
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
