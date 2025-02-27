@@ -24,7 +24,7 @@ img_host = [
     for key in sorted(config["DEFAULT"].keys())
     if key.startswith("img_host_1")
 ]
-task_limit = config['DEFAULT'].get('process_limit', "0")
+task_limit = int(config['DEFAULT'].get('process_limit', 0))
 cutoff = int(config['DEFAULT'].get('cutoff', 1))
 
 try:

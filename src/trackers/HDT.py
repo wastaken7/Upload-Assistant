@@ -268,25 +268,25 @@ class HDT():
         description = ""
         description += "\n" + subheading + "Links" + heading_end + "\n"
         if 'IMAGES' in self.config:
-            if movie['imdb_id'] != "0":
+            if movie['imdb_id'] != 0:
                 description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
-            if movie['tmdb'] != "0":
+            if movie['tmdb'] != 0:
                 description += f" [URL=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/URL]"
-            if movie['tvdb_id'] != "0":
+            if movie['tvdb_id'] != 0:
                 description += f" [URL=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/URL]"
-            if movie['tvmaze_id'] != "0":
+            if movie['tvmaze_id'] != 0:
                 description += f" [URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/URL]"
             if movie['mal_id'] != 0:
                 description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/URL]"
         else:
-            if movie['imdb_id'] != "0":
+            if movie['imdb_id'] != 0:
                 description += f"https://www.imdb.com/title/tt{movie['imdb_id']}"
-            if movie['tmdb'] != "0":
+            if movie['tmdb'] != 0:
                 description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
-            if movie['tvdb_id'] != "0":
+            if movie['tvdb_id'] != 0:
                 description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
-            if movie['tvmaze_id'] != "0":
-                description += f"\n[URL=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
+            if movie['tvmaze_id'] != 0:
+                description += f"\nhttps://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
             if movie['mal_id'] != 0:
                 description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
 

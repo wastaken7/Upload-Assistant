@@ -83,7 +83,11 @@ async def process_meta(meta, base_dir):
             console.print("[yellow]Running in Auto Mode")
     meta['base_dir'] = base_dir
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
-    meta = await prep.gather_prep(meta=meta, mode='cli')
+    try:
+        meta = await prep.gather_prep(meta=meta, mode='cli')
+    except Exception as e:
+        console.print(f"Error in gather_prep: {e}")
+        console.print(traceback.format_exc())
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
     parser = Args(config)
     helper = UploadHelper()

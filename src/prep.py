@@ -59,13 +59,6 @@ class Prep():
 
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
-        task_limit = self.config['DEFAULT'].get('task_limit', "0")
-        if int(task_limit) > 0:
-            meta['task_limit'] = task_limit
-        meta['tone_map'] = self.config['DEFAULT'].get('tone_map', False)
-        tone_task_limit = self.config['DEFAULT'].get('tone_task_limit', "0")
-        if int(tone_task_limit) > 0:
-            meta['tone_task_limit'] = tone_task_limit
         meta['mode'] = mode
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
@@ -86,7 +79,7 @@ class Prep():
         # console.print(f"Debug: meta['filelist'] before population: {meta.get('filelist', 'Not Set')}")
 
         if meta['is_disc'] == "BDMV":
-            video, meta['scene'], meta['imdb'] = await self.is_scene(meta['path'], meta, meta.get('imdb', None))
+            video, meta['scene'], meta['imdb_id'] = await self.is_scene(meta['path'], meta, meta.get('imdb_id', 0))
             meta['filelist'] = []  # No filelist for discs, use path
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -114,7 +107,7 @@ class Prep():
             mi = None
 
         elif meta['is_disc'] == "DVD":
-            video, meta['scene'], meta['imdb'] = await self.is_scene(meta['path'], meta, meta.get('imdb', None))
+            video, meta['scene'], meta['imdb_id'] = await self.is_scene(meta['path'], meta, meta.get('imdb_id', 0))
             meta['filelist'] = []
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -136,7 +129,7 @@ class Prep():
             meta['sd'] = await self.is_sd(meta['resolution'])
 
         elif meta['is_disc'] == "HDDVD":
-            video, meta['scene'], meta['imdb'] = await self.is_scene(meta['path'], meta, meta.get('imdb', None))
+            video, meta['scene'], meta['imdb_id'] = await self.is_scene(meta['path'], meta, meta.get('imdb_id', 0))
             meta['filelist'] = []
             search_term = os.path.basename(meta['path'])
             search_file_folder = 'folder'
@@ -160,7 +153,7 @@ class Prep():
             videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
             search_file_folder = 'file'
-            video, meta['scene'], meta['imdb'] = await self.is_scene(videopath, meta, meta.get('imdb', None))
+            video, meta['scene'], meta['imdb_id'] = await self.is_scene(videopath, meta, meta.get('imdb_id', 0))
             guess_name = ntpath.basename(video).replace('-', ' ')
             filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
             untouched_filename = os.path.basename(video)
@@ -739,7 +732,7 @@ class Prep():
                 if not meta.get('original_language', '').startswith('en'):
                     eng, orig = False, False
                     try:
-                        for t in tracks:
+                        for t in mi['media']['track']:
                             if t.get('@type') != "Audio":
                                 continue
 

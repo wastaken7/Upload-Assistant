@@ -86,7 +86,7 @@ class HUNO():
             'stream': await self.is_plex_friendly(meta),
             'sd': meta['sd'],
             'keywords': meta['keywords'],
-            'season_pack': meta.get('tv_pack', 0),
+            # 'season_pack': meta.get('tv_pack', 0),
             # 'featured' : 0,
             # 'free' : 0,
             # 'double_up' : 0,
@@ -100,6 +100,9 @@ class HUNO():
                 data['internal'] = 1
             else:
                 data['internal'] = 0
+
+        if meta.get('category') == 'TV' and meta.get('tv_pack') == 1:
+            data['season_pack'] = 1
 
         headers = {
             'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
