@@ -14,12 +14,14 @@ jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write  # Changed from read to write to allow version commit
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensures we get all history for tag retrieval
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -60,6 +62,18 @@ jobs:
             echo "Unsupported event: ${{ github.event_name }}"
             exit 1
           fi
+
+      - name: Update version.py
+        run: |
+          echo "__version__ = \"${{ env.VERSION }}\"" > data/version.py
+
+      - name: Commit version update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/version.py
+          git commit -m "Update version.py to ${{ env.VERSION }}"
+          git push
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
