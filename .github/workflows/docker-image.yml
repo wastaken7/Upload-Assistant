@@ -82,7 +82,7 @@ jobs:
           echo "\"\"\"" >> "$TEMP_FILE"
           echo "Changelog for version ${{ env.VERSION }} ($TIMESTAMP):" >> "$TEMP_FILE"
           echo "" >> "$TEMP_FILE"
-          echo "$RELEASE_NOTES" >> "$TEMP_FILE"
+          echo "${{ env.RELEASE_NOTES }}" >> "$TEMP_FILE"
           echo "\"\"\"" >> "$TEMP_FILE"
           echo "" >> "$TEMP_FILE"
           cat "$VERSION_FILE" >> "$TEMP_FILE"
