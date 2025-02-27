@@ -59,13 +59,6 @@ class Prep():
 
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
-        task_limit = self.config['DEFAULT'].get('task_limit', "0")
-        if int(task_limit) > 0:
-            meta['task_limit'] = task_limit
-        meta['tone_map'] = self.config['DEFAULT'].get('tone_map', False)
-        tone_task_limit = self.config['DEFAULT'].get('tone_task_limit', "0")
-        if int(tone_task_limit) > 0:
-            meta['tone_task_limit'] = tone_task_limit
         meta['mode'] = mode
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
