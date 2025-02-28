@@ -488,4 +488,5 @@ if __name__ == "__main__":
     except BaseException as e:
         console.print(f"[bold red]Critical error: {e}[/bold red]")
     finally:
+        reset_terminal()
         sys.exit(0)
