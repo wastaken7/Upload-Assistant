@@ -17,9 +17,9 @@ def calculate_piece_size(total_size, min_size, max_size, files, meta):
             max_piece_size_mib = int(meta['max_piece_size']) * 1024 * 1024  # Convert MiB to bytes
             max_size = min(max_piece_size_mib, torf.Torrent.piece_size_max)
         except ValueError:
-            max_size = 268435456  # Fallback to default if conversion fails
+            max_size = 134217728  # Fallback to default if conversion fails
     else:
-        max_size = 268435456
+        max_size = 134217728
 
     file_count = len(files)
     our_min_size = 16384
@@ -86,7 +86,7 @@ def calculate_piece_size(total_size, min_size, max_size, files, meta):
 class CustomTorrent(torf.Torrent):
     # Default piece size limits
     torf.Torrent.piece_size_min = 16384  # 16 KiB
-    torf.Torrent.piece_size_max = 268435456  # 256 MiB
+    torf.Torrent.piece_size_max = 134217728  # 256 MiB
 
     def __init__(self, meta, *args, **kwargs):
         # Set meta early to avoid AttributeError

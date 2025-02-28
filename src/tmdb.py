@@ -245,7 +245,7 @@ async def tmdb_other_meta(meta):
 
         # TVDB ID Handling
         if meta.get('tvdb_id') == 0:
-            meta['tvdb_id'] = external.get('tvdb_id', '0')
+            meta['tvdb_id'] = external.get('tvdb_id')
             if meta['tvdb_id'] in ["", " ", "None", None]:
                 meta['tvdb_id'] = 0
         try:
