@@ -133,7 +133,14 @@ class Clients():
 
         # Search the client if no pre-specified hash matches
         if torrent_client == 'qbit' and client.get('enable_search'):
-            found_hash = await self.search_qbit_for_torrent(meta, client)
+            try:
+                found_hash = await self.search_qbit_for_torrent(meta, client)
+            except KeyboardInterrupt:
+                console.print("[bold red]Search cancelled by user")
+                found_hash = None
+            except Exception as e:
+                console.print(f"[bold red]Error searching qBittorrent: {e}")
+                found_hash = None
             if found_hash:
                 extracted_torrent_dir = os.path.join(meta.get('base_dir', ''), "tmp", meta.get('uuid', ''))
                 found_torrent_path = os.path.join(torrent_storage_dir, f"{found_hash}.torrent") if torrent_storage_dir else os.path.join(extracted_torrent_dir, f"{found_hash}.torrent")
