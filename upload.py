@@ -129,6 +129,7 @@ async def process_meta(meta, base_dir):
     else:
         meta['we_are_uploading'] = True
         filename = meta.get('title', None)
+        bdmv_filename = meta.get('filename', None)
         bdinfo = meta.get('bdinfo', None)
         videopath = meta.get('filelist', [None])
         videopath = videopath[0] if videopath else None
@@ -142,7 +143,7 @@ async def process_meta(meta, base_dir):
                 use_vs = meta.get('vapoursynth', False)
                 try:
                     await disc_screenshots(
-                        meta, filename, bdinfo, meta['uuid'], base_dir, use_vs,
+                        meta, bdmv_filename, bdinfo, meta['uuid'], base_dir, use_vs,
                         meta.get('image_list', []), meta.get('ffdebug', False), None
                     )
                 except asyncio.CancelledError:
