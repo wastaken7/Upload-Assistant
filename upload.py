@@ -14,6 +14,7 @@ import traceback
 import time
 import gc
 import subprocess
+import re
 from src.trackersetup import tracker_class_map, api_trackers, other_api_trackers, http_trackers
 from src.trackerhandle import process_trackers
 from src.queuemanage import handle_queue
@@ -310,6 +311,17 @@ async def do_the_thing(base_dir):
             paths.append(os.path.abspath(each))
         else:
             break
+
+    version_file = os.path.join(base_dir, 'data', 'version.py')
+    with open(version_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+
+    if match:
+        console.print(f"[cyan]Version[/cyan] [yellow]{match.group(1)}")
+    else:
+        console.print("[red]Version not found")
 
     try:
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
