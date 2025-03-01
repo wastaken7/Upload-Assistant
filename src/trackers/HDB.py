@@ -482,24 +482,37 @@ class HDB():
     async def hdbimg_upload(self, meta):
         images = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['filename']}-*.png")
         url = "https://img.hdbits.org/upload_api.php"
+
         data = {
             'username': self.username,
             'passkey': self.passkey,
-            'galleryoption': 1,
+            'galleryoption': '1',
             'galleryname': meta['name'],
             'thumbsize': 'w300'
         }
-        files = {}
 
-        # Set maximum screenshots to 3 for tv singles and 6 for everthing else
+        # Set max screenshots to 3 for TV singles, 6 otherwise
         hdbimg_screen_count = 3 if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 else 6
-        if len(images) < hdbimg_screen_count:
-            hdbimg_screen_count = len(images)
+        hdbimg_screen_count = min(len(images), hdbimg_screen_count)
+        files = {}
         for i in range(hdbimg_screen_count):
-            files[f'images_files[{i}]'] = open(images[i], 'rb')
-        r = requests.post(url=url, data=data, files=files)
-        image_bbcode = r.text
-        return image_bbcode
+            file_path = images[i]
+            try:
+                files[f'images_files[{i}]'] = (f'image_{i}.png', open(file_path, 'rb'), 'image/png')
+            except Exception as e:
+                print(f"[ERROR] Failed to open {file_path}: {e}")
+                return None
+
+        try:
+            response = requests.post(url, data=data, files=files)
+            return response.text
+        except requests.RequestException as e:
+            print(f"[ERROR] HTTP Request failed: {e}")
+            return None
+        finally:
+            # Close files to prevent resource leaks
+            for f in files.values():
+                f[1].close()
 
     async def get_info_from_torrent_id(self, hdb_id):
         hdb_imdb = hdb_name = hdb_torrenthash = None
