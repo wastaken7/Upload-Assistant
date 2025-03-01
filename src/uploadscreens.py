@@ -433,7 +433,7 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
         if meta['debug']:
             console.print(f"Screenshot uploads processed in {time.time() - upload_start_time:.4f} seconds")
 
-        return new_images if using_custom_img_list else (meta['image_list'], len(successfully_uploaded))
+        return (new_images, len(new_images)) if using_custom_img_list else (meta['image_list'], len(successfully_uploaded))
 
     except asyncio.CancelledError:
         console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
