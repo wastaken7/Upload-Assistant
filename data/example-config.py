@@ -6,6 +6,11 @@ config = {
         # If you change any of these options, remove the #
         # -----------------------
 
+        # will print a notice if an update is available
+        "update_notification": True,
+        # will print the changelog if an update is available
+        "verbose_notification": False,
+
         "tmdb_api": "tmdb_api key",
         # btn api key for infohash parsing
         "btn_api": "btn_api key",

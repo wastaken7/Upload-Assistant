@@ -15,6 +15,8 @@ import time
 import gc
 import subprocess
 import re
+import requests
+from packaging import version
 from src.trackersetup import tracker_class_map, api_trackers, other_api_trackers, http_trackers
 from src.trackerhandle import process_trackers
 from src.queuemanage import handle_queue
@@ -302,6 +304,53 @@ def reset_terminal():
                 pass
 
 
+def get_local_version(version_file):
+    """Extracts the local version from the version.py file."""
+    try:
+        with open(version_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+        if match:
+            console.print(f"[cyan]Version[/cyan] [yellow]{match.group(1)}")
+            return match.group(1)
+        else:
+            console.print("[red]Version not found in local file.")
+            return None
+    except FileNotFoundError:
+        console.print("[red]Version file not found.")
+        return None
+
+
+def get_remote_version(url):
+    """Fetches the latest version information from the remote repository."""
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            content = response.text
+            match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+            if match:
+                return match.group(1), content
+            else:
+                console.print("[red]Version not found in remote file.")
+                return None, None
+        else:
+            console.print(f"[red]Failed to fetch remote version file. Status code: {response.status_code}")
+            return None, None
+    except requests.RequestException as e:
+        console.print(f"[red]An error occurred while fetching the remote version file: {e}")
+        return None, None
+
+
+def extract_changelog(content, from_version, to_version):
+    """Extracts the changelog entries between the specified versions."""
+    pattern = rf'__version__\s*=\s*"{re.escape(to_version)}"\s*(.*?)__version__\s*=\s*"{re.escape(from_version)}"'
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    else:
+        return None
+
+
 async def do_the_thing(base_dir):
     await asyncio.sleep(0.1)  # Ensure it's not racing
     meta = dict()
@@ -313,15 +362,32 @@ async def do_the_thing(base_dir):
             break
 
     version_file = os.path.join(base_dir, 'data', 'version.py')
-    with open(version_file, "r", encoding="utf-8") as f:
-        content = f.read()
+    remote_version_url = 'https://raw.githubusercontent.com/Audionut/Upload-Assistant/master/data/version.py'
 
-    match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+    notice = config['DEFAULT'].get('update_notification', True)
+    verbose = config['DEFAULT'].get('verbose_notification', False)
 
-    if match:
-        console.print(f"[cyan]Version[/cyan] [yellow]{match.group(1)}")
-    else:
-        console.print("[red]Version not found")
+    if not notice:
+        return
+
+    local_version = get_local_version(version_file)
+    if not local_version:
+        return
+
+    remote_version, remote_content = get_remote_version(remote_version_url)
+    if not remote_version:
+        return
+
+    if version.parse(remote_version) > version.parse(local_version):
+        console.print(f"[red][NOTICE] [green]Update available: v[/green][yellow]{remote_version}")
+        await asyncio.sleep(1)
+        if verbose and remote_content:
+            changelog = extract_changelog(remote_content, local_version, remote_version)
+            if changelog:
+                await asyncio.sleep(1)
+                console.print(f"{changelog}")
+            else:
+                console.print("[yellow]Changelog not found between versions.[/yellow]")
 
     try:
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
