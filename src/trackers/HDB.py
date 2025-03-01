@@ -480,7 +480,14 @@ class HDB():
             descfile.close()
 
     async def hdbimg_upload(self, meta):
-        images = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['filename']}-*.png")
+        image_glob = glob.glob("*.png")
+        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_files = set()
+        for pattern in unwanted_patterns:
+            unwanted_files.update(glob.glob(pattern))
+
+        image_glob = [file for file in image_glob if file not in unwanted_files]
+        images = list(set(image_glob))
         url = "https://img.hdbits.org/upload_api.php"
 
         data = {
