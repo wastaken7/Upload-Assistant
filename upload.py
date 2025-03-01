@@ -13,6 +13,7 @@ import cli_ui
 import traceback
 import time
 import gc
+import subprocess
 from src.trackersetup import tracker_class_map, api_trackers, other_api_trackers, http_trackers
 from src.trackerhandle import process_trackers
 from src.queuemanage import handle_queue
@@ -289,12 +290,14 @@ async def save_processed_file(log_file, file_path):
 
 def reset_terminal():
     """Reset the terminal to a sane state."""
-    if os.name == "posix":
+    if os.name == "posix" and sys.stdin.isatty():
         try:
-            if sys.stdin and sys.stdin.fileno() >= 0 and sys.stdin.isatty():
-                os.system("stty sane")
-        except (ValueError, OSError):
-            pass
+            subprocess.run(["stty", "sane"], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            try:
+                subprocess.run(["reset"], check=True)  # Fallback if stty is unavailable
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
 
 
 async def do_the_thing(base_dir):
