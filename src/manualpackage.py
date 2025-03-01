@@ -43,7 +43,7 @@ async def package(meta):
                     with open(poster_img, 'wb') as f:
                         shutil.copyfileobj(r.raw, f)
                     if not meta.get('skip_imghost_upload', False):
-                        poster, dummy = upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
+                        poster, dummy = await upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
                         poster = poster[0]
                         generic.write(f"TMDB Poster: {poster.get('raw_url', poster.get('img_url'))}\n")
                         meta['rehosted_poster'] = poster.get('raw_url', poster.get('img_url'))
