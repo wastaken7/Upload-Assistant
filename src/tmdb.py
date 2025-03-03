@@ -170,13 +170,13 @@ async def tmdb_other_meta(meta):
             else:
                 imdb_id_clean = imdb_id.lstrip('t')  # Remove 'tt' prefix safely
                 if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                    meta['imdb_id'] = str(int(imdb_id_clean)).zfill(7)
+                    meta['imdb_id'] = int(meta.get('imdb_id', 0))
                 else:
                     console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id}[/bold red]")
                     meta['imdb_id'] = 0  # Default to 0 if invalid
 
         else:
-            meta['imdb_id'] = str(meta.get('imdb_id')).zfill(7)
+            meta['imdb_id'] = int(meta.get('imdb_id', 0))
 
         # TVDB ID Handling
         if meta.get('tvdb_id') == 0:
@@ -235,13 +235,13 @@ async def tmdb_other_meta(meta):
             else:
                 imdb_id_clean = imdb_id.lstrip('t')  # Remove 'tt' prefix safely
                 if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                    meta['imdb_id'] = str(int(imdb_id_clean)).zfill(7)
+                    meta['imdb_id'] = int(meta.get('imdb_id', 0))
                 else:
                     console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id}[/bold red]")
                     meta['imdb_id'] = 0  # Default to 0 if invalid
 
         else:
-            meta['imdb_id'] = str(meta.get('imdb_id')).zfill(7)
+            meta['imdb_id'] = int(meta.get('imdb_id', 0))
 
         # TVDB ID Handling
         if meta.get('tvdb_id') == 0:
