@@ -557,7 +557,12 @@ class Prep():
     async def is_scene(self, video, meta, imdb=None):
         scene = False
         base = os.path.basename(video)
-        base = os.path.splitext(base)[0]
+        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+
+        if match and (not meta['is_disc'] or meta['keep_folder']):
+            base = match.group(1)
+        else:
+            print("Invalid filename or extension")
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
         if meta['debug']:
