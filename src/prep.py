@@ -1147,7 +1147,7 @@ class Prep():
         # print(f"Repack after Checks: {repack}")
 
         # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
-        if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper','proper2','proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
+        if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'proper2', 'proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
             edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
         if edition:
             console.print(f"Final Edition: {edition}")
