@@ -245,6 +245,9 @@ async def process_meta(meta, base_dir):
         else:
             meta = await prep.gen_desc(meta)
 
+        if meta.get('description') in ('None', '', ' '):
+            meta['description'] = None
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
