@@ -204,7 +204,7 @@ async def tmdb_other_meta(meta):
         meta['tmdb_directors'] = await get_directors(movie)
         if meta.get('anime', False) is False:
             meta['mal_id'], meta['aka'], meta['anime'], meta['demographic'] = await get_anime(response, meta)
-        if meta.get('mal_manual') is not None:
+        if meta.get('mal_manual') != 0:
             meta['mal_id'] = meta['mal_manual']
         meta['poster'] = response.get('poster_path', "")
         meta['tmdb_poster'] = response.get('poster_path', "")
@@ -268,7 +268,7 @@ async def tmdb_other_meta(meta):
         meta['genres'] = await get_genres(response)
         meta['tmdb_directors'] = await get_directors(tv)
         meta['mal_id'], meta['aka'], meta['anime'], meta['demographic'] = await get_anime(response, meta)
-        if meta.get('mal_manual') is not None:
+        if meta.get('mal_manual') != 0:
             meta['mal_id'] = meta['mal_manual']
         meta['poster'] = response.get('poster_path', '')
         meta['overview'] = response['overview']
