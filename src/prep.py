@@ -560,10 +560,14 @@ class Prep():
         base = os.path.splitext(base)[0]
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
+        if meta['debug']:
+            console.print("Using SRRDB url", url)
         if 'scene' not in meta:
             try:
                 response = requests.get(url, timeout=30)
                 response_json = response.json()
+                if meta['debug']:
+                    console.print(response_json)
 
                 if int(response_json.get('resultsCount', 0)) > 0:
                     first_result = response_json['results'][0]
