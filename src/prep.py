@@ -561,8 +561,6 @@ class Prep():
 
         if match and (not meta['is_disc'] or meta['keep_folder']):
             base = match.group(1)
-        else:
-            print("Invalid filename or extension")
         base = urllib.parse.quote(base)
         url = f"https://api.srrdb.com/v1/search/r:{base}"
         if meta['debug']:
