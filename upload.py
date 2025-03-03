@@ -354,16 +354,7 @@ def extract_changelog(content, from_version, to_version):
         return None
 
 
-async def do_the_thing(base_dir):
-    await asyncio.sleep(0.1)  # Ensure it's not racing
-    meta = dict()
-    paths = []
-    for each in sys.argv[1:]:
-        if os.path.exists(each):
-            paths.append(os.path.abspath(each))
-        else:
-            break
-
+async def update_notification(base_dir):
     version_file = os.path.join(base_dir, 'data', 'version.py')
     remote_version_url = 'https://raw.githubusercontent.com/Audionut/Upload-Assistant/master/data/version.py'
 
@@ -383,14 +374,27 @@ async def do_the_thing(base_dir):
 
     if version.parse(remote_version) > version.parse(local_version):
         console.print(f"[red][NOTICE] [green]Update available: v[/green][yellow]{remote_version}")
-        await asyncio.sleep(1)
+        asyncio.create_task(asyncio.sleep(1))
         if verbose and remote_content:
             changelog = extract_changelog(remote_content, local_version, remote_version)
             if changelog:
-                await asyncio.sleep(1)
+                asyncio.create_task(asyncio.sleep(1))
                 console.print(f"{changelog}")
             else:
                 console.print("[yellow]Changelog not found between versions.[/yellow]")
+
+
+async def do_the_thing(base_dir):
+    await asyncio.sleep(0.1)  # Ensure it's not racing
+    meta = dict()
+    paths = []
+    for each in sys.argv[1:]:
+        if os.path.exists(each):
+            paths.append(os.path.abspath(each))
+        else:
+            break
+
+    await update_notification(base_dir)
 
     try:
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
