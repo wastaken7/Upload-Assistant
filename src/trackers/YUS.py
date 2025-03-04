@@ -16,12 +16,6 @@ class YUS():
         Upload
     """
 
-    ###############################################################
-    ########                    EDIT ME                    ######## noqa E266
-    ###############################################################
-
-    # ALSO EDIT CLASS NAME ABOVE
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'YUS'
@@ -30,7 +24,8 @@ class YUS():
         self.search_url = 'https://yu-scene.net/api/torrents/filter'
         self.torrent_url = 'https://yu-scene.net/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
-        self.banned_groups = ['KiNGDOM', 'Lama','MeGusta','MezRips','mHD','mRS','msd','NeXus','NhaNc3','nHD','RARBG','Radarr','RCDiVX','RDN','SANTi','Will1869','x0r','XS','YIFY','YTS','ZKBL','ZmN','ZMNT']
+        self.banned_groups = ['KiNGDOM', 'Lama', 'MeGusta', 'MezRips', 'mHD', 'mRS', 'msd', 'NeXus', 'NhaNc3', 'nHD', 'RARBG', 'Radarr',
+                              'RCDiVX', 'RDN', 'SANTi', 'Will1869', 'x0r', 'XS', 'YIFY', 'YTS', 'ZKBL', 'ZmN', 'ZMNT']
         pass
 
     async def get_cat_id(self, category_name):
@@ -66,10 +61,6 @@ class YUS():
             '480i': '9'
         }.get(resolution, '10')
         return resolution_id
-
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ###### noqa E266
-    ###############################################################
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
@@ -186,4 +177,3 @@ class YUS():
             await asyncio.sleep(5)
 
         return dupes
-]
