@@ -608,13 +608,25 @@ class Prep():
 
                     # IMDb Handling
                     try:
-                        r = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
-                        r = r.json()
+                        response = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
 
-                        if r['releases'] != [] and imdb is None:
-                            imdb = r['releases'][0].get('imdb', imdb) if r['releases'][0].get('imdb') is not None else imdb
-                        console.print(f"[green]SRRDB: Matched to {first_result['release']}")
-                    except Exception as e:
+                        if response.status_code == 200:
+                            r = response.json()
+
+                            if r.get('releases') and imdb == 0:
+                                imdb_str = r['releases'][0].get('imdb') or r['releases'][0].get('imdbId')
+
+                                if imdb_str:
+                                    imdb_str = str(imdb_str).lstrip('tT')  # Strip 'tt' or 'TT'
+                                    imdb = int(imdb_str) if imdb_str.isdigit() else 0
+
+                                first_result = r['releases'][0] if r['releases'] else None
+                                if first_result:
+                                    console.print(f"[green]SRRDB: Matched to {first_result['release']}")
+                        else:
+                            console.print(f"[yellow]SRRDB API request failed with status: {response.status_code}")
+
+                    except requests.RequestException as e:
                         console.print("[yellow]Failed to fetch IMDb information:", e)
 
                 else:
