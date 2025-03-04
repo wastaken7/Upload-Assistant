@@ -123,9 +123,9 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HUNO, ITT, JPTV, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, THR, TIK, TL, ULCX, UTP, YOINK
+        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HUNO, ITT, JPTV, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, THR, TIK, TL, ULCX, UTP, YOINK, YUS
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime about tracker you do not have access too.
-        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HUNO, ITT, JPTV, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, THR, TIK, TL, ULCX, UTP, YOINK",
+        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, FNP, FRIKI, HDB, HDT, HUNO, ITT, JPTV, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RF, RTF, SN, STC, THR, TIK, TL, ULCX, UTP, YOINK, YUS",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -395,6 +395,11 @@ config = {
         "YOINK": {
             "api_key": "YOINK api key",
             "announce_url": "https://yoinked.org/announce/customannounceurl",
+            # "anon" : "False"
+        },
+        "YUS": {
+            "api_key": "YUS api key",
+            "announce_url": "https://yu-scene.net/announce/customannounceurl",
             # "anon" : "False"
         },
     },
