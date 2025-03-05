@@ -162,7 +162,7 @@ async def tmdb_other_meta(meta):
             meta['year'] = meta['search_year']
         external = movie.external_ids()
         if meta.get('imdb_id', 0) == 0:
-            imdb_id = external.get('imdb_id', '0')
+            imdb_id = external.get('imdb_id', None)
 
             # Ensure imdb_id is a valid string and strip 'tt' prefix if present
             if not imdb_id or imdb_id in ["", " ", "None", None]:
@@ -170,7 +170,7 @@ async def tmdb_other_meta(meta):
             else:
                 imdb_id_clean = imdb_id.lstrip('t')  # Remove 'tt' prefix safely
                 if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                    meta['imdb_id'] = int(meta.get('imdb_id', 0))
+                    meta['imdb_id'] = int(f'{imdb_id}', 0)
                 else:
                     console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id}[/bold red]")
                     meta['imdb_id'] = 0  # Default to 0 if invalid
@@ -180,7 +180,7 @@ async def tmdb_other_meta(meta):
 
         # TVDB ID Handling
         if meta.get('tvdb_id') == 0:
-            meta['tvdb_id'] = external.get('tvdb_id', '0')
+            meta['tvdb_id'] = external.get('tvdb_id', None)
             if meta['tvdb_id'] in ["", " ", "None", None]:
                 meta['tvdb_id'] = 0
         try:
@@ -227,7 +227,7 @@ async def tmdb_other_meta(meta):
             meta['year'] = meta['search_year']
         external = tv.external_ids()
         if meta.get('imdb_id', 0) == 0:
-            imdb_id = external.get('imdb_id', '0')
+            imdb_id = external.get('imdb_id', None)
 
             # Ensure imdb_id is a valid string and strip 'tt' prefix if present
             if not imdb_id or imdb_id in ["", " ", "None", None]:
@@ -235,7 +235,7 @@ async def tmdb_other_meta(meta):
             else:
                 imdb_id_clean = imdb_id.lstrip('t')  # Remove 'tt' prefix safely
                 if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                    meta['imdb_id'] = int(meta.get('imdb_id', 0))
+                    meta['imdb_id'] = int(f'{imdb_id}', 0)
                 else:
                     console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id}[/bold red]")
                     meta['imdb_id'] = 0  # Default to 0 if invalid
@@ -245,7 +245,7 @@ async def tmdb_other_meta(meta):
 
         # TVDB ID Handling
         if meta.get('tvdb_id') == 0:
-            meta['tvdb_id'] = external.get('tvdb_id')
+            meta['tvdb_id'] = external.get('tvdb_id', None)
             if meta['tvdb_id'] in ["", " ", "None", None]:
                 meta['tvdb_id'] = 0
         try:
