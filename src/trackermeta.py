@@ -7,6 +7,7 @@ import sys
 from PIL import Image
 import io
 from io import BytesIO
+import os
 
 # Define expected amount of screenshots from the config
 expected_images = int(config['DEFAULT']['screens'])
@@ -52,6 +53,8 @@ async def check_images_concurrently(imagelist, meta):
         return []
 
     # Function to check each image's URL, host, and log resolution
+    save_directory = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+
     async def check_and_collect(image_dict):
         img_url = image_dict.get('raw_url')
         if not img_url:
@@ -72,11 +75,8 @@ async def check_images_concurrently(imagelist, meta):
                         try:
                             image = Image.open(BytesIO(image_content))
                             vertical_resolution = image.height
-                            lower_bound = expected_vertical_resolution * 0.70  # 30% below
-                            if meta['is_disc'] == "DVD":
-                                upper_bound = expected_vertical_resolution * 1.30
-                            else:
-                                upper_bound = expected_vertical_resolution * 1.00
+                            lower_bound = expected_vertical_resolution * 0.70
+                            upper_bound = expected_vertical_resolution * (1.30 if meta['is_disc'] == "DVD" else 1.00)
 
                             if not (lower_bound <= vertical_resolution <= upper_bound):
                                 console.print(
@@ -85,7 +85,16 @@ async def check_images_concurrently(imagelist, meta):
                                 )
                                 return None
 
+                            # Save image
+                            os.makedirs(save_directory, exist_ok=True)
+                            image_filename = os.path.join(save_directory, os.path.basename(img_url))
+                            with open(image_filename, "wb") as f:
+                                f.write(image_content)
+
+                            console.print(f"Saved {img_url} as {image_filename}")
+
                             meta['image_sizes'][img_url] = len(image_content)
+
                             if meta['debug']:
                                 console.print(
                                     f"Valid image {img_url} with resolution {image.width}x{image.height} "
