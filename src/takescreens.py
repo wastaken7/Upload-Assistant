@@ -23,13 +23,14 @@ img_host = [
     for key in sorted(config["DEFAULT"].keys())
     if key.startswith("img_host_1")
 ]
-task_limit = int(config['DEFAULT'].get('process_limit', 0))
+task_limit = int(config['DEFAULT'].get('process_limit', 1))
+threads = str(config['DEFAULT'].get('threads', '1'))
 cutoff = int(config['DEFAULT'].get('cutoff', 1))
 
 try:
     task_limit = int(task_limit)  # Convert to integer
 except ValueError:
-    task_limit = 0
+    task_limit = 1
 tone_map = config['DEFAULT'].get('tone_map', False)
 optimize_images = config['DEFAULT'].get('optimize_images', True)
 
@@ -159,8 +160,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
 
         # Dynamically determine the number of processes
         num_tasks = len(valid_images)
-        max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
-        num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
+        num_workers = min(num_tasks, task_limit)
         console.print("[yellow]Now optimizing images...[/yellow]")
         if meta['debug']:
             console.print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
@@ -455,8 +455,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
         # Dynamically determine the number of processes
         num_tasks = len(valid_images)
-        max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
-        num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
+        num_workers = min(num_tasks, task_limit)
 
         if num_workers == 0:
             console.print("[red]No valid images found for optimization.[/red]")
@@ -695,8 +694,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     num_capture = num_screens + 1 - existing_images_count
     num_tasks = num_capture
-    max_cores = task_limit if task_limit > 0 else os.cpu_count() // 2
-    num_workers = min(num_tasks, max_cores)  # Limit to number of tasks or available cores
+    num_workers = min(num_tasks, task_limit)
 
     if meta['debug']:
         console.print(f"Using {num_workers} worker(s) for {num_capture} image(s)")
@@ -1009,7 +1007,7 @@ def optimize_image_task(image):
     """Optimizes an image using oxipng in a separate process."""
     try:
         if optimize_images:
-            os.environ['RAYON_NUM_THREADS'] = '1'
+            os.environ['RAYON_NUM_THREADS'] = threads
             if not os.path.exists(image):
                 error_msg = f"ERROR: File not found - {image}"
                 console.print(f"[red]{error_msg}[/red]")
