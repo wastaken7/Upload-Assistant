@@ -25,7 +25,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - Can re-use existing torrents instead of hashing new.
   - Generates proper name for your upload using Mediainfo/BDInfo and TMDb/IMDb conforming to site rules.
   - Checks for existing releases already on site.
-  - Uploads to ACM/Aither/AL/ANT/AR/BHD/BHDTV/BLU/CBR/FRIKI/FNP/FL/HDB/HDT/HHD/HP/HUNO/ITT/JPTV/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RTF/SHRI/SN/SP/SPD/STC/STT/TLC/THR/TL/TVC/TTG/ULCX/UTP/YOINK
+  - Uploads to ACM/Aither/AL/ANT/AR/BHD/BHDTV/BLU/CBR/FRIKI/FNP/FL/HDB/HDT/HHD/HP/HUNO/ITT/JPTV/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RTF/SHRI/SN/SP/SPD/STC/STT/TLC/THR/TL/TVC/TTG/ULCX/UTP/YOINK/YUS
   - Adds to your client with fast resume, seeding instantly (rtorrent/qbittorrent/deluge/watch folder).
   - ALL WITH MINIMAL INPUT!
   - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs.
