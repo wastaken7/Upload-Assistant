@@ -213,7 +213,6 @@ async def process_meta(meta, base_dir):
                 # Cleanup
                 console.print("[yellow]Cleaning up resources...[/yellow]")
                 gc.collect()
-                console.print("[green]Upload process completed (with or without interruptions).[/green]")
 
         elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
             meta['image_list'] = []

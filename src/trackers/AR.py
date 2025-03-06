@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import aiofiles
-import aiohttp
 import json
 import os
 import pickle
 import platform
 import re
+import asyncio
+import signal
 from rich.prompt import Prompt
 import urllib.parse
 from src.exceptions import *  # noqa F403
@@ -36,7 +37,7 @@ class AR():
         if (meta['type'] == 'DISC' or meta['type'] == 'REMUX') and meta['source'] == 'Blu-ray':
             return "14"
 
-        if meta['anime']:
+        if meta.get('anime'):
             if meta['sd']:
                 return '15'
             else:
@@ -92,21 +93,43 @@ class AR():
                 }.get(meta['resolution'], '7')
 
     async def start_session(self):
+        import aiohttp
         if self.session is not None:
             console.print("[dim red]Warning: Previous session was not closed properly. Closing it now.")
             await self.close_session()
         self.session = aiohttp.ClientSession()
+
+        self.attach_signal_handlers()
+        return aiohttp
 
     async def close_session(self):
         if self.session is not None:
             await self.session.close()
             self.session = None
 
+    def attach_signal_handlers(self):
+        loop = asyncio.get_running_loop()
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, lambda: asyncio.create_task(self.handle_shutdown(sig)))
+            except NotImplementedError:
+                pass
+
+    async def handle_shutdown(self, sig):
+        console.print(f"[red]Received shutdown signal {sig}. Closing session...[/red]")
+        await self.close_session()
+
     async def validate_credentials(self, meta):
         if self.session:
             console.print("[red dim]Warning: Previous session was not closed properly. Using existing session.")
         else:
-            await self.start_session()
+            try:
+                await self.start_session()
+            except asyncio.CancelledError:
+                console.print("[red]Session startup interrupted! Cleaning up...[/red]")
+                await self.close_session()
+                raise
 
         if await self.load_session(meta):
             response = await self.get_initial_response()
@@ -120,6 +143,8 @@ class AR():
                 return True
             else:
                 console.print('[red]Failed to validate credentials. Please confirm that the site is up and your passkey is valid. Exiting')
+
+        await self.close_session()
         return False
 
     async def get_initial_response(self):
@@ -157,36 +182,53 @@ class AR():
             pickle.dump(cookie_dict, f)
 
     async def load_session(self, meta):
+        import aiohttp
         session_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.pkl")
         retry_count = 0
         max_retries = 2
 
         while retry_count < max_retries:
             try:
+                if not os.path.exists(session_file):
+                    console.print(f"[red]Session file not found: {session_file}[/red]")
+                    return False  # No session file to load
+
                 with open(session_file, 'rb') as f:
-                    cookie_dict = pickle.load(f)
+                    try:
+                        cookie_dict = pickle.load(f)
+                    except (EOFError, pickle.UnpicklingError) as e:
+                        console.print(f"[red]Error loading session cookies: {e}[/red]")
+                        return False  # Corrupted session file
 
-                    # Update the cookie jar with the loaded cookies
-                    for name, value in cookie_dict.items():
-                        self.session.cookie_jar.update_cookies({name: value})
+                if self.session is None:
+                    await self.start_session()
 
-                    if meta.get('debug', False):
-                        console.print("[yellow]Loaded cookies:", cookie_dict)
+                for name, value in cookie_dict.items():
+                    self.session.cookie_jar.update_cookies({name: value})
 
-                # Validate the session by making a request after loading cookies
+                if meta.get('debug', False):
+                    console.print("[yellow]Loaded cookies:", cookie_dict)
+
                 try:
-                    await self.session.get(f'{self.base_url}/torrents.php')
-                    return True  # Session is valid
-                except Exception:
-                    console.print("[yellow]Session might be invalid, retrying...")
+                    async with self.session.get(f'{self.base_url}/torrents.php', timeout=5) as response:
+                        if response.status == 200:
+                            console.print("[green]Session validated successfully.[/green]")
+                            return True  # Session is valid
+                        else:
+                            console.print(f"[yellow]Session validation failed with status {response.status}, retrying...[/yellow]")
 
-            except (FileNotFoundError, EOFError) as e:
-                console.print(f"Session loading error: {e}. Closing session and retrying.")
-                await self.close_session()  # Close the session if there's an error
-                await self.start_session()  # Reinitialize the session
-                retry_count += 1
+                except aiohttp.ClientError as e:
+                    console.print(f"[yellow]Session might be invalid: {e}. Retrying...[/yellow]")
 
-        console.print("[red]Failed to reuse session after retries. Either try again or delete the cookie.")
+            except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
+                console.print(f"[red]Session loading error: {e}. Closing session and retrying.[/red]")
+
+            await self.close_session()
+            await self.start_session()
+            retry_count += 1
+
+        console.print("[red]Failed to reuse session after retries. Either try again or delete the cookie.[/red]")
+        return aiohttp
         return False
 
     def get_links(self, movie, subheading, heading_end):
@@ -388,7 +430,6 @@ class AR():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         type = await self.get_type(meta)
-
         # Read the description
         desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         try:
@@ -398,34 +439,29 @@ class AR():
             raise Exception(f"Description file not found at {desc_path} ")
 
         # Handle cover image input
-        cover = meta.get('poster') or meta["imdb_info"].get("cover")
+        cover = meta.get('poster', None) or meta["imdb_info"].get("cover", None)
         while cover is None and not meta.get("unattended", False):
             cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
                 console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
-
         # Tag Compilation
         genres = meta.get('genres')
         if genres:
             genres = ', '.join(tag.strip('.') for tag in (item.replace(' ', '.') for item in genres.split(',')))
             genres = re.sub(r'\.{2,}', '.', genres)
-
         # adding tags
         tags = ""
         if meta['imdb_id'] != 0:
             tags += f"tt{meta.get('imdb_id', '')}, "
         # no special chars can be used in tags. keep to minimum working tags only.
         tags += f"{genres}, "
-
         # Get initial response and extract auth key
         initial_response = await self.get_initial_response()
         auth_key = self.extract_auth_key(initial_response)
-
         # Access the session cookie
         cookies = self.session.cookie_jar.filter_cookies(self.upload_url)
         session_cookie = cookies.get('session')
-
         if not session_cookie:
             raise Exception("Session cookie not found.")
 
@@ -461,6 +497,7 @@ class AR():
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
 
         if meta['debug'] is False:
+            import aiohttp
             try:
                 async with aiofiles.open(torrent_path, 'rb') as torrent_file:
                     # Use a single session for all requests
@@ -500,6 +537,7 @@ class AR():
                             return
             except FileNotFoundError:
                 console.print(f"[red]File not found: {torrent_path}")
+            return aiohttp
         else:
             await self.close_session()
             console.print("[cyan]Request Data:")
