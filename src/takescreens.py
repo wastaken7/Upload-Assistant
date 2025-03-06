@@ -14,7 +14,6 @@ import concurrent.futures
 import signal
 import gc
 import traceback
-import multiprocessing
 from pymediainfo import MediaInfo
 from src.console import console
 from data.config import config
@@ -776,11 +775,11 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         sys.exit(1)
     finally:
         console.print("[yellow]Shutting down optimization workers...[/yellow]")
+        executor.shutdown(wait=True, cancel_futures=True)
         for task in tasks:
             task.cancel()
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
-        executor.shutdown(wait=True, cancel_futures=True)
         gc.collect()
 
     # Filter out failed results
@@ -1010,10 +1009,7 @@ def optimize_image_task(image):
     """Optimizes an image using oxipng in a separate process."""
     try:
         if optimize_images:
-            if sys.platform.startswith("linux") or sys.platform == "darwin":
-                num_cores = multiprocessing.cpu_count()
-                max_threads = num_cores // 2
-                os.environ['RAYON_NUM_THREADS'] = str(max_threads)
+            os.environ['RAYON_NUM_THREADS'] = '1'
             if not os.path.exists(image):
                 error_msg = f"ERROR: File not found - {image}"
                 console.print(f"[red]{error_msg}[/red]")
