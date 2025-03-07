@@ -188,7 +188,6 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             await kill_all_child_processes()
             console.print("[red]All tasks cancelled. Exiting.[/red]")
             sys.exit(1)
-
         finally:
             console.print("[yellow]Shutting down optimization workers...[/yellow]")
             executor.shutdown(wait=False)
@@ -699,13 +698,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if meta['debug']:
         console.print(f"Using {num_workers} worker(s) for {num_capture} image(s)")
 
-    def handle_sigint(sig, frame):
-        console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
-        asyncio.create_task(kill_all_child_processes())
-        sys.exit(1)
-
-    signal.signal(signal.SIGINT, handle_sigint)
-
     capture_tasks = []
     for i in range(num_screens + 1):
         image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
@@ -722,13 +714,27 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         capture_results.sort(key=lambda x: x[0])
         capture_results = [r[1] for r in capture_results if r[1] is not None]
 
+    except KeyboardInterrupt:
+        console.print("\n[red]CTRL+C detected. Cancelling capture tasks...[/red]")
+        await asyncio.sleep(0.1)
+        await kill_all_child_processes()
+        console.print("[red]All tasks cancelled. Exiting.[/red]")
+        gc.collect()
+        sys.exit(1)
     except asyncio.CancelledError:
+        await asyncio.sleep(0.1)
+        await kill_all_child_processes()
         gc.collect()
         raise
     except Exception as e:
         console.print(f"[red]Error during screenshot capture: {e}[/red]")
+        await asyncio.sleep(0.1)
+        await kill_all_child_processes()
+        gc.collect()
         return []
     finally:
+        await asyncio.sleep(0.1)
+        await kill_all_child_processes()
         console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
     console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
@@ -746,17 +752,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     console.print("[yellow]Now optimizing images...[/yellow]")
     if meta['debug']:
         console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
-    loop = asyncio.get_running_loop()
-    stop_event = asyncio.Event()
 
-    def handle_sigint(sig, frame):
-        console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
-        executor.shutdown(wait=False)
-        stop_event.set()
-        for task in asyncio.all_tasks(loop):
-            task.cancel()
-
-    signal.signal(signal.SIGINT, handle_sigint)
     executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
     try:
         with executor:
@@ -766,17 +762,19 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             # Wait for all tasks to complete
             optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
     except KeyboardInterrupt:
-        console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
+        console.print("\n[red]CTRL+C detected. Cancelling optimization tasks...[/red]")
+        await asyncio.sleep(0.1)
         executor.shutdown(wait=True, cancel_futures=True)
         await kill_all_child_processes()
         console.print("[red]All tasks cancelled. Exiting.[/red]")
+        gc.collect()
         sys.exit(1)
     finally:
         console.print("[yellow]Shutting down optimization workers...[/yellow]")
+        await asyncio.sleep(0.1)
         executor.shutdown(wait=True, cancel_futures=True)
         for task in tasks:
             task.cancel()
-        await asyncio.sleep(0.1)
         await kill_all_child_processes()
         gc.collect()
 
