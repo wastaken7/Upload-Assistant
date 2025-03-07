@@ -25,6 +25,8 @@ from src.torrentcreate import create_torrent, create_random_torrents, create_bas
 from src.uphelper import UploadHelper
 from src.trackerstatus import process_all_trackers
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+if os.name == "posix":
+    import termios
 
 
 cli_ui.setup(color='always', title="Audionut's Upload Assistant")
@@ -194,6 +196,10 @@ async def process_meta(meta, base_dir):
         except Exception as e:
             console.print(f"[red]Unexpected error occurred: {e}[/red]")
             await cleanup_screenshot_temp_files(meta)
+        finally:
+            await asyncio.sleep()
+            reset_terminal()
+            gc.collect()
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
@@ -210,7 +216,7 @@ async def process_meta(meta, base_dir):
             except Exception as e:
                 console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
             finally:
-                # Cleanup
+                reset_terminal()
                 console.print("[yellow]Cleaning up resources...[/yellow]")
                 gc.collect()
 
@@ -295,15 +301,29 @@ async def save_processed_file(log_file, file_path):
 
 
 def reset_terminal():
-    """Reset the terminal to a sane state."""
-    if os.name == "posix" and sys.stdin.isatty():
-        try:
-            subprocess.run(["stty", "sane"], check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            try:
-                subprocess.run(["reset"], check=True)  # Fallback if stty is unavailable
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
+    """Reset the terminal while allowing the script to continue running (Linux/macOS only)."""
+
+    if os.name != "posix":
+        return
+
+    try:
+        sys.stderr.flush()
+
+        if sys.stdin.isatty():
+            subprocess.run(["stty", "sane"], check=False)
+            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
+            subprocess.run(["stty", "-ixon"], check=False)
+
+        sys.stdout.write("\033[0m")
+        sys.stdout.flush()
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        os.system("jobs -p | xargs kill 2>/dev/null")
+        sys.stderr.flush()
+
+    except Exception as e:
+        sys.stderr.write(f"Error during terminal reset: {e}\n")
+        sys.stderr.flush()
 
 
 def get_local_version(version_file):

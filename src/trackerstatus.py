@@ -1,6 +1,5 @@
 import asyncio
 import os
-import sys
 from torf import Torrent
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map, http_trackers
@@ -13,16 +12,6 @@ from src.imdb import get_imdb_info_api
 from src.torrentcreate import create_base_from_existing_torrent
 import cli_ui
 import copy
-
-
-def reset_terminal():
-    """Reset the terminal to a sane state."""
-    if os.name == "posix":
-        try:
-            if sys.stdin and sys.stdin.fileno() >= 0 and sys.stdin.isatty():
-                os.system("stty sane")
-        except (ValueError, OSError):
-            pass
 
 
 async def process_all_trackers(meta):
@@ -164,8 +153,6 @@ async def process_all_trackers(meta):
         for tracker_name in meta['trackers']:
             tracker_name, status = await process_single_tracker(tracker_name, meta)
             tracker_status[tracker_name] = status
-            if not sys.stdin.closed:
-                reset_terminal()
 
     if meta['debug']:
         console.print("\n[bold]Tracker Processing Summary:[/bold]")
