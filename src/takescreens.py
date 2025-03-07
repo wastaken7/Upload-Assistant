@@ -742,10 +742,10 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
-    num_workers = len(capture_results)
+    num_workers = min(task_limit, len(capture_results))
     console.print("[yellow]Now optimizing images...[/yellow]")
     if meta['debug']:
-        console.print(f"Using {num_workers} worker(s) for {num_workers} image(s)")
+        console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 
