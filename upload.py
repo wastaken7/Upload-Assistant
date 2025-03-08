@@ -197,7 +197,7 @@ async def process_meta(meta, base_dir):
             console.print(f"[red]Unexpected error occurred: {e}[/red]")
             await cleanup_screenshot_temp_files(meta)
         finally:
-            await asyncio.sleep()
+            await asyncio.sleep(0.1)
             reset_terminal()
             gc.collect()
 
