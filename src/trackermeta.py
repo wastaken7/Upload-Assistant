@@ -158,7 +158,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name):
         if meta['debug']:
             console.print("set TMDB ID:", meta['tmdb_id'])
     if imdb:
-        meta['imdb_id'] = str(imdb).zfill(7)
+        meta['imdb_id'] = imdb
         if meta['debug']:
             console.print("set IMDB ID:", meta['imdb_id'])
     if tvdb:
@@ -225,7 +225,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             if ptp_torrent_id:
                 if imdb_id:
-                    meta['imdb_id'] = str(imdb_id).zfill(7)
+                    meta['imdb_id'] = imdb_id
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb_id']}[/green]")
 
                 if not meta['unattended']:
@@ -271,7 +271,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             console.print("[cyan]Using specified PTP ID to get IMDb ID[/cyan]")
             imdb_id, _, meta['ext_torrenthash'] = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
             if imdb_id:
-                meta['imdb_id'] = str(imdb_id).zfill(7)
+                meta['imdb_id'] = imdb_id
                 console.print(f"[green]IMDb ID found: tt{meta['imdb_id']}[/green]")
                 found_match = True
                 meta['skipit'] = True
@@ -300,8 +300,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
 
             if imdb or tvdb_id:
-                meta['imdb_id'] = str(imdb).zfill(7) if imdb else 0
-                meta['tvdb_id'] = str(tvdb_id) if tvdb_id else 0
+                meta['imdb_id'] = imdb if imdb else 0
+                meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
                 found_match = True
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
@@ -314,8 +314,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             # Use search_filename function if ID is not found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
 
-            meta['imdb_id'] = str(imdb).zfill(7) if imdb else meta.get('imdb_id')
-            meta['tvdb_id'] = str(tvdb_id) if tvdb_id else meta.get('tvdb_id')
+            meta['imdb_id'] = imdb if imdb else meta.get('imdb_id')
+            meta['tvdb_id'] = tvdb_id if tvdb_id else meta.get('tvdb_id')
             meta['hdb_name'] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id
