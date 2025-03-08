@@ -189,7 +189,7 @@ class Prep():
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
 
-        if 'description' not in meta:
+        if 'description' not in meta or meta.get('description') is None:
             meta['description'] = ""
 
         description_text = meta.get('description', '')
