@@ -640,6 +640,8 @@ class PTP():
         desc = desc.replace("[left]", "[align=left]").replace("[/left]", "[/align]")
         desc = desc.replace("[right]", "[align=right]").replace("[/right]", "[/align]")
         desc = desc.replace("[code]", "[quote]").replace("[/code]", "[/quote]")
+        desc = desc.replace("[h3]", "").replace("[/h3]", "")
+        desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return desc
 
     async def edit_desc(self, meta):
@@ -856,6 +858,10 @@ class PTP():
                     desc.write(f"[quote][align=center]This release is sourced from {meta['service_longname']}[/align][/quote]")
                 mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
                 desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
+                base2ptp = self.convert_bbcode(base)
+                if base2ptp.strip() != "":
+                    desc.write(base2ptp)
+                    desc.write("\n\n")
                 for img_index in range(len(images[:int(meta['screens'])])):
                     raw_url = meta['image_list'][img_index]['raw_url']
                     desc.write(f"[img]{raw_url}[/img]\n")
@@ -871,6 +877,10 @@ class PTP():
                     if i == 0:
                         if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None and self.web_source is True:
                             desc.write(f"[quote][align=center]This release is sourced from {meta['service_longname']}[/align][/quote]")
+                        base2ptp = self.convert_bbcode(base)
+                        if base2ptp.strip() != "":
+                            desc.write(base2ptp)
+                            desc.write("\n\n")
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
                         for img_index in range(min(multi_screens, len(meta['image_list']))):
