@@ -114,7 +114,7 @@ class PTP():
                                 # First, try matching in filelist > path
                                 for file in torrent['FileList']:
                                     if file.get('Path') == filename:
-                                        imdb_id = movie['ImdbId']
+                                        imdb_id = int(movie.get('ImdbId', 0) or 0)
                                         ptp_torrent_id = torrent['Id']
                                         dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
                                         console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
@@ -127,7 +127,7 @@ class PTP():
 
                                 # If no match in filelist > path, check directly in filepath
                                 if torrent.get('FilePath') == filename:
-                                    imdb_id = movie['ImdbId']
+                                    imdb_id = int(movie.get('ImdbId', 0) or 0)
                                     ptp_torrent_id = torrent['Id']
                                     dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
                                     console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
@@ -173,7 +173,7 @@ class PTP():
         try:
             if response.status_code == 200:
                 response = response.json()
-                imdb_id = response['ImdbId']
+                imdb_id = int(response.get('ImdbId', 0) or 0)
                 ptp_infohash = None
                 for torrent in response['Torrents']:
                     if torrent.get('Id', 0) == str(ptp_torrent_id):
@@ -977,7 +977,14 @@ class PTP():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
-        desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "r", encoding='utf-8').read()
+        file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+
+        try:
+            os.stat(file_path)
+            with open(file_path, "r", encoding="utf-8") as f:
+                desc = f.read()
+        except OSError as e:
+            print(f"File error: {e}")
         ptp_subtitles = self.get_subtitles(meta)
         no_audio_found = False
         english_audio = False
