@@ -126,36 +126,60 @@ def create_torrent(meta, path, output_filename):
         start_time = time.time()
 
     if meta['isdir']:
-        if meta['keep_folder']:
-            cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
-            path = path
-        else:
-            os.chdir(path)
-            globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
-            no_sample_globs = [
-                os.path.abspath(f"{path}{os.sep}{file}") for file in globs
-                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
-            ]
-            if len(no_sample_globs) == 1:
-                path = meta['filelist'][0]
+        os.chdir(path)
+        globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
+        no_sample_globs = [
+            os.path.abspath(f"{path}{os.sep}{file}") for file in globs
+            if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+        ]
+        if len(no_sample_globs) == 1:
+            path = meta['filelist'][0]
 
     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
     include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
 
+    # If using mkbrr, run the external application
     if meta.get('mkbrr'):
         third_party_exe = os.path.join(meta['base_dir'], "bin", "mkbrr", "mkbrr.exe")
         output_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"
 
-        # Check platform and set command
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
             cmd = ["mono", third_party_exe, "create", path, "-o", output_path]
         else:
             cmd = [third_party_exe, "create", path, "-o", output_path]
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            last_line = result.stdout.strip().split("\n")[-1]  # Extract only the last line
-            console.print(f"[bold cyan]{last_line}")
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+            total_pieces = 100  # Default to 100% for scaling progress
+            pieces_done = 0
+            mkbrr_start_time = time.time()
+
+            for line in process.stdout:
+                line = line.strip()
+
+                # Detect hashing progress, speed, and percentage
+                match = re.search(r"Hashing pieces.*?\[(\d+\.\d+ MB/s)\]\s+(\d+)%", line)
+                if match:
+                    speed = match.group(1)  # Extract speed (e.g., "12734.21 MB/s")
+                    pieces_done = int(match.group(2))  # Extract percentage (e.g., "60")
+
+                    # Estimate ETA (Time Remaining)
+                    elapsed_time = time.time() - mkbrr_start_time
+                    if pieces_done > 0:
+                        estimated_total_time = elapsed_time / (pieces_done / 100)
+                        eta_seconds = max(0, estimated_total_time - elapsed_time)
+                        eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
+                    else:
+                        eta = "--:--"  # Placeholder if we can't estimate yet
+
+                    cli_ui.info_progress(f"mkbrr hashing... {speed} | ETA: {eta}", pieces_done, total_pieces)
+
+                # Detect final output line
+                if "Wrote" in line and ".torrent" in line:
+                    console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
+
+            process.wait()
             return output_path
         except subprocess.CalledProcessError as e:
             console.print(f"[bold red]Error creating torrent: {e.stderr}")
@@ -166,7 +190,7 @@ def create_torrent(meta, path, output_filename):
         meta=meta,
         path=path,
         trackers=["https://fake.tracker"],
-        source="L4G",
+        source="Ausionut UA",
         private=True,
         exclude_globs=exclude or [],
         include_globs=include or [],
