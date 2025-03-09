@@ -126,14 +126,18 @@ def create_torrent(meta, path, output_filename):
         start_time = time.time()
 
     if meta['isdir']:
-        os.chdir(path)
-        globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
-        no_sample_globs = [
-            os.path.abspath(f"{path}{os.sep}{file}") for file in globs
-            if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
-        ]
-        if len(no_sample_globs) == 1:
-            path = meta['filelist'][0]
+        if meta['keep_folder']:
+            cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
+            path = path
+        else:
+            os.chdir(path)
+            globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
+            no_sample_globs = [
+                os.path.abspath(f"{path}{os.sep}{file}") for file in globs
+                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+            ]
+            if len(no_sample_globs) == 1:
+                path = meta['filelist'][0]
 
     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
     include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
