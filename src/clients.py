@@ -708,61 +708,80 @@ class Clients():
         torrents = qbt_client.torrents_info()
         found = False
 
+        extracted_torrent_dir = os.path.join(meta.get('base_dir', ''), "tmp", meta.get('uuid', ''))
+        os.makedirs(extracted_torrent_dir, exist_ok=True)
+
         for torrent in torrents:
             if torrent.get('infohash_v1') == info_hash_v1:
                 comment = torrent.get('comment', "")
+                match = None
 
                 if "https://passthepopcorn.me" in comment:
                     match = re.search(r'torrentid=(\d+)', comment)
                     if match:
                         meta['ptp'] = match.group(1)
-                        console.print(f"[bold cyan]meta['ptp'] set to torrentid: {meta['ptp']}")
-
                 elif "https://aither.cc" in comment:
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['aither'] = match.group(1)
-                        console.print(f"[bold cyan]meta['aither'] set to ID: {meta['aither']}")
-
                 elif "https://lst.gg" in comment:
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['lst'] = match.group(1)
-                        console.print(f"[bold cyan]meta['lst'] set to ID: {meta['lst']}")
-
                 elif "https://onlyencodes.cc" in comment:
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['oe'] = match.group(1)
-                        console.print(f"[bold cyan]meta['oe'] set to ID: {meta['oe']}")
-
                 elif "https://blutopia.cc" in comment:
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['blu'] = match.group(1)
-                        console.print(f"[bold cyan]meta['blu'] set to ID: {meta['blu']}")
-
                 elif "https://hdbits.org" in comment:
                     match = re.search(r'id=(\d+)', comment)
                     if match:
                         meta['hdb'] = match.group(1)
-                        console.print(f"[bold cyan]meta['hdb'] set to ID: {meta['hdb']}")
-
                 elif "https://broadcasthe.net" in comment:
                     match = re.search(r'id=(\d+)', comment)
                     if match:
                         meta['btn'] = match.group(1)
-                        console.print(f"[bold cyan]meta['btn'] set to ID: {meta['btn']}")
-
                 elif "https://beyond-hd.me" in comment:
                     meta['bhd'] = info_hash_v1
-                    console.print(f"[bold cyan]meta['bhd'] set to ID: {meta['bhd']}")
-
                 elif "https://jptv.club" in comment:
                     match = re.search(r'/(\d+)$', comment)
                     if match:
                         meta['jptv'] = match.group(1)
-                        console.print(f"[bold cyan]meta['jptv'] set to ID: {meta['jptv']}")
+
+                if match:
+                    console.print(f"[bold cyan]meta updated with tracker ID: {match.group(1)}")
+
+                torrent_storage_dir = client.get('torrent_storage_dir')
+                if not torrent_storage_dir:
+                    # Export .torrent file
+                    torrent_hash = torrent.get('infohash_v1')
+                    if meta.get('debug', False):
+                        console.print(f"[cyan]Exporting .torrent file for hash: {torrent_hash}")
+
+                    try:
+                        torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
+                        torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+
+                        with open(torrent_file_path, "wb") as f:
+                            f.write(torrent_file_content)
+
+                        # Validate the .torrent file before saving as BASE.torrent
+                        valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
+                        if not valid:
+                            console.print(f"[bold red]Validation failed for {torrent_file_path}")
+                            os.remove(torrent_file_path)  # Remove invalid file
+                        else:
+                            base_torrent_file_path = os.path.join(extracted_torrent_dir, "BASE.torrent")
+                            with open(base_torrent_file_path, "wb") as f:
+                                f.write(torrent_file_content)
+                            if meta.get('debug', False):
+                                console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
+
+                    except qbittorrentapi.APIError as e:
+                        console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
 
                 found = True
                 break
