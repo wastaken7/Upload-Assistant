@@ -1,3 +1,30 @@
+__version__ = "3.6.3"
+
+"""
+Changelog for version 3.6.3 (2025-03-09):
+
+## Config changes
+* As part of the effort to fix unresponsive terminals on unix systems, a new config option has been added , and an existing config option , now has a default setting even if commented out/not preset.
+* Non-unix users (or users without terminal issue) should uncomment and modify these settings to taste
+* https://github.com/Audionut/Upload-Assistant/blob/de7689ff36f76d7ba9b92afe1175b703a59cda65/data/example-config.py#L53
+
+## What's Changed
+* Create YUS.py by @fiftieth3322 in https://github.com/Audionut/Upload-Assistant/pull/373
+* remote_path as list by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/365
+* Correcting PROPER number namings in title by @Zips-sipZ in https://github.com/Audionut/Upload-Assistant/pull/378
+* Save extracted description images to disk (can be useful for rehosting to save the capture/optimization step)
+* Updates/fixes to ID handling across the board
+* Catch session interruptions in AR to ensure session is closed
+* Work around a bug that sets empty description to None, breaking repeated processing with same meta
+* Remote paths now accept list
+* More effort to stop unix terminals shitting the bed
+
+## New Contributors
+* @fiftieth3322 made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/373
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/3.6.2...3.6.3
+"""
+
 __version__ = "3.6.2"
 
 """
