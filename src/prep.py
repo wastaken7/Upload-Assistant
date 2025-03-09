@@ -327,7 +327,6 @@ class Prep():
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
         # Get imdb data
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
-            meta['imdb_id'] = str(meta.get('imdb_id')).zfill(7)
             meta['imdb_info'] = await get_imdb_info_api(meta['imdb_id'], meta)
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
