@@ -92,6 +92,7 @@ class Args():
         parser.add_argument('-mps', '--max-piece-size', nargs='*', required=False, help="Set max piece size allowed in MiB for default torrent creation (default 128 MiB)", choices=['2', '4', '8', '16', '32', '64', '128'])
         parser.add_argument('-nh', '--nohash', action='store_true', required=False, help="Don't hash .torrent")
         parser.add_argument('-rh', '--rehash', action='store_true', required=False, help="DO hash .torrent")
+        parser.add_argument('-mkbrr', '--mkbrr', action='store_true', required=False, help="Use mkbrr for torrent hashing")
         parser.add_argument('-dr', '--draft', action='store_true', required=False, help="Send to drafts (BHD, LST)")
         parser.add_argument('-mq', '--modq', action='store_true', required=False, help="Send to modQ")
         parser.add_argument('-client', '--client', nargs='*', required=False, help="Use this torrent client instead of default")
