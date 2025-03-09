@@ -31,20 +31,18 @@ async def get_btn_torrents(btn_api, btn_id, meta):
         torrents = data["result"]["torrents"]
         first_torrent = next(iter(torrents.values()), None)
         if first_torrent:
-            if meta.get('imdb_id') != 0:
-                if "ImdbID" in first_torrent and first_torrent["ImdbID"] is not None:
-                    meta["imdb_id"] = int(first_torrent["ImdbID"])
-                    print("BTN IMDb ID:", meta.get("imdb_id"))
-                    return int(first_torrent["ImdbID"])
-                else:
-                    meta["imdb_id"] = 0
-            if meta.get('tvdb_id') != 0:
-                if "TvdbID" in first_torrent and first_torrent['TvdbID'] is not None:
-                    meta["tvdb_id"] = int(first_torrent["TvdbID"])
-                    print("BTN TVDb ID:", meta.get("tvdb_id"))
-                    return int(first_torrent["TvdbID"])
-                else:
-                    meta["tvdb_id"] = 0
+            imdb_id = first_torrent.get("ImdbID")
+            tvdb_id = first_torrent.get("TvdbID")
+
+            if imdb_id and imdb_id != "0":
+                meta["imdb_id"] = int(imdb_id)
+                print("BTN IMDb ID:", meta["imdb_id"])
+
+            if tvdb_id and tvdb_id != "0":
+                meta["tvdb_id"] = int(tvdb_id)
+                print("BTN TVDb ID:", meta["tvdb_id"])
+
+            return meta
 
     print("No IMDb or TVDb ID found.")
     return meta
