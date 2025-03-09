@@ -70,8 +70,8 @@ class MTV():
                         exclude_globs=exclude,  # Ensure this is always a list
                         include_globs=include,  # Ensure this is always a list
                         creation_date=datetime.now(),
-                        comment="Created by L4G's Upload Assistant",
-                        created_by="L4G's Upload Assistant"
+                        comment="Created by Audionut's Upload Assistant",
+                        created_by="Audionut's Upload Assistant"
                     )
 
                     new_torrent.piece_size = 8 * 1024 * 1024

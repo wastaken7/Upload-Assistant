@@ -171,8 +171,8 @@ def create_torrent(meta, path, output_filename):
         exclude_globs=exclude or [],
         include_globs=include or [],
         creation_date=datetime.now(),
-        comment="Created by L4G's Upload Assistant",
-        created_by="L4G's Upload Assistant"
+        comment="Created by Audionut's Upload Assistant",
+        created_by="Audionut's Upload Assistant"
     )
 
     torrent.validate_piece_size(meta)
