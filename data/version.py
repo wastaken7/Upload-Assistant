@@ -1,3 +1,13 @@
+__version__ = "3.6.3.1"
+
+"""
+Changelog for version 3.6.3.1 (2025-03-09):
+
+- Fix BTN ID grabbing
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/3.6.3...3.6.3.1
+"""
+
 __version__ = "3.6.3"
 
 """
