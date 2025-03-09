@@ -9,13 +9,13 @@ import json
 async def get_imdb_aka_api(imdb_id, meta):
     if imdb_id == 0:
         return "", None
-    imdb_id = f"{int(imdb_id):07d}"
-    imdb_tt = f"tt{imdb_id}" if not str(imdb_id).startswith("tt") else imdb_id
+    if not str(imdb_id).startswith("tt"):
+        imdb_id = f"tt{imdb_id:07d}"
     url = "https://api.graphql.imdb.com/"
     query = {
         "query": f"""
             query {{
-                title(id: "{imdb_tt}") {{
+                title(id: "{imdb_id}") {{
                     id
                     titleText {{
                         text
@@ -77,15 +77,15 @@ async def get_imdb_info_api(imdbID, meta):
     imdb_info = {}
     if imdbID and imdbID != 0:
         try:
-            imdbID = f"{int(imdbID):07d}"
-            imdbIDtt = f"tt{imdbID}" if not str(imdbID).startswith("tt") else imdbID
+            if not str(imdbID).startswith("tt"):
+                imdbID = f"tt{imdbID:07d}"
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
             return imdb_info
         query = {
             "query": f"""
             query GetTitleInfo {{
-                title(id: "{imdbIDtt}") {{
+                title(id: "{imdbID}") {{
                 id
                 titleText {{
                     text

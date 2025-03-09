@@ -17,7 +17,7 @@ import json
 async def get_tmdb_from_imdb(meta, filename):
     imdb_id = meta['imdb_id']
     if str(imdb_id)[:2].lower() != "tt":
-        imdb_id = f"tt{imdb_id}"
+        imdb_id = f"tt{imdb_id:07d}"
     find = tmdb.Find(id=imdb_id)
     info = find.info(external_source="imdb_id")
     if len(info['movie_results']) >= 1:
