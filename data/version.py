@@ -1,3 +1,14 @@
+__version__ = "3.6.4"
+
+"""
+Changelog for version 3.6.4 (2025-03-09):
+
+- Added option to use mkbrr https://github.com/autobrr/mkbrr (). About 4 times faster than torf for a file in cache . Can be set via config
+- fixed empty HDB file/folder searching giving bad feedback print
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/3.6.3.1...3.6.4
+"""
+
 __version__ = "3.6.3.1"
 
 """
