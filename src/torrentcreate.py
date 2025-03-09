@@ -216,9 +216,41 @@ def create_torrent(meta, path, output_filename):
     return torrent
 
 
+torf_start_time = time.time()
+
+
 def torf_cb(torrent, filepath, pieces_done, pieces_total):
-    # print(f'{pieces_done/pieces_total*100:3.0f} % done')
-    cli_ui.info_progress("Hashing...", pieces_done, pieces_total)
+    global torf_start_time
+
+    if pieces_done == 0:
+        torf_start_time = time.time()  # Reset start time when hashing starts
+
+    elapsed_time = time.time() - torf_start_time
+
+    # Calculate percentage done
+    if pieces_total > 0:
+        percentage_done = (pieces_done / pieces_total) * 100
+    else:
+        percentage_done = 0
+
+    # Estimate ETA (if at least one piece is done)
+    if pieces_done > 0:
+        estimated_total_time = elapsed_time / (pieces_done / pieces_total)
+        eta_seconds = max(0, estimated_total_time - elapsed_time)
+        eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
+    else:
+        eta = "--:--"
+
+    # Calculate hashing speed (MB/s)
+    if elapsed_time > 0 and pieces_done > 0:
+        piece_size = torrent.piece_size / (1024 * 1024)
+        speed = (pieces_done * piece_size) / elapsed_time
+        speed_str = f"{speed:.2f} MB/s"
+    else:
+        speed_str = "-- MB/s"
+
+    # Display progress with percentage, speed, and ETA
+    cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
 
 
 def create_random_torrents(base_dir, uuid, num, path):
