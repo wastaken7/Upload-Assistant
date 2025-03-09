@@ -226,6 +226,8 @@ async def process_meta(meta, base_dir):
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
+        if not meta['mkbrr']:
+            meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         if not os.path.exists(torrent_path):
             reuse_torrent = None

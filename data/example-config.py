@@ -125,6 +125,9 @@ config = {
         # set true to only grab meta id's from trackers, not descriptions and images
         "only_id": False,
 
+        # set true to use mkbrr for torrent creation
+        "mkbrr": False,
+
     },
 
     # these are used for DB links on AR
