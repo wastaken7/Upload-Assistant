@@ -600,7 +600,7 @@ class HDB():
                     response_json = response.json()
                     # console.print(f"[green]HDB API response: {response_json}[/green]")
 
-                    if not response_json.get('data'):
+                    if 'data' not in response_json:
                         console.print(f"[red]Error: 'data' key not found or empty in HDB API response. Full response: {response_json}[/red]")
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
