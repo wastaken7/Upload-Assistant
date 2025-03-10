@@ -73,7 +73,7 @@ class Args():
             usage="upload.py [path...] [options]",
         )
 
-        parser.add_argument('path', nargs='+', help="Path to file/directory")
+        parser.add_argument('path', nargs='+', help="Path to file/directory (in single/double quotes is best)")
         parser.add_argument('--queue', nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
         parser.add_argument('-lq', '--limit-queue', dest='limit_queue', nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
         parser.add_argument('--unit3d', action='store_true', required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
@@ -83,7 +83,7 @@ class Args():
         parser.add_argument('-t', '--type', nargs=1, required=False, help="Type [DISC, REMUX, ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP]", choices=['disc', 'remux', 'encode', 'webdl', 'web-dl', 'webrip', 'hdtv', 'dvdrip'], dest="manual_type")
         parser.add_argument('--source', nargs=1, required=False, help="Source [Blu-ray, BluRay, DVD, HDDVD, WEB, HDTV, UHDTV, LaserDisc, DCP]", choices=['Blu-ray', 'BluRay', 'DVD', 'HDDVD', 'WEB', 'HDTV', 'UHDTV', 'LaserDisc', 'DCP'], dest="manual_source")
         parser.add_argument('-res', '--resolution', nargs=1, required=False, help="Resolution [2160p, 1080p, 1080i, 720p, 576p, 576i, 480p, 480i, 8640p, 4320p, OTHER]", choices=['2160p', '1080p', '1080i', '720p', '576p', '576i', '480p', '480i', '8640p', '4320p', 'other'])
-        parser.add_argument('-tmdb', '--tmdb', nargs=1, required=False, help="TMDb ID", type=str, dest='tmdb_manual')
+        parser.add_argument('-tmdb', '--tmdb', nargs=1, required=False, help="TMDb ID (use movie/ or tv/ prefix)", type=str, dest='tmdb_manual')
         parser.add_argument('-imdb', '--imdb', nargs=1, required=False, help="IMDb ID", type=str, dest='imdb_manual')
         parser.add_argument('-mal', '--mal', nargs=1, required=False, help="MAL ID", type=str, dest='mal_manual')
         parser.add_argument('-tvmaze', '--tvmaze', nargs=1, required=False, help="TVMAZE ID", type=str, dest='tvmaze_manual')
@@ -127,7 +127,7 @@ class Args():
         parser.add_argument('-manual_dvds', '--manual_dvds', nargs=1, required=False, help="Override the default number of DVD's (eg: use 2xDVD9+DVD5 instead)", type=str, dest='manual_dvds', default="")
         parser.add_argument('-pb', '--desclink', nargs=1, required=False, help="Custom Description (link to hastebin/pastebin)")
         parser.add_argument('-df', '--descfile', nargs=1, required=False, help="Custom Description (path to file)")
-        parser.add_argument('-ih', '--imghost', nargs=1, required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens', 'oeimg'])
+        parser.add_argument('-ih', '--imghost', nargs=1, required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens', 'oeimg', 'dalexni', 'zipline'])
         parser.add_argument('-siu', '--skip-imagehost-upload', dest='skip_imghost_upload', action='store_true', required=False, help="Skip Uploading to an image host")
         parser.add_argument('-th', '--torrenthash', nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
         parser.add_argument('-nfo', '--nfo', action='store_true', required=False, help="Use .nfo in directory for description")
