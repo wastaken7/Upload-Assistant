@@ -43,8 +43,7 @@ jobs:
               *darwin_arm64.tar.gz) tar -xzf "$file" -C macos/arm64 ;;
               *darwin_x86_64.tar.gz) tar -xzf "$file" -C macos/x86_64 ;;
               *freebsd_x86_64.tar.gz) tar -xzf "$file" -C freebsd/x86_64 ;;
-              *linux_amd64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;
-              *linux_x86_64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;  # Added x86_64 case
+              *linux_amd64.tar.gz|*linux_x86_64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;
               *linux_arm64.tar.gz) tar -xzf "$file" -C linux/arm64 ;;
               *linux_armv6.tar.gz) tar -xzf "$file" -C linux/armv6 ;;
               *linux_arm.tar.gz) tar -xzf "$file" -C linux/arm ;;
@@ -54,6 +53,18 @@ jobs:
           
           # Ensure executables have correct permissions
           find linux macos freebsd -type f -name "mkbrr" -exec chmod +x {} \;
+
+      - name: Cleanup Unneeded Files
+        run: |
+          cd bin/mkbrr
+          echo "Deleting unneeded archives and checksum files..."
+          
+          # Delete all archives & extracted source files
+          rm -f *.tar.gz *.zip *.apk *.deb *.rpm *.pkg.tar.zst *.txt
+
+          # Verify cleanup
+          echo "Remaining files in bin/mkbrr:"
+          ls -R
 
       - name: Commit & Push Changes
         run: |
