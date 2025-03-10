@@ -194,7 +194,7 @@ def create_torrent(meta, path, output_filename):
         meta=meta,
         path=path,
         trackers=["https://fake.tracker"],
-        source="Ausionut UA",
+        source="Audionut UA",
         private=True,
         exclude_globs=exclude or [],
         include_globs=include or [],
