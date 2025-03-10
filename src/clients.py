@@ -468,22 +468,11 @@ class Clients():
 
     async def qbittorrent(self, path, torrent, local_path, remote_path, client, is_disc, filelist, meta, tracker):
         if meta.get('keep_folder'):
-            # Keep only the root folder
             path = os.path.dirname(path)
         else:
-            # Adjust path based on filelist and directory status
             isdir = os.path.isdir(path)
             if len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
-
-        # Ensure remote path replacement and normalization
-        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
-            path = path.replace(local_path, remote_path)
-            path = path.replace(os.sep, '/')
-
-        # Ensure trailing slash for qBittorrent
-        if not path.endswith('/'):
-            path += '/'
 
         src = meta.get('path')
         if not src:
@@ -581,6 +570,22 @@ class Clients():
             console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
             return
 
+        # Apply remote pathing to `tracker_dir` before assigning `save_path`
+        if use_symlink or use_hardlink:
+            save_path = tracker_dir  # Default to linked directory
+            if local_path.lower() in save_path.lower() and local_path.lower() != remote_path.lower():
+                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
+                save_path = save_path.replace(os.sep, '/')  # Normalize for remote systems
+        else:
+            save_path = path  # Default to the original path
+            if local_path.lower() in save_path.lower() and local_path.lower() != remote_path.lower():
+                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
+                save_path = save_path.replace(os.sep, '/')  # Normalize for remote systems
+
+        # Ensure qBittorrent save path is formatted correctly
+        if not save_path.endswith('/'):
+            save_path += '/'
+
         # Automatic management
         auto_management = False
         am_config = client.get('automatic_management_paths', '')
@@ -599,10 +604,6 @@ class Clients():
             console.print("qbt_category:", qbt_category)
 
         content_layout = client.get('content_layout', 'Original')
-        if use_symlink or use_hardlink:
-            save_path = tracker_dir  # Use the linked directory
-        else:
-            save_path = path  # Use the original path if no linking is enabled
 
         console.print(f"[bold yellow]qBittorrent save path: {save_path}")
 
@@ -748,7 +749,6 @@ class Clients():
             torrent_client = self.config['DEFAULT']['default_torrent_client']
         else:
             torrent_client = meta['client']
-
         local_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('local_path', ['/LocalPath'])
         remote_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('remote_path', ['/RemotePath'])
 
@@ -768,7 +768,6 @@ class Clients():
 
         local_path = os.path.normpath(list_local_path)
         remote_path = os.path.normpath(list_remote_path)
-
         if local_path.endswith(os.sep):
             remote_path = remote_path + os.sep
 
