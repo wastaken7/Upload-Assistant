@@ -8,6 +8,57 @@ import sys
 from src.console import console
 
 
+class ShortHelpFormatter(argparse.HelpFormatter):
+    """
+    Custom formatter for short help (-h)
+    Only displays essential options.
+    """
+    def __init__(self, prog):
+        super().__init__(prog, max_help_position=40, width=80)
+
+    def format_help(self):
+        """
+        Customize short help output (only show essential arguments).
+        """
+        short_usage = "usage: upload.py [path...] [options]\n\n"
+        short_options = """
+Common options:
+  -dm, --delete-meta         Deletes the cached meta file that stores arguments/processed data
+  -tmdb, --tmdb              Specify the TMDb id to use with movie/ or tv/ prefix
+  -imdb, --imdb              Specify the IMDb id to use
+  --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
+  -mf, --manual_frames       Comma-seperated list of frame numbers to use for screenshots
+  -df, --descfile            Path to custom description file
+  -serv, --service           Streaming service
+  --no-aka                   Remove AKA from title
+  -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
+  -c, --category             Category (movie, tv, fanres)
+  -t, --type                 Type (disc, remux, encode, webdl, etc.)
+  --source                    Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
+  -debug, --debug            Prints more information, runs everything without actually uploading
+
+Use --help for a full list of options.
+"""
+        return short_usage + short_options
+
+
+class CustomArgumentParser(argparse.ArgumentParser):
+    """
+    Custom ArgumentParser to handle short (-h) and long (--help) help messages.
+    """
+    def print_help(self, file=None):
+        """
+        Show short help for `-h` and full help for `--help`
+        """
+        if "--help" in sys.argv:
+            super().print_help(file)  # Full help
+        else:
+            short_parser = argparse.ArgumentParser(
+                formatter_class=ShortHelpFormatter, add_help=False, usage="upload.py [path...] [options]"
+            )
+            short_parser.print_help(file)
+
+
 class Args():
     """
     Parse Args
@@ -18,7 +69,9 @@ class Args():
 
     def parse(self, args, meta):
         input = args
-        parser = argparse.ArgumentParser()
+        parser = CustomArgumentParser(
+            usage="upload.py [path...] [options]",
+        )
 
         parser.add_argument('path', nargs='+', help="Path to file/directory")
         parser.add_argument('--queue', nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
