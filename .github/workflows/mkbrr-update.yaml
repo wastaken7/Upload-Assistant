@@ -1,7 +1,7 @@
 name: Update mkbrr Binaries
 
 on:
-  workflow_dispatch:  # Allows manual trigger only
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   update-mkbrr:
@@ -35,17 +35,20 @@ jobs:
         run: |
           cd bin/mkbrr
           mkdir -p windows/x86_64 macos/arm64 macos/x86_64 linux/amd64 linux/arm linux/arm64 linux/armv6 freebsd/x86_64
-          
-          for file in mkbrr_*.tar.gz; do
+
+          # Extract and move binaries to correct folders
+          for file in *; do
             case "$file" in
               *windows_x86_64.zip) unzip "$file" -d windows/x86_64 ;;
               *darwin_arm64.tar.gz) tar -xzf "$file" -C macos/arm64 ;;
               *darwin_x86_64.tar.gz) tar -xzf "$file" -C macos/x86_64 ;;
               *freebsd_x86_64.tar.gz) tar -xzf "$file" -C freebsd/x86_64 ;;
               *linux_amd64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;
+              *linux_x86_64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;  # Added x86_64 case
               *linux_arm64.tar.gz) tar -xzf "$file" -C linux/arm64 ;;
               *linux_armv6.tar.gz) tar -xzf "$file" -C linux/armv6 ;;
               *linux_arm.tar.gz) tar -xzf "$file" -C linux/arm ;;
+              *.apk|*.deb|*.rpm|*.pkg.tar.zst) mv "$file" linux/amd64 ;;  # Move package files
             esac
           done
           
