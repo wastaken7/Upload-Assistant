@@ -283,7 +283,7 @@ async def create_base_from_existing_torrent(torrentpath, base_dir, uuid):
 
 def get_mkbrr_path(meta):
     """Determine the correct mkbrr binary based on OS and architecture."""
-    base_dir = os.path.join(meta['base_dir'], "data", "mkbrr")
+    base_dir = os.path.join(meta['base_dir'], "bin", "mkbrr")
 
     # Detect OS & Architecture
     system = platform.system().lower()
