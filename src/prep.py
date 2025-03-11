@@ -184,7 +184,7 @@ class Prep():
             # We need to have user input languages and file must have audio tracks.
             if len(any_of_languages) > 0 and len(audio_languages) > 0 and not set(any_of_languages).intersection(set(audio_languages)):
                 console.print(f"[red] None of the required languages ({meta['has_languages']}) is available on the file {audio_languages}")
-                return
+                raise Exception("No matching languages")
 
         # Debugging information after population
         # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
@@ -1448,11 +1448,6 @@ class Prep():
                     description.write(file_content)
                     meta['description'] = "CUSTOM"
                     content_written = True
-
-            if meta.get('desc') and not content_written:
-                description.write(meta['desc'] + "\n")
-                meta['description'] = "CUSTOM"
-                content_written = True
 
             if not content_written:
                 description_text = meta.get('description', '').strip()

@@ -123,7 +123,6 @@ class Args():
         parser.add_argument('--asian', dest='asian', action='store_true', required=False, help="Set for TIK Asian category")
         parser.add_argument('-disctype', '--disctype', nargs=1, required=False, help="Type of disc for TIK (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)", type=str)
         parser.add_argument('--untouched', dest='untouched', action='store_true', required=False, help="Set when a completely untouched disc at TIK")
-        parser.add_argument('-d', '--desc', nargs='+', required=False, help="Custom Description (string)")
         parser.add_argument('-manual_dvds', '--manual_dvds', nargs=1, required=False, help="Override the default number of DVD's (eg: use 2xDVD9+DVD5 instead)", type=str, dest='manual_dvds', default="")
         parser.add_argument('-pb', '--desclink', nargs=1, required=False, help="Custom Description (link to hastebin/pastebin)")
         parser.add_argument('-df', '--descfile', nargs=1, required=False, help="Custom Description (path to file)")
@@ -152,7 +151,7 @@ class Args():
         parser.add_argument('-qbt', '--qbit-tag', dest='qbit_tag', nargs=1, required=False, help="Add to qbit with this tag")
         parser.add_argument('-qbc', '--qbit-cat', dest='qbit_cat', nargs=1, required=False, help="Add to qbit with this category")
         parser.add_argument('-rtl', '--rtorrent-label', dest='rtorrent_label', nargs=1, required=False, help="Add to rtorrent with this label")
-        parser.add_argument('-tk', '--trackers', nargs='+', required=False, help="Upload to these trackers, space seperated (--trackers blu bhd) including manual")
+        parser.add_argument('-tk', '--trackers', nargs=1, required=False, help="Upload to these trackers, comma seperated (--trackers blu,bhd) including manual")
         parser.add_argument('-tpc', '--trackers-pass', dest='trackers_pass', nargs=1, required=False, help="How many trackers need to pass all checks (dupe/banned group/etc) to actually proceed to uploading", type=int)
         parser.add_argument('-rt', '--randomized', nargs=1, required=False, help="Number of extra, torrents with random infohash", default=0)
         parser.add_argument('-ua', '--unattended', action='store_true', required=False, help=argparse.SUPPRESS)
@@ -341,8 +340,6 @@ class Args():
                 meta[key] = value
             else:
                 meta[key] = meta.get(key, None)
-            if key in ('trackers'):
-                meta[key] = value
             # if key == 'help' and value == True:
                 # parser.print_help()
         return meta, parser, before_args
