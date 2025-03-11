@@ -498,21 +498,33 @@ class HDB():
             'galleryname': meta['name'],
             'thumbsize': 'w300'
         }
+        if meta['debug']:
+            print(f"[DEBUG] Uploading to: {url}")
+            print(f"[DEBUG] Metadata: {data}")
+            print(f"[DEBUG] Found {len(images)} images")
 
         # Set max screenshots to 3 for TV singles, 6 otherwise
         hdbimg_screen_count = 3 if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 else 6
         hdbimg_screen_count = min(len(images), hdbimg_screen_count)
+        if meta['debug']:
+            print(f"[DEBUG] Using {hdbimg_screen_count} images for upload")
+
         files = {}
         for i in range(hdbimg_screen_count):
             file_path = images[i]
             try:
                 files[f'images_files[{i}]'] = (f'image_{i}.png', open(file_path, 'rb'), 'image/png')
+                if meta['debug']:
+                    print(f"[DEBUG] Added file {file_path} as images_files[{i}]")
             except Exception as e:
                 print(f"[ERROR] Failed to open {file_path}: {e}")
                 return None
 
         try:
             response = requests.post(url, data=data, files=files)
+            if meta['debug']:
+                print(f"[DEBUG] HTTP Response Code: {response.status_code}")
+                print(f"[DEBUG] Response Text: {response.text[:500]}")  # Limit output for readability
             return response.text
         except requests.RequestException as e:
             print(f"[ERROR] HTTP Request failed: {e}")
@@ -521,6 +533,8 @@ class HDB():
             # Close files to prevent resource leaks
             for f in files.values():
                 f[1].close()
+                if meta['debug']:
+                    print(f"[DEBUG] Closed file {f[0]}")
 
     async def get_info_from_torrent_id(self, hdb_id):
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = None
