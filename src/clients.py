@@ -511,11 +511,6 @@ class Clients():
         if use_symlink and not link_target:
             link_target = linked_folder[0] if linked_folder else None
 
-        # Ensure link_target is valid
-        if not link_target:
-            console.print("[red]No valid linked folder found. Skipping linking.")
-            return
-
         # Create tracker-specific directory inside linked folder
         tracker_dir = os.path.join(link_target, tracker)
         os.makedirs(tracker_dir, exist_ok=True)
