@@ -287,7 +287,8 @@ class HDB():
             if meta.get('tvdb_id', 0) != 0:
                 data['tvdb'] = meta['tvdb_id']
             if int(meta.get('imdb_id')) != 0:
-                data['imdb'] = f"https://www.imdb.com/title/tt{meta.get('imdb_id')}/",
+                imdbID = f"tt{meta.get('imdb_id'):07d}"
+                data['imdb'] = f"https://www.imdb.com/title/{imdbID}/",
             if meta.get('category') == 'TV':
                 data['tvdb_season'] = int(meta.get('season_int', 1))
                 data['tvdb_episode'] = int(meta.get('episode_int', 1))
