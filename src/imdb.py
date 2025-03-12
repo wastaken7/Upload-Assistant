@@ -264,11 +264,11 @@ async def get_imdb_info_api(imdbID, meta):
             else:
                 meta['tv_year'] = None
 
-        difference = SequenceMatcher(None, meta['title'].lower(), meta['aka'][5:].lower()).ratio()
-        if difference >= 0.9 or meta['aka'][5:].strip() == "" or meta['aka'][5:].strip().lower() in meta['title'].lower():
+        difference = SequenceMatcher(None, imdb_info['title'].lower(), imdb_info['aka'][5:].lower()).ratio()
+        if difference >= 0.9 or imdb_info['aka'][5:].strip() == "" or imdb_info['aka'][5:].strip().lower() in imdb_info['title'].lower():
             meta['aka'] = ""
-        if f"({meta['year']})" in meta['aka']:
-            meta['aka'] = meta['aka'].replace(f"({meta['year']})", "").strip()
+        if f"({imdb_info['year']})" in imdb_info['aka']:
+            meta['aka'] = imdb_info['aka'].replace(f"({imdb_info['year']})", "").strip()
 
     else:
         imdb_info = {
