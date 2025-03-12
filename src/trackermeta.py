@@ -225,11 +225,11 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             if ptp_torrent_id:
                 if imdb_id:
-                    meta['imdb_id'] = imdb_id
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb_id']}[/green]")
 
                 if not meta['unattended']:
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
+                        meta['imdb_id'] = imdb_id
                         found_match = True
                         meta['ptp'] = ptp_torrent_id
                         if only_id is not True:
@@ -247,10 +247,12 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
                     else:
                         found_match = False
-                        meta['imdb_id'] = 0
+                        meta['imdb_id'] = meta.get('imdb_id') if meta.get('imdb_id') else 0
+                        meta['ptp'] = None
 
                 else:
                     found_match = True
+                    meta['imdb_id'] = imdb_id
                     ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                     if ptp_desc and len(ptp_desc) > 0:
                         meta['description'] = ptp_desc
