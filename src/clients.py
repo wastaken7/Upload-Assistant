@@ -502,21 +502,45 @@ class Clients():
         # Get linked folder for this drive
         linked_folder = client.get('linked_folder', [])
         if meta['debug']:
-            console.print(f"Linked folder: {linked_folder}")
+            console.print(f"Linked folders: {linked_folder}")
         if not isinstance(linked_folder, list):
             linked_folder = [linked_folder]  # Convert to list if single value
 
         # Determine drive letter (Windows) or root (Linux)
-        src_drive = os.path.splitdrive(src)[0] if platform.system() == "Windows" else "/"
+        if platform.system() == "Windows":
+            src_drive = os.path.splitdrive(src)[0]
+        else:
+            # On Unix/Linux, use the root directory or first directory component
+            src_drive = "/"
+            # Extract the first directory component for more specific matching
+            src_parts = src.strip('/').split('/')
+            if src_parts:
+                src_root_dir = '/' + src_parts[0]
+                # Check if any linked folder contains this root
+                for folder in linked_folder:
+                    if src_root_dir in folder or folder in src_root_dir:
+                        src_drive = src_root_dir
+                        break
 
         # Find a linked folder that matches the drive
         link_target = None
-        for folder in linked_folder:
-            folder_drive = os.path.splitdrive(folder)[0]
-            if folder_drive == src_drive:
-                link_target = folder
-                break
-
+        if platform.system() == "Windows":
+            # Windows matching based on drive letters
+            for folder in linked_folder:
+                folder_drive = os.path.splitdrive(folder)[0]
+                if folder_drive == src_drive:
+                    link_target = folder
+                    break
+        else:
+            # Unix/Linux matching based on path containment
+            for folder in linked_folder:
+                # Check if source path is in the linked folder or vice versa
+                if src.startswith(folder) or folder.startswith(src) or folder.startswith(src_drive):
+                    link_target = folder
+                    break
+        if meta['debug']:
+            console.print(f"Source drive: {src_drive}")
+            console.print(f"Link target: {link_target}")
         # If using symlinks and no matching drive folder, allow any available one
         if use_symlink and not link_target and linked_folder:
             link_target = linked_folder[0]
@@ -540,7 +564,8 @@ class Clients():
 
         # path magic
         if os.path.exists(dst) or os.path.islink(dst):
-            console.print(f"[yellow]Skipping linking, path already exists: {dst}")
+            if meta['debug']:
+                console.print(f"[yellow]Skipping linking, path already exists: {dst}")
         else:
             if use_hardlink:
                 try:
@@ -621,18 +646,36 @@ class Clients():
         # Apply remote pathing to `tracker_dir` before assigning `save_path`
         if use_symlink or use_hardlink:
             save_path = tracker_dir  # Default to linked directory
-            if local_path.lower() in save_path.lower() and local_path.lower() != remote_path.lower():
-                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
-                save_path = save_path.replace(os.sep, '/')  # Normalize for remote systems
         else:
             save_path = path  # Default to the original path
-            if local_path.lower() in save_path.lower() and local_path.lower() != remote_path.lower():
+
+        # Handle remote path mapping
+        if local_path and remote_path and local_path.lower() != remote_path.lower():
+            # Normalize paths for comparison
+            norm_save_path = os.path.normpath(save_path).lower()
+            norm_local_path = os.path.normpath(local_path).lower()
+
+            # Check if the save_path starts with local_path
+            if norm_save_path.startswith(norm_local_path):
+                # Get the relative part of the path
+                rel_path = os.path.relpath(save_path, local_path)
+                # Combine remote path with relative path
+                save_path = os.path.join(remote_path, rel_path)
+
+            # For direct replacement if the above approach doesn't work
+            elif local_path.lower() in save_path.lower():
                 save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
-                save_path = save_path.replace(os.sep, '/')  # Normalize for remote systems
+
+        # Always normalize separators for qBittorrent (it expects forward slashes)
+        save_path = save_path.replace(os.sep, '/')
 
         # Ensure qBittorrent save path is formatted correctly
         if not save_path.endswith('/'):
             save_path += '/'
+
+        if meta['debug']:
+            console.print(f"[cyan]Original path: {path}")
+            console.print(f"[cyan]Mapped save path: {save_path}")
 
         # Automatic management
         auto_management = False

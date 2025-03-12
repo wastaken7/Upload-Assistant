@@ -444,8 +444,10 @@ config = {
             # on windows, symlinks needs admin privs, hardlinks need ntfs/refs filesytem (and same drive)
             # "linking": "symlink",
 
-            # a folder or list of folders to use for linking. when hardlinking, will attempt to drive match
-            # folder from this list with the path of content
+            # A folder or list of folders that will contain the linked content
+            # if using hardlinking, the linked folder must be on the same drive/volume as the original contnt,
+            # with UA mapping the correct location if multiple paths are specified.
+            # Use local paths, remote path mapping will be handled.
             # "linked_folder": ["D:\\MY_UA_LINKS", "E:\\MY_OTHER_UA_LINKS"]
 
 
