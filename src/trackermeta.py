@@ -225,11 +225,11 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             if ptp_torrent_id:
                 if imdb_id:
-                    meta['imdb_id'] = imdb_id
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{meta['imdb_id']}[/green]")
 
                 if not meta['unattended']:
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
+                        meta['imdb_id'] = imdb_id
                         found_match = True
                         meta['ptp'] = ptp_torrent_id
                         if only_id is not True:
@@ -247,10 +247,12 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
                     else:
                         found_match = False
-                        meta['imdb_id'] = 0
+                        meta['imdb_id'] = meta.get('imdb_id') if meta.get('imdb_id') else 0
+                        meta['ptp'] = None
 
                 else:
                     found_match = True
+                    meta['imdb_id'] = imdb_id
                     ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                     if ptp_desc and len(ptp_desc) > 0:
                         meta['description'] = ptp_desc
@@ -313,9 +315,6 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
             # Use search_filename function if ID is not found in meta
             imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
-
-            meta['imdb_id'] = imdb if imdb else meta.get('imdb_id')
-            meta['tvdb_id'] = tvdb_id if tvdb_id else meta.get('tvdb_id')
             meta['hdb_name'] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id
@@ -325,12 +324,14 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
                     if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
                         console.print(f"[green]{tracker_name} data retained.[/green]")
+                        meta['imdb_id'] = imdb if imdb else meta.get('imdb_id')
+                        meta['tvdb_id'] = tvdb_id if tvdb_id else meta.get('tvdb_id')
                         found_match = True
                     else:
                         console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
                         meta[tracker_key] = None
-                        meta['tvdb_id'] = 0
-                        meta['imdb_id'] = 0
+                        meta['tvdb_id'] = meta.get('tvdb_id') if meta.get('tvdb_id') else 0
+                        meta['imdb_id'] = meta.get('imdb_id') if meta.get('imdb_id') else 0
                         meta['hdb_name'] = None
                         found_match = False
                 else:
