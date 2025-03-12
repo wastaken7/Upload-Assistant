@@ -1,0 +1,75 @@
+name: Update mkbrr Binaries
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  update-mkbrr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Get Latest Release Tag
+        id: get_release
+        run: |
+          LATEST_TAG=$(curl -s https://api.github.com/repos/autobrr/mkbrr/releases/latest | jq -r .tag_name)
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      - name: Download Release Assets
+        run: |
+          mkdir -p bin/mkbrr
+          cd bin/mkbrr
+          
+          # Fetch latest release assets
+          assets=$(curl -s https://api.github.com/repos/autobrr/mkbrr/releases/latest | jq -r '.assets[].browser_download_url')
+          
+          for url in $assets; do
+            filename=$(basename $url)
+            echo "Downloading $filename..."
+            curl -L -O "$url"
+          done
+
+      - name: Extract & Organize Binaries
+        run: |
+          cd bin/mkbrr
+          mkdir -p windows/x86_64 macos/arm64 macos/x86_64 linux/amd64 linux/arm linux/arm64 linux/armv6 freebsd/x86_64
+
+          # Extract and move binaries to correct folders
+          for file in *; do
+            case "$file" in
+              *windows_x86_64.zip) unzip "$file" -d windows/x86_64 ;;
+              *darwin_arm64.tar.gz) tar -xzf "$file" -C macos/arm64 ;;
+              *darwin_x86_64.tar.gz) tar -xzf "$file" -C macos/x86_64 ;;
+              *freebsd_x86_64.tar.gz) tar -xzf "$file" -C freebsd/x86_64 ;;
+              *linux_amd64.tar.gz|*linux_x86_64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;
+              *linux_arm64.tar.gz) tar -xzf "$file" -C linux/arm64 ;;
+              *linux_armv6.tar.gz) tar -xzf "$file" -C linux/armv6 ;;
+              *linux_arm.tar.gz) tar -xzf "$file" -C linux/arm ;;
+              *.apk|*.deb|*.rpm|*.pkg.tar.zst) mv "$file" linux/amd64 ;;  # Move package files
+            esac
+          done
+          
+          # Ensure executables have correct permissions
+          find linux macos freebsd -type f -name "mkbrr" -exec chmod +x {} \;
+
+      - name: Cleanup Unneeded Files
+        run: |
+          cd bin/mkbrr
+          echo "Deleting unneeded archives and checksum files..."
+          
+          # Delete all archives & extracted source files
+          rm -f *.tar.gz *.zip *.apk *.deb *.rpm *.pkg.tar.zst *.txt
+
+          # Verify cleanup
+          echo "Remaining files in bin/mkbrr:"
+          ls -R
+
+      - name: Commit & Push Changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add bin/mkbrr
+          git commit -m "Updated mkbrr binaries to $LATEST_TAG" || echo "No changes to commit"
+          git push

@@ -10,6 +10,7 @@ import glob
 import time
 import subprocess
 import sys
+import platform
 from src.console import console
 
 
@@ -144,15 +145,15 @@ def create_torrent(meta, path, output_filename):
 
     # If using mkbrr, run the external application
     if meta.get('mkbrr'):
-        third_party_exe = os.path.join(meta['base_dir'], "bin", "mkbrr", "mkbrr.exe")
-        output_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"
-
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            cmd = ["mono", third_party_exe, "create", path, "-o", output_path]
-        else:
-            cmd = [third_party_exe, "create", path, "-o", output_path]
-
         try:
+            mkbrr_binary = get_mkbrr_path(meta)
+            output_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], f"{output_filename}.torrent")
+
+            # Ensure executable permission for non-Windows systems
+            if not sys.platform.startswith("win"):
+                os.chmod(mkbrr_binary, 0o755)
+
+            cmd = [mkbrr_binary, "create", path, "-o", output_path]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             total_pieces = 100  # Default to 100% for scaling progress
@@ -194,7 +195,7 @@ def create_torrent(meta, path, output_filename):
         meta=meta,
         path=path,
         trackers=["https://fake.tracker"],
-        source="Ausionut UA",
+        source="Audionut UA",
         private=True,
         exclude_globs=exclude or [],
         include_globs=include or [],
@@ -278,3 +279,38 @@ async def create_base_from_existing_torrent(torrentpath, base_dir, uuid):
         base_torrent.source = 'L4G'
         base_torrent.private = True
         Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
+
+
+def get_mkbrr_path(meta):
+    """Determine the correct mkbrr binary based on OS and architecture."""
+    base_dir = os.path.join(meta['base_dir'], "bin", "mkbrr")
+
+    # Detect OS & Architecture
+    system = platform.system().lower()
+    arch = platform.machine().lower()
+
+    if system == "windows":
+        binary_path = os.path.join(base_dir, "windows", "x86_64", "mkbrr.exe")
+    elif system == "darwin":
+        if "arm" in arch:
+            binary_path = os.path.join(base_dir, "macos", "arm64", "mkbrr")
+        else:
+            binary_path = os.path.join(base_dir, "macos", "x86_64", "mkbrr")
+    elif system == "linux":
+        if "x86_64" in arch:
+            binary_path = os.path.join(base_dir, "linux", "amd64", "mkbrr")
+        elif "armv6" in arch:
+            binary_path = os.path.join(base_dir, "linux", "armv6", "mkbrr")
+        elif "arm" in arch:
+            binary_path = os.path.join(base_dir, "linux", "arm", "mkbrr")
+        elif "aarch64" in arch or "arm64" in arch:
+            binary_path = os.path.join(base_dir, "linux", "arm64", "mkbrr")
+        else:
+            raise Exception("Unsupported Linux architecture")
+    else:
+        raise Exception("Unsupported OS")
+
+    if not os.path.exists(binary_path):
+        raise FileNotFoundError(f"mkbrr binary not found: {binary_path}")
+
+    return binary_path

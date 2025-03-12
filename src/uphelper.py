@@ -117,8 +117,8 @@ class UploadHelper:
             'distributor': "Disc Distributor e.g.(BFI, Criterion)"
         }
         missing = []
-        if meta.get('imdb_id', '0') == '0':
-            meta['imdb_id'] = '0'
+        if meta.get('imdb_id', 0) == 0:
+            meta['imdb_id'] = 0
             meta['potential_missing'].append('imdb_id')
         for each in meta['potential_missing']:
             if str(meta.get(each, '')).strip() in ["", "None", "0"]:

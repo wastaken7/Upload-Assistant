@@ -53,7 +53,7 @@ class RTF():
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
             'mediaInfo': re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump) if bd_dump is None else f"{bd_dump}",
             "nfo": "",
-            "url": "https://www.imdb.com/title/" + (meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + meta['imdb_id']) + "/",
+            "url": "https://www.imdb.com/title/" + (meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + str(meta['imdb_id'])) + "/",
             # auto pulled from IMDB
             "descr": "This is short description",
             "poster": meta["poster"] if meta["poster"] is not None else "",
@@ -112,7 +112,7 @@ class RTF():
         params = {'includingDead': '1'}
 
         if meta['imdb_id'] != 0:
-            params['imdbId'] = meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + meta['imdb_id']
+            params['imdbId'] = meta['imdb_id'] if str(meta['imdb_id']).startswith("tt") else "tt" + str(meta['imdb_id'])
         else:
             params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')
 
