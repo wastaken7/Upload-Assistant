@@ -25,6 +25,7 @@ from src.torrentcreate import create_torrent, create_random_torrents, create_bas
 from src.uphelper import UploadHelper
 from src.trackerstatus import process_all_trackers
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+from src.cleanup import cleanup
 if os.name == "posix":
     import termios
 
@@ -514,62 +515,6 @@ def check_python_version():
         sys.exit(1)
 
 
-async def cleanup():
-    """Ensure all running tasks and subprocesses are properly cleaned up before exiting."""
-    console.print("[yellow]Cleaning up tasks before exiting...[/yellow]")
-
-    # Terminate all tracked subprocesses
-    while running_subprocesses:
-        proc = running_subprocesses.pop()
-        if proc.returncode is None:  # If still running
-            console.print(f"[yellow]Terminating subprocess {proc.pid}...[/yellow]")
-            proc.terminate()  # Send SIGTERM first
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=3)  # Wait for process to exit
-            except asyncio.TimeoutError:
-                console.print(f"[red]Subprocess {proc.pid} did not exit in time, force killing.[/red]")
-                proc.kill()  # Force kill if it doesn't exit
-
-        # Close process streams safely
-        if proc.stdout:
-            try:
-                proc.stdout.close()
-            except Exception:
-                pass
-        if proc.stderr:
-            try:
-                proc.stderr.close()
-            except Exception:
-                pass
-        if proc.stdin:
-            try:
-                proc.stdin.close()
-            except Exception:
-                pass
-
-    # Give some time for subprocess transport cleanup
-    await asyncio.sleep(0.1)
-
-    # Cancel all running asyncio tasks **gracefully**
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    console.print(f"[yellow]Cancelling {len(tasks)} remaining tasks...[/yellow]")
-
-    for task in tasks:
-        task.cancel()
-
-    # Stage 1: Give tasks a moment to cancel themselves
-    await asyncio.sleep(0.1)  # Ensures task loop unwinds properly
-
-    # Stage 2: Gather tasks with exception handling
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for result in results:
-        if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
-            console.print(f"[red]Error during cleanup: {result}[/red]")
-
-    console.print("[green]Cleanup completed. Exiting safely.[/green]")
-
-
 async def main():
     try:
         await do_the_thing(base_dir)  # Ensure base_dir is correctly defined
@@ -598,5 +543,6 @@ if __name__ == "__main__":
     except BaseException as e:
         console.print(f"[bold red]Critical error: {e}[/bold red]")
     finally:
+        asyncio.run(cleanup())
         reset_terminal()
         sys.exit(0)
