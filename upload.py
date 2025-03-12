@@ -199,8 +199,9 @@ async def process_meta(meta, base_dir):
             await cleanup_screenshot_temp_files(meta)
         finally:
             await asyncio.sleep(0.1)
-            reset_terminal()
+            await cleanup()
             gc.collect()
+            reset_terminal()
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
