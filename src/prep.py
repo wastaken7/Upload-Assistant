@@ -352,13 +352,86 @@ class Prep():
                 console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
                 meta['imdb_info'] = {}
 
+        # Check if both IMDb and TMDb IDs are present next
+        elif int(meta['imdb_id']) != 0 and int(meta['tmdb_id']) != 0:
+            # Create a list of coroutines to run concurrently
+            coroutines = [
+                tmdb_other_meta(
+                    tmdb_id=meta['tmdb_id'],
+                    path=meta.get('path'),
+                    search_year=meta.get('search_year'),
+                    category=meta.get('category'),
+                    imdb_id=meta.get('imdb_id', 0),
+                    manual_language=meta.get('manual_language'),
+                    anime=meta.get('anime', False),
+                    mal_manual=meta.get('mal_manual'),
+                    aka=meta.get('aka', ''),
+                    original_language=meta.get('original_language'),
+                    poster=meta.get('poster'),
+                    debug=meta.get('debug', False),
+                    mode=meta.get('mode', 'discord'),
+                    tvdb_id=meta.get('tvdb_id', 0)
+                ),
+                get_imdb_info_api(
+                    meta['imdb_id'],
+                    manual_language=meta.get('manual_language'),
+                    debug=meta.get('debug', False)
+                )
+            ]
+
+            # Add TVMaze search if it's a TV category
+            if meta['category'] == 'TV':
+                coroutines.append(
+                    search_tvmaze(
+                        filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tvdb_id', 0),
+                        manual_date=meta.get('manual_date'),
+                        tvmaze_manual=meta.get('tvmaze_manual'),
+                        debug=meta.get('debug', False),
+                        return_full_tuple=False
+                    )
+                )
+
+            # Gather results
+            results = await asyncio.gather(*coroutines, return_exceptions=True)
+
+            # Process the results
+            tmdb_metadata = results[0] if not isinstance(results[0], Exception) else {}
+            imdb_info_result = results[1]
+
+            # Update meta with TMDB metadata
+            if tmdb_metadata:
+                meta.update(tmdb_metadata)
+
+            # Process IMDb info
+            if isinstance(imdb_info_result, dict):
+                meta['imdb_info'] = imdb_info_result
+                meta['tv_year'] = imdb_info_result.get('tv_year', None)
+            elif isinstance(imdb_info_result, Exception):
+                console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
+                meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
+            else:
+                console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
+                meta['imdb_info'] = {}
+
+            # Process TVMaze results if it was included
+            if meta['category'] == 'TV' and len(results) > 2:
+                tvmaze_result = results[2]
+                if isinstance(tvmaze_result, int):
+                    meta['tvmaze_id'] = tvmaze_result
+                elif isinstance(tvmaze_result, Exception):
+                    console.print(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
+                    meta['tvmaze_id'] = 0  # Set default value if an exception occurred
+
+        console.print("TMDB ID:", meta.get("tmdb_id"), "IMDB ID:", meta.get("imdb_id"), "TVDB ID:", meta.get("tvdb_id"), "TVMaze ID:", meta.get("tvmaze_id"))
         # Get TMDB and IMDb metadata only if IDs are still missing
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
+            console.print("Fetching TMDB ID...")
             meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(
                 mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id']
             )
 
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
+            console.print("Fetching TMDB ID from filename...")
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
         elif meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
             category, tmdb_id, original_language = await get_tmdb_from_imdb(
@@ -376,7 +449,32 @@ class Prep():
 
         # Fetch TMDB metadata if available
         if int(meta['tmdb_id']) != 0:
-            meta = await tmdb_other_meta(meta)
+            # Check if essential TMDB metadata is already populated
+            essential_fields = ['title', 'year', 'genres', 'overview']
+            tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
+
+            if not tmdb_metadata_populated:
+                console.print("Fetching TMDB metadata...")
+                # Extract only the needed parameters
+                tmdb_metadata = await tmdb_other_meta(
+                    tmdb_id=meta['tmdb_id'],
+                    path=meta.get('path'),
+                    search_year=meta.get('search_year'),
+                    category=meta.get('category'),
+                    imdb_id=meta.get('imdb_id', 0),
+                    manual_language=meta.get('manual_language'),
+                    anime=meta.get('anime', False),
+                    mal_manual=meta.get('mal_manual'),
+                    aka=meta.get('aka', ''),
+                    original_language=meta.get('original_language'),
+                    poster=meta.get('poster'),
+                    debug=meta.get('debug', False),
+                    mode=meta.get('mode', 'cli'),
+                    tvdb_id=meta.get('tvdb_id', 0)
+                )
+
+                # Update meta with return values from tmdb_other_meta
+                meta.update(tmdb_metadata)
 
         # Search TVMaze only if it's a TV category and tvmaze_id is still missing
         if meta['category'] == "TV":
