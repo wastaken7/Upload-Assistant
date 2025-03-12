@@ -201,16 +201,44 @@ class Prep():
 
         client = Clients(config=config)
         only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
+
+        # Ensure all manual IDs have proper default values
         meta['tmdb_manual'] = meta.get('tmdb_manual') or 0
-        meta['tmdb_id'] = meta.get('tmdb_manual')
         meta['imdb_manual'] = meta.get('imdb_manual') or 0
-        meta['imdb_id'] = meta.get('imdb_manual')
-        if str(meta.get('imdb_id', '')).startswith('tt'):
-            meta['imdb_id'] = meta['imdb_id'][2:]
         meta['mal_manual'] = meta.get('mal_manual') or 0
-        meta['mal_id'] = meta.get('mal_manual')
         meta['tvdb_manual'] = meta.get('tvdb_manual') or 0
-        meta['tvdb_id'] = meta.get('tvdb_manual')
+
+        # Set tmdb_id
+        try:
+            meta['tmdb_id'] = int(meta['tmdb_manual'])
+        except (ValueError, TypeError):
+            meta['tmdb_id'] = 0
+
+        # Set imdb_id with proper handling for 'tt' prefix
+        try:
+            imdb_value = meta['imdb_manual']
+            if imdb_value:
+                if str(imdb_value).startswith('tt'):
+                    meta['imdb_id'] = int(str(imdb_value)[2:])
+                else:
+                    meta['imdb_id'] = int(imdb_value)
+            else:
+                meta['imdb_id'] = 0
+        except (ValueError, TypeError):
+            meta['imdb_id'] = 0
+
+        # Set mal_id
+        try:
+            meta['mal_id'] = int(meta['mal_manual'])
+        except (ValueError, TypeError):
+            meta['mal_id'] = 0
+
+        # Set tvdb_id
+        try:
+            meta['tvdb_id'] = int(meta['tvdb_manual'])
+        except (ValueError, TypeError):
+            meta['tvdb_id'] = 0
+
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list') and not meta.get('edit', False):
