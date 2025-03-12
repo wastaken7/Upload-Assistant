@@ -521,7 +521,7 @@ class Clients():
         if use_symlink and not link_target and linked_folder:
             link_target = linked_folder[0]
 
-        if not link_target:
+        if (use_symlink or use_hardlink) and not link_target:
             error_msg = f"No suitable linked folder found for drive {src_drive}"
             console.print(f"[bold red]{error_msg}")
             raise ValueError(error_msg)
