@@ -295,10 +295,10 @@ class Prep():
         if meta['debug']:
             console.print("ID inputs into prep")
             console.print("category:", meta.get("category"))
-            console.print(f"Raw TVDB ID: {repr(meta['tvdb_id'])}")
-            console.print(f"Raw IMDb ID: {repr(meta['imdb_id'])}")
-            console.print(f"Raw TMDb ID: {repr(meta['tmdb_id'])}")
-            console.print(f"Raw MAL ID: {repr(meta['mal_id'])}")
+            console.print(f"Raw TVDB ID: {meta['tvdb_id']} (type: {type(meta['tvdb_id']).__name__})")
+            console.print(f"Raw IMDb ID: {meta['imdb_id']} (type: {type(meta['imdb_id']).__name__})")
+            console.print(f"Raw TMDb ID: {meta['tmdb_id']} (type: {type(meta['tmdb_id']).__name__})")
+            console.print(f"Raw MAL ID: {meta['mal_id']} (type: {type(meta['mal_id']).__name__})")
         console.print("[yellow]Building meta data.....")
         if meta['debug']:
             meta_start_time = time.time()
