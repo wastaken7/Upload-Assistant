@@ -4,22 +4,34 @@ import json
 
 
 async def search_tvmaze(filename, year, imdbID, tvdbID, meta):
+    # Convert tvdbID to integer
     try:
-        tvdbID = int(tvdbID) if tvdbID is not None else 0
+        tvdbID = int(tvdbID) if tvdbID not in (None, '', '0') else 0
     except ValueError:
         print(f"Error: tvdbID is not a valid integer. Received: {tvdbID}")
         tvdbID = 0
+
+    # Convert imdbID to integer (remove 'tt' prefix if present)
     try:
-        imdbID = f"{imdbID:07d}" if imdbID is not None else 0
+        if isinstance(imdbID, str) and imdbID.startswith('tt'):
+            imdbID = int(imdbID[2:])
+        else:
+            imdbID = int(imdbID) if imdbID not in (None, '', '0') else 0
     except ValueError:
-        print(f"Error: tvdbID is not a valid integer. Received: {imdbID}")
+        print(f"Error: imdbID is not a valid integer. Received: {imdbID}")
         imdbID = 0
 
+    # Initialize tvmazeID
+    tvmazeID = 0
+
     if meta.get('tvmaze_manual'):
-        tvmazeID = int(meta['tvmaze_manual'])
+        try:
+            tvmazeID = int(meta['tvmaze_manual'])
+        except ValueError:
+            print(f"Error: manual tvmaze_id is not a valid integer. Received: {meta['tvmaze_manual']}")
+            tvmazeID = 0
         return tvmazeID, imdbID, tvdbID
     else:
-        tvmazeID = 0
         results = []
 
         if meta['manual_date'] is None:
@@ -66,7 +78,8 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, meta):
         if not results:
             if meta['debug']:
                 print("No results found.")
-            return tvmazeID, imdbID, tvdbID
+            # Ensure we return integers
+            return int(tvmazeID), int(imdbID), int(tvdbID)
 
         if meta['manual_date'] is not None:
             print("Search results:")
@@ -83,7 +96,7 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, meta):
                         break
                     if 1 <= choice <= len(results):
                         selected_show = results[choice - 1]
-                        tvmazeID = selected_show['id']
+                        tvmazeID = int(selected_show['id'])
                         print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
                         break
                     else:
@@ -92,13 +105,15 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, meta):
                     print("Invalid input. Please enter a number.")
         else:
             selected_show = results[0]
-            tvmazeID = selected_show['id']
+            tvmazeID = int(selected_show['id'])
             if meta['debug']:
                 print(f"Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
 
         if meta['debug']:
             print(f"Returning results - TVmaze ID: {tvmazeID}, IMDb ID: {imdbID}, TVDB ID: {tvdbID}")
-        return tvmazeID, imdbID, tvdbID
+
+        # Final safeguard to ensure we return integers
+        return int(tvmazeID), int(imdbID), int(tvdbID)
 
 
 async def _make_tvmaze_request(url, params, meta):
