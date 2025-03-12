@@ -395,7 +395,21 @@ class Prep():
             results = await asyncio.gather(*coroutines, return_exceptions=True)
 
             # Process the results
-            tmdb_metadata = results[0] if not isinstance(results[0], Exception) else {}
+            if isinstance(results[0], Exception):
+                error_msg = f"TMDB metadata retrieval failed: {str(results[0])}"
+                console.print(f"[bold red]{error_msg}[/bold red]")
+                raise RuntimeError(error_msg)
+            elif not results[0]:  # Check if the result is empty (empty dict)
+                error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta['tmdb_id']}"
+                console.print(f"[bold red]{error_msg}[/bold red]")
+                raise ValueError(error_msg)
+            else:
+                tmdb_metadata = results[0]
+
+            # Update meta with TMDB metadata
+            if tmdb_metadata:
+                meta.update(tmdb_metadata)
+
             imdb_info_result = results[1]
 
             # Update meta with TMDB metadata
@@ -422,7 +436,6 @@ class Prep():
                     console.print(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
                     meta['tvmaze_id'] = 0  # Set default value if an exception occurred
 
-        console.print("TMDB ID:", meta.get("tmdb_id"), "IMDB ID:", meta.get("imdb_id"), "TVDB ID:", meta.get("tvdb_id"), "TVMaze ID:", meta.get("tvmaze_id"))
         # Get TMDB and IMDb metadata only if IDs are still missing
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             console.print("Fetching TMDB ID...")
@@ -455,26 +468,38 @@ class Prep():
 
             if not tmdb_metadata_populated:
                 console.print("Fetching TMDB metadata...")
-                # Extract only the needed parameters
-                tmdb_metadata = await tmdb_other_meta(
-                    tmdb_id=meta['tmdb_id'],
-                    path=meta.get('path'),
-                    search_year=meta.get('search_year'),
-                    category=meta.get('category'),
-                    imdb_id=meta.get('imdb_id', 0),
-                    manual_language=meta.get('manual_language'),
-                    anime=meta.get('anime', False),
-                    mal_manual=meta.get('mal_manual'),
-                    aka=meta.get('aka', ''),
-                    original_language=meta.get('original_language'),
-                    poster=meta.get('poster'),
-                    debug=meta.get('debug', False),
-                    mode=meta.get('mode', 'cli'),
-                    tvdb_id=meta.get('tvdb_id', 0)
-                )
+                try:
+                    # Extract only the needed parameters
+                    tmdb_metadata = await tmdb_other_meta(
+                        tmdb_id=meta['tmdb_id'],
+                        path=meta.get('path'),
+                        search_year=meta.get('search_year'),
+                        category=meta.get('category'),
+                        imdb_id=meta.get('imdb_id', 0),
+                        manual_language=meta.get('manual_language'),
+                        anime=meta.get('anime', False),
+                        mal_manual=meta.get('mal_manual'),
+                        aka=meta.get('aka', ''),
+                        original_language=meta.get('original_language'),
+                        poster=meta.get('poster'),
+                        debug=meta.get('debug', False),
+                        mode=meta.get('mode', 'cli'),
+                        tvdb_id=meta.get('tvdb_id', 0)
+                    )
 
-                # Update meta with return values from tmdb_other_meta
-                meta.update(tmdb_metadata)
+                    # Check if the metadata is empty or missing essential fields
+                    if not tmdb_metadata or not all(tmdb_metadata.get(field) for field in ['title', 'year']):
+                        error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta['tmdb_id']}"
+                        console.print(f"[bold red]{error_msg}[/bold red]")
+                        raise ValueError(error_msg)
+
+                    # Update meta with return values from tmdb_other_meta
+                    meta.update(tmdb_metadata)
+
+                except Exception as e:
+                    error_msg = f"TMDB metadata retrieval failed for ID {meta['tmdb_id']}: {str(e)}"
+                    console.print(f"[bold red]{error_msg}[/bold red]")
+                    raise RuntimeError(error_msg) from e
 
         # Search TVMaze only if it's a TV category and tvmaze_id is still missing
         if meta['category'] == "TV":
