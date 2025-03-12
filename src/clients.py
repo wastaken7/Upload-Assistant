@@ -474,10 +474,18 @@ class Clients():
             if len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
-        src = meta.get('path')
+        # Get the appropriate source path
+        if len(meta['filelist']) == 1 and os.path.isfile(meta['filelist'][0]) and not meta.get('keep_folder'):
+            # If there's a single file and not keep_folder, use the file itself as the source
+            src = meta['filelist'][0]
+        else:
+            # Otherwise, use the directory
+            src = meta.get('path')
+
         if not src:
-            console.print("[red]No source path found in meta. Skipping linking.")
-            return
+            error_msg = "[red]No source path found in meta."
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
 
         # Determine linking method
         linking_method = client.get('linking', None)  # "symlink", "hardlink", or None
@@ -487,8 +495,9 @@ class Clients():
         use_hardlink = linking_method == "hardlink"
 
         if use_symlink and use_hardlink:
-            console.print("[red]Cannot use both hard links and symlinks. Choose one.")
-            return
+            error_msg = "Cannot use both hard links and symlinks simultaneously"
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
 
         # Get linked folder for this drive
         linked_folder = client.get('linked_folder', [])
@@ -498,18 +507,24 @@ class Clients():
             linked_folder = [linked_folder]  # Convert to list if single value
 
         # Determine drive letter (Windows) or root (Linux)
-        drive_letter = os.path.splitdrive(src)[0] if platform.system() == "Windows" else "/"
+        src_drive = os.path.splitdrive(src)[0] if platform.system() == "Windows" else "/"
 
         # Find a linked folder that matches the drive
         link_target = None
         for folder in linked_folder:
-            if folder.startswith(drive_letter):
+            folder_drive = os.path.splitdrive(folder)[0]
+            if folder_drive == src_drive:
                 link_target = folder
                 break
 
         # If using symlinks and no matching drive folder, allow any available one
-        if use_symlink and not link_target:
-            link_target = linked_folder[0] if linked_folder else None
+        if use_symlink and not link_target and linked_folder:
+            link_target = linked_folder[0]
+
+        if not link_target:
+            error_msg = f"No suitable linked folder found for drive {src_drive}"
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
 
         # Create tracker-specific directory inside linked folder
         tracker_dir = os.path.join(link_target, tracker)
@@ -517,6 +532,7 @@ class Clients():
 
         if meta['debug']:
             console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
+            console.print(f"[cyan]Source path: {src}")
 
         # Extract only the folder or file name from `src`
         src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
@@ -528,11 +544,46 @@ class Clients():
         else:
             if use_hardlink:
                 try:
-                    os.link(src, dst)
-                    if meta['debug']:
-                        console.print(f"[green]Hard link created: {dst} -> {src}")
+                    # Check if we're linking a file or directory
+                    if os.path.isfile(src):
+                        # For a single file, create a hardlink directly
+                        os.link(src, dst)
+                        if meta['debug']:
+                            console.print(f"[green]Hard link created: {dst} -> {src}")
+                    else:
+                        # For directories, we need to link each file inside
+                        console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
+                        os.makedirs(dst, exist_ok=True)
+
+                        for root, _, files in os.walk(src):
+                            # Get the relative path from source
+                            rel_path = os.path.relpath(root, src)
+
+                            # Create corresponding directory in destination
+                            if rel_path != '.':
+                                dst_dir = os.path.join(dst, rel_path)
+                                os.makedirs(dst_dir, exist_ok=True)
+
+                            # Create hardlinks for each file
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
+                                try:
+                                    os.link(src_file, dst_file)
+                                    if meta['debug'] and files.index(file) == 0:
+                                        console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
+                                except OSError as e:
+                                    console.print(f"[red]Failed to create hard link for file {file}: {e}")
+
+                        if meta['debug']:
+                            console.print(f"[green]Directory structure and files linked: {dst}")
                 except OSError as e:
-                    console.print(f"[red]Failed to create hard link: {e}")
+                    error_msg = f"Failed to create hard link: {e}"
+                    console.print(f"[bold red]{error_msg}")
+                    if meta['debug']:
+                        console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                        console.print(f"[yellow]Destination: {dst}")
+                    raise OSError(error_msg)
 
             elif use_symlink:
                 try:
@@ -545,7 +596,9 @@ class Clients():
                         console.print(f"[green]Symbolic link created: {dst} -> {src}")
 
                 except OSError as e:
-                    console.print(f"[red]Failed to create symlink: {e}")
+                    error_msg = f"Failed to create symlink: {e}"
+                    console.print(f"[bold red]{error_msg}")
+                    raise OSError(error_msg)
 
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
