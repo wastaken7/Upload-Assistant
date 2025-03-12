@@ -555,8 +555,8 @@ class Prep():
             meta['tv_year'] = imdb_info.get('tv_year', None)
 
         aka = meta.get('imdb_info', {}).get('aka', "").strip()
-        title = meta.get('title', "").strip().lower()
-        year = str(meta.get('year', ""))
+        title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+        year = str(meta.get('imdb_info', {}).get('year', ""))
 
         if aka:
             aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
