@@ -309,6 +309,7 @@ class Prep():
             meta['category'] = await self.get_cat(video)
         else:
             meta['category'] = meta['category'].upper()
+
         # Check if both IMDb and TVDB IDs are present first
         if int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0:
             results = await asyncio.gather(

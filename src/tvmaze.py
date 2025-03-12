@@ -9,22 +9,34 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
     - If `return_full_tuple=True`, returns `(tvmaze_id, imdbID, tvdbID)`.
     - Otherwise, only returns `tvmaze_id`.
     """
+    # Convert TVDB ID to integer
     try:
-        tvdbID = int(tvdbID) if tvdbID is not None else 0
+        tvdbID = int(tvdbID) if tvdbID not in (None, '', '0') else 0
     except ValueError:
-        print(f"Error: tvdbID is not a valid integer. Received: {tvdbID}")
+        console.print(f"[red]Error: tvdbID is not a valid integer. Received: {tvdbID}[/red]")
         tvdbID = 0
+
+    # Handle IMDb ID - ensure it's an integer without tt prefix
     try:
-        imdbID = f"{imdbID:07d}" if imdbID is not None else 0
+        if isinstance(imdbID, str) and imdbID.startswith('tt'):
+            imdbID = int(imdbID[2:])
+        else:
+            imdbID = int(imdbID) if imdbID not in (None, '', '0') else 0
     except ValueError:
-        print(f"Error: imdbID is not a valid integer. Received: {imdbID}")
+        console.print(f"[red]Error: imdbID is not a valid integer. Received: {imdbID}[/red]")
         imdbID = 0
 
     # If manual selection has been provided, return it directly
     if tvmaze_manual:
-        return (int(tvmaze_manual), imdbID, tvdbID) if return_full_tuple else int(tvmaze_manual)
+        try:
+            tvmaze_id = int(tvmaze_manual)
+            return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
+        except (ValueError, TypeError):
+            console.print(f"[red]Error: tvmaze_manual is not a valid integer. Received: {tvmaze_manual}[/red]")
+            tvmaze_id = 0
+            return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
-    tvmazeID = 0
+    tvmaze_id = 0
     results = []
 
     async def fetch_tvmaze_data(url, params):
@@ -40,7 +52,7 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
             results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}))
 
         if not results and imdbID:
-            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"}))
+            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID:07d}"}))
 
         if not results:
             search_resp = await fetch_tvmaze_data("https://api.tvmaze.com/search/shows", {"q": filename})
@@ -50,7 +62,7 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
             results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}))
 
         if imdbID:
-            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID}"}))
+            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID:07d}"}))
 
         search_resp = await fetch_tvmaze_data("https://api.tvmaze.com/search/shows", {"q": filename})
         results.extend([each['show'] for each in search_resp if 'show' in each])
@@ -61,12 +73,12 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
 
     if not unique_results:
         if debug:
-            print("No results found.")
-        return (tvmazeID, imdbID, tvdbID) if return_full_tuple else tvmazeID
+            console.print("[yellow]No TVMaze results found.[/yellow]")
+        return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
     # Manual selection process
     if manual_date is not None:
-        print("Search results:")
+        console.print("[bold]Search results:[/bold]")
         for idx, show in enumerate(unique_results):
             console.print(f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])")
             console.print(f"[yellow]   Premiered: {show.get('premiered', 'Unknown')}[/yellow]")
@@ -76,26 +88,27 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
             try:
                 choice = int(input(f"Enter the number of the correct show (1-{len(unique_results)}) or 0 to skip: "))
                 if choice == 0:
-                    print("Skipping selection.")
+                    console.print("Skipping selection.")
                     break
                 if 1 <= choice <= len(unique_results):
                     selected_show = unique_results[choice - 1]
-                    tvmazeID = selected_show['id']
-                    print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+                    tvmaze_id = int(selected_show['id'])
+                    console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
                     break
                 else:
-                    print(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
+                    console.print(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
             except ValueError:
-                print("Invalid input. Please enter a number.")
+                console.print("Invalid input. Please enter a number.")
     else:
         selected_show = unique_results[0]
-        tvmazeID = selected_show['id']
+        tvmaze_id = int(selected_show['id'])
         if debug:
-            print(f"Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmazeID})")
+            console.print(f"[cyan]Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})[/cyan]")
 
     if debug:
-        print(f"Returning TVmaze ID: {tvmazeID}, IMDb ID: {imdbID}, TVDB ID: {tvdbID}")
-    return (tvmazeID, imdbID, tvdbID) if return_full_tuple else tvmazeID
+        console.print(f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__}), IMDb ID: {imdbID} (type: {type(imdbID).__name__}), TVDB ID: {tvdbID} (type: {type(tvdbID).__name__})[/cyan]")
+
+    return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
 
 async def _make_tvmaze_request(url, params):
