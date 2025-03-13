@@ -352,8 +352,7 @@ async def get_anime(response, meta):
 
 
 async def get_romaji(tmdb_name, mal):
-    if mal is None:
-        mal = 0
+    if mal is None or mal == 0:
         tmdb_name = tmdb_name.replace('-', "").replace("The Movie", "")
         tmdb_name = ' '.join(tmdb_name.split())
         query = '''

@@ -57,6 +57,8 @@ class BHD():
         else:
             anon = 1
 
+        imdb_id = str(meta['imdb_id']).zfill(7)
+
         if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8')
         else:
@@ -76,7 +78,7 @@ class BHD():
             'category_id': cat_id,
             'type': type_id,
             'source': source_id,
-            'imdb_id': meta['imdb_id'],
+            'imdb_id': imdb_id,
             'tmdb_id': meta['tmdb'],
             'description': desc,
             'anon': anon,
