@@ -241,6 +241,9 @@ class Prep():
         except (ValueError, TypeError):
             meta['tvdb_id'] = 0
 
+        if meta.get('category', None) is not None:
+            meta['category'] = meta['category'].upper()
+
         if meta.get('infohash') is not None:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list') and not meta.get('edit', False):
@@ -554,20 +557,20 @@ class Prep():
             meta['imdb_info'] = imdb_info
             meta['tv_year'] = imdb_info.get('tv_year', None)
 
-        aka = meta.get('imdb_info', {}).get('aka', "").strip()
-        title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-        year = str(meta.get('imdb_info', {}).get('year', ""))
+            aka = meta.get('imdb_info', {}).get('aka', "").strip()
+            title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+            year = str(meta.get('imdb_info', {}).get('year', ""))
 
-        if aka:
-            aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
-            difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-            if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                aka = ""
+            if aka:
+                aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
+                difference = SequenceMatcher(None, title, aka_trimmed).ratio()
+                if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
+                    aka = ""
 
-            if f"({year})" in aka:
-                aka = aka.replace(f"({year})", "").strip()
+                if f"({year})" in aka:
+                    aka = aka.replace(f"({year})", "").strip()
 
-            meta['aka'] = aka
+                meta['aka'] = aka
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
