@@ -259,6 +259,24 @@ async def tmdb_other_meta(
     """
     tmdb_metadata = {}
 
+    # Initialize variables that might not be set in all code paths
+    retrieved_aka = ""
+    year = None
+    title = None
+    youtube = None
+    overview = ""
+    genres = ""
+    keywords = ""
+    directors = []
+    original_title = ""
+    runtime = 60
+    certification = ""
+    backdrop = ""
+    poster_path = ""
+    tmdb_type = ""
+    mal_id = 0
+    demographic = ""
+
     if tmdb_id == 0:
         try:
             title = guessit(path, {"excludes": ["country", "language"]})['title'].lower()
