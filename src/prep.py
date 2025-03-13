@@ -637,7 +637,7 @@ class Prep():
             imdb_str = str(meta['imdb_id']).zfill(7)
             meta['imdb'] = imdb_str
         else:
-            meta['imdb'] = 0
+            meta['imdb'] = '0'
         meta['mal'] = meta.get('mal_id')
         meta['tvdb'] = meta.get('tvdb_id')
 
