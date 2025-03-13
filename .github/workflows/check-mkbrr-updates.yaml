@@ -1,0 +1,29 @@
+name: Check for New mkbrr Release
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"  # Runs every Monday at 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Latest Release Tag
+        id: get_release
+        run: |
+          LATEST_TAG=$(curl -s https://api.github.com/repos/autobrr/mkbrr/releases/latest | jq -r .tag_name)
+          echo "Latest mkbrr release: $LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      - name: Create GitHub Issue Notification
+        run: |
+          curl -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -d '{
+            "title": "New mkbrr Release Available!",
+            "body": "A new mkbrr release ('$LATEST_TAG') has been detected. Consider running the update workflow.",
+            "labels": ["mkbrr", "update"]
+          }' \
+          "https://api.github.com/repos/${{ github.repository }}/issues"
