@@ -141,10 +141,6 @@ class AITHER():
         name_type = meta.get('type', "")
         source = meta.get('source', "")
 
-        if name_type == "DVDRIP":
-            aither_name = aither_name.replace(f"{meta['source']}", f"{resolution} {meta['source']}", 1)
-            aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
-
         if not meta['is_disc']:
 
             def has_english_audio(tracks=None, media_info_text=None):
@@ -181,7 +177,12 @@ class AITHER():
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
 
-        if meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+        if name_type == "DVDRIP":
+            aither_name = aither_name.replace(f"{meta['source']}{meta['video_encode']}", f"{meta['source']}", 1)
+            aither_name = aither_name.replace(f"{meta['source']}", f"{resolution} {meta['source']}", 1)
+            aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+
+        elif meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
             aither_name = aither_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
             aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
 
