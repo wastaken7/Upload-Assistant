@@ -550,80 +550,81 @@ class Clients():
             console.print(f"[bold red]{error_msg}")
             raise ValueError(error_msg)
 
-        # Create tracker-specific directory inside linked folder
-        tracker_dir = os.path.join(link_target, tracker)
-        os.makedirs(tracker_dir, exist_ok=True)
+        if use_symlink or use_hardlink:
+            # Create tracker-specific directory inside linked folder
+            tracker_dir = os.path.join(link_target, tracker)
+            os.makedirs(tracker_dir, exist_ok=True)
 
-        if meta['debug']:
-            console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
-            console.print(f"[cyan]Source path: {src}")
-
-        # Extract only the folder or file name from `src`
-        src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
-        dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
-
-        # path magic
-        if os.path.exists(dst) or os.path.islink(dst):
             if meta['debug']:
-                console.print(f"[yellow]Skipping linking, path already exists: {dst}")
-        else:
-            if use_hardlink:
-                try:
-                    # Check if we're linking a file or directory
-                    if os.path.isfile(src):
-                        # For a single file, create a hardlink directly
-                        os.link(src, dst)
+                console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
+                console.print(f"[cyan]Source path: {src}")
+
+            # Extract only the folder or file name from `src`
+            src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
+            dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
+
+            # path magic
+            if os.path.exists(dst) or os.path.islink(dst):
+                if meta['debug']:
+                    console.print(f"[yellow]Skipping linking, path already exists: {dst}")
+            else:
+                if use_hardlink:
+                    try:
+                        # Check if we're linking a file or directory
+                        if os.path.isfile(src):
+                            # For a single file, create a hardlink directly
+                            os.link(src, dst)
+                            if meta['debug']:
+                                console.print(f"[green]Hard link created: {dst} -> {src}")
+                        else:
+                            # For directories, we need to link each file inside
+                            console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
+                            os.makedirs(dst, exist_ok=True)
+
+                            for root, _, files in os.walk(src):
+                                # Get the relative path from source
+                                rel_path = os.path.relpath(root, src)
+
+                                # Create corresponding directory in destination
+                                if rel_path != '.':
+                                    dst_dir = os.path.join(dst, rel_path)
+                                    os.makedirs(dst_dir, exist_ok=True)
+
+                                # Create hardlinks for each file
+                                for file in files:
+                                    src_file = os.path.join(root, file)
+                                    dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
+                                    try:
+                                        os.link(src_file, dst_file)
+                                        if meta['debug'] and files.index(file) == 0:
+                                            console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
+                                    except OSError as e:
+                                        console.print(f"[red]Failed to create hard link for file {file}: {e}")
+
+                            if meta['debug']:
+                                console.print(f"[green]Directory structure and files linked: {dst}")
+                    except OSError as e:
+                        error_msg = f"Failed to create hard link: {e}"
+                        console.print(f"[bold red]{error_msg}")
                         if meta['debug']:
-                            console.print(f"[green]Hard link created: {dst} -> {src}")
-                    else:
-                        # For directories, we need to link each file inside
-                        console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
-                        os.makedirs(dst, exist_ok=True)
+                            console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                            console.print(f"[yellow]Destination: {dst}")
+                        raise OSError(error_msg)
 
-                        for root, _, files in os.walk(src):
-                            # Get the relative path from source
-                            rel_path = os.path.relpath(root, src)
-
-                            # Create corresponding directory in destination
-                            if rel_path != '.':
-                                dst_dir = os.path.join(dst, rel_path)
-                                os.makedirs(dst_dir, exist_ok=True)
-
-                            # Create hardlinks for each file
-                            for file in files:
-                                src_file = os.path.join(root, file)
-                                dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
-                                try:
-                                    os.link(src_file, dst_file)
-                                    if meta['debug'] and files.index(file) == 0:
-                                        console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
-                                except OSError as e:
-                                    console.print(f"[red]Failed to create hard link for file {file}: {e}")
+                elif use_symlink:
+                    try:
+                        if platform.system() == "Windows":
+                            os.symlink(src, dst, target_is_directory=os.path.isdir(src))
+                        else:
+                            os.symlink(src, dst)
 
                         if meta['debug']:
-                            console.print(f"[green]Directory structure and files linked: {dst}")
-                except OSError as e:
-                    error_msg = f"Failed to create hard link: {e}"
-                    console.print(f"[bold red]{error_msg}")
-                    if meta['debug']:
-                        console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
-                        console.print(f"[yellow]Destination: {dst}")
-                    raise OSError(error_msg)
+                            console.print(f"[green]Symbolic link created: {dst} -> {src}")
 
-            elif use_symlink:
-                try:
-                    if platform.system() == "Windows":
-                        os.symlink(src, dst, target_is_directory=os.path.isdir(src))
-                    else:
-                        os.symlink(src, dst)
-
-                    if meta['debug']:
-                        console.print(f"[green]Symbolic link created: {dst} -> {src}")
-
-                except OSError as e:
-                    error_msg = f"Failed to create symlink: {e}"
-                    console.print(f"[bold red]{error_msg}")
-                    raise OSError(error_msg)
+                    except OSError as e:
+                        error_msg = f"Failed to create symlink: {e}"
+                        console.print(f"[bold red]{error_msg}")
+                        raise OSError(error_msg)
 
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
