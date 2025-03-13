@@ -1,3 +1,31 @@
+__version__ = "4.0.0.2"
+
+"""
+Changelog for version 4.0.0.2 (2025-03-13):
+
+- two site files manually imported tmdbsimple.
+- fixed R4E by adding the want tmdb data from the main tmdb api call, which negates the need to make a needless api call when uploading to R4E, and will shave around 2 seconds from the time it takes to upload.
+- other site file will be fixed when I get around to dealing with that mess.
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.0.1...4.0.0.2
+
+## Version 4 release notes:
+## Breaking change
+* When using trackers argument,  or , you must now use a comma separated list.
+
+## Linking support in qBitTorrent
+### This is not fully tested. 
+It seems to be working fine on this windows box, but you absolutely should test with the  argument to make sure it works on your system before putting it into production.
+* You can specify to use symbolic or hard links
+* 
+* Add one or many (local) paths which you want to contain the links, and UA will map the correct drive/volume for hardlinks.
+
+## Reminder
+* UA has mkbrr support 
+* You can specify an argument  or set the config 
+* UA loads binary files for the supported mkbrr OS. If you find mkbrr slower than the original torf implementation when hashing torrents, the mkbrr devs are likely to be appreciative of any reports.
+"""
+
 __version__ = "4.0.0.1"
 
 """
