@@ -7,7 +7,7 @@ import requests
 import os
 import re
 from difflib import SequenceMatcher
-from src.tmdb import get_tmdb_id, tmdb_other_meta, daily_to_tmdb_season_episode, get_romaji
+from src.tmdb import get_tmdb_id, daily_to_tmdb_season_episode, get_romaji
 from src.exceptions import *  # noqa: F403
 
 
@@ -90,7 +90,7 @@ async def get_season_episode(video, meta):
             if meta.get('tmdb_id') == 0:
                 year = parsed.get('anime_year', str(seasonYear))
                 meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
-            meta = await tmdb_other_meta(meta)
+            # meta = await tmdb_other_meta(meta)
             if meta['category'] != "TV":
                 return meta
 
