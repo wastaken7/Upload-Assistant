@@ -100,7 +100,7 @@ class SN():
             'name': meta['name'],
             'category_id': cat_id,
             'type_id': sub_cat_id,
-            'media_ref': f"tt{meta['imdb_id']}",
+            'media_ref': f"tt{meta['imdb']}",
             'description': desc,
             'media_info': mi_dump
 
@@ -158,7 +158,7 @@ class SN():
             else:
                 params['filter'] = meta['title']
         else:
-            params['media_ref'] = f"tt{meta['imdb_id']}"
+            params['media_ref'] = f"tt{meta['imdb']}"
             if meta['category'] == 'TV':
                 params['filter'] = f"{meta.get('season', '')}"
             else:

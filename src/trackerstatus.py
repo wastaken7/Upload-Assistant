@@ -8,7 +8,6 @@ from data.config import config
 from src.trackers.COMMON import COMMON
 from src.clients import Clients
 from src.uphelper import UploadHelper
-from src.imdb import get_imdb_info_api
 from src.torrentcreate import create_base_from_existing_torrent
 import cli_ui
 import copy
@@ -49,19 +48,19 @@ async def process_all_trackers(meta):
                     ).strip()
 
                     if not imdb_id:
-                        meta['imdb_id'] = 0
+                        meta['imdb'] = '0'
                     else:
                         imdb_id = imdb_id.lower()
                         if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
-                            meta['imdb_id'] = imdb_id[2:].zfill(7)
+                            meta['imdb'] = imdb_id[2:].zfill(7)
                         else:
                             cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
-                            meta['imdb_id'] = 0
+                            meta['imdb'] = '0'
 
             if tracker_name == "PTP":
                 console.print("[yellow]Searching for Group ID on PTP")
                 ptp = PTP(config=config)
-                groupID = await ptp.get_group_by_imdb(local_meta['imdb_id'])
+                groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
                 if groupID is None:
                     console.print("[yellow]No Existing Group found")
                     if local_meta.get('youtube', None) is None or "youtube" not in str(local_meta.get('youtube', '')):
@@ -114,10 +113,6 @@ async def process_all_trackers(meta):
                                 if torrent.piece_size > 8388608:
                                     console.print("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
                                     local_tracker_status['skipped'] = True
-
-                if local_meta.get('skipping') is None and not local_tracker_status['dupe'] and tracker_name == "PTP":
-                    if local_meta.get('imdb_info', {}) == {}:
-                        meta['imdb_info'] = await get_imdb_info_api(local_meta['imdb_id'], local_meta)
 
                 we_already_asked = local_meta.get('we_asked', False)
 

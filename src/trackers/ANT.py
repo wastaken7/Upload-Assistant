@@ -152,10 +152,10 @@ class ANT():
             't': 'search',
             'o': 'json'
         }
-        if str(meta['tmdb']) != "0":
+        if str(meta['tmdb']) != 0:
             params['tmdb'] = meta['tmdb']
         elif int(meta['imdb_id']) != 0:
-            params['imdb'] = meta['imdb_id']
+            params['imdb'] = meta['imdb']
 
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:

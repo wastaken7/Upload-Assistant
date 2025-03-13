@@ -334,7 +334,7 @@ class HDB():
 
         # Add IMDb and TVDB IDs if available
         if int(meta.get('imdb_id')) != 0:
-            data['imdb'] = {'id': meta['imdb_id']}
+            data['imdb'] = {'id': meta['imdb']}
         if int(meta.get('tvdb_id')) != 0:
             data['tvdb'] = {'id': meta['tvdb_id']}
 

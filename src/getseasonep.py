@@ -7,7 +7,7 @@ import requests
 import os
 import re
 from difflib import SequenceMatcher
-from src.tmdb import get_tmdb_id, tmdb_other_meta, daily_to_tmdb_season_episode, get_romaji
+from src.tmdb import get_tmdb_id, daily_to_tmdb_season_episode, get_romaji
 from src.exceptions import *  # noqa: F403
 
 
@@ -81,112 +81,116 @@ async def get_season_episode(video, meta):
 
         else:
             # If Anime
-            parsed = anitopy.parse(Path(video).name)
-            romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal_id', 0))
-            if mal_id:
-                meta['mal_id'] = mal_id
-            if meta.get('mal_id') != 0:
-                mal_id = meta.get('mal_id')
-            if meta.get('tmdb_id') == 0:
-                year = parsed.get('anime_year', str(seasonYear))
-                meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
-            meta = await tmdb_other_meta(meta)
-            if meta['category'] != "TV":
-                return meta
+            # if the mal id is set, then we've already run get_romaji in tmdb.py
+            if meta.get('mal_id') == 0:
+                parsed = anitopy.parse(Path(video).name)
+                romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal_id', 0))
+                if mal_id:
+                    meta['mal_id'] = mal_id
+                if meta.get('mal_id') != 0:
+                    mal_id = meta.get('mal_id')
+                if meta.get('tmdb_id') == 0:
+                    year = parsed.get('anime_year', str(seasonYear))
+                    meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
+                # meta = await tmdb_other_meta(meta)
+                if meta['category'] != "TV":
+                    return meta
 
-            tag = parsed.get('release_group', "")
-            if tag != "":
-                meta['tag'] = f"-{tag}"
-            if len(filelist) == 1:
-                try:
-                    episodes = parsed.get('episode_number', guessit(video).get('episode', '1'))
-                    if not isinstance(episodes, list) and not episodes.isnumeric():
-                        episodes = guessit(video)['episode']
-                    if isinstance(episodes, list):
-                        episode_int = int(episodes[0])  # Always convert to integer
-                        episode = "".join([f"E{str(int(item)).zfill(2)}" for item in episodes])
-                    else:
-                        episode_int = int(episodes)  # Convert to integer
-                        episode = f"E{str(episode_int).zfill(2)}"
-                except Exception:
-                    episode = "E01"
-                    episode_int = 1  # Ensure it's an integer
-                    console.print('[bold yellow]There was an error guessing the episode number. Guessing E01. Use [bold green]--episode #[/bold green] to correct if needed')
-                    await asyncio.sleep(1.5)
-            else:
-                episode = ""
-                episode_int = 0  # Ensure it's an integer
-                meta['tv_pack'] = 1
-
-            try:
-                if meta.get('season_int'):
-                    season_int = int(meta.get('season_int'))  # Convert to integer
-                else:
-                    season = parsed.get('anime_season', guessit(video).get('season', '1'))
-                    season_int = int(season)  # Convert to integer
-                season = f"S{str(season_int).zfill(2)}"
-            except Exception:
-                try:
-                    if episode_int >= anilist_episodes:
-                        params = {
-                            'id': str(meta['tvdb_id']),
-                            'origin': 'tvdb',
-                            'absolute': str(episode_int),
-                        }
-                        url = "https://thexem.info/map/single"
-                        response = requests.post(url, params=params).json()
-                        if response['result'] == "failure":
-                            raise XEMNotFound  # noqa: F405
-                        if meta['debug']:
-                            console.log(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
-                        season_int = int(response['data']['scene']['season'])  # Convert to integer
-                        season = f"S{str(season_int).zfill(2)}"
-                        if len(filelist) == 1:
-                            episode_int = int(response['data']['scene']['episode'])  # Convert to integer
-                            episode = f"E{str(episode_int).zfill(2)}"
-                    else:
-                        season_int = 1  # Default to 1 if error occurs
-                        season = "S01"
-                        names_url = f"https://thexem.info/map/names?origin=tvdb&id={str(meta['tvdb_id'])}"
-                        names_response = requests.get(names_url).json()
-                        if meta['debug']:
-                            console.log(f'[cyan]Matching Season Number from TheXEM\n{names_response}')
-                        difference = 0
-                        if names_response['result'] == "success":
-                            for season_num, values in names_response['data'].items():
-                                for lang, names in values.items():
-                                    if lang == "jp":
-                                        for name in names:
-                                            romaji_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", romaji.lower().replace(' ', ''))
-                                            name_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", name.lower().replace(' ', ''))
-                                            diff = SequenceMatcher(None, romaji_check, name_check).ratio()
-                                            if romaji_check in name_check and diff >= difference:
-                                                season_int = int(season_num) if season_num != "all" else 1  # Convert to integer
-                                                season = f"S{str(season_int).zfill(2)}"
-                                                difference = diff
-                                    if lang == "us":
-                                        for name in names:
-                                            eng_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", eng_title.lower().replace(' ', ''))
-                                            name_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", name.lower().replace(' ', ''))
-                                            diff = SequenceMatcher(None, eng_check, name_check).ratio()
-                                            if eng_check in name_check and diff >= difference:
-                                                season_int = int(season_num) if season_num != "all" else 1  # Convert to integer
-                                                season = f"S{str(season_int).zfill(2)}"
-                                                difference = diff
-                        else:
-                            raise XEMNotFound  # noqa: F405
-                except Exception:
-                    if meta['debug']:
-                        console.print_exception()
+                tag = parsed.get('release_group', "")
+                if tag != "":
+                    meta['tag'] = f"-{tag}"
+                if len(filelist) == 1:
                     try:
-                        season = guessit(video).get('season', '1')
-                        season_int = int(season)  # Convert to integer
+                        episodes = parsed.get('episode_number', guessit(video).get('episode', '1'))
+                        if not isinstance(episodes, list) and not episodes.isnumeric():
+                            episodes = guessit(video)['episode']
+                        if isinstance(episodes, list):
+                            episode_int = int(episodes[0])  # Always convert to integer
+                            episode = "".join([f"E{str(int(item)).zfill(2)}" for item in episodes])
+                        else:
+                            episode_int = int(episodes)  # Convert to integer
+                            episode = f"E{str(episode_int).zfill(2)}"
                     except Exception:
-                        season_int = 1  # Default to 1 if error occurs
-                        season = "S01"
-                    console.print(f"[bold yellow]{meta['title']} does not exist on thexem, guessing {season}")
-                    console.print(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
-                    await asyncio.sleep(3)
+                        episode = "E01"
+                        episode_int = 1  # Ensure it's an integer
+                        console.print('[bold yellow]There was an error guessing the episode number. Guessing E01. Use [bold green]--episode #[/bold green] to correct if needed')
+                        await asyncio.sleep(1.5)
+                else:
+                    episode = ""
+                    episode_int = 0  # Ensure it's an integer
+                    meta['tv_pack'] = 1
+
+                try:
+                    if meta.get('season_int'):
+                        season_int = int(meta.get('season_int'))  # Convert to integer
+                    else:
+                        season = parsed.get('anime_season', guessit(video).get('season', '1'))
+                        season_int = int(season)  # Convert to integer
+                    season = f"S{str(season_int).zfill(2)}"
+                except Exception:
+                    try:
+                        if episode_int >= anilist_episodes:
+                            params = {
+                                'id': str(meta['tvdb_id']),
+                                'origin': 'tvdb',
+                                'absolute': str(episode_int),
+                            }
+                            url = "https://thexem.info/map/single"
+                            response = requests.post(url, params=params).json()
+                            if response['result'] == "failure":
+                                raise XEMNotFound  # noqa: F405
+                            if meta['debug']:
+                                console.log(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
+                            season_int = int(response['data']['scene']['season'])  # Convert to integer
+                            season = f"S{str(season_int).zfill(2)}"
+                            if len(filelist) == 1:
+                                episode_int = int(response['data']['scene']['episode'])  # Convert to integer
+                                episode = f"E{str(episode_int).zfill(2)}"
+                        else:
+                            season_int = 1  # Default to 1 if error occurs
+                            season = "S01"
+                            names_url = f"https://thexem.info/map/names?origin=tvdb&id={str(meta['tvdb_id'])}"
+                            names_response = requests.get(names_url).json()
+                            if meta['debug']:
+                                console.log(f'[cyan]Matching Season Number from TheXEM\n{names_response}')
+                            difference = 0
+                            if names_response['result'] == "success":
+                                for season_num, values in names_response['data'].items():
+                                    for lang, names in values.items():
+                                        if lang == "jp":
+                                            for name in names:
+                                                romaji_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", romaji.lower().replace(' ', ''))
+                                                name_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", name.lower().replace(' ', ''))
+                                                diff = SequenceMatcher(None, romaji_check, name_check).ratio()
+                                                if romaji_check in name_check and diff >= difference:
+                                                    season_int = int(season_num) if season_num != "all" else 1  # Convert to integer
+                                                    season = f"S{str(season_int).zfill(2)}"
+                                                    difference = diff
+                                        if lang == "us":
+                                            for name in names:
+                                                eng_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", eng_title.lower().replace(' ', ''))
+                                                name_check = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", name.lower().replace(' ', ''))
+                                                diff = SequenceMatcher(None, eng_check, name_check).ratio()
+                                                if eng_check in name_check and diff >= difference:
+                                                    season_int = int(season_num) if season_num != "all" else 1  # Convert to integer
+                                                    season = f"S{str(season_int).zfill(2)}"
+                                                    difference = diff
+                            else:
+                                raise XEMNotFound  # noqa: F405
+                    except Exception:
+                        if meta['debug']:
+                            console.print_exception()
+                        try:
+                            season = guessit(video).get('season', '1')
+                            season_int = int(season)  # Convert to integer
+                        except Exception:
+                            season_int = 1  # Default to 1 if error occurs
+                            season = "S01"
+                        console.print(f"[bold yellow]{meta['title']} does not exist on thexem, guessing {season}")
+                        console.print(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
+                        await asyncio.sleep(3)
+            else:
+                return meta
 
         if meta.get('manual_season', None) is None:
             meta['season'] = season

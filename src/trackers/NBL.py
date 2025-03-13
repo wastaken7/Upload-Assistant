@@ -95,7 +95,7 @@ class NBL():
         if int(meta.get('tvmaze_id', 0)) != 0:
             search_term = {'tvmaze': int(meta['tvmaze_id'])}
         elif int(meta.get('imdb_id')) != 0:
-            search_term = {'imdb': meta.get('imdb_id')}
+            search_term = {'imdb': meta.get('imdb')}
         else:
             search_term = {'series': meta['title']}
         payload = {

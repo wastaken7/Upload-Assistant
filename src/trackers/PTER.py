@@ -67,7 +67,7 @@ class PTER():
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
         cookies = await common.parseCookieFile(cookiefile)
-        imdb = f"tt{meta['imdb_id']}" if int(meta['imdb_id']) != 0 else ""
+        imdb = f"tt{meta['imdb']}" if int(meta['imdb_id']) != 0 else ""
         source = await self.get_type_medium_id(meta)
         search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
 

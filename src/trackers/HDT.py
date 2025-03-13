@@ -153,7 +153,7 @@ class HDT():
 
             # IMDB
             if int(meta.get('imdb_id')) != 0:
-                data['infosite'] = f"https://www.imdb.com/title/tt{meta['imdb_id']}/"
+                data['infosite'] = f"https://www.imdb.com/title/tt{meta['imdb']}/"
 
             # Full Season Pack
             if int(meta.get('tv_pack', '0')) != 0:
@@ -204,7 +204,7 @@ class HDT():
             search_url = f"{self.base_url}/torrents.php"
             csrfToken = await self.get_csrfToken(session, search_url)
             if int(meta['imdb_id']) != 0:
-                imdbID = f"tt{meta['imdb_id']}"
+                imdbID = f"tt{meta['imdb']}"
                 params = {
                     'csrfToken': csrfToken,
                     'search': imdbID,

@@ -78,7 +78,7 @@ class THR():
             'name': thr_name,
             'descr': desc,
             'type': cat_id,
-            'url': f"https://www.imdb.com/title/tt{meta.get('imdb_id')}/",
+            'url': f"https://www.imdb.com/title/tt{meta.get('imdb')}/",
             'tube': meta.get('youtube', '')
         }
         headers = {
@@ -190,7 +190,7 @@ class THR():
             desc.write(f"Category: {meta['category']}\n")
             desc.write(f"TMDB: https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}\n")
             if meta['imdb_id'] != 0:
-                desc.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb_id']}\n")
+                desc.write(f"IMDb: https://www.imdb.com/title/tt{meta['imdb']}\n")
             if meta['tvdb_id'] != 0:
                 desc.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
             desc.write("[/quote]")
