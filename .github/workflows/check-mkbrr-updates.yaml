@@ -17,7 +17,22 @@ jobs:
           echo "Latest mkbrr release: $LATEST_TAG"
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
+      - name: Check if Issue Already Exists
+        id: check_issue
+        run: |
+          ISSUE_EXISTS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=mkbrr" | \
+          jq -r --arg tag "New mkbrr Release Available! ($LATEST_TAG)" \
+          'map(select(.title == $tag)) | length')
+
+          if [[ "$ISSUE_EXISTS" -gt 0 ]]; then
+            echo "Issue already exists for release $LATEST_TAG (open or closed)."
+          else
+            echo "NEW_RELEASE=true" >> $GITHUB_ENV
+          fi
+
       - name: Create GitHub Issue Notification
+        if: env.NEW_RELEASE == 'true'
         run: |
           curl -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
