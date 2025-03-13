@@ -266,6 +266,7 @@ async def tmdb_other_meta(
     youtube = None
     overview = ""
     genres = ""
+    genre_ids = ""
     keywords = ""
     directors = []
     original_title = ""
@@ -402,7 +403,9 @@ async def tmdb_other_meta(
             keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in keywords_data.get('keywords', [])])
 
             # Get genres
-            genres = await get_genres(movie_data)
+            genres_data = await get_genres(movie_data)  # or tv_data
+            genres = genres_data['genre_names']
+            genre_ids = genres_data['genre_ids']
 
             # Get directors
             credits_resp = await client.get(
@@ -526,8 +529,9 @@ async def tmdb_other_meta(
             keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in keywords_data.get('results', [])])
 
             # Get genres
-            genres = await get_genres(tv_data)
-
+            genres_data = await get_genres(tv_data)
+            genres = genres_data['genre_names']
+            genre_ids = genres_data['genre_ids']
             # Get directors/creators
             credits_resp = await client.get(
                 f"{TMDB_BASE_URL}/tv/{tmdb_id}/credits",
@@ -582,6 +586,7 @@ async def tmdb_other_meta(
         'original_title': original_title,
         'keywords': keywords,
         'genres': genres,
+        'genre_ids': genre_ids,
         'tmdb_directors': directors,
         'mal_id': mal_id,
         'anime': anime,
@@ -626,10 +631,23 @@ async def get_genres(response_data):
     """Extract genres from TMDB response data"""
     if response_data is not None:
         tmdb_genres = response_data.get('genres', [])
+
         if tmdb_genres:
-            genres = [genre['name'].replace(',', ' ') for genre in tmdb_genres]
-            return ', '.join(genres)
-    return ''
+            # Extract genre names and IDs
+            genre_names = [genre['name'].replace(',', ' ') for genre in tmdb_genres]
+            genre_ids = [str(genre['id']) for genre in tmdb_genres]
+
+            # Create and return both strings
+            return {
+                'genre_names': ', '.join(genre_names),
+                'genre_ids': ', '.join(genre_ids)
+            }
+
+    # Return empty values if no genres found
+    return {
+        'genre_names': '',
+        'genre_ids': ''
+    }
 
 
 async def get_directors(tmdb_id, category):

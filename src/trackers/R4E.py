@@ -2,7 +2,6 @@
 # import discord
 import asyncio
 import requests
-import tmdbsimple as tmdb
 import platform
 import os
 import glob
@@ -104,23 +103,23 @@ class R4E():
         name = meta['name']
         return name
 
-    async def get_cat_id(self, category_name, tmdb_id):
-        if category_name == 'MOVIE':
-            movie = tmdb.Movies(tmdb_id)
-            movie_info = movie.info()
-            is_docu = self.is_docu(movie_info['genres'])
-            category_id = '70'  # Motorsports Movie
-            if is_docu:
-                category_id = '66'  # Documentary
-        elif category_name == 'TV':
-            tv = tmdb.TV(tmdb_id)
-            tv_info = tv.info()
-            is_docu = self.is_docu(tv_info['genres'])
-            category_id = '79'  # TV Series
-            if is_docu:
-                category_id = '2'  # TV Documentary
-        else:
-            category_id = '24'
+    async def get_cat_id(self, category_name, tmdb_id, meta=None):
+        # Use stored genre IDs if available
+        if meta and meta.get('genre_ids'):
+            genre_ids = meta['genre_ids'].split(',')
+            is_docu = '99' in genre_ids
+
+            if category_name == 'MOVIE':
+                category_id = '70'  # Motorsports Movie
+                if is_docu:
+                    category_id = '66'  # Documentary
+            elif category_name == 'TV':
+                category_id = '79'  # TV Series
+                if is_docu:
+                    category_id = '2'  # TV Documentary
+            else:
+                category_id = '24'
+
         return category_id
 
     async def get_type_id(self, type):

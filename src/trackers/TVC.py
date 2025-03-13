@@ -231,6 +231,7 @@ class TVC():
             console.print(data)
         open_torrent.close()
 
+    # why the fuck is this even a thing.....
     async def get_tmdb_data(self, meta):
         import tmdbsimple as tmdb
         if meta['category'] == "MOVIE":
