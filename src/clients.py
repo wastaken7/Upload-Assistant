@@ -15,6 +15,7 @@ import shutil
 import time
 from src.console import console
 import re
+import platform
 
 
 class Clients():
@@ -53,7 +54,7 @@ class Clients():
         if torrent_client.lower() == "rtorrent":
             self.rtorrent(meta['path'], torrent_path, torrent, meta, local_path, remote_path, client)
         elif torrent_client == "qbit":
-            await self.qbittorrent(meta['path'], torrent, local_path, remote_path, client, meta['is_disc'], meta['filelist'], meta)
+            await self.qbittorrent(meta['path'], torrent, local_path, remote_path, client, meta['is_disc'], meta['filelist'], meta, tracker)
         elif torrent_client.lower() == "deluge":
             if meta['type'] == "DISC":
                 path = os.path.dirname(meta['path'])  # noqa F841
@@ -465,25 +466,164 @@ class Clients():
             console.print(f"[cyan]Path: {path}")
         return
 
-    async def qbittorrent(self, path, torrent, local_path, remote_path, client, is_disc, filelist, meta):
-        # Remote path mount
+    async def qbittorrent(self, path, torrent, local_path, remote_path, client, is_disc, filelist, meta, tracker):
         if meta.get('keep_folder'):
-            # Keep only the root folder (e.g., "D:\\Movies")
             path = os.path.dirname(path)
         else:
-            # Adjust path based on filelist and directory status
             isdir = os.path.isdir(path)
             if len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
-        # Ensure remote path replacement and normalization
-        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
-            path = path.replace(local_path, remote_path)
-            path = path.replace(os.sep, '/')
+        # Get the appropriate source path
+        if len(meta['filelist']) == 1 and os.path.isfile(meta['filelist'][0]) and not meta.get('keep_folder'):
+            # If there's a single file and not keep_folder, use the file itself as the source
+            src = meta['filelist'][0]
+        else:
+            # Otherwise, use the directory
+            src = meta.get('path')
 
-        # Ensure trailing slash for qBittorrent
-        if not path.endswith('/'):
-            path += '/'
+        if not src:
+            error_msg = "[red]No source path found in meta."
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
+
+        # Determine linking method
+        linking_method = client.get('linking', None)  # "symlink", "hardlink", or None
+        if meta['debug']:
+            console.print("Linking method:", linking_method)
+        use_symlink = linking_method == "symlink"
+        use_hardlink = linking_method == "hardlink"
+
+        if use_symlink and use_hardlink:
+            error_msg = "Cannot use both hard links and symlinks simultaneously"
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
+
+        # Get linked folder for this drive
+        linked_folder = client.get('linked_folder', [])
+        if meta['debug']:
+            console.print(f"Linked folders: {linked_folder}")
+        if not isinstance(linked_folder, list):
+            linked_folder = [linked_folder]  # Convert to list if single value
+
+        # Determine drive letter (Windows) or root (Linux)
+        if platform.system() == "Windows":
+            src_drive = os.path.splitdrive(src)[0]
+        else:
+            # On Unix/Linux, use the root directory or first directory component
+            src_drive = "/"
+            # Extract the first directory component for more specific matching
+            src_parts = src.strip('/').split('/')
+            if src_parts:
+                src_root_dir = '/' + src_parts[0]
+                # Check if any linked folder contains this root
+                for folder in linked_folder:
+                    if src_root_dir in folder or folder in src_root_dir:
+                        src_drive = src_root_dir
+                        break
+
+        # Find a linked folder that matches the drive
+        link_target = None
+        if platform.system() == "Windows":
+            # Windows matching based on drive letters
+            for folder in linked_folder:
+                folder_drive = os.path.splitdrive(folder)[0]
+                if folder_drive == src_drive:
+                    link_target = folder
+                    break
+        else:
+            # Unix/Linux matching based on path containment
+            for folder in linked_folder:
+                # Check if source path is in the linked folder or vice versa
+                if src.startswith(folder) or folder.startswith(src) or folder.startswith(src_drive):
+                    link_target = folder
+                    break
+        if meta['debug']:
+            console.print(f"Source drive: {src_drive}")
+            console.print(f"Link target: {link_target}")
+        # If using symlinks and no matching drive folder, allow any available one
+        if use_symlink and not link_target and linked_folder:
+            link_target = linked_folder[0]
+
+        if (use_symlink or use_hardlink) and not link_target:
+            error_msg = f"No suitable linked folder found for drive {src_drive}"
+            console.print(f"[bold red]{error_msg}")
+            raise ValueError(error_msg)
+
+        # Create tracker-specific directory inside linked folder
+        tracker_dir = os.path.join(link_target, tracker)
+        os.makedirs(tracker_dir, exist_ok=True)
+
+        if meta['debug']:
+            console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
+            console.print(f"[cyan]Source path: {src}")
+
+        # Extract only the folder or file name from `src`
+        src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
+        dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
+
+        # path magic
+        if os.path.exists(dst) or os.path.islink(dst):
+            if meta['debug']:
+                console.print(f"[yellow]Skipping linking, path already exists: {dst}")
+        else:
+            if use_hardlink:
+                try:
+                    # Check if we're linking a file or directory
+                    if os.path.isfile(src):
+                        # For a single file, create a hardlink directly
+                        os.link(src, dst)
+                        if meta['debug']:
+                            console.print(f"[green]Hard link created: {dst} -> {src}")
+                    else:
+                        # For directories, we need to link each file inside
+                        console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
+                        os.makedirs(dst, exist_ok=True)
+
+                        for root, _, files in os.walk(src):
+                            # Get the relative path from source
+                            rel_path = os.path.relpath(root, src)
+
+                            # Create corresponding directory in destination
+                            if rel_path != '.':
+                                dst_dir = os.path.join(dst, rel_path)
+                                os.makedirs(dst_dir, exist_ok=True)
+
+                            # Create hardlinks for each file
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
+                                try:
+                                    os.link(src_file, dst_file)
+                                    if meta['debug'] and files.index(file) == 0:
+                                        console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
+                                except OSError as e:
+                                    console.print(f"[red]Failed to create hard link for file {file}: {e}")
+
+                        if meta['debug']:
+                            console.print(f"[green]Directory structure and files linked: {dst}")
+                except OSError as e:
+                    error_msg = f"Failed to create hard link: {e}"
+                    console.print(f"[bold red]{error_msg}")
+                    if meta['debug']:
+                        console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                        console.print(f"[yellow]Destination: {dst}")
+                    raise OSError(error_msg)
+
+            elif use_symlink:
+                try:
+                    if platform.system() == "Windows":
+                        os.symlink(src, dst, target_is_directory=os.path.isdir(src))
+                    else:
+                        os.symlink(src, dst)
+
+                    if meta['debug']:
+                        console.print(f"[green]Symbolic link created: {dst} -> {src}")
+
+                except OSError as e:
+                    error_msg = f"Failed to create symlink: {e}"
+                    console.print(f"[bold red]{error_msg}")
+                    raise OSError(error_msg)
 
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
@@ -493,6 +633,7 @@ class Clients():
             password=client['qbit_pass'],
             VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
         )
+
         if meta['debug']:
             console.print("[bold yellow]Adding and rechecking torrent")
 
@@ -502,7 +643,41 @@ class Clients():
             console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
             return
 
-        # Check for automatic management
+        # Apply remote pathing to `tracker_dir` before assigning `save_path`
+        if use_symlink or use_hardlink:
+            save_path = tracker_dir  # Default to linked directory
+        else:
+            save_path = path  # Default to the original path
+
+        # Handle remote path mapping
+        if local_path and remote_path and local_path.lower() != remote_path.lower():
+            # Normalize paths for comparison
+            norm_save_path = os.path.normpath(save_path).lower()
+            norm_local_path = os.path.normpath(local_path).lower()
+
+            # Check if the save_path starts with local_path
+            if norm_save_path.startswith(norm_local_path):
+                # Get the relative part of the path
+                rel_path = os.path.relpath(save_path, local_path)
+                # Combine remote path with relative path
+                save_path = os.path.join(remote_path, rel_path)
+
+            # For direct replacement if the above approach doesn't work
+            elif local_path.lower() in save_path.lower():
+                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
+
+        # Always normalize separators for qBittorrent (it expects forward slashes)
+        save_path = save_path.replace(os.sep, '/')
+
+        # Ensure qBittorrent save path is formatted correctly
+        if not save_path.endswith('/'):
+            save_path += '/'
+
+        if meta['debug']:
+            console.print(f"[cyan]Original path: {path}")
+            console.print(f"[cyan]Mapped save path: {save_path}")
+
+        # Automatic management
         auto_management = False
         am_config = client.get('automatic_management_paths', '')
         if isinstance(am_config, list):
@@ -512,17 +687,21 @@ class Clients():
         else:
             if os.path.normpath(am_config).lower() in os.path.normpath(path).lower() and am_config.strip() != "":
                 auto_management = True
+
         qbt_category = client.get("qbit_cat") if not meta.get("qbit_cat") else meta.get('qbit_cat')
+
         if meta['debug']:
             console.print("client.get('qbit_cat'):", client.get('qbit_cat'))
             console.print("qbt_category:", qbt_category)
+
         content_layout = client.get('content_layout', 'Original')
 
-        # Add the torrent
+        console.print(f"[bold yellow]qBittorrent save path: {save_path}")
+
         try:
             qbt_client.torrents_add(
                 torrent_files=torrent.dump(),
-                save_path=path,
+                save_path=save_path,
                 use_auto_torrent_management=auto_management,
                 is_skip_checking=True,
                 content_layout=content_layout,
@@ -550,7 +729,7 @@ class Clients():
             qbt_client.torrents_add_tags(tags=meta['qbit_tag'], torrent_hashes=torrent.infohash)
 
         if meta['debug']:
-            console.print(f"Added to: {path}")
+            console.print(f"Added to: {save_path}")
 
     def deluge(self, path, torrent_path, torrent, local_path, remote_path, client, meta):
         client = DelugeRPCClient(client['deluge_url'], int(client['deluge_port']), client['deluge_user'], client['deluge_pass'])
@@ -661,7 +840,6 @@ class Clients():
             torrent_client = self.config['DEFAULT']['default_torrent_client']
         else:
             torrent_client = meta['client']
-
         local_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('local_path', ['/LocalPath'])
         remote_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('remote_path', ['/RemotePath'])
 
@@ -681,7 +859,6 @@ class Clients():
 
         local_path = os.path.normpath(list_local_path)
         remote_path = os.path.normpath(list_remote_path)
-
         if local_path.endswith(os.sep):
             remote_path = remote_path + os.sep
 
