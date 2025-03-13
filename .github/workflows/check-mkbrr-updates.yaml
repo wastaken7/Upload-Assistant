@@ -17,28 +17,36 @@ jobs:
           echo "Latest mkbrr release: $LATEST_TAG"
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
-      - name: Check if Issue Already Exists
+      - name: Check if Issue Already Exists for This Version
         id: check_issue
         run: |
-          ISSUE_EXISTS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=mkbrr" | \
-          jq -r --arg tag "New mkbrr Release Available!" \
-          'map(select(.title == $tag)) | length')
-
+          # Get all issues with the mkbrr label
+          ISSUES=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=mkbrr&per_page=100")
+          
+          # Check if any issue already mentions this specific release tag
+          ISSUE_EXISTS=$(echo "$ISSUES" | jq -r --arg tag "$LATEST_TAG" \
+            '[.[] | select(.body | contains($tag))] | length')
+          
           if [[ "$ISSUE_EXISTS" -gt 0 ]]; then
-            echo "Issue already exists for release $LATEST_TAG (open or closed)."
+            echo "Issue already exists for mkbrr release $LATEST_TAG"
+            echo "ISSUE_EXISTS=true" >> $GITHUB_ENV
           else
+            echo "No issue exists for mkbrr release $LATEST_TAG"
+            echo "ISSUE_EXISTS=false" >> $GITHUB_ENV
             echo "NEW_RELEASE=true" >> $GITHUB_ENV
           fi
 
       - name: Create GitHub Issue Notification
-        if: env.NEW_RELEASE == 'true'
+        if: env.NEW_RELEASE == 'true' && env.ISSUE_EXISTS == 'false'
         run: |
           curl -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -d '{
-            "title": "New mkbrr Release Available!",
-            "body": "A new mkbrr release ('$LATEST_TAG') has been detected. Consider running the update workflow.",
-            "labels": ["mkbrr", "update"]
-          }' \
-          "https://api.github.com/repos/${{ github.repository }}/issues"
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{
+              "title": "New mkbrr Release Available!",
+              "body": "A new mkbrr release ('$LATEST_TAG') has been detected. Consider running the update workflow to incorporate the latest mkbrr binaries into Upload-Assistant.",
+              "labels": ["mkbrr", "update"]
+            }' \
+            "https://api.github.com/repos/${{ github.repository }}/issues"
+          
+          echo "Created new issue for mkbrr release $LATEST_TAG"
