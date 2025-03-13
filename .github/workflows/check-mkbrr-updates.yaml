@@ -22,7 +22,7 @@ jobs:
         run: |
           ISSUE_EXISTS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=mkbrr" | \
-          jq -r --arg tag "New mkbrr Release Available! ($LATEST_TAG)" \
+          jq -r --arg tag "New mkbrr Release Available!" \
           'map(select(.title == $tag)) | length')
 
           if [[ "$ISSUE_EXISTS" -gt 0 ]]; then
