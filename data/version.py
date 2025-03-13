@@ -1,3 +1,35 @@
+__version__ = "4.0.0"
+
+"""
+Changelog for version 4.0.0 (2025-03-13):
+
+Pushing this as v4 given some significant code changes.
+
+## Breaking change
+* When using trackers argument,  or , you must now use a comma separated list.
+
+## Linking support in qBitTorrent
+### This is not fully tested. 
+It seems to be working fine on this windows box, but you absolutely should test with the  argument to make sure it works on your system before putting it into production.
+* You can specify to use symbolic or hard links
+* 
+* Add one or many (local) paths which you want to contain the links, and UA will map the correct drive/volume for hardlinks.
+
+## Reminder
+* UA has mkbrr support 
+* You can specify an argument  or set the config 
+* UA loads binary files for the supported mkbrr OS. If you find mkbrr slower than the original torf implementation when hashing torrents, the mkbrr devs are likely to be appreciative of any reports.
+
+## What's Changed
+* move cleanup to file by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/384
+* async metadata calls by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/382
+* add initial linking support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/380
+* Refactor args parsing by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/383
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/3.6.5...4.0.0
+"""
+
 __version__ = "3.6.5"
 
 """
