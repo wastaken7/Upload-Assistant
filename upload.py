@@ -104,8 +104,11 @@ async def process_meta(meta, base_dir):
     else:
         default_trackers = config['TRACKERS'].get('default_trackers', '')
         trackers = [tracker.strip() for tracker in default_trackers.split(',')]
-    if "," in trackers:
-        trackers = trackers.split(',')
+    if isinstance(trackers, str):
+        if "," in trackers:
+            trackers = [t.strip() for t in trackers.split(',')]
+        else:
+            trackers = [trackers]  # Make it a list with one element
     meta['trackers'] = trackers
     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
         json.dump(meta, f, indent=4)

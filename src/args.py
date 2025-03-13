@@ -338,6 +338,19 @@ class Args():
                 meta[key] = value
             elif key in ["tvmaze_manual"]:
                 meta[key] = value
+            elif key == 'trackers':
+                if value:
+                    tracker_value = value
+                    if isinstance(tracker_value, str):
+                        tracker_value = tracker_value.strip('"\'')
+
+                    if isinstance(tracker_value, str) and ',' in tracker_value:
+                        meta[key] = [t.strip() for t in tracker_value.split(',')]
+                    else:
+                        meta[key] = [tracker_value.strip()] if isinstance(tracker_value, str) else [tracker_value]
+
+                else:
+                    meta[key] = []
             else:
                 meta[key] = meta.get(key, None)
             # if key == 'help' and value == True:
