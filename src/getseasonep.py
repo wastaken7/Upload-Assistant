@@ -93,7 +93,7 @@ async def get_season_episode(video, meta):
                     year = parsed.get('anime_year', str(seasonYear))
                     meta = await get_tmdb_id(guessit(parsed['anime_title'], {"excludes": ["country", "language"]})['title'], year, meta, meta['category'])
                 # meta = await tmdb_other_meta(meta)
-            elif meta.get('mal_id') != 0 and meta['category'] == "TV":
+            if meta.get('mal_id') != 0 and meta['category'] == "TV":
                 parsed = anitopy.parse(Path(video).name)
                 tag = parsed.get('release_group', "")
                 if tag != "":
