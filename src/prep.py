@@ -417,7 +417,7 @@ class Prep():
 
         # return duplicate ids so I don't have to catch every site file
         meta['tmdb'] = meta.get('tmdb_id')
-        meta['imdb'] = str(meta.get('imdb_id').zfill(7))
+        meta['imdb'] = meta.get('imdb_id')
         meta['mal'] = meta.get('mal_id')
         meta['tvdb'] = meta.get('tvdb_id')
 
