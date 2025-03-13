@@ -65,7 +65,7 @@ class R4E():
             'category_id': cat_id,
             'type_id': type_id,
             'tmdb': meta['tmdb'],
-            'imdb': meta['imdb_id'],
+            'imdb': meta['imdb'],
             'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,

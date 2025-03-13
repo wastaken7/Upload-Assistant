@@ -151,7 +151,7 @@ class TTG():
             }
             url = "https://totheglory.im/takeupload.php"
             if int(meta['imdb_id']) != 0:
-                data['imdb_c'] = f"tt{meta.get('imdb_id')}"
+                data['imdb_c'] = f"tt{meta.get('imdb')}"
 
             # Submit
             if meta['debug']:
@@ -188,7 +188,7 @@ class TTG():
             cookies = pickle.load(cf)
 
         if int(meta['imdb_id']) != 0:
-            imdb = f"imdb{meta['imdb_id']}"
+            imdb = f"imdb{meta['imdb']}"
         else:
             imdb = ""
         if meta.get('is_disc', '') == "BDMV":

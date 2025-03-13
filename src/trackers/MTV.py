@@ -203,7 +203,7 @@ class MTV():
     async def edit_group_desc(self, meta):
         description = ""
         if meta['imdb_id'] != 0:
-            description += f"https://www.imdb.com/title/tt{meta['imdb_id']}"
+            description += f"https://www.imdb.com/title/tt{meta['imdb']}"
         if meta['tmdb'] != 0:
             description += f"\nhttps://www.themoviedb.org/{str(meta['category'].lower())}/{str(meta['tmdb'])}"
         if meta['tvdb_id'] != 0:
@@ -540,7 +540,7 @@ class MTV():
         }
 
         if meta['imdb_id'] != 0:
-            params['imdbid'] = "tt" + str(meta['imdb_id'])
+            params['imdbid'] = "tt" + str(meta['imdb'])
         elif meta['tmdb'] != 0:
             params['tmdbid'] = str(meta['tmdb'])
         elif meta['tvdb_id'] != 0:

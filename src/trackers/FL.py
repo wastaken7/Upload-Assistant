@@ -154,7 +154,7 @@ class FL():
             }
 
             if int(meta.get('imdb_id')) != 0:
-                data['imdbid'] = meta.get('imdb_id')
+                data['imdbid'] = meta.get('imdb')
                 data['description'] = meta['imdb_info'].get('genres', '')
             if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
                 data['epenis'] = self.uploader_name
@@ -203,7 +203,7 @@ class FL():
 
         if int(meta['imdb_id']) != 0:
             params = {
-                'search': meta['imdb_id'],
+                'search': meta['imdb'],
                 'cat': await self.get_category_id(meta),
                 'searchin': '3'
             }

@@ -71,7 +71,7 @@ class SPD():
             'media_info': mi_dump,
             'bd_info': bd_dump,
             'type': type_id,
-            'url': f"https://www.imdb.com/title/tt{meta['imdb_id']}",
+            'url': f"https://www.imdb.com/title/tt{meta['imdb']}",
             'shortDescription': meta['genres'],
             'keywords': meta['keywords'],
             'releaseInfo': self.forum_link

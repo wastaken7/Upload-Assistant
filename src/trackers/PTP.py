@@ -115,12 +115,13 @@ class PTP():
                                 for file in torrent['FileList']:
                                     if file.get('Path') == filename:
                                         imdb_id = int(movie.get('ImdbId', 0) or 0)
+                                        imdb = f"tt{str(imdb_id).zfill(7)}"
                                         ptp_torrent_id = torrent['Id']
                                         dummy, ptp_torrent_hash, *_ = await self.get_imdb_from_torrent_id(ptp_torrent_id)
                                         console.print(f'[bold green]Matched release with PTP ID: [yellow]{ptp_torrent_id}[/yellow][/bold green]')
 
                                         # Call get_torrent_info and print the results
-                                        tinfo = await self.get_torrent_info(imdb_id, meta)
+                                        tinfo = await self.get_torrent_info(imdb, meta)
                                         console.print(f"[cyan]Torrent Info: {tinfo}[/cyan]")
 
                                         return imdb_id, ptp_torrent_id, ptp_torrent_hash
@@ -1065,14 +1066,14 @@ class PTP():
         if int(meta.get("imdb_id")) == 0:
             data["imdb"] = "0"
         else:
-            data["imdb"] = meta["imdb_id"]
+            data["imdb"] = meta["imdb"]
 
         if groupID is None:  # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
             if data["imdb"] == "0":
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
-                tinfo = await self.get_torrent_info(meta.get("imdb_id"), meta)
+                tinfo = await self.get_torrent_info(meta.get("imdb"), meta)
             cover = meta["imdb_info"].get("cover")
             if cover is None:
                 cover = meta.get('poster')

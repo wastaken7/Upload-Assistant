@@ -76,7 +76,7 @@ class BHD():
             'category_id': cat_id,
             'type': type_id,
             'source': source_id,
-            'imdb_id': meta['imdb_id'],
+            'imdb_id': meta['imdb'],
             'tmdb_id': meta['tmdb'],
             'description': desc,
             'anon': anon,

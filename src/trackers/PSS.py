@@ -106,7 +106,7 @@ class PSS():
             'type_id': type_id,
             'resolution_id': resolution_id,
             'tmdb': meta['tmdb'],
-            'imdb': meta['imdb_id'],
+            'imdb': meta['imdb'],
             'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,

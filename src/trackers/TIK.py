@@ -86,7 +86,7 @@ class TIK():
             'region_id': region_id,
             'distributor_id': distributor_id,
             'tmdb': meta['tmdb'],
-            'imdb': meta['imdb_id'].replace('tt', ''),
+            'imdb': meta['imdb'].replace('tt', ''),
             'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,
