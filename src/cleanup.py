@@ -100,7 +100,7 @@ def kill_all_threads():
             del thread
 
     # 🔹 Print remaining active threads
-    active_threads = [t for t in threading.enumerate()]
+    # active_threads = [t for t in threading.enumerate()]
     # console.print(f"[bold yellow]Remaining active threads:[/bold yellow] {len(active_threads)}")
     # for t in active_threads:
     #    console.print(f"  - {t.name} (Alive: {t.is_alive()})")
