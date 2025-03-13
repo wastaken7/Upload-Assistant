@@ -66,7 +66,7 @@ class UploadHelper:
         if int(meta.get('tmdb_id') or 0) != 0:
             console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}")
         if int(meta.get('imdb_id') or 0) != 0:
-            console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb_id']}")
+            console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb']}")
         if int(meta.get('tvdb_id') or 0) != 0:
             console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
         if int(meta.get('tvmaze_id') or 0) != 0:
