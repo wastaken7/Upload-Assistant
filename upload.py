@@ -95,6 +95,7 @@ async def process_meta(meta, base_dir):
     except Exception as e:
         console.print(f"Error in gather_prep: {e}")
         console.print(traceback.format_exc())
+        return
     meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
     parser = Args(config)
     helper = UploadHelper()
@@ -502,6 +503,7 @@ async def do_the_thing(base_dir):
 
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}")
+        console.print(traceback.format_exc())
         reset_terminal()
 
     finally:

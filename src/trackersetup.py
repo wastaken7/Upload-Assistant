@@ -60,19 +60,27 @@ class TRACKER_SETUP:
 
     def trackers_enabled(self, meta):
         from data.config import config
-        if meta.get('trackers', None) is not None:
+
+        if meta.get('trackers') is not None:
             trackers = meta['trackers']
         else:
             trackers = config['TRACKERS']['default_trackers']
-        if "," in trackers:
-            trackers = trackers.split(',')
 
         if isinstance(trackers, str):
             trackers = trackers.split(',')
-        trackers = [s.strip().upper() for s in trackers]
+
+        trackers = [str(s).strip().upper() for s in trackers]
+
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
-        return trackers
+
+        valid_trackers = [t for t in trackers if t in tracker_class_map or t == "MANUAL"]
+        removed_trackers = set(trackers) - set(valid_trackers)
+
+        for tracker in removed_trackers:
+            print(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.")
+
+        return valid_trackers
 
     async def get_banned_groups(self, meta, tracker):
         file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_banned_groups.json')
