@@ -30,7 +30,7 @@ class R4E():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(meta['category'], meta['tmdb'])
+        cat_id = await self.get_cat_id(meta['category'], meta['tmdb'], meta)
         type_id = await self.get_type_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         name = await self.edit_name(meta)
@@ -103,7 +103,7 @@ class R4E():
         name = meta['name']
         return name
 
-    async def get_cat_id(self, category_name, tmdb_id, meta=None):
+    async def get_cat_id(self, category_name, tmdb_id, meta):
         # Use stored genre IDs if available
         if meta and meta.get('genre_ids'):
             genre_ids = meta['genre_ids'].split(',')
