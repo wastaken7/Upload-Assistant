@@ -1,3 +1,18 @@
+__version__ = "3.6.5"
+
+"""
+Changelog for version 3.6.5 (2025-03-12):
+
+## What's Changed
+* bunch of id related issues fixed
+* if using , take that moment to validate and export the torrent file
+* some prettier printing with torf torrent hashing
+* mkbrr binary files by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/381
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/3.6.4...3.6.5
+"""
+
 __version__ = "3.6.4"
 
 """
