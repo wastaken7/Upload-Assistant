@@ -218,14 +218,15 @@ class Prep():
 
         # Set imdb_id with proper handling for 'tt' prefix
         try:
-            imdb_value = meta['imdb_manual']
-            if imdb_value:
-                if str(imdb_value).startswith('tt'):
-                    meta['imdb_id'] = int(str(imdb_value)[2:])
+            if not meta['imdb_id']:
+                imdb_value = meta['imdb_manual']
+                if imdb_value:
+                    if str(imdb_value).startswith('tt'):
+                        meta['imdb_id'] = int(str(imdb_value)[2:])
+                    else:
+                        meta['imdb_id'] = int(imdb_value)
                 else:
-                    meta['imdb_id'] = int(imdb_value)
-            else:
-                meta['imdb_id'] = 0
+                    meta['imdb_id'] = 0
         except (ValueError, TypeError):
             meta['imdb_id'] = 0
 
