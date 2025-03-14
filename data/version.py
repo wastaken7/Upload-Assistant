@@ -1,3 +1,16 @@
+__version__ = "4.0.1"
+
+"""
+Changelog for version 4.0.1 (2025-03-14):
+
+- fixed a tracker handling error when answering no to title confirmation
+- fixed imdb from srrdb
+- strip matching distributor from title and add to meta object
+- other little fixes
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.0.3...4.0.1
+"""
+
 __version__ = "4.0.0.3"
 
 """
