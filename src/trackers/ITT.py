@@ -23,7 +23,7 @@ class ITT():
     def __init__(self, config):
         self.config = config
         self.tracker = 'ITT'
-        self.source_flag = 'Itatorrents'
+        self.source_flag = 'ItaTorrents'
         self.upload_url = 'https://itatorrents.xyz/api/torrents/upload'
         self.search_url = 'https://itatorrents.xyz/api/torrents/filter'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
