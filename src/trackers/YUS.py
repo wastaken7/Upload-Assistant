@@ -37,7 +37,7 @@ class YUS():
 
     async def get_type_id(self, type):
         type_id = {
-            'DISC': '1',
+            'DISC': '17',
             'REMUX': '2',
             'WEBDL': '4',
             'WEBRIP': '5',
