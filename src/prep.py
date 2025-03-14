@@ -619,7 +619,7 @@ class Prep():
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await self.get_video_encode(mi, meta['type'], bdinfo)
         if meta.get('no_edition') is False:
-            meta['edition'], meta['repack'] = await self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'))
+            meta['edition'], meta['repack'] = await self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
             if "REPACK" in meta.get('edition', ""):
                 meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
@@ -1354,7 +1354,7 @@ class Prep():
             video_codec = f"MPEG-{mi['media']['track'][1].get('Format_Version')}"
         return video_encode, video_codec, has_encode_settings, bit_depth
 
-    async def get_edition(self, video, bdinfo, filelist, manual_edition):
+    async def get_edition(self, video, bdinfo, filelist, manual_edition, meta):
         if video.lower().startswith('dc'):
             video = video.replace('dc', '', 1)
 
@@ -1415,13 +1415,23 @@ class Prep():
         # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
         if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'proper2', 'proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
             edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
+
         if edition:
+            from src.region import get_distributor
+            distributors = await get_distributor(edition)
+
+            bad = ['internal', 'limited', 'retail']
+
+            if distributors:
+                bad.append(distributors.lower())
+                meta['distributor'] = distributors
+
+            if any(term.lower() in edition.lower() for term in bad):
+                edition = re.sub(r'\b(?:' + '|'.join(bad) + r')\b', '', edition, flags=re.IGNORECASE).strip()
+                # Clean up extra spaces
+                while '  ' in edition:
+                    edition = edition.replace('  ', ' ')
             console.print(f"Final Edition: {edition}")
-        bad = ['internal', 'limited', 'retail']
-
-        if edition.lower() in bad:
-            edition = re.sub(r'\b(?:' + '|'.join(bad) + r')\b', '', edition, flags=re.IGNORECASE).strip()
-
         return edition, repack
 
     async def get_name(self, meta):
