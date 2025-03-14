@@ -150,7 +150,8 @@ class AITHER():
                         language = language.lower().strip()
                         if language.lower().startswith('en'):
                             title_match = re.findall(r'Audio[\s\S]+?Title\s+:\s+(.+)', media_info_text)
-                            if title_match and "commentary" in title_match[i].lower():
+                            # Check if title_match has enough elements to access index i
+                            if title_match and len(title_match) > i and "commentary" in title_match[i].lower():
                                 continue
                             return True
                 return False
