@@ -445,6 +445,7 @@ config = {
             # "torrent_storage_dir": "path/to/BT_backup folder"  ## use double-backslash on windows eg: "C:\\client\\backup"
 
             # here you can chose to use either symbolic or hard links, or leave uncommented to use original path
+            # this will diable any automatic torrent management if set
             # use either "symlink" or "hardlink"
             # on windows, symlinks needs admin privs, hardlinks need ntfs/refs filesytem (and same drive)
             # "linking": "symlink",
@@ -475,6 +476,7 @@ config = {
             "content_layout": "Original"
 
             # Enable automatic torrent management if listed path(s) are present in the path
+            # Linking does not work with ATM. ATM will be disbaled if linking is enabled.
             # If using remote path mapping, use remote path
             # For using multiple paths, use a list ["path1", "path2"]
             # "automatic_management_paths" : ""
