@@ -121,10 +121,10 @@ class TOCA():
             console.print(data)
         open_torrent.close()
 
-    async def get_cat_id(self, category_name, edition, meta):
+    async def get_cat_id(self, category_name):
         category_id = {
             'MOVIE': '1',
-            'TV': '2'
+            'TV': '2',
         }.get(category_name, '0')
         return category_id
 
