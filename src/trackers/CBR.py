@@ -28,8 +28,13 @@ class CBR():
         self.upload_url = 'https://capybarabr.com/api/torrents/upload'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [
-            '3LTON', '4yEo', 'ADE', 'AFG', 'AROMA', 'AniHLS', 'AniURL', 'AnimeRG', 'BLUDV', 'CHD', 'CM8', 'Comando', 'CrEwSaDe', 'DNL', 'DeadFish', 'ELiTE', 'FGT', 'FRDS', 'FUM', 'FaNGDiNG0', 'Flights', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'Hiro360', 'ION10', 'JIVE', 'KiNGDOM', 'LEGi0N', 'LOAD', 'Lapumia', 'Leffe', 'MACCAULAY', 'MeGusta', 'NOIVTC', 'NhaNc3', 'OFT', 'Oj', 'PRODJi', 'PiRaTeS', 'PlaySD', 'RAPiDCOWS', 'RARBG', 'RDN', 'REsuRRecTioN', 'RMTeam', 'RetroPeeps', 'SANTi', 'SILVEIRATeam', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'SicFoI', 'TGx', 'TM', 'TRiToN', 'Telly', 'UPiNSMOKE', 'URANiME', 'WAF', 'XS', 'YIFY', 'ZKBL', 'ZMNT', 'ZmN', 'aXXo', 'd3g', 'eSc', 'iPlanet', 'mHD', 'mSD', 'nHD', 'nSD', 'nikt0', 'playXD', 'x0r', 'xRed'
-]
+            '3LTON', '4yEo', 'ADE', 'AFG', 'AROMA', 'AniHLS', 'AniURL', 'AnimeRG', 'BLUDV', 'CHD', 'CM8', 'Comando', 'CrEwSaDe', 'DNL', 'DeadFish',
+            'ELiTE', 'FGT', 'FRDS', 'FUM', 'FaNGDiNG0', 'Flights', 'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'Hiro360', 'ION10', 'JIVE', 'KiNGDOM',
+            'LEGi0N', 'LOAD', 'Lapumia', 'Leffe', 'MACCAULAY', 'MeGusta', 'NOIVTC', 'NhaNc3', 'OFT', 'Oj', 'PRODJi', 'PiRaTeS', 'PlaySD', 'RAPiDCOWS',
+            'RARBG', 'RDN', 'REsuRRecTioN', 'RMTeam', 'RetroPeeps', 'SANTi', 'SILVEIRATeam', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'SicFoI', 'TGx', 'TM',
+            'TRiToN', 'Telly', 'UPiNSMOKE', 'URANiME', 'WAF', 'XS', 'YIFY', 'ZKBL', 'ZMNT', 'ZmN', 'aXXo', 'd3g', 'eSc', 'iPlanet', 'mHD', 'mSD', 'nHD',
+            'nSD', 'nikt0', 'playXD', 'x0r', 'xRed'
+        ]
         pass
 
     async def upload(self, meta, disctype):
