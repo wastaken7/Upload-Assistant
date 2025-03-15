@@ -445,7 +445,7 @@ config = {
             # "torrent_storage_dir": "path/to/BT_backup folder"  ## use double-backslash on windows eg: "C:\\client\\backup"
 
             # here you can chose to use either symbolic or hard links, or leave uncommented to use original path
-            # this will diable any automatic torrent management if set
+            # this will disable any automatic torrent management if set
             # use either "symlink" or "hardlink"
             # on windows, symlinks needs admin privs, hardlinks need ntfs/refs filesytem (and same drive)
             # "linking": "symlink",
