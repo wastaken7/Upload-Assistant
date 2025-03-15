@@ -680,16 +680,17 @@ class Clients():
 
         # Automatic management
         auto_management = False
-        am_config = client.get('automatic_management_paths', '')
-        if meta['debug']:
-            console.print(f"AM Config: {am_config}")
-        if isinstance(am_config, list):
-            for each in am_config:
-                if os.path.normpath(each).lower() in os.path.normpath(path).lower():
+        if not use_symlink and not use_hardlink:
+            am_config = client.get('automatic_management_paths', '')
+            if meta['debug']:
+                console.print(f"AM Config: {am_config}")
+            if isinstance(am_config, list):
+                for each in am_config:
+                    if os.path.normpath(each).lower() in os.path.normpath(path).lower():
+                        auto_management = True
+            else:
+                if os.path.normpath(am_config).lower() in os.path.normpath(path).lower() and am_config.strip() != "":
                     auto_management = True
-        else:
-            if os.path.normpath(am_config).lower() in os.path.normpath(path).lower() and am_config.strip() != "":
-                auto_management = True
 
         qbt_category = client.get("qbit_cat") if not meta.get("qbit_cat") else meta.get('qbit_cat')
 
