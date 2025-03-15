@@ -1,3 +1,20 @@
+__version__ = "4.0.2"
+
+"""
+Changelog for version 4.0.2 (2025-03-15):
+
+## What's Changed
+* Update CBR.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/392
+* Update ITT.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/393
+* Added support for TocaShare by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/394
+* Force auto torrent management to false when using linking
+
+## New Contributors
+* @wastaken7 made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/392
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.1...4.0.2
+"""
+
 __version__ = "4.0.1"
 
 """
