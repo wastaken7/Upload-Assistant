@@ -34,7 +34,7 @@ class TOCA():
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
-        cat_id = await self.get_cat_id(meta['category'], meta.get('edition', ''), meta)
+        cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         region_id = await common.unit3d_region_ids(meta.get('region'))
