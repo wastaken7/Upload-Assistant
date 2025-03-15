@@ -550,8 +550,8 @@ class Clients():
             console.print(f"[bold red]{error_msg}")
             raise ValueError(error_msg)
 
+        # Create tracker-specific directory inside linked folder
         if use_symlink or use_hardlink:
-            # Create tracker-specific directory inside linked folder
             tracker_dir = os.path.join(link_target, tracker)
             os.makedirs(tracker_dir, exist_ok=True)
 
@@ -681,6 +681,8 @@ class Clients():
         # Automatic management
         auto_management = False
         am_config = client.get('automatic_management_paths', '')
+        if meta['debug']:
+            console.print(f"AM Config: {am_config}")
         if isinstance(am_config, list):
             for each in am_config:
                 if os.path.normpath(each).lower() in os.path.normpath(path).lower():
@@ -692,10 +694,11 @@ class Clients():
         qbt_category = client.get("qbit_cat") if not meta.get("qbit_cat") else meta.get('qbit_cat')
 
         if meta['debug']:
-            console.print("client.get('qbit_cat'):", client.get('qbit_cat'))
             console.print("qbt_category:", qbt_category)
 
         content_layout = client.get('content_layout', 'Original')
+        if meta['debug']:
+            console.print(f"Content Layout: {content_layout}")
 
         console.print(f"[bold yellow]qBittorrent save path: {save_path}")
 
@@ -728,6 +731,10 @@ class Clients():
             qbt_client.torrents_add_tags(tags=client['qbit_tag'], torrent_hashes=torrent.infohash)
         if meta.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=meta['qbit_tag'], torrent_hashes=torrent.infohash)
+
+        if meta['debug']:
+            info = qbt_client.torrents_info(torrent_hashes=torrent.infohash)
+            console.print(f"[cyan]Actual qBittorrent save path: {info[0].save_path}")
 
         if meta['debug']:
             console.print(f"Added to: {save_path}")
