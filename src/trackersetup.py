@@ -43,6 +43,7 @@ from src.trackers.YOINK import YOINK
 from src.trackers.HHD import HHD
 from src.trackers.SP import SP
 from src.trackers.YUS import YUS
+from src.trackers.TOCA import TOCA
 from src.console import console
 import httpx
 import os
@@ -447,12 +448,12 @@ tracker_class_map = {
     'FNP': FNP, 'FL': FL, 'FRIKI': FRIKI, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT, 'JPTV': JPTV, 'LCD': LCD,
     'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
     'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
-    'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
+    'TIK': TIK, 'TL': TL, 'TOCA': TOCA, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
 
 api_trackers = {
     'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
-    'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'ULCX', 'UTP', 'YOINK', 'YUS'
+    'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'TOCA', 'ULCX', 'UTP', 'YOINK', 'YUS'
 }
 
 other_api_trackers = {
