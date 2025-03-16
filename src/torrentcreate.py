@@ -122,7 +122,7 @@ class CustomTorrent(torf.Torrent):
         self.metainfo['info']['piece length'] = self.piece_size  # Ensure 'piece length' is set
 
 
-def create_torrent(meta, path, output_filename):
+def create_torrent(meta, path, output_filename, tracker_url=None):
     if meta['debug']:
         start_time = time.time()
 
@@ -152,8 +152,11 @@ def create_torrent(meta, path, output_filename):
             # Ensure executable permission for non-Windows systems
             if not sys.platform.startswith("win"):
                 os.chmod(mkbrr_binary, 0o755)
-
-            cmd = [mkbrr_binary, "create", path, "-o", output_path]
+            if tracker_url is not None:
+                cmd = [mkbrr_binary, "create", path, "-t", tracker_url, "-o", output_path]
+                console.print('mkbrr cmd:', cmd)
+            else:
+                cmd = [mkbrr_binary, "create", path, "-o", output_path]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             total_pieces = 100  # Default to 100% for scaling progress
