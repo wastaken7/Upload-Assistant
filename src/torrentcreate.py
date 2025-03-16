@@ -152,11 +152,29 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             # Ensure executable permission for non-Windows systems
             if not sys.platform.startswith("win"):
                 os.chmod(mkbrr_binary, 0o755)
+
+            cmd = [mkbrr_binary, "create", path]
+
             if tracker_url is not None:
-                cmd = [mkbrr_binary, "create", path, "-t", tracker_url, "-o", output_path]
-                console.print('mkbrr cmd:', cmd)
-            else:
-                cmd = [mkbrr_binary, "create", path, "-o", output_path]
+                cmd.extend(["-t", tracker_url])
+
+            if meta.get('max_piece_size'):
+                try:
+                    max_size_bytes = int(meta['max_piece_size']) * 1024 * 1024
+
+                    # Calculate the appropriate power of 2 (log2)
+                    # We want the largest power of 2 that's less than or equal to max_size_bytes
+                    import math
+                    power = min(27, max(16, math.floor(math.log2(max_size_bytes))))
+
+                    cmd.extend(["-l", str(power)])
+                    console.print(f"[yellow]Setting mkbrr piece length to 2^{power} bytes ({2**power} bytes)")
+                except (ValueError, TypeError):
+                    console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
+
+            cmd.extend(["-o", output_path])
+            console.print('mkbrr cmd:', cmd)
+
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             total_pieces = 100  # Default to 100% for scaling progress
