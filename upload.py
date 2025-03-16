@@ -428,12 +428,23 @@ async def do_the_thing(base_dir):
 
     await update_notification(base_dir)
 
-    try:
-        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+    cleanup_only = any('--cleanup' in arg for arg in sys.argv) and len(sys.argv) <= 2
 
-        if meta.get('cleanup') and os.path.exists(f"{base_dir}/tmp"):
-            shutil.rmtree(f"{base_dir}/tmp")
-            console.print("[bold green]Successfully emptied tmp directory")
+    try:
+        # If cleanup is the only operation, use a dummy path to satisfy the parser
+        if cleanup_only:
+            args_list = sys.argv[1:] + ['dummy_path']
+            meta, help, before_args = parser.parse(tuple(' '.join(args_list).split(' ')), meta)
+            meta['path'] = None  # Clear the dummy path after parsing
+        else:
+            meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+
+        if meta.get('cleanup'):
+            if os.path.exists(f"{base_dir}/tmp"):
+                shutil.rmtree(f"{base_dir}/tmp")
+                console.print("[bold green]Successfully emptied tmp directory")
+            if not meta.get('path') or cleanup_only:
+                exit(0)
 
         if not meta.get('path'):
             exit(0)
