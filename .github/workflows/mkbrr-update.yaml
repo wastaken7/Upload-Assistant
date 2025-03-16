@@ -17,6 +17,11 @@ jobs:
           LATEST_TAG=$(curl -s https://api.github.com/repos/autobrr/mkbrr/releases/latest | jq -r .tag_name)
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
+      - name: Clean Existing Binaries
+        run: |
+          # Remove existing binary directories to avoid conflicts
+          rm -rf bin/mkbrr/*
+
       - name: Download Release Assets
         run: |
           mkdir -p bin/mkbrr
@@ -39,20 +44,39 @@ jobs:
           # Extract and move binaries to correct folders
           for file in *; do
             case "$file" in
-              *windows_x86_64.zip) unzip "$file" -d windows/x86_64 ;;
-              *darwin_arm64.tar.gz) tar -xzf "$file" -C macos/arm64 ;;
-              *darwin_x86_64.tar.gz) tar -xzf "$file" -C macos/x86_64 ;;
-              *freebsd_x86_64.tar.gz) tar -xzf "$file" -C freebsd/x86_64 ;;
-              *linux_amd64.tar.gz|*linux_x86_64.tar.gz) tar -xzf "$file" -C linux/amd64 ;;
-              *linux_arm64.tar.gz) tar -xzf "$file" -C linux/arm64 ;;
-              *linux_armv6.tar.gz) tar -xzf "$file" -C linux/armv6 ;;
-              *linux_arm.tar.gz) tar -xzf "$file" -C linux/arm ;;
-              *.apk|*.deb|*.rpm|*.pkg.tar.zst) mv "$file" linux/amd64 ;;  # Move package files
+              *windows_x86_64.zip) 
+                echo "Extracting $file to windows/x86_64..."
+                unzip -o "$file" -d windows/x86_64 ;;
+              *darwin_arm64.tar.gz) 
+                echo "Extracting $file to macos/arm64..."
+                tar -xzf "$file" -C macos/arm64 ;;
+              *darwin_x86_64.tar.gz) 
+                echo "Extracting $file to macos/x86_64..."
+                tar -xzf "$file" -C macos/x86_64 ;;
+              *freebsd_x86_64.tar.gz) 
+                echo "Extracting $file to freebsd/x86_64..."
+                tar -xzf "$file" -C freebsd/x86_64 ;;
+              *linux_amd64.tar.gz|*linux_x86_64.tar.gz) 
+                echo "Extracting $file to linux/amd64..."
+                tar -xzf "$file" -C linux/amd64 ;;
+              *linux_arm64.tar.gz) 
+                echo "Extracting $file to linux/arm64..."
+                tar -xzf "$file" -C linux/arm64 ;;
+              *linux_armv6.tar.gz) 
+                echo "Extracting $file to linux/armv6..."
+                tar -xzf "$file" -C linux/armv6 ;;
+              *linux_arm.tar.gz) 
+                echo "Extracting $file to linux/arm..."
+                tar -xzf "$file" -C linux/arm ;;
+              *.apk|*.deb|*.rpm|*.pkg.tar.zst) 
+                echo "Moving $file to linux/amd64..."
+                mv "$file" linux/amd64 ;;  # Move package files
             esac
           done
           
           # Ensure executables have correct permissions
           find linux macos freebsd -type f -name "mkbrr" -exec chmod +x {} \;
+          echo "All done with binary extraction"
 
       - name: Cleanup Unneeded Files
         run: |
