@@ -158,6 +158,9 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             if tracker_url is not None:
                 cmd.extend(["-t", tracker_url])
 
+            if int(meta.get('randomized', 0)) >= 1:
+                cmd.extend(["-e"])
+
             if meta.get('max_piece_size'):
                 try:
                     max_size_bytes = int(meta['max_piece_size']) * 1024 * 1024
