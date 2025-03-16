@@ -345,10 +345,9 @@ class Args():
                         tracker_value = tracker_value.strip('"\'')
 
                     if isinstance(tracker_value, str) and ',' in tracker_value:
-                        meta[key] = [t.strip() for t in tracker_value.split(',')]
+                        meta[key] = [t.strip().upper() for t in tracker_value.split(',')]
                     else:
-                        meta[key] = [tracker_value.strip()] if isinstance(tracker_value, str) else [tracker_value]
-
+                        meta[key] = [tracker_value.strip().upper()] if isinstance(tracker_value, str) else [tracker_value.upper()]
                 else:
                     meta[key] = []
             else:
