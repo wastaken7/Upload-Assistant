@@ -104,11 +104,14 @@ async def process_meta(meta, base_dir):
     else:
         default_trackers = config['TRACKERS'].get('default_trackers', '')
         trackers = [tracker.strip() for tracker in default_trackers.split(',')]
+
     if isinstance(trackers, str):
         if "," in trackers:
-            trackers = [t.strip() for t in trackers.split(',')]
+            trackers = [t.strip().upper() for t in trackers.split(',')]
         else:
-            trackers = [trackers]  # Make it a list with one element
+            trackers = [trackers.strip().upper()]  # Make it a list with one element
+    else:
+        trackers = [t.strip().upper() for t in trackers]
     meta['trackers'] = trackers
     with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
         json.dump(meta, f, indent=4)
@@ -316,28 +319,47 @@ async def save_processed_file(log_file, file_path):
 
 def reset_terminal():
     """Reset the terminal while allowing the script to continue running (Linux/macOS only)."""
-
     if os.name != "posix":
         return
 
     try:
-        sys.stderr.flush()
+        if not sys.stderr.closed:
+            sys.stderr.flush()
 
-        if sys.stdin.isatty():
-            subprocess.run(["stty", "sane"], check=False)
-            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
-            subprocess.run(["stty", "-ixon"], check=False)
+        if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+            try:
+                subprocess.run(["stty", "sane"], check=False)
+                if hasattr(termios, 'tcflush'):
+                    termios.tcflush(sys.stdin.fileno(), termios.TCIOFLUSH)
+                subprocess.run(["stty", "-ixon"], check=False)
+            except (IOError, OSError):
+                pass
 
-        sys.stdout.write("\033[0m")
-        sys.stdout.flush()
-        sys.stdout.write("\033[?25h")
-        sys.stdout.flush()
-        os.system("jobs -p | xargs kill 2>/dev/null")
-        sys.stderr.flush()
+        if not sys.stdout.closed:
+            try:
+                sys.stdout.write("\033[0m")
+                sys.stdout.flush()
+                sys.stdout.write("\033[?25h")
+                sys.stdout.flush()
+            except (IOError, ValueError):
+                pass
+
+        # Kill background jobs
+        try:
+            os.system("jobs -p | xargs -r kill 2>/dev/null")
+        except Exception:
+            pass
+
+        if not sys.stderr.closed:
+            sys.stderr.flush()
 
     except Exception as e:
-        sys.stderr.write(f"Error during terminal reset: {e}\n")
-        sys.stderr.flush()
+        try:
+            if not sys.stderr.closed:
+                sys.stderr.write(f"Error during terminal reset: {e}\n")
+                sys.stderr.flush()
+        except Exception:
+            pass  # At this point we can't do much more
 
 
 def get_local_version(version_file):
@@ -429,12 +451,23 @@ async def do_the_thing(base_dir):
 
     await update_notification(base_dir)
 
-    try:
-        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+    cleanup_only = any(arg in ('--cleanup', '-cleanup') for arg in sys.argv) and len(sys.argv) <= 2
 
-        if meta.get('cleanup') and os.path.exists(f"{base_dir}/tmp"):
-            shutil.rmtree(f"{base_dir}/tmp")
-            console.print("[bold green]Successfully emptied tmp directory")
+    try:
+        # If cleanup is the only operation, use a dummy path to satisfy the parser
+        if cleanup_only:
+            args_list = sys.argv[1:] + ['dummy_path']
+            meta, help, before_args = parser.parse(tuple(' '.join(args_list).split(' ')), meta)
+            meta['path'] = None  # Clear the dummy path after parsing
+        else:
+            meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+
+        if meta.get('cleanup'):
+            if os.path.exists(f"{base_dir}/tmp"):
+                shutil.rmtree(f"{base_dir}/tmp")
+                console.print("[bold green]Successfully emptied tmp directory")
+            if not meta.get('path') or cleanup_only:
+                exit(0)
 
         if not meta.get('path'):
             exit(0)

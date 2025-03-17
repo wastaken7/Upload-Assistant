@@ -70,6 +70,7 @@ class ULCX():
         if resolution_id is None:
             console.print("Resolution is below 720p; skipping.")
             return
+        name = await self.edit_name(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -98,7 +99,7 @@ class ULCX():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -154,6 +155,14 @@ class ULCX():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def edit_name(self, meta):
+        ulcx_name = meta['name']
+        if meta['category'] == 'TV':
+            ulcx_name = ulcx_name.replace(f"{meta['title']} {meta['year']}", f"{meta['title']}", 1)
+        else:
+            ulcx_name = ulcx_name
+        return ulcx_name
 
     async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:

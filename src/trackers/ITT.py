@@ -152,7 +152,7 @@ class ITT():
                 console.print(response.json())
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
-                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://fearnopeer.com/torrents/" + t_id)
+                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://itatorrents.xyz/torrents/" + t_id)
             except Exception:
                 console.print("It may have uploaded, go check")
                 return
