@@ -1,3 +1,21 @@
+__version__ = "4.0.3"
+
+"""
+Changelog for version 4.0.3 (2025-03-17):
+
+## What's Changed
+* Update naming logic for SP Anime Uploads by @tubaboy26 in https://github.com/Audionut/Upload-Assistant/pull/399
+* Fix ITT torrent comment by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/400
+* Fix --cleanup without path
+* Fix tracker casing
+* Fix AKA
+
+## New Contributors
+* @tubaboy26 made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/399
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.2...4.0.3
+"""
+
 __version__ = "4.0.2"
 
 """
