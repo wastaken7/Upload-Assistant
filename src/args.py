@@ -89,12 +89,12 @@ class Args():
         parser.add_argument('-tvmaze', '--tvmaze', nargs=1, required=False, help="TVMAZE ID", type=str, dest='tvmaze_manual')
         parser.add_argument('-tvdb', '--tvdb', nargs=1, required=False, help="TVDB ID", type=str, dest='tvdb_manual')
         parser.add_argument('-g', '--tag', nargs=1, required=False, help="Group Tag", type=str)
-        parser.add_argument('-serv', '--service', nargs=1, required=False, help="Streaming Service", type=str)
-        parser.add_argument('-dist', '--distributor', nargs=1, required=False, help="Disc Distributor e.g.(Criterion, BFI, etc.)", type=str)
-        parser.add_argument('-edition', '--edition', '--repack', nargs=1, required=False, help="Edition/Repack String e.g.(Director's Cut, Uncut, Hybrid, REPACK, REPACK3)", type=str, dest='manual_edition', default=None)
+        parser.add_argument('-serv', '--service', nargs='*', required=False, help="Streaming Service", type=str)
+        parser.add_argument('-dist', '--distributor', nargs='*', required=False, help="Disc Distributor e.g.(Criterion, BFI, etc.)", type=str)
+        parser.add_argument('-edition', '--edition', '--repack', nargs='*', required=False, help="Edition/Repack String e.g.(Director's Cut, Uncut, Hybrid, REPACK, REPACK3)", type=str, dest='manual_edition')
         parser.add_argument('-season', '--season', nargs=1, required=False, help="Season (number)", type=str)
         parser.add_argument('-episode', '--episode', nargs=1, required=False, help="Episode (number)", type=str)
-        parser.add_argument('-met', '--manual-episode-title', nargs=1, required=False, help="Set episode title, empty = empty", type=str, dest="manual_episode_title")
+        parser.add_argument('-met', '--manual-episode-title', nargs='*', required=False, help="Set episode title, empty = empty", type=str, dest="manual_episode_title")
         parser.add_argument('-daily', '--daily', nargs=1, required=False, help="Air date of this episode (YYYY-MM-DD)", type=datetime.date.fromisoformat, dest="manual_date")
         parser.add_argument('--no-season', dest='no_season', action='store_true', required=False, help="Remove Season from title")
         parser.add_argument('--no-year', dest='no_year', action='store_true', required=False, help="Remove Year from title")
@@ -325,7 +325,10 @@ class Args():
                 else:
                     meta[key] = value
             elif key in ("manual_edition"):
-                meta[key] = value
+                if isinstance(value, list) and len(value) == 1:
+                    meta[key] = value[0]
+                else:
+                    meta[key] = value
             elif key in ("manual_dvds"):
                 meta[key] = value
             elif key in ("freeleech"):
