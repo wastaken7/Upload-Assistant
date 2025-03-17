@@ -1027,6 +1027,11 @@ class PTP():
             console.print("ptp_subtitles", ptp_subtitles)
         if meta['hardcoded-subs']:
             ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            if ptp_trumpable == 4:
+                if 44 in ptp_subtitles:
+                    ptp_subtitles.remove(44)
+                if 3 not in ptp_subtitles:
+                    ptp_subtitles.append(3)
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
@@ -1035,6 +1040,11 @@ class PTP():
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+                if ptp_trumpable == 4:
+                    if 44 in ptp_subtitles:
+                        ptp_subtitles.remove(44)
+                    if 3 not in ptp_subtitles:
+                        ptp_subtitles.append(3)
         if meta['debug']:
             console.print("ptp_trumpable", ptp_trumpable)
         data = {
