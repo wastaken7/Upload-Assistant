@@ -267,12 +267,21 @@ async def create_base_from_existing_torrent(torrentpath, base_dir, uuid):
     if os.path.exists(torrentpath):
         base_torrent = Torrent.read(torrentpath)
         base_torrent.trackers = ['https://fake.tracker']
-        base_torrent.comment = "Created by L4G's Upload Assistant"
-        base_torrent.created_by = "Created by L4G's Upload Assistant"
-        # Remove Un-whitelisted info from torrent
-        for each in list(base_torrent.metainfo['info']):
-            if each not in ('files', 'length', 'name', 'piece length', 'pieces', 'private', 'source'):
-                base_torrent.metainfo['info'].pop(each, None)
+        base_torrent.comment = "Created by Audionut's Upload Assistant"
+        base_torrent.created_by = "Created by Audionut's Upload Assistant"
+        info_dict = base_torrent.metainfo['info']
+        valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
+
+        # Add the correct key based on single vs multi file torrent
+        if 'files' in info_dict:
+            valid_keys.append('files')
+        elif 'length' in info_dict:
+            valid_keys.append('length')
+
+        # Remove everything not in the whitelist
+        for each in list(info_dict):
+            if each not in valid_keys:
+                info_dict.pop(each, None)
         for each in list(base_torrent.metainfo):
             if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
                 base_torrent.metainfo.pop(each, None)

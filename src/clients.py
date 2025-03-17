@@ -960,11 +960,8 @@ class Clients():
                             console.print(f"[bold red]Validation failed for {torrent_file_path}")
                             os.remove(torrent_file_path)  # Remove invalid file
                         else:
-                            base_torrent_file_path = os.path.join(extracted_torrent_dir, "BASE.torrent")
-                            with open(base_torrent_file_path, "wb") as f:
-                                f.write(torrent_file_content)
-                            if meta.get('debug', False):
-                                console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
+                            from src.torrentcreate import create_base_from_existing_torrent
+                            await create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'])
 
                     except qbittorrentapi.APIError as e:
                         console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
