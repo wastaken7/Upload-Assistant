@@ -566,12 +566,13 @@ class Prep():
                 aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
                 difference = SequenceMatcher(None, title, aka_trimmed).ratio()
                 if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                    aka = ""
+                    aka = None
 
-                if f"({year})" in aka:
-                    aka = aka.replace(f"({year})", "").strip()
+                if aka is not None:
+                    if f"({year})" in aka:
+                        aka = aka.replace(f"({year})", "").strip()
 
-                meta['aka'] = f"AKA {aka}"
+                    meta['aka'] = f"AKA {aka}"
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
