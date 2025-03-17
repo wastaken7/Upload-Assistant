@@ -191,7 +191,7 @@ class SP():
             else:
                 name = meta['uuid']
         elif meta.get('is_disc') is True:
-            name =  meta['name']
+            name = meta['name']
         else:
             if meta.get('mal_id', 0) != 0:
                 name = meta['name']
