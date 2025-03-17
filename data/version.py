@@ -1,3 +1,13 @@
+__version__ = "4.0.3.1"
+
+"""
+Changelog for version 4.0.3.1 (2025-03-17):
+
+- Fix erroneous AKA in title when AKA empty
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.3...4.0.3.1
+"""
+
 __version__ = "4.0.3"
 
 """
