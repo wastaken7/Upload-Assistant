@@ -562,7 +562,7 @@ class Prep():
             title = meta.get('imdb_info', {}).get('title', "").strip().lower()
             year = str(meta.get('imdb_info', {}).get('year', ""))
 
-            if aka:
+            if aka and not meta.get('aka'):
                 aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
                 difference = SequenceMatcher(None, title, aka_trimmed).ratio()
                 if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
@@ -571,7 +571,7 @@ class Prep():
                 if f"({year})" in aka:
                     aka = aka.replace(f"({year})", "").strip()
 
-                meta['aka'] = aka
+                meta['aka'] = f"AKA {aka}"
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
