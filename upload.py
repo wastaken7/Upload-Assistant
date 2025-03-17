@@ -450,7 +450,7 @@ async def do_the_thing(base_dir):
 
     await update_notification(base_dir)
 
-    cleanup_only = any('--cleanup' in arg for arg in sys.argv) and len(sys.argv) <= 2
+    cleanup_only = any(arg in ('--cleanup', '-cleanup') for arg in sys.argv) and len(sys.argv) <= 2
 
     try:
         # If cleanup is the only operation, use a dummy path to satisfy the parser
