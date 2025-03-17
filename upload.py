@@ -318,28 +318,47 @@ async def save_processed_file(log_file, file_path):
 
 def reset_terminal():
     """Reset the terminal while allowing the script to continue running (Linux/macOS only)."""
-
     if os.name != "posix":
         return
 
     try:
-        sys.stderr.flush()
+        if not sys.stderr.closed:
+            sys.stderr.flush()
 
-        if sys.stdin.isatty():
-            subprocess.run(["stty", "sane"], check=False)
-            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
-            subprocess.run(["stty", "-ixon"], check=False)
+        if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+            try:
+                subprocess.run(["stty", "sane"], check=False)
+                if hasattr(termios, 'tcflush'):
+                    termios.tcflush(sys.stdin.fileno(), termios.TCIOFLUSH)
+                subprocess.run(["stty", "-ixon"], check=False)
+            except (IOError, OSError):
+                pass
 
-        sys.stdout.write("\033[0m")
-        sys.stdout.flush()
-        sys.stdout.write("\033[?25h")
-        sys.stdout.flush()
-        os.system("jobs -p | xargs kill 2>/dev/null")
-        sys.stderr.flush()
+        if not sys.stdout.closed:
+            try:
+                sys.stdout.write("\033[0m")
+                sys.stdout.flush()
+                sys.stdout.write("\033[?25h")
+                sys.stdout.flush()
+            except (IOError, ValueError):
+                pass
+
+        # Kill background jobs
+        try:
+            os.system("jobs -p | xargs -r kill 2>/dev/null")
+        except Exception:
+            pass
+
+        if not sys.stderr.closed:
+            sys.stderr.flush()
 
     except Exception as e:
-        sys.stderr.write(f"Error during terminal reset: {e}\n")
-        sys.stderr.flush()
+        try:
+            if not sys.stderr.closed:
+                sys.stderr.write(f"Error during terminal reset: {e}\n")
+                sys.stderr.flush()
+        except Exception:
+            pass  # At this point we can't do much more
 
 
 def get_local_version(version_file):
