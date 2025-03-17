@@ -190,8 +190,10 @@ class SP():
                 name = meta.get('scene_name')
             else:
                 name = meta['uuid']
+        elif meta.get('is_disc') is True:
+            name =  meta['name']
         else:
-            if meta.get('is_disc') is True:
+            if meta.get('mal_id', 0) != 0:
                 name = meta['name']
             else:
                 name = meta['uuid']
