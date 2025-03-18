@@ -94,7 +94,7 @@ class Args():
         parser.add_argument('-edition', '--edition', '--repack', nargs='*', required=False, help="Edition/Repack String e.g.(Director's Cut, Uncut, Hybrid, REPACK, REPACK3)", type=str, dest='manual_edition')
         parser.add_argument('-season', '--season', nargs=1, required=False, help="Season (number)", type=str)
         parser.add_argument('-episode', '--episode', nargs=1, required=False, help="Episode (number)", type=str)
-        parser.add_argument('-met', '--manual-episode-title', nargs='*', required=False, help="Set episode title, empty = empty", type=str, dest="manual_episode_title")
+        parser.add_argument('-met', '--manual-episode-title', nargs='*', required=False, help="Set episode title, empty = empty", type=str, dest="manual_episode_title", default=None)
         parser.add_argument('-daily', '--daily', nargs=1, required=False, help="Air date of this episode (YYYY-MM-DD)", type=datetime.date.fromisoformat, dest="manual_date")
         parser.add_argument('--no-season', dest='no_season', action='store_true', required=False, help="Remove Season from title")
         parser.add_argument('--no-year', dest='no_year', action='store_true', required=False, help="Remove Year from title")
