@@ -1442,7 +1442,10 @@ class Prep():
     async def get_name(self, meta):
         type = meta.get('type', "").upper()
         title = meta.get('title', "")
-        alt_title = meta.get('aka', "")
+        if meta.get('tmdb_id') != 157744:
+            alt_title = meta.get('aka', "")
+        else:
+            alt_title = ""
         year = meta.get('year', "")
         if meta.get('manual_year') > 0:
             year = meta.get('manual_year')
