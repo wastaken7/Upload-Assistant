@@ -7,7 +7,7 @@ from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze
 from src.imdb import get_imdb_info_api, search_imdb
 from src.trackermeta import update_metadata_from_tracker
-from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id
+from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id, get_episode_details
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
@@ -581,6 +581,9 @@ class Prep():
                 meta['tag'] = f"-{meta['tag']}"
         if meta['category'] == "TV":
             meta = await get_season_episode(video, meta)
+            episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
+            if meta.get('episode_title') is None:
+                meta['episode_title'] = episode_details['name']
         meta = await self.tag_override(meta)
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
