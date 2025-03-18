@@ -136,6 +136,38 @@ class BBCODE:
         desc = desc.replace('http://passthepopcorn.me', 'PTP').replace('https://passthepopcorn.me', 'PTP')
         desc = desc.replace('http://hdbits.org', 'HDB').replace('https://hdbits.org', 'HDB')
 
+        # Catch Stray Images and Prepare Image List
+        imagelist = []
+        excluded_urls = set()
+
+        source_encode_comps = re.findall(r"\[comparison=Source, Encode\][\s\S]*", desc, flags=re.IGNORECASE)
+        source_vs_encode_sections = re.findall(r"Source Vs Encode:[\s\S]*", desc, flags=re.IGNORECASE)
+        specific_cases = source_encode_comps + source_vs_encode_sections
+
+        # Extract URLs and update excluded_urls
+        for block in specific_cases:
+            urls = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", block, flags=re.IGNORECASE)
+            excluded_urls.update(urls)
+            desc = desc.replace(block, '')
+
+        # General [comparison=...] handling
+        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc, flags=re.IGNORECASE)
+        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc, flags=re.IGNORECASE)
+        comps.extend(hides)
+        nocomp = desc
+
+        # Exclude URLs from exculed array fom `nocomp`
+        for url in excluded_urls:
+            nocomp = nocomp.replace(url, '')
+
+        comp_placeholders = []
+
+        # Replace comparison/hide tags with placeholder because sometimes uploaders use comp images as loose images
+        for i, comp in enumerate(comps):
+            nocomp = nocomp.replace(comp, '')
+            desc = desc.replace(comp, f"COMPARISON_PLACEHOLDER-{i} ")
+            comp_placeholders.append(comp)
+
         if is_disc == "DVD":
             desc = re.sub(r"\[mediainfo\][\s\S]*?\[\/mediainfo\]", "", desc)
 
@@ -223,38 +255,6 @@ class BBCODE:
         ]
         for each in remove_list:
             desc = desc.replace(each, '')
-
-        # Catch Stray Images and Prepare Image List
-        imagelist = []
-        excluded_urls = set()
-
-        source_encode_comps = re.findall(r"\[comparison=Source, Encode\][\s\S]*", desc, flags=re.IGNORECASE)
-        source_vs_encode_sections = re.findall(r"Source Vs Encode:[\s\S]*", desc, flags=re.IGNORECASE)
-        specific_cases = source_encode_comps + source_vs_encode_sections
-
-        # Extract URLs and update excluded_urls
-        for block in specific_cases:
-            urls = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", block, flags=re.IGNORECASE)
-            excluded_urls.update(urls)
-            desc = desc.replace(block, '')
-
-        # General [comparison=...] handling
-        comps = re.findall(r"\[comparison=[\s\S]*?\[\/comparison\]", desc, flags=re.IGNORECASE)
-        hides = re.findall(r"\[hide[\s\S]*?\[\/hide\]", desc, flags=re.IGNORECASE)
-        comps.extend(hides)
-        nocomp = desc
-
-        # Exclude URLs from exculed array fom `nocomp`
-        for url in excluded_urls:
-            nocomp = nocomp.replace(url, '')
-
-        comp_placeholders = []
-
-        # Replace comparison/hide tags with placeholder because sometimes uploaders use comp images as loose images
-        for i, comp in enumerate(comps):
-            nocomp = nocomp.replace(comp, '')
-            desc = desc.replace(comp, f"COMPARISON_PLACEHOLDER-{i} ")
-            comp_placeholders.append(comp)
 
         # Remove Images in IMG tags
         desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
