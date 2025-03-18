@@ -67,6 +67,7 @@ class BHD():
         files = {
             'mediainfo': mi_dump,
         }
+        imdb = int(meta['imdb'])
         if os.path.exists(torrent_file):
             open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
             files['file'] = open_torrent.read()
@@ -76,7 +77,7 @@ class BHD():
             'category_id': cat_id,
             'type': type_id,
             'source': source_id,
-            'imdb_id': meta['imdb'],
+            'imdb_id': imdb,
             'tmdb_id': meta['tmdb'],
             'description': desc,
             'anon': anon,
