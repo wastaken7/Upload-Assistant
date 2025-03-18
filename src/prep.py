@@ -583,7 +583,10 @@ class Prep():
             meta = await get_season_episode(video, meta)
             episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
             if meta.get('episode_title') is None and episode_details.get('name') is not None:
-                meta['episode_title'] = episode_details['name']
+                if 'episode' in episode_details.get("name").lower():
+                    meta['episode_title'] = ""
+                else:
+                    meta['episode_title'] = episode_details['name']
         meta = await self.tag_override(meta)
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
