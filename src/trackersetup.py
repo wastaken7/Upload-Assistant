@@ -195,7 +195,7 @@ class TRACKER_SETUP:
             content = await asyncio.to_thread(self._read_file, file_path)
             data = json.loads(content)
             last_updated = datetime.strptime(data['last_updated'], "%Y-%m-%d")
-            return datetime.now() >= last_updated + timedelta(days=2)
+            return datetime.now() >= last_updated + timedelta(days=1)
         except FileNotFoundError:
             return True
         except Exception as e:
