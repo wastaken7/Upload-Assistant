@@ -169,6 +169,10 @@ class ULCX():
             console.print('[bold red]Concerts not allowed at ULCX.')
             meta['skipping'] = "ULCX"
             return
+        if meta['video_codec'] == "HEVC" and meta['resolution'] != "2160p" and 'animation' not in meta['keywords'] and meta.get('anime', False) is not True:
+            console.print('[bold red]This content is not allowed at ULCX.')
+            meta['skipping'] = "ULCX"
+            return
         dupes = []
         console.print("[yellow]Searching for existing torrents on ULCX...")
         params = {
