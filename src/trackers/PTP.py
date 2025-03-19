@@ -891,7 +891,7 @@ class PTP():
                     else:
                         mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "w", newline="", encoding="utf-8") as f:
-                            f.write(mi_dump)
+                            f.write(mi_dump.replace(file, os.path.basename(file)))
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "r", encoding="utf-8").read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
                         new_images_key = f'new_images_file_{i}'
