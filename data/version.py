@@ -1,3 +1,28 @@
+__version__ = "4.0.4"
+
+"""
+Changelog for version 4.0.4 (2025-03-19):
+
+## What's Changed
+* get episode title from tmdb by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/403
+* supporting 540p by @swannie-eire in https://github.com/Audionut/Upload-Assistant/pull/404
+* LT - fix no distributor api endpoint by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/406
+* reset terminal fix
+* ULCX content checks
+* PTP - set EN sub flag when trumpable for HC's English subs
+* PTP - fixed an issue where description images were not being parsed correctly
+* Caught an IMDB issue when no IMDB is returned by metadata functions
+* Changed the banned groups/claims checking to daily
+
+## Episode title data change
+Instead of relying solely on guessit to catch episode titles, UA now pulls episode title information from TMDB. There is some pre-filtering to catch placeholder title information like 'Episode 2', but you should monitor your TV uploads. Setting  with an empty space will clear the episode title.
+
+Conversely (reminder of already existing functionality), setting met with some title  will force that episode title.
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.3.1...4.0.4
+"""
+
 __version__ = "4.0.3.1"
 
 """
