@@ -641,7 +641,7 @@ class Prep():
 
         # return duplicate ids so I don't have to catch every site file
         meta['tmdb'] = meta.get('tmdb_id')
-        if meta.get('imdb_id') != 0:
+        if int(meta.get('imdb_id')) != 0:
             imdb_str = str(meta['imdb_id']).zfill(7)
             meta['imdb'] = imdb_str
         else:
