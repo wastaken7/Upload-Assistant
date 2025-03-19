@@ -167,7 +167,7 @@ class LT():
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
 
-        #if distributor_id != 0:
+        # if distributor_id != 0:
         #    data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = int(meta.get('season_int', '0'))
