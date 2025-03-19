@@ -119,15 +119,41 @@ jobs:
           echo "VERSION=${{ env.VERSION }}"
           echo "UPDATE_VERSION=${{ env.UPDATE_VERSION }}"
 
-      - name: Build and push Docker image
+      # Split build and push into platform-specific jobs
+      - name: Build and push amd64 Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}
-            ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64
+          build-args: |
+            TARGET_ARCH=amd64
+            MKBRR_ARCH=linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build and push arm64 Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64
+          build-args: |
+            TARGET_ARCH=arm64
+            MKBRR_ARCH=linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Create and push the manifest to combine both images
+      - name: Create and push manifest
+        run: |
+          docker manifest create \
+            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }} \
+            --amend ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64 \
+            --amend ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64
+          
+          docker manifest push ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}
