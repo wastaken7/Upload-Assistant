@@ -114,7 +114,7 @@ class LT():
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         # region_id = await common.unit3d_region_ids(meta.get('region'))
-        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        # distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         lt_name = await self.edit_name(meta)
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
@@ -167,8 +167,8 @@ class LT():
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
 
-        if distributor_id != 0:
-            data['distributor_id'] = distributor_id
+        #if distributor_id != 0:
+        #    data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = int(meta.get('season_int', '0'))
             data['episode_number'] = int(meta.get('episode_int', '0'))
