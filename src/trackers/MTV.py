@@ -249,8 +249,6 @@ class MTV():
 
             if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE') and "DD" in audio_str:
                 mtv_name = mtv_name.replace(audio_str, audio_str.replace(' ', '', 1))
-            if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '' and meta['episode'].strip() != '':
-                mtv_name = mtv_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}")
             if 'DD+' in meta.get('audio', '') and 'DDP' in meta['uuid']:
                 mtv_name = mtv_name.replace('DD+', 'DDP')
 

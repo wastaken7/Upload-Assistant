@@ -90,8 +90,6 @@ class HDT():
 
     async def edit_name(self, meta):
         hdt_name = meta['name']
-        if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 and meta.get('episode_title_storage', '').strip() != '':
-            hdt_name = hdt_name.replace(meta['episode'], f"{meta['episode']} {meta['episode_title_storage']}")
         if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE'):
             hdt_name = hdt_name.replace(meta['audio'], meta['audio'].replace(' ', '', 1))
         if 'DV' in meta.get('hdr', ''):
