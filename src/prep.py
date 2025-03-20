@@ -589,7 +589,8 @@ class Prep():
                     else:
                         meta['episode_title'] = episode_details['name']
         meta = await self.tag_override(meta)
-        if meta.get('user_overrides', False):
+        user_overrides = config['DEFAULT'].get('user_overrides', False)
+        if user_overrides:
             meta = await self.get_source_override(meta)
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
