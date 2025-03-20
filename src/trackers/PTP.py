@@ -1176,8 +1176,12 @@ class PTP():
                 "User-Agent": self.user_agent
             }
             if meta['debug']:
+                debug_data = data.copy()
+                # Redact the AntiCsrfToken
+                if 'AntiCsrfToken' in debug_data:
+                    debug_data['AntiCsrfToken'] = '[REDACTED]'
                 console.log(url)
-                console.log(data)
+                console.log(debug_data)
             else:
                 with requests.Session() as session:
                     cookiefile = f"{meta['base_dir']}/data/cookies/PTP.pickle"
