@@ -151,29 +151,9 @@ jobs:
       # Create and push the manifest to combine both images
       - name: Create and push manifest
         run: |
-          # First, inspect the images to verify they are not manifest lists
-          echo "Inspecting amd64 image..."
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64
-          
-          echo "Inspecting arm64 image..."
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64
-          
-          echo "Creating manifest list..."
           docker manifest create \
             ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }} \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64
+            --amend ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64 \
+            --amend ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64
           
-          echo "Annotating manifest with platform info..."
-          docker manifest annotate \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }} \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-amd64 \
-            --os linux --arch amd64
-          
-          docker manifest annotate \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }} \
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}-arm64 \
-            --os linux --arch arm64
-          
-          echo "Pushing manifest..."
           docker manifest push ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}
