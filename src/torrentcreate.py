@@ -171,7 +171,7 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                     power = min(27, max(16, math.floor(math.log2(max_size_bytes))))
 
                     cmd.extend(["-l", str(power)])
-                    console.print(f"[yellow]Setting mkbrr piece length to 2^{power} bytes ({2**power} bytes)")
+                    console.print(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
                 except (ValueError, TypeError):
                     console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
