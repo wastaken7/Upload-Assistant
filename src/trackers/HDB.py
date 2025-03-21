@@ -481,7 +481,8 @@ class HDB():
             descfile.close()
 
     async def hdbimg_upload(self, meta):
-        image_glob = glob.glob("*.png")
+        image_path = os.path.join(meta['base_dir'], "tmp", os.path.basename(meta['path']), "*.png")
+        image_glob = glob.glob(image_path)
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files = set()
         for pattern in unwanted_patterns:
