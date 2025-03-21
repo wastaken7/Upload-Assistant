@@ -188,7 +188,7 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 line = line.strip()
 
                 # Detect hashing progress, speed, and percentage
-                match = re.search(r"Hashing pieces.*?\[(\d+\.\d+ MB/s)\]\s+(\d+)%", line)
+                match = re.search(r"Hashing pieces.*?\[(\d+(?:\.\d+)? (?:MB|MiB)/s)\]\s+(\d+)%", line)
                 if match:
                     speed = match.group(1)  # Extract speed (e.g., "12734.21 MB/s")
                     pieces_done = int(match.group(2))  # Extract percentage (e.g., "60")
