@@ -1,3 +1,23 @@
+__version__ = "4.0.5"
+
+"""
+Changelog for version 4.0.5 (2025-03-21):
+
+## What's Changed
+* Refactor TOCA.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/410
+* fixed an imdb search returning bad results
+* don't run episode title checks on season packs or episode == 0
+* cleaned PTP mediainfo in packed content (scrubbed by PTP upload parser anyway)
+* fixed some sites duplicating episode title
+* docker should only pull needed mkbrr binaries, not all of them
+* removed private details from some console prints
+* fixed handling in ptp mediainfo check
+* fixed  arg work with no value
+* removed rehosting from OTW, they seem fine with ptpimg now.
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.4...4.0.5
+"""
+
 __version__ = "4.0.4"
 
 """
