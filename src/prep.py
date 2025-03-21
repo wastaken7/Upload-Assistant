@@ -776,7 +776,7 @@ class Prep():
                     scan = "p"  # Assume progressive based on common resolution markers
                 else:
                     scan = "i"  # Default to interlaced if no indicators are found
-            width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
+            width_list = [3840, 2560, 1920, 1280, 1024, 960, 854, 720, 15360, 7680, 0]
             height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
             width = await self.closest(width_list, int(width))
             actual_height = int(height)
