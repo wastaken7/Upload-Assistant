@@ -89,21 +89,24 @@ class BBCODE:
         desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
-        # Strip trailing whitespace and newlines:
-        desc = desc.rstrip()
+        if meta.get('flux', False):
+            # Strip trailing whitespace and newlines:
+            desc = desc.rstrip()
 
-        # Strip blank lines:
-        desc = desc.strip('\n')
-        desc = re.sub("\n\n+", "\n\n", desc)
-        while desc.startswith('\n'):
-            desc = desc.replace('\n', '', 1)
-        desc = desc.strip('\n')
+            # Strip blank lines:
+            desc = desc.strip('\n')
+            desc = re.sub("\n\n+", "\n\n", desc)
+            while desc.startswith('\n'):
+                desc = desc.replace('\n', '', 1)
+            desc = desc.strip('\n')
 
-        if desc.replace('\n', '').strip() == '':
-            console.print("[yellow]Description is empty after cleaning.")
-            return "", imagelist
+            if desc.replace('\n', '').strip() == '':
+                console.print("[yellow]Description is empty after cleaning.")
+                return "", imagelist
 
-        description = f"[code]{desc}[/code]"
+            description = f"[code]{desc}[/code]"
+        else:
+            description = ""
 
         return description, imagelist
 

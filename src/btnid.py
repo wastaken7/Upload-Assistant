@@ -83,7 +83,6 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
 
     first_result = results[0]
     name = first_result.get("name", "").lower()
-    internal = bool(first_result.get("internal", False))
     description = first_result.get("description", "")
 
     imdb_id = first_result.get("imdb_id", "").replace("tt", "") if first_result.get("imdb_id") else 0
@@ -96,11 +95,13 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
     if only_id:
         return meta["imdb_id"] or meta["tmdb_id"] or 0
 
-    if not only_id and internal and ("framestor" in name or "flux" in name):
+    if not only_id:
         bbcode = BBCODE()
         imagelist = []
         if "framestor" in name:
             meta["framestor"] = True
+        elif "flux" in name:
+            meta["flux"] = True
         description, imagelist = bbcode.clean_bhd_description(description, meta)
         meta["description"] = description
         meta["image_list"] = imagelist

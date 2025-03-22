@@ -376,6 +376,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     meta['imdb_id'] = 0
                     meta['tmdb_id'] = 0
                     meta["framestor"] = False
+                    meta["flux"] = False
                     meta["description"] = None
                     meta["image_list"] = []
                     meta['nfo'] = False
