@@ -8,6 +8,7 @@ from PIL import Image
 import io
 from io import BytesIO
 import os
+import click
 from src.btnid import get_bhd_torrents
 
 # Define expected amount of screenshots from the config
@@ -363,6 +364,32 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             if not meta['unattended']:
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
                 if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                    if meta.get('description') and meta.get('description') != "":
+                        description = meta.get('description')
+                        console.print("[bold green]Successfully grabbed description from BHD")
+                        console.print(f"Description after cleaning:\n{description[:1000]}...", markup=False)
+
+                        if not meta.get('skipit') and not meta['unattended']:
+                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+
+                            if edit_choice.lower() == 'e':
+                                edited_description = click.edit(description)
+                                if edited_description:
+                                    desc = edited_description.strip()
+                                    meta['description'] = description
+                                    meta['saved_description'] = True
+                                console.print(f"[green]Final description after editing:[/green] {desc}")
+                            elif edit_choice.lower() == 'd':
+                                description = ""
+                                console.print("[yellow]Description discarded.[/yellow]")
+                            else:
+                                console.print("[green]Keeping the original description.[/green]")
+                                meta['description'] = description
+                                meta['saved_description'] = True
+                        else:
+                            meta['description'] = description
+                            meta['saved_description'] = True
                     if meta.get('image_list'):
                         valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                         if valid_images:
@@ -415,6 +442,19 @@ async def handle_image_list(meta, tracker_name):
             if not keep_images:
                 meta['image_list'] = []
                 meta['image_sizes'] = {}
+                save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                try:
+                    import glob
+                    png_files = glob.glob(os.path.join(save_path, "*.png"))
+                    for png_file in png_files:
+                        os.remove(png_file)
+
+                    if png_files:
+                        console.print(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")
+                    else:
+                        console.print("[yellow]No image files found to delete.[/yellow]")
+                except Exception as e:
+                    console.print(f"[red]Failed to delete image files: {e}[/red]")
                 console.print(f"[yellow]Images discarded from {tracker_name}.")
             else:
                 console.print(f"[green]Images retained from {tracker_name}.")
