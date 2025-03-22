@@ -864,3 +864,67 @@ async def daily_to_tmdb_season_episode(tmdbid, date):
             console.print(f"[yellow]Unable to map the date ([bold yellow]{str(date)}[/bold yellow]) to a Season/Episode number")
 
     return season, episode
+
+
+async def get_episode_details(tmdb_id, season_number, episode_number, debug=False):
+    async with httpx.AsyncClient() as client:
+        try:
+            # Get episode details
+            response = await client.get(
+                f"{TMDB_BASE_URL}/tv/{tmdb_id}/season/{season_number}/episode/{episode_number}",
+                params={"api_key": TMDB_API_KEY, "append_to_response": "images,credits,external_ids"}
+            )
+            response.raise_for_status()
+            episode_data = response.json()
+
+            if debug:
+                console.print(f"[cyan]Episode Data: {json.dumps(episode_data, indent=2)[:600]}...")
+
+            # Extract relevant information
+            episode_info = {
+                'name': episode_data.get('name', ''),
+                'overview': episode_data.get('overview', ''),
+                'air_date': episode_data.get('air_date', ''),
+                'still_path': episode_data.get('still_path', ''),
+                'vote_average': episode_data.get('vote_average', 0),
+                'episode_number': episode_data.get('episode_number', 0),
+                'season_number': episode_data.get('season_number', 0),
+                'runtime': episode_data.get('runtime', 0),
+                'crew': [],
+                'guest_stars': [],
+                'director': '',
+                'writer': '',
+                'imdb_id': episode_data.get('external_ids', {}).get('imdb_id', '')
+            }
+
+            # Extract crew information
+            for crew_member in episode_data.get('crew', []):
+                episode_info['crew'].append({
+                    'name': crew_member.get('name', ''),
+                    'job': crew_member.get('job', ''),
+                    'department': crew_member.get('department', '')
+                })
+
+                # Extract director and writer specifically
+                if crew_member.get('job') == 'Director':
+                    episode_info['director'] = crew_member.get('name', '')
+                elif crew_member.get('job') == 'Writer':
+                    episode_info['writer'] = crew_member.get('name', '')
+
+            # Extract guest stars
+            for guest in episode_data.get('guest_stars', []):
+                episode_info['guest_stars'].append({
+                    'name': guest.get('name', ''),
+                    'character': guest.get('character', ''),
+                    'profile_path': guest.get('profile_path', '')
+                })
+
+            # Get full image URLs
+            if episode_info['still_path']:
+                episode_info['still_url'] = f"https://image.tmdb.org/t/p/original{episode_info['still_path']}"
+
+            return episode_info
+
+        except Exception:
+            console.print("[bold red]Error fetching title episode details[/bold red]")
+            return {}

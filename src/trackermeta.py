@@ -11,6 +11,7 @@ import os
 
 # Define expected amount of screenshots from the config
 expected_images = int(config['DEFAULT']['screens'])
+valid_images = []
 
 
 async def prompt_user_for_confirmation(message: str) -> bool:
@@ -53,7 +54,7 @@ async def check_images_concurrently(imagelist, meta):
         return []
 
     # Function to check each image's URL, host, and log resolution
-    save_directory = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+    save_directory = f"{meta['base_dir']}/tmp/{meta['uuid']}"  # Change this to your desired directory
 
     async def check_and_collect(image_dict):
         img_url = image_dict.get('raw_url')
@@ -345,7 +346,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
 async def handle_image_list(meta, tracker_name):
     if meta.get('image_list'):
-        console.print(f"[cyan]Selected the following {expected_images} valid images from {tracker_name}:")
+        console.print(f"[cyan]Selected the following {valid_images} valid images from {tracker_name}:")
         for img in meta['image_list']:
             console.print(f"Image:[green]'{img.get('img_url')}'[/green]")
 

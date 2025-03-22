@@ -39,7 +39,7 @@ class BLU():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        blu_name = meta['name']
+        blu_name = await self.edit_name(meta)
         desc_header = ""
         if meta.get('webdv', False):
             blu_name, desc_header = await self.derived_dv_layer(meta)
@@ -136,6 +136,12 @@ class BLU():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def edit_name(self, meta):
+        blu_name = meta['name']
+        if meta['category'] == 'TV' and meta.get('episode_title', "") != "":
+            blu_name = blu_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
+        return blu_name
 
     async def get_flag(self, meta, flag_name):
         config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)

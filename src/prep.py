@@ -7,7 +7,7 @@ from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze
 from src.imdb import get_imdb_info_api, search_imdb
 from src.trackermeta import update_metadata_from_tracker
-from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id
+from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id, get_episode_details
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
@@ -581,6 +581,13 @@ class Prep():
                 meta['tag'] = f"-{meta['tag']}"
         if meta['category'] == "TV":
             meta = await get_season_episode(video, meta)
+            if not meta.get('tv_pack', False) or meta.get('episode_int') != 0:
+                episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
+                if meta.get('episode_title') is None and episode_details.get('name') is not None:
+                    if 'episode' in episode_details.get("name").lower():
+                        meta['episode_title'] = ""
+                    else:
+                        meta['episode_title'] = episode_details['name']
         meta = await self.tag_override(meta)
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
@@ -635,7 +642,7 @@ class Prep():
 
         # return duplicate ids so I don't have to catch every site file
         meta['tmdb'] = meta.get('tmdb_id')
-        if meta.get('imdb_id') != 0:
+        if int(meta.get('imdb_id')) != 0:
             imdb_str = str(meta['imdb_id']).zfill(7)
             meta['imdb'] = imdb_str
         else:
@@ -769,7 +776,7 @@ class Prep():
                     scan = "p"  # Assume progressive based on common resolution markers
                 else:
                     scan = "i"  # Default to interlaced if no indicators are found
-            width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
+            width_list = [3840, 2560, 1920, 1280, 1024, 960, 854, 720, 15360, 7680, 0]
             height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
             width = await self.closest(width_list, int(width))
             actual_height = int(height)

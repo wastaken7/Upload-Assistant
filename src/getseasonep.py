@@ -210,12 +210,7 @@ async def get_season_episode(video, meta):
 
         # Manual episode title
         if 'manual_episode_title' in meta and meta['manual_episode_title'] == "":
-            meta['episode_title_storage'] = meta.get('manual_episode_title')
-        else:
-            meta['episode_title_storage'] = guessit(video, {"excludes": "part"}).get('episode_title', '')
-
-        if meta['season'] == "S00" or meta['episode'] == "E00":
-            meta['episode_title'] = meta['episode_title_storage']
+            meta['episode_title'] = meta.get('manual_episode_title')
 
         # Guess the part of the episode (if available)
         meta['part'] = ""

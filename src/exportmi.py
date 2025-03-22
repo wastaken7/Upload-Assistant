@@ -14,6 +14,8 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
         "1280x540p": "720p", "1280x576p": "720p",
         "1024x576p": "576p", "576p": "576p",
         "1024x576i": "576i", "576i": "576i",
+        "960x540p": "540p", "540p": "540p",
+        "960x540i": "540i", "540i": "540i",
         "854x480p": "480p", "480p": "480p",
         "854x480i": "480i", "480i": "480i",
         "720x576p": "576p", "576p": "576p",
@@ -24,8 +26,6 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
         "7680x4320p": "4320p", "4320p": "4320p",
         "OTHER": "OTHER"}
     resolution = res_map.get(res, None)
-    if actual_height == 540:
-        resolution = "OTHER"
     if resolution is None:
         try:
             resolution = guess['screen_size']
@@ -38,6 +38,8 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
                 '1280p': '720p',
                 '1024p': '576p',
                 '1024i': '576i',
+                '960p': '540p',
+                '960i': '540i',
                 '854p': '480p',
                 '854i': '480i',
                 '720p': '576p',

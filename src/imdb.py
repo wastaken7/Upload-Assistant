@@ -295,4 +295,6 @@ async def search_imdb(filename, search_year):
         if filename in movie.get('title', ''):
             if movie.get('year') == search_year:
                 imdbID = int(str(movie.movieID).replace('tt', '').strip())
+        else:
+            imdbID = 0
     return imdbID

@@ -65,3 +65,5 @@ Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-n
 
 ## **Docker Usage:**
   Visit our wonderful [docker usage wiki page](https://github.com/Audionut/Upload-Assistant/wiki/Docker)
+
+  Also see this excellent video put together by a community memeber https://videos.badkitty.zone/ua
