@@ -360,7 +360,32 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, filename=filename)
 
         if meta.get('imdb_id') or meta.get('tmdb_id'):
-            found_match = True
+            if not meta['unattended']:
+                console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
+                if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                    console.print(f"[green]{tracker_name} data retained.[/green]")
+                    found_match = True
+                else:
+                    console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                    meta[tracker_key] = None
+                    meta['imdb_id'] = 0
+                    meta['tmdb_id'] = 0
+                    meta["framestor"] = False
+                    meta["description"] = None
+                    meta["image_list"] = []
+                    meta['nfo'] = False
+                    meta['bhd_nfo'] = False
+                    save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                    nfo_file_path = os.path.join(save_path, "bhd.nfo")
+                    if os.path.exists(nfo_file_path):
+                        try:
+                            os.remove(nfo_file_path)
+                        except Exception as e:
+                            console.print(f"[red]Failed to delete BHD NFO file: {e}[/red]")
+                    found_match = False
+            else:
+                console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
+                found_match = True
         else:
             found_match = False
 
