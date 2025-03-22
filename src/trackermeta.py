@@ -8,6 +8,7 @@ from PIL import Image
 import io
 from io import BytesIO
 import os
+from src.btnid import get_bhd_torrents
 
 # Define expected amount of screenshots from the config
 expected_images = int(config['DEFAULT']['screens'])
@@ -340,6 +341,28 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     found_match = True
             else:
                 found_match = False
+
+    elif tracker_name == "BHD":
+        bhd_api = config['DEFAULT'].get('bhd_api')
+        bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
+        use_foldername = (meta.get('is_disc') is not None or
+                          meta.get('keep_folder') is True or
+                          meta.get('isdir') is True)
+
+        if use_foldername:
+            # Use folder name from path if available, fall back to UUID
+            folder_path = meta.get('path', '')
+            foldername = os.path.basename(folder_path) if folder_path else meta.get('uuid', '')
+            await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, foldername=foldername)
+        else:
+            # Only use filename if none of the folder conditions are met
+            filename = os.path.basename(meta['filelist'][0]) if meta.get('filelist') else None
+            await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, filename=filename)
+
+        if meta.get('imdb_id') or meta.get('tmdb_id'):
+            found_match = True
+        else:
+            found_match = False
 
     return meta, found_match
 

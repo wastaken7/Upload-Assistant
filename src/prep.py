@@ -302,14 +302,14 @@ class Prep():
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta, only_id)
+                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
                         if meta.get('imdb_id') != 0:
                             found_match = True
                     else:
                         meta = await process_tracker(specific_tracker, meta)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    tracker_order = ["PTP", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
+                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found
