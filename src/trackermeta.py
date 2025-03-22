@@ -369,7 +369,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         console.print("[bold green]Successfully grabbed description from BHD")
                         console.print(f"Description after cleaning:\n{description[:1000]}...", markup=False)
 
-                        if not meta.get('skipit') and not meta['unattended']:
+                        if not meta.get('skipit'):
                             console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
@@ -390,6 +390,45 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         else:
                             meta['description'] = description
                             meta['saved_description'] = True
+                    elif meta.get('bhd_nfo'):
+                        if not meta.get('skipit'):
+                            nfo_file_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "bhd.nfo")
+                            if os.path.exists(nfo_file_path):
+                                with open(nfo_file_path, 'r', encoding='utf-8') as nfo_file:
+                                    nfo_content = nfo_file.read()
+                                    console.print("[bold green]Successfully grabbed FraMeSToR description")
+                                    console.print(f"Description content:\n{nfo_content[:1000]}...", markup=False)
+                                    console.print("[cyan]Do you want to discard or keep the description?[/cyan]")
+                                    edit_choice = input("Enter 'd' to discard, or press Enter to keep it as is: ")
+
+                                    if edit_choice.lower() == 'd':
+                                        description = ""
+                                        nfo_file_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "bhd.nfo")
+                                        nfo_file.close()
+
+                                        try:
+                                            import gc
+                                            gc.collect()  # Force garbage collection to close any lingering handles
+                                            for attempt in range(3):
+                                                try:
+                                                    os.remove(nfo_file_path)
+                                                    console.print("[yellow]NFO file successfully deleted.[/yellow]")
+                                                    break
+                                                except Exception as e:
+                                                    if attempt < 2:
+                                                        console.print(f"[yellow]Attempt {attempt+1}: Could not delete file, retrying in 1 second...[/yellow]")
+                                                        import time
+                                                        time.sleep(1)
+                                                    else:
+                                                        console.print(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
+                                        except Exception as e:
+                                            console.print(f"[red]Error during file cleanup: {e}[/red]")
+                                        meta['nfo'] = False
+                                        meta['bhd_nfo'] = False
+                                        console.print("[yellow]Description discarded.[/yellow]")
+                                    else:
+                                        console.print("[green]Keeping the original description.[/green]")
+
                     if meta.get('image_list'):
                         valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                         if valid_images:

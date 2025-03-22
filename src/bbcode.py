@@ -41,14 +41,16 @@ class BBCODE:
         # Unescape html
         desc = html.unescape(description)
         desc = desc.replace('\r\n', '\n')
+        imagelist = []
 
         if "framestor" in meta and meta['framestor']:
+            framestor_desc = desc
             save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
             os.makedirs(save_path, exist_ok=True)
             nfo_file_path = os.path.join(save_path, "bhd.nfo")
             with open(nfo_file_path, 'w', encoding='utf-8') as f:
                 try:
-                    f.write(desc)
+                    f.write(framestor_desc)
                 finally:
                     f.close()
             console.print(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
@@ -60,8 +62,6 @@ class BBCODE:
         desc = desc.replace("[/size]", "")
         desc = desc.replace("<", "/")
         desc = desc.replace("<", "\\")
-
-        imagelist = []
 
         # Remove Images in IMG tags
         desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
