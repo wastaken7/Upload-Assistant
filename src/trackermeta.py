@@ -357,6 +357,19 @@ async def handle_image_list(meta, tracker_name):
             if not keep_images:
                 meta['image_list'] = []
                 meta['image_sizes'] = {}
+                save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                try:
+                    import glob
+                    png_files = glob.glob(os.path.join(save_path, "*.png"))
+                    for png_file in png_files:
+                        os.remove(png_file)
+
+                    if png_files:
+                        console.print(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")
+                    else:
+                        console.print("[yellow]No image files found to delete.[/yellow]")
+                except Exception as e:
+                    console.print(f"[red]Failed to delete image files: {e}[/red]")
                 console.print(f"[yellow]Images discarded from {tracker_name}.")
             else:
                 console.print(f"[green]Images retained from {tracker_name}.")
