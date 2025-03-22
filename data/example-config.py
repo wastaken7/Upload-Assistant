@@ -179,6 +179,7 @@ config = {
             # "anon" : "False"
         },
         "BHD": {
+            "useAPI": False,  # Set to True if using BHD for automatic file/foldername searching
             "api_key": "BHD api key",
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
             "draft_default": "True",  # Send to drafts
