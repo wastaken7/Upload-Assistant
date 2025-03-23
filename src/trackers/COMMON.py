@@ -61,10 +61,10 @@ class COMMON():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
-            if episode_overview and meta.get('overview_meta', None) is not None:
+            if episode_overview and meta.get('overview_meta') is not None and meta.get('overview_meta') != "":
                 descfile.write("[center][code]")
                 descfile.write(meta['overview_meta'])
-                descfile.write("[/center][/code]\n\n")
+                descfile.write("[/code][/center]\n\n")
 
             bbcode = BBCODE()
             discs = meta.get('discs', [])
