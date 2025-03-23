@@ -302,14 +302,14 @@ class Prep():
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
                         if not meta.get('infohash'):
                             meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta['infohash'], meta, only_id)
+                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
                         if meta.get('imdb_id') != 0:
                             found_match = True
                     else:
                         meta = await process_tracker(specific_tracker, meta)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    tracker_order = ["PTP", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
+                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found
@@ -779,7 +779,7 @@ class Prep():
                     scan = "p"  # Assume progressive based on common resolution markers
                 else:
                     scan = "i"  # Default to interlaced if no indicators are found
-            width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
+            width_list = [3840, 2560, 1920, 1280, 1024, 960, 854, 720, 15360, 7680, 0]
             height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
             width = await self.closest(width_list, int(width))
             actual_height = int(height)
@@ -1449,10 +1449,7 @@ class Prep():
     async def get_name(self, meta):
         type = meta.get('type', "").upper()
         title = meta.get('title', "")
-        if meta.get('tmdb_id') != 157744:
-            alt_title = meta.get('aka', "")
-        else:
-            alt_title = ""
+        alt_title = meta.get('aka', "")
         year = meta.get('year', "")
         if meta.get('manual_year') > 0:
             year = meta.get('manual_year')

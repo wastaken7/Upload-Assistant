@@ -77,10 +77,6 @@ class ANT():
 
         await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
         flags = await self.get_flags(meta)
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
-            anon = 0
-        else:
-            anon = 1
 
         if meta['bdinfo'] is not None:
             bd_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8').read()
@@ -104,8 +100,7 @@ class ANT():
             'tmdbid': meta['tmdb'],
             'mediainfo': mi_dump,
             'flags[]': flags,
-            'anonymous': anon,
-            'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])
+            'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4]),
         }
         if meta['bdinfo'] is not None:
             data.update({

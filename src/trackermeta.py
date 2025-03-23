@@ -8,6 +8,8 @@ from PIL import Image
 import io
 from io import BytesIO
 import os
+import click
+from src.btnid import get_bhd_torrents
 
 # Define expected amount of screenshots from the config
 expected_images = int(config['DEFAULT']['screens'])
@@ -341,6 +343,128 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             else:
                 found_match = False
 
+    elif tracker_name == "BHD":
+        bhd_api = config['DEFAULT'].get('bhd_api')
+        bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
+        use_foldername = (meta.get('is_disc') is not None or
+                          meta.get('keep_folder') is True or
+                          meta.get('isdir') is True)
+
+        if use_foldername:
+            # Use folder name from path if available, fall back to UUID
+            folder_path = meta.get('path', '')
+            foldername = os.path.basename(folder_path) if folder_path else meta.get('uuid', '')
+            await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, foldername=foldername)
+        else:
+            # Only use filename if none of the folder conditions are met
+            filename = os.path.basename(meta['filelist'][0]) if meta.get('filelist') else None
+            await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, filename=filename)
+
+        if meta.get('imdb_id') or meta.get('tmdb_id'):
+            if not meta['unattended']:
+                console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
+                if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                    if meta.get('description') and meta.get('description') != "":
+                        description = meta.get('description')
+                        console.print("[bold green]Successfully grabbed description from BHD")
+                        console.print(f"Description after cleaning:\n{description[:1000]}...", markup=False)
+
+                        if not meta.get('skipit'):
+                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+
+                            if edit_choice.lower() == 'e':
+                                edited_description = click.edit(description)
+                                if edited_description:
+                                    desc = edited_description.strip()
+                                    meta['description'] = description
+                                    meta['saved_description'] = True
+                                console.print(f"[green]Final description after editing:[/green] {desc}")
+                            elif edit_choice.lower() == 'd':
+                                description = ""
+                                console.print("[yellow]Description discarded.[/yellow]")
+                            else:
+                                console.print("[green]Keeping the original description.[/green]")
+                                meta['description'] = description
+                                meta['saved_description'] = True
+                        else:
+                            meta['description'] = description
+                            meta['saved_description'] = True
+                    elif meta.get('bhd_nfo'):
+                        if not meta.get('skipit'):
+                            nfo_file_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "bhd.nfo")
+                            if os.path.exists(nfo_file_path):
+                                with open(nfo_file_path, 'r', encoding='utf-8') as nfo_file:
+                                    nfo_content = nfo_file.read()
+                                    console.print("[bold green]Successfully grabbed FraMeSToR description")
+                                    console.print(f"Description content:\n{nfo_content[:1000]}...", markup=False)
+                                    console.print("[cyan]Do you want to discard or keep the description?[/cyan]")
+                                    edit_choice = input("Enter 'd' to discard, or press Enter to keep it as is: ")
+
+                                    if edit_choice.lower() == 'd':
+                                        description = ""
+                                        nfo_file_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "bhd.nfo")
+                                        nfo_file.close()
+
+                                        try:
+                                            import gc
+                                            gc.collect()  # Force garbage collection to close any lingering handles
+                                            for attempt in range(3):
+                                                try:
+                                                    os.remove(nfo_file_path)
+                                                    console.print("[yellow]NFO file successfully deleted.[/yellow]")
+                                                    break
+                                                except Exception as e:
+                                                    if attempt < 2:
+                                                        console.print(f"[yellow]Attempt {attempt+1}: Could not delete file, retrying in 1 second...[/yellow]")
+                                                        import time
+                                                        time.sleep(1)
+                                                    else:
+                                                        console.print(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
+                                        except Exception as e:
+                                            console.print(f"[red]Error during file cleanup: {e}[/red]")
+                                        meta['nfo'] = False
+                                        meta['bhd_nfo'] = False
+                                        console.print("[yellow]Description discarded.[/yellow]")
+                                    else:
+                                        console.print("[green]Keeping the original description.[/green]")
+
+                    if meta.get('image_list'):
+                        valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                        if valid_images:
+                            meta['image_list'] = valid_images
+                            await handle_image_list(meta, tracker_name)
+                    console.print(f"[green]{tracker_name} data retained.[/green]")
+                    found_match = True
+                else:
+                    console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                    meta[tracker_key] = None
+                    meta['imdb_id'] = 0
+                    meta['tmdb_id'] = 0
+                    meta["framestor"] = False
+                    meta["flux"] = False
+                    meta["description"] = None
+                    meta["image_list"] = []
+                    meta['nfo'] = False
+                    meta['bhd_nfo'] = False
+                    save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                    nfo_file_path = os.path.join(save_path, "bhd.nfo")
+                    if os.path.exists(nfo_file_path):
+                        try:
+                            os.remove(nfo_file_path)
+                        except Exception as e:
+                            console.print(f"[red]Failed to delete BHD NFO file: {e}[/red]")
+                    found_match = False
+            else:
+                console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
+                if meta.get('image_list'):
+                    valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                    if valid_images:
+                        meta['image_list'] = valid_images
+                found_match = True
+        else:
+            found_match = False
+
     return meta, found_match
 
 
@@ -357,6 +481,19 @@ async def handle_image_list(meta, tracker_name):
             if not keep_images:
                 meta['image_list'] = []
                 meta['image_sizes'] = {}
+                save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                try:
+                    import glob
+                    png_files = glob.glob(os.path.join(save_path, "*.png"))
+                    for png_file in png_files:
+                        os.remove(png_file)
+
+                    if png_files:
+                        console.print(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")
+                    else:
+                        console.print("[yellow]No image files found to delete.[/yellow]")
+                except Exception as e:
+                    console.print(f"[red]Failed to delete image files: {e}[/red]")
                 console.print(f"[yellow]Images discarded from {tracker_name}.")
             else:
                 console.print(f"[green]Images retained from {tracker_name}.")

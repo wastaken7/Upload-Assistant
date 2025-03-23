@@ -38,6 +38,8 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
                 '1280p': '720p',
                 '1024p': '576p',
                 '1024i': '576i',
+                '960p': '540p',
+                '960i': '540i',
                 '854p': '480p',
                 '854i': '480i',
                 '720p': '576p',

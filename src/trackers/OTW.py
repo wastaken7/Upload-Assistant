@@ -8,7 +8,6 @@ import glob
 import requests
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.rehostimages import check_hosts
 
 
 class OTW():
@@ -79,26 +78,12 @@ class OTW():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "imagebam.com": "bam",
-        }
-
         otw_name = await self.edit_name(meta)
-
-        approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
-        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
-        if 'OTW_images_key' in meta:
-            image_list = meta['OTW_images_key']
-        else:
-            image_list = meta['image_list']
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):

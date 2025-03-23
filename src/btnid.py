@@ -48,14 +48,22 @@ async def get_btn_torrents(btn_api, btn_id, meta):
     return meta
 
 
-async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False):
+async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=None, filename=None, foldername=None):
     print("Fetching BHD data...")
     post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
     post_data = {
         "action": "search",
         "rsskey": bhd_rss_key,
-        "info_hash": info_hash,
     }
+
+    if info_hash:
+        post_data["info_hash"] = info_hash
+
+    if filename:
+        post_data["file_name"] = filename
+
+    if foldername:
+        post_data["folder_name"] = foldername
 
     headers = {"Content-Type": "application/json"}
 
@@ -75,7 +83,6 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
 
     first_result = results[0]
     name = first_result.get("name", "").lower()
-    internal = bool(first_result.get("internal", False))
     description = first_result.get("description", "")
 
     imdb_id = first_result.get("imdb_id", "").replace("tt", "") if first_result.get("imdb_id") else 0
@@ -88,11 +95,13 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, info_hash, meta, only_id=False)
     if only_id:
         return meta["imdb_id"] or meta["tmdb_id"] or 0
 
-    if not only_id and internal and ("framestor" in name or "flux" in name):
+    if not only_id:
         bbcode = BBCODE()
         imagelist = []
         if "framestor" in name:
             meta["framestor"] = True
+        elif "flux" in name:
+            meta["flux"] = True
         description, imagelist = bbcode.clean_bhd_description(description, meta)
         meta["description"] = description
         meta["image_list"] = imagelist

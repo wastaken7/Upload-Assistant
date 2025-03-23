@@ -1003,7 +1003,7 @@ class PTP():
             bdinfo = meta.get('bdinfo', {})
             audio_tracks = bdinfo.get("audio", [])
             if audio_tracks:
-                first_language = str(audio_tracks[0].get("language", "")).lower()
+                first_language = str(audio_tracks[0].get("Language", "")).lower()
                 if not first_language:
                     no_audio_found = True
                 elif first_language.startswith("en"):
@@ -1013,8 +1013,17 @@ class PTP():
         else:
             mediainfo = meta.get('mediainfo', {})
             audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
-            if audio_tracks:
-                first_language = str(audio_tracks[0].get("language", "")).lower()
+            if meta['debug']:
+                console.print(f"[Debug] Found {len(audio_tracks)} audio tracks")
+
+            if not audio_tracks:
+                no_audio_found = True
+                console.print("[yellow]No audio tracks found in mediainfo")
+            else:
+                first_language = str(audio_tracks[0].get("Language", "")).lower()
+                if meta['debug']:
+                    console.print(f"[Debug] First audio track language: {first_language}")
+
                 if not first_language:
                     no_audio_found = True
                 elif first_language.startswith("en"):
@@ -1167,8 +1176,12 @@ class PTP():
                 "User-Agent": self.user_agent
             }
             if meta['debug']:
+                debug_data = data.copy()
+                # Redact the AntiCsrfToken
+                if 'AntiCsrfToken' in debug_data:
+                    debug_data['AntiCsrfToken'] = '[REDACTED]'
                 console.log(url)
-                console.log(data)
+                console.log(debug_data)
             else:
                 with requests.Session() as session:
                     cookiefile = f"{meta['base_dir']}/data/cookies/PTP.pickle"

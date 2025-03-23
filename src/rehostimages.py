@@ -50,11 +50,11 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
         hostname = parsed_url.netloc
         mapped_host = match_host(hostname, url_host_mapping.keys())
         mapped_host = url_host_mapping.get(mapped_host, mapped_host)
-        if meta['debug']:
-            if mapped_host in approved_image_hosts:
+        if mapped_host in approved_image_hosts:
+            if meta['debug']:
                 console.print(f"[green]URL '{raw_url}' is correctly matched to approved host '{mapped_host}'.")
-            else:
-                console.print(f"[red]URL '{raw_url}' is not recognized as part of an approved host.")
+        else:
+            console.print(f"[red]URL '{raw_url}' is not recognized as part of an approved host.")
 
     if not all(
         url_host_mapping.get(
