@@ -198,14 +198,43 @@ class Prep():
                 # if not AKA, catch titles that begin with a year
                 match = re.match(r"^(\d+)", basename)
                 if match:
-                    title = match.group(1)
-                    # If we find year at beginning, look for a year elsewhere in the filename
+                    potential_title = match.group(1)
+                    # Check if this title could also be a year (1900-2099)
+                    could_be_year = re.match(r'^(19|20)\d{2}$', potential_title) is not None
+
+                    # Search for a different year elsewhere in the filename
                     year_match = re.search(r'\b(19|20)\d{2}\b', basename)
-                    if year_match:
+
+                    # Only accept the year_match if it's different from the potential_title
+                    if year_match and (not could_be_year or year_match.group(0) != potential_title):
                         year = year_match.group(0)
+                    else:
+                        year = None
+
+                    # If the title is also a valid year and no other year was found,
+                    # we need to decide whether to treat it as a title or a year
+                    if could_be_year and not year:
+                        # Look for title patterns that suggest this is a year as a title
+                        # (e.g., "1883.S01E01" suggests 1883 is a title, not a year)
+                        if re.search(r'\bS\d+', basename) or '.S' in basename:
+                            # This looks like a TV show, so treat the number as a title
+                            title = potential_title
+                        else:
+                            # This could be a movie from that year, so try to use it as a year
+                            year = potential_title
+                            title = None
+                    else:
+                        title = potential_title
+
                     return title, None, year
 
-                return match, None, year
+                # If no pattern match works but there's still a year in the filename, extract it
+                year_match = re.search(r'\b(19|20)\d{2}\b', basename)
+                if year_match:
+                    year = year_match.group(0)
+                    return None, None, year
+
+                return None, None, None
 
             videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
@@ -214,6 +243,7 @@ class Prep():
             video, meta['scene'], meta['imdb_id'] = await self.is_scene(videopath, meta, meta.get('imdb_id', 0))
 
             title, secondary_title, extracted_year = extract_title_and_year(video)
+            console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
             if secondary_title:
                 meta['secondary_title'] = secondary_title
             if extracted_year and not meta.get('search_year'):
@@ -235,6 +265,8 @@ class Prep():
                 except Exception:
                     search_year = ""
                 meta['search_year'] = search_year
+            else:
+                meta['search_year'] = ""
 
             if not meta.get('edit', False):
                 mi = await exportInfo(videopath, meta['isdir'], meta['uuid'], base_dir, export_text=True)

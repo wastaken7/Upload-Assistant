@@ -114,6 +114,9 @@ async def get_tmdb_from_imdb(imdb_id, tvdb_id=None, search_year=None, filename=N
 async def get_tmdb_id(filename, search_year, meta, category, untouched_filename="", attempted=0):
     console.print("[bold cyan]Fetching TMDB ID...[/bold cyan]")
 
+    search_results = {"results": []}
+    secondary_results = {"results": []}
+
     async with httpx.AsyncClient() as client:
         try:
             # Primary search attempt with year
@@ -134,26 +137,6 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
                 response = await client.get(f"{TMDB_BASE_URL}/search/movie", params=params)
                 response.raise_for_status()
                 search_results = response.json()
-
-            # Check if results were found
-            if search_results.get('results'):
-                meta['tmdb_id'] = search_results['results'][0]['id']
-                return meta
-
-            # If no results and we have a secondary title, try searching with that
-            if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
-                console.print(f"[yellow]No results found for primary title. Trying secondary title: {meta['secondary_title']}[/yellow]")
-                secondary_meta = await get_tmdb_id(
-                    meta['secondary_title'],
-                    search_year,
-                    meta,
-                    category,
-                    untouched_filename,
-                    attempted + 1
-                )
-
-                if secondary_meta.get('tmdb_id', 0) != 0:
-                    return secondary_meta
 
             elif category == "TV":
                 if meta.get('debug', False):
@@ -181,6 +164,7 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
                 meta['tmdb_id'] = search_results['results'][0]['id']
                 return meta
 
+            # If no results and we have a secondary title, try searching with that
             if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
                 console.print(f"[yellow]No results found for primary title. Trying secondary title: {meta['secondary_title']}[/yellow]")
                 secondary_meta = await get_tmdb_id(
@@ -197,6 +181,7 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
 
         except Exception as e:
             console.print(f"[bold red]TMDb search error:[/bold red] {e}")
+            search_results = {"results": []}  # Reset search_results on exception
 
         # Secondary attempt: Try searching without the year
         console.print("[yellow]Retrying without year...[/yellow]")
@@ -239,6 +224,7 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
                 meta['tmdb_id'] = search_results['results'][0]['id']
                 return meta
 
+            # Try with secondary title without year
             if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
                 console.print(f"[yellow]No results found for primary title without year. Trying secondary title: {meta['secondary_title']}[/yellow]")
 
