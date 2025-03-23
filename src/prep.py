@@ -300,11 +300,19 @@ class Prep():
                     elif specific_tracker == "BHD":
                         bhd_api = config['DEFAULT'].get('bhd_api')
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
-                        if not meta.get('infohash'):
-                            meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
-                        if meta.get('imdb_id') != 0:
-                            found_match = True
+                        if meta.get('bhd'):
+                            if len(str(meta['bhd'])) > 8:
+                                if not meta.get('infohash'):
+                                    meta['infohash'] = meta['bhd']
+                                await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
+                                if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
+                                    found_match = True
+                            else:
+                                await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, torrent_id=meta['bhd'])
+                                if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
+                                    found_match = True
+                        else:
+                            console.print("[yellow]No BHD ID found, skipping BHD tracker update.[/yellow]")
                     else:
                         meta = await process_tracker(specific_tracker, meta)
                 else:

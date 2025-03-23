@@ -48,13 +48,20 @@ async def get_btn_torrents(btn_api, btn_id, meta):
     return meta
 
 
-async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=None, filename=None, foldername=None):
+async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=None, filename=None, foldername=None, torrent_id=None):
     print("Fetching BHD data...")
     post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
-    post_data = {
-        "action": "search",
-        "rsskey": bhd_rss_key,
-    }
+
+    if torrent_id is not None:
+        post_data = {
+            "action": "details",
+            "torrent_id": torrent_id,
+        }
+    else:
+        post_data = {
+            "action": "search",
+            "rsskey": bhd_rss_key,
+        }
 
     if info_hash:
         post_data["info_hash"] = info_hash
@@ -75,10 +82,14 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
         print(f"[ERROR] Failed to fetch BHD data: {e}")
         return meta
+    if data.get("status_code") == 0 or data.get("success") is False:
+        error_message = data.get("status_message", "Unknown BHD API error")
+        print(f"[ERROR] BHD API error: {error_message}")
+        return meta
 
     results = data.get("results", [])
     if not results:
-        print("[WARNING] No results found in BHD API response.")
+        print("No results found in BHD API response.")
         return meta
 
     first_result = results[0]
