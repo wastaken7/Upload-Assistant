@@ -229,7 +229,7 @@ class Prep():
 
             # Only guessit the year if it's not already set
             # additionally if the title is already set, it was set because the title starts with year, which guessit fails with
-            if not meta.get('search_year'):
+            if not meta.get('search_year') and not title:
                 try:
                     search_year = guessit(video)['year']
                 except Exception:
