@@ -152,12 +152,56 @@ class Prep():
             meta['sd'] = await self.is_sd(meta['resolution'])
 
         else:
+            def extract_title_and_year(filename):
+                basename = os.path.basename(filename)
+                basename = os.path.splitext(basename)[0]
+
+                secondary_title = None
+
+                aka_patterns = [' AKA ', '.aka.', ' aka ', '.AKA.']
+                for pattern in aka_patterns:
+                    if pattern in basename:
+                        aka_parts = basename.split(pattern, 1)
+                        if len(aka_parts) > 1:
+                            primary_title = aka_parts[0].strip()
+                            secondary_part = aka_parts[1].strip()
+                            secondary_match = re.match(r"^(\d+)", secondary_part)
+                            if secondary_match:
+                                secondary_title = secondary_match.group(1)
+                            else:
+                                year_or_release_match = re.search(r'\b(19|20)\d{2}\b|\bBluRay\b|\bREMUX\b|\b\d+p\b|\bDTS-HD\b|\bAVC\b', secondary_part)
+                                if year_or_release_match:
+
+                                    secondary_title = secondary_part[:year_or_release_match.start()].strip()
+                                else:
+                                    secondary_title = secondary_part
+
+                            primary_title = primary_title.replace('.', ' ')
+                            secondary_title = secondary_title.replace('.', ' ')
+                            return primary_title, secondary_title
+
+                match = re.match(r"^(\d+)", basename)
+                if match:
+                    return match.group(1), None
+
+                return match, None
+
             videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
             search_file_folder = 'file'
+
             video, meta['scene'], meta['imdb_id'] = await self.is_scene(videopath, meta, meta.get('imdb_id', 0))
+
+            title, secondary_title = extract_title_and_year(video)
+            if secondary_title:
+                meta['secondary_title'] = secondary_title
+
             guess_name = ntpath.basename(video).replace('-', ' ')
-            filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
+
+            if title:
+                filename = title
+            else:
+                filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
             untouched_filename = os.path.basename(video)
             try:
                 meta['search_year'] = guessit(video)['year']
