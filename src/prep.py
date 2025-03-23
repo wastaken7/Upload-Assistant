@@ -157,7 +157,9 @@ class Prep():
                 basename = os.path.splitext(basename)[0]
 
                 secondary_title = None
+                year = None
 
+                # Check for AKA patterns first
                 aka_patterns = [' AKA ', '.aka.', ' aka ', '.AKA.']
                 for pattern in aka_patterns:
                     if pattern in basename:
@@ -165,12 +167,25 @@ class Prep():
                         if len(aka_parts) > 1:
                             primary_title = aka_parts[0].strip()
                             secondary_part = aka_parts[1].strip()
+
+                            # Look for a year in the primary title
+                            year_match_primary = re.search(r'\b(19|20)\d{2}\b', primary_title)
+                            if year_match_primary:
+                                year = year_match_primary.group(0)
+
+                            # Process secondary title
                             secondary_match = re.match(r"^(\d+)", secondary_part)
                             if secondary_match:
                                 secondary_title = secondary_match.group(1)
                             else:
+                                # Catch everything after AKA until it hits a year or release info
                                 year_or_release_match = re.search(r'\b(19|20)\d{2}\b|\bBluRay\b|\bREMUX\b|\b\d+p\b|\bDTS-HD\b|\bAVC\b', secondary_part)
                                 if year_or_release_match:
+                                    # Check if we found a year in the secondary part
+                                    if re.match(r'\b(19|20)\d{2}\b', year_or_release_match.group(0)):
+                                        # If no year was found in primary title, or we want to override
+                                        if not year:
+                                            year = year_or_release_match.group(0)
 
                                     secondary_title = secondary_part[:year_or_release_match.start()].strip()
                                 else:
@@ -178,13 +193,19 @@ class Prep():
 
                             primary_title = primary_title.replace('.', ' ')
                             secondary_title = secondary_title.replace('.', ' ')
-                            return primary_title, secondary_title
+                            return primary_title, secondary_title, year
 
+                # if not AKA, catch titles that begin with a year
                 match = re.match(r"^(\d+)", basename)
                 if match:
-                    return match.group(1), None
+                    title = match.group(1)
+                    # If we find year at beginning, look for a year elsewhere in the filename
+                    year_match = re.search(r'\b(19|20)\d{2}\b', basename)
+                    if year_match:
+                        year = year_match.group(0)
+                    return title, None, year
 
-                return match, None
+                return match, None, year
 
             videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
@@ -192,9 +213,11 @@ class Prep():
 
             video, meta['scene'], meta['imdb_id'] = await self.is_scene(videopath, meta, meta.get('imdb_id', 0))
 
-            title, secondary_title = extract_title_and_year(video)
+            title, secondary_title, extracted_year = extract_title_and_year(video)
             if secondary_title:
                 meta['secondary_title'] = secondary_title
+            if extracted_year and not meta.get('search_year'):
+                meta['search_year'] = extracted_year
 
             guess_name = ntpath.basename(video).replace('-', ' ')
 
@@ -203,10 +226,15 @@ class Prep():
             else:
                 filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
             untouched_filename = os.path.basename(video)
-            try:
-                meta['search_year'] = guessit(video)['year']
-            except Exception:
-                meta['search_year'] = ""
+
+            # Only guessit the year if it's not already set
+            # additionally if the title is already set, it was set because the title starts with year, which guessit fails with
+            if not meta.get('search_year'):
+                try:
+                    search_year = guessit(video)['year']
+                except Exception:
+                    search_year = ""
+                meta['search_year'] = search_year
 
             if not meta.get('edit', False):
                 mi = await exportInfo(videopath, meta['isdir'], meta['uuid'], base_dir, export_text=True)
