@@ -1,6 +1,7 @@
 ## This is just a template file. Replace with your own values and rename to user-args.json
 ## Currently only tmdb_id is supported, and this file is parsed after metadata processing
 ## Changing category or season or episode for instance, is ill advised as these are used in metadata processing
+## Not throughly tested, for args try using a list instead of a string or vice versa if you encounter issues
 
 {
     "entries": [
