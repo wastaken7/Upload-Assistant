@@ -131,6 +131,9 @@ config = {
         # set true to use argument overrides from data/templates/user-args.json
         "user_overrides": False,
 
+        # set true to add episode overview to description
+        "episode_overview": False,
+
     },
 
     # these are used for DB links on AR

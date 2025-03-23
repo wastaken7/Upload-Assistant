@@ -588,6 +588,7 @@ class Prep():
                         meta['episode_title'] = ""
                     else:
                         meta['episode_title'] = episode_details['name']
+                    meta['overview_meta'] = episode_details.get('overview', None)
         meta = await self.tag_override(meta)
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides:
