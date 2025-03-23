@@ -265,6 +265,8 @@ class Prep():
                 except Exception:
                     search_year = ""
                 meta['search_year'] = search_year
+            elif extracted_year:
+                meta['search_year'] = extracted_year
             else:
                 meta['search_year'] = ""
 
