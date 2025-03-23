@@ -128,6 +128,9 @@ config = {
         # set true to use mkbrr for torrent creation
         "mkbrr": False,
 
+        # set true to add episode overview to description
+        "episode_overview": False,
+
     },
 
     # these are used for DB links on AR
