@@ -17,6 +17,7 @@
           "--no-year",
           "--personalrelease",
           "--descfile", "path_do_desc_file"
+          "--manual_frames=100,200,300,400,500,600,700"
         ]
       }
     ]
