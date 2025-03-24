@@ -1151,24 +1151,47 @@ class Prep():
             return ""
 
     async def get_tag(self, video, meta):
-        try:
-            parsed = guessit(video)
-            release_group = parsed.get('release_group')
-            if meta['is_disc'] == "BDMV":
-                if release_group:
+        # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
+        release_group = None
+        basename = os.path.basename(video)
+
+        # Try specialized regex patterns first
+        if meta.get('anime', False):
+            # Anime pattern: [Group] at the beginning
+            basename_stripped = os.path.splitext(basename)[0]
+            anime_match = re.search(r'^\s*\[(.+?)\]', basename_stripped)
+            if anime_match:
+                release_group = anime_match.group(1)
+        else:
+            # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
+            basename_stripped = os.path.splitext(basename)[0]
+            non_anime_match = re.search(r'(?<=-)((?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
+            if non_anime_match:
+                release_group = non_anime_match.group(1).strip()
+
+        # If regex patterns didn't work, fall back to guessit
+        if not release_group:
+            try:
+                parsed = guessit(video)
+                release_group = parsed.get('release_group')
+
+                # BDMV validation
+                if meta['is_disc'] == "BDMV" and release_group:
                     if f"-{release_group}" not in video:
-                        if meta['debug']:
-                            console.print(f"[warning] Invalid release group format: {release_group}")
                         release_group = None
+            except Exception as e:
+                console.print(f"Error while parsing group tag: {e}")
+                release_group = None
 
-            tag = f"-{release_group}" if release_group else ""
-        except Exception as e:
-            console.print(f"Error while parsing: {e}")
-            tag = ""
+        # Format the tag
+        tag = f"-{release_group}" if release_group else ""
 
+        # Clean up any tags that are just a hyphen
         if tag == "-":
             tag = ""
-        if tag[1:].lower() in ["nogroup", "nogrp"]:
+
+        # Remove generic "no group" tags
+        if tag and tag[1:].lower() in ["nogroup", "nogrp"]:
             tag = ""
 
         return tag
