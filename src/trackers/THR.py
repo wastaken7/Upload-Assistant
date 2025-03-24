@@ -64,7 +64,7 @@ class THR():
             desc = f.read()
             f.close()
 
-        torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]{meta['clean_name']}.torrent")
+        torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR].torrent")
         with open(torrent_path, 'rb') as f:
             tfile = f.read()
             f.close()

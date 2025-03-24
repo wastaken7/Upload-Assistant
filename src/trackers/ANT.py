@@ -96,7 +96,7 @@ class ANT():
             mi_dump = media_info_output.replace('\r\n', '\n')
         else:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
-        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
+        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {'file_input': open_torrent}
         data = {
             'api_key': self.config['TRACKERS'][self.tracker]['api_key'].strip(),

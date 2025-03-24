@@ -345,7 +345,7 @@ class PTER():
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8')
 
         pter_desc = open(desc_file, 'r').read()
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
         with open(torrent_path, 'rb') as torrentFile:
             if len(meta['filelist']) == 1:

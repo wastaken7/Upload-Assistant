@@ -51,7 +51,7 @@ class LCD():
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8').read()
             bd_dump = None
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[LCD]DESCRIPTION.txt", 'r', encoding='utf-8').read()
-        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[LCD]{meta['clean_name']}.torrent", 'rb')
+        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[LCD].torrent", 'rb')
         files = {'torrent': ("placeholder.torrent", open_torrent, "application/x-bittorrent")}
         base_dir = meta['base_dir']
         uuid = meta['uuid']
