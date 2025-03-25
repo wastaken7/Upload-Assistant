@@ -99,7 +99,8 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
                         new_tvdb_id = selected_show['externals']['thetvdb']
                         if new_tvdb_id:
                             tvdbID = int(new_tvdb_id)
-                    console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id}, TVDb ID: {tvdbID})")
+                            console.print(f"[green]Updated TVDb ID to: {tvdbID}[/green]")
+                    console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
                     break
                 else:
                     console.print(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
@@ -131,3 +132,72 @@ async def _make_tvmaze_request(url, params):
     except httpx.RequestError as e:
         print(f"[ERROR] Network error while accessing TVmaze: {e}")
     return {}
+
+
+async def get_tvmaze_episode_data(tvmaze_id, season, episode):
+    console.print(f"[cyan]Fetching TVMaze episode data for S{season}E{episode}...[/cyan]")
+
+    url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodebynumber"
+    params = {
+        "season": season,
+        "number": episode
+    }
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+
+            if data:
+                # Get show data for additional information
+                show_data = {}
+                if "show" in data.get("_links", {}) and "href" in data["_links"]["show"]:
+                    show_url = data["_links"]["show"]["href"]
+                    show_name = data["_links"]["show"].get("name", "")
+
+                    show_response = await client.get(show_url, timeout=10.0)
+                    if show_response.status_code == 200:
+                        show_data = show_response.json()
+                    else:
+                        show_data = {"name": show_name}
+
+                # Clean HTML tags from summary
+                summary = data.get("summary", "")
+                if summary:
+                    summary = summary.replace("<p>", "").replace("</p>", "").strip()
+
+                # Format the response in a consistent structure
+                result = {
+                    "episode_name": data.get("name", ""),
+                    "overview": summary,
+                    "season_number": data.get("season", season),
+                    "episode_number": data.get("number", episode),
+                    "air_date": data.get("airdate", ""),
+                    "runtime": data.get("runtime", 0),
+                    "series_name": show_data.get("name", data.get("_links", {}).get("show", {}).get("name", "")),
+                    "series_overview": show_data.get("summary", "").replace("<p>", "").replace("</p>", "").strip(),
+                    "image": data.get("image", {}).get("original", None) if data.get("image") else None,
+                    "series_image": show_data.get("image", {}).get("original", None) if show_data.get("image") else None,
+                }
+
+                console.print(f"[green]Found episode: {result['series_name']} - S{result['season_number']}E{result['episode_number']} - {result['episode_name']}[/green]")
+                if result["air_date"]:
+                    console.print(f"[yellow]Air date: {result['air_date']}[/yellow]")
+                if result["overview"]:
+                    console.print(f"[yellow]Overview: {result['overview'][:100]}{'...' if len(result['overview']) > 100 else ''}[/yellow]")
+
+                return result
+            else:
+                console.print(f"[yellow]No episode data found for S{season:02d}E{episode:02d}[/yellow]")
+                return None
+
+    except httpx.HTTPStatusError as e:
+        console.print(f"[red]HTTP error occurred: {e.response.status_code} - {e.response.text}[/red]")
+        return None
+    except httpx.RequestError as e:
+        console.print(f"[red]Request error occurred: {e}[/red]")
+        return None
+    except Exception as e:
+        console.print(f"[red]Error fetching TVMaze episode data: {e}[/red]")
+        return None
