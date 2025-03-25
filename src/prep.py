@@ -1493,8 +1493,10 @@ class Prep():
         hdr = meta.get('hdr', "")
         if meta.get('manual_episode_title'):
             episode_title = meta.get('manual_episode_title')
+        elif meta.get('daily_episode_title'):
+            episode_title = meta.get('daily_episode_title')
         else:
-            episode_title = meta.get('episode_title', '')
+            episode_title = ""
         if meta.get('is_disc', "") == "BDMV":  # Disk
             video_codec = meta.get('video_codec', "")
             region = meta.get('region', "")
