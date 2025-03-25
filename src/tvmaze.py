@@ -93,7 +93,13 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
                 if 1 <= choice <= len(unique_results):
                     selected_show = unique_results[choice - 1]
                     tvmaze_id = int(selected_show['id'])
-                    console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
+                    # set the tvdb id since it's sure to be correct
+                    # won't get returned outside manual date since full tuple is not returned
+                    if 'externals' in selected_show and 'thetvdb' in selected_show['externals']:
+                        new_tvdb_id = selected_show['externals']['thetvdb']
+                        if new_tvdb_id:
+                            tvdbID = int(new_tvdb_id)
+                    console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id}, TVDb ID: {tvdbID})")
                     break
                 else:
                     console.print(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
