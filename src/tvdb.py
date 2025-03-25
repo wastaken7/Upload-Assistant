@@ -74,8 +74,6 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                     "season_name": episode_data.get("seasonName", ""),
                     "series_name": series_data.get("name", ""),
                     "series_overview": series_data.get("overview", ""),
-                    "image": episode_data.get("image", None),
-                    "series_image": series_data.get("image", None)
                 }
 
                 console.print(f"[green]Found episode: {result['season_name']} - S{result['season_number']}E{result['episode_number']} - {result['episode_name']}[/green] - {result['air_date']}")
