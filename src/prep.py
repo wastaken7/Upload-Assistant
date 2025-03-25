@@ -12,6 +12,7 @@ from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.btnid import get_btn_torrents, get_bhd_torrents
+from src.tvdb import get_tvdb_episode_data
 
 try:
     import traceback
@@ -61,6 +62,8 @@ class Prep():
 
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
+        tvdb_api = str(self.config['DEFAULT'].get('tvdb_api', None))
+        tvdb_token = str(self.config['DEFAULT'].get('tvdb_token', None))
         meta['mode'] = mode
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
@@ -589,6 +592,8 @@ class Prep():
                     else:
                         meta['episode_title'] = episode_details['name']
                     meta['overview_meta'] = episode_details.get('overview', None)
+                if tvdb_api and tvdb_token:
+                    await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('season_int'), meta.get('episode_int'), api_key=tvdb_api)
         meta = await self.tag_override(meta)
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides:
