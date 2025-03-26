@@ -114,6 +114,9 @@ async def get_tmdb_from_imdb(imdb_id, tvdb_id=None, search_year=None, filename=N
 async def get_tmdb_id(filename, search_year, meta, category, untouched_filename="", attempted=0):
     console.print("[bold cyan]Fetching TMDB ID...[/bold cyan]")
 
+    search_results = {"results": []}
+    secondary_results = {"results": []}
+
     async with httpx.AsyncClient() as client:
         try:
             # Primary search attempt with year
@@ -159,10 +162,26 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
             # Check if results were found
             if search_results.get('results'):
                 meta['tmdb_id'] = search_results['results'][0]['id']
-                return meta  # Successful match, return immediately
+                return meta
+
+            # If no results and we have a secondary title, try searching with that
+            if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
+                console.print(f"[yellow]No results found for primary title. Trying secondary title: {meta['secondary_title']}[/yellow]")
+                secondary_meta = await get_tmdb_id(
+                    meta['secondary_title'],
+                    search_year,
+                    meta,
+                    category,
+                    untouched_filename,
+                    attempted + 1
+                )
+
+                if secondary_meta.get('tmdb_id', 0) != 0:
+                    return secondary_meta
 
         except Exception as e:
             console.print(f"[bold red]TMDb search error:[/bold red] {e}")
+            search_results = {"results": []}  # Reset search_results on exception
 
         # Secondary attempt: Try searching without the year
         console.print("[yellow]Retrying without year...[/yellow]")
@@ -203,7 +222,49 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
             # Check if results were found
             if search_results.get('results'):
                 meta['tmdb_id'] = search_results['results'][0]['id']
-                return meta  # Successful match, return immediately
+                return meta
+
+            # Try with secondary title without year
+            if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
+                console.print(f"[yellow]No results found for primary title without year. Trying secondary title: {meta['secondary_title']}[/yellow]")
+
+                if category == "MOVIE":
+                    if meta.get('debug', False):
+                        console.print(f"[green]Searching TMDb for movie with secondary title:[/] [cyan]{meta['secondary_title']}[/cyan] (Without year)")
+
+                    params = {
+                        "api_key": TMDB_API_KEY,
+                        "query": meta['secondary_title'],
+                        "language": "en-US",
+                        "include_adult": "true"
+                    }
+
+                    response = await client.get(f"{TMDB_BASE_URL}/search/movie", params=params)
+                    response.raise_for_status()
+                    secondary_results = response.json()
+
+                elif category == "TV":
+                    if meta.get('debug', False):
+                        console.print(f"[green]Searching TMDb for TV show with secondary title:[/] [cyan]{meta['secondary_title']}[/cyan] (Without year)")
+
+                    params = {
+                        "api_key": TMDB_API_KEY,
+                        "query": meta['secondary_title'],
+                        "language": "en-US",
+                        "include_adult": "true"
+                    }
+
+                    response = await client.get(f"{TMDB_BASE_URL}/search/tv", params=params)
+                    response.raise_for_status()
+                    secondary_results = response.json()
+
+                if meta.get('debug', False):
+                    console.print(f"[yellow]Secondary title search results: {json.dumps(secondary_results.get('results', [])[:2], indent=2)}[/yellow]")
+
+                if secondary_results.get('results'):
+                    meta['tmdb_id'] = secondary_results['results'][0]['id']
+                    console.print(f"[green]Found match using secondary title: {meta['secondary_title']}[/green]")
+                    return meta
 
         except Exception as e:
             console.print(f"[bold red]Secondary search error:[/bold red] {e}")
