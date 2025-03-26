@@ -1,3 +1,25 @@
+__version__ = "4.0.6"
+
+"""
+Changelog for version 4.0.6 (2025-03-25):
+
+## What's Changed
+* update to improve 540 detection by @swannie-eire in https://github.com/Audionut/Upload-Assistant/pull/413
+* Update YUS.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/414
+* BHD - file/folder searching by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/415
+* Allow some hardcoded user overrides by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/411
+* option episode overview in description by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/418
+* Catch HUNO BluRay naming requirement by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/419
+* group tag regex by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/420
+* OTW - stop pre-filtering image hosts
+* revert automatic episode title
+
+BHD auto searching does not currently return description/image links
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.5...4.0.6
+"""
+
 __version__ = "4.0.5"
 
 """

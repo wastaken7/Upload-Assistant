@@ -85,6 +85,14 @@ class COMMON():
                 desc = bbcode.convert_comparison_to_collapse(desc, 1000)
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
+
+            add_logo_enabled = self.config["DEFAULT"].get("add_logo", False)
+            if add_logo_enabled and 'logo' in meta:
+                logo = meta['logo']
+                logo_size = self.config["DEFAULT"].get("logo_size", 420)
+                if logo != "":
+                    descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]\n\n")
+
             # Handle single disc case
             if len(discs) == 1:
                 each = discs[0]

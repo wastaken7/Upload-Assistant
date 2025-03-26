@@ -216,9 +216,9 @@ async def process_meta(meta, base_dir):
             reset_terminal()
 
         meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
+        if 'image_list' not in meta:
+            meta['image_list'] = []
         if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
-            if 'image_list' not in meta:
-                meta['image_list'] = []
             return_dict = {}
             try:
                 new_images, dummy_var = await upload_screens(

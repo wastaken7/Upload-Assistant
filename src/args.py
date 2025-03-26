@@ -4,7 +4,7 @@ import urllib.parse
 import os
 import datetime
 import sys
-
+import re
 from src.console import console
 
 
@@ -115,7 +115,7 @@ class Args():
         parser.add_argument('-tik', '--tik', nargs=1, required=False, help="TIK torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs=1, required=False, help="HDB torrent id/link", type=str)
         parser.add_argument('-btn', '--btn', nargs=1, required=False, help="BTN torrent id/link", type=str)
-        parser.add_argument('-bhd', '--bhd', nargs=1, required=False, help="BHD infohash", type=str)
+        parser.add_argument('-bhd', '--bhd', nargs=1, required=False, help="BHD infohash or torrent_id", type=str)
         parser.add_argument('-jptv', '--jptv', nargs=1, required=False, help="JPTV torrent id/link", type=str)
         parser.add_argument('-onlyID', '--onlyID', action='store_true', required=False, help="Only grab meta ids (tmdb/imdb/etc) from tracker, not description/image links.")
         parser.add_argument('--foreign', dest='foreign', action='store_true', required=False, help="Set for TIK Foreign category")
@@ -304,7 +304,28 @@ class Args():
                             meta['btn'] = value2
 
                     elif key == 'bhd':
-                        meta['bhd'] = value2
+                        if value2.startswith('http'):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                bhdpath = parsed.path
+                                if bhdpath.endswith('/'):
+                                    bhdpath = bhdpath[:-1]
+
+                                if '/download/' in bhdpath or '/torrents/' in bhdpath:
+                                    torrent_id_match = re.search(r'\.(\d+)$', bhdpath)
+                                    if torrent_id_match:
+                                        meta['bhd'] = torrent_id_match.group(1)
+                                    else:
+                                        meta['bhd'] = bhdpath.split('/')[-1]
+                                else:
+                                    meta['bhd'] = bhdpath.split('/')[-1]
+
+                                console.print(f"[green]Parsed BHD torrent ID: {meta['bhd']}")
+                            except Exception as e:
+                                console.print(f'[red]Unable to parse id from url: {e}')
+                                console.print('[red]Continuing without --bhd')
+                        else:
+                            meta['bhd'] = value2
 
                     elif key == 'jptv':
                         if value2.startswith('http'):

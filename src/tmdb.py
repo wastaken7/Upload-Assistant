@@ -114,6 +114,9 @@ async def get_tmdb_from_imdb(imdb_id, tvdb_id=None, search_year=None, filename=N
 async def get_tmdb_id(filename, search_year, meta, category, untouched_filename="", attempted=0):
     console.print("[bold cyan]Fetching TMDB ID...[/bold cyan]")
 
+    search_results = {"results": []}
+    secondary_results = {"results": []}
+
     async with httpx.AsyncClient() as client:
         try:
             # Primary search attempt with year
@@ -159,10 +162,26 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
             # Check if results were found
             if search_results.get('results'):
                 meta['tmdb_id'] = search_results['results'][0]['id']
-                return meta  # Successful match, return immediately
+                return meta
+
+            # If no results and we have a secondary title, try searching with that
+            if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
+                console.print(f"[yellow]No results found for primary title. Trying secondary title: {meta['secondary_title']}[/yellow]")
+                secondary_meta = await get_tmdb_id(
+                    meta['secondary_title'],
+                    search_year,
+                    meta,
+                    category,
+                    untouched_filename,
+                    attempted + 1
+                )
+
+                if secondary_meta.get('tmdb_id', 0) != 0:
+                    return secondary_meta
 
         except Exception as e:
             console.print(f"[bold red]TMDb search error:[/bold red] {e}")
+            search_results = {"results": []}  # Reset search_results on exception
 
         # Secondary attempt: Try searching without the year
         console.print("[yellow]Retrying without year...[/yellow]")
@@ -203,7 +222,49 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
             # Check if results were found
             if search_results.get('results'):
                 meta['tmdb_id'] = search_results['results'][0]['id']
-                return meta  # Successful match, return immediately
+                return meta
+
+            # Try with secondary title without year
+            if not search_results.get('results') and meta.get('secondary_title') and attempted < 3:
+                console.print(f"[yellow]No results found for primary title without year. Trying secondary title: {meta['secondary_title']}[/yellow]")
+
+                if category == "MOVIE":
+                    if meta.get('debug', False):
+                        console.print(f"[green]Searching TMDb for movie with secondary title:[/] [cyan]{meta['secondary_title']}[/cyan] (Without year)")
+
+                    params = {
+                        "api_key": TMDB_API_KEY,
+                        "query": meta['secondary_title'],
+                        "language": "en-US",
+                        "include_adult": "true"
+                    }
+
+                    response = await client.get(f"{TMDB_BASE_URL}/search/movie", params=params)
+                    response.raise_for_status()
+                    secondary_results = response.json()
+
+                elif category == "TV":
+                    if meta.get('debug', False):
+                        console.print(f"[green]Searching TMDb for TV show with secondary title:[/] [cyan]{meta['secondary_title']}[/cyan] (Without year)")
+
+                    params = {
+                        "api_key": TMDB_API_KEY,
+                        "query": meta['secondary_title'],
+                        "language": "en-US",
+                        "include_adult": "true"
+                    }
+
+                    response = await client.get(f"{TMDB_BASE_URL}/search/tv", params=params)
+                    response.raise_for_status()
+                    secondary_results = response.json()
+
+                if meta.get('debug', False):
+                    console.print(f"[yellow]Secondary title search results: {json.dumps(secondary_results.get('results', [])[:2], indent=2)}[/yellow]")
+
+                if secondary_results.get('results'):
+                    meta['tmdb_id'] = secondary_results['results'][0]['id']
+                    console.print(f"[green]Found match using secondary title: {meta['secondary_title']}[/green]")
+                    return meta
 
         except Exception as e:
             console.print(f"[bold red]Secondary search error:[/bold red] {e}")
@@ -273,10 +334,12 @@ async def tmdb_other_meta(
     runtime = 60
     certification = ""
     backdrop = ""
+    logo_path = ""
     poster_path = ""
     tmdb_type = ""
     mal_id = 0
     demographic = ""
+    logo_path = None
 
     if tmdb_id == 0:
         try:
@@ -440,6 +503,9 @@ async def tmdb_other_meta(
             if backdrop:
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
+            if config['DEFAULT'].get('add_logo', False):
+                logo_path = await get_logo(client, tmdb_id, category, debug)
+
             overview = movie_data['overview']
             tmdb_type = 'Movie'
             runtime = movie_data.get('runtime', 60)
@@ -561,6 +627,9 @@ async def tmdb_other_meta(
             if backdrop:
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
+            if config['DEFAULT'].get('add_logo', False):
+                logo_path = await get_logo(client, tmdb_id, category, debug)
+
             overview = tv_data['overview']
             tmdb_type = tv_data.get('type', 'Scripted')
 
@@ -594,6 +663,7 @@ async def tmdb_other_meta(
         'aka': retrieved_aka,
         'poster': poster,
         'tmdb_poster': poster_path,
+        'logo': logo_path,
         'backdrop': backdrop,
         'overview': overview,
         'tmdb_type': tmdb_type,
@@ -928,3 +998,36 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
         except Exception:
             console.print("[bold red]Error fetching title episode details[/bold red]")
             return {}
+
+
+async def get_logo(client, tmdb_id, category, debug=False):
+    logo_path = None
+    # Get preferred languages in order (from config, then 'en' as fallback)
+    logo_languages = [config['DEFAULT'].get('logo_language', 'en'), 'en']
+
+    try:
+        image_response = await client.get(
+            f"{TMDB_BASE_URL}/{"tv" if category == "TV" else "movie"}/{tmdb_id}/images",
+            params={"api_key": TMDB_API_KEY}
+        )
+        image_response.raise_for_status()
+        image_data = image_response.json()
+
+        logos = image_data.get('logos', [])
+
+        # Only look for logos that match our specified languages
+        for language in logo_languages:
+            matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None)
+            if matching_logo:
+                logo_path = f"https://image.tmdb.org/t/p/original{matching_logo['file_path']}"
+                if debug:
+                    console.print(f"[cyan]Found logo in language '{language}': {logo_path}[/cyan]")
+                break
+
+        if not logo_path and debug:
+            console.print(f"[yellow]No logo found in preferred languages: {logo_languages}[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error fetching logo: {e}[/red]")
+
+    return logo_path

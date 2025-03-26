@@ -23,8 +23,7 @@ config = {
 
         # btn api key for infohash parsing
         "btn_api": "btn_api key",
-
-        # bhd api/rss keys for infohash parsing
+        # bhd api/rss keys for infohash parsing and auto torrent id/filename searching
         "bhd_api": "bhd api key",
         "bhd_rss_key": "bhd rss key",
 
@@ -49,6 +48,16 @@ config = {
         "img_host_7": "oeimg",
         "img_host_8": "dalexni",
         "img_host_9": "zipline",
+
+        # Whether to add a logo for the show/movie from TMDB to the top of the description
+        "add_logo": False,
+
+        # Logo image size
+        "logo_size": "420",
+
+        # Accepted logo language (ISO 639-1)
+        # If a logo with this language cannot be found, English will be used instead
+        "logo_language": "en",
 
         # Number of screenshots to capture
         "screens": "6",
@@ -196,6 +205,7 @@ config = {
             # "anon" : "False"
         },
         "BHD": {
+            # set api/rss keys above if using BHD for automatic ID searching or torrent_id searching
             "useAPI": False,  # Set to True if using BHD for automatic file/foldername searching
             "api_key": "BHD api key",
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
