@@ -278,6 +278,7 @@ async def tmdb_other_meta(
     tmdb_type = ""
     mal_id = 0
     demographic = ""
+    logo_path = None
 
     if tmdb_id == 0:
         try:
@@ -443,7 +444,7 @@ async def tmdb_other_meta(
 
             if config['DEFAULT'].get('add_logo', False):
                 logo_path = await get_logo(client, tmdb_id, category, debug)
-                
+
             overview = movie_data['overview']
             tmdb_type = 'Movie'
             runtime = movie_data.get('runtime', 60)
@@ -566,7 +567,7 @@ async def tmdb_other_meta(
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
             if config['DEFAULT'].get('add_logo', False):
-                logo_path = await get_logo(client, tmdb_id, category, debug)             
+                logo_path = await get_logo(client, tmdb_id, category, debug)
 
             overview = tv_data['overview']
             tmdb_type = tv_data.get('type', 'Scripted')
@@ -937,25 +938,35 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
             console.print("[bold red]Error fetching title episode details[/bold red]")
             return {}
 
-async def get_logo(client, tmdb_id, category, debug = False):
+
+async def get_logo(client, tmdb_id, category, debug=False):
+    logo_path = None
+    # Get preferred languages in order (from config, then 'en' as fallback)
     logo_languages = [config['DEFAULT'].get('logo_language', 'en'), 'en']
 
-    image_response = await client.get(
-        f"{TMDB_BASE_URL}/{"tv" if category == "TV" else "movie"}/{tmdb_id}/images",
-        params={"api_key": TMDB_API_KEY}
-    )
-    image_response.raise_for_status()
-    image_data = image_response.json()
+    try:
+        image_response = await client.get(
+            f"{TMDB_BASE_URL}/{"tv" if category == "TV" else "movie"}/{tmdb_id}/images",
+            params={"api_key": TMDB_API_KEY}
+        )
+        image_response.raise_for_status()
+        image_data = image_response.json()
 
-    logo_path = None
-    for language in logo_languages:
         logos = image_data.get('logos', [])
-        first_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None)
-        if first_logo:
-            logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"
-            break
-    
-    if debug:
-        console.print(f"[cyan]Grabbed logo ({language}): {logo_path}")
+
+        # Only look for logos that match our specified languages
+        for language in logo_languages:
+            matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None)
+            if matching_logo:
+                logo_path = f"https://image.tmdb.org/t/p/original{matching_logo['file_path']}"
+                if debug:
+                    console.print(f"[cyan]Found logo in language '{language}': {logo_path}[/cyan]")
+                break
+
+        if not logo_path and debug:
+            console.print(f"[yellow]No logo found in preferred languages: {logo_languages}[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error fetching logo: {e}[/red]")
 
     return logo_path

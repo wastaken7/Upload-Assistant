@@ -91,7 +91,7 @@ class COMMON():
                 logo = meta['logo']
                 logo_size = self.config["DEFAULT"].get("logo_size", 420)
                 if logo != "":
-                    descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]")  
+                    descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]\n\n")
 
             # Handle single disc case
             if len(discs) == 1:
