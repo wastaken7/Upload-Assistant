@@ -1006,8 +1006,9 @@ async def get_logo(client, tmdb_id, category, debug=False):
     logo_languages = [config['DEFAULT'].get('logo_language', 'en'), 'en']
 
     try:
+        endpoint = "tv" if category == "TV" else "movie"
         image_response = await client.get(
-            f"{TMDB_BASE_URL}/{"tv" if category == "TV" else "movie"}/{tmdb_id}/images",
+            f"{TMDB_BASE_URL}/{endpoint}/{tmdb_id}/images",
             params={"api_key": TMDB_API_KEY}
         )
         image_response.raise_for_status()
