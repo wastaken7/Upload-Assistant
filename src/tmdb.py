@@ -442,18 +442,7 @@ async def tmdb_other_meta(
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
             if config['DEFAULT'].get('add_logo', False):
-                # Get movie images
-                image_response = await client.get(
-                    f"{TMDB_BASE_URL}/movie/{tmdb_id}/images",
-                    params={"api_key": TMDB_API_KEY}
-                )
-                image_response.raise_for_status()
-                image_data = image_response.json()
-
-                logos = image_data.get('logos', [])
-                first_logo = next((logo for logo in logos if logo.get('iso_639_1') == 'en'), None) or (logos[0] if logos else None)
-                if first_logo:
-                    logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"
+                logo_path = await get_logo(client, tmdb_id, category, debug)
                 
             overview = movie_data['overview']
             tmdb_type = 'Movie'
@@ -577,18 +566,7 @@ async def tmdb_other_meta(
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
             if config['DEFAULT'].get('add_logo', False):
-                # Get tv images
-                image_response = await client.get(
-                    f"{TMDB_BASE_URL}/tv/{tmdb_id}/images",
-                    params={"api_key": TMDB_API_KEY}
-                )
-                image_response.raise_for_status()
-                image_data = image_response.json()
-
-                logos = image_data.get('logos', [])
-                first_logo = next((logo for logo in logos if logo.get('iso_639_1') == 'en'), None) or (logos[0] if logos else None)
-                if first_logo:
-                    logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"                
+                logo_path = await get_logo(client, tmdb_id, category, debug)             
 
             overview = tv_data['overview']
             tmdb_type = tv_data.get('type', 'Scripted')
@@ -958,3 +936,25 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
         except Exception:
             console.print("[bold red]Error fetching title episode details[/bold red]")
             return {}
+
+async def get_logo(client, tmdb_id, category, debug = False):
+    logo_languages = [config['DEFAULT'].get('logo_language', 'en'), 'en']
+
+    image_response = await client.get(
+        f"{TMDB_BASE_URL}/{"tv" if category == "TV" else "movie"}/{tmdb_id}/images",
+        params={"api_key": TMDB_API_KEY}
+    )
+    image_response.raise_for_status()
+    image_data = image_response.json()
+
+    for language in logo_languages:
+        logos = image_data.get('logos', [])
+        first_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None) or (logos[0] if logos else None)
+        if first_logo:
+            logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"
+            break
+    
+    if debug:
+        console.print(f"[cyan]Grabbed logo ({language}): {logo_path}")
+
+    return logo_path

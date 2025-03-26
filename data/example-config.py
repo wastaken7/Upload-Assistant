@@ -45,6 +45,10 @@ config = {
         # Logo image size
         "logo_size": "420",
 
+        # Accepted logo language (ISO 639-1)
+        # If a logo with this language cannot be found, English will be used instead
+        "logo_language": "en",
+
         # Number of screenshots to capture
         "screens": "6",
 
