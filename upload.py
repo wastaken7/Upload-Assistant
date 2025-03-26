@@ -236,9 +236,6 @@ async def process_meta(meta, base_dir):
 
         elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
             meta['image_list'] = []
-        else:
-            console.print("[bold red]Something went wrong at the image capture step. Aborting.....[/yellow]")
-            raise Exception("Image capture failed")
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
