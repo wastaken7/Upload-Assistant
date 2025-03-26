@@ -947,9 +947,10 @@ async def get_logo(client, tmdb_id, category, debug = False):
     image_response.raise_for_status()
     image_data = image_response.json()
 
+    logo_path = None
     for language in logo_languages:
         logos = image_data.get('logos', [])
-        first_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None) or (logos[0] if logos else None)
+        first_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None)
         if first_logo:
             logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"
             break
