@@ -661,10 +661,19 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     os.chdir(f"{base_dir}/tmp/{folder_id}")
 
     if manual_frames:
-        if meta['debug']:
+        if meta.get('debug', False):
             console.print(f"[yellow]Using manual frames: {manual_frames}")
-        manual_frames = [int(frame) for frame in manual_frames.split(',')]
-        ss_times = [frame / frame_rate for frame in manual_frames]
+
+        try:
+            if isinstance(manual_frames, str):
+                manual_frames = [int(frame.strip()) for frame in manual_frames.split(',')]
+            elif isinstance(manual_frames, list):
+                manual_frames = [int(frame) if isinstance(frame, str) else frame for frame in manual_frames]
+
+            ss_times = [frame / frame_rate for frame in manual_frames]
+        except (TypeError, ValueError) as e:
+            console.print(f"[red]Error processing manual frames: {e}. Using auto-generated frames.[/red]")
+            ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
     else:
         ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
 

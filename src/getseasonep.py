@@ -33,7 +33,7 @@ async def get_season_episode(video, meta):
                     episode = f"E{str(episode_int).zfill(2)}"
                     # For daily shows, pass the supplied date as the episode title
                     # Season and episode will be stripped later to conform with standard daily episode naming format
-                    meta['episode_title'] = meta.get('manual_date')
+                    meta['daily_episode_title'] = meta.get('manual_date')
 
                 else:
                     try:

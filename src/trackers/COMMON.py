@@ -53,6 +53,7 @@ class COMMON():
         file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
         thumb_size = int(self.config['DEFAULT'].get('pack_thumb_size', '300'))
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
+        episode_overview = int(self.config['DEFAULT'].get('episode_overview', False)) or meta.get('episode_overview', None)
         try:
             screenheader = self.config['DEFAULT']['screenshot_header']
         except Exception:
@@ -60,6 +61,10 @@ class COMMON():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
+            if episode_overview and meta.get('overview_meta') is not None and meta.get('overview_meta') != "":
+                descfile.write("[center][code]")
+                descfile.write(meta['overview_meta'])
+                descfile.write("[/code][/center]\n\n")
 
             bbcode = BBCODE()
             discs = meta.get('discs', [])

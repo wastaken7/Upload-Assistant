@@ -231,7 +231,7 @@ class HUNO():
         tag = meta.get('tag', "").replace("-", "- ")
         if tag == "":
             tag = "- NOGRP"
-        source = meta.get('source', "")
+        source = meta.get('source', "").replace("Blu-ray", "BluRay")
         uhd = meta.get('uhd', "")
         hdr = meta.get('hdr', "")
         if not hdr.strip():
