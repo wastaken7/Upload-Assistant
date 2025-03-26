@@ -931,6 +931,14 @@ async def capture_screenshot(args):
         # Ensure process completes and doesn't leak
         try:
             stdout, stderr = await process.communicate()
+
+            # Print stdout and stderr if in verbose mode
+            if loglevel == 'verbose':
+                if stdout:
+                    console.print(f"[blue]FFmpeg stdout:[/blue]\n{stdout.decode('utf-8', errors='replace')}")
+                if stderr:
+                    console.print(f"[yellow]FFmpeg stderr:[/yellow]\n{stderr.decode('utf-8', errors='replace')}")
+
         except asyncio.CancelledError:
             process.kill()
             raise
