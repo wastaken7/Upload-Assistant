@@ -273,6 +273,7 @@ async def tmdb_other_meta(
     runtime = 60
     certification = ""
     backdrop = ""
+    logo_path = ""
     poster_path = ""
     tmdb_type = ""
     mal_id = 0
@@ -440,6 +441,20 @@ async def tmdb_other_meta(
             if backdrop:
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
+            if config['DEFAULT'].get('add_logo', False):
+                # Get movie images
+                image_response = await client.get(
+                    f"{TMDB_BASE_URL}/movie/{tmdb_id}/images",
+                    params={"api_key": TMDB_API_KEY}
+                )
+                image_response.raise_for_status()
+                image_data = image_response.json()
+
+                logos = image_data.get('logos', [])
+                first_logo = next((logo for logo in logos if logo.get('iso_639_1') == 'en'), None) or (logos[0] if logos else None)
+                if first_logo:
+                    logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"
+                
             overview = movie_data['overview']
             tmdb_type = 'Movie'
             runtime = movie_data.get('runtime', 60)
@@ -561,6 +576,20 @@ async def tmdb_other_meta(
             if backdrop:
                 backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
 
+            if config['DEFAULT'].get('add_logo', False):
+                # Get tv images
+                image_response = await client.get(
+                    f"{TMDB_BASE_URL}/tv/{tmdb_id}/images",
+                    params={"api_key": TMDB_API_KEY}
+                )
+                image_response.raise_for_status()
+                image_data = image_response.json()
+
+                logos = image_data.get('logos', [])
+                first_logo = next((logo for logo in logos if logo.get('iso_639_1') == 'en'), None) or (logos[0] if logos else None)
+                if first_logo:
+                    logo_path = f"https://image.tmdb.org/t/p/original{first_logo['file_path']}"                
+
             overview = tv_data['overview']
             tmdb_type = tv_data.get('type', 'Scripted')
 
@@ -594,6 +623,7 @@ async def tmdb_other_meta(
         'aka': retrieved_aka,
         'poster': poster,
         'tmdb_poster': poster_path,
+        'logo': logo_path,
         'backdrop': backdrop,
         'overview': overview,
         'tmdb_type': tmdb_type,

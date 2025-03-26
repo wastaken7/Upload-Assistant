@@ -39,6 +39,12 @@ config = {
         "img_host_8": "dalexni",
         "img_host_9": "zipline",
 
+        # Whether to add a logo for the show/movie from TMDB to the top of the description
+        "add_logo": False,
+
+        # Logo image size
+        "logo_size": "420",
+
         # Number of screenshots to capture
         "screens": "6",
 
