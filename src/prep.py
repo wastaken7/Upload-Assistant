@@ -211,22 +211,7 @@ class Prep():
                     else:
                         year = None
 
-                    # If the title is also a valid year and no other year was found,
-                    # we need to decide whether to treat it as a title or a year
-                    if could_be_year and not year:
-                        # Look for title patterns that suggest this is a year as a title
-                        # (e.g., "1883.S01E01" suggests 1883 is a title, not a year)
-                        if re.search(r'\bS\d+', basename) or '.S' in basename:
-                            # This looks like a TV show, so treat the number as a title
-                            title = potential_title
-                        else:
-                            # This could be a movie from that year, so try to use it as a year
-                            year = potential_title
-                            title = None
-                    else:
-                        title = potential_title
-
-                    return title, None, year
+                    return potential_title, None, year
 
                 # If no pattern match works but there's still a year in the filename, extract it
                 year_match = re.search(r'\b(19|20)\d{2}\b', basename)
