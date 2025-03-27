@@ -829,7 +829,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
                     random_time = random.uniform(0, length)
                     screenshot_response = await capture_screenshot(
-                        (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap)
+                        (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
                     )
 
                     if not os.path.exists(screenshot_response):
