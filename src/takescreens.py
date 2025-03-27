@@ -713,7 +713,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
                 capture_screenshot(  # Direct async function call
-                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False), meta.get('debug', False))
+                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False), meta)
                 )
             )
 
@@ -893,7 +893,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
 
 async def capture_screenshot(args):
-    index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, debug = args
+    index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
         if width <= 0 or height <= 0:
@@ -902,22 +902,16 @@ async def capture_screenshot(args):
         if ss_time < 0:
             return f"Error: Invalid timestamp {ss_time}"
 
-        if debug:
-            console.print(f"[cyan]Processing file: {path}[/cyan]")
         # Normalize path for cross-platform compatibility
         path = os.path.normpath(path)
-        if debug:
-            console.print(f"[yellow]Normalized path: {path}")
 
-        # If path is a directory and we have meta data with filelist, use the first file
+        # If path is a directory and meta has a filelist, use the first file from the filelist
         if os.path.isdir(path):
             error_msg = f"Error: Path is a directory, not a file: {path}"
             console.print(f"[yellow]{error_msg}[/yellow]")
 
-            # Get first file from meta['filelist'] if available
-            # Note: This requires meta to be passed to capture_screenshot
-            if 'meta' in globals() and hasattr(globals()['meta'], 'get') and globals()['meta'].get('filelist'):
-                video_file = globals()['meta']['filelist'][0]
+            if meta and isinstance(meta, dict) and 'filelist' in meta and meta['filelist']:
+                video_file = meta['filelist'][0]
                 console.print(f"[green]Using first file from filelist: {video_file}[/green]")
                 path = video_file
             else:
@@ -930,9 +924,8 @@ async def capture_screenshot(args):
             return error_msg
 
         # Debug output showing the exact path being used
-        if loglevel == 'verbose':
+        if loglevel == 'verbose' or (meta and meta.get('debug', False)):
             console.print(f"[cyan]Processing file: {path}[/cyan]")
-            console.print(f"[cyan]Output image: {image_path}[/cyan]")
 
         # Proceed with screenshot capture
         ff = ffmpeg.input(path, ss=ss_time)
@@ -956,7 +949,7 @@ async def capture_screenshot(args):
         )
 
         # Print the command for debugging
-        if loglevel == 'verbose':
+        if loglevel == 'verbose' or (meta and meta.get('debug', False)):
             cmd = command.compile()
             console.print(f"[cyan]FFmpeg command: {' '.join(cmd)}[/cyan]")
 
@@ -971,7 +964,7 @@ async def capture_screenshot(args):
             stdout, stderr = await process.communicate()
 
             # Print stdout and stderr if in verbose mode
-            if loglevel == 'verbose':
+            if loglevel == 'verbose' or (meta and meta.get('debug', False)):
                 if stdout:
                     console.print(f"[blue]FFmpeg stdout:[/blue]\n{stdout.decode('utf-8', errors='replace')}")
                 if stderr:
