@@ -89,7 +89,12 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     discs = meta.get('discs', [])  # noqa F841
     filelist = meta.get('video', [])
     filename = meta['title']
-    path = meta['path']
+    if meta.get('is_disc') == "HDDVD":
+        path = meta['discs'][0]['largest_evo']
+    else:
+        path = meta.get('filelist', [None])
+        path = path[0] if path else None
+
     if isinstance(filelist, str):
         filelist = [filelist]
 
