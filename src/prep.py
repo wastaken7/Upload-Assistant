@@ -680,7 +680,7 @@ class Prep():
                 meta['tag'] = f"-{meta['tag']}"
         if meta['category'] == "TV":
             meta = await get_season_episode(video, meta)
-            if not meta.get('tv_pack', False) or meta.get('episode_int') != 0:
+            if not meta.get('tv_pack', False) and meta.get('episode_int') != 0:
                 episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
                 if meta.get('episode_title') is None and episode_details.get('name') is not None:
                     if 'episode' in episode_details.get("name").lower():
