@@ -513,6 +513,10 @@ async def do_the_thing(base_dir):
                 start_time = time.time()
 
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
+
+            if not meta.get('infohash') and not meta.get('torrent_hash') and not meta.get('ptp') and not meta.get('bhd') and not meta.get('hdb') and not meta.get('blu') and not meta.get('btn') and not meta.get('oe') and not meta.get('aither') and not meta.get('lst'):
+                await client.get_pathed_torrents(path, meta)
+
             await process_meta(meta, base_dir)
 
             if 'we_are_uploading' not in meta:

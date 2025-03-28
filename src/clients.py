@@ -873,7 +873,7 @@ class Clients():
 
         return local_path, remote_path
 
-    async def get_ptp_from_hash(self, meta):
+    async def get_ptp_from_hash(self, meta, pathed=False):
         default_torrent_client = self.config['DEFAULT']['default_torrent_client']
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         qbt_client = qbittorrentapi.Client(
@@ -893,6 +893,10 @@ class Clients():
         info_hash_v1 = meta.get('infohash')
         torrents = qbt_client.torrents_info()
         found = False
+
+        folder_id = os.path.basename(meta['path'])
+        if meta.get('uuid', None) is None:
+            meta['uuid'] = folder_id
 
         extracted_torrent_dir = os.path.join(meta.get('base_dir', ''), "tmp", meta.get('uuid', ''))
         os.makedirs(extracted_torrent_dir, exist_ok=True)
@@ -940,36 +944,152 @@ class Clients():
                 if match:
                     console.print(f"[bold cyan]meta updated with tracker ID: {match.group(1)}")
 
-                torrent_storage_dir = client.get('torrent_storage_dir')
-                if not torrent_storage_dir:
-                    # Export .torrent file
-                    torrent_hash = torrent.get('infohash_v1')
-                    if meta.get('debug', False):
-                        console.print(f"[cyan]Exporting .torrent file for hash: {torrent_hash}")
+                if not pathed:
+                    torrent_storage_dir = client.get('torrent_storage_dir')
+                    if not torrent_storage_dir:
+                        # Export .torrent file
+                        torrent_hash = torrent.get('infohash_v1')
+                        if meta.get('debug', False):
+                            console.print(f"[cyan]Exporting .torrent file for hash: {torrent_hash}")
 
-                    try:
-                        torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
-                        torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+                        try:
+                            torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
+                            torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
 
-                        with open(torrent_file_path, "wb") as f:
-                            f.write(torrent_file_content)
+                            with open(torrent_file_path, "wb") as f:
+                                f.write(torrent_file_content)
 
-                        # Validate the .torrent file before saving as BASE.torrent
-                        valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
-                        if not valid:
-                            console.print(f"[bold red]Validation failed for {torrent_file_path}")
-                            os.remove(torrent_file_path)  # Remove invalid file
-                        else:
-                            from src.torrentcreate import create_base_from_existing_torrent
-                            await create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'])
+                            # Validate the .torrent file before saving as BASE.torrent
+                            valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
+                            if not valid:
+                                console.print(f"[bold red]Validation failed for {torrent_file_path}")
+                                os.remove(torrent_file_path)  # Remove invalid file
+                            else:
+                                from src.torrentcreate import create_base_from_existing_torrent
+                                await create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'])
 
-                    except qbittorrentapi.APIError as e:
-                        console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
+                        except qbittorrentapi.APIError as e:
+                            console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
 
                 found = True
                 break
 
         if not found:
-            console.print("[bold red]Torrent with the specified infohash_v1 not found.")
+            console.print("[bold red]Matching site torrent with the specified infohash_v1 not found.")
 
         return meta
+
+    async def get_pathed_torrents(self, path, meta):
+        # Find matching torrents asynchronously
+        try:
+
+            matching_torrents = await self.find_qbit_torrents_by_path(path, meta)
+
+            # If we found matches, use the hash from the first exact match
+            if matching_torrents:
+                # Prefer exact matches
+                exact_matches = [t for t in matching_torrents if t['match_type'] == 'exact']
+                if exact_matches:
+                    meta['infohash'] = exact_matches[0]['hash']
+                    console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
+                    await self.get_ptp_from_hash(meta, pathed=True)
+
+                console.print("[blue]Found the torrent in qBitTorrent, setting values[/blue]")
+            else:
+                if meta['debug']:
+                    console.print("[yellow]No matching torrents for the path found in qBittorrent[/yellow]")
+
+        except Exception as e:
+            console.print(f"[red]Error searching for torrents: {str(e)}[/red]")
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
+    async def find_qbit_torrents_by_path(self, content_path, meta):
+        try:
+            if meta.get('client', None) is None:
+                default_torrent_client = self.config['DEFAULT']['default_torrent_client']
+            else:
+                default_torrent_client = meta['client']
+            if meta.get('client', None) == 'none':
+                return
+            if default_torrent_client == "none":
+                return
+            client_config = self.config['TORRENT_CLIENTS'][default_torrent_client]
+            torrent_client = client_config['torrent_client']
+
+            local_path, remote_path = await self.remote_path_map(meta)
+
+            if torrent_client != 'qbit':
+                return []
+
+            # Normalize the content path for comparison
+            normalized_content_path = os.path.normpath(content_path).lower()
+            if meta['debug']:
+                console.print(f"[cyan]Looking for torrents with content path: {normalized_content_path}")
+
+            # Connect to qBittorrent
+            try:
+                qbt_client = qbittorrentapi.Client(
+                    host=client_config['qbit_url'],
+                    port=int(client_config['qbit_port']),  # Ensure port is an integer
+                    username=client_config['qbit_user'],
+                    password=client_config['qbit_pass'],
+                    VERIFY_WEBUI_CERTIFICATE=client_config.get('VERIFY_WEBUI_CERTIFICATE', True)
+                )
+                await asyncio.to_thread(qbt_client.auth_log_in)  # Convert sync call to async
+
+            except qbittorrentapi.LoginFailed:
+                console.print("[bold red]Failed to login to qBittorrent - incorrect credentials")
+                return []
+
+            except qbittorrentapi.APIConnectionError:
+                console.print("[bold red]Failed to connect to qBittorrent - check host/port")
+                return []
+
+            # Get all torrents - convert to async
+            torrents = await asyncio.to_thread(qbt_client.torrents_info)
+            if meta['debug']:
+                console.print(f"[cyan]Found {len(torrents)} torrents in qBittorrent")
+
+            matching_torrents = []
+
+            # First collect exact path matches
+            for torrent in torrents:
+                try:
+                    # Get content path and normalize it
+                    torrent_content_path = os.path.normpath(os.path.join(torrent.save_path, torrent.name)).lower()
+
+                    if torrent_content_path == normalized_content_path:
+                        if meta['debug']:
+                            console.print(f"[green]Found exact match: {torrent.name}")
+
+                        # Add relevant torrent info
+                        matching_torrents.append({
+                            'hash': torrent.hash,
+                            'name': torrent.name,
+                            'save_path': torrent.save_path,
+                            'content_path': torrent_content_path,
+                            'size': torrent.size,
+                            'category': torrent.category,
+                            'match_type': 'exact'
+                        })
+                except Exception as e:
+                    if meta['debug']:
+                        console.print(f"[yellow]Error processing torrent {torrent.name}: {str(e)}")
+                    continue
+
+            # Display results summary
+            if meta['debug']:
+                if matching_torrents:
+                    console.print(f"[green]Found {len(matching_torrents)} matching torrents")
+                else:
+                    console.print(f"[yellow]No matching torrents found for {content_path}")
+
+            return matching_torrents
+
+        except Exception as e:
+            console.print(f"[bold red]Error finding torrents by content path: {str(e)}")
+            if meta['debug']:
+                import traceback
+                console.print(traceback.format_exc())
+            return []
