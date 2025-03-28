@@ -879,6 +879,7 @@ class Clients():
         torrent_client = client['torrent_client']
         if torrent_client == 'rtorrent':
             await self.get_ptp_from_hash_rtorrent(meta, pathed)
+            return meta
         elif torrent_client == 'qbit':
             qbt_client = qbittorrentapi.Client(
                 host=client['qbit_url'],
