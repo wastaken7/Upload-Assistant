@@ -986,7 +986,7 @@ class Clients():
             return meta
 
     async def get_ptp_from_hash_rtorrent(self, meta, client, pathed=False):
-        torrent_storage_dir = client('torrent_storage_dir')
+        torrent_storage_dir = client['torrent_storage_dir']
         console.print(f"[cyan]Torrent storage directory: {torrent_storage_dir}")
         info_hash_v1 = meta.get('infohash')
 
