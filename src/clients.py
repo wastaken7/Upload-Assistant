@@ -986,7 +986,8 @@ class Clients():
             return meta
 
     async def get_ptp_from_hash_rtorrent(self, meta, client, pathed=False):
-        torrent_storage_dir = client.get('torrent_storage_dir')
+        torrent_storage_dir = client('torrent_storage_dir')
+        console.print(f"[cyan]Torrent storage directory: {torrent_storage_dir}")
         info_hash_v1 = meta.get('infohash')
 
         if not torrent_storage_dir or not info_hash_v1:
@@ -1031,6 +1032,7 @@ class Clients():
         try:
             torrent = Torrent.read(torrent_path)
             comment = torrent.comment or ""
+            console.print(f"[cyan]Torrent comment: {comment}")
 
             # Try to find tracker IDs in the comment
             if meta.get('debug'):
