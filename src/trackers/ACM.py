@@ -101,11 +101,11 @@ class ACM():
         }.get(resolution, '10')
         return resolution_id
 
-    # ACM rejects uploads with more that 4 keywords
+    # ACM rejects uploads with more that 10 keywords
     async def get_keywords(self, keywords):
         if keywords != '':
             keywords_list = keywords.split(',')
-            keywords_list = [keyword for keyword in keywords_list if " " not in keyword][:4]
+            keywords_list = [keyword for keyword in keywords_list if " " not in keyword][:10]
             keywords = ', '.join(keywords_list)
         return keywords
 
