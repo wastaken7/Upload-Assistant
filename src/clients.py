@@ -878,7 +878,7 @@ class Clients():
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         torrent_client = client['torrent_client']
         if torrent_client == 'rtorrent':
-            await self.get_ptp_from_hash_rtorrent(meta, torrent_client, pathed)
+            await self.get_ptp_from_hash_rtorrent(meta, pathed)
         elif torrent_client == 'qbit':
             qbt_client = qbittorrentapi.Client(
                 host=client['qbit_url'],
@@ -985,8 +985,10 @@ class Clients():
         else:
             return meta
 
-    async def get_ptp_from_hash_rtorrent(self, meta, client, pathed=False):
-        torrent_storage_dir = client['torrent_storage_dir']
+    async def get_ptp_from_hash_rtorrent(self, meta, pathed=False):
+        default_torrent_client = self.config['DEFAULT']['default_torrent_client']
+        client = self.config['TORRENT_CLIENTS'][default_torrent_client]
+        torrent_storage_dir = client.get('torrent_storage_dir')
         console.print(f"[cyan]Torrent storage directory: {torrent_storage_dir}")
         info_hash_v1 = meta.get('infohash')
 
