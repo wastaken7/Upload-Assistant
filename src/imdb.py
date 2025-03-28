@@ -80,6 +80,7 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
     imdb_info = {}
 
     if not imdbID or imdbID == 0:
+        imdb_info['type'] = None
         return imdb_info
 
     try:
