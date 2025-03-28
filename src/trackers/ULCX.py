@@ -6,6 +6,7 @@ import platform
 import os
 import glob
 import httpx
+import cli_ui
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -167,12 +168,26 @@ class ULCX():
     async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:
             console.print('[bold red]Concerts not allowed at ULCX.')
-            meta['skipping'] = "ULCX"
-            return
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    meta['skipping'] = "ULCX"
+                    return
+            else:
+                meta['skipping'] = "ULCX"
+                return
         if meta['video_codec'] == "HEVC" and meta['resolution'] != "2160p" and 'animation' not in meta['keywords'] and meta.get('anime', False) is not True:
-            console.print('[bold red]This content is not allowed at ULCX.')
-            meta['skipping'] = "ULCX"
-            return
+            console.print('[bold red]This content might not fit HEVC rules.')
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    meta['skipping'] = "ULCX"
+                    return
+            else:
+                meta['skipping'] = "ULCX"
+                return
         dupes = []
         console.print("[yellow]Searching for existing torrents on ULCX...")
         params = {
