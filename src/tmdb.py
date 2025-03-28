@@ -339,7 +339,6 @@ async def tmdb_other_meta(
     tmdb_type = ""
     mal_id = 0
     demographic = ""
-    logo_path = None
 
     if tmdb_id == 0:
         try:
@@ -1001,7 +1000,7 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
 
 
 async def get_logo(client, tmdb_id, category, debug=False):
-    logo_path = None
+    logo_path = ""
     # Get preferred languages in order (from config, then 'en' as fallback)
     logo_languages = [config['DEFAULT'].get('logo_language', 'en'), 'en']
 
@@ -1018,7 +1017,7 @@ async def get_logo(client, tmdb_id, category, debug=False):
 
         # Only look for logos that match our specified languages
         for language in logo_languages:
-            matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), None)
+            matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), "")
             if matching_logo:
                 logo_path = f"https://image.tmdb.org/t/p/original{matching_logo['file_path']}"
                 if debug:
