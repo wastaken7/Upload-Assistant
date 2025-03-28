@@ -12,7 +12,7 @@ from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.btnid import get_btn_torrents, get_bhd_torrents
-from src.tvdb import get_tvdb_episode_data
+from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes
 
 try:
     import traceback
@@ -687,6 +687,7 @@ class Prep():
             if not meta.get('tv_pack', False) or meta.get('episode_int') != 0:
                 # prioritze tvdb metadata if available
                 if tvdb_api and tvdb_token:
+                    meta['season_int'], meta['episode_int'] = await get_tvdb_series_episodes(base_dir, tvdb_token, meta.get('tvdb_id'), meta.get('season_int'), meta.get('episode_int'), tvdb_api)
                     tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('season_int'), meta.get('episode_int'), api_key=tvdb_api)
                     if tvdb_episode_data:
                         meta['tvdb_episode_data'] = tvdb_episode_data
