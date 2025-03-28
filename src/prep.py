@@ -687,10 +687,10 @@ class Prep():
             if not meta.get('tv_pack', False) or meta.get('episode_int') != 0:
                 # prioritze tvdb metadata if available
                 if tvdb_api and tvdb_token:
-                    meta['season_int'], meta['episode_int'] = await get_tvdb_series_episodes(base_dir, tvdb_token, meta.get('tvdb_id'), meta.get('season_int'), meta.get('episode_int'), tvdb_api)
+                    meta['season_int'], meta['episode_int'] = await get_tvdb_series_episodes(base_dir, tvdb_token, meta.get('tvdb_id'), meta.get('season_int'), meta.get('episode_int'), tvdb_api, debug=meta.get('debug', False))
                     meta['season'] = "S" + str(meta['season_int']).zfill(2)
                     meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
-                    tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('season_int'), meta.get('episode_int'), api_key=tvdb_api)
+                    tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('season_int'), meta.get('episode_int'), api_key=tvdb_api, debug=meta.get('debug', False))
                     if tvdb_episode_data:
                         meta['tvdb_episode_data'] = tvdb_episode_data
 

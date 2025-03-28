@@ -6,7 +6,7 @@ from data.config import config
 config = config
 
 
-async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False):
+async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False, debug=False):
     console.print(f"[cyan]Fetching TVDb episode data for S{season}E{episode}...[/cyan]")
 
     url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/episodes/default"
@@ -78,12 +78,13 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                     "series_overview": series_data.get("overview", ""),
                 }
 
-                console.print(f"[green]Found episode: {result['season_name']} - S{result['season_number']}E{result['episode_number']} - {result['episode_name']}[/green] - {result['air_date']}")
-                console.print(f"[yellow]Overview: {result['overview']}")
-                console.print(f"[yellow]Series: {result['series_name']} - {result['series_overview']}[/yellow]")
+                if debug:
+                    console.print(f"[green]Found episode: {result['season_name']} - S{result['season_number']}E{result['episode_number']} - {result['episode_name']}[/green] - {result['air_date']}")
+                    console.print(f"[yellow]Overview: {result['overview']}")
+                    console.print(f"[yellow]Series: {result['series_name']} - {result['series_overview']}[/yellow]")
                 return result
             else:
-                console.print(f"[yellow]No episode data found for S{season}E{episode}[/yellow]")
+                console.print(f"[yellow]No TVDB episode data found for S{season}E{episode}[/yellow]")
                 return None
 
     except httpx.HTTPStatusError as e:
@@ -166,7 +167,7 @@ async def get_tvdb_token(api_key, base_dir):
         return None
 
 
-async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False):
+async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False, debug=False):
     console.print(f"[cyan]Fetching episode list for series ID {tvdb_id}...[/cyan]")
 
     url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/extended?meta=episodes&short=false"
@@ -179,8 +180,6 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
     try:
         async with httpx.AsyncClient() as client:
-            # TVDb API for extended endpoint doesn't use pagination for episodes,
-            # it returns all episodes at once in the response
             response = await client.get(url, headers=headers, timeout=30.0)
 
             # Handle unauthorized responses
@@ -225,7 +224,7 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                 all_episodes = episodes
 
             if not all_episodes:
-                console.print(f"[yellow]No episodes found for series ID {tvdb_id}[/yellow]")
+                console.print(f"[yellow]No episodes found for TVDB series ID {tvdb_id}[/yellow]")
                 return None
 
             # Process and organize episode data
@@ -299,13 +298,15 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                         for ep in episodes_by_season[season]:
                             if ep["episodeNumber"] == episode:
                                 found_episode = ep
-                                console.print(f"[green]Found episode S{season}E{episode} directly: {ep['name']}[/green]")
+                                if debug:
+                                    console.print(f"[green]Found episode S{season}E{episode} directly: {ep['name']}[/green]")
                                 # Since we found it directly, return the original season and episode
                                 return (season, episode)
                     else:
                         # Episode number is greater than max in this season, so try absolute numbering
-                        console.print(f"[yellow]Episode {episode} is greater than max episode ({max_episode_in_season}) in season {season}[/yellow]")
-                        console.print("[yellow]Trying to find by absolute episode number...[/yellow]")
+                        if debug:
+                            console.print(f"[yellow]Episode {episode} is greater than max episode ({max_episode_in_season}) in season {season}[/yellow]")
+                            console.print("[yellow]Trying to find by absolute episode number...[/yellow]")
 
                         # Calculate absolute episode number
                         absolute_number = episode
@@ -321,26 +322,29 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                             for ep in episodes_by_season[actual_season]:
                                 if ep["episodeNumber"] == actual_episode:
                                     found_episode = ep
-                                    console.print(f"[green]Found by absolute number {absolute_number}: S{actual_season}E{actual_episode} - {ep['name']}[/green]")
-                                    console.print(f"[bold yellow]Note: S{season}E{episode} maps to S{actual_season}E{actual_episode} using absolute numbering[/bold yellow]")
+                                    if debug:
+                                        console.print(f"[green]Found by absolute number {absolute_number}: S{actual_season}E{actual_episode} - {ep['name']}[/green]")
+                                        console.print(f"[bold yellow]Note: S{season}E{episode} maps to S{actual_season}E{actual_episode} using absolute numbering[/bold yellow]")
                                     # Return the absolute-based season and episode since that's what corresponds to the actual content
                                     return (actual_season, actual_episode)
                         else:
-                            console.print(f"[red]Could not find episode with absolute number {absolute_number}[/red]")
+                            if debug:
+                                console.print(f"[red]Could not find episode with absolute number {absolute_number}[/red]")
                             # Return original values if absolute mapping failed
                             return (season, episode)
                 else:
-                    console.print(f"[red]Season {season} not found in series[/red]")
+                    if debug:
+                        console.print(f"[red]Season {season} not found in series[/red]")
                     # Return original values if season wasn't found
                     return (season, episode)
 
                 # If we get here and haven't returned yet, return the original values
                 if not found_episode:
-                    console.print(f"[yellow]No matching episode found, keeping original S{season}E{episode}[/yellow]")
+                    if debug:
+                        console.print(f"[yellow]No matching episode found, keeping original S{season}E{episode}[/yellow]")
                     return (season, episode)
 
             # If we get here, no specific episode was requested or processing, so return the original values
-            # This maintains backward compatibility with how your code unpacks the return value
             return (season, episode)
 
     except httpx.HTTPStatusError as e:
