@@ -713,7 +713,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
                 capture_screenshot(  # Direct async function call
-                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False))
+                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False), meta)
                 )
             )
 
@@ -829,7 +829,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
                     random_time = random.uniform(0, length)
                     screenshot_response = await capture_screenshot(
-                        (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap)
+                        (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
                     )
 
                     if not os.path.exists(screenshot_response):
@@ -893,7 +893,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
 
 async def capture_screenshot(args):
-    index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap = args
+    index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
         if width <= 0 or height <= 0:
@@ -902,6 +902,32 @@ async def capture_screenshot(args):
         if ss_time < 0:
             return f"Error: Invalid timestamp {ss_time}"
 
+        # Normalize path for cross-platform compatibility
+        path = os.path.normpath(path)
+
+        # If path is a directory and meta has a filelist, use the first file from the filelist
+        if os.path.isdir(path):
+            error_msg = f"Error: Path is a directory, not a file: {path}"
+            console.print(f"[yellow]{error_msg}[/yellow]")
+
+            if meta and isinstance(meta, dict) and 'filelist' in meta and meta['filelist']:
+                video_file = meta['filelist'][0]
+                console.print(f"[green]Using first file from filelist: {video_file}[/green]")
+                path = video_file
+            else:
+                return error_msg
+
+        # After potential path correction, validate again
+        if not os.path.exists(path):
+            error_msg = f"Error: Input file does not exist: {path}"
+            console.print(f"[red]{error_msg}[/red]")
+            return error_msg
+
+        # Debug output showing the exact path being used
+        if loglevel == 'verbose' or (meta and meta.get('debug', False)):
+            console.print(f"[cyan]Processing file: {path}[/cyan]")
+
+        # Proceed with screenshot capture
         ff = ffmpeg.input(path, ss=ss_time)
         if w_sar != 1 or h_sar != 1:
             ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
@@ -922,6 +948,11 @@ async def capture_screenshot(args):
             .global_args('-loglevel', loglevel)
         )
 
+        # Print the command for debugging
+        if loglevel == 'verbose' or (meta and meta.get('debug', False)):
+            cmd = command.compile()
+            console.print(f"[cyan]FFmpeg command: {' '.join(cmd)}[/cyan]")
+
         process = await asyncio.create_subprocess_exec(
             *command.compile(),
             stdout=asyncio.subprocess.PIPE,
@@ -931,16 +962,27 @@ async def capture_screenshot(args):
         # Ensure process completes and doesn't leak
         try:
             stdout, stderr = await process.communicate()
+
+            # Print stdout and stderr if in verbose mode
+            if loglevel == 'verbose' or (meta and meta.get('debug', False)):
+                if stdout:
+                    console.print(f"[blue]FFmpeg stdout:[/blue]\n{stdout.decode('utf-8', errors='replace')}")
+                if stderr:
+                    console.print(f"[yellow]FFmpeg stderr:[/yellow]\n{stderr.decode('utf-8', errors='replace')}")
+
         except asyncio.CancelledError:
+            console.print(traceback.format_exc())
             process.kill()
             raise
 
         if process.returncode == 0:
             return (index, image_path)
         else:
-            console.print(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
+            stderr_text = stderr.decode('utf-8', errors='replace')
+            console.print(f"[red]FFmpeg error capturing screenshot: {stderr_text}[/red]")
             return (index, None)
     except Exception as e:
+        console.print(traceback.format_exc())
         return f"Error: {str(e)}"
 
 

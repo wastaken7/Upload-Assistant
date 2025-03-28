@@ -684,60 +684,14 @@ class Prep():
 
         if meta['category'] == "TV":
             meta = await get_season_episode(video, meta)
-            if not meta.get('tv_pack', False) or meta.get('episode_int') != 0:
-                # prioritze tvdb metadata if available
-                if tvdb_api and tvdb_token:
-                    tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('season_int'), meta.get('episode_int'), api_key=tvdb_api)
-                    if tvdb_episode_data:
-                        meta['tvdb_episode_data'] = tvdb_episode_data
-
-                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('episode_name'):
-                            episode_name = meta['tvdb_episode_data'].get('episode_name')
-                            if episode_name and isinstance(episode_name, str) and episode_name.strip():
-                                meta['tvdb_episode_title'] = episode_name.strip()
-                                meta['auto_episode_title'] = episode_name.strip()
-                            else:
-                                meta['auto_episode_title'] = None
-
-                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('overview'):
-                            overview = meta['tvdb_episode_data'].get('overview')
-                            if overview and isinstance(overview, str) and overview.strip():
-                                meta['overview_meta'] = overview.strip()
-                                console.print(f"tvdb_episode_title: {meta.get('tvdb_episode_title')}")
-                                console.print(f"[green]Using TVDb overview: {overview[:100]}{'...' if len(overview) > 100 else ''}[/green]")
-                            else:
-                                meta['overview_meta'] = None
-
-                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('season_name'):
-                            meta['tvdb_season_name'] = meta['tvdb_episode_data'].get('season_name')
-
-                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('season_number'):
-                            meta['tvdb_season_number'] = meta['tvdb_episode_data'].get('season_number')
-
-                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('episode_number'):
-                            meta['tvdb_episode_number'] = meta['tvdb_episode_data'].get('episode_number')
-
-                # fallback to tmdb data if tvdb data is not available
-                if not meta.get('auto_episode_title') or not meta.get('overview_meta'):
-                    episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
-                    if meta.get('auto_episode_title') is None and episode_details.get('name') is not None:
-                        if 'episode' in episode_details.get("name").lower():
-                            meta['auto_episode_title'] = None
-                        else:
-                            meta['auto_episode_title'] = episode_details['name']
-                    if meta.get('overview_meta') is None and episode_details.get('overview') is not None:
-                        meta['overview_meta'] = episode_details.get('overview', None)
-
-                # fallback to tvmaze data if no other data is available
-                if not meta.get('auto_episode_title') or not meta.get('overview_meta'):
-                    tvmaze_episode_data = await get_tvmaze_episode_data(meta.get('tvmaze_id'), meta.get('season_int'), meta.get('episode_int'))
-                    if tvmaze_episode_data:
-                        meta['tvmaze_episode_data'] = tvmaze_episode_data
-                        if meta.get('auto_episode_title') is None and tvmaze_episode_data.get('name') is not None:
-                            meta['auto_episode_title'] = tvmaze_episode_data['name']
-                        if meta.get('overview_meta') is None and tvmaze_episode_data.get('summary') is not None:
-                            meta['overview_meta'] = tvmaze_episode_data.get('summary', None)
-
+            if not meta.get('tv_pack', False) and meta.get('episode_int') != 0:
+                episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
+                if meta.get('episode_title') is None and episode_details.get('name') is not None:
+                    if 'episode' in episode_details.get("name").lower():
+                        meta['episode_title'] = ""
+                    else:
+                        meta['episode_title'] = episode_details['name']
+                    meta['overview_meta'] = episode_details.get('overview', None)
         meta = await self.tag_override(meta)
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides:

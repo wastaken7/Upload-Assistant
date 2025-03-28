@@ -29,7 +29,29 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
     if resolution is None:
         try:
             resolution = guess['screen_size']
+            # Check if the resolution from guess exists in our map
+            if resolution not in res_map:
+                # If not in the map, use width-based mapping
+                width_map = {
+                    '3840p': '2160p',
+                    '2560p': '1550p',
+                    '1920p': '1080p',
+                    '1920i': '1080i',
+                    '1280p': '720p',
+                    '1024p': '576p',
+                    '1024i': '576i',
+                    '960p': '540p',
+                    '960i': '540i',
+                    '854p': '480p',
+                    '854i': '480i',
+                    '720p': '576p',
+                    '720i': '576i',
+                    '15360p': '4320p',
+                    'OTHERp': 'OTHER'
+                }
+                resolution = width_map.get(f"{width}{scan}", "OTHER")
         except Exception:
+            # If we can't get from guess, use width-based mapping
             width_map = {
                 '3840p': '2160p',
                 '2560p': '1550p',
@@ -48,7 +70,10 @@ async def mi_resolution(res, guess, width, scan, height, actual_height):
                 'OTHERp': 'OTHER'
             }
             resolution = width_map.get(f"{width}{scan}", "OTHER")
-        resolution = await mi_resolution(resolution, guess, width, scan, height, actual_height)
+
+    # Final check to ensure we have a valid resolution
+    if resolution not in res_map:
+        resolution = "OTHER"
 
     return resolution
 
