@@ -510,28 +510,6 @@ class Clients():
         if platform.system() == "Windows":
             src_drive = os.path.splitdrive(src)[0]
         else:
-            # On Unix/Linux, use the root directory or first directory component
-            src_drive = "/"
-            # Extract the first directory component for more specific matching
-            src_parts = src.strip('/').split('/')
-            if src_parts:
-                src_root_dir = '/' + src_parts[0]
-                # Check if any linked folder contains this root
-                for folder in linked_folder:
-                    if src_root_dir in folder or folder in src_root_dir:
-                        src_drive = src_root_dir
-                        break
-
-        # Find a linked folder that matches the drive
-        link_target = None
-        if platform.system() == "Windows":
-            # Windows matching based on drive letters
-            for folder in linked_folder:
-                folder_drive = os.path.splitdrive(folder)[0]
-                if folder_drive == src_drive:
-                    link_target = folder
-                    break
-        else:
             # On Unix/Linux, use the full mount point path for more accurate matching
             src_drive = "/"
 
@@ -581,6 +559,38 @@ class Clients():
                         if src_root_dir in folder or folder in src_root_dir:
                             src_drive = src_root_dir
                             break
+
+        # Find a linked folder that matches the drive
+        link_target = None
+        if platform.system() == "Windows":
+            # Windows matching based on drive letters
+            for folder in linked_folder:
+                folder_drive = os.path.splitdrive(folder)[0]
+                if folder_drive == src_drive:
+                    link_target = folder
+                    break
+        else:
+            # Unix/Linux matching based on path containment
+            for folder in linked_folder:
+                # Check if the linked folder starts with the mount point
+                if folder.startswith(src_drive) or src.startswith(folder):
+                    link_target = folder
+                    break
+
+                # Also check if this is a sibling mount point with the same structure
+                folder_parts = folder.split('/')
+                src_drive_parts = src_drive.split('/')
+
+                # Check if both are mounted under the same parent directory
+                if (len(folder_parts) >= 2 and len(src_drive_parts) >= 2 and
+                        folder_parts[1] == src_drive_parts[1]):
+
+                    potential_match = os.path.join(src_drive, folder_parts[-1])
+                    if os.path.exists(potential_match):
+                        link_target = potential_match
+                        if meta['debug']:
+                            console.print(f"[cyan]Found sibling mount point linked folder: {link_target}")
+                        break
 
         if meta['debug']:
             console.print(f"Source drive: {src_drive}")
