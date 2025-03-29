@@ -11,12 +11,22 @@ config = {
         # will print the changelog if an update is available
         "verbose_notification": False,
 
+        # tmdb api key
+        # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "tmdb_api key",
+
+        # tvdb api key
+        # visit "https://www.thetvdb.com/dashboard/account/apikey" copy api key and insert below
+        "tvdb_api": "",
+        # visit "https://thetvdb.github.io/v4-api/#/Login/post_login" enter api key, generate token and insert token below
+        "tvdb_token": "",
+
         # btn api key for infohash parsing
         "btn_api": "btn_api key",
         # bhd api/rss keys for infohash parsing and auto torrent id/filename searching
         "bhd_api": "bhd api key",
         "bhd_rss_key": "bhd rss key",
+
         # image host api keys
         "imgbb_api": "imgbb api key",
         "ptpimg_api": "ptpimg api key",
@@ -143,6 +153,9 @@ config = {
 
         # set true to add episode overview to description
         "episode_overview": False,
+
+        # set true to skip automated client torrent searching
+        'skip_auto_torrent': False,
 
     },
 

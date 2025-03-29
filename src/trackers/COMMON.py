@@ -67,10 +67,25 @@ class COMMON():
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
+            add_logo_enabled = self.config["DEFAULT"].get("add_logo", False)
+            if add_logo_enabled and 'logo' in meta:
+                logo = meta['logo']
+                logo_size = self.config["DEFAULT"].get("logo_size", 420)
+                if logo != "":
+                    descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]\n\n")
+            season_name = meta.get('tvdb_season_name') if meta.get('tvdb_season_name') is not None and meta.get('tvdb_season_name') != "" else None
+            season_number = meta.get('tvdb_season_number') if meta.get('tvdb_season_number') is not None and meta.get('tvdb_season_number') != "" else None
+            episode_number = meta.get('tvdb_episode_number') if meta.get('tvdb_episode_number') is not None and meta.get('tvdb_episode_number') != "" else None
+            episode_title = meta.get('tvdb_episode_title') if meta.get('tvdb_episode_title') is not None and meta.get('tvdb_episode_title') != "" else None
+            if episode_overview and season_name and season_number and episode_number and episode_title:
+                descfile.write("[center][pre]")
+                descfile.write(f"{season_name} - S{season_number}E{episode_number}: {episode_title}")
+                descfile.write("[/pre][/center]\n\n")
             if episode_overview and meta.get('overview_meta') is not None and meta.get('overview_meta') != "":
-                descfile.write("[center][code]")
-                descfile.write(meta['overview_meta'])
-                descfile.write("[/code][/center]\n\n")
+                episode_data = meta.get('overview_meta')
+                descfile.write("[center][pre]")
+                descfile.write(episode_data)
+                descfile.write("[/pre][/center]\n\n")
 
             bbcode = BBCODE()
             discs = meta.get('discs', [])
@@ -91,13 +106,6 @@ class COMMON():
                 desc = bbcode.convert_comparison_to_collapse(desc, 1000)
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
-
-            add_logo_enabled = self.config["DEFAULT"].get("add_logo", False)
-            if add_logo_enabled and 'logo' in meta:
-                logo = meta['logo']
-                logo_size = self.config["DEFAULT"].get("logo_size", 420)
-                if logo != "":
-                    descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]\n\n")
 
             # Handle single disc case
             if len(discs) == 1:
