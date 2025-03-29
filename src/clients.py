@@ -532,12 +532,56 @@ class Clients():
                     link_target = folder
                     break
         else:
-            # Unix/Linux matching based on path containment
-            for folder in linked_folder:
-                # Check if source path is in the linked folder or vice versa
-                if src.startswith(folder) or folder.startswith(src) or folder.startswith(src_drive):
-                    link_target = folder
+            # On Unix/Linux, use the full mount point path for more accurate matching
+            src_drive = "/"
+
+            # Get all mount points on the system to find the most specific match
+            mounted_volumes = []
+            try:
+                # Read mount points from /proc/mounts or use 'mount' command output
+                if os.path.exists('/proc/mounts'):
+                    with open('/proc/mounts', 'r') as f:
+                        for line in f:
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                mount_point = parts[1]
+                                mounted_volumes.append(mount_point)
+                else:
+                    # Fall back to mount command if /proc/mounts doesn't exist
+                    import subprocess
+                    output = subprocess.check_output(['mount'], text=True)
+                    for line in output.splitlines():
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            mount_point = parts[2]
+                            mounted_volumes.append(mount_point)
+            except Exception as e:
+                if meta.get('debug', False):
+                    console.print(f"[yellow]Error getting mount points: {str(e)}")
+
+            # Sort mount points by length (descending) to find most specific match first
+            mounted_volumes.sort(key=len, reverse=True)
+
+            # Find the most specific mount point that contains our source path
+            for mount_point in mounted_volumes:
+                if src.startswith(mount_point):
+                    src_drive = mount_point
+                    if meta.get('debug', False):
+                        console.print(f"[cyan]Found mount point: {mount_point} for path: {src}")
                     break
+
+            # If we couldn't find a specific mount point, fall back to linked folder matching
+            if src_drive == "/":
+                # Extract the first directory component for basic matching
+                src_parts = src.strip('/').split('/')
+                if src_parts:
+                    src_root_dir = '/' + src_parts[0]
+                    # Check if any linked folder contains this root
+                    for folder in linked_folder:
+                        if src_root_dir in folder or folder in src_root_dir:
+                            src_drive = src_root_dir
+                            break
+
         if meta['debug']:
             console.print(f"Source drive: {src_drive}")
             console.print(f"Link target: {link_target}")
