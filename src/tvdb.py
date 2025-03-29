@@ -64,8 +64,6 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
             if data.get("status") == "success" and data.get("data") and data["data"].get("episodes"):
                 episode_data = data["data"]["episodes"][0]
                 series_data = data["data"].get("series", {})
-                console.print(f"episode_data: {episode_data}")
-                console.print(f"series_data: {series_data}")
 
                 result = {
                     "episode_name": episode_data.get("name", ""),
