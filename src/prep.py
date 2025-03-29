@@ -743,11 +743,11 @@ class Prep():
                         if meta.get('overview_meta') is None and tvmaze_episode_data.get('summary') is not None:
                             meta['overview_meta'] = tvmaze_episode_data.get('summary', None)
 
-        if meta['tvdb_season_int'] and meta['tvdb_episode_int'] != 0:
-            meta['episode_int'] = meta['tvdb_episode_int']
-            meta['season_int'] = meta['tvdb_season_int']
-            meta['season'] = "S" + str(meta['season_int']).zfill(2)
-            meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
+                if 'tvdb_season_int' in meta and meta['tvdb_season_int'] and meta['tvdb_episode_int'] != 0:
+                    meta['episode_int'] = meta['tvdb_episode_int']
+                    meta['season_int'] = meta['tvdb_season_int']
+                    meta['season'] = "S" + str(meta['season_int']).zfill(2)
+                    meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
 
         meta = await self.tag_override(meta)
         user_overrides = config['DEFAULT'].get('user_overrides', False)
