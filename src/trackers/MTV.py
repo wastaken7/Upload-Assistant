@@ -75,19 +75,19 @@ class MTV():
                             meta=meta,
                             path=Path(meta['path']),
                             trackers=["https://fake.tracker"],
-                            source="L4G",
+                            source="Audionut",
                             private=True,
                             exclude_globs=exclude,  # Ensure this is always a list
                             include_globs=include,  # Ensure this is always a list
                             creation_date=datetime.now(),
-                            comment="Created by L4G's Upload Assistant",
-                            created_by="L4G's Upload Assistant"
+                            comment="Created by Audionut's Upload Assistant",
+                            created_by="Audionut's Upload Assistant"
                         )
 
                         new_torrent.piece_size = 8 * 1024 * 1024
                         new_torrent.validate_piece_size()
                         new_torrent.generate(callback=torf_cb, interval=5)
-                        new_torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/MTV.torrent", overwrite=True)
+                        new_torrent.write(torrent_path, overwrite=True)
 
                         torrent_filename = "[MTV]"
                         await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
