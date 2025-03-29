@@ -228,7 +228,8 @@ class Prep():
             video, meta['scene'], meta['imdb_id'] = await self.is_scene(videopath, meta, meta.get('imdb_id', 0))
 
             title, secondary_title, extracted_year = extract_title_and_year(video)
-            console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
+            if meta['debug']:
+                console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
             if secondary_title:
                 meta['secondary_title'] = secondary_title
             if extracted_year and not meta.get('search_year'):
