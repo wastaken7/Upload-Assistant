@@ -76,7 +76,7 @@ class SPD():
             'keywords': meta['keywords'],
             'releaseInfo': self.forum_link
         }
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb') as binary_file:
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb') as binary_file:
             binary_file_data = binary_file.read()
             base64_encoded_data = base64.b64encode(binary_file_data)
             base64_message = base64_encoded_data.decode('utf-8')
@@ -95,14 +95,14 @@ class SPD():
                         if 'downloadUrl' in response.json():
                             with requests.get(url=self.url + response.json()['downloadUrl'], stream=True, headers=headers) as r:
                                 # replacing L4g/torf created torrent so it will be added to the client.
-                                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent",
+                                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent",
                                           'wb') as f:
                                     shutil.copyfileobj(r.raw, f)
                             # adding as comment link to torrent
-                            if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"):
-                                new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent")
+                            if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"):
+                                new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent")
                                 new_torrent.metainfo['comment'] = f"{self.url}/browse/{response.json()['torrent']['id']}"
-                                Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", overwrite=True)
+                                Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", overwrite=True)
                         else:
                             console.print("[bold red]No downloadUrl in response.")
                             console.print("[bold red]Confirm it uploaded correctly and try to download manually")

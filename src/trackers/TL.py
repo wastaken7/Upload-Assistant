@@ -90,7 +90,7 @@ class TL():
         open_info.close()
 
         open_desc.seek(0)
-        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent", 'rb')
+        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {
             'nfo': open_desc,
             'torrent': (self.get_name(meta) + '.torrent', open_torrent)

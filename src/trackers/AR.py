@@ -494,7 +494,7 @@ class AR():
             "Cookie": f"session={session_cookie.value}",
         }
 
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
         if meta['debug'] is False:
             import aiohttp
@@ -505,7 +505,7 @@ class AR():
                         form = aiohttp.FormData()
                         for key, value in data.items():
                             form.add_field(key, value)
-                        form.add_field('file_input', torrent_file, filename=f"{meta['clean_name']}.torrent")
+                        form.add_field('file_input', torrent_file, filename=f"[{self.tracker}].torrent")
 
                         # Perform the upload
                         try:

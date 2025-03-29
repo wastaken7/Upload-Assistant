@@ -93,7 +93,7 @@ class LST():
         if meta.get('service') == "hentai":
             desc = "[center]" + "[img]" + str(meta['poster']) + "[/img][/center]" + "\n[center]" + "https://www.themoviedb.org/tv/" + str(meta['tmdb']) + "\nhttps://myanimelist.net/anime/" + str(meta['mal']) + "[/center]" + desc
 
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]{meta['clean_name']}.torrent"
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         open_torrent = open(torrent_file_path, 'rb')
         files = {'torrent': open_torrent}
         base_dir = meta['base_dir']

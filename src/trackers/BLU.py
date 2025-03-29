@@ -72,7 +72,7 @@ class BLU():
         if nfo_files:
             nfo_file = open(nfo_files[0], 'rb')
 
-        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[BLU]{meta['clean_name']}.torrent", 'rb')
+        open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[BLU].torrent", 'rb')
         files = {'torrent': ("placeholder.torrent", open_torrent, "application/x-bittorrent")}
 
         if nfo_file:
