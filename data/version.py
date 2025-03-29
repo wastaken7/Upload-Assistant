@@ -1,3 +1,46 @@
+__version__ = "4.1.0"
+
+"""
+Changelog for version 4.1.0 (2025-03-29):
+
+## New config options
+See example-config.py
+-  and  - add tv series logo to top of descriptions with size control
+-  - from the last release, adds tv series overview to description. Now includes season name and details if applicable, see below
+-  (qBitTorrent v5+ only) - don't automatically try and find a matching torrent from just the path
+-  and  for tvdb data support
+
+## Notes
+- UA will now try and automatically find a torrent from qBitTorrent (v5+ only) that matches any site based argument. If it finds a matching torrent, for instance from PTP, it will automatically set . In other words, you no longer need to set a site argument ( or  or --whatever (or  and/or ) as UA will now do this automatically if the path matches a torrent in client. Use the applicable config option to disable this default behavior.
+
+- TVDB requires token to be initially inputted, after which time it will be auto generated as needed.
+- Automatic Absolute Order to Aired Order season/episode numbering with TVDB.
+- BHD now supports torrent id instead of just hash.
+- Some mkbrr updates, including support for  and rehashing for sites as needed.
+- TMDB searching should be improved.
+
+
+See examples below for new logo and episode data handling.
+<img src=https://github.com/user-attachments/assets/b2dc4a64-236d-4b77-af32-abe9b1b4fb44 width=400> <img src=https://github.com/user-attachments/assets/19011997-977b-4e19-b45b-51db598aba17 width=346>
+
+
+## What's Changed
+* BHD torrent id parsing by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/417
+* Better title/year parsing for tmdb searching by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/416
+* feat: pull logo from tmdb by @markhc in https://github.com/Audionut/Upload-Assistant/pull/425
+* fix: logo displayed as None by @markhc in https://github.com/Audionut/Upload-Assistant/pull/427
+* Update region.py by @ikitub3 in https://github.com/Audionut/Upload-Assistant/pull/429
+* proper mkbrr handling by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/397
+* TVDB support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/423
+* qBitTorrent auto torrent grabing and rTorrent infohash support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/428
+
+## New Contributors
+* @markhc made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/425
+* @ikitub3 made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/429
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.0.6...4.1.0
+"""
+
 __version__ = "4.0.6"
 
 """
