@@ -514,7 +514,11 @@ async def do_the_thing(base_dir):
 
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
 
-            if not meta.get('infohash') and not meta.get('torrent_hash') and not meta.get('ptp') and not meta.get('bhd') and not meta.get('hdb') and not meta.get('blu') and not meta.get('btn') and not meta.get('oe') and not meta.get('aither') and not meta.get('lst'):
+            meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
+            hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
+            tracker_ids = ['ptp', 'bhd', 'hdb', 'blu', 'btn', 'oe', 'aither', 'lst']
+
+            if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids):
                 await client.get_pathed_torrents(path, meta)
 
             await process_meta(meta, base_dir)

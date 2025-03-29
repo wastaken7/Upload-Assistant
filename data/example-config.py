@@ -154,6 +154,9 @@ config = {
         # set true to add episode overview to description
         "episode_overview": False,
 
+        # set true to skip automated client torrent searching
+        'skip_auto_torrent': False,
+
     },
 
     # these are used for DB links on AR
