@@ -28,8 +28,14 @@ class COMMON():
                     new_torrent.metainfo.pop(each, None)
             new_torrent.metainfo['announce'] = self.config['TRACKERS'][tracker].get('announce_url', "https://fake.tracker").strip()
             new_torrent.metainfo['info']['source'] = source_flag
+            if 'created by' in new_torrent.metainfo and isinstance(new_torrent.metainfo['created by'], str):
+                created_by = new_torrent.metainfo['created by']
+                if "mkbrr" in created_by.lower():
+                    new_torrent.metainfo['created by'] = f"{created_by} using Audionut's Upload Assistant"
+
             # setting comment as blank as if BASE.torrent is manually created then it can result in private info such as download link being exposed.
             new_torrent.metainfo['comment'] = ''
+
             Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent", overwrite=True)
 
     # used to add tracker url, comment and source flag to torrent file
