@@ -886,11 +886,18 @@ class Clients():
                 port=client['qbit_port'],
                 username=client['qbit_user'],
                 password=client['qbit_pass'],
-                VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
+                VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True),
+                REQUESTS_ARGS={'timeout': 10}
             )
 
             try:
-                qbt_client.auth_log_in()
+                await asyncio.wait_for(
+                    asyncio.to_thread(qbt_client.auth_log_in),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                console.print("[bold red]Login attempt to qBittorrent timed out after 10 seconds")
+                return None
             except qbittorrentapi.LoginFailed as e:
                 console.print(f"[bold red]Login failed while trying to get info hash: {e}")
                 exit(1)
@@ -1160,9 +1167,18 @@ class Clients():
                     port=int(client_config['qbit_port']),
                     username=client_config['qbit_user'],
                     password=client_config['qbit_pass'],
-                    VERIFY_WEBUI_CERTIFICATE=client_config.get('VERIFY_WEBUI_CERTIFICATE', True)
+                    VERIFY_WEBUI_CERTIFICATE=client_config.get('VERIFY_WEBUI_CERTIFICATE', True),
+                    REQUESTS_ARGS={'timeout': 10}
                 )
-                await asyncio.to_thread(qbt_client.auth_log_in)
+
+                try:
+                    await asyncio.wait_for(
+                        asyncio.to_thread(qbt_client.auth_log_in),
+                        timeout=10.0
+                    )
+                except asyncio.TimeoutError:
+                    console.print("[bold red]Connection to qBittorrent timed out after 10 seconds")
+                    return []
 
             except qbittorrentapi.LoginFailed:
                 console.print("[bold red]Failed to login to qBittorrent - incorrect credentials")
