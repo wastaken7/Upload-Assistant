@@ -697,8 +697,12 @@ class Prep():
                         if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('episode_name'):
                             episode_name = meta['tvdb_episode_data'].get('episode_name')
                             if episode_name and isinstance(episode_name, str) and episode_name.strip():
-                                meta['tvdb_episode_title'] = episode_name.strip()
-                                meta['auto_episode_title'] = episode_name.strip()
+                                if 'episode' in episode_name.lower():
+                                    meta['auto_episode_title'] = None
+                                    meta['tvdb_episode_title'] = None
+                                else:
+                                    meta['tvdb_episode_title'] = episode_name.strip()
+                                    meta['auto_episode_title'] = episode_name.strip()
                             else:
                                 meta['auto_episode_title'] = None
 
@@ -739,7 +743,10 @@ class Prep():
                     if tvmaze_episode_data:
                         meta['tvmaze_episode_data'] = tvmaze_episode_data
                         if meta.get('auto_episode_title') is None and tvmaze_episode_data.get('name') is not None:
-                            meta['auto_episode_title'] = tvmaze_episode_data['name']
+                            if 'episode' in tvmaze_episode_data.get("name").lower():
+                                meta['auto_episode_title'] = None
+                            else:
+                                meta['auto_episode_title'] = tvmaze_episode_data['name']
                         if meta.get('overview_meta') is None and tvmaze_episode_data.get('summary') is not None:
                             meta['overview_meta'] = tvmaze_episode_data.get('summary', None)
 
