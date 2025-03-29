@@ -533,8 +533,8 @@ async def do_the_thing(base_dir):
                         if log_file:
                             await save_processed_file(log_file, path)
 
-            if 'limit_queue' in meta and meta['limit_queue'] > 0:
-                if processed_files_count >= meta['limit_queue']:
+            if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
+                if processed_files_count >= int(meta['limit_queue']):
                     console.print(f"[red]Processing limit of {meta['limit_queue']} files reached. Stopping queue processing.")
                     break
 
