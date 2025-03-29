@@ -1120,7 +1120,6 @@ class Clients():
                 if exact_matches:
                     meta['infohash'] = exact_matches[0]['hash']
                     console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
-                    await self.get_ptp_from_hash(meta, pathed=True)
 
             else:
                 if meta['debug']:
