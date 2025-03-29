@@ -193,10 +193,10 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                         )
                     else:
                         console.print("[red]Failed to refresh TVDb token[/red]")
-                        return None
+                        return (season, episode)
                 else:
                     console.print("[red]Unauthorized access to TVDb API[/red]")
-                    return None
+                    return (season, episode)
 
             response.raise_for_status()
             data = response.json()
@@ -212,10 +212,10 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                         )
                     else:
                         console.print("[red]Failed to refresh TVDb token[/red]")
-                        return None
+                        return (season, episode)
                 else:
                     console.print("[red]Unauthorized response from TVDb API[/red]")
-                    return None
+                    return (season, episode)
 
             if data.get("status") == "success" and data.get("data"):
                 episodes = data["data"].get("episodes", [])
@@ -223,7 +223,7 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
             if not all_episodes:
                 console.print(f"[yellow]No episodes found for TVDB series ID {tvdb_id}[/yellow]")
-                return None
+                return (season, episode)
 
             # Process and organize episode data
             episodes_by_season = {}
@@ -231,7 +231,14 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
             absolute_mapping = {}  # Map absolute numbers to season/episode
 
             # Sort by aired date first (if available)
-            all_episodes.sort(key=lambda ep: ep.get("aired", "9999-99-99"))
+            def get_aired_date(ep):
+                aired = ep.get("aired")
+                # Return default value if aired is None or not present
+                if aired is None:
+                    return "9999-99-99"
+                return aired
+
+            all_episodes.sort(key=get_aired_date)
 
             for ep in all_episodes:
                 season_number = ep.get("seasonNumber")
@@ -347,10 +354,12 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
     except httpx.HTTPStatusError as e:
         console.print(f"[red]HTTP error occurred: {e.response.status_code} - {e.response.text}[/red]")
-        return None
+        return (season, episode)
     except httpx.RequestError as e:
         console.print(f"[red]Request error occurred: {e}[/red]")
-        return None
+        return (season, episode)
     except Exception as e:
-        console.print(f"[red]Error fetching TVDb episode list: {e}[/red]")
-        return None
+        console.print(f"[red]Error fetching TVDb episode list: {str(e)}[/red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        return (season, episode)
