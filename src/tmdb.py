@@ -1024,8 +1024,16 @@ async def get_logo(client, tmdb_id, category, debug=False):
                     console.print(f"[cyan]Found logo in language '{language}': {logo_path}[/cyan]")
                 break
 
+        # fallback to getting logo with null language if no match found, espicially useful for movies it seems
+        if not logo_path:
+            null_language_logo = next((logo for logo in logos if logo.get('iso_639_1') is None or logo.get('iso_639_1') == ''), None)
+            if null_language_logo:
+                logo_path = f"https://image.tmdb.org/t/p/original{null_language_logo['file_path']}"
+                if debug:
+                    console.print(f"[cyan]Found logo with null language: {logo_path}[/cyan]")
+
         if not logo_path and debug:
-            console.print(f"[yellow]No logo found in preferred languages: {logo_languages}[/yellow]")
+            console.print("[yellow]No suitable logo found in preferred languages or null language[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error fetching logo: {e}[/red]")
