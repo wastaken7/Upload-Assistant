@@ -358,7 +358,6 @@ class Prep():
                     'tik': 'TIK',
                     'btn': 'BTN',
                     'bhd': 'BHD',
-                    'jptv': 'JPTV',
                 }
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)

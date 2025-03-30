@@ -1002,13 +1002,9 @@ class Clients():
                             meta['btn'] = match.group(1)
                     elif "https://beyond-hd.me" in comment:
                         meta['bhd'] = info_hash_v1
-                    elif "https://jptv.club" in comment:
-                        match = re.search(r'/(\d+)$', comment)
-                        if match:
-                            meta['jptv'] = match.group(1)
 
                     if match:
-                        for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd', 'jptv']:
+                        for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1134,13 +1130,9 @@ class Clients():
                     meta['btn'] = match.group(1)
             elif "https://beyond-hd.me" in comment:
                 meta['bhd'] = info_hash_v1
-            elif "https://jptv.club" in comment:
-                match = re.search(r'/(\d+)$', comment)
-                if match:
-                    meta['jptv'] = match.group(1)
 
             # If we found a tracker ID, log it
-            for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd', 'jptv']:
+            for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
                 if meta.get(tracker):
                     console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1259,7 +1251,6 @@ class Clients():
                 'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
                 'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
                 'bhd': {"url": "https://beyond-hd.me", "pattern": None},
-                'jptv': {"url": "https://jptv.club", "pattern": r'/(\d+)$'}
             }
 
             # First collect exact path matches

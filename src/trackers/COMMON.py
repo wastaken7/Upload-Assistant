@@ -648,7 +648,7 @@ class COMMON():
                 console.print(f"[green]Successfully grabbed description from {tracker}")
                 console.print(f"Extracted description: {description}", markup=False)
 
-                if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik') or meta.get('jptv')):
+                if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik')):
                     meta['description'] = description
                     meta['saved_description'] = True
                 else:
