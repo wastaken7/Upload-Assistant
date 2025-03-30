@@ -78,14 +78,26 @@ class COMMON():
             episode_number = meta.get('tvdb_episode_number') if meta.get('tvdb_episode_number') is not None and meta.get('tvdb_episode_number') != "" else None
             episode_title = meta.get('tvdb_episode_title') if meta.get('tvdb_episode_title') is not None and meta.get('tvdb_episode_title') != "" else None
             if episode_overview and season_name and season_number and episode_number and episode_title:
-                descfile.write("[center][pre]")
+                if not tracker == "HUNO":
+                    descfile.write("[center][pre]")
+                else:
+                    descfile.write("[center]")
                 descfile.write(f"{season_name} - S{season_number}E{episode_number}: {episode_title}")
-                descfile.write("[/pre][/center]\n\n")
+                if not tracker == "HUNO":
+                    descfile.write("[/pre][/center]\n\n")
+                else:
+                    descfile.write("[/center]\n\n")
             if episode_overview and meta.get('overview_meta') is not None and meta.get('overview_meta') != "":
                 episode_data = meta.get('overview_meta')
-                descfile.write("[center][pre]")
+                if not tracker == "HUNO":
+                    descfile.write("[center][pre]")
+                else:
+                    descfile.write("[center]")
                 descfile.write(episode_data)
-                descfile.write("[/pre][/center]\n\n")
+                if not tracker == "HUNO":
+                    descfile.write("[/pre][/center]\n\n")
+                else:
+                    descfile.write("[/center]\n\n")
 
             bbcode = BBCODE()
             discs = meta.get('discs', [])
