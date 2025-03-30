@@ -225,6 +225,9 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                 console.print(f"[yellow]No episodes found for TVDB series ID {tvdb_id}[/yellow]")
                 return (season, episode)
 
+            if debug:
+                console.print(f"[cyan]Looking for season {season} episode {episode} in series {tvdb_id}[/cyan]")
+
             # Process and organize episode data
             episodes_by_season = {}
             absolute_episode_count = 0
@@ -242,10 +245,29 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
             for ep in all_episodes:
                 season_number = ep.get("seasonNumber")
+                episode_number = ep.get("number")
 
-                # Skip episodes without season number
-                if season_number is None:
+                # Ensure season_number is valid and convert to int if needed
+                if season_number is not None:
+                    try:
+                        season_number = int(season_number)
+                    except (ValueError, TypeError):
+                        console.print(f"[yellow]Invalid season number: {season_number}, skipping episode[/yellow]")
+                        continue
+                else:
+                    console.print(f"[yellow]Missing season number for episode {ep.get('name', 'Unknown')}, skipping[/yellow]")
                     continue
+
+                # Ensure episode_number is valid
+                if episode_number is not None:
+                    try:
+                        episode_number = int(episode_number)
+                    except (ValueError, TypeError):
+                        console.print(f"[yellow]Invalid episode number: {episode_number}, skipping episode[/yellow]")
+                        continue
+
+                if debug:
+                    console.print(f"[cyan]Processing episode: S{season_number}E{episode_number} - {ep.get('name', '')}[/cyan]")
 
                 # Handle special seasons (e.g., season 0)
                 is_special = season_number == 0
@@ -255,7 +277,7 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                     # Store mapping of absolute number to season/episode
                     absolute_mapping[absolute_episode_count] = {
                         "season": season_number,
-                        "episode": ep.get("number"),
+                        "episode": episode_number,
                         "episode_data": ep
                     }
 
@@ -264,7 +286,7 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                     "name": ep.get("name", ""),
                     "overview": ep.get("overview", ""),
                     "seasonNumber": season_number,
-                    "episodeNumber": ep.get("number"),
+                    "episodeNumber": episode_number,
                     "absoluteNumber": absolute_episode_count if not is_special else None,
                     "aired": ep.get("aired"),
                     "runtime": ep.get("runtime"),
@@ -288,14 +310,35 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
             # Sort episodes within each season by episode number
             for s in episodes_by_season:
-                episodes_by_season[s].sort(key=lambda ep: ep["episodeNumber"] or 9999)
+                valid_episodes = [ep for ep in episodes_by_season[s] if ep["episodeNumber"] is not None]
+                episodes_by_season[s] = sorted(valid_episodes, key=lambda ep: ep["episodeNumber"])
 
             # If season and episode were provided, try to find the matching episode
             if season is not None and episode is not None:
                 found_episode = None
 
+                # Ensure season is an integer
+                try:
+                    season = int(season)
+                except (ValueError, TypeError):
+                    if debug:
+                        console.print(f"[yellow]Invalid season number provided: {season}, using as-is[/yellow]")
+
+                if debug:
+                    console.print(f"[cyan]Looking for season {season} (type: {type(season)}) in episodes_by_season keys: {sorted(episodes_by_season.keys())} (types: {[type(s) for s in episodes_by_season.keys()]})[/cyan]")
+
                 # First try to find the episode in the specified season
                 if season in episodes_by_season:
+                    if debug:
+                        console.print(f"[green]Found season {season} in episodes_by_season[/green]")
+
+                    # Convert episode to int if not already
+                    try:
+                        episode = int(episode)
+                    except (ValueError, TypeError):
+                        if debug:
+                            console.print(f"[yellow]Invalid episode number provided: {episode}, using as-is[/yellow]")
+
                     max_episode_in_season = max([ep["episodeNumber"] or 0 for ep in episodes_by_season[season]])
 
                     if episode <= max_episode_in_season:
