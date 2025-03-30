@@ -266,9 +266,6 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                         console.print(f"[yellow]Invalid episode number: {episode_number}, skipping episode[/yellow]")
                         continue
 
-                if debug:
-                    console.print(f"[cyan]Processing episode: S{season_number}E{episode_number} - {ep.get('name', '')}[/cyan]")
-
                 # Handle special seasons (e.g., season 0)
                 is_special = season_number == 0
 
