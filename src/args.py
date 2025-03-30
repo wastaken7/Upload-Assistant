@@ -186,8 +186,8 @@ class Args():
                     else:
                         break
 
-        if meta.get('tmdb_manual') is not None or meta.get('imdb') is not None:
-            meta['tmdb_manual'] = meta['imdb'] = None
+        if meta.get('tmdb_manual') is not None or meta.get('imdb_manual') is not None:
+            meta['tmdb_manual'] = meta['tmdb_id'] = meta['tmdb'] = meta['imdb_id'] = meta['imdb'] = None
         for key in args:
             value = args.get(key)
             if value not in (None, []):
