@@ -762,7 +762,8 @@ class Prep():
                 meta['tag'] = f"-{meta['tag']}"
 
         if meta['category'] == "TV":
-            meta = await get_season_episode(video, meta)
+            if not meta.get('not_anime', False):
+                meta = await get_season_episode(video, meta)
             if not meta.get('tv_pack', False) and meta.get('episode_int') != 0:
                 if not meta.get('auto_episode_title') and not meta.get('overview_meta'):
                     # prioritze tvdb metadata if available
