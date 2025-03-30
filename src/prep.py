@@ -581,7 +581,8 @@ class Prep():
 
                 # Add TMDb episode details if it's a TV show with episodes
                 if ('season_int' in meta and 'episode_int' in meta and
-                        not meta.get('tv_pack', False)):
+                        not meta.get('tv_pack', False) and
+                        meta.get('episode_int') != 0):
                     coroutines.append(
                         get_episode_details(
                             meta.get('tmdb_id'),
