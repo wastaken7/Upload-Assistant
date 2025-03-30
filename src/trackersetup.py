@@ -1,49 +1,51 @@
-from src.trackers.AR import AR
-from src.trackers.HUNO import HUNO
-from src.trackers.BLU import BLU
-from src.trackers.BHD import BHD
-from src.trackers.AITHER import AITHER
-from src.trackers.STC import STC
-from src.trackers.R4E import R4E
-from src.trackers.THR import THR
-from src.trackers.PTP import PTP
-from src.trackers.SN import SN
 from src.trackers.ACM import ACM
-from src.trackers.HDB import HDB
-from src.trackers.LCD import LCD
-from src.trackers.TTG import TTG
-from src.trackers.LST import LST
-from src.trackers.FRIKI import FRIKI
-from src.trackers.FL import FL
-from src.trackers.LT import LT
-from src.trackers.NBL import NBL
-from src.trackers.ANT import ANT
-from src.trackers.PTER import PTER
-from src.trackers.MTV import MTV
-from src.trackers.JPTV import JPTV
-from src.trackers.TL import TL
-from src.trackers.HDT import HDT
-from src.trackers.RF import RF
-from src.trackers.OE import OE
-from src.trackers.BHDTV import BHDTV
-from src.trackers.RTF import RTF
-from src.trackers.OTW import OTW
-from src.trackers.FNP import FNP
-from src.trackers.CBR import CBR
-from src.trackers.UTP import UTP
+from src.trackers.AITHER import AITHER
 from src.trackers.AL import AL
-from src.trackers.SHRI import SHRI
-from src.trackers.ITT import ITT
-from src.trackers.TIK import TIK
-from src.trackers.TVC import TVC
-from src.trackers.PSS import PSS
-from src.trackers.ULCX import ULCX
-from src.trackers.SPD import SPD
-from src.trackers.YOINK import YOINK
+from src.trackers.ANT import ANT
+from src.trackers.AR import AR
+from src.trackers.BHD import BHD
+from src.trackers.BHDTV import BHDTV
+from src.trackers.BLU import BLU
+from src.trackers.CBR import CBR
+from src.trackers.DP import DP
+from src.trackers.FL import FL
+from src.trackers.FNP import FNP
+from src.trackers.FRIKI import FRIKI
+from src.trackers.HDB import HDB
+from src.trackers.HDT import HDT
 from src.trackers.HHD import HHD
+from src.trackers.HUNO import HUNO
+from src.trackers.ITT import ITT
+from src.trackers.JPTV import JPTV
+from src.trackers.LCD import LCD
+from src.trackers.LST import LST
+from src.trackers.LT import LT
+from src.trackers.MTV import MTV
+from src.trackers.NBL import NBL
+from src.trackers.OE import OE
+from src.trackers.OTW import OTW
+from src.trackers.PSS import PSS
+from src.trackers.PTER import PTER
+from src.trackers.PTP import PTP
+from src.trackers.R4E import R4E
+from src.trackers.RAS import RAS
+from src.trackers.RF import RF
+from src.trackers.RTF import RTF
+from src.trackers.SHRI import SHRI
+from src.trackers.SN import SN
 from src.trackers.SP import SP
-from src.trackers.YUS import YUS
+from src.trackers.SPD import SPD
+from src.trackers.STC import STC
+from src.trackers.THR import THR
+from src.trackers.TIK import TIK
+from src.trackers.TL import TL
 from src.trackers.TOCA import TOCA
+from src.trackers.TTG import TTG
+from src.trackers.TVC import TVC
+from src.trackers.ULCX import ULCX
+from src.trackers.UTP import UTP
+from src.trackers.YOINK import YOINK
+from src.trackers.YUS import YUS
 from src.console import console
 import httpx
 import os
@@ -444,16 +446,16 @@ class TRACKER_SETUP:
 
 
 tracker_class_map = {
-    'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR,
+    'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'BHD': BHD, 'BHDTV': BHDTV, 'BLU': BLU, 'CBR': CBR, 'DP': DP,
     'FNP': FNP, 'FL': FL, 'FRIKI': FRIKI, 'HDB': HDB, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT, 'JPTV': JPTV, 'LCD': LCD,
     'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PSS': PSS, 'PTP': PTP, 'PTER': PTER,
-    'R4E': R4E, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
+    'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TOCA': TOCA, 'TVC': TVC, 'TTG': TTG, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
 
 api_trackers = {
-    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
-    'OE', 'OTW', 'PSS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'TOCA', 'ULCX', 'UTP', 'YOINK', 'YUS'
+    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'DP', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
+    'OE', 'OTW', 'PSS', 'RAS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'TOCA', 'ULCX', 'UTP', 'YOINK', 'YUS'
 }
 
 other_api_trackers = {
