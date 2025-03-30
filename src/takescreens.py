@@ -25,7 +25,7 @@ img_host = [
 ]
 task_limit = int(config['DEFAULT'].get('process_limit', 1))
 threads = str(config['DEFAULT'].get('threads', '1'))
-cutoff = int(config['DEFAULT'].get('cutoff', 1))
+cutoff = int(config['DEFAULT'].get('cutoff_screens', 1))
 
 try:
     task_limit = int(task_limit)  # Convert to integer
