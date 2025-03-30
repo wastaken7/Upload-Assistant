@@ -448,6 +448,9 @@ class Prep():
         if meta.get("not_anime", False) and meta.get("category") == "TV":
             meta = await get_season_episode(video, meta)
 
+        meta['we_checked_tvdb'] = False
+        meta['we_checked_tmdb'] = False
+
         # Check if both IMDb and TVDB IDs are present first
         if int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0:
             tasks = [
@@ -495,6 +498,7 @@ class Prep():
 
                 if tvdb_episode_data:
                     meta['tvdb_episode_data'] = tvdb_episode_data
+                    meta['we_checked_tvdb'] = True
 
                     # Process episode name
                     if meta['tvdb_episode_data'].get('episode_name'):
@@ -634,6 +638,7 @@ class Prep():
                     episode_details_result = results[3]
                     if isinstance(episode_details_result, dict):
                         meta['tmdb_episode_data'] = episode_details_result
+                        meta['we_checked_tmdb'] = True
 
                         # Only set episode title if not already set and if the title doesn't just contain "Episode"
                         if meta.get('auto_episode_title') is None and episode_details_result.get('name') is not None:
@@ -760,7 +765,7 @@ class Prep():
             if not meta.get('tv_pack', False) and meta.get('episode_int') != 0:
                 if not meta.get('auto_episode_title') and not meta.get('overview_meta'):
                     # prioritze tvdb metadata if available
-                    if tvdb_api and tvdb_token:
+                    if tvdb_api and tvdb_token and not meta.get('we_checked_tvdb', False):
                         console.print("[yellow]Fetching TVDb metadata...")
                         meta['tvdb_season_int'], meta['tvdb_episode_int'] = await get_tvdb_series_episodes(base_dir, tvdb_token, meta.get('tvdb_id'), meta.get('season_int'), meta.get('episode_int'), tvdb_api, debug=meta.get('debug', False))
                         tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('tvdb_season_int'), meta.get('tvdb_episode_int'), api_key=tvdb_api, debug=meta.get('debug', False))
@@ -798,7 +803,7 @@ class Prep():
                                 meta['tvdb_episode_number'] = meta['tvdb_episode_data'].get('episode_number')
 
                     # fallback to tmdb data if tvdb data is not available
-                    if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None:
+                    if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None and not meta.get('we_checked_tmdb', False):
                         console.print("[yellow]Fetching TMDb episode metadata...")
                         episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
                         if meta.get('auto_episode_title') is None and episode_details.get('name') is not None:
