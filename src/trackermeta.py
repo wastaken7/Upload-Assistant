@@ -56,7 +56,9 @@ async def check_images_concurrently(imagelist, meta):
         return []
 
     # Function to check each image's URL, host, and log resolution
-    save_directory = f"{meta['base_dir']}/tmp/{meta['uuid']}"  # Change this to your desired directory
+    save_directory = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+
+    timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10, sock_read=10)
 
     async def check_and_collect(image_dict):
         img_url = image_dict.get('raw_url')
@@ -69,53 +71,79 @@ async def check_images_concurrently(imagelist, meta):
             image_dict['web_url'] = img_url
 
         # Verify the image link
-        if await check_image_link(img_url):
-            async with aiohttp.ClientSession() as session:
-                async with session.get(img_url) as response:
-                    if response.status == 200:
-                        image_content = await response.read()
-
+        try:
+            if await check_image_link(img_url, timeout):
+                try:
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
                         try:
-                            image = Image.open(BytesIO(image_content))
-                            vertical_resolution = image.height
-                            lower_bound = expected_vertical_resolution * 0.70
-                            upper_bound = expected_vertical_resolution * (1.30 if meta['is_disc'] == "DVD" else 1.00)
+                            async with session.get(img_url) as response:
+                                if response.status == 200:
+                                    image_content = await response.read()
 
-                            if not (lower_bound <= vertical_resolution <= upper_bound):
-                                console.print(
-                                    f"[red]Image {img_url} resolution ({vertical_resolution}p) "
-                                    f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
-                                )
-                                return None
+                                    try:
+                                        image = Image.open(BytesIO(image_content))
+                                        vertical_resolution = image.height
+                                        lower_bound = expected_vertical_resolution * 0.70
+                                        upper_bound = expected_vertical_resolution * (1.30 if meta['is_disc'] == "DVD" else 1.00)
 
-                            # Save image
-                            os.makedirs(save_directory, exist_ok=True)
-                            image_filename = os.path.join(save_directory, os.path.basename(img_url))
-                            with open(image_filename, "wb") as f:
-                                f.write(image_content)
+                                        if not (lower_bound <= vertical_resolution <= upper_bound):
+                                            console.print(
+                                                f"[red]Image {img_url} resolution ({vertical_resolution}p) "
+                                                f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
+                                            )
+                                            return None
 
-                            console.print(f"Saved {img_url} as {image_filename}")
+                                        # Save image
+                                        os.makedirs(save_directory, exist_ok=True)
+                                        image_filename = os.path.join(save_directory, os.path.basename(img_url))
+                                        with open(image_filename, "wb") as f:
+                                            f.write(image_content)
 
-                            meta['image_sizes'][img_url] = len(image_content)
+                                        console.print(f"Saved {img_url} as {image_filename}")
 
-                            if meta['debug']:
-                                console.print(
-                                    f"Valid image {img_url} with resolution {image.width}x{image.height} "
-                                    f"and size {len(image_content) / 1024:.2f} KiB"
-                                )
-                        except Exception as e:
-                            console.print(f"[red]Failed to process image {img_url}: {e}")
+                                        meta['image_sizes'][img_url] = len(image_content)
+
+                                        if meta['debug']:
+                                            console.print(
+                                                f"Valid image {img_url} with resolution {image.width}x{image.height} "
+                                                f"and size {len(image_content) / 1024:.2f} KiB"
+                                            )
+                                        return image_dict
+                                    except Exception as e:
+                                        console.print(f"[red]Failed to process image {img_url}: {e}")
+                                        return None
+                                else:
+                                    console.print(f"[red]Failed to fetch image {img_url}. Status: {response.status}. Skipping.")
+                                    return None
+                        except asyncio.TimeoutError:
+                            console.print(f"[red]Timeout downloading image: {img_url}")
                             return None
-                    else:
-                        console.print(f"[red]Failed to fetch image {img_url}. Skipping.")
-
-            return image_dict
-        else:
+                        except aiohttp.ClientError as e:
+                            console.print(f"[red]Client error downloading image: {img_url} - {e}")
+                            return None
+                except Exception as e:
+                    console.print(f"[red]Session error for image: {img_url} - {e}")
+                    return None
+            else:
+                return None
+        except Exception as e:
+            console.print(f"[red]Error checking image: {img_url} - {e}")
             return None
 
-    # Run image verification concurrently
-    tasks = [check_and_collect(image_dict) for image_dict in imagelist]
-    results = await asyncio.gather(*tasks)
+    # Run image verification concurrently but with a limit to prevent too many simultaneous connections
+    semaphore = asyncio.Semaphore(2)  # Limit concurrent requests to 2
+
+    async def bounded_check(image_dict):
+        async with semaphore:
+            return await check_and_collect(image_dict)
+
+    tasks = [bounded_check(image_dict) for image_dict in imagelist]
+
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+    except Exception as e:
+        console.print(f"[red]Error during image processing: {e}")
+        results = []
 
     # Collect valid images and limit to amount set in config
     valid_images = [image for image in results if image is not None]
@@ -125,31 +153,43 @@ async def check_images_concurrently(imagelist, meta):
     return valid_images
 
 
-async def check_image_link(url):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    content_type = response.headers.get('Content-Type', '').lower()
-                    if 'image' in content_type:
-                        # Attempt to load the image
-                        image_data = await response.read()
-                        try:
-                            image = Image.open(io.BytesIO(image_data))
-                            image.verify()  # This will check if the image is broken
-                            return True
-                        except (IOError, SyntaxError) as e:  # noqa #F841
-                            console.print(f"[red]Image verification failed (corrupt image): {url}[/red]")
+async def check_image_link(url, timeout=None):
+    if timeout is None:
+        timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_connect=10)
+
+    connector = aiohttp.TCPConnector(ssl=False)  # Disable SSL verification for testing
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            try:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        content_type = response.headers.get('Content-Type', '').lower()
+                        if 'image' in content_type:
+                            # Attempt to load the image
+                            image_data = await response.read()
+                            try:
+                                image = Image.open(io.BytesIO(image_data))
+                                image.verify()  # This will check if the image is broken
+                                return True
+                            except (IOError, SyntaxError) as e:
+                                console.print(f"[red]Image verification failed (corrupt image): {url} {e}[/red]")
+                                return False
+                        else:
+                            console.print(f"[red]Content type is not an image: {url}[/red]")
                             return False
                     else:
-                        console.print(f"[red]Content type is not an image: {url}[/red]")
+                        console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status})[/red]")
                         return False
-                else:
-                    console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status})[/red]")
-                    return False
-        except Exception as e:
-            console.print(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
-            return False
+            except asyncio.TimeoutError:
+                console.print(f"[red]Timeout checking image link: {url}[/red]")
+                return False
+            except Exception as e:
+                console.print(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
+                return False
+    except Exception as e:
+        console.print(f"[red]Session creation failed for: {url} - {str(e)}[/red]")
+        return False
 
 
 async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id=False):
@@ -181,7 +221,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
                 meta['image_list'] = valid_images
                 if meta.get('image_list'):  # Double-check if image_list is set before handling it
                     if not (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('tik') or meta.get('jptv')) or meta['unattended']:
-                        await handle_image_list(meta, tracker_name)
+                        await handle_image_list(meta, tracker_name, valid_images)
 
     if filename:
         meta[f'{tracker_name.lower()}_filename'] = filename
@@ -248,7 +288,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                                 valid_images = await check_images_concurrently(ptp_imagelist, meta)
                                 if valid_images:
                                     meta['image_list'] = valid_images
-                                    await handle_image_list(meta, tracker_name)
+                                    await handle_image_list(meta, tracker_name, valid_images)
 
                     else:
                         found_match = False
@@ -436,7 +476,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                         if valid_images:
                             meta['image_list'] = valid_images
-                            await handle_image_list(meta, tracker_name)
+                            await handle_image_list(meta, tracker_name, valid_images)
                     console.print(f"[green]{tracker_name} data retained.[/green]")
                     found_match = True
                 else:
@@ -471,9 +511,9 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
     return meta, found_match
 
 
-async def handle_image_list(meta, tracker_name):
+async def handle_image_list(meta, tracker_name, valid_images=None):
     if meta.get('image_list'):
-        console.print(f"[cyan]Selected the following {valid_images} valid images from {tracker_name}:")
+        console.print(f"[cyan]Selected the following {len(valid_images)} valid images from {tracker_name}:")
         for img in meta['image_list']:
             console.print(f"Image:[green]'{img.get('img_url')}'[/green]")
 
