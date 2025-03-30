@@ -9,20 +9,6 @@ from src.console import console
 
 
 class DP():
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
-
-    ###############################################################
-    ########                    EDIT ME                    ######## noqa E266
-    ###############################################################
-
-    # ALSO EDIT CLASS NAME ABOVE
-
     def __init__(self, config):
         self.config = config
         self.tracker = 'DP'
@@ -67,10 +53,6 @@ class DP():
             '480i': '9'
         }.get(resolution, '10')
         return resolution_id
-
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ###### noqa E266
-    ###############################################################
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)

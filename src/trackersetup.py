@@ -454,7 +454,7 @@ tracker_class_map = {
 }
 
 api_trackers = {
-    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
+    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'DP', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'ITT', 'JPTV', 'LCD', 'LST', 'LT',
     'OE', 'OTW', 'PSS', 'RAS', 'RF', 'R4E', 'SHRI', 'SP', 'STC', 'TIK', 'TOCA', 'ULCX', 'UTP', 'YOINK', 'YUS'
 }
 

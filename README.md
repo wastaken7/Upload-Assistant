@@ -15,14 +15,15 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
 
 ## What It Can Do:
   - Generates and Parses MediaInfo/BDInfo.
-  - Generates and Uploads screenshots.
-  - Uses srrdb to fix scene filenames.
+  - Generates and Uploads screenshots. HDR tonemapping if config.
+  - Uses srrdb to fix scene names used at sites.
   - Can grab descriptions from PTP/BLU/Aither/LST/OE (with config option automatically on filename match, or using arg).
-  - Can strip existing screenshots from descriptions to skip screenshot generation and uploading.
-  - Obtains TMDb/IMDb/MAL identifiers.
-  - Converts absolute to season episode numbering for Anime.
+  - Can strip and use existing screenshots from descriptions to skip screenshot generation and uploading.
+  - Obtains TMDb/IMDb/MAL/TVDB/TVMAZE identifiers.
+  - Converts absolute to season episode numbering for Anime. Non-Anime support with TVDB credentials
   - Generates custom .torrents without useless top level folders/nfos.
   - Can re-use existing torrents instead of hashing new.
+  - Can automatigically search qBitTorrent version 5+ clients for matching existing torrent.
   - Generates proper name for your upload using Mediainfo/BDInfo and TMDb/IMDb conforming to site rules.
   - Checks for existing releases already on site.
   - Uploads to ACM/Aither/AL/ANT/AR/BHD/BHDTV/BLU/CBR/DP/FRIKI/FNP/FL/HDB/HDT/HHD/HP/HUNO/ITT/JPTV/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RAS/RTF/SHRI/SN/SP/SPD/STC/STT/TLC/THR/TL/TOCA/TVC/TTG/ULCX/UTP/YOINK/YUS
@@ -31,6 +32,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs.
 
 Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
+mkbrr support with binaries from https://github.com/autobrr/mkbrr
 
 ## **Setup:**
    - **REQUIRES AT LEAST PYTHON 3.9 AND PIP3**
@@ -53,15 +55,15 @@ Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-n
 ## **Updating:**
   - To update first navigate into the Upload-Assistant directory: `cd Upload-Assistant`
   - Run a `git pull` to grab latest updates
-  - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
   - Or download a fresh zip and overwrite existing files
+  - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
 
 ## **CLI Usage:**
   
   `python3 upload.py "/downloads/path/to/content" --args`
   
   Args are OPTIONAL and ALWAYS follow path, for a list of acceptable args, pass `--help`.
-  Path should be in quotes.
+  Path works best in quotes.
 
 ## **Docker Usage:**
   Visit our wonderful [docker usage wiki page](https://github.com/Audionut/Upload-Assistant/wiki/Docker)
