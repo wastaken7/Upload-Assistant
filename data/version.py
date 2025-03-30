@@ -1,3 +1,20 @@
+__version__ = "4.1.2"
+
+"""
+Changelog for version 4.1.2 (2025-03-30):
+
+## What's Changed
+* Added support for DarkPeers and Rastastugan by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/431
+* fixed HDB missing call for torf regeneration
+* fixed cutoff screens handling when taking images
+* fixed existing image timeout error causing UA to hard crash
+* tweaked  pathway to ensure no duplicate api calls
+* fixed a duplicate import in PTP that could cause some python versions to hard error
+* removed JPTV
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.1...4.1.2
+"""
+
 __version__ = "4.1.1"
 
 """
