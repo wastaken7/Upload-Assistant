@@ -1137,7 +1137,6 @@ class PTP():
             console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
             if meta.get('mkbrr', False):
                 from data.config import config
-                from src.trackers.COMMON import COMMON
                 common = COMMON(config=self.config)
                 tracker_url = config['TRACKERS']['PTP'].get('announce_url', "https://fake.tracker").strip()
 
