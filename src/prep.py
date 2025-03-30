@@ -1035,32 +1035,45 @@ class Prep():
 
                     # IMDb Handling
                     try:
-                        response = requests.get(f"https://api.srrdb.com/v1/imdb/{base}")
+                        imdb_response = requests.get(f"https://api.srrdb.com/v1/imdb/{base}", timeout=10)
 
-                        if response.status_code == 200:
-                            r = response.json()
+                        if imdb_response.status_code == 200:
+                            imdb_json = imdb_response.json()
+                            if meta['debug']:
+                                console.print(f"imdb_json: {imdb_json}")
 
-                            if r.get('releases') and imdb == 0:
-                                imdb_str = r['releases'][0].get('imdb') or r['releases'][0].get('imdbId')
+                            if imdb_json.get('releases') and len(imdb_json['releases']) > 0 and imdb == 0:
+                                imdb_str = None
+                                first_release = imdb_json['releases'][0]
+
+                                if 'imdb' in first_release:
+                                    imdb_str = first_release['imdb']
+                                elif 'imdbId' in first_release:
+                                    imdb_str = first_release['imdbId']
+                                elif 'imdbid' in first_release:
+                                    imdb_str = first_release['imdbid']
 
                                 if imdb_str:
                                     imdb_str = str(imdb_str).lstrip('tT')  # Strip 'tt' or 'TT'
                                     imdb = int(imdb_str) if imdb_str.isdigit() else 0
 
-                                first_result = r['releases'][0] if r['releases'] else None
-                                if first_result:
-                                    console.print(f"[green]SRRDB: Matched to {first_result['release']}")
+                                first_release_name = imdb_json['releases'][0].get('title', imdb_json.get('query', ['Unknown release'])[0] if isinstance(imdb_json.get('query'), list) else 'Unknown release')
+                                console.print(f"[green]SRRDB: Matched to {first_release_name}")
                         else:
-                            console.print(f"[yellow]SRRDB API request failed with status: {response.status_code}")
+                            console.print(f"[yellow]SRRDB API request failed with status: {imdb_response.status_code}")
 
                     except requests.RequestException as e:
-                        console.print("[yellow]Failed to fetch IMDb information:", e)
+                        console.print(f"[yellow]Failed to fetch IMDb information: {e}")
+                    except (KeyError, IndexError, ValueError) as e:
+                        console.print(f"[yellow]Error processing IMDb data: {e}")
+                    except Exception as e:
+                        console.print(f"[yellow]Unexpected error during IMDb lookup: {e}")
 
                 else:
                     console.print("[yellow]SRRDB: No match found")
 
             except Exception as e:
-                console.print("[yellow]SRRDB: No match found, or request has timed out", e)
+                console.print(f"[yellow]SRRDB: No match found, or request has timed out: {e}")
 
         return video, scene, imdb
 
