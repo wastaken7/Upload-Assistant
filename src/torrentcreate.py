@@ -161,6 +161,12 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             if int(meta.get('randomized', 0)) >= 1:
                 cmd.extend(["-e"])
 
+            if not meta.get('is_disc', False):
+                cmd.extend(["-x", "*sample.mkv"])
+                cmd.extend(["-x", "!sample*.*"])
+                cmd.extend(["-x", "*.nfo", "-x", "*.jpg", "-x", "*.png", "-x", "*.txt",
+                            "-x", "*.srt", "-x", "*.sub", "-x", "*.idx", "-x", "*.sfv", "-x", "*.md5"])
+
             if meta.get('max_piece_size') and tracker_url is None:
                 try:
                     max_size_bytes = int(meta['max_piece_size']) * 1024 * 1024
