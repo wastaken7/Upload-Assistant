@@ -804,7 +804,7 @@ class Prep():
                                 meta['tvdb_episode_number'] = meta['tvdb_episode_data'].get('episode_number')
 
                     # fallback to tmdb data if tvdb data is not available
-                    if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None and not meta.get('we_checked_tmdb', False):
+                    if (meta.get('auto_episode_title') is None or meta.get('overview_meta') is None) and not meta.get('we_checked_tmdb', False):
                         console.print("[yellow]Fetching TMDb episode metadata...")
                         episode_details = await get_episode_details(meta.get('tmdb_id'), meta.get('season_int'), meta.get('episode_int'), debug=meta.get('debug', False))
                         if meta.get('auto_episode_title') is None and episode_details.get('name') is not None:
