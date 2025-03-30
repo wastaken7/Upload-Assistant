@@ -425,120 +425,125 @@ class AR():
         return None
 
     async def upload(self, meta, disctype):
-        # Prepare the data for the upload
-        common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
-        await self.edit_desc(meta)
-        type = await self.get_type(meta)
-        # Read the description
-        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         try:
-            async with aiofiles.open(desc_path, 'r') as desc_file:
-                desc = await desc_file.read()
-        except FileNotFoundError:
-            raise Exception(f"Description file not found at {desc_path} ")
-
-        # Handle cover image input
-        cover = meta.get('poster', None) or meta["imdb_info"].get("cover", None)
-        while cover is None and not meta.get("unattended", False):
-            cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
-            if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
-                console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
-                cover = None
-        # Tag Compilation
-        genres = meta.get('genres')
-        if genres:
-            genres = ', '.join(tag.strip('.') for tag in (item.replace(' ', '.') for item in genres.split(',')))
-            genres = re.sub(r'\.{2,}', '.', genres)
-        # adding tags
-        tags = ""
-        if meta['imdb_id'] != 0:
-            tags += f"tt{meta.get('imdb_id', '')}, "
-        # no special chars can be used in tags. keep to minimum working tags only.
-        tags += f"{genres}, "
-        # Get initial response and extract auth key
-        initial_response = await self.get_initial_response()
-        auth_key = self.extract_auth_key(initial_response)
-        # Access the session cookie
-        cookies = self.session.cookie_jar.filter_cookies(self.upload_url)
-        session_cookie = cookies.get('session')
-        if not session_cookie:
-            raise Exception("Session cookie not found.")
-
-        # must use scene name if scene release
-        if meta['scene']:
-            ar_name = meta['scene_name']
-        else:
-            # name must have . instead of spaces
-            ar_name = meta['name'].replace(' ', ".").replace("'", '').replace(':', '')
-
-        if meta['tag'] == "":
-            # replacing spaces with . as per rules
-            ar_name += "-NoGRP"
-
-        data = {
-            "submit": "true",
-            "auth": auth_key,
-            "type": type,
-            "title": ar_name,
-            "tags": tags,
-            "image": cover,
-            "desc": desc,
-        }
-
-        headers = {
-            "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Origin": f'{self.base_url}',
-            "Referer": f'{self.base_url}/upload.php',
-            "Cookie": f"session={session_cookie.value}",
-        }
-
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-
-        if meta['debug'] is False:
-            import aiohttp
+            # Prepare the data for the upload
+            common = COMMON(config=self.config)
+            await common.edit_torrent(meta, self.tracker, self.source_flag)
+            await self.edit_desc(meta)
+            type = await self.get_type(meta)
+            # Read the description
+            desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
             try:
-                async with aiofiles.open(torrent_path, 'rb') as torrent_file:
-                    # Use a single session for all requests
-                    async with aiohttp.ClientSession() as session:
-                        form = aiohttp.FormData()
-                        for key, value in data.items():
-                            form.add_field(key, value)
-                        form.add_field('file_input', torrent_file, filename=f"[{self.tracker}].torrent")
-
-                        # Perform the upload
-                        try:
-                            async with session.post(self.upload_url, data=form, headers=headers) as response:
-                                if response.status == 200:
-                                    # URL format in case of successful upload: https://alpharatio.cc/torrents.php?id=2989202
-                                    console.print(f"[green]{response.url}")
-                                    match = re.match(r".*?alpharatio\.cc/torrents\.php\?id=(\d+)", str(response.url))
-                                    if match is None:
-                                        await self.close_session()
-                                        console.print(response.url)
-                                        console.print(data)
-                                        raise UploadException(  # noqa F405
-                                            f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
-
-                                    # having UA add the torrent link as a comment.
-                                    if match:
-                                        await self.close_session()
-                                        common = COMMON(config=self.config)
-                                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
-
-                                else:
-                                    console.print("[red]Upload failed. Response was not 200.")
-                        except Exception:
-                            await self.close_session()
-                            console.print("[red]Error! It may have uploaded, go check")
-                            console.print("[cyan]Request Data:")
-                            console.print_exception()
-                            return
+                async with aiofiles.open(desc_path, 'r', encoding='utf-8') as desc_file:
+                    desc = await desc_file.read()
             except FileNotFoundError:
-                console.print(f"[red]File not found: {torrent_path}")
-            return aiohttp
-        else:
+                raise Exception(f"Description file not found at {desc_path} ")
+
+            # Handle cover image input
+            cover = meta.get('poster', None) or meta["imdb_info"].get("cover", None)
+            while cover is None and not meta.get("unattended", False):
+                cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
+                if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
+                    console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                    cover = None
+            # Tag Compilation
+            genres = meta.get('genres')
+            if genres:
+                genres = ', '.join(tag.strip('.') for tag in (item.replace(' ', '.') for item in genres.split(',')))
+                genres = re.sub(r'\.{2,}', '.', genres)
+            # adding tags
+            tags = ""
+            if meta['imdb_id'] != 0:
+                tags += f"tt{meta.get('imdb_id', '')}, "
+            # no special chars can be used in tags. keep to minimum working tags only.
+            tags += f"{genres}, "
+            # Get initial response and extract auth key
+            initial_response = await self.get_initial_response()
+            auth_key = self.extract_auth_key(initial_response)
+            # Access the session cookie
+            cookies = self.session.cookie_jar.filter_cookies(self.upload_url)
+            session_cookie = cookies.get('session')
+            if not session_cookie:
+                raise Exception("Session cookie not found.")
+
+            # must use scene name if scene release
+            if meta['scene']:
+                ar_name = meta['scene_name']
+            else:
+                # name must have . instead of spaces
+                ar_name = meta['name'].replace(' ', ".").replace("'", '').replace(':', '')
+
+            if meta['tag'] == "":
+                # replacing spaces with . as per rules
+                ar_name += "-NoGRP"
+
+            data = {
+                "submit": "true",
+                "auth": auth_key,
+                "type": type,
+                "title": ar_name,
+                "tags": tags,
+                "image": cover,
+                "desc": desc,
+            }
+
+            headers = {
+                "User-Agent": self.user_agent,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Origin": f'{self.base_url}',
+                "Referer": f'{self.base_url}/upload.php',
+                "Cookie": f"session={session_cookie.value}",
+            }
+
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+
+            if meta['debug'] is False:
+                import aiohttp
+                try:
+                    async with aiofiles.open(torrent_path, 'rb') as torrent_file:
+                        # Use a single session for all requests
+                        async with aiohttp.ClientSession() as session:
+                            form = aiohttp.FormData()
+                            for key, value in data.items():
+                                form.add_field(key, value)
+                            form.add_field('file_input', torrent_file, filename=f"{self.tracker}.torrent")
+
+                            # Perform the upload
+                            try:
+                                async with session.post(self.upload_url, data=form, headers=headers) as response:
+                                    if response.status == 200:
+                                        # URL format in case of successful upload: https://alpharatio.cc/torrents.php?id=2989202
+                                        console.print(f"[green]{response.url}")
+                                        match = re.match(r".*?alpharatio\.cc/torrents\.php\?id=(\d+)", str(response.url))
+                                        if match is None:
+                                            await self.close_session()
+                                            console.print(response.url)
+                                            console.print(data)
+                                            raise UploadException(  # noqa F405
+                                                f"Upload to {self.tracker} failed: result URL {response.url} ({response.status}) is not the expected one.")  # noqa F405
+
+                                        # having UA add the torrent link as a comment.
+                                        if match:
+                                            await self.close_session()
+                                            common = COMMON(config=self.config)
+                                            await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
+
+                                    else:
+                                        console.print("[red]Upload failed. Response was not 200.")
+                            except Exception:
+                                await self.close_session()
+                                console.print("[red]Error! It may have uploaded, go check")
+                                console.print("[cyan]Request Data:")
+                                console.print_exception()
+                                return
+                except FileNotFoundError:
+                    console.print(f"[red]File not found: {torrent_path}")
+                return aiohttp
+            else:
+                await self.close_session()
+                console.print("[cyan]Request Data:")
+                console.print(data)
+        except Exception as e:
             await self.close_session()
-            console.print("[cyan]Request Data:")
-            console.print(data)
+            console.print(f"[red]Upload failed: {e}")
+            return
