@@ -202,6 +202,7 @@ class HDB():
         common = COMMON(config=self.config)
         await self.edit_desc(meta)
         hdb_name = await self.edit_name(meta)
+        await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_type_category_id(meta)
         codec_id = await self.get_type_codec_id(meta)
         medium_id = await self.get_type_medium_id(meta)
