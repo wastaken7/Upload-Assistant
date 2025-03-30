@@ -297,7 +297,7 @@ class Prep():
                 description.write(description_text)
 
         client = Clients(config=config)
-        only_id = meta.get('onlyID', config['DEFAULT'].get('only_id', False))
+        only_id = config['DEFAULT'].get('only_id', False) if not meta.get('only_id') else False
 
         # Ensure all manual IDs have proper default values
         meta['tmdb_manual'] = meta.get('tmdb_manual') or 0
@@ -363,7 +363,7 @@ class Prep():
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)
 
-                async def process_tracker(tracker_name, meta):
+                async def process_tracker(tracker_name, meta, only_id):
                     nonlocal found_match
                     if tracker_class_map is None:
                         print(f"Tracker class for {tracker_name} not found.")
@@ -409,7 +409,7 @@ class Prep():
                         else:
                             console.print("[yellow]No BHD ID found, skipping BHD tracker update.[/yellow]")
                     else:
-                        meta = await process_tracker(specific_tracker, meta)
+                        meta = await process_tracker(specific_tracker, meta, only_id)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
@@ -418,7 +418,7 @@ class Prep():
                         if not found_match:  # Stop checking once a match is found
                             tracker_config = self.config['TRACKERS'].get(tracker_name, {})
                             if str(tracker_config.get('useAPI', 'false')).lower() == "true":
-                                meta = await process_tracker(tracker_name, meta)
+                                meta = await process_tracker(tracker_name, meta, only_id)
 
                 if not found_match:
                     console.print("[yellow]No matches found on any trackers.[/yellow]")

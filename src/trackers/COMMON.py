@@ -537,8 +537,7 @@ class COMMON():
             return True
         return False
 
-    async def unit3d_torrent_info(self, tracker, torrent_url, search_url, meta, id=None, file_name=None):
-        only_id = self.config['DEFAULT'].get('only_id', False)
+    async def unit3d_torrent_info(self, tracker, torrent_url, search_url, meta, id=None, file_name=None, only_id=False):
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist = []
 
@@ -658,6 +657,9 @@ class COMMON():
                         console.print("[green]Keeping the original description.[/green]")
                         meta['description'] = description
                         meta['saved_description'] = True
+            else:
+                description = ""
+                imagelist = []
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
