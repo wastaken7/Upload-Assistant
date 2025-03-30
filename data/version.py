@@ -1,3 +1,22 @@
+__version__ = "4.1.1"
+
+"""
+Changelog for version 4.1.1 (2025-03-30):
+
+## What's Changed
+* add argument --not-anime by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/430
+* fixed linking on linux when volumes have the same mount
+* fixed torf torrent regeneration in MTV
+* added null language check for tmdb logo (mostly useful for movies)
+* fixed 
+* fixed ssrdb release matching print
+* fixed tvdb season matching under some conditions (wasn't serious)
+
+Check v4.1.0 release notes if not already https://github.com/Audionut/Upload-Assistant/releases/tag/4.1.0
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.0.2...4.1.1
+"""
+
 __version__ = "4.1.0.2"
 
 """
