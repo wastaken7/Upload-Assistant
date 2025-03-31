@@ -23,7 +23,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - Converts absolute to season episode numbering for Anime. Non-Anime support with TVDB credentials
   - Generates custom .torrents without useless top level folders/nfos.
   - Can re-use existing torrents instead of hashing new.
-  - Can automatigically search qBitTorrent version 5+ clients for matching existing torrent.
+  - Can automagically search qBitTorrent version 5+ clients for matching existing torrent.
   - Generates proper name for your upload using Mediainfo/BDInfo and TMDb/IMDb conforming to site rules.
   - Checks for existing releases already on site.
   - Uploads to ACM/Aither/AL/ANT/AR/BHD/BHDTV/BLU/CBR/DP/FRIKI/FNP/FL/HDB/HDT/HHD/HP/HUNO/ITT/LCD/LST/LT/MTV/NBL/OE/OTW/PSS/PTP/PTER/PTT/RF/R4E(limited)/RAS/RTF/SHRI/SN/SP/SPD/STC/STT/TLC/THR/TL/TOCA/TVC/TTG/ULCX/UTP/YOINK/YUS
