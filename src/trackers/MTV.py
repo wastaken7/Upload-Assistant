@@ -87,7 +87,7 @@ class MTV():
                         new_torrent.piece_size = 8 * 1024 * 1024
                         new_torrent.validate_piece_size()
                         new_torrent.generate(callback=torf_cb, interval=5)
-                        new_torrent.write(torrent_path, overwrite=True)
+                        new_torrent.write(torrent_file_path, overwrite=True)
 
                         torrent_filename = "[MTV]"
                         await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -127,7 +127,7 @@ class MTV():
             tfile = f.read()
 
         files = {
-            'file_input': (f"{meta['name']}.torrent", tfile)
+            'file_input': (f"[{self.tracker}].torrent", tfile)
         }
 
         data = {

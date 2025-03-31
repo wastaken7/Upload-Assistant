@@ -240,6 +240,12 @@ async def process_meta(meta, base_dir):
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
 
+        trackers_create = meta.get('trackers')
+        if trackers_create and isinstance(trackers_create, list):
+            for tracker_create in trackers_create:
+                if isinstance(tracker_create, str) and tracker_create:
+                    output_filename = f"[{tracker_create}]"
+
         if not meta['mkbrr']:
             meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
@@ -248,7 +254,7 @@ async def process_meta(meta, base_dir):
             if meta.get('rehash', False) is False:
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
-                    await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
+                    await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], output_filename)
 
             if meta['nohash'] is False and reuse_torrent is None:
                 create_torrent(meta, Path(meta['path']), "BASE")
