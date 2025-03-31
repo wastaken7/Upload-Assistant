@@ -77,6 +77,8 @@ class COMMON():
             season_number = meta.get('tvdb_season_number') if meta.get('tvdb_season_number') is not None and meta.get('tvdb_season_number') != "" else None
             episode_number = meta.get('tvdb_episode_number') if meta.get('tvdb_episode_number') is not None and meta.get('tvdb_episode_number') != "" else None
             episode_title = meta.get('tvdb_episode_title') if meta.get('tvdb_episode_title') is not None and meta.get('tvdb_episode_title') != "" else None
+            if episode_title is None:
+                episode_title = meta.get('tvmaze_episode_data', {}).get('episode_name') if meta.get('tvmaze_episode_data', {}).get('episode_name') else None
             if episode_overview and season_name and season_number and episode_number and episode_title:
                 if not tracker == "HUNO":
                     descfile.write("[center][pre]")
