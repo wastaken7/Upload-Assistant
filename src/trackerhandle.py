@@ -57,13 +57,21 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             color = "green" if upload_status else "red"
             console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
-                if modq == "Yes":
-                    console.print(f"(modq: {modq})")
-                if draft == "Yes":
-                    console.print(f"(draft: {draft})")
-                await tracker_class.upload(meta, disctype)
-                await client.add_to_client(meta, tracker_class.tracker)
+                try:
+                    modq, draft = await check_mod_q_and_draft(tracker_class, meta, debug, disctype)
+                    if modq == "Yes":
+                        console.print(f"(modq: {modq})")
+                    if draft == "Yes":
+                        console.print(f"(draft: {draft})")
+                    try:
+                        await tracker_class.upload(meta, disctype)
+                    except Exception as e:
+                        console.print(f"[red]Upload failed: {e}")
+                        return
+                    await client.add_to_client(meta, tracker_class.tracker)
+                except Exception:
+                    console.print(traceback.format_exc())
+                    return
 
         elif tracker in other_api_trackers:
             tracker_class = tracker_class_map[tracker](config=config)
@@ -72,12 +80,20 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             color = "green" if upload_status else "red"
             console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                if tracker == "RTF":
-                    await tracker_class.api_test(meta)
-                await tracker_class.upload(meta, disctype)
-                if tracker == 'SN':
-                    await asyncio.sleep(16)
-                await client.add_to_client(meta, tracker_class.tracker)
+                try:
+                    if tracker == "RTF":
+                        await tracker_class.api_test(meta)
+                    try:
+                        await tracker_class.upload(meta, disctype)
+                    except Exception as e:
+                        console.print(f"[red]Upload failed: {e}")
+                        return
+                    if tracker == 'SN':
+                        await asyncio.sleep(16)
+                    await client.add_to_client(meta, tracker_class.tracker)
+                except Exception:
+                    console.print(traceback.format_exc())
+                    return
 
         elif tracker in http_trackers:
             tracker_class = tracker_class_map[tracker](config=config)
@@ -86,9 +102,18 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             color = "green" if upload_status else "red"
             console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                if await tracker_class.validate_credentials(meta) is True:
-                    await tracker_class.upload(meta, disctype)
+                try:
+                    if tracker == "AR":
+                        await tracker_class.validate_credentials(meta) is True
+                    try:
+                        await tracker_class.upload(meta, disctype)
+                    except Exception as e:
+                        console.print(f"[red]Upload failed: {e}")
+                        return
                     await client.add_to_client(meta, tracker_class.tracker)
+                except Exception:
+                    console.print(traceback.format_exc())
+                    return
 
         elif tracker == "MANUAL":
             if meta['unattended']:
@@ -122,10 +147,15 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     with requests.Session() as session:
                         console.print("[yellow]Logging in to THR")
                         session = thr.login(session)
-                        await thr.upload(session, meta, disctype)
+                        try:
+                            await thr.upload(session, meta, disctype)
+                        except Exception as e:
+                            console.print(f"[red]Upload failed: {e}")
+                            return
                         await client.add_to_client(meta, "THR")
                 except Exception:
                     console.print(traceback.format_exc())
+                    return
 
         elif tracker == "PTP":
             tracker_status = meta.get('tracker_status', {})
@@ -133,12 +163,20 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             color = "green" if upload_status else "red"
             console.print(f"[yellow]Tracker: {tracker}, Upload: [{color}]{'YES' if upload_status else 'No'}[/{color}]")
             if upload_status:
-                ptp = PTP(config=config)
-                groupID = meta.get('ptp_groupID', None)
-                ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                await ptp.upload(meta, ptpUrl, ptpData, disctype)
-                await asyncio.sleep(5)
-                await client.add_to_client(meta, "PTP")
+                try:
+                    ptp = PTP(config=config)
+                    groupID = meta.get('ptp_groupID', None)
+                    ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
+                    try:
+                        await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                        await asyncio.sleep(5)
+                    except Exception as e:
+                        console.print(f"[red]Upload failed: {e}")
+                        return
+                    await client.add_to_client(meta, "PTP")
+                except Exception:
+                    console.print(traceback.format_exc())
+                    return
 
     # Process each tracker sequentially
     for tracker in enabled_trackers:

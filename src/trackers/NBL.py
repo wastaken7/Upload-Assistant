@@ -126,6 +126,7 @@ class NBL():
 
         except httpx.TimeoutException:
             console.print("[bold red]Request timed out after 5 seconds")
+            meta['skipping'] = "NBL"
         except httpx.RequestError as e:
             console.print(f"[bold red]An error occurred while making the request: {e}")
             meta['skipping'] = "NBL"
@@ -135,6 +136,7 @@ class NBL():
                 console.print("[red]NBL API returned an unexpected response. Please manually check for dupes.")
                 dupes.append("ERROR: PLEASE CHECK FOR EXISTING RELEASES MANUALLY")
         except Exception as e:
+            meta['skipping'] = "NBL"
             console.print(f"[bold red]Unexpected error: {e}")
             console.print_exception()
 
