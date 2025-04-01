@@ -170,7 +170,7 @@ class OTW():
 
     async def search_existing(self, meta, disctype):
         if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
-            console.print('[bold red]Genre does not match Animation or Family.')
+            console.print('[bold red]Genre does not match Animation or Family needed for OTW.')
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -186,7 +186,7 @@ class OTW():
             meta['skipping'] = "OTW"
             return []
         if meta['sd'] and 'BluRay' in meta['source']:
-            console.print("[bold red]SD content from HD source not allowed")
+            console.print("[bold red]SD content from HD source not allowed at OTW")
             meta['skipping'] = "OTW"
             return []
         dupes = []

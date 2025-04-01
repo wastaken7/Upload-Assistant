@@ -178,7 +178,7 @@ class ULCX():
                 meta['skipping'] = "ULCX"
                 return
         if meta['video_codec'] == "HEVC" and meta['resolution'] != "2160p" and 'animation' not in meta['keywords'] and meta.get('anime', False) is not True:
-            console.print('[bold red]This content might not fit HEVC rules.')
+            console.print('[bold red]This content might not fit HEVC rules at ULCX.')
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
