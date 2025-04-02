@@ -161,12 +161,6 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             if int(meta.get('randomized', 0)) >= 1:
                 cmd.extend(["-e"])
 
-            if not meta.get('is_disc', False):
-                cmd.extend(["-x", "*sample.mkv"])
-                cmd.extend(["-x", "!sample*.*"])
-                cmd.extend(["-x", "*.nfo", "-x", "*.jpg", "-x", "*.png", "-x", "*.txt",
-                            "-x", "*.srt", "-x", "*.sub", "-x", "*.idx", "-x", "*.sfv", "-x", "*.md5"])
-
             if meta.get('max_piece_size') and tracker_url is None:
                 try:
                     max_size_bytes = int(meta['max_piece_size']) * 1024 * 1024
@@ -182,13 +176,14 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                     console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
             cmd.extend(["-o", output_path])
-            console.print('mkbrr cmd:', cmd)
+            console.print(f"[cyan]mkbrr cmd: {cmd}")
 
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             total_pieces = 100  # Default to 100% for scaling progress
             pieces_done = 0
             mkbrr_start_time = time.time()
+            torrent_written = False
 
             for line in process.stdout:
                 line = line.strip()
@@ -213,12 +208,44 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 # Detect final output line
                 if "Wrote" in line and ".torrent" in line:
                     console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
+                    torrent_written = True
 
-            process.wait()
-            return output_path
+            # Wait for the process to finish
+            result = process.wait()
+
+            # Verify the torrent was actually created
+            if result != 0:
+                console.print(f"[bold red]mkbrr exited with non-zero status code: {result}")
+                raise RuntimeError(f"mkbrr exited with status code {result}")
+
+            if not torrent_written or not os.path.exists(output_path):
+                console.print("[bold red]mkbrr did not create a torrent file!")
+                raise FileNotFoundError(f"Expected torrent file {output_path} was not created")
+
+            # Validate the torrent file by trying to read it
+            try:
+                test_torrent = Torrent.read(output_path)
+                if not test_torrent.metainfo.get('info', {}).get('pieces'):
+                    console.print("[bold red]Generated torrent file appears to be invalid (missing pieces)")
+                    raise ValueError("Generated torrent is missing pieces hash")
+
+                console.print(f"[bold green]Successfully created torrent with {len(test_torrent.files)} file(s), " +
+                              f"{test_torrent.size / (1024*1024):.2f} MiB total size")
+                return output_path
+
+            except Exception as e:
+                console.print(f"[bold red]Generated torrent file is invalid: {str(e)}")
+                console.print("[yellow]Falling back to CustomTorrent method")
+                meta['mkbrr'] = False
+
         except subprocess.CalledProcessError as e:
-            console.print(f"[bold red]Error creating torrent: {e.stderr}")
-            return None
+            console.print(f"[bold red]Error creating torrent with mkbrr: {e}")
+            console.print("[yellow]Falling back to CustomTorrent method")
+            meta['mkbrr'] = False
+        except Exception as e:
+            console.print(f"[bold red]Error using mkbrr: {str(e)}")
+            console.print("[yellow]Falling back to CustomTorrent method")
+            meta['mkbrr'] = False
 
     # Fallback to CustomTorrent if mkbrr is not used
     torrent = CustomTorrent(
