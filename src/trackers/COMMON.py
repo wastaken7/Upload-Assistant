@@ -847,6 +847,11 @@ class COMMON():
                 if any(str(res) in each for res in [1080, 720, 2160]):
                     return False
 
+            if web_dl:
+                if "hdtv" in normalized and not any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
+                    await log_exclusion("source mismatch: WEB-DL vs HDTV", each)
+                    return True
+
             if is_dvd or "DVD" in target_source or is_dvdrip:
                 skip_resolution_check = True
             else:
@@ -897,8 +902,9 @@ class COMMON():
                     await log_exclusion("season/episode mismatch", each)
                     return True
 
-            if (web_dl or is_hdtv) and ("web-dl" in normalized or "webdl" in normalized or "web dl" in normalized):
-                return False
+            if is_hdtv:
+                if any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
+                    return False
 
             if meta['debug']:
                 console.log(f"[debug] Passed all checks: {each}")
