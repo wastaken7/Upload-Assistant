@@ -1,3 +1,16 @@
+__version__ = "4.1.3"
+
+"""
+Changelog for version 4.1.3 (2025-04-02):
+
+- All torrent creation issues should now be fixed
+- Site upload issues are gracefully handled
+- tvmaze episode title fallback
+- Fix web/hdtv dupe handling
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.2...4.1.3
+"""
+
 __version__ = "4.1.2"
 
 """
