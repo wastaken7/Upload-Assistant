@@ -189,17 +189,17 @@ class SP():
             if meta.get('scene_name') != "":
                 name = meta.get('scene_name')
             else:
-                name = meta['uuid']
+                name = meta['uuid'].replace(" ", ".")
         elif meta.get('is_disc') is True:
-            name = meta['name']
+            name = meta['name'].replace(" ", ".")
         else:
             if meta.get('mal_id', 0) != 0:
-                name = meta['name']
+                name = meta['name'].replace(" ", ".")
             else:
-                name = meta['uuid']
+                name = meta['uuid'].replace(" ", ".")
         base, ext = os.path.splitext(name)
         if ext.lower() in KNOWN_EXTENSIONS:
-            name = base
+            name = base.replace(" ", ".")
         console.print(f"[cyan]Name: {name}")
         return name
 
