@@ -351,7 +351,11 @@ class OE():
                 if response.status_code == 200:
                     data = response.json()
                     for each in data['data']:
-                        result = [each][0]['attributes']['name']
+                        attributes = each['attributes']
+                        result = {
+                            'name': attributes['name'],
+                            'size': attributes['size']
+                        }
                         dupes.append(result)
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
