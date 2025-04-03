@@ -176,7 +176,8 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                     console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
             cmd.extend(["-o", output_path])
-            console.print(f"[cyan]mkbrr cmd: {cmd}")
+            if meta['debug']:
+                console.print(f"[cyan]mkbrr cmd: {cmd}")
 
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
