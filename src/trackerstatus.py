@@ -5,10 +5,10 @@ from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map, http_trackers
 from src.console import console
 from data.config import config
-from src.trackers.COMMON import COMMON
 from src.clients import Clients
 from src.uphelper import UploadHelper
 from src.torrentcreate import create_base_from_existing_torrent
+from src.dupe_checking import filter_dupes
 import cli_ui
 import copy
 
@@ -16,7 +16,6 @@ import copy
 async def process_all_trackers(meta):
     tracker_status = {}
     successful_trackers = 0
-    common = COMMON(config=config)
     client = Clients(config=config)
     tracker_setup = TRACKER_SETUP(config=config)
     helper = UploadHelper()
@@ -86,7 +85,7 @@ async def process_all_trackers(meta):
                     dupes = await ptp.search_existing(groupID, local_meta, disctype)
 
                 if ('skipping' not in local_meta or local_meta['skipping'] is None) and tracker_name != "TL":
-                    dupes = await common.filter_dupes(dupes, local_meta, tracker_name)
+                    dupes = await filter_dupes(dupes, local_meta, tracker_name)
                     local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
                     if is_dupe:
                         local_tracker_status['dupe'] = True
