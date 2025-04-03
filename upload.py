@@ -525,6 +525,16 @@ async def do_the_thing(base_dir):
                 if not path:
                     raise ValueError("The 'path' variable is not defined or is empty.")
 
+                tmp_path = os.path.join(base_dir, "tmp", os.path.basename(path))
+
+                if meta.get('delete_tmp', False) and os.path.exists(tmp_path):
+                    try:
+                        shutil.rmtree(tmp_path)
+                        os.makedirs(tmp_path, exist_ok=True)
+                        console.print(f"[bold green]Successfully cleaned temp directory for {os.path.basename(path)}")
+                    except Exception as e:
+                        console.print(f"[bold red]Failed to delete temp directory: {str(e)}")
+
                 meta_file = os.path.join(base_dir, "tmp", os.path.basename(path), "meta.json")
 
                 if meta.get('delete_meta') and os.path.exists(meta_file):
