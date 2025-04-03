@@ -230,8 +230,9 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                     console.print("[bold red]Generated torrent file appears to be invalid (missing pieces)")
                     raise ValueError("Generated torrent is missing pieces hash")
 
-                console.print(f"[bold green]Successfully created torrent with {len(test_torrent.files)} file(s), " +
-                              f"{test_torrent.size / (1024*1024):.2f} MiB total size")
+                if meta['debug']:
+                    console.print(f"[bold green]Successfully created torrent with {len(test_torrent.files)} file(s), " +
+                                  f"{test_torrent.size / (1024*1024):.2f} MiB total size")
                 return output_path
 
             except Exception as e:

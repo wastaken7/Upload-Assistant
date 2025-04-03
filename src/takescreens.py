@@ -189,7 +189,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             console.print("[red]All tasks cancelled. Exiting.[/red]")
             sys.exit(1)
         finally:
-            console.print("[yellow]Shutting down optimization workers...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Shutting down optimization workers...[/yellow]")
             executor.shutdown(wait=False)
             await asyncio.sleep(0.1)
             await kill_all_child_processes()
