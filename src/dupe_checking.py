@@ -90,7 +90,6 @@ async def filter_dupes(dupes, meta, tracker_name):
             console.log(f"  has_repack_in_uuid: {has_repack_in_uuid}")
             console.log(f"  'repack' in each.lower(): {'repack' in each.lower()}")
             console.log(f"[debug] meta['uuid']: {meta.get('uuid', '')}")
-            console.log(f"[debug] meta['tag']: {meta.get('tag', '').lower()}")
             console.log(f"[debug] normalized encoder: {normalized_encoder}")
 
         if has_is_disc and each.lower().endswith(".m2ts"):
@@ -101,6 +100,10 @@ async def filter_dupes(dupes, meta, tracker_name):
             return True
 
         if meta.get('is_disc') == "BDMV" and tracker_name in ["AITHER", "LST", "HDB", "BHD"]:
+            if len(dupes) > 1 and tag == "":
+                return False
+            if tag and tag.strip() and tag.strip() in normalized:
+                return False
             return True
 
         if is_sd == 1 and (tracker_name == "BHD" or tracker_name == "AITHER"):
