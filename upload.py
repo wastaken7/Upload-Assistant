@@ -155,6 +155,25 @@ async def process_meta(meta, base_dir):
         if 'manual_frames' not in meta:
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
+
+        image_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json"
+        if os.path.exists(image_data_file) and not meta.get('image_list'):
+            try:
+                with open(image_data_file, 'r') as img_file:
+                    image_data = json.load(img_file)
+
+                    if 'image_list' in image_data and not meta.get('image_list'):
+                        meta['image_list'] = image_data['image_list']
+                        if meta.get('debug'):
+                            console.print(f"[cyan]Loaded {len(image_data['image_list'])} previously saved image links")
+
+                    if 'image_sizes' in image_data and not meta.get('image_sizes'):
+                        meta['image_sizes'] = image_data['image_sizes']
+                        if meta.get('debug'):
+                            console.print("[cyan]Loaded previously saved image sizes")
+            except Exception as e:
+                console.print(f"[yellow]Could not load saved image data: {str(e)}")
+
         # Take Screenshots
         try:
             if meta['is_disc'] == "BDMV":
@@ -239,6 +258,21 @@ async def process_meta(meta, base_dir):
 
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
             json.dump(meta, f, indent=4)
+
+        if 'image_list' in meta and meta['image_list']:
+            try:
+                image_data = {
+                    "image_list": meta.get('image_list', []),
+                    "image_sizes": meta.get('image_sizes', {})
+                }
+
+                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json", 'w') as img_file:
+                    json.dump(image_data, img_file, indent=4)
+
+                if meta.get('debug'):
+                    console.print(f"[cyan]Saved {len(meta['image_list'])} images to image_data.json")
+            except Exception as e:
+                console.print(f"[yellow]Failed to save image data: {str(e)}")
 
         if not meta['mkbrr']:
             meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
