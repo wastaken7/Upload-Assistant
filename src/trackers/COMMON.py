@@ -867,17 +867,16 @@ class COMMON():
 
                 if len(dupes) == 1 and meta.get('is_disc') != "BDMV" and tracker_name == "AITHER":
                     if fileSize and "1080" in target_resolution:
-                        target_size = fileSize
-                        size = sized
+                        target_size = int(fileSize)
+                        dupe_size = sized
 
-                        if size is not None and target_size is not None:
-                            target_size = int(target_size)
-                            size_difference = abs(size - target_size) / target_size
+                        if dupe_size is not None and target_size is not None:
+                            size_difference = (target_size - dupe_size) / dupe_size
                             if meta['debug']:
-                                console.print(f"Actual size: {size}, Target size: {target_size}, Size difference: {size_difference:.4f}")
-                            if size_difference < 0.20:
-                                await log_exclusion(f"size difference too small ({size_difference * 100:.2f}%)", each)
-                                return False
+                                console.print(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
+                            if size_difference >= 0.20:
+                                await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
+                                return True
 
             if is_dvd and not tracker_name == "BHD":
                 if any(str(res) in each for res in [1080, 720, 2160]):
