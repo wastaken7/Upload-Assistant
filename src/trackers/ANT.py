@@ -158,14 +158,32 @@ class ANT():
                 if response.status_code == 200:
                     try:
                         data = response.json()
+                        target_resolution = meta.get('resolution', '').lower()
+
                         for each in data.get('item', []):
-                            # Find the largest file
-                            largest = each['files'][0]
-                            for file in each['files']:
-                                if int(file['size']) > int(largest['size']):
-                                    largest = file
-                            result = largest['name']
+                            if target_resolution and each.get('resolution', '').lower() != target_resolution.lower():
+                                if meta.get('debug'):
+                                    console.print(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+                                continue
+
+                            largest_file = None
+                            if 'files' in each and len(each['files']) > 0:
+                                largest = each['files'][0]
+                                for file in each['files']:
+                                    if int(file.get('size', 0)) > int(largest.get('size', 0)):
+                                        largest = file
+                                largest_file = largest.get('name', '')
+
+                            result = {
+                                'name': largest_file or each.get('fileName', ''),
+                                'size': int(each.get('size', 0)),
+                                'flags': each.get('flags', [])
+                            }
                             dupes.append(result)
+
+                            if meta.get('debug'):
+                                console.print(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+
                     except json.JSONDecodeError:
                         console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
                         meta['skipping'] = "ANT"
