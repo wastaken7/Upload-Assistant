@@ -253,7 +253,7 @@ class HUNO():
                 if meta['is_disc'] == 'BDMV':
                     name = f"{title} ({year}) {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'DVD':
-                    name = f"{title} ({year}) {edition} ({resolution} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
                     name = f"{title} ({year}) {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source == "BluRay":  # BluRay Remux
@@ -271,7 +271,7 @@ class HUNO():
                 if meta['is_disc'] == 'BDMV':
                     name = f"{title} ({year}) {season}{episode} {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 if meta['is_disc'] == 'DVD':
-                    name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
                     name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source == "BluRay":  # BluRay Remux
