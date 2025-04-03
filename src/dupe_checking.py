@@ -100,14 +100,14 @@ async def filter_dupes(dupes, meta, tracker_name):
             await log_exclusion("file extension mismatch (is_disc=True)", each)
             return True
 
-        if meta.get('is_disc') == "BDMV" and tracker_name == "AITHER":
+        if meta.get('is_disc') == "BDMV" and tracker_name in ["AITHER", "LST", "HDB", "BHD"]:
             return True
 
         if is_sd == 1 and (tracker_name == "BHD" or tracker_name == "AITHER"):
             if any(str(res) in each for res in [1080, 720, 2160]):
                 return False
 
-        if tracker_name == "AITHER" and is_dvd:
+        if tracker_name in ["AITHER", "LST"] and is_dvd:
             return True
 
         if web_dl:
@@ -156,7 +156,7 @@ async def filter_dupes(dupes, meta, tracker_name):
                 return False
 
         if len(dupes) == 1 and meta.get('is_disc') != "BDMV":
-            if tracker_name == "AITHER":
+            if tracker_name in ["AITHER", "BHD", "HUNO", "OE", "ULCX", "RF"]:
                 if fileSize and "1080" in target_resolution and 'x264' in video_encode:
                     target_size = int(fileSize)
                     dupe_size = sized
