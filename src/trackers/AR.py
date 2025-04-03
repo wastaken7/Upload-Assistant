@@ -405,7 +405,8 @@ class AR():
         except Exception as e:
             console.print(f"[red]Error occurred: {e}")
 
-        console.print(f"[blue]{dupes}")
+        if meta['debug']:
+            console.print(f"[blue]{dupes}")
         await self.close_session()
         return dupes
 
