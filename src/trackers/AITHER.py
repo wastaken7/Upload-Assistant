@@ -250,9 +250,10 @@ class AITHER():
             'tmdbId': meta['tmdb'],
             'categories[]': await self.get_cat_id(meta['category']),
             'types[]': await self.get_type_id(meta['type']),
-            'resolutions[]': await self.get_res_id(meta['resolution']),
             'name': ""
         }
+        if not meta.get('sd'):
+            params['resolutions[]'] = await self.get_res_id(meta['resolution'])
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}"
         if meta.get('edition', "") != "":

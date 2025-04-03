@@ -100,9 +100,15 @@ async def filter_dupes(dupes, meta, tracker_name):
             await log_exclusion("file extension mismatch (is_disc=True)", each)
             return True
 
-        if is_sd == 1 and tracker_name == "BHD":
+        if meta.get('is_disc') == "BDMV" and tracker_name == "AITHER":
+            return True
+
+        if is_sd == 1 and (tracker_name == "BHD" or tracker_name == "AITHER"):
             if any(str(res) in each for res in [1080, 720, 2160]):
                 return False
+
+        if tracker_name == "AITHER" and is_dvd:
+            return True
 
         if web_dl:
             if "hdtv" in normalized and not any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
@@ -121,19 +127,6 @@ async def filter_dupes(dupes, meta, tracker_name):
             if not await has_matching_hdr(file_hdr, target_hdr, meta):
                 await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                 return True
-
-            if len(dupes) == 1 and meta.get('is_disc') != "BDMV" and tracker_name == "AITHER":
-                if fileSize and "1080" in target_resolution:
-                    target_size = int(fileSize)
-                    dupe_size = sized
-
-                    if dupe_size is not None and target_size is not None:
-                        size_difference = (target_size - dupe_size) / dupe_size
-                        if meta['debug']:
-                            console.print(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
-                        if size_difference >= 0.20:
-                            await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
-                            return True
 
         if is_dvd and not tracker_name == "BHD":
             if any(str(res) in each for res in [1080, 720, 2160]):
@@ -161,6 +154,20 @@ async def filter_dupes(dupes, meta, tracker_name):
         if is_hdtv:
             if any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
                 return False
+
+        if len(dupes) == 1 and meta.get('is_disc') != "BDMV":
+            if tracker_name == "AITHER":
+                if fileSize and "1080" in target_resolution and 'x264' in video_encode:
+                    target_size = int(fileSize)
+                    dupe_size = sized
+
+                    if dupe_size is not None and target_size is not None:
+                        size_difference = (target_size - dupe_size) / dupe_size
+                        if meta['debug']:
+                            console.print(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
+                        if size_difference >= 0.20:
+                            await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
+                            return True
 
         if meta['debug']:
             console.log(f"[debug] Passed all checks: {each}")
