@@ -99,7 +99,6 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
     if meta['debug'] and not force_screenshots:
         console.print(f"[bold yellow]Saving Screens... Total needed: {screens}, Existing: {total_existing}, To capture: {num_screens}")
 
-    tone_map = meta.get('tone_map', False)
     if tone_map and "HDR" in meta['hdr']:
         hdr_tonemap = True
     else:
@@ -683,7 +682,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     sanitized_filename = await sanitize_filename(filename)
 
-    tone_map = meta.get('tone_map', False)
     if tone_map and "HDR" in meta['hdr']:
         hdr_tonemap = True
     else:
@@ -714,7 +712,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
                 capture_screenshot(  # Direct async function call
-                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, meta.get('hdr_tonemap', False), meta)
+                    (i, path, ss_times[i], image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
                 )
             )
 
