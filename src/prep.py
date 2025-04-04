@@ -674,13 +674,16 @@ class Prep():
             )
 
             meta['category'] = category
-            meta['tmdb_id'] = tmdb_id
+            meta['tmdb_id'] = int(tmdb_id)
             meta['original_language'] = original_language
         # Fetch TMDB metadata if available
         if int(meta['tmdb_id']) != 0:
             # Check if essential TMDB metadata is already populated
-            essential_fields = ['title', 'year', 'genres', 'overview']
-            tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
+            if not meta.get('edit', False):
+                essential_fields = ['title', 'year', 'genres', 'overview']
+                tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
+            else:
+                tmdb_metadata_populated = False
 
             if not tmdb_metadata_populated:
                 console.print("Fetching TMDB metadata...")
