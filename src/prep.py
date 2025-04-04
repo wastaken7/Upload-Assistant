@@ -1421,25 +1421,33 @@ class Prep():
             anime_match = re.search(r'^\s*\[(.+?)\]', basename_stripped)
             if anime_match:
                 release_group = anime_match.group(1)
+                if meta['debug']:
+                    console.print(f"Anime regex match: {release_group}")
         else:
-            # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
-            basename_stripped = os.path.splitext(basename)[0]
-            non_anime_match = re.search(r'(?<=-)((?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
-            if non_anime_match:
-                release_group = non_anime_match.group(1).strip()
+            if not meta.get('is_disc') == "BDMV":
+                # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
+                basename_stripped = os.path.splitext(basename)[0]
+                non_anime_match = re.search(r'(?<=-)((?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
+                if non_anime_match:
+                    release_group = non_anime_match.group(1).strip()
+                    if meta['debug']:
+                        console.print(f"Non-anime regex match: {release_group}")
 
         # If regex patterns didn't work, fall back to guessit
         if not release_group:
             try:
                 parsed = guessit(video)
                 release_group = parsed.get('release_group')
+                if meta['debug']:
+                    console.print(f"Guessit match: {release_group}")
 
-                # BDMV validation
-                if meta['is_disc'] == "BDMV" and release_group:
-                    if f"-{release_group}" not in video:
-                        release_group = None
             except Exception as e:
                 console.print(f"Error while parsing group tag: {e}")
+                release_group = None
+
+        # BDMV validation
+        if meta['is_disc'] == "BDMV" and release_group:
+            if f"-{release_group}" not in video:
                 release_group = None
 
         # Format the tag
