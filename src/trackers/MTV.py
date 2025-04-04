@@ -158,6 +158,7 @@ class MTV():
                 try:
                     if "torrents.php" in response.url:
                         console.print(response.url)
+                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)
                     else:
                         if "authkey.php" in response.url:
                             console.print("[red]No DL link in response, It may have uploaded, check manually.")
