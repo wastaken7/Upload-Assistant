@@ -304,6 +304,7 @@ class Prep():
         meta['imdb_manual'] = meta.get('imdb_manual') or 0
         meta['mal_manual'] = meta.get('mal_manual') or 0
         meta['tvdb_manual'] = meta.get('tvdb_manual') or 0
+        meta['tvmaze_manual'] = meta.get('tvmaze_manual') or 0
 
         # Set tmdb_id
         try:
@@ -313,7 +314,7 @@ class Prep():
 
         # Set imdb_id with proper handling for 'tt' prefix
         try:
-            if not meta['imdb_id']:
+            if not meta.get('imdb_id'):
                 imdb_value = meta['imdb_manual']
                 if imdb_value:
                     if str(imdb_value).startswith('tt'):
@@ -336,6 +337,11 @@ class Prep():
             meta['tvdb_id'] = int(meta['tvdb_manual'])
         except (ValueError, TypeError):
             meta['tvdb_id'] = 0
+
+        try:
+            meta['tvmaze_id'] = int(meta['tvmaze_manual'])
+        except (ValueError, TypeError):
+            meta['tvmaze_id'] = 0
 
         if meta.get('category', None) is not None:
             meta['category'] = meta['category'].upper()
