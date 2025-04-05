@@ -63,6 +63,10 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Add some overlay details to the screenshots
+        # Frame number/type and Tonemapped if applicable
+        "frame_overlay": False,
+
         # Tonemap HDR screenshots
         "tone_map": False,
 

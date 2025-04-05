@@ -699,6 +699,25 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         return existing_image_paths
 
+    meta['frame_overlay'] = config['DEFAULT'].get('frame_overlay', False)
+    if meta['frame_overlay']:
+        console.print("[yellow]Getting frame information for overlays...")
+        frame_info_tasks = [
+            get_frame_info(path, ss_times[i], meta)
+            for i in range(num_screens + 1)
+            if not os.path.exists(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
+            or meta.get('retake', False)
+        ]
+        frame_info_results = await asyncio.gather(*frame_info_tasks)
+        meta['frame_info_map'] = {}
+
+        # Create a mapping from time to frame info
+        for i, info in enumerate(frame_info_results):
+            meta['frame_info_map'][ss_times[i]] = info
+
+        if meta['debug']:
+            console.print(f"[cyan]Collected frame information for {len(frame_info_results)} frames")
+
     num_capture = num_screens + 1 - existing_images_count
     num_tasks = num_capture
     num_workers = min(num_tasks, task_limit)
@@ -891,6 +910,70 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
 
+async def get_frame_info(path, ss_time, meta):
+    """Get frame information (type, exact timestamp) for a specific frame"""
+    try:
+        info_ff = ffmpeg.input(path, ss=ss_time)
+        info_command = (
+            info_ff
+            .filter('showinfo')
+            .output('-', format='null', vframes=1)
+            .global_args('-loglevel', 'info')
+        )
+
+        # Print the actual FFmpeg command for debugging
+        cmd = info_command.compile()
+        if meta.get('debug', False):
+            console.print(f"[cyan]FFmpeg showinfo command: {' '.join(cmd)}[/cyan]")
+
+        # Execute the info gathering command
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        _, stderr = await process.communicate()
+        stderr_text = stderr.decode('utf-8', errors='replace')
+
+        # Calculate frame number based on timestamp and framerate
+        frame_rate = meta.get('frame_rate', 24.0)
+        calculated_frame = int(ss_time * frame_rate)
+
+        # Default values
+        frame_info = {
+            'frame_type': 'Unknown',
+            'frame_number': calculated_frame
+        }
+
+        pict_type_match = re.search(r'pict_type:(\w)', stderr_text)
+        if pict_type_match:
+            frame_info['frame_type'] = pict_type_match.group(1)
+        else:
+            # Try alternative patterns that might appear in newer FFmpeg versions
+            alt_match = re.search(r'type:(\w)\s', stderr_text)
+            if alt_match:
+                frame_info['frame_type'] = alt_match.group(1)
+
+        pts_time_match = re.search(r'pts_time:(\d+\.\d+)', stderr_text)
+        if pts_time_match:
+            exact_time = float(pts_time_match.group(1))
+            frame_info['pts_time'] = exact_time
+            # Recalculate frame number based on exact PTS time if available
+            frame_info['frame_number'] = int(exact_time * frame_rate)
+
+        return frame_info
+
+    except Exception as e:
+        console.print(f"[yellow]Error getting frame info: {e}. Will use estimated values.[/yellow]")
+        if meta.get('debug', False):
+            console.print(traceback.format_exc())
+        return {
+            'frame_type': 'Unknown',
+            'frame_number': int(ss_time * meta.get('frame_rate', 24.0))
+        }
+
+
 async def capture_screenshot(args):
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
@@ -909,6 +992,7 @@ async def capture_screenshot(args):
             error_msg = f"Error: Path is a directory, not a file: {path}"
             console.print(f"[yellow]{error_msg}[/yellow]")
 
+            # Use meta that's passed directly to the function
             if meta and isinstance(meta, dict) and 'filelist' in meta and meta['filelist']:
                 video_file = meta['filelist'][0]
                 console.print(f"[green]Using first file from filelist: {video_file}[/green]")
@@ -940,6 +1024,63 @@ async def capture_screenshot(args):
                 .filter('format', 'rgb24')
             )
 
+        if meta.get('frame_overlay', False):
+            # Get frame info from pre-collected data if available
+            frame_info = meta.get('frame_info_map', {}).get(ss_time, {})
+
+            frame_rate = meta.get('frame_rate', 24.0)
+            frame_number = int(ss_time * frame_rate)
+
+            # If we have PTS time from frame info, use it to calculate a more accurate frame number
+            if 'pts_time' in frame_info:
+                # Only use PTS time for frame number calculation if it makes sense
+                # (sometimes seeking can give us a frame from the beginning instead of where we want)
+                pts_time = frame_info.get('pts_time', 0)
+                if pts_time > 1.0 and abs(pts_time - ss_time) < 10:
+                    frame_number = int(pts_time * frame_rate)
+
+            frame_type = frame_info.get('frame_type', 'Unknown')
+
+            # Use the filtered output with frame info
+            base_text = ff
+
+            # Frame number
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Number: {frame_number}",
+                                         fontcolor='white',
+                                         fontsize=24,
+                                         x=10,
+                                         y=10,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # Frame type
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Type: {frame_type}",
+                                         fontcolor='white',
+                                         fontsize=24,
+                                         x=10,
+                                         y=40,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # HDR status
+            if hdr_tonemap:
+                base_text = base_text.filter('drawtext',
+                                             text="Tonemapped HDR",
+                                             fontcolor='white',
+                                             fontsize=24,
+                                             x=10,
+                                             y=70,
+                                             box=1,
+                                             boxcolor='black@0.5'
+                                             )
+
+            # Use the filtered output with frame info
+            ff = base_text
+
         command = (
             ff
             .output(image_path, vframes=1, pix_fmt="rgb24")
@@ -963,7 +1104,7 @@ async def capture_screenshot(args):
             stdout, stderr = await process.communicate()
 
             # Print stdout and stderr if in verbose mode
-            if loglevel == 'verbose' or (meta and meta.get('debug', False)):
+            if loglevel == 'verbose':
                 if stdout:
                     console.print(f"[blue]FFmpeg stdout:[/blue]\n{stdout.decode('utf-8', errors='replace')}")
                 if stderr:
