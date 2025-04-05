@@ -241,7 +241,6 @@ class HUNO():
         video_encode = meta.get('video_encode', "").replace(".", "")
         if 'x265' in basename:
             video_encode = video_encode.replace('H', 'x')
-        region = meta.get('region', "")
         dvd_size = meta.get('dvd_size', "")
         edition = meta.get('edition', "")
         hybrid = "Hybrid" if "HYBRID" in basename.upper() else ""
@@ -251,7 +250,7 @@ class HUNO():
         if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
-                    name = f"{title} ({year}) {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {three_d} {edition} ({resolution} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'DVD':
                     name = f"{title} ({year}) {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
@@ -269,7 +268,7 @@ class HUNO():
         elif meta['category'] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
-                    name = f"{title} ({year}) {season}{episode} {three_d} {edition} ({resolution} {region} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {season}{episode} {three_d} {edition} ({resolution} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 if meta['is_disc'] == 'DVD':
                     name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
