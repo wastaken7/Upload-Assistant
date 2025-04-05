@@ -71,10 +71,13 @@ class ULCX():
         if resolution_id is None:
             console.print("Resolution is below 720p; skipping.")
             return
-        name = await self.edit_name(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        name, region_id, distributor_id = await self.edit_name(meta, region_id, distributor_id)
+        if region_id == "SKIPPED" or distributor_id == "SKIPPED":
+            console.print("Region or Distributor ID not found; skipping ULCX upload.")
+            return
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
@@ -157,13 +160,32 @@ class ULCX():
             console.print(data)
         open_torrent.close()
 
-    async def edit_name(self, meta):
+    async def edit_name(self, meta, region_id, distributor_id):
+        common = COMMON(config=self.config)
         ulcx_name = meta['name']
         if meta['category'] == 'TV':
             ulcx_name = ulcx_name.replace(f"{meta['title']} {meta['year']}", f"{meta['title']}", 1)
         else:
             ulcx_name = ulcx_name
-        return ulcx_name
+        if meta.get('is_disc') == "BDMV":
+            if not region_id:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    region_name = cli_ui.ask_string("ULCX: Region code not found for disc. Please enter it manually (UPPERCASE): ")
+                    region_id = await common.unit3d_region_ids(region_name)
+                    if not meta.get('edition', ""):
+                        ulcx_name = ulcx_name.replace(f"{meta['resolution']}", f"{meta['resolution']} {region_name}", 1)
+                    else:
+                        ulcx_name = ulcx_name.replace(f"{meta['resolution']} {meta['edition']}", f"{meta['resolution']} {meta['edition']} {region_name}", 1)
+                else:
+                    region_id = "SKIPPED"
+            if not distributor_id:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    distributor_name = cli_ui.ask_string("ULCX: Distributor code not found for disc. Please enter it manually (UPPERCASE): ")
+                    distributor_id = await common.unit3d_distributor_ids(distributor_name)
+                else:
+                    distributor_id = "SKIPPED"
+
+        return ulcx_name, region_id, distributor_id
 
     async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:
