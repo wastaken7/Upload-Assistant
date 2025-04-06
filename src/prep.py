@@ -2016,7 +2016,10 @@ class Prep():
                     content_written = True
 
             if not content_written:
-                description_text = meta.get('description', '').strip()
+                if meta.get('description'):
+                    description_text = meta.get('description', '').strip()
+                else:
+                    description_text = ""
                 if description_text:
                     description.write(description_text + "\n")
 
