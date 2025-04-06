@@ -1745,7 +1745,7 @@ class Prep():
         title = meta.get('title', "")
         alt_title = meta.get('aka', "")
         year = meta.get('year', "")
-        if meta.get('manual_year') > 0:
+        if int(meta.get('manual_year')) > 0:
             year = meta.get('manual_year')
         resolution = meta.get('resolution', "")
         if resolution == "OTHER":
