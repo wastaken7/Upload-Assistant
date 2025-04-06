@@ -67,6 +67,9 @@ config = {
         # Frame number/type and Tonemapped if applicable
         "frame_overlay": False,
 
+        # Overlay text size, scales with resolution
+        "overlay_text_size": "18",
+
         # Tonemap HDR screenshots
         "tone_map": False,
 

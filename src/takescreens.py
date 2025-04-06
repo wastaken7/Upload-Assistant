@@ -1041,14 +1041,17 @@ async def capture_screenshot(args):
 
             frame_type = frame_info.get('frame_type', 'Unknown')
 
+            text_size = int(config['DEFAULT'].get('overlay_text_size', 18))
             # Get the resolution and convert it to integer
             resol = int(''.join(filter(str.isdigit, meta.get('resolution', '1080p'))))
-            # Assess the font size from the resolution
-            font_size = round(24*resol/1080)
+            font_size = round(text_size*resol/1080)
             x_all = round(10*resol/1080)
-            y_number = round(10*resol/1080)
-            y_type = round(40*resol/1080)
-            y_hdr = round(70*resol/1080)
+
+            # Scale vertical spacing based on font size
+            line_spacing = round(font_size * 1.1)
+            y_number = x_all
+            y_type = y_number + line_spacing
+            y_hdr = y_type + line_spacing
 
             # Use the filtered output with frame info
             base_text = ff
