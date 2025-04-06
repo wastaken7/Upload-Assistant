@@ -33,6 +33,8 @@ except ValueError:
     task_limit = 1
 tone_map = config['DEFAULT'].get('tone_map', False)
 optimize_images = config['DEFAULT'].get('optimize_images', True)
+algorithm = config['DEFAULT'].get('algorithm', 'mobius').strip()
+desat = float(config['DEFAULT'].get('desat', 10.0))
 
 
 async def sanitize_filename(filename):
@@ -284,7 +286,7 @@ async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel
             ff = (
                 ff
                 .filter('zscale', transfer='linear')
-                .filter('tonemap', tonemap='mobius', desat=8.0)
+                .filter('tonemap', tonemap=algorithm, desat=desat)
                 .filter('zscale', transfer='bt709')
                 .filter('format', 'rgb24')
             )
@@ -1019,7 +1021,7 @@ async def capture_screenshot(args):
             ff = (
                 ff
                 .filter('zscale', transfer='linear')
-                .filter('tonemap', tonemap='mobius', desat=10.0)
+                .filter('tonemap', tonemap=algorithm, desat=desat)
                 .filter('zscale', transfer='bt709')
                 .filter('format', 'rgb24')
             )

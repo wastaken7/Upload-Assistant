@@ -66,12 +66,15 @@ config = {
         # Add some overlay details to the screenshots
         # Frame number/type and Tonemapped if applicable
         "frame_overlay": False,
-
         # Overlay text size, scales with resolution
         "overlay_text_size": "18",
 
         # Tonemap HDR screenshots
         "tone_map": False,
+        # Tonemap HDR screenshots with the following settings
+        # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
+        "algorithm": "mobius",
+        "desat": "10.0",
 
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
