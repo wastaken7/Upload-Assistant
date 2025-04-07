@@ -12,6 +12,7 @@ import click
 import httpx
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.uploadscreens import upload_screens
 
 
 class TIK():
@@ -83,8 +84,6 @@ class TIK():
             'category_id': cat_id,
             'type_id': type_id,
             'resolution_id': resolution_id,
-            'region_id': region_id,
-            'distributor_id': distributor_id,
             'tmdb': meta['tmdb'],
             'imdb': meta['imdb'].replace('tt', ''),
             'tvdb': meta['tvdb_id'],
@@ -281,12 +280,6 @@ class TIK():
         return 1 if meta.get(flag_name, False) else 0
 
     async def edit_desc(self, meta):
-        from src.prep import Prep
-        prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=self.config)
-
-        # Fetch additional IMDb metadata
-        meta_imdb = await prep.imdb_other_meta(meta)  # noqa #F841
-
         if len(meta.get('discs', [])) > 0:
             summary = meta['discs'][0].get('summary', '')
         else:
@@ -331,7 +324,7 @@ class TIK():
         if os.path.exists(poster_path):
             try:
                 console.print("Uploading standard poster to image host....")
-                new_poster_url, _ = prep.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
+                new_poster_url, _ = upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
 
                 # Ensure that the new poster URL is assigned only once
                 if len(new_poster_url) > 0:
