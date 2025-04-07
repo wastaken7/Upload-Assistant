@@ -230,7 +230,6 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
 
             # Process and organize episode data
             episodes_by_season = {}
-            absolute_episode_count = 0
             absolute_mapping = {}  # Map absolute numbers to season/episode
 
             # Sort by aired date first (if available)
