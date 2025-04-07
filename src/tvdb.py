@@ -246,6 +246,7 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
             for ep in all_episodes:
                 season_number = ep.get("seasonNumber")
                 episode_number = ep.get("number")
+                absolute_episode_count = ep.get("absoluteNumber")
 
                 # Ensure season_number is valid and convert to int if needed
                 if season_number is not None:
@@ -270,7 +271,6 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
                 is_special = season_number == 0
 
                 if not is_special:
-                    absolute_episode_count += 1
                     # Store mapping of absolute number to season/episode
                     absolute_mapping[absolute_episode_count] = {
                         "season": season_number,
