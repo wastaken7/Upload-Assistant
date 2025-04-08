@@ -461,6 +461,7 @@ class Prep():
 
         meta['we_checked_tvdb'] = False
         meta['we_checked_tmdb'] = False
+        meta['we_asked_tvmaze'] = False
 
         # if we have all of the ids, search everything all at once
         if int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0 and int(meta['tvmaze_id']) != 0:
@@ -636,6 +637,7 @@ class Prep():
                         # Only set overview if not already set
                         if meta.get('overview_meta') is None and tvmaze_episode_data.get('summary') is not None:
                             meta['overview_meta'] = tvmaze_episode_data.get('summary', None)
+                        meta['we_asked_tvmaze'] = True
                     elif isinstance(tvmaze_episode_data, Exception):
                         console.print(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}")
 
