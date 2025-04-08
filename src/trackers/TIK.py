@@ -181,7 +181,7 @@ class TIK():
         meta['category_id'] = await self.get_cat_id(category_name, foreign, opera, asian)
 
         name = ""
-        alt_title_part = f" / {alt_title}" if alt_title else ""
+        alt_title_part = f" {alt_title}" if alt_title else ""
         if meta['category_id'] in ("1", "3", "5", "6"):
             if meta['is_disc'] == 'BDMV':
                 name = f"{title}{alt_title_part} ({year}) {disctype} {resolution} {video_codec} {three_d_tag}"
@@ -379,7 +379,7 @@ class TIK():
         desc_text.append("[code]\n")
         if meta['is_disc'] == 'BDMV':
             desc_text.append(f"  Disc Label.........:{meta.get('bdinfo', {}).get('label', '')}\n")
-        desc_text.append(f"  IMDb...............: [url=https://www.imdb.com/title/tt{meta.get('imdb_id')}]{meta.get('imdb_rating', '')}[/url]\n")
+        desc_text.append(f"  IMDb...............: [url]https://www.imdb.com/title/tt{meta.get('imdb_id')}{meta.get('imdb_rating', '')}[/url]\n")
         desc_text.append(f"  Year...............: {meta.get('year', '')}\n")
         desc_text.append(f"  Country............: {country_name}\n")
         if meta['is_disc'] == 'BDMV':
@@ -444,7 +444,7 @@ class TIK():
             desc_text.append(f"  Source.............: {meta.get('disctype', 'Unknown')}\n")
         else:
             desc_text.append(f"  Source.............: {meta.get('dvd_size', 'Unknown')}\n")
-        desc_text.append(f"  Film Distributor...: [url={meta.get('distributor_link', '')}]{meta.get('distributor', 'Unknown')}[url] [color=red]Don't forget the actual distributor link\n")
+        desc_text.append(f"  Film Distributor...: [url={meta.get('distributor_link', '')}]{meta.get('distributor', 'Unknown')}[/url] [color=red]Don't forget the actual distributor link\n")
         desc_text.append(f"  Average Bitrate....: {total_bitrate}\n")
         desc_text.append("  Ripping Program....:  [color=red]Specify - if it's your rip or custom version, otherwise 'Not my rip'[/color]\n")
         desc_text.append("\n")
