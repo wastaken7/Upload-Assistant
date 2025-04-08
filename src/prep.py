@@ -235,8 +235,8 @@ class Prep():
                 console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
             if secondary_title:
                 meta['secondary_title'] = secondary_title
-            if extracted_year and not meta.get('search_year'):
-                meta['search_year'] = extracted_year
+            if extracted_year and not meta.get('year'):
+                meta['year'] = extracted_year
 
             guess_name = ntpath.basename(video).replace('-', ' ')
 
@@ -246,17 +246,10 @@ class Prep():
                 filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
             untouched_filename = os.path.basename(video)
 
-            # Only guessit the year if it's not already set
-            # additionally if the title is already set, it was set because the title starts with year, which guessit fails with
-            if not meta.get('search_year') and not title:
-                try:
-                    search_year = guessit(video)['year']
-                except Exception:
-                    search_year = ""
-                meta['search_year'] = search_year
-            elif extracted_year:
-                meta['search_year'] = extracted_year
-            else:
+            # rely only on guessit for search_year for tv matching
+            try:
+                meta['search_year'] = guessit(video)['year']
+            except Exception:
                 meta['search_year'] = ""
 
             if not meta.get('edit', False):
@@ -596,6 +589,15 @@ class Prep():
 
                         if meta['tvdb_episode_data'].get('episode_number'):
                             meta['tvdb_episode_number'] = meta['tvdb_episode_data'].get('episode_number')
+
+                        if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('series_name'):
+                            year = meta['tvdb_episode_data'].get('series_name')
+                            year_match = re.search(r'\b(19\d\d|20[0-3]\d)\b', year)
+                            if year_match:
+                                meta['search_year'] = year_match.group(0)
+                            else:
+                                meta['search_year'] = ""
+
                     elif isinstance(tvdb_episode_data, Exception):
                         console.print(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}")
 
@@ -712,6 +714,14 @@ class Prep():
                             meta['overview_meta'] = None
                     else:
                         meta['overview_meta'] = None
+
+                    if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('series_name'):
+                        year = meta['tvdb_episode_data'].get('series_name')
+                        year_match = re.search(r'\b(19\d\d|20[0-3]\d)\b', year)
+                        if year_match:
+                            meta['search_year'] = year_match.group(0)
+                        else:
+                            meta['search_year'] = ""
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             tmdb_result, tvmaze_id, imdb_info_result = results[:3]
@@ -996,6 +1006,14 @@ class Prep():
 
                             if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('episode_number'):
                                 meta['tvdb_episode_number'] = meta['tvdb_episode_data'].get('episode_number')
+
+                            if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('series_name'):
+                                year = meta['tvdb_episode_data'].get('series_name')
+                                year_match = re.search(r'\b(19\d\d|20[0-3]\d)\b', year)
+                                if year_match:
+                                    meta['search_year'] = year_match.group(0)
+                                else:
+                                    meta['search_year'] = ""
 
                     # fallback to tmdb data if tvdb data is not available
                     if (meta.get('auto_episode_title') is None or meta.get('overview_meta') is None) and not meta.get('we_checked_tmdb', False):
