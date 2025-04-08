@@ -541,6 +541,9 @@ config = {
             # "torrent_storage_dir" : "path/to/session folder",
             # "rtorrent_label" : "Add this label to all uploads"
 
+            # "linking": "hardlink",  # use either "symlink" or "hardlink"
+            # "linked_folder": ["/path/to/linked/folder", "/path/to/other/linked/folder"]
+
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             # "local_path" : "/LocalPath",
             # "remote_path" : "/RemotePath"
