@@ -125,7 +125,7 @@ class Args():
         parser.add_argument('--untouched', dest='untouched', action='store_true', required=False, help="Set when a completely untouched disc at TIK")
         parser.add_argument('-manual_dvds', '--manual_dvds', nargs=1, required=False, help="Override the default number of DVD's (eg: use 2xDVD9+DVD5 instead)", type=str, dest='manual_dvds', default="")
         parser.add_argument('-pb', '--desclink', nargs=1, required=False, help="Custom Description (link to hastebin/pastebin)")
-        parser.add_argument('-df', '--descfile', nargs=1, required=False, help="Custom Description (path to file)")
+        parser.add_argument('-df', '--descfile', nargs=1, required=False, help="Custom Description (path to file OR filename in current working directory)")
         parser.add_argument('-ih', '--imghost', nargs=1, required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens', 'oeimg', 'dalexni', 'zipline'])
         parser.add_argument('-siu', '--skip-imagehost-upload', dest='skip_imghost_upload', action='store_true', required=False, help="Skip Uploading to an image host")
         parser.add_argument('-th', '--torrenthash', nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
@@ -197,6 +197,8 @@ class Args():
                         meta['manual_type'] = value2.upper().replace('-', '')
                     elif key == 'tag':
                         meta[key] = f"-{value2}"
+                    elif key == 'descfile':
+                        meta[key] = os.path.abspath(value2)
                     elif key == 'screens':
                         meta[key] = int(value2)
                     elif key == 'season':
