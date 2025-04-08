@@ -1,3 +1,30 @@
+__version__ = "4.1.4"
+
+"""
+Changelog for version 4.1.4 (2025-04-08):
+
+## What's Changed
+* Update SP.py to replace   with . per upload guidelines by @tubaboy26 in https://github.com/Audionut/Upload-Assistant/pull/435
+* HUNO - remove region from name by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/441
+* Correct absolute episode number lookup by @ppkhoa in https://github.com/Audionut/Upload-Assistant/pull/447
+* add more args overrides options by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/437
+* add rTorrent linking support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/390
+* Accept both relative and absolute path for the description filename. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/448
+* Updated dupe checking - mainly to allow uploads when more than 1 of a content is allowed
+* Added an argument  which cleans just the tmp directory for the current pathed content
+* Hide some not important console prints behind debug
+* Fixed HDR tonemapping
+* Added config option to overlay some details on screenshots (currently only files)
+* Adjust font size of screenshot overlays to match the resolution. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/442
+* Fixed manual year
+* Other minor fixes
+
+## New Contributors
+* @GizmoBal made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/442
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.3...4.1.4
+"""
+
 __version__ = "4.1.3"
 
 """
