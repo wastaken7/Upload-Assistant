@@ -537,21 +537,32 @@ async def do_the_thing(base_dir):
 
                 meta_file = os.path.join(base_dir, "tmp", os.path.basename(path), "meta.json")
 
+                keep_meta = config['DEFAULT'].get('keep_meta', False)
+
+                if not keep_meta:
+                    if os.path.exists(meta_file):
+                        try:
+                            os.remove(meta_file)
+                            if meta['debug']:
+                                console.print(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
+                        except Exception as e:
+                            console.print(f"[bold red]Failed to delete metadata file {meta_file}: {str(e)}")
+                    else:
+                        if meta['debug']:
+                            console.print(f"[yellow]No metadata file found at {meta_file}")
+
                 if meta.get('delete_meta') and os.path.exists(meta_file):
                     os.remove(meta_file)
                     console.print("[bold red]Successfully deleted meta.json")
 
-                if os.path.exists(meta_file):
+                if keep_meta and os.path.exists(meta_file):
                     with open(meta_file, "r") as f:
                         saved_meta = json.load(f)
                         console.print("[yellow]Existing metadata file found, it holds cached values")
                         meta.update(await merge_meta(meta, saved_meta, path))
-                else:
-                    if meta['debug']:
-                        console.print(f"[yellow]No metadata file found at {meta_file}")
 
             except Exception as e:
-                console.print(f"[red]Failed to load metadata for path '{path}': {e}")
+                console.print(f"[red]Exception: '{path}': {e}")
                 reset_terminal()
 
             if meta['debug']:
