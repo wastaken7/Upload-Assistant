@@ -403,7 +403,6 @@ def get_local_version(version_file):
             content = f.read()
         match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
         if match:
-            console.print(f"[cyan]Version[/cyan] [yellow]{match.group(1)}")
             return match.group(1)
         else:
             console.print("[red]Version not found in local file.")
@@ -450,19 +449,20 @@ async def update_notification(base_dir):
     notice = config['DEFAULT'].get('update_notification', True)
     verbose = config['DEFAULT'].get('verbose_notification', False)
 
-    if not notice:
-        return
-
     local_version = get_local_version(version_file)
     if not local_version:
         return
 
+    if not notice:
+        return local_version
+
     remote_version, remote_content = get_remote_version(remote_version_url)
     if not remote_version:
-        return
+        return local_version
 
     if version.parse(remote_version) > version.parse(local_version):
         console.print(f"[red][NOTICE] [green]Update available: v[/green][yellow]{remote_version}")
+        console.print(f"[red][NOTICE] [green]Current version: v[/green][yellow]{local_version}")
         asyncio.create_task(asyncio.sleep(1))
         if verbose and remote_content:
             changelog = extract_changelog(remote_content, local_version, remote_version)
@@ -471,6 +471,8 @@ async def update_notification(base_dir):
                 console.print(f"{changelog}")
             else:
                 console.print("[yellow]Changelog not found between versions.[/yellow]")
+
+    return local_version
 
 
 async def do_the_thing(base_dir):
@@ -483,7 +485,7 @@ async def do_the_thing(base_dir):
         else:
             break
 
-    await update_notification(base_dir)
+    meta['current_version'] = await update_notification(base_dir)
 
     cleanup_only = any(arg in ('--cleanup', '-cleanup') for arg in sys.argv) and len(sys.argv) <= 2
 
