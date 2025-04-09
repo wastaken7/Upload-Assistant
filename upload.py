@@ -541,7 +541,7 @@ async def do_the_thing(base_dir):
                     try:
                         os.remove(meta_file)
                         if meta['debug']:
-                            console.print(f"[bold green]Found and deleted existing metadata file: {meta_file}")
+                            console.print(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
                     except Exception as e:
                         console.print(f"[bold red]Failed to delete metadata file {meta_file}: {str(e)}")
                 else:
