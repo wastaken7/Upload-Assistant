@@ -108,7 +108,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
     else:
         hdr_tonemap = False
 
-    ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate)
+    ss_times = await valid_ss_time([], num_screens, length, frame_rate)
 
     if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
@@ -487,7 +487,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
     main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
     voblength, n = await _is_vob_good(0, 0, num_screens)
-    ss_times = await valid_ss_time([], num_screens + 1, voblength, frame_rate)
+    ss_times = await valid_ss_time([], num_screens, voblength, frame_rate)
     capture_tasks = []
     existing_images = 0
     existing_image_paths = []
@@ -852,9 +852,9 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             ss_times = [frame / frame_rate for frame in manual_frames]
         except (TypeError, ValueError) as e:
             console.print(f"[red]Error processing manual frames: {e}. Using auto-generated frames.[/red]")
-            ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
+            ss_times = await valid_ss_time([], num_screens, length, frame_rate)
     else:
-        ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate, exclusion_zone=500)
+        ss_times = await valid_ss_time([], num_screens, length, frame_rate)
 
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
@@ -1253,37 +1253,28 @@ async def capture_screenshot(args):
         return f"Error: {str(e)}"
 
 
-async def valid_ss_time(ss_times, num_screens, length, frame_rate, exclusion_zone=None):
+async def valid_ss_time(ss_times, num_screens, length, frame_rate):
     total_screens = num_screens + 1
+    total_frames = int(length * frame_rate)
 
-    if exclusion_zone is None:
-        exclusion_zone = max(length / (3 * total_screens), length / 15)
+    # Calculate usable portion (from 5% to 90% of video)
+    start_frame = int(total_frames * 0.05)
+    end_frame = int(total_frames * 0.9)
+    usable_frames = end_frame - start_frame
+
+    if total_screens > 1:
+        frame_interval = usable_frames // (total_screens - 1)
+    else:
+        frame_interval = usable_frames
 
     result_times = ss_times.copy()
-    section_size = (round(4 * length / 5) - round(length / 5)) / total_screens * 1.3
-    section_starts = [round(length / 5) + i * (section_size * 0.9) for i in range(total_screens)]
 
-    for section_index in range(total_screens):
-        valid_time = False
-        attempts = 0
-        start_frame = round(section_starts[section_index] * frame_rate)
-        end_frame = round((section_starts[section_index] + section_size) * frame_rate)
-
-        while not valid_time and attempts < 50:
-            attempts += 1
-            frame = random.randint(start_frame, end_frame)
-            time = frame / frame_rate
-
-            if all(abs(frame - existing_time * frame_rate) > exclusion_zone * frame_rate for existing_time in result_times):
-                result_times.append(time)
-                valid_time = True
-
-        if not valid_time:
-            midpoint_frame = (start_frame + end_frame) // 2
-            result_times.append(midpoint_frame / frame_rate)
+    for i in range(total_screens):
+        frame = start_frame + (i * frame_interval)
+        time = frame / frame_rate
+        result_times.append(time)
 
     result_times = sorted(result_times)
-
     return result_times
 
 
