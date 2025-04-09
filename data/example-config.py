@@ -168,6 +168,10 @@ config = {
         # set true to skip automated client torrent searching
         'skip_auto_torrent': False,
 
+        # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING
+        # set true to not delete existing meta.json file before running
+        "keep_meta": False,
+
     },
 
     # these are used for DB links on AR
