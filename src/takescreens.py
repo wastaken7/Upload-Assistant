@@ -17,6 +17,7 @@ import traceback
 from pymediainfo import MediaInfo
 from src.console import console
 from data.config import config
+from src.cleanup import cleanup
 
 img_host = [
     config["DEFAULT"][key].lower()
@@ -35,6 +36,7 @@ tone_map = config['DEFAULT'].get('tone_map', False)
 optimize_images = config['DEFAULT'].get('optimize_images', True)
 algorithm = config['DEFAULT'].get('algorithm', 'mobius').strip()
 desat = float(config['DEFAULT'].get('desat', 10.0))
+frame_overlay = config['DEFAULT'].get('frame_overlay', False)
 
 
 async def sanitize_filename(filename):
@@ -108,8 +110,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
 
     ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate)
 
-    meta['frame_overlay'] = config['DEFAULT'].get('frame_overlay', False)
-    if meta['frame_overlay']:
+    if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [
             get_frame_info(file, ss_times[i], meta)
@@ -185,8 +186,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         num_tasks = len(valid_images)
         num_workers = min(num_tasks, task_limit)
         console.print("[yellow]Now optimizing images...[/yellow]")
-        if meta['debug']:
-            console.print(f"Using {num_workers} worker(s) for {num_tasks} image(s)")
+
         loop = asyncio.get_running_loop()
         stop_event = asyncio.Event()
 
@@ -211,6 +211,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             await kill_all_child_processes()
             console.print("[red]All tasks cancelled. Exiting.[/red]")
             sys.exit(1)
+
         finally:
             if meta['debug']:
                 console.print("[yellow]Shutting down optimization workers...[/yellow]")
@@ -299,6 +300,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
     if meta['debug']:
         finish_time = time.time()
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
+    await cleanup()
 
 
 async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap, meta):
@@ -313,7 +315,7 @@ async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel
                 .filter('format', 'rgb24')
             )
 
-        if meta.get('frame_overlay', False):
+        if frame_overlay:
             # Get frame info from pre-collected data if available
             frame_info = meta.get('frame_info_map', {}).get(ss_time, {})
 
@@ -502,13 +504,39 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         capture_results = existing_image_paths
         return
     else:
+        capture_tasks = []
+        image_paths = []
+        input_files = []
+
         for i in range(num_screens + 1):
-            image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][disc_num]['name']}-{i}.png"
+            sanitized_disc_name = await sanitize_filename(meta['discs'][disc_num]['name'])
+            image = f"{meta['base_dir']}/tmp/{meta['uuid']}/{sanitized_disc_name}-{i}.png"
             input_file = f"{meta['discs'][disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
-            if not os.path.exists(image) or meta.get('retake', False):
+            image_paths.append(image)
+            input_files.append(input_file)
+
+        if frame_overlay:
+            console.print("[yellow]Getting frame information for overlays...")
+            frame_info_tasks = [
+                get_frame_info(input_files[i], ss_times[i], meta)
+                for i in range(num_screens + 1)
+                if not os.path.exists(image_paths[i]) or meta.get('retake', False)
+            ]
+
+            frame_info_results = await asyncio.gather(*frame_info_tasks)
+            meta['frame_info_map'] = {}
+
+            for i, info in enumerate(frame_info_results):
+                meta['frame_info_map'][ss_times[i]] = info
+
+            if meta['debug']:
+                console.print(f"[cyan]Collected frame information for {len(frame_info_results)} frames")
+
+        for i in range(num_screens + 1):
+            if not os.path.exists(image_paths[i]) or meta.get('retake', False):
                 capture_tasks.append(
                     capture_dvd_screenshot(
-                        (i, input_file, image, ss_times[i], meta, width, height, w_sar, h_sar)
+                        (i, input_files[i], image_paths[i], ss_times[i], meta, width, height, w_sar, h_sar)
                     )
                 )
 
@@ -663,6 +691,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
     console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+    await cleanup()
 
 
 async def capture_dvd_screenshot(task):
@@ -680,6 +709,62 @@ async def capture_dvd_screenshot(task):
         ff = ffmpeg.input(input_file, ss=seek_time)
         if w_sar != 1 or h_sar != 1:
             ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
+
+        if frame_overlay:
+            # Get frame info from pre-collected data if available
+            frame_info = meta.get('frame_info_map', {}).get(seek_time, {})
+
+            frame_rate = meta.get('frame_rate', 24.0)
+            frame_number = int(seek_time * frame_rate)
+
+            # If we have PTS time from frame info, use it to calculate a more accurate frame number
+            if 'pts_time' in frame_info:
+                # Only use PTS time for frame number calculation if it makes sense
+                # (sometimes seeking can give us a frame from the beginning instead of where we want)
+                pts_time = frame_info.get('pts_time', 0)
+                if pts_time > 1.0 and abs(pts_time - seek_time) < 10:
+                    frame_number = int(pts_time * frame_rate)
+
+            frame_type = frame_info.get('frame_type', 'Unknown')
+
+            text_size = int(config['DEFAULT'].get('overlay_text_size', 18))
+            # Get the resolution and convert it to integer
+            resol = int(''.join(filter(str.isdigit, meta.get('resolution', '576p'))))
+            font_size = round(text_size*resol/576)
+            x_all = round(10*resol/576)
+
+            # Scale vertical spacing based on font size
+            line_spacing = round(font_size * 1.1)
+            y_number = x_all
+            y_type = y_number + line_spacing
+
+            # Use the filtered output with frame info
+            base_text = ff
+
+            # Frame number
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Number: {frame_number}",
+                                         fontcolor='white',
+                                         fontsize=font_size,
+                                         x=x_all,
+                                         y=y_number,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # Frame type
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Type: {frame_type}",
+                                         fontcolor='white',
+                                         fontsize=font_size,
+                                         x=x_all,
+                                         y=y_type,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # Use the filtered output with frame info
+            ff = base_text
 
         cmd = ff.output(image, vframes=1, pix_fmt="rgb24").overwrite_output().global_args('-loglevel', loglevel, '-accurate_seek').compile()
 
@@ -793,8 +878,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         return existing_image_paths
 
-    meta['frame_overlay'] = config['DEFAULT'].get('frame_overlay', False)
-    if meta['frame_overlay']:
+    if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [
             get_frame_info(path, ss_times[i], meta)
@@ -1002,70 +1086,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if meta['debug']:
         finish_time = time.time()
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
-
-
-async def get_frame_info(path, ss_time, meta):
-    """Get frame information (type, exact timestamp) for a specific frame"""
-    try:
-        info_ff = ffmpeg.input(path, ss=ss_time)
-        info_command = (
-            info_ff
-            .filter('showinfo')
-            .output('-', format='null', vframes=1)
-            .global_args('-loglevel', 'info')
-        )
-
-        # Print the actual FFmpeg command for debugging
-        cmd = info_command.compile()
-        if meta.get('debug', False):
-            console.print(f"[cyan]FFmpeg showinfo command: {' '.join(cmd)}[/cyan]")
-
-        # Execute the info gathering command
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-
-        _, stderr = await process.communicate()
-        stderr_text = stderr.decode('utf-8', errors='replace')
-
-        # Calculate frame number based on timestamp and framerate
-        frame_rate = meta.get('frame_rate', 24.0)
-        calculated_frame = int(ss_time * frame_rate)
-
-        # Default values
-        frame_info = {
-            'frame_type': 'Unknown',
-            'frame_number': calculated_frame
-        }
-
-        pict_type_match = re.search(r'pict_type:(\w)', stderr_text)
-        if pict_type_match:
-            frame_info['frame_type'] = pict_type_match.group(1)
-        else:
-            # Try alternative patterns that might appear in newer FFmpeg versions
-            alt_match = re.search(r'type:(\w)\s', stderr_text)
-            if alt_match:
-                frame_info['frame_type'] = alt_match.group(1)
-
-        pts_time_match = re.search(r'pts_time:(\d+\.\d+)', stderr_text)
-        if pts_time_match:
-            exact_time = float(pts_time_match.group(1))
-            frame_info['pts_time'] = exact_time
-            # Recalculate frame number based on exact PTS time if available
-            frame_info['frame_number'] = int(exact_time * frame_rate)
-
-        return frame_info
-
-    except Exception as e:
-        console.print(f"[yellow]Error getting frame info: {e}. Will use estimated values.[/yellow]")
-        if meta.get('debug', False):
-            console.print(traceback.format_exc())
-        return {
-            'frame_type': 'Unknown',
-            'frame_number': int(ss_time * meta.get('frame_rate', 24.0))
-        }
+    await cleanup()
 
 
 async def capture_screenshot(args):
@@ -1118,7 +1139,7 @@ async def capture_screenshot(args):
                 .filter('format', 'rgb24')
             )
 
-        if meta.get('frame_overlay', False):
+        if frame_overlay:
             # Get frame info from pre-collected data if available
             frame_info = meta.get('frame_info_map', {}).get(ss_time, {})
 
@@ -1324,3 +1345,67 @@ def optimize_image_task(image):
         console.print(f"[red]{error_message}[/red]")
         console.print(traceback.format_exc())  # Print detailed traceback
         return None
+
+
+async def get_frame_info(path, ss_time, meta):
+    """Get frame information (type, exact timestamp) for a specific frame"""
+    try:
+        info_ff = ffmpeg.input(path, ss=ss_time)
+        info_command = (
+            info_ff
+            .filter('showinfo')
+            .output('-', format='null', vframes=1)
+            .global_args('-loglevel', 'info')
+        )
+
+        # Print the actual FFmpeg command for debugging
+        cmd = info_command.compile()
+        if meta.get('debug', False):
+            console.print(f"[cyan]FFmpeg showinfo command: {' '.join(cmd)}[/cyan]")
+
+        # Execute the info gathering command
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        _, stderr = await process.communicate()
+        stderr_text = stderr.decode('utf-8', errors='replace')
+
+        # Calculate frame number based on timestamp and framerate
+        frame_rate = meta.get('frame_rate', 24.0)
+        calculated_frame = int(ss_time * frame_rate)
+
+        # Default values
+        frame_info = {
+            'frame_type': 'Unknown',
+            'frame_number': calculated_frame
+        }
+
+        pict_type_match = re.search(r'pict_type:(\w)', stderr_text)
+        if pict_type_match:
+            frame_info['frame_type'] = pict_type_match.group(1)
+        else:
+            # Try alternative patterns that might appear in newer FFmpeg versions
+            alt_match = re.search(r'type:(\w)\s', stderr_text)
+            if alt_match:
+                frame_info['frame_type'] = alt_match.group(1)
+
+        pts_time_match = re.search(r'pts_time:(\d+\.\d+)', stderr_text)
+        if pts_time_match:
+            exact_time = float(pts_time_match.group(1))
+            frame_info['pts_time'] = exact_time
+            # Recalculate frame number based on exact PTS time if available
+            frame_info['frame_number'] = int(exact_time * frame_rate)
+
+        return frame_info
+
+    except Exception as e:
+        console.print(f"[yellow]Error getting frame info: {e}. Will use estimated values.[/yellow]")
+        if meta.get('debug', False):
+            console.print(traceback.format_exc())
+        return {
+            'frame_type': 'Unknown',
+            'frame_number': int(ss_time * meta.get('frame_rate', 24.0))
+        }
