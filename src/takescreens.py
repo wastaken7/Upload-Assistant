@@ -105,6 +105,28 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         hdr_tonemap = True
     else:
         hdr_tonemap = False
+
+    ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate)
+
+    meta['frame_overlay'] = config['DEFAULT'].get('frame_overlay', False)
+    if meta['frame_overlay']:
+        console.print("[yellow]Getting frame information for overlays...")
+        frame_info_tasks = [
+            get_frame_info(file, ss_times[i], meta)
+            for i in range(num_screens + 1)
+            if not os.path.exists(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
+            or meta.get('retake', False)
+        ]
+        frame_info_results = await asyncio.gather(*frame_info_tasks)
+        meta['frame_info_map'] = {}
+
+        # Create a mapping from time to frame info
+        for i, info in enumerate(frame_info_results):
+            meta['frame_info_map'][ss_times[i]] = info
+
+        if meta['debug']:
+            console.print(f"[cyan]Collected frame information for {len(frame_info_results)} frames")
+
     capture_tasks = []
     capture_results = []
     if use_vs:
@@ -116,7 +138,6 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         else:
             loglevel = 'quiet'
 
-        ss_times = await valid_ss_time([], num_screens + 1, length, frame_rate)
         existing_indices = {int(p.split('-')[-1].split('.')[0]) for p in existing_screens}
         capture_tasks = [
             capture_disc_task(
@@ -126,7 +147,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
                 os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{len(existing_indices) + i}.png"),
                 keyframe,
                 loglevel,
-                hdr_tonemap
+                hdr_tonemap,
+                meta
             )
             for i in range(num_screens + 1)
         ]
@@ -239,7 +261,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
 
                         random_time = random.uniform(0, length)
                         screenshot_response = await capture_disc_task(
-                            (index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap)
+                            (index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
                         )
 
                         await optimize_image_task(screenshot_response)
@@ -279,7 +301,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         console.print(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
 
-async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap):
+async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap, meta):
     try:
         ff = ffmpeg.input(file, ss=ss_time, skip_frame=keyframe)
         if hdr_tonemap:
@@ -290,6 +312,76 @@ async def capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel
                 .filter('zscale', transfer='bt709')
                 .filter('format', 'rgb24')
             )
+
+        if meta.get('frame_overlay', False):
+            # Get frame info from pre-collected data if available
+            frame_info = meta.get('frame_info_map', {}).get(ss_time, {})
+
+            frame_rate = meta.get('frame_rate', 24.0)
+            frame_number = int(ss_time * frame_rate)
+
+            # If we have PTS time from frame info, use it to calculate a more accurate frame number
+            if 'pts_time' in frame_info:
+                # Only use PTS time for frame number calculation if it makes sense
+                # (sometimes seeking can give us a frame from the beginning instead of where we want)
+                pts_time = frame_info.get('pts_time', 0)
+                if pts_time > 1.0 and abs(pts_time - ss_time) < 10:
+                    frame_number = int(pts_time * frame_rate)
+
+            frame_type = frame_info.get('frame_type', 'Unknown')
+
+            text_size = int(config['DEFAULT'].get('overlay_text_size', 18))
+            # Get the resolution and convert it to integer
+            resol = int(''.join(filter(str.isdigit, meta.get('resolution', '1080p'))))
+            font_size = round(text_size*resol/1080)
+            x_all = round(10*resol/1080)
+
+            # Scale vertical spacing based on font size
+            line_spacing = round(font_size * 1.1)
+            y_number = x_all
+            y_type = y_number + line_spacing
+            y_hdr = y_type + line_spacing
+
+            # Use the filtered output with frame info
+            base_text = ff
+
+            # Frame number
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Number: {frame_number}",
+                                         fontcolor='white',
+                                         fontsize=font_size,
+                                         x=x_all,
+                                         y=y_number,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # Frame type
+            base_text = base_text.filter('drawtext',
+                                         text=f"Frame Type: {frame_type}",
+                                         fontcolor='white',
+                                         fontsize=font_size,
+                                         x=x_all,
+                                         y=y_type,
+                                         box=1,
+                                         boxcolor='black@0.5'
+                                         )
+
+            # HDR status
+            if hdr_tonemap:
+                base_text = base_text.filter('drawtext',
+                                             text="Tonemapped HDR",
+                                             fontcolor='white',
+                                             fontsize=font_size,
+                                             x=x_all,
+                                             y=y_hdr,
+                                             box=1,
+                                             boxcolor='black@0.5'
+                                             )
+
+            # Use the filtered output with frame info
+            ff = base_text
+
         command = (
             ff
             .output(image_path, vframes=1, pix_fmt="rgb24")
