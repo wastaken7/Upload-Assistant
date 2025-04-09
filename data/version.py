@@ -1,3 +1,16 @@
+__version__ = "4.1.4.1"
+
+"""
+Changelog for version 4.1.4.1 (2025-04-09):
+
+## What's Changed
+* Minor fixes in TIK.py by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/449
+* Fixed year getting inserted into incorrect TV
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.4...4.1.4.1
+"""
+
 __version__ = "4.1.4"
 
 """
