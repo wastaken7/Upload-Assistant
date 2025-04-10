@@ -1174,6 +1174,19 @@ class Clients():
                     comment = torrent.get('comment', "")
                     match = None
 
+                    if 'torrent_comments' not in meta:
+                        meta['torrent_comments'] = []
+
+                    comment_data = {
+                        'hash': torrent.get('infohash_v1', ''),
+                        'name': torrent.get('name', ''),
+                        'comment': comment,
+                    }
+                    meta['torrent_comments'].append(comment_data)
+
+                    if meta.get('debug', False):
+                        console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
+
                     if "https://passthepopcorn.me" in comment:
                         match = re.search(r'torrentid=(\d+)', comment)
                         if match:
@@ -1209,6 +1222,9 @@ class Clients():
                         for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
+
+                    if meta.get('torrent_comments') and meta['debug']:
+                        console.print(f"[green]Stored {len(meta['torrent_comments'])} torrent comments for later use")
 
                     if not pathed:
                         torrent_storage_dir = client.get('torrent_storage_dir')
@@ -1301,6 +1317,19 @@ class Clients():
             if meta.get('debug'):
                 console.print(f"[cyan]Torrent comment: {comment}")
 
+            if 'torrent_comments' not in meta:
+                meta['torrent_comments'] = []
+
+            comment_data = {
+                'hash': torrent.get('infohash_v1', ''),
+                'name': torrent.get('name', ''),
+                'comment': comment,
+            }
+            meta['torrent_comments'].append(comment_data)
+
+            if meta.get('debug', False):
+                console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
+
             # Handle various tracker URL formats in the comment
             if "https://passthepopcorn.me" in comment:
                 match = re.search(r'torrentid=(\d+)', comment)
@@ -1337,6 +1366,9 @@ class Clients():
             for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
                 if meta.get(tracker):
                     console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
+
+            if meta.get('torrent_comments') and meta['debug']:
+                console.print(f"[green]Stored {len(meta['torrent_comments'])} torrent comments for later use")
 
             if not pathed:
                 valid, resolved_path = await self.is_valid_torrent(
@@ -1515,6 +1547,9 @@ class Clients():
                                 console.print(f"[yellow]Error getting properties for torrent {torrent.name}: {str(e)}")
                             comment = ""
 
+                        if 'torrent_comments' not in meta:
+                            meta['torrent_comments'] = []
+
                         match_info = {
                             'hash': torrent.hash,
                             'name': torrent.name,
@@ -1523,9 +1558,15 @@ class Clients():
                             'size': torrent.size,
                             'category': torrent.category,
                             'match_type': 'exact',
-                            'trackers': [],
-                            'has_working_tracker': has_working_tracker
+                            'trackers': url,
+                            'has_working_tracker': has_working_tracker,
+                            'comment': comment
                         }
+
+                        meta['torrent_comments'].append(match_info)
+
+                        if meta.get('debug', False):
+                            console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
                         # Check the comment for known tracker URLs
                         tracker_found = False
