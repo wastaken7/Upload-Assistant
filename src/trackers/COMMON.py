@@ -604,6 +604,10 @@ class COMMON():
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
+                if not meta.get('region') and attributes.get('region_id'):
+                    meta['region'] = attributes.get('region')
+                if not meta.get('distributor') and attributes.get('distributor_id'):
+                    meta['distributor'] = attributes.get('distributor')
             else:
                 # Handle response when searching by ID
                 if id and not data:
@@ -621,6 +625,10 @@ class COMMON():
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
+                    if not meta.get('region') and attributes.get('region_id'):
+                        meta['region'] = attributes.get('region')
+                    if not meta.get('distributor') and attributes.get('distributor_id'):
+                        meta['distributor'] = attributes.get('distributor')
                     # Handle file name extraction
                     files = attributes.get('files', [])
                     if files:
