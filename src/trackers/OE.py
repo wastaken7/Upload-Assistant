@@ -244,7 +244,7 @@ class OE():
             if desc_header != "":
                 descfile.write(desc_header)
 
-            if not meta['is_disc']:
+            if not meta['is_disc'] == "BDMV":
                 def process_languages(tracks):
                     audio_languages = []
                     subtitle_languages = []
