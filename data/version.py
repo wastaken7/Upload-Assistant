@@ -1,3 +1,17 @@
+__version__ = "4.1.5"
+
+"""
+Changelog for version 4.1.5 (2025-04-10):
+
+## What's Changed
+* Clean existing meta by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/451
+* Added frame overlays to disc based content
+* Refactored ss_times
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.4.1...4.1.5
+"""
+
 __version__ = "4.1.4.1"
 
 """
