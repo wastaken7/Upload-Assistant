@@ -1435,11 +1435,6 @@ class Clients():
             if torrent_client != 'qbit':
                 return []
 
-            # Normalize the content path for comparison
-            normalized_content_path = os.path.normpath(content_path).lower()
-            if meta['debug']:
-                console.print(f"[cyan]Looking for torrents with content path: {normalized_content_path}")
-
             # Connect to qBittorrent
             try:
                 qbt_client = qbittorrentapi.Client(
@@ -1484,19 +1479,44 @@ class Clients():
                 'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
                 'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
                 'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
-                'bhd': {"url": "https://beyond-hd.me", "pattern": None},
+                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
             }
 
             # First collect exact path matches
             for torrent in torrents:
                 try:
-                    # Get content path and normalize it
-                    torrent_content_path = os.path.normpath(os.path.join(torrent.save_path, torrent.name)).lower()
+                    # Use name-based matching instead of content path
+                    torrent_name = torrent.name
 
-                    # Check for path match
-                    if torrent_content_path == normalized_content_path:
-                        has_working_tracker = False
+                    # Skip torrents with missing attributes
+                    if not torrent_name:
+                        if meta['debug']:
+                            console.print("[yellow]Skipping torrent with missing name attribute")
+                        continue
 
+                    is_match = False
+
+                    # Match logic for single files vs disc/multi-file
+                    # Add a fallback default value for meta['is_disc']
+                    is_disc = meta.get('is_disc', "")
+
+                    if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
+                        # For single files, match by name and file count
+                        if torrent_name == meta['uuid'] and len(torrent.files) == len(meta.get('filelist', [])):
+                            is_match = True
+                            match_type = 'name_exact'
+                    else:
+                        # For directories/disc, match by folder name
+                        if torrent_name == meta['uuid']:
+                            is_match = True
+                            match_type = 'name_exact'
+
+                    if not is_match:
+                        continue
+
+                    has_working_tracker = False
+
+                    if is_match:
                         try:
                             # Get torrent trackers
                             torrent_trackers = await asyncio.to_thread(qbt_client.torrents_trackers, torrent_hash=torrent.hash)
@@ -1554,48 +1574,40 @@ class Clients():
                             'hash': torrent.hash,
                             'name': torrent.name,
                             'save_path': torrent.save_path,
-                            'content_path': torrent_content_path,
+                            'content_path': os.path.normpath(os.path.join(torrent.save_path, torrent.name)).lower(),
                             'size': torrent.size,
                             'category': torrent.category,
-                            'match_type': 'exact',
+                            'match_type': match_type,
                             'trackers': url,
                             'has_working_tracker': has_working_tracker,
                             'comment': comment
                         }
 
+                        tracker_found = False
+                        tracker_urls = []
+
+                        for tracker_id, tracker_info in tracker_patterns.items():
+                            if tracker_info["url"] in comment:
+                                match = re.search(tracker_info["pattern"], comment)
+                                if match:
+                                    tracker_id_value = match.group(1)
+                                    tracker_urls.append({
+                                        'id': tracker_id,
+                                        'tracker_id': tracker_id_value
+                                    })
+                                    meta[tracker_id] = tracker_id_value
+                                    tracker_found = True
+
+                        match_info['tracker_urls'] = tracker_urls
+                        match_info['has_tracker'] = tracker_found
+
+                        if tracker_found:
+                            meta['found_tracker_match'] = True
+
                         meta['torrent_comments'].append(match_info)
 
                         if meta.get('debug', False):
                             console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
-
-                        # Check the comment for known tracker URLs
-                        tracker_found = False
-                        for tracker_id, tracker_info in tracker_patterns.items():
-                            if tracker_info["url"] in comment:
-                                if tracker_info["pattern"] is None:
-                                    # Special case for BHD which uses hash
-                                    match_info['trackers'].append({
-                                        'id': tracker_id,
-                                        'tracker_id': torrent.hash
-                                    })
-                                    tracker_found = True
-                                else:
-                                    match = re.search(tracker_info["pattern"], comment)
-                                    if match:
-                                        match_info['trackers'].append({
-                                            'id': tracker_id,
-                                            'tracker_id': match.group(1)
-                                        })
-                                        tracker_found = True
-
-                        # Add tracker matching flag for sorting
-                        match_info['has_tracker'] = tracker_found
-
-                        if meta['debug']:
-                            if tracker_found:
-                                console.print(f"[green]Found exact match with tracker URL: {torrent.name}")
-                            else:
-                                console.print(f"[green]Found exact match without tracker URL: {torrent.name}")
 
                         matching_torrents.append(match_info)
 
@@ -1609,23 +1621,23 @@ class Clients():
 
             # Extract tracker IDs to meta for the best match (first one after sorting)
             if matching_torrents and matching_torrents[0]['has_tracker']:
-                for tracker in matching_torrents[0]['trackers']:
-                    meta[tracker['id']] = tracker['tracker_id']
-                    console.print(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
+                for tracker in matching_torrents[0]['tracker_urls']:
+                    if tracker.get('id') and tracker.get('tracker_id'):
+                        meta[tracker['id']] = tracker['tracker_id']
+                        console.print(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
 
             # Display results summary
             if meta['debug']:
                 if matching_torrents:
                     console.print(f"[green]Found {len(matching_torrents)} matching torrents")
                     console.print(f"[green]Torrents with working trackers: {sum(1 for t in matching_torrents if t.get('has_working_tracker', False))}")
-                    console.print(f"[green]Torrents with tracker URLs: {sum(1 for t in matching_torrents if t['has_tracker'])}")
                 else:
-                    console.print(f"[yellow]No matching torrents found for {content_path}")
+                    console.print(f"[yellow]No matching torrents found for {torrent_name}")
 
             return matching_torrents
 
         except Exception as e:
-            console.print(f"[bold red]Error finding torrents by content path: {str(e)}")
+            console.print(f"[bold red]Error finding torrents: {str(e)}")
             if meta['debug']:
                 import traceback
                 console.print(traceback.format_exc())
