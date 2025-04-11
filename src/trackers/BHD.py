@@ -173,6 +173,7 @@ class BHD():
             "BluRay": "Blu-ray",
             "HDDVD": "HD-DVD",
             "HD DVD": "HD-DVD",
+            "WEB": "WEB",
             "Web": "WEB",
             "HDTV": "HDTV",
             "UHDTV": "HDTV",
