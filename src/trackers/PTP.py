@@ -207,7 +207,7 @@ class PTP():
         await asyncio.sleep(1)
 
         ptp_desc = response.text
-        # console.print(f"[yellow]Raw description received:\n{ptp_desc[:6800]}...")  # Show first 500 characters for brevity
+        # console.print(f"[yellow]Raw description received:\n{ptp_desc}...")  # Show first 500 characters for brevity
 
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
@@ -649,6 +649,19 @@ class PTP():
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
 
+        # Check for saved pack_image_links.json file
+        pack_images_file = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "pack_image_links.json")
+        pack_images_data = {}
+        if os.path.exists(pack_images_file):
+            try:
+                with open(pack_images_file, 'r', encoding='utf-8') as f:
+                    pack_images_data = json.load(f)
+                    if meta['debug']:
+                        console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                        console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} previously uploaded images")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
+
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding="utf-8") as desc:
             images = meta['image_list']
             discs = meta.get('discs', [])
@@ -699,6 +712,21 @@ class PTP():
                         summary_key = f"summary_{i}" if i > 0 else "summary"
                         summary = each.get(summary_key, "No summary available")
 
+                        # Check for saved images first
+                        if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                            saved_images = pack_images_data['keys'][new_images_key]['images']
+                            if saved_images:
+                                if meta['debug']:
+                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                meta[new_images_key] = []
+                                for img in saved_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img.get('img_url', ''),
+                                        'raw_url': img.get('raw_url', ''),
+                                        'web_url': img.get('web_url', '')
+                                    })
+
                         if new_images_key in meta and meta[new_images_key]:
                             desc.write(f"\n[b]{edition}[/b]\n\n")
                             # Use the summary corresponding to the current bdinfo
@@ -724,6 +752,8 @@ class PTP():
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
                                 uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                    await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -765,6 +795,20 @@ class PTP():
                             if base2ptp.strip() != "":
                                 desc.write(base2ptp)
                                 desc.write("\n\n")
+                            # Check for saved images first
+                            if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                                saved_images = pack_images_data['keys'][new_images_key]['images']
+                                if saved_images:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                    meta[new_images_key] = []
+                                    for img in saved_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img.get('img_url', ''),
+                                            'raw_url': img.get('raw_url', ''),
+                                            'web_url': img.get('web_url', '')
+                                        })
                             if new_images_key in meta and meta[new_images_key]:
                                 for img in meta[new_images_key]:
                                     raw_url = img['raw_url']
@@ -782,6 +826,8 @@ class PTP():
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
                                     uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                    await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -817,6 +863,20 @@ class PTP():
                             if base2ptp.strip() != "":
                                 desc.write(base2ptp)
                                 desc.write("\n\n")
+                            # Check for saved images first
+                            if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                                saved_images = pack_images_data['keys'][new_images_key]['images']
+                                if saved_images:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                    meta[new_images_key] = []
+                                    for img in saved_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img.get('img_url', ''),
+                                            'raw_url': img.get('raw_url', ''),
+                                            'web_url': img.get('web_url', '')
+                                        })
                             if new_images_key in meta and meta[new_images_key]:
                                 for img in meta[new_images_key]:
                                     raw_url = img['raw_url']
@@ -836,6 +896,8 @@ class PTP():
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
                                     uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                    await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -887,12 +949,26 @@ class PTP():
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
                     else:
-                        mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={'inform_version': '1'})
+                        mi_dump = MediaInfo.parse(file, output="STRING", full=False)
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "w", newline="", encoding="utf-8") as f:
                             f.write(mi_dump.replace(file, os.path.basename(file)))
                         mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/TEMP_PTP_MEDIAINFO.txt", "r", encoding="utf-8").read()
                         desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
                         new_images_key = f'new_images_file_{i}'
+                        # Check for saved images first
+                        if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                            saved_images = pack_images_data['keys'][new_images_key]['images']
+                            if saved_images:
+                                if meta['debug']:
+                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                meta[new_images_key] = []
+                                for img in saved_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img.get('img_url', ''),
+                                        'raw_url': img.get('raw_url', ''),
+                                        'web_url': img.get('web_url', '')
+                                    })
                         if new_images_key in meta and meta[new_images_key]:
                             for img in meta[new_images_key]:
                                 raw_url = img['raw_url']
@@ -911,6 +987,8 @@ class PTP():
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
                                 uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                    await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -924,6 +1002,65 @@ class PTP():
                         meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
                         with open(meta_filename, 'w') as f:
                             json.dump(meta, f, indent=4)
+
+    async def save_image_links(self, meta, image_key, image_list=None):
+        if image_list is None:
+            console.print("[yellow]No image links to save.[/yellow]")
+            return None
+
+        output_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, "pack_image_links.json")
+
+        # Load existing data if the file exists
+        existing_data = {}
+        if os.path.exists(output_file):
+            try:
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
+
+        # Create data structure if it doesn't exist yet
+        if not existing_data:
+            existing_data = {
+                "keys": {},
+                "total_count": 0
+            }
+
+        # Update the data with the new images under the specific key
+        if image_key not in existing_data["keys"]:
+            existing_data["keys"][image_key] = {
+                "count": 0,
+                "images": []
+            }
+
+        # Add new images to the specific key
+        for idx, img in enumerate(image_list):
+            image_entry = {
+                "index": existing_data["keys"][image_key]["count"] + idx,
+                "raw_url": img.get("raw_url", ""),
+                "web_url": img.get("web_url", ""),
+                "img_url": img.get("img_url", ""),
+            }
+            existing_data["keys"][image_key]["images"].append(image_entry)
+
+        # Update counts
+        existing_data["keys"][image_key]["count"] = len(existing_data["keys"][image_key]["images"])
+        existing_data["total_count"] = sum(key_data["count"] for key_data in existing_data["keys"].values())
+
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_data, f, indent=2)
+
+            if meta['debug']:
+                console.print(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+                console.print(f"[blue]  - JSON: {output_file}[/blue]")
+
+            return output_file
+        except Exception as e:
+            console.print(f"[bold red]Error saving image links: {e}[/bold red]")
+            return None
 
     async def get_AntiCsrfToken(self, meta):
         if not os.path.exists(f"{meta['base_dir']}/data/cookies"):
@@ -989,7 +1126,7 @@ class PTP():
         file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
 
         try:
-            os.stat(file_path)
+            os.stat(file_path)  # Ensures the file is accessible
             with open(file_path, "r", encoding="utf-8") as f:
                 desc = f.read()
         except OSError as e:
@@ -1052,6 +1189,7 @@ class PTP():
                         ptp_subtitles.remove(44)
                     if 3 not in ptp_subtitles:
                         ptp_subtitles.append(3)
+
         if meta['debug']:
             console.print("ptp_trumpable", ptp_trumpable)
         data = {
