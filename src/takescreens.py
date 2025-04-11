@@ -265,7 +265,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
                             (index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
                         )
 
-                        await optimize_image_task(screenshot_response)
+                        optimize_image_task(screenshot_response)
                         new_size = os.path.getsize(screenshot_response)
                         valid_image = False
 
@@ -670,7 +670,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                             console.print(f"[red]Failed to capture screenshot for {image}. Retrying...[/red]")
                             continue
 
-                        await optimize_image_task(screenshot_result)
+                        optimize_image_task(screenshot_result)
 
                         retaken_size = os.path.getsize(screenshot_result)
                         if retaken_size > 75000:
@@ -1031,7 +1031,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                     if not os.path.exists(screenshot_response):
                         raise FileNotFoundError(f"Screenshot {screenshot_response} was not created successfully.")
 
-                    await optimize_image_task(screenshot_response)
+                    optimize_image_task(screenshot_response)
                     new_size = os.path.getsize(screenshot_response)
                     valid_image = False
 
