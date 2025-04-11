@@ -522,6 +522,7 @@ config = {
             # "torrent_storage_dir": "path/to/BT_backup folder"
             # "qbit_tag": "tag",
             # "qbit_cat": "category"
+            # "use_tracker_as_tag": False,
 
             # Content Layout for adding .torrents: "Original"(recommended)/"Subfolder"/"NoSubfolder"
             "content_layout": "Original"
