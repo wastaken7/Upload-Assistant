@@ -150,7 +150,7 @@ class HUNO():
                         language = "SKIPPED"
 
                 elif languages:
-                    language = languages
+                    language = list(languages)[0] if languages else "SKIPPED"
                 else:
                     print("DEBUG: No languages found in BDMV audio tracks.")
 
