@@ -72,8 +72,11 @@ class OTW():
 
     async def edit_name(self, meta):
         otw_name = meta['name']
-
+        source = meta['source']
+        resolution = meta['resolution']
         otw_name = otw_name.replace(meta["aka"], '')
+        if meta['is_disc'] == "DVD":
+            otw_name = otw_name.replace(source, f"{source} {resolution}")
 
         return otw_name
 
