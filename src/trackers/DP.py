@@ -156,13 +156,37 @@ class DP():
         episode = meta.get('episode')
         year = meta.get('year')
         nordic = "NORDiC"
+        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
 
-        if not meta['is_disc'] == "BDMV":
+        if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
+            has_nordic_lang = False
+
+            if 'audio' in meta['bdinfo']:
+                for audio_track in meta['bdinfo']['audio']:
+                    if 'language' in audio_track and audio_track['language'].lower() in nordic_languages:
+                        has_nordic_lang = True
+                        break
+
+            if not has_nordic_lang and 'subtitles' in meta['bdinfo']:
+                for subtitle in meta['bdinfo']['subtitles']:
+                    if subtitle.lower() in nordic_languages:
+                        has_nordic_lang = True
+                        break
+
+            if has_nordic_lang:
+                if meta['category'] == "TV":
+                    if meta['tv_pack']:
+                        dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
+                    else:
+                        dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
+                else:
+                    dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
+
+        elif not meta['is_disc'] == "BDMV":
             def has_nordic(media_info_text=None):
                 if media_info_text:
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                     subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
 
                     for i, language in enumerate(audio_section):
                         language = language.lower().strip()
