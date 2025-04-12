@@ -4,6 +4,7 @@ import asyncio
 import requests
 import platform
 import httpx
+import re
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
@@ -69,6 +70,7 @@ class DP():
             image_list = meta['DP_images_key']
         else:
             image_list = meta['image_list']
+        name = await self.edit_name(meta)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
@@ -91,7 +93,7 @@ class DP():
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {'torrent': open_torrent}
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -147,6 +149,68 @@ class DP():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def edit_name(self, meta):
+        dp_name = meta.get('name')
+        season = meta.get('season')
+        episode = meta.get('episode')
+        year = meta.get('year')
+        nordic = "NORDiC"
+
+        if not meta['is_disc'] == "BDMV":
+            def has_nordic(media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
+
+                    for i, language in enumerate(audio_section):
+                        language = language.lower().strip()
+                        if language in nordic_languages:
+                            return True
+
+                    for i, language in enumerate(subtitle_section):
+                        language = language.lower().strip()
+                        if language in nordic_languages:
+                            return True
+                return False
+
+            def get_audio_lang(media_info_text=None):
+                if media_info_text:
+                    console.print("Checking for audio language...")
+                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
+
+            def get_subtitle_lang(media_info_text=None):
+                if media_info_text:
+                    console.print("Checking for audio language...")
+                    match = re.search(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
+
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
+
+                if has_nordic(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
+                    subtitle_lang = get_subtitle_lang(media_info_text=media_info_text)
+                    if audio_lang or subtitle_lang:
+                        if meta['category'] == "TV":
+                            if meta['tv_pack']:
+                                dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
+                            else:
+                                dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
+                        else:
+                            dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
+
+        return dp_name
 
     async def search_existing(self, meta, disctype):
         dupes = []
