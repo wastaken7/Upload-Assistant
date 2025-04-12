@@ -58,6 +58,10 @@ class DP():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
+        name = await self.edit_name(meta)
+        if meta.get('dp_skipping', False):
+            console.print("[red]Skipping DP upload as language conditions were not met.")
+            return
         url_host_mapping = {
             "ibb.co": "imgbb",
             "pixhost.to": "pixhost",
@@ -70,7 +74,6 @@ class DP():
             image_list = meta['DP_images_key']
         else:
             image_list = meta['image_list']
-        name = await self.edit_name(meta)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
@@ -157,21 +160,37 @@ class DP():
         year = meta.get('year')
         nordic = "NORDiC"
         nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
+        english_languages = ['english']
+        meta['dp_skipping'] = False
 
         if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
             has_nordic_lang = False
+            has_english_audio = False
+            has_nordic_audio = False
 
             if 'audio' in meta['bdinfo']:
                 for audio_track in meta['bdinfo']['audio']:
-                    if 'language' in audio_track and audio_track['language'].lower() in nordic_languages:
-                        has_nordic_lang = True
-                        break
+                    if 'language' in audio_track:
+                        audio_lang = audio_track['language'].lower()
+                        if audio_lang in nordic_languages:
+                            has_nordic_audio = True
+                            has_nordic_lang = True
+                            break
+                        elif audio_lang in english_languages:
+                            has_english_audio = True
 
-            if not has_nordic_lang and 'subtitles' in meta['bdinfo']:
-                for subtitle in meta['bdinfo']['subtitles']:
-                    if subtitle.lower() in nordic_languages:
-                        has_nordic_lang = True
-                        break
+            if not has_english_audio and not has_nordic_audio:
+                has_nordic_subtitle = False
+                if 'subtitles' in meta['bdinfo']:
+                    for subtitle in meta['bdinfo']['subtitles']:
+                        if subtitle.lower() in nordic_languages:
+                            has_nordic_subtitle = True
+                            has_nordic_lang = True
+                            break
+
+                    if not has_nordic_subtitle:
+                        meta['dp_skipping'] = True
+                        return dp_name
 
             if has_nordic_lang:
                 if meta['category'] == "TV":
@@ -188,12 +207,29 @@ class DP():
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                     subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
 
-                    for i, language in enumerate(audio_section):
+                    has_nordic_audio = False
+                    has_english_audio = False
+                    for language in audio_section:
                         language = language.lower().strip()
                         if language in nordic_languages:
+                            has_nordic_audio = True
                             return True
+                        elif language in english_languages:
+                            has_english_audio = True
 
-                    for i, language in enumerate(subtitle_section):
+                    if not has_english_audio and not has_nordic_audio:
+                        has_nordic_sub = False
+                        for language in subtitle_section:
+                            language = language.lower().strip()
+                            if language in nordic_languages:
+                                has_nordic_sub = True
+                                return True
+
+                        if not has_nordic_sub:
+                            meta['dp_skipping'] = True
+                            return False
+
+                    for language in subtitle_section:
                         language = language.lower().strip()
                         if language in nordic_languages:
                             return True
