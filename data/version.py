@@ -1,3 +1,20 @@
+__version__ = "4.1.6"
+
+"""
+Changelog for version 4.1.6 (2025-04-12):
+
+## What's Changed
+* qBittorrent Option: Include Tracker as Tag - New sites SAM and UHD by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/454
+* fixed image retaking
+* fixed pack images to be saved in unique file now that meta is deleted by default
+* updated OE to check all mediainfo when language checking
+* updated OTW to include resolution with DVD
+* updated DP rule compliance
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.5...4.1.6
+"""
+
 __version__ = "4.1.5"
 
 """
