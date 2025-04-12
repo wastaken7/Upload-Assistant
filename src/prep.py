@@ -948,7 +948,7 @@ class Prep():
             year = str(meta.get('imdb_info', {}).get('year', ""))
 
             if aka and not meta.get('aka'):
-                aka_trimmed = aka[5:].strip().lower() if len(aka) > 5 else aka.lower()
+                aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
                 difference = SequenceMatcher(None, title, aka_trimmed).ratio()
                 if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
                     aka = None
