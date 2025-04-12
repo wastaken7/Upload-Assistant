@@ -1084,11 +1084,7 @@ class Prep():
         if meta.get('no_tag', False):
             meta['tag'] = ""
         meta['3D'] = await self.is_3d(mi, bdinfo)
-        if meta.get('manual_source', None):
-            meta['source'] = meta['manual_source']
-            _, meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
-        else:
-            meta['source'], meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+        meta['source'], meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = await get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
@@ -1696,13 +1692,16 @@ class Prep():
             if meta['debug']:
                 console.print("No mediainfo.json")
         try:
-            try:
-                source = guessit(video)['source']
-            except Exception:
+            if meta.get('manual_source', None):
+                source = meta['manual_source']
+            else:
                 try:
-                    source = guessit(path)['source']
+                    source = guessit(video)['source']
                 except Exception:
-                    source = "BluRay"
+                    try:
+                        source = guessit(path)['source']
+                    except Exception:
+                        source = "BluRay"
             if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
                 if type == "DISC":
                     source = "Blu-ray"
