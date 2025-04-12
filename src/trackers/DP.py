@@ -5,6 +5,8 @@ import requests
 import platform
 import httpx
 import re
+import glob
+import os
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
@@ -96,6 +98,15 @@ class DP():
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {'torrent': open_torrent}
+        base_dir = meta['base_dir']
+        uuid = meta['uuid']
+        specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        nfo_files = glob.glob(specified_dir_path)
+        nfo_file = None
+        if nfo_files:
+            nfo_file = open(nfo_files[0], 'rb')
+        if nfo_file:
+            files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
             'name': name,
             'description': desc,
