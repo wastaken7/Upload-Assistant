@@ -8,6 +8,7 @@ import re
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
+from data.config import config
 
 
 class DP():
@@ -273,6 +274,10 @@ class DP():
         return dp_name
 
     async def search_existing(self, meta, disctype):
+        if not config['DEFAULT'].get('add_logo', False):
+            console.print('[bold red]DP requires logo, please set add_logo config option to upload.')
+            meta['skipping'] = "DP"
+            return []
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
         params = {
