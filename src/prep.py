@@ -294,7 +294,7 @@ class Prep():
 
         meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
         hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
-        tracker_ids = ['ptp', 'bhd', 'hdb', 'blu', 'btn', 'oe', 'aither', 'lst']
+        tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']
 
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids):
             await client.get_pathed_torrents(meta['path'], meta)
@@ -356,14 +356,14 @@ class Prep():
                 # Check if a specific tracker is already set in meta
                 tracker_keys = {
                     'ptp': 'PTP',
+                    'bhd': 'BHD',
+                    'btn': 'BTN',
                     'hdb': 'HDB',
                     'blu': 'BLU',
                     'aither': 'AITHER',
                     'lst': 'LST',
                     'oe': 'OE',
                     'tik': 'TIK',
-                    'btn': 'BTN',
-                    'bhd': 'BHD',
                 }
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)

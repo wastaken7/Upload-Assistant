@@ -408,6 +408,10 @@ class Clients():
                         # If `prefer_small_pieces` is False, return first valid torrent
                         console.print(f"[green]Returning first valid torrent: {torrent_hash}")
                         return torrent_hash
+                else:
+                    if meta['debug']:
+                        console.print(f"[bold red]{torrent_hash} failed validation")
+                    os.remove(torrent_file_path)
 
             except Exception as e:
                 console.print(f"[bold red]Unexpected error while handling {torrent_hash}: {e}")
@@ -1219,7 +1223,7 @@ class Clients():
                         meta['bhd'] = info_hash_v1
 
                     if match:
-                        for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
+                        for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1267,7 +1271,6 @@ class Clients():
         default_torrent_client = self.config['DEFAULT']['default_torrent_client']
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         torrent_storage_dir = client.get('torrent_storage_dir')
-        console.print(f"[cyan]Torrent storage directory: {torrent_storage_dir}")
         info_hash_v1 = meta.get('infohash')
 
         if not torrent_storage_dir or not info_hash_v1:
@@ -1363,7 +1366,7 @@ class Clients():
                 meta['bhd'] = info_hash_v1
 
             # If we found a tracker ID, log it
-            for tracker in ['ptp', 'aither', 'lst', 'oe', 'blu', 'hdb', 'btn', 'bhd']:
+            for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
                 if meta.get(tracker):
                     console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1579,7 +1582,7 @@ class Clients():
                         }
 
                         # Initialize a list for found tracker IDs
-                        tracker_priority = ['ptp', 'bhd', 'aither', 'blu', 'lst', 'oe', 'hdb', 'btn']
+                        tracker_priority = ['ptp', 'bhd', 'btn', 'aither', 'blu', 'lst', 'oe', 'hdb']
                         tracker_found = False
                         tracker_urls = []
 
