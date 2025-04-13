@@ -81,6 +81,17 @@ class DP():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
+        if meta.get('logo', "") == "":
+            from src.tmdb import get_logo
+            TMDB_API_KEY = config['DEFAULT'].get('tmdb_api', False)
+            TMDB_BASE_URL = "https://api.themoviedb.org/3"
+            tmdb_id = meta.get('tmdb')
+            category = meta.get('category')
+            debug = meta.get('debug')
+            logo_languages = ['da', 'sv', 'no', 'fi', 'is', 'en']
+            logo_path = await get_logo(tmdb_id, category, debug, logo_languages=logo_languages, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL)
+            if logo_path:
+                meta['logo'] = logo_path
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -285,10 +296,6 @@ class DP():
         return dp_name
 
     async def search_existing(self, meta, disctype):
-        if not config['DEFAULT'].get('add_logo', False):
-            console.print('[bold red]DP requires logo, please set add_logo config option to upload.')
-            meta['skipping'] = "DP"
-            return []
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
         params = {
