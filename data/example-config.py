@@ -287,14 +287,14 @@ config = {
             # "anon" : "False"
             "announce_url": "https://hdts-announce.ru/announce.php",  # DO NOT EDIT THIS LINE
         },
-        "HUNO": {
-            "api_key": "HUNO api key",
-            "announce_url": "https://hawke.uno/announce/customannounceurl",
-            # "anon" : False
-        },
         "HHD": {
             "api_key": "HHD api key",
             "announce_url": "https://homiehelpdesk.net/announce/customannounceurl",
+            # "anon" : False
+        },
+        "HUNO": {
+            "api_key": "HUNO api key",
+            "announce_url": "https://hawke.uno/announce/customannounceurl",
             # "anon" : False
         },
         "ITT": {
