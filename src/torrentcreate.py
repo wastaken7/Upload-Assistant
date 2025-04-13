@@ -15,88 +15,76 @@ from src.console import console
 
 
 def calculate_piece_size(total_size, min_size, max_size, files, meta):
-    # Set piece_size_max before calling super().__init__
+    # Set max_size
     if 'max_piece_size' in meta and meta['max_piece_size']:
         try:
-            max_piece_size_mib = int(meta['max_piece_size']) * 1024 * 1024  # Convert MiB to bytes
-            max_size = min(max_piece_size_mib, torf.Torrent.piece_size_max)
+            max_size = min(int(meta['max_piece_size']) * 1024 * 1024, torf.Torrent.piece_size_max)
         except ValueError:
             max_size = 134217728  # Fallback to default if conversion fails
     else:
-        max_size = 134217728
+        max_size = 134217728  # 128 MiB default maximum
 
-    file_count = len(files)
-    our_min_size = 16384
-    our_max_size = max_size
-    if meta['debug']:
+    if meta.get('debug'):
+        console.print(f"Content size: {total_size / (1024*1024):.2f} MiB")
         console.print(f"Max size: {max_size}")
-    piece_size = 4194304  # Start with 4 MiB
 
-    num_pieces = math.ceil(total_size / piece_size)
+    total_size_mib = total_size / (1024*1024)
 
-    # Initial torrent_file_size calculation based on file_count
-    pathname_bytes = sum(len(str(file).encode('utf-8')) for file in files)
-    if file_count > 1000:
-        torrent_file_size = 20 + (num_pieces * 20) + int(pathname_bytes * 71 / 100)
-    elif file_count > 500:
-        torrent_file_size = 20 + (num_pieces * 20) + int(pathname_bytes * 4 / 5)
+    if total_size_mib <= 60:  # <= 60 MiB
+        piece_size = 32 * 1024  # 32 KiB
+    elif total_size_mib <= 120:  # <= 120 MiB
+        piece_size = 64 * 1024  # 64 KiB
+    elif total_size_mib <= 240:  # <= 240 MiB
+        piece_size = 128 * 1024  # 128 KiB
+    elif total_size_mib <= 480:  # <= 480 MiB
+        piece_size = 256 * 1024  # 256 KiB
+    elif total_size_mib <= 960:  # <= 960 MiB
+        piece_size = 512 * 1024  # 512 KiB
+    elif total_size_mib <= 1920:  # <= 1.875 GiB
+        piece_size = 1024 * 1024  # 1 MiB
+    elif total_size_mib <= 3840:  # <= 3.75 GiB
+        piece_size = 2 * 1024 * 1024  # 2 MiB
+    elif total_size_mib <= 7680:  # <= 7.5 GiB
+        piece_size = 4 * 1024 * 1024  # 4 MiB
+    elif total_size_mib <= 15360:  # <= 15 GiB
+        piece_size = 8 * 1024 * 1024  # 8 MiB
+    elif total_size_mib <= 46080:  # <= 45 GiB
+        piece_size = 16 * 1024 * 1024  # 16 MiB
+    elif total_size_mib <= 92160:  # <= 90 GiB
+        piece_size = 32 * 1024 * 1024  # 32 MiB
+    elif total_size_mib <= 138240:  # <= 135 GiB
+        piece_size = 64 * 1024 * 1024
     else:
-        torrent_file_size = 20 + (num_pieces * 20) + pathname_bytes
+        piece_size = 128 * 1024 * 1024  # 128 MiB
 
-    # Adjust the piece size to fit within the constraints
-    while not ((750 <= num_pieces <= 2200 or num_pieces < 750 and 40960 <= torrent_file_size <= 250000) and torrent_file_size <= 250000):
-        if num_pieces > 1000 and num_pieces < 2000 and torrent_file_size < 250000:
-            break
-        elif num_pieces < 1500 and torrent_file_size >= 250000:
-            piece_size *= 2
-            if piece_size > our_max_size:
-                piece_size = our_max_size
-                break
-        elif num_pieces < 750:
-            piece_size //= 2
-            if piece_size < our_min_size:
-                piece_size = our_min_size
-                break
-            elif 40960 < torrent_file_size < 250000:
-                break
-        elif num_pieces > 2200:
-            piece_size *= 2
-            if piece_size > our_max_size:
-                piece_size = our_max_size
-                break
-            elif torrent_file_size < 2048:
-                break
-        elif torrent_file_size > 250000:
-            piece_size *= 2
-            if piece_size > our_max_size:
-                piece_size = our_max_size
-                cli_ui.warning('WARNING: .torrent size will exceed 250 KiB!')
-                break
+    # Enforce minimum and maximum limits
+    piece_size = max(min_size, min(piece_size, max_size))
 
-        # Update num_pieces
-        num_pieces = math.ceil(total_size / piece_size)
-
-        # Recalculate torrent_file_size based on file_count in each iteration
-        if file_count > 1000:
-            torrent_file_size = 20 + (num_pieces * 20) + int(pathname_bytes * 71 / 100)
-        elif file_count > 500:
-            torrent_file_size = 20 + (num_pieces * 20) + int(pathname_bytes * 4 / 5)
-        else:
-            torrent_file_size = 20 + (num_pieces * 20) + pathname_bytes
+    # Calculate number of pieces for debugging
+    num_pieces = math.ceil(total_size / piece_size)
+    if meta.get('debug'):
+        console.print(f"Selected piece size: {piece_size / 1024:.2f} KiB")
+        console.print(f"Number of pieces: {num_pieces}")
 
     return piece_size
 
 
 class CustomTorrent(torf.Torrent):
     # Default piece size limits
-    torf.Torrent.piece_size_min = 16384  # 16 KiB
-    torf.Torrent.piece_size_max = 134217728  # 256 MiB
+    torf.Torrent.piece_size_min = 32768  # 32 KiB
+    torf.Torrent.piece_size_max = 134217728
 
     def __init__(self, meta, *args, **kwargs):
-        # Set meta early to avoid AttributeError
         self._meta = meta
-        super().__init__(*args, **kwargs)  # Now safe to call parent constructor
-        self.validate_piece_size(meta)  # Validate and set the piece size
+
+        # Extract and store the precalculated piece size
+        self._precalculated_piece_size = kwargs.pop('piece_size', None)
+        super().__init__(*args, **kwargs)
+
+        # Set piece size directly
+        if self._precalculated_piece_size is not None:
+            self._piece_size = self._precalculated_piece_size
+            self.metainfo['info']['piece length'] = self._precalculated_piece_size
 
     @property
     def piece_size(self):
@@ -104,31 +92,25 @@ class CustomTorrent(torf.Torrent):
 
     @piece_size.setter
     def piece_size(self, value):
-        if value is None:
-            total_size = self._calculate_total_size()
-            value = calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files, self._meta)
-        self._piece_size = value
-        self.metainfo['info']['piece length'] = value  # Ensure 'piece length' is set
+        if value is None and self._precalculated_piece_size is not None:
+            value = self._precalculated_piece_size
 
-    def _calculate_total_size(self):
-        return sum(file.size for file in self.files)
+        self._piece_size = value
+        self.metainfo['info']['piece length'] = value
 
     def validate_piece_size(self, meta=None):
-        if meta is None:
-            meta = self._meta  # Use stored meta if not explicitly provided
-        if not hasattr(self, '_piece_size') or self._piece_size is None:
-            total_size = self._calculate_total_size()
-            self.piece_size = calculate_piece_size(total_size, self.piece_size_min, self.piece_size_max, self.files, meta)
-        self.metainfo['info']['piece length'] = self.piece_size  # Ensure 'piece length' is set
+        if hasattr(self, '_precalculated_piece_size') and self._precalculated_piece_size is not None:
+            self._piece_size = self._precalculated_piece_size
+            self.metainfo['info']['piece length'] = self._precalculated_piece_size
+            return
 
 
 def create_torrent(meta, path, output_filename, tracker_url=None):
-    if meta['debug']:
-        start_time = time.time()
-
     if meta['isdir']:
         if meta['keep_folder']:
             cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
+            if meta.get('mkbrr', False):
+                cli_ui.info('mkbrr does not support folder torrents. Using CustomTorrent instead.')
             path = path
         else:
             os.chdir(path)
@@ -234,23 +216,8 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             if not torrent_written or not os.path.exists(output_path):
                 console.print("[bold red]mkbrr did not create a torrent file!")
                 raise FileNotFoundError(f"Expected torrent file {output_path} was not created")
-
-            # Validate the torrent file by trying to read it
-            try:
-                test_torrent = Torrent.read(output_path)
-                if not test_torrent.metainfo.get('info', {}).get('pieces'):
-                    console.print("[bold red]Generated torrent file appears to be invalid (missing pieces)")
-                    raise ValueError("Generated torrent is missing pieces hash")
-
-                if meta['debug']:
-                    console.print(f"[bold green]Successfully created torrent with {len(test_torrent.files)} file(s), " +
-                                  f"{test_torrent.size / (1024*1024):.2f} MiB total size")
+            else:
                 return output_path
-
-            except Exception as e:
-                console.print(f"[bold red]Generated torrent file is invalid: {str(e)}")
-                console.print("[yellow]Falling back to CustomTorrent method")
-                meta['mkbrr'] = False
 
         except subprocess.CalledProcessError as e:
             console.print(f"[bold red]Error creating torrent with mkbrr: {e}")
@@ -260,6 +227,16 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             console.print(f"[bold red]Error using mkbrr: {str(e)}")
             console.print("[yellow]Falling back to CustomTorrent method")
             meta['mkbrr'] = False
+
+    overall_start_time = time.time()
+    initial_size = 0
+    if os.path.isfile(path):
+        initial_size = os.path.getsize(path)
+    elif os.path.isdir(path):
+        for root, dirs, files in os.walk(path):
+            initial_size += sum(os.path.getsize(os.path.join(root, f)) for f in files if os.path.isfile(os.path.join(root, f)))
+
+    piece_size = calculate_piece_size(initial_size, 32768, 134217728, [], meta)
 
     # Fallback to CustomTorrent if mkbrr is not used
     torrent = CustomTorrent(
@@ -272,19 +249,23 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
         include_globs=include or [],
         creation_date=datetime.now(),
         comment="Created by Audionut's Upload Assistant",
-        created_by="Audionut's Upload Assistant"
+        created_by="Audionut's Upload Assistant",
+        piece_size=piece_size
     )
 
-    torrent.validate_piece_size(meta)
     torrent.generate(callback=torf_cb, interval=5)
     torrent.write(f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent", overwrite=True)
     torrent.verify_filesize(path)
 
-    if meta['debug']:
-        finish_time = time.time()
-        console.print(f"torrent created in {finish_time - start_time:.4f} seconds")
+    total_elapsed_time = time.time() - overall_start_time
+    formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_elapsed_time))
 
-    console.print("[bold green].torrent created", end="\r")
+    torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"
+    torrent_file_size = os.path.getsize(torrent_file_path) / 1024
+    if meta['debug']:
+        console.print()
+        console.print(f"[bold green]torrent created in {formatted_time}")
+        console.print(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
     return torrent
 
 
