@@ -293,7 +293,7 @@ class HDB():
             # If internal, set 1
             if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
                 if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
-                    data['internal'] = 1
+                    data['origin'] = 1
             # If not BDMV fill mediainfo
             if meta.get('is_disc', '') != "BDMV":
                 data['techinfo'] = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
