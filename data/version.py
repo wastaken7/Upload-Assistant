@@ -1,3 +1,21 @@
+__version__ = "4.1.7"
+
+"""
+Changelog for version 4.1.7 (2025-04-13):
+
+## What's Changed
+* Fix missing HHD config in example-config.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/455
+* Updated mkbrr including fix for BDMV torrent and symlink creation
+* Fixed manual source with BHD
+* Added nfo file upload support for DP
+* Changed logo handling so individual sites can pull language specific logos
+* Fixed an error with adding mkbrr regenerated torrents to client
+* Refactored Torf torrent creation to be quicker
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.6...4.1.7
+"""
+
 __version__ = "4.1.6"
 
 """
