@@ -125,12 +125,6 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
     include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
 
-    if os.path.islink(path) and meta.get('mkbrr', False):
-        real_path = os.path.realpath(path)
-        console.print(f"[yellow]Warning: Path '{path}' is a symlink pointing to '{real_path}'")
-        console.print("[yellow]mkbrr does not support symlinks. Using Torf instead.")
-        meta['mkbrr'] = False
-
     # If using mkbrr, run the external application
     if meta.get('mkbrr'):
         try:
