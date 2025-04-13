@@ -185,9 +185,9 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS
+        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime about tracker you do not have access too.
-        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS",
+        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -290,6 +290,11 @@ config = {
         "HUNO": {
             "api_key": "HUNO api key",
             "announce_url": "https://hawke.uno/announce/customannounceurl",
+            # "anon" : False
+        },
+        "HHD": {
+            "api_key": "HHD api key",
+            "announce_url": "https://homiehelpdesk.net/announce/customannounceurl",
             # "anon" : False
         },
         "ITT": {
