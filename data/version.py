@@ -1,3 +1,21 @@
+__version__ = "4.1.8"
+
+"""
+Changelog for version 4.1.8 (2025-04-14):
+
+## What's Changed
+* Correct typo to enable UA to set the 'Internal' tag on HDB. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/456
+* Updated AL upload by @b-igu in https://github.com/Audionut/Upload-Assistant/pull/457
+* Run cleaning between items in a queue - fixes terminal issue when running a queue
+* Fixed an error when imdb returns no results
+* Fixes image rehosting was overwriting main image_list
+
+## New Contributors
+* @b-igu made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/457
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.7...4.1.8
+"""
+
 __version__ = "4.1.7"
 
 """
