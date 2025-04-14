@@ -4,8 +4,10 @@ import asyncio
 import requests
 import platform
 import httpx
+
 from src.trackers.COMMON import COMMON
 from src.console import console
+
 
 class AL():
     """
@@ -77,28 +79,28 @@ class AL():
 
     async def edit_name(self, meta):
         category = meta['category']
-        title = '' 
+        title = ''
         try:
             title = meta['imdb_info']['title']
-        except Exception as e :
+        except Exception as e:
             console.log(e)
             title = meta['title']
         mal_title = await self.get_mal_title(meta['mal'])
-        year = '' 
+        year = ''
         service = meta.get('service', '')
         try:
             year = meta['imdb_info']['year']
-        except Exception as e :
+        except Exception as e:
             console.log(e)
             year = meta['year']
         season = meta['season']
         episode = meta.get('episode', '')
         resolution = meta['resolution'].replace('i', 'p')
-        bit_depth =  meta.get('bit_depth', '')
+        bit_depth = meta.get('bit_depth', '')
         service = meta['service']
         source = meta['source']
         region = meta.get('region', '')
-        if meta['is_disc'] == None:
+        if meta['is_disc'] is None:
             video_type = meta['type']
             audios = await self.format_audios(meta['mediainfo']['media']['track'])
             subtitles = await self.format_subtitles(meta['mediainfo']['media']['track'])
@@ -109,7 +111,7 @@ class AL():
         tag = meta['tag']
         video_encode = meta.get('video_encode', '')
         video_codec = meta['video_codec']
-        
+
         name = f"{title}"
         if title.upper() != mal_title.upper():
             name += f" ({mal_title})"
@@ -117,52 +119,52 @@ class AL():
             name += f" {year}"
         else:
             name += f" {season}{episode}"
-            
+
         name += f" {resolution}"
-        
+
         if bit_depth == "10":
             name += f" {bit_depth}Bit"
-        
+
         if service != '':
             name += f" {service}"
 
         if region not in ['', None]:
             name += f" {region}"
-        
-        if meta['is_disc'] == None:    
-            if source in ['BluRay','Blu-ray','LaserDisc', 'DCP']:
+
+        if meta['is_disc'] is None:
+            if source in ['BluRay', 'Blu-ray', 'LaserDisc', 'DCP']:
                 if source == 'Blu-ray':
                     source = 'BluRay'
                 name += f" {source}"
-            
+
             if video_type != 'ENCODE':
                 name += f" {video_type}"
         else:
             name += f" {video_type}"
-                
+
         name += f" {audios}"
-        
+
         if len(subtitles.strip()) > 0:
             name += f" {subtitles}Subs"
-        
+
         if len(video_encode.strip()) > 0:
             name += f" {video_encode.strip()}"
-                    
+
         if tag == '':
             tag = 'NoGroup'
         if 'AVC' in video_codec and '264' in video_encode:
             name += f"{tag.strip()}"
         else:
             name += f" {video_codec}{tag.strip()}"
-        
+
         console.print(f"[yellow]Corrected title : [green]{name}")
         return name
-    
+
     async def get_mal_title(self, anime_id):
         response = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
         content = response.json()
         return content['data']['title']
-        
+
     async def format_audios(self, tracks):
         formats = {}
         audio_tracks = [track for track in tracks if track['@type'] == "Audio"]
@@ -171,18 +173,18 @@ class AL():
             audio_codec = await self.get_correct_audio_codec_str(audio_track['Format'])
             audio_format = f"{audio_codec} {channels_str}"
             audio_language = await self.get_correct_language_str(audio_track['Language'])
-            if(formats.get(audio_format, False)):
+            if (formats.get(audio_format, False)):
                 if audio_language not in formats[audio_format]:
                     formats[audio_format] += f"-{audio_language}"
             else:
                 formats[audio_format] = audio_language
-        
+
         audios = ""
         for audio_format in formats.keys():
             audios_languages = formats[audio_format]
             audios += f"{audios_languages} {audio_format} "
         return audios.strip()
-    
+
     async def format_audios_disc(self, tracks):
         formats = {}
         for audio_track in tracks:
@@ -190,17 +192,17 @@ class AL():
             audio_codec = await self.get_correct_audio_codec_str(audio_track['codec'])
             audio_format = f"{channels_str}-{audio_codec}"
             audio_language = await self.get_correct_language_str(audio_track['language'])
-            if(formats.get(audio_format, False)):
+            if (formats.get(audio_format, False)):
                 formats[audio_format] += f"-{audio_language}"
             else:
                 formats[audio_format] = audio_language
-        
+
         audios = ""
         for audio_format in formats.keys():
             audios_languages = formats[audio_format]
             audios += f"{audios_languages} {audio_format} "
         return audios.strip()
-    
+
     async def format_subtitles(self, tracks):
         subtitles = []
         subtitle_tracks = [track for track in tracks if track['@type'] == "Text"]
@@ -211,7 +213,7 @@ class AL():
         if len(subtitles) > 3:
             return 'Multi-'
         return "-".join(subtitles)
-    
+
     async def format_subtitles_disc(self, tracks):
         subtitles = []
         for subtitle_track in tracks:
@@ -221,30 +223,30 @@ class AL():
         if len(subtitles) > 3:
             return 'Multi-'
         return "-".join(subtitles)
-        
+
     async def get_correct_language_str(self, language):
-        try:                
+        try:
             language_upper = language.upper()
-            if language_upper in ['JA', 'JAP']:
+            if language_upper.startswith('JA'):
                 return 'Jap'
-            elif language_upper in ['EN', 'ENG', 'ENGLISH', 'EN-US']:
+            elif language_upper.startswith('EN'):
                 return 'Eng'
-            elif language_upper in ['SPANISH', 'ES', 'SPA', 'SPANISH'] :
+            elif language_upper.startswith('ES'):
                 return 'Spa'
-            elif language_upper in ['FR', 'FRE'] :
-                return 'Fre'
-            elif language_upper in ['PT-BR', 'PT', 'POR'] :
+            elif language_upper.startswith('PT'):
                 return 'Por'
-            elif language_upper in ['AR', 'ARA'] :
+            elif language_upper.startswith('FR'):
+                return 'Fre'
+            elif language_upper.startswith('AR'):
                 return 'Ara'
-            elif language_upper in ['RU', 'RUS'] :
-                return 'Rus'
-            elif language_upper in ['ZH', 'CHI'] :
-                return 'Chi'
-            elif language_upper in ['DE', 'GER'] :
-                return 'Ger'
-            elif language_upper in ['IT', 'ITA'] :
+            elif language_upper.startswith('IT'):
                 return 'Ita'
+            elif language_upper.startswith('RU'):
+                return 'Rus'
+            elif language_upper.startswith('ZH') or language_upper.startswith('CHI'):
+                return 'Chi'
+            elif language_upper.startswith('DE') or language_upper.startswith('GER'):
+                return 'Ger'
             else:
                 if len(language) >= 3:
                     return language[0:3]
@@ -253,7 +255,7 @@ class AL():
         except Exception as e:
             console.log(e)
             return 'UNKOWN'
-        
+
     async def get_correct_channels_str(self, channels_str):
         if channels_str == '6':
             return '5.1'
@@ -263,7 +265,7 @@ class AL():
             return '2.0'
         else:
             return channels_str
-        
+
     async def get_correct_audio_codec_str(self, audio_codec_str):
         if audio_codec_str == 'AC-3':
             return 'AC3'
@@ -277,7 +279,7 @@ class AL():
             return 'DD'
         else:
             return audio_codec_str
-    
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
