@@ -52,9 +52,6 @@ class MTV():
 
         if torrent.piece_size > 8388608:
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
-            if meta.get('race', False) is True:
-                console.print("Skipping MTV as existing torrent fails and race mode is enabled")
-                return
             if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
                 if meta.get('mkbrr', False):
