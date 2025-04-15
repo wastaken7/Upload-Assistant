@@ -294,7 +294,7 @@ class Prep():
 
         meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
         hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
-        tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']
+        tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb', 'huno']
 
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids):
             await client.get_pathed_torrents(meta['path'], meta)
