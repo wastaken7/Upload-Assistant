@@ -960,7 +960,7 @@ class Prep():
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         if aka.lower() != title.strip().lower():
-                            meta['aka'] = f"AKA {meta.get('imdb_info', {}).get('title', "").strip()}"
+                            meta['aka'] = f"AKA {meta.get('imdb_info', {}).get('title', '').strip()}"
                             console.print(f"[yellow]Found AKA: {meta['aka']}[/yellow]")
                         else:
                             meta['aka'] = f"AKA {aka}"
