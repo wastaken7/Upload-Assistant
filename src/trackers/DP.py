@@ -260,7 +260,8 @@ class DP():
 
             def get_audio_lang(media_info_text=None):
                 if media_info_text:
-                    console.print("Checking for audio language...")
+                    if meta['debug']:
+                        console.print("Checking for audio language...")
                     match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                     if match:
                         return match.group(1).upper()
@@ -268,7 +269,8 @@ class DP():
 
             def get_subtitle_lang(media_info_text=None):
                 if media_info_text:
-                    console.print("Checking for audio language...")
+                    if meta['debug']:
+                        console.print("Checking for subtitle language...")
                     match = re.search(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                     if match:
                         return match.group(1).upper()

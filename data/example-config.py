@@ -263,7 +263,7 @@ config = {
         "FNP": {
             "api_key": "FNP api key",
             "announce_url": "https://fearnopeer.com/announce/customannounceurl",
-            # "anon" : "False"
+            # "anon" : False,
         },
         "FRIKI": {
             "api_key": "FRIKI API KEY",
