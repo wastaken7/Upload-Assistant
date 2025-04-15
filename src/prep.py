@@ -955,13 +955,10 @@ class Prep():
                         aka = None
 
                     if aka is not None:
-                        console.print(f"[yellow]Found AKA: {aka}[/yellow]")
-                        console.print(f"[yellow]Found title: {title}[/yellow]")
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         if aka.lower() != title.strip().lower():
                             meta['aka'] = f"AKA {meta.get('imdb_info', {}).get('title', '').strip()}"
-                            console.print(f"[yellow]Found AKA: {meta['aka']}[/yellow]")
                         else:
                             meta['aka'] = f"AKA {aka}"
         if meta.get('tag', None) is None:
