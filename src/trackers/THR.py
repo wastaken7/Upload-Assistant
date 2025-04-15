@@ -24,6 +24,7 @@ class THR():
     """
     def __init__(self, config):
         self.config = config
+        self.tracker = 'THR'
         self.username = config['TRACKERS']['THR'].get('username')
         self.password = config['TRACKERS']['THR'].get('password')
         self.banned_groups = [""]
