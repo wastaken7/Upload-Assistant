@@ -48,7 +48,7 @@ class PTP():
             ("Czech", "cze", "cz", "cs"): 30,
             ("Danish", "dan", "da"): 10,
             ("Dutch", "dut", "nl"): 9,
-            ("English", "eng", "en", "en-US", "English (CC)", "English - SDH"): 3,
+            ("English", "eng", "en", "en-US", "en-GB", "English (CC)", "English - SDH"): 3,
             ("English - Forced", "English (Forced)", "en (Forced)", "en-US (Forced)"): 50,
             ("English Intertitles", "English (Intertitles)", "English - Intertitles", "en (Intertitles)", "en-US (Intertitles)"): 51,
             ("Estonian", "est", "et"): 38,
