@@ -346,7 +346,9 @@ class Prep():
         if meta.get('category', None) is not None:
             meta['category'] = meta['category'].upper()
 
-        if meta.get('infohash') is not None and 'base_torrent_created' in meta and not meta['base_torrent_created']:
+        if 'base_torrent_created' not in meta:
+            meta['base_torrent_created'] = False
+        if meta.get('infohash') is not None and not meta['base_torrent_created']:
             meta = await client.get_ptp_from_hash(meta)
         if not meta.get('image_list') and not meta.get('edit', False):
             # Reuse information from trackers with fallback
@@ -358,6 +360,7 @@ class Prep():
                     'ptp': 'PTP',
                     'bhd': 'BHD',
                     'btn': 'BTN',
+                    'huno': 'HUNO',
                     'hdb': 'HDB',
                     'blu': 'BLU',
                     'aither': 'AITHER',
@@ -417,7 +420,7 @@ class Prep():
                         meta = await process_tracker(specific_tracker, meta, only_id)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB"]
+                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB", "HUNO"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found

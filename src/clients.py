@@ -993,7 +993,6 @@ class Clients():
 
         if client.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=client['qbit_tag'], torrent_hashes=torrent.infohash)
-
         if meta and meta.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=meta['qbit_tag'], torrent_hashes=torrent.infohash)
 
@@ -1225,9 +1224,13 @@ class Clients():
                             meta['btn'] = match.group(1)
                     elif "https://beyond-hd.me" in comment:
                         meta['bhd'] = info_hash_v1
+                    elif "/torrents/" in comment:
+                        match = re.search(r'/(\d+)$', comment)
+                        if match:
+                            meta['huno'] = match.group(1)
 
                     if match:
-                        for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
+                        for tracker in ['ptp', 'bhd', 'btn', 'huno', 'blu', 'aither', 'lst', 'oe', 'hdb']:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1488,6 +1491,7 @@ class Clients():
                 'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
                 'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
                 'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
+                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
             }
 
             # First collect exact path matches
@@ -1564,6 +1568,7 @@ class Clients():
                         try:
                             torrent_properties = await asyncio.to_thread(qbt_client.torrents_properties, torrent_hash=torrent.hash)
                             comment = torrent_properties.get('comment', '')
+                            created_by = torrent_properties.get('created_by', '')
                         except Exception as e:
                             if meta['debug']:
                                 console.print(f"[yellow]Error getting properties for torrent {torrent.name}: {str(e)}")
@@ -1582,11 +1587,12 @@ class Clients():
                             'match_type': match_type,
                             'trackers': url,
                             'has_working_tracker': has_working_tracker,
-                            'comment': comment
+                            'comment': comment,
+                            'created_by': created_by
                         }
 
                         # Initialize a list for found tracker IDs
-                        tracker_priority = ['ptp', 'bhd', 'btn', 'aither', 'blu', 'lst', 'oe', 'hdb']
+                        tracker_priority = ['ptp', 'bhd', 'btn', 'huno', 'aither', 'blu', 'lst', 'oe', 'hdb']
                         tracker_found = False
                         tracker_urls = []
 
@@ -1605,6 +1611,27 @@ class Clients():
                                     })
                                     meta[tracker_id] = tracker_id_value
                                     tracker_found = True
+
+                        if created_by and 'Edited by HUNO' in created_by:
+                            if meta['debug']:
+                                console.print(f"[green]Found HUNO signature in 'Created By' field: {created_by}")
+
+                            # Try to extract torrent ID from the comment first
+                            huno_id = None
+                            if "/torrents/" in comment:
+                                match = re.search(r'/torrents/(\d+)', comment)
+                                if match:
+                                    huno_id = match.group(1)
+
+                            # If we found an ID, use it
+                            if huno_id:
+                                tracker_urls.append({
+                                    'id': 'huno',
+                                    'tracker_id': huno_id,
+                                    'source': 'created_by_with_id'
+                                })
+                                meta['huno'] = huno_id
+                                tracker_found = True
 
                         match_info['tracker_urls'] = tracker_urls
                         match_info['has_tracker'] = tracker_found
