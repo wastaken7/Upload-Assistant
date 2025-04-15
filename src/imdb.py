@@ -39,10 +39,10 @@ async def get_imdb_aka_api(imdb_id, manual_language=None):
             data = response.json()
         except httpx.HTTPStatusError as e:
             console.print(f"[red]IMDb API error: {e.response.status_code}[/red]")
-            return
+            return "", None
         except httpx.RequestError as e:
             console.print(f"[red]IMDb API Network error: {e}[/red]")
-            return
+            return "", None
 
     # Check if `data` and `title` exist
     title_data = data.get("data", {}).get("title")
@@ -51,9 +51,17 @@ async def get_imdb_aka_api(imdb_id, manual_language=None):
         return "", None
 
     # Extract relevant fields from the response
-    aka = title_data.get("originalTitleText", {}).get("text", "")
-    is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
-    title_text = title_data.get("titleText", {}).get("text", "")
+    aka_check = title_data.get("originalTitleText", {})
+    if aka_check:
+        aka = title_data.get("originalTitleText", {}).get("text", "")
+    else:
+        return "", None
+    title_txt_check = title_data.get("titleText", {})
+    if title_txt_check:
+        is_original = title_data.get("titleText", {}).get("isOriginalTitle", False)
+        title_text = title_data.get("titleText", {}).get("text", "")
+    else:
+        return "", None
     if manual_language:
         original_language = manual_language
     else:

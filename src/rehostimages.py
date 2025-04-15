@@ -18,6 +18,44 @@ def match_host(hostname, approved_hosts):
 
 
 async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approved_image_hosts=None):
+    new_images_key = f'{tracker}_images_key'
+    if new_images_key not in meta:
+        meta[new_images_key] = []
+
+    # Check if we have main image_list but no tracker-specific images yet
+    if meta.get('image_list') and not meta.get(new_images_key):
+        console.print(f"[yellow]Checking if existing images in meta['image_list'] can be used for {tracker}...")
+        # Check if the URLs in image_list are from approved hosts
+        approved_images = []
+        need_reupload = False
+
+        for image in meta.get('image_list', []):
+            raw_url = image.get('raw_url')
+            if not raw_url:
+                continue
+
+            parsed_url = urlparse(raw_url)
+            hostname = parsed_url.netloc
+            mapped_host = match_host(hostname, url_host_mapping.keys())
+
+            if mapped_host:
+                mapped_host = url_host_mapping.get(mapped_host, mapped_host)
+                if mapped_host in approved_image_hosts:
+                    approved_images.append(image)
+                    if meta['debug']:
+                        console.print(f"[green]URL '{raw_url}' is from approved host '{mapped_host}'.")
+                else:
+                    need_reupload = True
+                    if meta['debug']:
+                        console.print(f"[yellow]URL '{raw_url}' is not from an approved host for {tracker}.")
+            else:
+                need_reupload = True
+
+        if approved_images and len(approved_images) == len(meta.get('image_list', [])) and not need_reupload:
+            meta[new_images_key] = approved_images.copy()
+            console.print(f"[green]All existing images are from approved hosts for {tracker}.")
+            return meta[new_images_key], False, False
+
     reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "reuploaded_images.json")
     reuploaded_images = []
 
@@ -47,36 +85,28 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
                 console.print(f"[red]URL '{raw_url}' from reuploaded_images.json is not recognized as an approved host.")
 
     if valid_reuploaded_images:
-        meta['image_list'] = valid_reuploaded_images
+        meta[new_images_key] = valid_reuploaded_images
         console.print("[green]Using valid images from reuploaded_images.json.")
-        return meta['image_list'], False, False
+        return meta[new_images_key], False, False
 
-    for image in meta['image_list']:
-        raw_url = image.get('raw_url')
-        if not raw_url:
-            continue
+    # Check if the tracker-specific key has valid images
+    has_valid_images = False
+    if meta.get(new_images_key):
+        all_images_valid = all(
+            url_host_mapping.get(
+                match_host(urlparse(image.get('raw_url', '')).netloc, url_host_mapping.keys()),
+                None
+            ) in approved_image_hosts for image in meta[new_images_key]
+        )
 
-        parsed_url = urlparse(raw_url)
-        hostname = parsed_url.netloc
-        mapped_host = match_host(hostname, url_host_mapping.keys())
+        if all_images_valid and meta[new_images_key]:
+            has_valid_images = True
 
-        if mapped_host:
-            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
-            if meta['debug']:
-                if mapped_host in approved_image_hosts:
-                    console.print(f"[green]URL '{raw_url}' is correctly matched to approved host '{mapped_host}'.")
-                else:
-                    console.print(f"[red]URL '{raw_url}' is not recognized as part of an approved host.")
+    if has_valid_images:
+        console.print(f"[green]Using valid images from {new_images_key}.")
+        return meta[new_images_key], False, False
 
-    all_images_valid = all(
-        url_host_mapping.get(
-            match_host(urlparse(image.get('raw_url', '')).netloc, url_host_mapping.keys()),
-            None
-        ) in approved_image_hosts for image in meta['image_list']
-    )
-
-    if all_images_valid:
-        return meta['image_list'], False, False
+    console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
     max_retries = len(approved_image_hosts)
@@ -86,18 +116,20 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
             meta, tracker, url_host_mapping, approved_image_hosts, img_host_index=img_host_index
         )
 
+        if image_list:
+            meta[new_images_key] = image_list
+
         if retry_mode:
             console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
             img_host_index += 1
             continue  # Retry with next host
 
-        new_images_key = f'{tracker}_images_key'
-        if image_list is not None:
-            meta['image_list'] = meta.get(new_images_key, [])
-            break
+        break
 
-    if meta['image_list'] is None or not meta['image_list']:
+    if not meta.get(new_images_key):
         console.print("[red]All image hosts failed. Please check your configuration.")
+
+    return meta.get(new_images_key, []), False, images_reuploaded
 
 
 async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_hosts=None, img_host_index=1, file=None):
@@ -116,7 +148,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     if isinstance(filelist, str):
         filelist = [filelist]
 
-    multi_screens = int(config['DEFAULT'].get('screens', 6))
+    multi_screens = meta.get('screens') if meta.get('screens') else int(config['DEFAULT'].get('screens', 6))
     base_dir = meta['base_dir']
     folder_id = meta['uuid']
     meta[new_images_key] = []
@@ -300,6 +332,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
             meta[new_images_key] = uploaded_images
 
         if meta['debug']:
+            console.print(f"[debug] Updated {new_images_key} with {len(uploaded_images)} images.")
             for image in uploaded_images:
                 console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
 
@@ -324,7 +357,6 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
         ):
             if new_images_key in meta and isinstance(meta[new_images_key], list):
                 output_file = os.path.join(screenshots_dir, "reuploaded_images.json")
-
                 try:
                     async with aiofiles.open(output_file, 'r', encoding='utf-8') as f:
                         existing_data = await f.read()

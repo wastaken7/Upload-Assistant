@@ -988,9 +988,13 @@ class Clients():
 
         # Resume and tag torrent
         qbt_client.torrents_resume(torrent.infohash)
+        if client.get("use_tracker_as_tag", False) and tracker:
+            qbt_client.torrents_add_tags(tags=tracker, torrent_hashes=torrent.infohash)
+
         if client.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=client['qbit_tag'], torrent_hashes=torrent.infohash)
-        if meta.get('qbit_tag'):
+
+        if meta and meta.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=meta['qbit_tag'], torrent_hashes=torrent.infohash)
 
         if meta['debug']:

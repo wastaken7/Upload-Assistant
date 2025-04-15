@@ -1,3 +1,66 @@
+__version__ = "4.1.8.1"
+
+"""
+Changelog for version 4.1.8.1 (2025-04-15):
+
+* Fixed a quote bug
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.8...4.1.8.1
+"""
+
+__version__ = "4.1.8"
+
+"""
+Changelog for version 4.1.8 (2025-04-14):
+
+## What's Changed
+* Correct typo to enable UA to set the 'Internal' tag on HDB. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/456
+* Updated AL upload by @b-igu in https://github.com/Audionut/Upload-Assistant/pull/457
+* Run cleaning between items in a queue - fixes terminal issue when running a queue
+* Fixed an error when imdb returns no results
+* Fixes image rehosting was overwriting main image_list
+
+## New Contributors
+* @b-igu made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/457
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.7...4.1.8
+"""
+
+__version__ = "4.1.7"
+
+"""
+Changelog for version 4.1.7 (2025-04-13):
+
+## What's Changed
+* Fix missing HHD config in example-config.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/455
+* Updated mkbrr including fix for BDMV torrent and symlink creation
+* Fixed manual source with BHD
+* Added nfo file upload support for DP
+* Changed logo handling so individual sites can pull language specific logos
+* Fixed an error with adding mkbrr regenerated torrents to client
+* Refactored Torf torrent creation to be quicker
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.6...4.1.7
+"""
+
+__version__ = "4.1.6"
+
+"""
+Changelog for version 4.1.6 (2025-04-12):
+
+## What's Changed
+* qBittorrent Option: Include Tracker as Tag - New sites SAM and UHD by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/454
+* fixed image retaking
+* fixed pack images to be saved in unique file now that meta is deleted by default
+* updated OE to check all mediainfo when language checking
+* updated OTW to include resolution with DVD
+* updated DP rule compliance
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.5...4.1.6
+"""
+
 __version__ = "4.1.5"
 
 """

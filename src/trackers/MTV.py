@@ -42,61 +42,62 @@ class MTV():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
+        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         if not os.path.exists(torrent_file_path):
             torrent_filename = "BASE"
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
-            torrent = Torrent.read(torrent_path)
+            torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
 
-            if torrent.piece_size > 8388608:
-                tracker_config = self.config['TRACKERS'].get(self.tracker, {})
-                if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
-                    console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-                    if meta.get('mkbrr', False):
-                        from data.config import config
-                        tracker_url = config['TRACKERS']['MTV'].get('announce_url', "https://fake.tracker").strip()
+        torrent = Torrent.read(torrent_file_path)
 
-                        # Create the torrent with the tracker URL
-                        torrent_create = f"[{self.tracker}]"
-                        create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
-                        torrent_filename = "[MTV]"
+        if torrent.piece_size > 8388608:
+            tracker_config = self.config['TRACKERS'].get(self.tracker, {})
+            if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
+                console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+                if meta.get('mkbrr', False):
+                    from data.config import config
+                    tracker_url = config['TRACKERS']['MTV'].get('announce_url', "https://fake.tracker").strip()
 
-                        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
-                    else:
-                        meta['max_piece_size'] = '8'
-                        if meta['is_disc']:
-                            include = []
-                            exclude = []
-                        else:
-                            include = ["*.mkv", "*.mp4", "*.ts"]
-                            exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+                    # Create the torrent with the tracker URL
+                    torrent_create = f"[{self.tracker}]"
+                    create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
+                    torrent_filename = "[MTV]"
 
-                        new_torrent = CustomTorrent(
-                            meta=meta,
-                            path=Path(meta['path']),
-                            trackers=["https://fake.tracker"],
-                            source="Audionut",
-                            private=True,
-                            exclude_globs=exclude,  # Ensure this is always a list
-                            include_globs=include,  # Ensure this is always a list
-                            creation_date=datetime.now(),
-                            comment="Created by Audionut's Upload Assistant",
-                            created_by="Audionut's Upload Assistant"
-                        )
-
-                        new_torrent.piece_size = 8 * 1024 * 1024
-                        new_torrent.validate_piece_size()
-                        new_torrent.generate(callback=torf_cb, interval=5)
-                        new_torrent.write(torrent_file_path, overwrite=True)
-
-                        torrent_filename = "[MTV]"
-                        await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
-
+                    await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
                 else:
-                    console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
-                    return
+                    meta['max_piece_size'] = '8'
+                    if meta['is_disc']:
+                        include = []
+                        exclude = []
+                    else:
+                        include = ["*.mkv", "*.mp4", "*.ts"]
+                        exclude = ["*.*", "*sample.mkv", "!sample*.*"]
+
+                    new_torrent = CustomTorrent(
+                        meta=meta,
+                        path=Path(meta['path']),
+                        trackers=["https://fake.tracker"],
+                        source="Audionut",
+                        private=True,
+                        exclude_globs=exclude,  # Ensure this is always a list
+                        include_globs=include,  # Ensure this is always a list
+                        creation_date=datetime.now(),
+                        comment="Created by Audionut's Upload Assistant",
+                        created_by="Audionut's Upload Assistant"
+                    )
+
+                    new_torrent.piece_size = 8 * 1024 * 1024
+                    new_torrent.validate_piece_size()
+                    new_torrent.generate(callback=torf_cb, interval=5)
+                    new_torrent.write(torrent_file_path, overwrite=True)
+
+                    torrent_filename = "[MTV]"
+                    await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
+
             else:
-                await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
+                console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
+                return
+
         approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
         url_host_mapping = {
             "ibb.co": "imgbb",

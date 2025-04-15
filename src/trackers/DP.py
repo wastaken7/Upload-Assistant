@@ -4,8 +4,13 @@ import asyncio
 import requests
 import platform
 import httpx
+import re
+import glob
+import os
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.rehostimages import check_hosts
+from data.config import config
 
 
 class DP():
@@ -56,11 +61,38 @@ class DP():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
+        name = await self.edit_name(meta)
+        if meta.get('dp_skipping', False):
+            console.print("[red]Skipping DP upload as language conditions were not met.")
+            return
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "imagebam.com": "bam",
+        }
+        approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
+        if 'DP_images_key' in meta:
+            image_list = meta['DP_images_key']
+        else:
+            image_list = meta['image_list']
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
+        if meta.get('logo', "") == "":
+            from src.tmdb import get_logo
+            TMDB_API_KEY = config['DEFAULT'].get('tmdb_api', False)
+            TMDB_BASE_URL = "https://api.themoviedb.org/3"
+            tmdb_id = meta.get('tmdb')
+            category = meta.get('category')
+            debug = meta.get('debug')
+            logo_languages = ['da', 'sv', 'no', 'fi', 'is', 'en']
+            logo_path = await get_logo(tmdb_id, category, debug, logo_languages=logo_languages, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL)
+            if logo_path:
+                meta['logo'] = logo_path
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
@@ -77,8 +109,17 @@ class DP():
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {'torrent': open_torrent}
+        base_dir = meta['base_dir']
+        uuid = meta['uuid']
+        specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        nfo_files = glob.glob(specified_dir_path)
+        nfo_file = None
+        if nfo_files:
+            nfo_file = open(nfo_files[0], 'rb')
+        if nfo_file:
+            files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -134,6 +175,127 @@ class DP():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def edit_name(self, meta):
+        dp_name = meta.get('name')
+        season = meta.get('season')
+        episode = meta.get('episode')
+        year = meta.get('year')
+        nordic = "NORDiC"
+        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
+        english_languages = ['english']
+        meta['dp_skipping'] = False
+
+        if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
+            has_nordic_lang = False
+            has_english_audio = False
+            has_nordic_audio = False
+
+            if 'audio' in meta['bdinfo']:
+                for audio_track in meta['bdinfo']['audio']:
+                    if 'language' in audio_track:
+                        audio_lang = audio_track['language'].lower()
+                        if audio_lang in nordic_languages:
+                            has_nordic_audio = True
+                            has_nordic_lang = True
+                            break
+                        elif audio_lang in english_languages:
+                            has_english_audio = True
+
+            if not has_english_audio and not has_nordic_audio:
+                has_nordic_subtitle = False
+                if 'subtitles' in meta['bdinfo']:
+                    for subtitle in meta['bdinfo']['subtitles']:
+                        if subtitle.lower() in nordic_languages:
+                            has_nordic_subtitle = True
+                            has_nordic_lang = True
+                            break
+
+                    if not has_nordic_subtitle:
+                        meta['dp_skipping'] = True
+                        return dp_name
+
+            if has_nordic_lang:
+                if meta['category'] == "TV":
+                    if meta['tv_pack']:
+                        dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
+                    else:
+                        dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
+                else:
+                    dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
+
+        elif not meta['is_disc'] == "BDMV":
+            def has_nordic(media_info_text=None):
+                if media_info_text:
+                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+
+                    has_nordic_audio = False
+                    has_english_audio = False
+                    for language in audio_section:
+                        language = language.lower().strip()
+                        if language in nordic_languages:
+                            has_nordic_audio = True
+                            return True
+                        elif language in english_languages:
+                            has_english_audio = True
+
+                    if not has_english_audio and not has_nordic_audio:
+                        has_nordic_sub = False
+                        for language in subtitle_section:
+                            language = language.lower().strip()
+                            if language in nordic_languages:
+                                has_nordic_sub = True
+                                return True
+
+                        if not has_nordic_sub:
+                            meta['dp_skipping'] = True
+                            return False
+
+                    for language in subtitle_section:
+                        language = language.lower().strip()
+                        if language in nordic_languages:
+                            return True
+                return False
+
+            def get_audio_lang(media_info_text=None):
+                if media_info_text:
+                    if meta['debug']:
+                        console.print("Checking for audio language...")
+                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
+
+            def get_subtitle_lang(media_info_text=None):
+                if media_info_text:
+                    if meta['debug']:
+                        console.print("Checking for subtitle language...")
+                    match = re.search(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                    if match:
+                        return match.group(1).upper()
+                return ""
+
+            try:
+                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                with open(media_info_path, 'r', encoding='utf-8') as f:
+                    media_info_text = f.read()
+
+                if has_nordic(media_info_text=media_info_text):
+                    audio_lang = get_audio_lang(media_info_text=media_info_text)
+                    subtitle_lang = get_subtitle_lang(media_info_text=media_info_text)
+                    if audio_lang or subtitle_lang:
+                        if meta['category'] == "TV":
+                            if meta['tv_pack']:
+                                dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
+                            else:
+                                dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
+                        else:
+                            dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
+            except (FileNotFoundError, KeyError) as e:
+                print(f"Error processing MEDIAINFO.txt: {e}")
+
+        return dp_name
 
     async def search_existing(self, meta, disctype):
         dupes = []

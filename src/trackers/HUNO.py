@@ -150,7 +150,7 @@ class HUNO():
                         language = "SKIPPED"
 
                 elif languages:
-                    language = languages
+                    language = list(languages)[0] if languages else "SKIPPED"
                 else:
                     print("DEBUG: No languages found in BDMV audio tracks.")
 
@@ -239,7 +239,7 @@ class HUNO():
         distributor = meta.get('distributor', "")  # noqa F841
         video_codec = meta.get('video_codec', "")
         video_encode = meta.get('video_encode', "").replace(".", "")
-        if 'x265' in basename:
+        if 'x265' in basename and not meta.get('type') == "WEBDL":
             video_encode = video_encode.replace('H', 'x')
         dvd_size = meta.get('dvd_size', "")
         edition = meta.get('edition', "")

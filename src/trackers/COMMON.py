@@ -54,6 +54,20 @@ class COMMON():
         else:
             images = meta['image_list']
             multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
+
+        # Check for saved pack_image_links.json file
+        pack_images_file = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "pack_image_links.json")
+        pack_images_data = {}
+        if os.path.exists(pack_images_file):
+            try:
+                with open(pack_images_file, 'r', encoding='utf-8') as f:
+                    pack_images_data = json.load(f)
+                    if meta['debug']:
+                        console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                        console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} previously uploaded images")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
+
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf8').read()
         char_limit = int(self.config['DEFAULT'].get('charLimit', 14000))
         file_limit = int(self.config['DEFAULT'].get('fileLimit', 5))
@@ -76,7 +90,7 @@ class COMMON():
             season_name = meta.get('tvdb_season_name') if meta.get('tvdb_season_name') is not None and meta.get('tvdb_season_name') != "" else None
             season_number = meta.get('tvdb_season_number') if meta.get('tvdb_season_number') is not None and meta.get('tvdb_season_number') != "" else None
             episode_number = meta.get('tvdb_episode_number') if meta.get('tvdb_episode_number') is not None and meta.get('tvdb_episode_number') != "" else None
-            episode_title = meta.get('tvdb_episode_title') if meta.get('tvdb_episode_title') is not None and meta.get('tvdb_episode_title') != "" else None
+            episode_title = meta.get('auto_episode_title') if meta.get('auto_episode_title') is not None and meta.get('auto_episode_title') != "" else None
             if episode_title is None:
                 episode_title = meta.get('tvmaze_episode_data', {}).get('episode_name') if meta.get('tvmaze_episode_data', {}).get('episode_name') else None
             if episode_overview and season_name and season_number and episode_number and episode_title:
@@ -120,7 +134,6 @@ class COMMON():
                 desc = bbcode.convert_comparison_to_collapse(desc, 1000)
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
-
             # Handle single disc case
             if len(discs) == 1:
                 each = discs[0]
@@ -150,6 +163,21 @@ class COMMON():
                             # Find the corresponding summary for this bdinfo
                             summary_key = f"summary_{i}" if i > 0 else "summary"
                             summary = each.get(summary_key, "No summary available")
+
+                            # Check for saved images first
+                            if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                                saved_images = pack_images_data['keys'][new_images_key]['images']
+                                if saved_images:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                    meta[new_images_key] = []
+                                    for img in saved_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img.get('img_url', ''),
+                                            'raw_url': img.get('raw_url', ''),
+                                            'web_url': img.get('web_url', '')
+                                        })
 
                             if new_images_key in meta and meta[new_images_key]:
                                 descfile.write("[center]\n\n")
@@ -181,6 +209,8 @@ class COMMON():
                                     new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
                                     uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                    if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                        await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
                                             'img_url': img['img_url'],
@@ -234,6 +264,20 @@ class COMMON():
                     else:
                         if multi_screens != 0:
                             # Check if screenshots exist for the current disc key
+                            # Check for saved images first
+                            if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                                saved_images = pack_images_data['keys'][new_images_key]['images']
+                                if saved_images:
+                                    if meta['debug']:
+                                        console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                    meta[new_images_key] = []
+                                    for img in saved_images:
+                                        meta[new_images_key].append({
+                                            'img_url': img.get('img_url', ''),
+                                            'raw_url': img.get('raw_url', ''),
+                                            'web_url': img.get('web_url', '')
+                                        })
                             if new_images_key in meta and meta[new_images_key]:
                                 if meta['debug']:
                                     console.print(f"[yellow]Found needed image URLs for {new_images_key}")
@@ -290,7 +334,8 @@ class COMMON():
 
                                 if new_screens and not meta.get('skip_imghost_upload', False):
                                     uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
-
+                                    if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                        await self.save_image_links(meta, new_images_key, uploaded_images)
                                     # Append each uploaded image's data to `meta[new_images_key]`
                                     for img in uploaded_images:
                                         meta[new_images_key].append({
@@ -347,6 +392,20 @@ class COMMON():
                 if multi_screens != 0:
                     if i > 0:
                         new_images_key = f'new_images_file_{i}'
+                        # Check for saved images first
+                        if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
+                            saved_images = pack_images_data['keys'][new_images_key]['images']
+                            if saved_images:
+                                if meta['debug']:
+                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                                meta[new_images_key] = []
+                                for img in saved_images:
+                                    meta[new_images_key].append({
+                                        'img_url': img.get('img_url', ''),
+                                        'raw_url': img.get('raw_url', ''),
+                                        'web_url': img.get('web_url', '')
+                                    })
                         if new_images_key not in meta or not meta[new_images_key]:
                             meta[new_images_key] = []
                             # Proceed with image generation if not already present
@@ -366,6 +425,8 @@ class COMMON():
                             # Upload generated screenshots
                             if new_screens and not meta.get('skip_imghost_upload', False):
                                 uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                if uploaded_images and not meta.get('skip_imghost_upload', False):
+                                    await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
                                     meta[new_images_key].append({
                                         'img_url': img['img_url'],
@@ -448,6 +509,65 @@ class COMMON():
                 descfile.write(signature)
             descfile.close()
         return
+
+    async def save_image_links(self, meta, image_key, image_list=None):
+        if image_list is None:
+            console.print("[yellow]No image links to save.[/yellow]")
+            return None
+
+        output_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, "pack_image_links.json")
+
+        # Load existing data if the file exists
+        existing_data = {}
+        if os.path.exists(output_file):
+            try:
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
+
+        # Create data structure if it doesn't exist yet
+        if not existing_data:
+            existing_data = {
+                "keys": {},
+                "total_count": 0
+            }
+
+        # Update the data with the new images under the specific key
+        if image_key not in existing_data["keys"]:
+            existing_data["keys"][image_key] = {
+                "count": 0,
+                "images": []
+            }
+
+        # Add new images to the specific key
+        for idx, img in enumerate(image_list):
+            image_entry = {
+                "index": existing_data["keys"][image_key]["count"] + idx,
+                "raw_url": img.get("raw_url", ""),
+                "web_url": img.get("web_url", ""),
+                "img_url": img.get("img_url", ""),
+            }
+            existing_data["keys"][image_key]["images"].append(image_entry)
+
+        # Update counts
+        existing_data["keys"][image_key]["count"] = len(existing_data["keys"][image_key]["images"])
+        existing_data["total_count"] = sum(key_data["count"] for key_data in existing_data["keys"].values())
+
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_data, f, indent=2)
+
+            if meta['debug']:
+                console.print(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+                console.print(f"[blue]  - JSON: {output_file}[/blue]")
+
+            return output_file
+        except Exception as e:
+            console.print(f"[bold red]Error saving image links: {e}[/bold red]")
+            return None
 
     async def unit3d_region_ids(self, region):
         region_id = {

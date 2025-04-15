@@ -591,6 +591,10 @@ async def do_the_thing(base_dir):
                     if not meta['debug']:
                         if log_file:
                             await save_processed_file(log_file, path)
+                    await asyncio.sleep(0.1)
+                    await cleanup()
+                    gc.collect()
+                    reset_terminal()
 
             if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
                 if processed_files_count >= int(meta['limit_queue']):
