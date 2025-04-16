@@ -40,8 +40,8 @@ class COMMON():
 
     # used to add tracker url, comment and source flag to torrent file
     async def add_tracker_torrent(self, meta, tracker, source_flag, new_tracker, comment):
-        if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"):
-            new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"):
+            new_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent")
             new_torrent.metainfo['announce'] = new_tracker
             new_torrent.metainfo['comment'] = comment
             new_torrent.metainfo['info']['source'] = source_flag
