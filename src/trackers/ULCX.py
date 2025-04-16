@@ -9,6 +9,7 @@ import httpx
 import cli_ui
 from src.trackers.COMMON import COMMON
 from src.console import console
+from src.dupe_checking import check_for_english
 
 
 class ULCX():
@@ -44,9 +45,6 @@ class ULCX():
         return type_id
 
     async def get_res_id(self, resolution, type):
-        if type in ['ENCODE']:
-            if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
-                return None
         resolution_id = {
             '8640p': '10',
             '4320p': '1',
@@ -68,9 +66,6 @@ class ULCX():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'], meta['type'])
-        if resolution_id is None:
-            console.print("Resolution is below 720p; skipping.")
-            return
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -187,7 +182,7 @@ class ULCX():
 
         return ulcx_name, region_id, distributor_id
 
-    async def search_existing(self, meta, disctype):
+    async def search_existing(self, meta, disctype, tracker=None):
         if 'concert' in meta['keywords']:
             console.print('[bold red]Concerts not allowed at ULCX.')
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -200,7 +195,7 @@ class ULCX():
                 meta['skipping'] = "ULCX"
                 return
         if meta['video_codec'] == "HEVC" and meta['resolution'] != "2160p" and 'animation' not in meta['keywords'] and meta.get('anime', False) is not True:
-            console.print('[bold red]This content might not fit HEVC rules at ULCX.')
+            console.print('[bold red]This content might not fit HEVC rules for ULCX.')
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -210,6 +205,13 @@ class ULCX():
             else:
                 meta['skipping'] = "ULCX"
                 return
+        if meta['type'] == "ENCODE" and meta['resolution'] not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
+            console.print('[bold red]Encodes must be at least 720p resolution for ULCX.')
+            meta['skipping'] = "ULCX"
+            return
+
+        await check_for_english(meta, tracker)
+
         dupes = []
         console.print("[yellow]Searching for existing torrents on ULCX...")
         params = {

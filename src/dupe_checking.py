@@ -1,4 +1,5 @@
 import re
+import cli_ui
 from src.console import console
 
 
@@ -271,3 +272,80 @@ async def has_matching_hdr(file_hdr, target_hdr, meta):
             target_hdr_simple = {"HDR"}
 
     return file_hdr_simple == target_hdr_simple
+
+
+async def check_for_english(meta, tracker):
+    english_languages = ['english']
+    if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
+        async def has_english_stuff():
+            has_english_audio = False
+            if 'audio' in meta['bdinfo']:
+                for audio_track in meta['bdinfo']['audio']:
+                    if 'language' in audio_track:
+                        audio_lang = audio_track['language'].lower()
+                        if audio_lang in english_languages:
+                            has_english_audio = True
+                            return True
+
+            if not has_english_audio:
+                has_english_subtitle = False
+                if 'subtitles' in meta['bdinfo']:
+                    for subtitle in meta['bdinfo']['subtitles']:
+                        if subtitle.lower() in english_languages:
+                            has_english_subtitle = True
+                            return True
+
+                    if not has_english_subtitle:
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            console.print(f'[bold red]No English audio or subtitles found in BDINFO required for {tracker}.')
+                            if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                return True
+                            else:
+                                return False
+                        return False
+                return False
+        if not await has_english_stuff():
+            meta['skipping'] = {tracker}
+            return
+
+    elif not meta['is_disc'] == "BDMV":
+        async def has_english(media_info_text=None):
+            if media_info_text:
+                audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                has_english_audio = False
+                for language in audio_section:
+                    language = language.lower().strip()
+                    if language in english_languages:
+                        has_english_audio = True
+                        return True
+
+                if not has_english_audio:
+                    has_english_sub = False
+                    for language in subtitle_section:
+                        language = language.lower().strip()
+                        if language in english_languages:
+                            has_english_sub = True
+                            return True
+
+                    if not has_english_sub:
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            console.print(f'[bold red]No English audio or subtitles found in MEDIAINFO required for {tracker}.')
+                            if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                return True
+                            else:
+                                return False
+                        return False
+
+        try:
+            media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+            with open(media_info_path, 'r', encoding='utf-8') as f:
+                media_info_text = f.read()
+
+            if not await has_english(media_info_text=media_info_text):
+                meta['skipping'] = {tracker}
+                return
+        except (FileNotFoundError, KeyError) as e:
+            print(f"Error processing MEDIAINFO.txt: {e}")
+            meta['skipping'] = {tracker}
+            return
