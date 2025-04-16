@@ -185,46 +185,49 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         # Dynamically determine the number of processes
         num_tasks = len(valid_images)
         num_workers = min(num_tasks, task_limit)
-        console.print("[yellow]Now optimizing images...[/yellow]")
+        if optimize_images:
+            console.print("[yellow]Now optimizing images...[/yellow]")
 
-        loop = asyncio.get_running_loop()
-        stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            stop_event = asyncio.Event()
 
-        def handle_sigint(sig, frame):
-            console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
-            executor.shutdown(wait=False)
-            stop_event.set()
-            for task in asyncio.all_tasks(loop):
-                task.cancel()
+            def handle_sigint(sig, frame):
+                console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
+                executor.shutdown(wait=False)
+                stop_event.set()
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
 
-        signal.signal(signal.SIGINT, handle_sigint)
+            signal.signal(signal.SIGINT, handle_sigint)
 
-        try:
-            with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-                tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
+            try:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+                    tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
 
-                optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
+                    optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        except KeyboardInterrupt:
-            console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
-            executor.shutdown(wait=False)
-            await kill_all_child_processes()
-            console.print("[red]All tasks cancelled. Exiting.[/red]")
-            sys.exit(1)
+            except KeyboardInterrupt:
+                console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
+                executor.shutdown(wait=False)
+                await kill_all_child_processes()
+                console.print("[red]All tasks cancelled. Exiting.[/red]")
+                sys.exit(1)
 
-        finally:
+            finally:
+                if meta['debug']:
+                    console.print("[yellow]Shutting down optimization workers...[/yellow]")
+                executor.shutdown(wait=False)
+                await asyncio.sleep(0.1)
+                await kill_all_child_processes()
+                gc.collect()
+
+            optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
             if meta['debug']:
-                console.print("[yellow]Shutting down optimization workers...[/yellow]")
-            executor.shutdown(wait=False)
-            await asyncio.sleep(0.1)
-            await kill_all_child_processes()
-            gc.collect()
+                console.print("Optimized results:", optimized_results)
 
-        optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
-        if meta['debug']:
-            console.print("Optimized results:", optimized_results)
-
-        console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+            console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+        else:
+            optimized_results = valid_images
 
         valid_results = []
         remaining_retakes = []
@@ -264,8 +267,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
                         screenshot_response = await capture_disc_task(
                             (index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
                         )
-
-                        optimize_image_task(screenshot_response)
+                        if optimize_images:
+                            optimize_image_task(screenshot_response)
                         new_size = os.path.getsize(screenshot_response)
                         valid_image = False
 
@@ -578,50 +581,53 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         num_tasks = len(valid_images)
         num_workers = min(num_tasks, task_limit)
 
-        if num_workers == 0:
-            console.print("[red]No valid images found for optimization.[/red]")
-            return
-        console.print("[yellow]Now optimizing images...[/yellow]")
+        if optimize_images:
+            if num_workers == 0:
+                console.print("[red]No valid images found for optimization.[/red]")
+                return
+            console.print("[yellow]Now optimizing images...[/yellow]")
 
-        loop = asyncio.get_running_loop()
-        stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            stop_event = asyncio.Event()
 
-        def handle_sigint(sig, frame):
-            console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
-            executor.shutdown(wait=False)
-            stop_event.set()
-            for task in asyncio.all_tasks(loop):
-                task.cancel()
+            def handle_sigint(sig, frame):
+                console.print("\n[red]CTRL+C detected. Cancelling optimization...[/red]")
+                executor.shutdown(wait=False)
+                stop_event.set()
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
 
-        signal.signal(signal.SIGINT, handle_sigint)
+            signal.signal(signal.SIGINT, handle_sigint)
 
-        try:
-            with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-                # Start all tasks in parallel using worker_wrapper()
-                tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
+            try:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+                    # Start all tasks in parallel using worker_wrapper()
+                    tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
 
-                # Wait for all tasks to complete
-                optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
-        except KeyboardInterrupt:
-            console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
-            executor.shutdown(wait=False)
-            await kill_all_child_processes()
-            console.print("[red]All tasks cancelled. Exiting.[/red]")
-            sys.exit(1)
-        finally:
-            console.print("[yellow]Shutting down optimization workers...[/yellow]")
-            await asyncio.sleep(0.1)
-            await kill_all_child_processes()
-            executor.shutdown(wait=False)
-            gc.collect()
+                    # Wait for all tasks to complete
+                    optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
+            except KeyboardInterrupt:
+                console.print("\n[red]CTRL+C detected. Cancelling tasks...[/red]")
+                executor.shutdown(wait=False)
+                await kill_all_child_processes()
+                console.print("[red]All tasks cancelled. Exiting.[/red]")
+                sys.exit(1)
+            finally:
+                console.print("[yellow]Shutting down optimization workers...[/yellow]")
+                await asyncio.sleep(0.1)
+                await kill_all_child_processes()
+                executor.shutdown(wait=False)
+                gc.collect()
 
-        optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
+            optimized_results = [res for res in optimized_results if not isinstance(res, str) or not res.startswith("Error")]
 
-        if meta['debug']:
-            console.print("Optimized results:", optimized_results)
-        console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
+            if meta['debug']:
+                console.print("Optimized results:", optimized_results)
+            console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
-        executor.shutdown(wait=True)  # Ensure cleanup
+            executor.shutdown(wait=True)  # Ensure cleanup
+        else:
+            optimized_results = valid_images
 
         valid_results = []
         remaining_retakes = []
@@ -670,7 +676,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                             console.print(f"[red]Failed to capture screenshot for {image}. Retrying...[/red]")
                             continue
 
-                        optimize_image_task(screenshot_result)
+                        if optimize_images:
+                            optimize_image_task(screenshot_result)
 
                         retaken_size = os.path.getsize(screenshot_result)
                         if retaken_size > 75000:
@@ -954,38 +961,41 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
     num_workers = min(task_limit, len(capture_results))
-    console.print("[yellow]Now optimizing images...[/yellow]")
-    if meta['debug']:
-        console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
+    if optimize_images:
+        console.print("[yellow]Now optimizing images...[/yellow]")
+        if meta['debug']:
+            console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
 
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
-    try:
-        with executor:
-            # Start all tasks in parallel using worker_wrapper()
-            tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
+        executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
+        try:
+            with executor:
+                # Start all tasks in parallel using worker_wrapper()
+                tasks = [asyncio.create_task(worker_wrapper(image, optimize_image_task, executor)) for image in valid_images]
 
-            # Wait for all tasks to complete
-            optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
-    except KeyboardInterrupt:
-        console.print("\n[red]CTRL+C detected. Cancelling optimization tasks...[/red]")
-        await asyncio.sleep(0.1)
-        executor.shutdown(wait=True, cancel_futures=True)
-        await kill_all_child_processes()
-        console.print("[red]All tasks cancelled. Exiting.[/red]")
-        gc.collect()
-        sys.exit(1)
-    finally:
-        console.print("[yellow]Shutting down optimization workers...[/yellow]")
-        await asyncio.sleep(0.1)
-        executor.shutdown(wait=True, cancel_futures=True)
-        for task in tasks:
-            task.cancel()
-        await kill_all_child_processes()
-        gc.collect()
+                # Wait for all tasks to complete
+                optimized_results = await asyncio.gather(*tasks, return_exceptions=True)
+        except KeyboardInterrupt:
+            console.print("\n[red]CTRL+C detected. Cancelling optimization tasks...[/red]")
+            await asyncio.sleep(0.1)
+            executor.shutdown(wait=True, cancel_futures=True)
+            await kill_all_child_processes()
+            console.print("[red]All tasks cancelled. Exiting.[/red]")
+            gc.collect()
+            sys.exit(1)
+        finally:
+            console.print("[yellow]Shutting down optimization workers...[/yellow]")
+            await asyncio.sleep(0.1)
+            executor.shutdown(wait=True, cancel_futures=True)
+            for task in tasks:
+                task.cancel()
+            await kill_all_child_processes()
+            gc.collect()
 
-    # Filter out failed results
-    optimized_results = [res for res in optimized_results if isinstance(res, str) and "Error" not in res]
-    console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+        # Filter out failed results
+        optimized_results = [res for res in optimized_results if isinstance(res, str) and "Error" not in res]
+        console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+    else:
+        optimized_results = valid_images
 
     valid_results = []
     remaining_retakes = []
@@ -1031,7 +1041,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                     if not os.path.exists(screenshot_response):
                         raise FileNotFoundError(f"Screenshot {screenshot_response} was not created successfully.")
 
-                    optimize_image_task(screenshot_response)
+                    if optimize_images:
+                        optimize_image_task(screenshot_response)
                     new_size = os.path.getsize(screenshot_response)
                     valid_image = False
 
