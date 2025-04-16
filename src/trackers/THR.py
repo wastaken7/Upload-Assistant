@@ -259,7 +259,8 @@ class THR():
             desc.close()
         return pronfo
 
-    async def search_existing(self, session, imdb_id, disctype):
+    async def search_existing(self, meta, disctype):
+        imdb_id = meta.get('imdb', '')
         search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes = []
         console.print("[yellow]Searching for existing torrents on THR...")
