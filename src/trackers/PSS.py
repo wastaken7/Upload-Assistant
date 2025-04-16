@@ -67,16 +67,16 @@ class PSS():
         return resolution_id
 
     async def edit_name(self, meta):
-        rf_name = meta['name']
+        pss_name = meta['name']
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "NoGroup", "unknown", "-unk-"]
 
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
-                rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
-            rf_name = f"{rf_name}-NOGROUP"
+                pss_name = re.sub(f"-{invalid_tag}", "", pss_name, flags=re.IGNORECASE)
+            pss_name = f"{pss_name}-NOGROUP"
 
-        return rf_name
+        return pss_name
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
@@ -84,7 +84,7 @@ class PSS():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
-        rf_name = await self.edit_name(meta)
+        pss_name = await self.edit_name(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -112,7 +112,7 @@ class PSS():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': rf_name,
+            'name': pss_name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
