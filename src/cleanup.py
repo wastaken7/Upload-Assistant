@@ -1,11 +1,14 @@
 import asyncio
 import psutil
 import threading
+import multiprocessing
+import sys
 from src.console import console
 from concurrent.futures import ThreadPoolExecutor
 
 running_subprocesses = set()
 thread_executor: ThreadPoolExecutor = None
+IS_MACOS = sys.platform == 'darwin'
 
 
 async def cleanup():
@@ -74,6 +77,14 @@ async def cleanup():
     # 🔹 Step 6: Kill all remaining threads and orphaned processes
     kill_all_threads()
 
+    if IS_MACOS:
+        try:
+            # Ensure any multiprocessing resources are properly released
+            multiprocessing.resource_tracker._resource_tracker = None
+        except Exception:
+            console.print("[red]Error releasing multiprocessing resources.[/red]")
+            pass
+
     # console.print("[green]Cleanup completed. Exiting safely.[/green]")
 
 
@@ -82,22 +93,50 @@ def kill_all_threads():
     # console.print("[yellow]Checking for remaining background threads...[/yellow]")
 
     # 🔹 Kill any lingering subprocesses
-    current_process = psutil.Process()
-    children = current_process.children(recursive=True)
+    try:
+        current_process = psutil.Process()
+        children = current_process.children(recursive=True)
 
-    for child in children:
-        # console.print(f"[yellow]Terminating process {child.pid}...[/yellow]")
-        child.terminate()
+        for child in children:
+            # console.print(f"[yellow]Terminating process {child.pid}...[/yellow]")
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
 
-    _, still_alive = psutil.wait_procs(children, timeout=3)
-    for child in still_alive:
-        # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
-        child.kill()
+        # Wait for a short time for processes to terminate
+        _, still_alive = psutil.wait_procs(children, timeout=3)
+        for child in still_alive:
+            # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
+    except Exception as e:
+        console.print(f"[red]Error killing processes: {e}[/red]")
+        pass
+
+    # 🔹 For macOS, specifically check and terminate any multiprocessing processes
+    if IS_MACOS and hasattr(multiprocessing, 'active_children'):
+        for child in multiprocessing.active_children():
+            try:
+                child.terminate()
+                child.join(1)  # Wait 1 second for it to terminate
+            except Exception:
+                pass
 
     # 🔹 Remove references to completed threads
-    for thread in threading.enumerate():
-        if not thread.is_alive():
-            del thread
+    try:
+        for thread in threading.enumerate():
+            if thread != threading.current_thread() and not thread.is_alive():
+                try:
+                    if hasattr(thread, '_delete'):
+                        thread._delete()
+                except Exception:
+                    pass
+    except Exception as e:
+        console.print(f"[red]Error cleaning up threads: {e}[/red]")
+        pass
 
     # 🔹 Print remaining active threads
     # active_threads = [t for t in threading.enumerate()]
