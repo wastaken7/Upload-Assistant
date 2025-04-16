@@ -182,7 +182,7 @@ class ULCX():
 
         return ulcx_name, region_id, distributor_id
 
-    async def search_existing(self, meta, disctype, tracker=None):
+    async def search_existing(self, meta, disctype):
         if 'concert' in meta['keywords']:
             console.print('[bold red]Concerts not allowed at ULCX.')
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -210,6 +210,7 @@ class ULCX():
             meta['skipping'] = "ULCX"
             return
 
+        tracker = self.tracker
         await check_for_english(meta, tracker)
 
         dupes = []
