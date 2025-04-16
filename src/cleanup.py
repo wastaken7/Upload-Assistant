@@ -105,13 +105,14 @@ def kill_all_threads():
                 pass
 
         # Wait for a short time for processes to terminate
-        _, still_alive = psutil.wait_procs(children, timeout=3)
-        for child in still_alive:
-            # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
-            try:
-                child.kill()
-            except psutil.NoSuchProcess:
-                pass
+        if not IS_MACOS:
+            _, still_alive = psutil.wait_procs(children, timeout=3)
+            for child in still_alive:
+                # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
+                try:
+                    child.kill()
+                except psutil.NoSuchProcess:
+                    pass
     except Exception as e:
         console.print(f"[red]Error killing processes: {e}[/red]")
         pass
