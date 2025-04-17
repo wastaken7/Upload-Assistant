@@ -75,9 +75,27 @@ class COMMON():
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
         episode_overview = int(self.config['DEFAULT'].get('episode_overview', False)) or meta.get('episode_overview', None)
         try:
-            screenheader = self.config['DEFAULT']['screenshot_header']
+            # If tracker has screenshot header specified in config, use that. Otherwise, check if screenshot default is used. Otherwise, fall back to None
+            screenheader = self.config['TRACKERS'][tracker].get('custom_screenshot_header', self.config['DEFAULT'].get('screenshot_header', None))
         except Exception:
             screenheader = None
+        try:
+            # If tracker has description header specified in config, use that. Otherwise, check if custom description header default is used. 
+            desc_header = self.config['TRACKERS'][tracker].get('custom_description_header', self.config['DEFAULT'].get('custom_description_header', desc_header))
+        except Exception as e:
+            console.print(f"[yellow]Warning: Error setting custom description header: {str(e)}[/yellow]")
+        try:
+            # If screensPerRow is set, use that to determine how many screenshots should be on each row. Otherwise, use default
+            screensPerRow = int(self.config['DEFAULT']['screens_per_row'])
+        except Exception:
+            screensPerRow = None
+        try:
+            # If custom signature set and isn't empty, use that instead of the signature parameter
+            custom_signature = self.config['TRACKERS'][tracker].get('custom_signature', signature)
+            if custom_signature != '':
+                signature = custom_signature
+        except Exception as e:
+            console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
                 descfile.write(desc_header)
@@ -148,6 +166,10 @@ class COMMON():
                     web_url = images[img_index]['web_url']
                     raw_url = images[img_index]['raw_url']
                     descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url]")
+
+                    # If screensPerRow is set and we have reached that number of screenshots, add a new line
+                    if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                        descfile.write("\n")
                 descfile.write("[/center]")
                 if each['type'] == "BDMV":
                     bdinfo_keys = [key for key in each if key.startswith("bdinfo")]
@@ -260,6 +282,10 @@ class COMMON():
                             raw_url = images[img_index]['raw_url']
                             image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                             descfile.write(image_str)
+                    
+                            # If screensPerRow is set and we have reached that number of screenshots, add a new line
+                            if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                                descfile.write("\n")
                         descfile.write("[/center]\n\n")
                     else:
                         if multi_screens != 0:
@@ -376,6 +402,10 @@ class COMMON():
                     web_url = images[img_index]['web_url']
                     raw_url = images[img_index]['raw_url']
                     descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url]")
+                    
+                    # If screensPerRow is set and we have reached that number of screenshots, add a new line
+                    if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                        descfile.write("\n")
                 descfile.write("[/center]")
 
             # Handle multiple files case
@@ -464,6 +494,10 @@ class COMMON():
                             descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
                             char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
                         else:
+                            # If there are screen shots and screen shot header, write the header above the first filename
+                            if i == 0 and images and screenheader is not None:
+                                descfile.write(screenheader + '\n')
+                                char_count += len(screenheader + '\n')
                             descfile.write(f"[center]{filename}\n[/center]\n")
                             char_count += len(f"[center]{filename}\n[/center]\n")
 
@@ -471,9 +505,6 @@ class COMMON():
                     new_images_key = f'new_images_file_{i}'
                     if i == 0:  # For the first file, use 'image_list' key and add screenheader if applicable
                         if images:
-                            if screenheader is not None:
-                                descfile.write(screenheader + '\n')
-                                char_count += len(screenheader + '\n')
                             descfile.write("[center]")
                             char_count += len("[center]")
                             for img_index in range(len(images)):
@@ -482,6 +513,10 @@ class COMMON():
                                 image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                 descfile.write(image_str)
                                 char_count += len(image_str)
+                    
+                                # If screensPerRow is set and we have reached that number of screenshots, add a new line
+                                if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                                    descfile.write("\n")
                             descfile.write("[/center]\n\n")
                             char_count += len("[/center]\n\n")
                     elif multi_screens != 0:
