@@ -76,7 +76,7 @@ class CBR():
     ###############################################################
 
     async def edit_name(self, meta):
-        name = meta['name'].replace('DD+ ', 'DDP')
+        name = meta['name'].replace('DD+ ', 'DDP').replace('DD ', 'DD').replace('AAC ', 'AAC').replace('FLAC ', 'FLAC')
 
         cbr_name = name
         tag_lower = meta['tag'].lower()
