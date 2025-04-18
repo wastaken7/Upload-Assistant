@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import asyncio
-from torf import Torrent
 import requests
 import json
 import glob
