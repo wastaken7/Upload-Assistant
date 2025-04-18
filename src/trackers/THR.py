@@ -12,26 +12,22 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 from src.console import console
+from src.trackers.COMMON import COMMON
 
 
 class THR():
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
     def __init__(self, config):
         self.config = config
         self.tracker = 'THR'
+        self.source_flag = '[https://www.torrenthr.org] TorrentHR.org'
         self.username = config['TRACKERS']['THR'].get('username')
         self.password = config['TRACKERS']['THR'].get('password')
         self.banned_groups = [""]
         pass
 
     async def upload(self, session, meta, disctype):
-        await self.edit_torrent(meta)
+        common = COMMON(config=self.config)
+        await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         pronfo = await self.edit_desc(meta)  # noqa #F841
@@ -160,14 +156,6 @@ class THR():
                 if language is not None:
                     subs.append(language)
         return subs
-
-    async def edit_torrent(self, meta):
-        if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"):
-            THR_torrent = Torrent.read(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
-            THR_torrent.metainfo['announce'] = self.config['TRACKERS']['THR']['announce_url']
-            THR_torrent.metainfo['info']['source'] = "[https://www.torrenthr.org] TorrentHR.org"
-            Torrent.copy(THR_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]{meta['clean_name']}.torrent", overwrite=True)
-        return
 
     async def edit_desc(self, meta):
         pronfo = False
