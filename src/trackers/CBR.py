@@ -10,13 +10,6 @@ from src.console import console
 
 
 class CBR():
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
     def __init__(self, config):
         self.config = config
         self.tracker = 'CBR'
@@ -70,10 +63,6 @@ class CBR():
             'Other': '10',
         }.get(resolution, '10')
         return resolution_id
-
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ###### noqa E266
-    ###############################################################
 
     async def edit_name(self, meta):
         name = meta['name'].replace('DD+ ', 'DDP').replace('DD ', 'DD').replace('AAC ', 'AAC').replace('FLAC ', 'FLAC')
