@@ -551,7 +551,7 @@ class Prep():
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         meta['aka'] = f"AKA {aka.strip()}"
-                        meta['title'] = f"{title}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
             elif isinstance(imdb_info, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -760,7 +760,7 @@ class Prep():
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         meta['aka'] = f"AKA {aka.strip()}"
-                        meta['title'] = f"{title}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
             elif isinstance(imdb_info_result, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -858,7 +858,7 @@ class Prep():
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         meta['aka'] = f"AKA {aka.strip()}"
-                        meta['title'] = f"{title}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
             elif isinstance(imdb_info_result, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -1003,7 +1003,7 @@ class Prep():
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
                         meta['aka'] = f"AKA {aka.strip()}"
-                        meta['title'] = f"{title}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
