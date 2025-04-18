@@ -300,9 +300,11 @@ class HDB():
             # If tv, submit tvdb_id/season/episode
             if meta.get('tvdb_id', 0) != 0:
                 data['tvdb'] = meta['tvdb_id']
-            if int(meta.get('imdb_id')) != 0:
+            if meta.get('imdb_id') != 0:
                 imdbID = f"tt{meta.get('imdb_id'):07d}"
                 data['imdb'] = f"https://www.imdb.com/title/{imdbID}/",
+            else:
+                data['imdb'] = 0
             if meta.get('category') == 'TV':
                 data['tvdb_season'] = int(meta.get('season_int', 1))
                 data['tvdb_episode'] = int(meta.get('episode_int', 1))
@@ -342,37 +344,60 @@ class HDB():
             'passkey': self.passkey,
             'category': await self.get_type_category_id(meta),
             'codec': await self.get_type_codec_id(meta),
-            'medium': await self.get_type_medium_id(meta),
-            'search': meta['resolution']
+            'medium': await self.get_type_medium_id(meta)
         }
 
-        # Add IMDb and TVDB IDs if available
         if int(meta.get('imdb_id')) != 0:
             data['imdb'] = {'id': meta['imdb']}
         if int(meta.get('tvdb_id')) != 0:
             data['tvdb'] = {'id': meta['tvdb_id']}
 
-        try:
-            # Send POST request with JSON body
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.post(url, json=data)
+        search_terms = []
+        if meta.get('imdb') == 0 and meta.get('tvdb_id') == 0:
+            console.print("[yellow]No IMDb or TVDB ID found, trying other options...")
+            console.print("[yellow]Double check that the upload does not already exist...")
+            search_terms.append(meta['filename'])
+            if meta.get('aka') and meta['aka'] != "":
+                aka_clean = meta['aka'].replace('AKA ', '').strip()
+                if aka_clean:
+                    search_terms.append(aka_clean)
+            if meta.get('uuid'):
+                search_terms.append(meta['uuid'])
+        else:
+            search_terms.append(meta['resolution'])
 
-                if response.status_code == 200:
-                    response_data = response.json()
-                    for each in response_data.get('data', []):
-                        result = each['name']
-                        dupes.append(result)
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+        for search_term in search_terms:
+            console.print(f"[yellow]Searching HDB for: {search_term}")
+            data['search'] = search_term
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print("[bold red]Unexpected error occurred while searching torrents.")
-            console.print(str(e))
-            await asyncio.sleep(5)
+            try:
+                # Send POST request with JSON body
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.post(url, json=data)
+
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        results = response_data.get('data', [])
+
+                        if results:
+                            for each in results:
+                                result = each['name']
+                                dupes.append(result)
+                            console.print(f"[green]Found {len(results)} results using search term: {search_term}")
+                            break  # We found results, no need to try other search terms
+                        else:
+                            console.print(f"[yellow]No results found using search term: {search_term}")
+                    else:
+                        console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+
+            except httpx.TimeoutException:
+                console.print("[bold red]Request timed out while searching for existing torrents.")
+            except httpx.RequestError as e:
+                console.print(f"[bold red]An error occurred while making the request: {e}")
+            except Exception as e:
+                console.print("[bold red]Unexpected error occurred while searching torrents.")
+                console.print(str(e))
+                await asyncio.sleep(5)
 
         return dupes
 
