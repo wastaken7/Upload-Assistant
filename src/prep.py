@@ -366,7 +366,6 @@ class Prep():
                     'aither': 'AITHER',
                     'lst': 'LST',
                     'oe': 'OE',
-                    'tik': 'TIK',
                 }
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)
@@ -420,7 +419,7 @@ class Prep():
                         meta = await process_tracker(specific_tracker, meta, only_id)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "TIK", "HDB", "HUNO"]
+                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found
@@ -436,7 +435,8 @@ class Prep():
                     common = COMMON(config)
 
                     # Prioritize trackers in this order
-                    tracker_order = ["BLU", "AITHER", "LST", "OE", "TIK"]
+                    # Prioritize trackers in this order
+                    tracker_order = ["BLU", "AITHER", "LST", "OE"]
 
                     # Check if we have stored torrent comments
                     if meta.get('torrent_comments'):
@@ -444,6 +444,8 @@ class Prep():
                         for tracker_name in tracker_order:
                             # Skip if we already have region and distributor
                             if meta.get('region') and meta.get('distributor'):
+                                if meta.get('debug', False):
+                                    console.print(f"[green]Both region ({meta['region']}) and distributor ({meta['distributor']}) found - no need to check more trackers[/green]")
                                 break
 
                             tracker_id = None
@@ -476,26 +478,32 @@ class Prep():
                                         tracker_id = match.group(1)
                                         meta[tracker_key] = tracker_id
                                         break
-                                elif "cinematik.net" in comment and tracker_name == "TIK":
-                                    match = re.search(r'/(\d+)$', comment)
-                                    if match:
-                                        tracker_id = match.group(1)
-                                        meta[tracker_key] = tracker_id
-                                        break
 
                             # If we found a tracker ID, try to get region/distributor data
                             if tracker_id:
+                                missing_info = []
+                                if not meta.get('region'):
+                                    missing_info.append("region")
+                                if not meta.get('distributor'):
+                                    missing_info.append("distributor")
+
                                 if meta.get('debug', False):
-                                    console.print(f"[cyan]Using {tracker_name} ID {tracker_id} to get region/distributor info[/cyan]")
-                                # Get the tracker instance
+                                    console.print(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
+
                                 tracker_instance = tracker_class_map[tracker_name](config=config)
-                                # Try to get region/distributor data
+
+                                # Store initial state to detect changes
+                                had_region = bool(meta.get('region'))
+                                had_distributor = bool(meta.get('distributor'))
                                 await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, tracker_id)
-                                # Stop if we found both region and distributor
-                                if meta.get('region') and meta.get('distributor'):
+
+                                if meta.get('region') and not had_region:
                                     if meta.get('debug', False):
-                                        console.print(f"[green]Successfully found region and distributor from {tracker_name}[/green]")
-                                    break
+                                        console.print(f"[green]Found region '{meta['region']}' from {tracker_name}[/green]")
+
+                                if meta.get('distributor') and not had_distributor:
+                                    if meta.get('debug', False):
+                                        console.print(f"[green]Found distributor '{meta['distributor']}' from {tracker_name}[/green]")
 
             else:
                 console.print("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
