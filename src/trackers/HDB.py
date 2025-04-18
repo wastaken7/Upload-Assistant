@@ -353,7 +353,7 @@ class HDB():
             data['tvdb'] = {'id': meta['tvdb_id']}
 
         search_terms = []
-        if meta.get('imdb') == 0 and meta.get('tvdb_id') == 0:
+        if meta.get('imdb_id') == 0 and meta.get('tvdb_id') == 0:
             console.print("[yellow]No IMDb or TVDB ID found, trying other options...")
             console.print("[yellow]Double check that the upload does not already exist...")
             search_terms.append(meta['filename'])
