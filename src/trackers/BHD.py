@@ -351,7 +351,7 @@ class BHD():
         return str(value).strip().lower() in {"true", "1", "yes"}
 
     async def get_live(self, meta):
-        draft = self.config['TRACKERS'][self.tracker]['draft_default'].strip()
+        draft = self.config['TRACKERS'][self.tracker].get('draft_default', "False").strip()
         draft_bool = self._is_true(draft)  # Convert to boolean (True for "true", False for "false")
         draft_int = 0 if draft_bool or meta.get('draft') else 1
 
