@@ -1214,6 +1214,10 @@ class Clients():
                         match = re.search(r'/(\d+)$', comment)
                         if match:
                             meta['blu'] = match.group(1)
+                    elif "https://upload.cx" in comment:
+                        match = re.search(r'/(\d+)$', comment)
+                        if match:
+                            meta['ulcx'] = match.group(1)
                     elif "https://hdbits.org" in comment:
                         match = re.search(r'id=(\d+)', comment)
                         if match:
@@ -1230,7 +1234,7 @@ class Clients():
                             meta['huno'] = match.group(1)
 
                     if match:
-                        for tracker in ['ptp', 'bhd', 'btn', 'huno', 'blu', 'aither', 'lst', 'oe', 'hdb']:
+                        for tracker in ['ptp', 'bhd', 'btn', 'huno', 'blu', 'aither', 'ulcx', 'lst', 'oe', 'hdb']:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1492,6 +1496,7 @@ class Clients():
                 'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
                 'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
                 'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
+                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
             }
 
             # First collect exact path matches
@@ -1592,7 +1597,7 @@ class Clients():
                         }
 
                         # Initialize a list for found tracker IDs
-                        tracker_priority = ['ptp', 'bhd', 'btn', 'huno', 'aither', 'blu', 'lst', 'oe', 'hdb']
+                        tracker_priority = ['ptp', 'bhd', 'btn', 'huno', 'aither', 'blu', 'ulcx', 'lst', 'oe', 'hdb']
                         tracker_found = False
                         tracker_urls = []
 

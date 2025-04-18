@@ -366,6 +366,7 @@ class Prep():
                     'aither': 'AITHER',
                     'lst': 'LST',
                     'oe': 'OE',
+                    'ulcx': 'ULCX',
                 }
 
                 specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)
@@ -419,7 +420,7 @@ class Prep():
                         meta = await process_tracker(specific_tracker, meta, only_id)
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
-                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO"]
+                    tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO", "ULCX"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found
@@ -430,13 +431,13 @@ class Prep():
                 if not found_match:
                     console.print("[yellow]No matches found on any trackers.[/yellow]")
 
+                # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
                 if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV":
                     from src.trackers.COMMON import COMMON
                     common = COMMON(config)
 
                     # Prioritize trackers in this order
-                    # Prioritize trackers in this order
-                    tracker_order = ["BLU", "AITHER", "LST", "OE"]
+                    tracker_order = ["BLU", "AITHER", "ULCX", "LST", "OE"]
 
                     # Check if we have stored torrent comments
                     if meta.get('torrent_comments'):
@@ -473,6 +474,12 @@ class Prep():
                                         meta[tracker_key] = tracker_id
                                         break
                                 elif "onlyencodes.cc" in comment and tracker_name == "OE":
+                                    match = re.search(r'/(\d+)$', comment)
+                                    if match:
+                                        tracker_id = match.group(1)
+                                        meta[tracker_key] = tracker_id
+                                        break
+                                elif "https://upload.cx" in comment and tracker_name == "ULCX":
                                     match = re.search(r'/(\d+)$', comment)
                                     if match:
                                         tracker_id = match.group(1)
