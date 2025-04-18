@@ -62,9 +62,10 @@ config = {
 
         # Number of screenshots to capture
         "screens": "6",
-		
+
         # Number of screenshots per row in the description. Default is single row.
-		# "screens_per_row": "3",
+        # Only for sites that use common description for now
+        # "screens_per_row": "3",
 
         # Add some overlay details to the screenshots
         # Frame number/type and Tonemapped if applicable
@@ -135,10 +136,10 @@ config = {
         # Absolute limit on processed files in packs.
         # You might not want to process screens/mediainfo for 40 episodes in a season pack.
         "processLimit": "5",
-		
+
         # Providing the option to add a description header, in bbcode, at the top of the description section
-		# where supported
-		# "custom_description_header": "[center] My Release [/center]",
+        # where supported
+        # "custom_description_header": "[center] My Release [/center]",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[center] SCREENSHOTS [/center]",
@@ -480,11 +481,10 @@ config = {
         # "UNIT3D_TEMPLATE": {
         #    "api_key": "UNIT3D_TEMPLATE api key",
         #    "announce_url": "https://domain.tld/announce/customannounceurl",
-        #    # "anon" : False,
-		#	"custom_signature" : "",
-		#	"custom_description_header": "",
-		#	"custom_screenshot_header": "",
-        #    # "modq" : False  ## Not working yet
+        #    "anon" : False,
+        #    "custom_description_header": "",
+        #    "custom_screenshot_header": "",
+        #    "modq" : False,  ## Not working yet
         # },
         "UTP": {
             "api_key": "UTP api key",

@@ -80,7 +80,7 @@ class COMMON():
         except Exception:
             screenheader = None
         try:
-            # If tracker has description header specified in config, use that. Otherwise, check if custom description header default is used. 
+            # If tracker has description header specified in config, use that. Otherwise, check if custom description header default is used.
             desc_header = self.config['TRACKERS'][tracker].get('custom_description_header', self.config['DEFAULT'].get('custom_description_header', desc_header))
         except Exception as e:
             console.print(f"[yellow]Warning: Error setting custom description header: {str(e)}[/yellow]")
@@ -282,7 +282,7 @@ class COMMON():
                             raw_url = images[img_index]['raw_url']
                             image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                             descfile.write(image_str)
-                    
+
                             # If screensPerRow is set and we have reached that number of screenshots, add a new line
                             if screensPerRow and (img_index + 1) % screensPerRow == 0:
                                 descfile.write("\n")
@@ -402,7 +402,7 @@ class COMMON():
                     web_url = images[img_index]['web_url']
                     raw_url = images[img_index]['raw_url']
                     descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url]")
-                    
+
                     # If screensPerRow is set and we have reached that number of screenshots, add a new line
                     if screensPerRow and (img_index + 1) % screensPerRow == 0:
                         descfile.write("\n")
@@ -513,7 +513,7 @@ class COMMON():
                                 image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
                                 descfile.write(image_str)
                                 char_count += len(image_str)
-                    
+
                                 # If screensPerRow is set and we have reached that number of screenshots, add a new line
                                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                                     descfile.write("\n")
