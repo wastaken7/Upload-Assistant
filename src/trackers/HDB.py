@@ -356,7 +356,7 @@ class HDB():
         has_valid_ids = ((meta.get('category') == 'TV' and meta.get('tvdb_id') == 0 and meta.get('imdb_id') == 0) or
                          (meta.get('category') == 'MOVIE' and meta.get('imdb_id') == 0))
 
-        if not has_valid_ids:
+        if has_valid_ids:
             console.print("[yellow]No IMDb or TVDB ID found, trying other options...")
             console.print("[yellow]Double check that the upload does not already exist...")
             search_terms.append(meta['filename'])
@@ -388,8 +388,6 @@ class HDB():
                                 dupes.append(result)
                             console.print(f"[green]Found {len(results)} results using search term: {search_term}")
                             break  # We found results, no need to try other search terms
-                        else:
-                            console.print(f"[yellow]No results found using search term: {search_term}")
                     else:
                         console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
