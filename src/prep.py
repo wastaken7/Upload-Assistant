@@ -431,7 +431,8 @@ class Prep():
             meta = await self.get_source_override(meta, other_id=True)
             meta['no_override'] = True
 
-        get_bluray_info = meta.get('get_bluray_info', True)
+        get_bluray_info = int(self.config['DEFAULT'].get('get_bluray_info', False))
+        meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
 

@@ -459,65 +459,63 @@ async def get_bluray_releases(meta):
     console.print(f"[green]Found {len(matching_releases)} total matching releases[/green]")
 
     if matching_releases:
-        console.print("[yellow]Matching releases:[/yellow]")
-        for idx, release in enumerate(matching_releases, 1):
-            console.print(f"[green]{idx}. {release['movie_title']} ({release['movie_year']}):[/green]")
-            console.print(f"   [blue]Title: {release['title']}[/blue]")
-            console.print(f"   [blue]Country: {release['country']}[/blue]")
-            console.print(f"   [blue]Publisher: {release['publisher']}[/blue]")
-            console.print(f"   [blue]Price: {release['price']}[/blue]")
-            console.print(f"   [dim]URL: {release['url']}[/dim]")
+        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+            console.print("[yellow]Matching releases:[/yellow]")
+            for idx, release in enumerate(matching_releases, 1):
+                console.print(f"[green]{idx}. {release['movie_title']} ({release['movie_year']}):[/green]")
+                console.print(f"   [blue]Title: {release['title']}[/blue]")
+                console.print(f"   [blue]Country: {release['country']}[/blue]")
+                console.print(f"   [blue]Publisher: {release['publisher']}[/blue]")
+                console.print(f"   [blue]Price: {release['price']}[/blue]")
+                console.print(f"   [dim]URL: {release['url']}[/dim]")
 
-        if meta.get('unattended', False):
-            cli_ui.info_1("Running in unattended mode, using first release by default")
-            selected_release = matching_releases[0]
-            meta['region'] = selected_release['country']
-            meta['distributor'] = selected_release['publisher']
-            return matching_releases
+            cli_ui.info_section("Blu-ray Release Selection")
+            cli_ui.info("Please select a Blu-ray release to use for region and distributor information:")
+            cli_ui.info("Enter release number, 'a' for all releases, or 'n' to skip")
+            cli_ui.info("Selecting all releases will search every release for more information...")
+            cli_ui.info("More releases will require more time to process")
 
-        cli_ui.info_section("Blu-ray Release Selection")
-        cli_ui.info("Please select a Blu-ray release to use for region and distributor information:")
-        cli_ui.info("Enter release number, 'a' for all releases, or 'n' to skip")
-        cli_ui.info("Selecting all releases will search every release for more information...")
-        cli_ui.info("More releases will require more time to process")
-
-        while True:
-            try:
-                selection = input(f"Selection (1-{len(matching_releases)}/a/n): ").strip().lower()
-                if selection == 'a':
-                    cli_ui.info("All releases selected")
-                    detailed_releases = await process_all_releases(matching_releases, meta)
-                    return detailed_releases
-                elif selection == 'n':
-                    cli_ui.info("Skipped - not using Blu-ray.com information")
-                    return []
-                else:
-                    try:
-                        selected_idx = int(selection)
-
-                        if 1 <= selected_idx <= len(matching_releases):
-                            selected_release = matching_releases[selected_idx - 1]
-                            cli_ui.info(f"Selected: {selected_release['title']} - {selected_release['country']} - {selected_release['publisher']}")
-                            region_code = map_country_to_region_code(selected_release['country'])
-                            meta['region'] = region_code
-                            meta['distributor'] = selected_release['publisher'].upper()
-                            cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
-
-                            return [selected_release]
-                        else:
-                            cli_ui.warning(f"Invalid selection: {selected_idx}. Must be between 1 and {len(matching_releases)}")
-                    except ValueError:
-                        cli_ui.warning(f"Invalid input: '{selection}'. Please enter a number, 'a', or 'n'")
-
-            except (KeyboardInterrupt, EOFError):
+            while True:
                 try:
-                    confirm = input("Press Enter to exit or any other key to continue: ")
-                    if confirm.strip() == "":
-                        raise SystemExit("Selection cancelled by user")
+                    selection = input(f"Selection (1-{len(matching_releases)}/a/n): ").strip().lower()
+                    if selection == 'a':
+                        cli_ui.info("All releases selected")
+                        detailed_releases = await process_all_releases(matching_releases, meta)
+                        return detailed_releases
+                    elif selection == 'n':
+                        cli_ui.info("Skipped - not using Blu-ray.com information")
+                        return []
                     else:
-                        cli_ui.info("Continuing selection...")
+                        try:
+                            selected_idx = int(selection)
+
+                            if 1 <= selected_idx <= len(matching_releases):
+                                selected_release = matching_releases[selected_idx - 1]
+                                cli_ui.info(f"Selected: {selected_release['title']} - {selected_release['country']} - {selected_release['publisher']}")
+                                region_code = map_country_to_region_code(selected_release['country'])
+                                meta['region'] = region_code
+                                meta['distributor'] = selected_release['publisher'].upper()
+                                cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
+
+                                return [selected_release]
+                            else:
+                                cli_ui.warning(f"Invalid selection: {selected_idx}. Must be between 1 and {len(matching_releases)}")
+                        except ValueError:
+                            cli_ui.warning(f"Invalid input: '{selection}'. Please enter a number, 'a', or 'n'")
+
                 except (KeyboardInterrupt, EOFError):
-                    raise SystemExit("Selection cancelled by user")
+                    try:
+                        confirm = input("Press Enter to exit or any other key to continue: ")
+                        if confirm.strip() == "":
+                            raise SystemExit("Selection cancelled by user")
+                        else:
+                            cli_ui.info("Continuing selection...")
+                    except (KeyboardInterrupt, EOFError):
+                        raise SystemExit("Selection cancelled by user")
+        else:
+            console.print("[yellow]Unattended mode - selecting all releases")
+            detailed_releases = await process_all_releases(matching_releases, meta)
+            return detailed_releases
 
     try:
         imdb_id = meta.get('imdb_id', '0000000')
@@ -865,6 +863,7 @@ async def process_all_releases(releases, meta):
         scored_releases = []
         for idx, release in enumerate(detailed_releases, 1):
             console.print(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
+            console.print(f"[blue]Release URL: {release['url']}[/blue]")
             score = 100.0
 
             if 'specs' in release:
@@ -1201,18 +1200,84 @@ async def process_all_releases(releases, meta):
         scored_releases.sort(reverse=True, key=lambda x: x[0])
 
         if scored_releases:
+            bluray_score = meta.get('bluray_score', 100)
             best_score, best_release = scored_releases[0]
-            cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+            close_matches = [release for score, release in scored_releases if best_score - score <= 10]
 
-            region_code = map_country_to_region_code(best_release['country'])
-            meta['region'] = region_code
-            meta['distributor'] = best_release['publisher'].upper()
-            cli_ui.info(f"Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+            if len(close_matches) == 1 and best_score == 100:
+                cli_ui.info(f"Single perfect match found: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                region_code = map_country_to_region_code(best_release['country'])
+                meta['region'] = region_code
+                meta['distributor'] = best_release['publisher'].upper()
+                meta['release_url'] = best_release['url']
+                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
 
-            if best_score >= 85:
-                cli_ui.info(f"[green]Updated metadata with information from {best_release['title']}[/green]")
+            elif len(close_matches) > 1 and best_score > bluray_score:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    console.print("[yellow]Multiple releases are within 10% of the best match. Please confirm which release to use:[/yellow]")
+                    for idx, release in enumerate(close_matches, 1):
+                        score = next(score for score, r in scored_releases if r == release)
+                        console.print(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
+
+                    console.print("Enter the number of the release to use, or 'n' to skip:")
+                    while True:
+                        user_input = input("Selection: ").strip().lower()
+                        if user_input == 'n':
+                            cli_ui.warning("No release selected. You may want to manually verify this information.")
+                            detailed_releases = []
+                            break
+                        try:
+                            selected_idx = int(user_input)
+                            if 1 <= selected_idx <= len(close_matches):
+                                selected_release = close_matches[selected_idx - 1]
+                                cli_ui.info(f"Selected: {selected_release['title']} ({selected_release['country']})")
+                                region_code = map_country_to_region_code(selected_release['country'])
+                                meta['region'] = region_code
+                                meta['distributor'] = selected_release['publisher'].upper()
+                                meta['release_url'] = selected_release['url']
+                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
+                                break
+                            else:
+                                console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
+                        except ValueError:
+                            console.print("[red]Invalid input. Please enter a number or 'n'.[/red]")
+                elif best_score > bluray_score:
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    region_code = map_country_to_region_code(best_release['country'])
+                    meta['region'] = region_code
+                    meta['distributor'] = best_release['publisher'].upper()
+                    meta['release_url'] = best_release['url']
+                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+
+            elif best_score > bluray_score:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    console.print("Do you want to use this release? Enter 'y' to confirm or 'n' to discard:")
+                    while True:
+                        user_input = input("Selection (y/n): ").strip().lower()
+                        if user_input == 'y':
+                            region_code = map_country_to_region_code(best_release['country'])
+                            meta['region'] = region_code
+                            meta['distributor'] = best_release['publisher'].upper()
+                            meta['release_url'] = best_release['url']
+                            console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                            break
+                        elif user_input == 'n':
+                            cli_ui.warning("Release discarded by user.")
+                            detailed_releases = []
+                            break
+                        else:
+                            console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                else:
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    region_code = map_country_to_region_code(best_release['country'])
+                    meta['region'] = region_code
+                    meta['distributor'] = best_release['publisher'].upper()
+                    meta['release_url'] = best_release['url']
+                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
             else:
-                cli_ui.warning(f"Match score is low ({best_score:.1f}/100). You may want to manually verify this information.")
+                cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                detailed_releases = []
 
     return detailed_releases
 
