@@ -582,23 +582,56 @@ async def parse_release_details(response_text, release):
         # Parse audio section
         audio_section = extract_section(specs_td, 'Audio')
         if audio_section:
-            audio_div = specs_td.find('div', id='shortaudio') or specs_td.find('div', id='longaudio')
+            audio_div = specs_td.find('div', id='longaudio')
+            if not audio_div:
+                audio_div = specs_td.find('div', id='shortaudio')
+                console.print("[dim]Using shortaudio because longaudio wasn't found[/dim]")
             if audio_div:
-                # Extract all audio tracks and handle notes
-                audio_lines = []
-                raw_lines = [line.strip() for line in audio_div.get_text().split('\n') if line.strip() and 'less' not in line]
+                audio_html = str(audio_div)
+                audio_html = re.sub(r'<br\s*/?>', '\n', audio_html)
+                audio_soup = BeautifulSoup(audio_html, 'html.parser')
+                raw_text = audio_soup.get_text()
+                raw_lines = [line.strip() for line in raw_text.split('\n') if line.strip() and 'less' not in line]
 
-                current_track = ""
-                for line in raw_lines:
-                    if line.startswith("Note:"):
+                audio_lines = []
+                i = 0
+                while i < len(raw_lines):
+                    current_line = raw_lines[i]
+                    is_atmos = 'atmos' in current_line.lower()
+
+                    # If it's an Atmos track and there's a next line with the same language, combine them
+                    if is_atmos and i + 1 < len(raw_lines):
+                        next_line = raw_lines[i + 1]
+                        current_lang = current_line.split(':', 1)[0].strip() if ':' in current_line else ''
+                        next_lang = next_line.split(':', 1)[0].strip() if ':' in next_line else ''
+
+                        if current_lang and current_lang == next_lang:
+                            # This is likely an Atmos track followed by its core track
+                            # Combine them into a single entry
+                            if 'Dolby Atmos' in current_line and ('Dolby Digital' in next_line or 'Dolby TrueHD' in next_line):
+                                channel_info = ""
+                                if '7.1' in next_line:
+                                    channel_info = "7.1"
+                                elif '5.1' in next_line:
+                                    channel_info = "5.1"
+                                if 'TrueHD' in next_line:
+                                    combined_track = f"{current_lang}: Dolby TrueHD Atmos {channel_info}"
+                                else:
+                                    combined_track = f"{current_lang}: Dolby Atmos {channel_info}"
+
+                                audio_lines.append(combined_track)
+                                i += 2
+                                continue
+
+                    if current_line.startswith("Note:"):
                         # This is a note for the previous track
-                        if current_track:
-                            audio_lines[-1] = f"{audio_lines[-1]} - {line}"
-                            current_track = ""
+                        if audio_lines:
+                            audio_lines[-1] = f"{audio_lines[-1]} - {current_line}"
                     else:
                         # This is a new track
-                        audio_lines.append(line)
-                        current_track = line
+                        audio_lines.append(current_line)
+
+                    i += 1
 
                 specs['audio'] = audio_lines
                 console.print(f"[blue]Audio Tracks: {len(audio_lines)} found[/blue]")
@@ -608,7 +641,10 @@ async def parse_release_details(response_text, release):
         # Parse subtitle section
         subtitle_section = extract_section(specs_td, 'Subtitles')
         if subtitle_section:
-            subs_div = specs_td.find('div', id='shortsubs') or specs_td.find('div', id='longsubs')
+            subs_div = specs_td.find('div', id='longsubs')
+            if not subs_div:
+                subs_div = specs_td.find('div', id='shortsubs')
+                console.print("[dim]Using shortsubs because longsubs wasn't found[/dim]")
             if subs_div:
                 subtitle_text = subs_div.get_text().strip()
                 subtitle_text = re.sub(r'\s*\(less\)\s*', '', subtitle_text)
@@ -827,7 +863,8 @@ async def process_all_releases(releases, meta):
 
     if detailed_releases:
         scored_releases = []
-        for release in detailed_releases:
+        for idx, release in enumerate(detailed_releases, 1):
+            console.print(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
             score = 100.0
 
             if 'specs' in release:
@@ -836,12 +873,16 @@ async def process_all_releases(releases, meta):
                 # Check for completeness of data (penalty for missing info)
                 if not specs.get('video', {}):
                     score -= 10  # Missing video info
+                    console.print("[red]✗[/red] Missing video info")
                 if not specs.get('audio', []):
                     score -= 10  # Missing audio info
+                    console.print("[red]✗[/red] Missing audio info")
                 if meta_subtitles and not specs.get('subtitles', []):
                     score -= 5  # Missing subtitle info when bdinfo has subtitles
+                    console.print("[red]✗[/red] Missing subtitle info")
                 if not specs.get('discs', {}):
                     score -= 3  # Missing disc info
+                    console.print("[red]✗[/red] Missing disc info")
 
                 # Disc format check
                 if 'discs' in specs and 'format' in specs['discs'] and 'discs' in meta and 'bdinfo' in meta['discs'][0]:
@@ -849,7 +890,11 @@ async def process_all_releases(releases, meta):
                     disc_size_gb = meta['discs'][0]['bdinfo'].get('size', 0)
 
                     expected_format = ""
-                    if disc_size_gb > 40:  # BD-50 typically holds around 50GB
+                    if disc_size_gb > 90:  # BD-100 typically holds around 100GB
+                        expected_format = "bd-100"
+                    elif disc_size_gb > 60:  # BD-66 typically holds around 66GB
+                        expected_format = "bd-66"
+                    elif disc_size_gb > 40:  # BD-50 typically holds around 50GB
                         expected_format = "bd-50"
                     elif disc_size_gb > 20:  # BD-25 typically holds around 25GB
                         expected_format = "bd-25"
@@ -912,30 +957,64 @@ async def process_all_releases(releases, meta):
 
                 # Audio track checks
                 if 'audio' in specs and meta_audio_specs:
-                    # Count how many of our local audio tracks were found in the release
                     audio_matches = 0
                     partial_audio_matches = 0
                     missing_audio_tracks = 0
+                    available_release_tracks = specs.get('audio', [])[:]
 
                     for meta_track in meta_audio_specs:
                         meta_lang = meta_track.get('language', '').lower()
-                        meta_format = meta_track.get('codec', '').lower()
-                        meta_channels = meta_track.get('channels', '').lower()
+                        meta_format = meta_track.get('codec', '').lower().replace('audio', '')
+                        meta_channels = meta_track.get('channels', '').lower().replace('audio', '')
                         meta_sample_rate = meta_track.get('sample_rate', '').lower()
                         meta_bit_depth = meta_track.get('bit_depth', '').lower()
+                        meta_bitrate = meta_track.get('bitrate', '').lower()
+
+                        # Special handling for Atmos tracks
+                        if meta_track.get('atmos_why_you_be_like_this', '').lower() == 'atmos' or 'atmos' in meta_channels:
+                            if 'truehd' in meta_format:
+                                meta_format = 'dolby truehd atmos'
+                            elif 'dolby' in meta_format:
+                                meta_format = 'dolby atmos'
+                            if meta_channels.strip() in ['atmos audio', 'atmos', '']:
+                                if meta_sample_rate in ['7.1', '5.1', '2.0', '1.0']:
+                                    meta_channels = meta_sample_rate
+                                else:
+                                    meta_channels = '7.1'
+
+                            if 'khz' in meta_bitrate and 'khz' not in meta_sample_rate:
+                                meta_sample_rate = meta_bitrate
+                                meta_bitrate = ""
+
+                            if 'kbps' in meta_bit_depth:
+                                bitrate_part = re.search(r'(\d+\s*kbps)', meta_bit_depth)
+                                if bitrate_part:
+                                    meta_bitrate = bitrate_part.group(1)
+                                    bit_depth_part = re.search(r'(\d+)-bit', meta_bit_depth)
+                                    if bit_depth_part:
+                                        meta_bit_depth = bit_depth_part.group(1) + "-bit"
+                                    else:
+                                        meta_bit_depth = ""
+
+                        # Skip bit depth if it contains "DN -" (Dolby Digital Normalization)
+                        if 'dn -' in meta_bit_depth:
+                            meta_bit_depth = ""
 
                         best_match_score = 0
+                        best_match_core_score = 0
+                        best_match_idx = -1
                         track_found = False
 
-                        for release_track in specs.get('audio', []):
+                        for idx, release_track in enumerate(available_release_tracks):
                             release_track_lower = release_track.lower()
                             current_match_score = 0
+                            core_match_score = 0
 
-                            # Check language match (required)
                             lang_match = False
                             if meta_lang and meta_lang in release_track_lower:
                                 lang_match = True
                                 current_match_score += 1
+                                core_match_score += 1
 
                             if not lang_match:
                                 continue
@@ -944,42 +1023,54 @@ async def process_all_releases(releases, meta):
                             if 'lpcm' in meta_format and ('pcm' in release_track_lower or 'lpcm' in release_track_lower):
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
                             elif 'dts-hd' in meta_format and 'dts-hd' in release_track_lower:
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
                             elif 'dts' in meta_format and 'dts' in release_track_lower:
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
                             elif 'dolby' in meta_format and 'dolby' in release_track_lower:
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
                             elif 'truehd' in meta_format and 'truehd' in release_track_lower:
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
                             elif 'atmos' in meta_format and 'atmos' in release_track_lower:
                                 format_match = True
                                 current_match_score += 1
+                                core_match_score += 1
 
                             channel_match = False
                             if meta_channels:
                                 if '5.1' in meta_channels and '5.1' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '7.1' in meta_channels and '7.1' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '2.0' in meta_channels and '2.0' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '2.0' in meta_channels and 'stereo' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '1.0' in meta_channels and '1.0' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '1.0' in meta_channels and 'mono' in release_track_lower:
                                     channel_match = True
                                     current_match_score += 1
+                                    core_match_score += 1
                                 elif '2.0' in meta_channels and 'mono' in release_track_lower:
                                     channel_match = False
                                 elif '1.0' in meta_channels and ('2.0' in release_track_lower or 'stereo' in release_track_lower):
@@ -993,7 +1084,7 @@ async def process_all_releases(releases, meta):
                                 elif "note:" in release_track_lower and sample_rate_str in release_track_lower:
                                     current_match_score += 1
 
-                            if meta_bit_depth:
+                            if meta_bit_depth and meta_bit_depth != "":
                                 bit_depth_str = meta_bit_depth.lower()
                                 if bit_depth_str in release_track_lower:
                                     current_match_score += 1
@@ -1002,23 +1093,37 @@ async def process_all_releases(releases, meta):
                                 elif "note:" in release_track_lower and bit_depth_str.replace('-', '') in release_track_lower.replace(' ', ''):
                                     current_match_score += 1
 
+                            if meta_bitrate and meta_bitrate != "":
+                                bitrate_str = meta_bitrate.lower()
+                                if bitrate_str in release_track_lower:
+                                    current_match_score += 1
+                                elif "note:" in release_track_lower and bitrate_str in release_track_lower:
+                                    current_match_score += 1
+
                             if current_match_score > best_match_score:
                                 best_match_score = current_match_score
+                                best_match_core_score = core_match_score
+                                best_match_idx = idx
 
-                                if lang_match and (format_match or channel_match or best_match_score >= 2):
-                                    track_found = True
+                            if lang_match and (format_match or channel_match):
+                                track_found = True
 
-                        if track_found:
-                            # Calculate how complete the match is
-                            # Maximum possible score: language (1) + format (1) + channels (1) + sample rate (1) + bit depth (1) = 5
-                            match_quality = best_match_score / 5.0
+                        if track_found and best_match_idx >= 0:
+                            # Calculate matches based on core fields (language, format, channels)
+                            # Maximum core score: language (1) + format (1) + channels (1) = 3
+                            core_match_quality = best_match_core_score / 3.0
+                            matched_track = available_release_tracks[best_match_idx]
 
-                            if match_quality >= 1.0:  # Everything matches perfectly
+                            if core_match_quality >= 1:
                                 audio_matches += 1
-                                console.print(f"[green]✓[/green] Found good match for {meta_lang} {meta_format} {meta_channels} track (match quality: {match_quality:.1%})")
+                                console.print(f"[green]✓[/green] Found good match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: 100%)")
                             else:
                                 partial_audio_matches += 1
-                                console.print(f"[yellow]⚠[/yellow] Found partial match for {meta_lang} {meta_format} {meta_channels} track (match quality: {match_quality:.1%})")
+                                percent = int(core_match_quality * 100)
+                                console.print(f"[yellow]⚠[/yellow] Found partial match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: {percent}%)")
+
+                            available_release_tracks.pop(best_match_idx)
+
                         else:
                             missing_audio_tracks += 1
                             console.print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} track")
@@ -1028,13 +1133,12 @@ async def process_all_releases(releases, meta):
                         full_match_percentage = (audio_matches / total_tracks) * 100
                         partial_match_percentage = (partial_audio_matches / total_tracks) * 100
 
-                        # Deduction based on percentage of missing tracks
-                        # Full penalty for missing tracks, half penalty for partial matches
-                        audio_penalty = 20 * (missing_audio_tracks / total_tracks) + 10 * (partial_audio_matches / total_tracks)
+                        audio_penalty = 40 * (missing_audio_tracks / total_tracks) + 10 * (partial_audio_matches / total_tracks)
+                        console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
 
                         if audio_matches > 0:
-                            console.print(f"[green]✓[/green] Audio tracks with exact matches: {audio_matches}/{total_tracks} ({full_match_percentage:.1f}% of tracks)")
+                            console.print(f"[green]✓[/green] Audio tracks with good matches: {audio_matches}/{total_tracks} ({full_match_percentage:.1f}% of tracks)")
                             if partial_audio_matches > 0:
                                 console.print(f"[yellow]⚠[/yellow] Audio tracks with partial matches: {partial_audio_matches}/{total_tracks} ({partial_match_percentage:.1f}% of tracks)")
                         elif partial_audio_matches > 0:
@@ -1049,25 +1153,34 @@ async def process_all_releases(releases, meta):
                 if 'subtitles' in specs and meta_subtitles:
                     sub_matches = 0
                     missing_subs = 0
+                    available_release_subs = specs.get('subtitles', [])[:]
 
                     for meta_sub in meta_subtitles:
                         meta_sub_lower = meta_sub.lower()
                         sub_found = False
+                        matched_idx = -1
 
-                        for release_sub in specs.get('subtitles', []):
+                        for idx, release_sub in enumerate(available_release_subs):
                             release_sub_lower = release_sub.lower()
                             if meta_sub_lower in release_sub_lower or release_sub_lower in meta_sub_lower:
                                 sub_found = True
-                                sub_matches += 1
+                                matched_idx = idx
                                 break
 
-                        if not sub_found:
+                        if sub_found and matched_idx >= 0:
+                            matched_sub = available_release_subs[matched_idx]
+                            sub_matches += 1
+                            console.print(f"[green]✓[/green] Subtitle match found: {meta_sub} -> {matched_sub}")
+                            available_release_subs.pop(matched_idx)
+                        else:
                             missing_subs += 1
+                            console.print(f"[red]✗[/red] No match found for subtitle: {meta_sub}")
 
                     total_subs = len(meta_subtitles)
                     if total_subs > 0:
                         match_percentage = (sub_matches / total_subs) * 100
-                        sub_penalty = 10 * (missing_subs / total_subs)
+                        sub_penalty = 40 * (missing_subs / total_subs)
+                        console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
                         score -= sub_penalty
 
                         if sub_matches > 0:
@@ -1081,8 +1194,8 @@ async def process_all_releases(releases, meta):
                 score -= 80
                 console.print("[red]✗[/red] No specifications available for this release")
 
-            score = max(0, score)
-            console.print(f"[blue]Final score: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
+            console.print(f"[blue]Final score for release {idx}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
+            console.print("=" * 80)
             scored_releases.append((score, release))
 
         scored_releases.sort(reverse=True, key=lambda x: x[0])
