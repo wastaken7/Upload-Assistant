@@ -1028,7 +1028,7 @@ async def get_logo(tmdb_id, category, debug=False, logo_languages=None, TMDB_API
             image_response.raise_for_status()
             image_data = image_response.json()
             if debug:
-                console.print(f"[cyan]Image Data: {json.dumps(image_data, indent=2)}...")
+                console.print(f"[cyan]Image Data: {json.dumps(image_data, indent=2)[:500]}...")
 
             logos = image_data.get('logos', [])
 

@@ -24,7 +24,8 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
 
     # Check if we have main image_list but no tracker-specific images yet
     if meta.get('image_list') and not meta.get(new_images_key):
-        console.print(f"[yellow]Checking if existing images in meta['image_list'] can be used for {tracker}...")
+        if meta['debug']:
+            console.print(f"[yellow]Checking if existing images in meta['image_list'] can be used for {tracker}...")
         # Check if the URLs in image_list are from approved hosts
         approved_images = []
         need_reupload = False

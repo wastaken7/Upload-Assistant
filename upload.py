@@ -587,7 +587,10 @@ async def do_the_thing(base_dir):
                 await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
                 if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
-                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                    if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
+                        console.print(f"[cyan]Processed {processed_files_count} of {meta['limit_queue']} in limit with {total_files} files.")
+                    else:
+                        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
                     if not meta['debug']:
                         if log_file:
                             await save_processed_file(log_file, path)

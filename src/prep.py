@@ -630,6 +630,20 @@ class Prep():
             if isinstance(imdb_info, dict):
                 meta['imdb_info'] = imdb_info
                 meta['tv_year'] = imdb_info.get('tv_year', None)
+                aka = meta.get('imdb_info', {}).get('aka', "").strip()
+                title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+                year = str(meta.get('imdb_info', {}).get('year', ""))
+                if aka and not meta.get('aka'):
+                    aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
+                    difference = SequenceMatcher(None, title, aka_trimmed).ratio()
+                    if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
+                        aka = None
+
+                    if aka is not None:
+                        if f"({year})" in aka:
+                            aka = aka.replace(f"({year})", "").strip()
+                        meta['aka'] = f"AKA {aka.strip()}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
             elif isinstance(imdb_info, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -825,6 +839,20 @@ class Prep():
             if isinstance(imdb_info_result, dict):
                 meta['imdb_info'] = imdb_info_result
                 meta['tv_year'] = imdb_info_result.get('tv_year', None)
+                aka = meta.get('imdb_info', {}).get('aka', "").strip()
+                title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+                year = str(meta.get('imdb_info', {}).get('year', ""))
+                if aka and not meta.get('aka'):
+                    aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
+                    difference = SequenceMatcher(None, title, aka_trimmed).ratio()
+                    if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
+                        aka = None
+
+                    if aka is not None:
+                        if f"({year})" in aka:
+                            aka = aka.replace(f"({year})", "").strip()
+                        meta['aka'] = f"AKA {aka.strip()}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
             elif isinstance(imdb_info_result, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -909,6 +937,20 @@ class Prep():
             if isinstance(imdb_info_result, dict):
                 meta['imdb_info'] = imdb_info_result
                 meta['tv_year'] = imdb_info_result.get('tv_year', None)
+                aka = meta.get('imdb_info', {}).get('aka', "").strip()
+                title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+                year = str(meta.get('imdb_info', {}).get('year', ""))
+                if aka and not meta.get('aka'):
+                    aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
+                    difference = SequenceMatcher(None, title, aka_trimmed).ratio()
+                    if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
+                        aka = None
+
+                    if aka is not None:
+                        if f"({year})" in aka:
+                            aka = aka.replace(f"({year})", "").strip()
+                        meta['aka'] = f"AKA {aka.strip()}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
             elif isinstance(imdb_info_result, Exception):
                 console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
                 meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -1012,6 +1054,7 @@ class Prep():
                     error_msg = f"TMDB metadata retrieval failed for ID {meta['tmdb_id']}: {str(e)}"
                     console.print(f"[bold red]{error_msg}[/bold red]")
                     raise RuntimeError(error_msg) from e
+
         # Search TVMaze only if it's a TV category and tvmaze_id is still missing
         if meta['category'] == "TV":
             if meta.get('tvmaze_id', 0) == 0:
@@ -1026,9 +1069,11 @@ class Prep():
             meta.setdefault('tvmaze_id', 0)
 
         meta['tvmaze'] = meta.get('tvmaze_id', 0)
+
         # If no IMDb ID, search for it
         if meta.get('imdb_id') == 0:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
+
         # Ensure IMDb info is retrieved if it wasn't already fetched
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
             imdb_info = await get_imdb_info_api(meta['imdb_id'], manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
@@ -1047,15 +1092,11 @@ class Prep():
                         aka = None
 
                     if aka is not None:
-                        console.print(f"[yellow]Found AKA: {aka}[/yellow]")
-                        console.print(f"[yellow]Found title: {title}[/yellow]")
                         if f"({year})" in aka:
                             aka = aka.replace(f"({year})", "").strip()
-                        if aka.lower() != title.strip().lower():
-                            meta['aka'] = f"AKA {meta.get('imdb_info', {}).get('title', '').strip()}"
-                            console.print(f"[yellow]Found AKA: {meta['aka']}[/yellow]")
-                        else:
-                            meta['aka'] = f"AKA {aka}"
+                        meta['aka'] = f"AKA {aka.strip()}"
+                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
+
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
         else:
