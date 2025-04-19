@@ -432,7 +432,7 @@ class Prep():
             meta['no_override'] = True
 
         get_bluray_info = meta.get('get_bluray_info', True)
-        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None):
+        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
 
         if meta['debug']:
