@@ -63,6 +63,10 @@ config = {
         # Number of screenshots to capture
         "screens": "6",
 
+        # Number of screenshots per row in the description. Default is single row.
+        # Only for sites that use common description for now
+        # "screens_per_row": "3",
+
         # Add some overlay details to the screenshots
         # Frame number/type and Tonemapped if applicable
         "frame_overlay": False,
@@ -132,6 +136,10 @@ config = {
         # Absolute limit on processed files in packs.
         # You might not want to process screens/mediainfo for 40 episodes in a season pack.
         "processLimit": "5",
+
+        # Providing the option to add a description header, in bbcode, at the top of the description section
+        # where supported
+        # "custom_description_header": "[center] My Release [/center]",
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # "screenshot_header": "[center] SCREENSHOTS [/center]",
@@ -247,12 +255,12 @@ config = {
         "CBR": {
             "api_key": "CBR api key",
             "announce_url": "https://capybarabr.com/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "DP": {
             "api_key": "DP api key",
             "announce_url": "https://darkpeers.org/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "FL": {
             "username": "FL username",
@@ -284,28 +292,28 @@ config = {
             "username": "username",
             "password": "password",
             "my_announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
-            # "anon" : "False"
+            # "anon" : "False",
             "announce_url": "https://hdts-announce.ru/announce.php",  # DO NOT EDIT THIS LINE
         },
         "HHD": {
             "api_key": "HHD api key",
             "announce_url": "https://homiehelpdesk.net/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "HUNO": {
             "api_key": "HUNO api key",
             "announce_url": "https://hawke.uno/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "ITT": {
             "api_key": "ITT api key",
             "announce_url": "https://itatorrents.xyz/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "LCD": {
             "api_key": "LCD api key",
             "announce_url": "https://locadora.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "LST": {
             "useAPI": False,  # Set to True if using LST for automatic ID searching or description parsing
@@ -318,7 +326,7 @@ config = {
         "LT": {
             "api_key": "LT api key",
             "announce_url": "https://lat-team.com/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "MTV": {
             'api_key': 'get from security page',
@@ -338,17 +346,17 @@ config = {
             "useAPI": False,  # Set to True if using OE for automatic ID searching or description parsing
             "api_key": "OE api key",
             "announce_url": "https://onlyencodes.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "OTW": {
             "api_key": "OTW api key",
             "announce_url": "https://oldtoons.world/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "PSS": {
             "api_key": "PSS api key",
             "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "PTER": {  # Does not appear to be working at all
             "passkey": 'passkey',
@@ -365,7 +373,7 @@ config = {
             "ApiKey": 'ptp api key',
             "username": "",
             "password": "",
-            "announce_url": ""
+            "announce_url": "",
         },
         "PTT": {
             "api_key": "PTT api key",
@@ -375,24 +383,24 @@ config = {
         "R4E": {
             "api_key": "R4E api key",
             "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "RAS": {
             "api_key": "RAS api key",
             "announce_url": "https://rastastugan.org/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "RF": {
             "api_key": "RF api key",
             "announce_url": "https://reelflix.xyz/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "RTF": {
             "username": "username",
             "password": "password",
             "api_key": 'get_it_by_running_/api/ login command from https://retroflix.club/api/doc',
             "announce_url": "get from upload page",
-            # "anon": True
+            # "anon": True,
         },
         "SAM": {
             "api_key": "Samaritano API KEY",
@@ -402,7 +410,7 @@ config = {
         "SHRI": {
             "api_key": "SHRI api key",
             "announce_url": "https://shareisland.org/announce/customannounceurl",
-            # "anon" : "False"
+            # "anon" : "False",
         },
         "SN": {
             "api_key": "SN",
@@ -419,7 +427,7 @@ config = {
         "STC": {
             "api_key": "STC",
             "announce_url": "https://skipthecommericals.xyz/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "THR": {
             "username": "username",
@@ -429,7 +437,7 @@ config = {
             "pronfo_api_key": "pronfo api key",
             "pronfo_theme": "pronfo theme code",
             "pronfo_rapi_id": "pronfo remote api id",
-            # "anon" : False
+            # "anon" : False,
         },
         "TIK": {
             "useAPI": False,  # Set to True if using TIK for automatic ID searching, won't work great until folder searching is added to UNIT3D API
@@ -444,7 +452,7 @@ config = {
         "TOCA": {
             "api_key": "TOCA api key",
             "announce_url": "https://tocashare.biz/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "TTG": {
             "username": "username",
@@ -453,12 +461,12 @@ config = {
             "login_answer": "login_answer",
             "user_id": "user_id",
             "announce_url": "https://totheglory.im/announce/",
-            # "anon" : False
+            # "anon" : False,
         },
         "TVC": {
             "api_key": "TVC API Key",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
-            # "anon": "False"
+            # "anon": "False",
         },
         "UHD": {
             "api_key": "UHDshare API KEY",
@@ -473,23 +481,25 @@ config = {
         # "UNIT3D_TEMPLATE": {
         #    "api_key": "UNIT3D_TEMPLATE api key",
         #    "announce_url": "https://domain.tld/announce/customannounceurl",
-        #    # "anon" : False,
-        #    # "modq" : False  ## Not working yet
+        #    "anon" : False,
+        #    "custom_description_header": "",
+        #    "custom_screenshot_header": "",
+        #    "modq" : False,  ## Not working yet
         # },
         "UTP": {
             "api_key": "UTP api key",
             "announce_url": "https://UTP/announce/customannounceurl",
-            # "anon" : False
+            # "anon" : False,
         },
         "YOINK": {
             "api_key": "YOINK api key",
             "announce_url": "https://yoinked.org/announce/customannounceurl",
-            # "anon" : "False"
+            # "anon" : "False",
         },
         "YUS": {
             "api_key": "YUS api key",
             "announce_url": "https://yu-scene.net/announce/customannounceurl",
-            # "anon" : "False"
+            # "anon" : "False",
         },
     },
 
