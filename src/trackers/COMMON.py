@@ -98,7 +98,10 @@ class COMMON():
             console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
             if desc_header:
-                descfile.write(desc_header)
+                if not desc_header.endswith('\n'):
+                    descfile.write(desc_header + '\n')
+                else:
+                    descfile.write(desc_header)
             add_logo_enabled = self.config["DEFAULT"].get("add_logo", False)
             if add_logo_enabled and 'logo' in meta:
                 logo = meta['logo']
