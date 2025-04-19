@@ -13,6 +13,7 @@ from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.btnid import get_btn_torrents, get_bhd_torrents
 from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes
+from src.bluray_com import get_bluray_releases
 
 try:
     import traceback
@@ -429,6 +430,10 @@ class Prep():
         if user_overrides and (meta.get('imdb_id') != 0 or meta.get('tvdb_id') != 0):
             meta = await self.get_source_override(meta, other_id=True)
             meta['no_override'] = True
+
+        get_bluray_info = meta.get('get_bluray_info', True)
+        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None):
+            await get_bluray_releases(meta)
 
         if meta['debug']:
             console.print("ID inputs into prep")
