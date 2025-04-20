@@ -1156,10 +1156,11 @@ async def process_all_releases(releases, meta):
                             else:
                                 audio_penalty = 2.5
                         else:
+                            missing_tracks = total_tracks - (audio_matches + partial_audio_matches)
                             if total_tracks == 1 and audio_matches == 0:
                                 audio_penalty = 10.0
                             else:
-                                audio_penalty = 5.0
+                                audio_penalty = 5.0 * missing_tracks
                         if meta['debug']:
                             console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
@@ -1173,19 +1174,18 @@ async def process_all_releases(releases, meta):
                         else:
                             console.print("[red]✗[/red] No audio tracks match!")
 
-                    extra_audio_tracks = []
-                    if available_release_tracks:
-                        for release_track in available_release_tracks:
-                            extra_audio_tracks.append(release_track)
-                            console.print(f"[yellow]⚠[/yellow] Release has extra audio track not in BDInfo: {release_track}")
+                        extra_audio_tracks = []
+                        if available_release_tracks:
+                            for release_track in available_release_tracks:
+                                extra_audio_tracks.append(release_track)
+                                console.print(f"[yellow]⚠[/yellow] Release has extra audio track not in BDInfo: {release_track}")
 
-                    if extra_audio_tracks:
-                        for each in extra_audio_tracks:
-                            extra_penalty = 5
-                        score -= extra_penalty
-                        console.print(f"[red]-[/red] Found {len(extra_audio_tracks)} additional audio tracks in release not in BDInfo")
-                        if meta['debug']:
-                            console.print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]")
+                        if extra_audio_tracks:
+                            extra_penalty = len(extra_audio_tracks * 5)
+                            score -= extra_penalty
+                            console.print(f"[red]-[/red] Found {len(extra_audio_tracks)} additional audio tracks in release not in BDInfo")
+                            if meta['debug']:
+                                console.print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]")
 
                 else:
                     score -= 10
@@ -1221,10 +1221,11 @@ async def process_all_releases(releases, meta):
                     total_subs = len(meta_subtitles)
                     if total_subs > 0:
                         match_percentage = (sub_matches / total_subs) * 100
+                        missing_tracks = total_subs - sub_matches
                         if total_subs == 1 and sub_matches == 0:
                             sub_penalty = 10.0
                         else:
-                            sub_penalty = 5
+                            sub_penalty = 5.0 * missing_tracks
                         if meta['debug']:
                             console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
                         score -= sub_penalty
@@ -1234,19 +1235,18 @@ async def process_all_releases(releases, meta):
                         else:
                             console.print("[red]✗[/red] No subtitle tracks match!")
 
-                    extra_subtitles = []
-                    if available_release_subs:
-                        for release_sub in available_release_subs:
-                            extra_subtitles.append(release_sub)
-                            console.print(f"[yellow]⚠[/yellow] Release has extra subtitle not in BDInfo: {release_sub}")
+                        extra_subtitles = []
+                        if available_release_subs:
+                            for release_sub in available_release_subs:
+                                extra_subtitles.append(release_sub)
+                                console.print(f"[yellow]⚠[/yellow] Release has extra subtitle not in BDInfo: {release_sub}")
 
-                    if extra_subtitles:
-                        for each in extra_subtitles:
-                            extra_penalty = 5
-                        score -= extra_penalty
-                        console.print(f"[red]-[/red] Found {len(extra_subtitles)} additional subtitles in release not in BDInfo")
-                        if meta['debug']:
-                            console.print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]")
+                        if extra_subtitles:
+                            extra_penalty = len(extra_subtitles * 5)
+                            score -= extra_penalty
+                            console.print(f"[red]-[/red] Found {len(extra_subtitles)} additional subtitles in release not in BDInfo")
+                            if meta['debug']:
+                                console.print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]")
 
                 else:
                     score -= 10
@@ -1255,7 +1255,7 @@ async def process_all_releases(releases, meta):
                 score -= 80
                 console.print("[red]✗[/red] No specifications available for this release")
 
-            console.print(f"[blue]Final score for release {idx + 1}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
+            console.print(f"[blue]Final score for release {idx}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
             console.print("=" * 80)
             scored_releases.append((score, release))
 
