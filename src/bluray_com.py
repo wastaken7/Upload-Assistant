@@ -884,7 +884,7 @@ async def process_all_releases(releases, meta):
                     score -= 10  # Missing video info
                     console.print("[red]✗[/red] Missing video info")
                 if not specs.get('audio', []):
-                    score -= 10  # Missing audio info
+                    score -= 5  # Missing audio info
                     console.print("[red]✗[/red] Missing audio info")
                 if meta_subtitles and not specs.get('subtitles', []):
                     score -= 5  # Missing subtitle info when bdinfo has subtitles
@@ -1172,8 +1172,23 @@ async def process_all_releases(releases, meta):
                             console.print(f"[yellow]⚠[/yellow] There were only partial audio track matches: {partial_audio_matches}/{total_tracks}")
                         else:
                             console.print("[red]✗[/red] No audio tracks match!")
+
+                    extra_audio_tracks = []
+                    if available_release_tracks:
+                        for release_track in available_release_tracks:
+                            extra_audio_tracks.append(release_track)
+                            console.print(f"[yellow]⚠[/yellow] Release has extra audio track not in BDInfo: {release_track}")
+
+                    if extra_audio_tracks:
+                        for each in extra_audio_tracks:
+                            extra_penalty = 5
+                        score -= extra_penalty
+                        console.print(f"[red]-[/red] Found {len(extra_audio_tracks)} additional audio tracks in release not in BDInfo")
+                        if meta['debug']:
+                            console.print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]")
+
                 else:
-                    score -= 15
+                    score -= 10
                     console.print("[yellow]?[/yellow] Cannot compare audio tracks")
 
                 # Subtitle checks
@@ -1218,8 +1233,23 @@ async def process_all_releases(releases, meta):
                             console.print(f"[green]✓[/green] Subtitle matches: {sub_matches}/{total_subs} ({match_percentage:.1f}%)")
                         else:
                             console.print("[red]✗[/red] No subtitle tracks match!")
+
+                    extra_subtitles = []
+                    if available_release_subs:
+                        for release_sub in available_release_subs:
+                            extra_subtitles.append(release_sub)
+                            console.print(f"[yellow]⚠[/yellow] Release has extra subtitle not in BDInfo: {release_sub}")
+
+                    if extra_subtitles:
+                        for each in extra_subtitles:
+                            extra_penalty = 5
+                        score -= extra_penalty
+                        console.print(f"[red]-[/red] Found {len(extra_subtitles)} additional subtitles in release not in BDInfo")
+                        if meta['debug']:
+                            console.print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]")
+
                 else:
-                    score -= 15
+                    score -= 10
                     console.print("[yellow]?[/yellow] Cannot compare subtitles")
             else:
                 score -= 80
