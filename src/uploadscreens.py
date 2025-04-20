@@ -206,19 +206,44 @@ def upload_image_task(args):
 
         elif img_host == "pixhost":
             url = "https://api.pixhost.to/images"
-            data = {
-                'content_type': '0',
-                'max_th_size': 350
-            }
-            files = {
-                'img': ('file-upload[0]', open(image, 'rb'))
-            }
-            response = requests.post(url, data=data, files=files, timeout=timeout)
-            response_data = response.json()
-            if response.status_code == 200:
-                raw_url = response_data['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
-                img_url = response_data['th_url']
-                web_url = response_data['show_url']
+            try:
+                data = {
+                    'content_type': '0',
+                    'max_th_size': 350
+                }
+                files = {
+                    'img': ('file-upload[0]', open(image, 'rb'))
+                }
+                response = requests.post(url, data=data, files=files, timeout=timeout)
+
+                if response.status_code != 200:
+                    console.print(f"[yellow]pixhost failed with status code {response.status_code}, trying next image host")
+                    return {'status': 'failed', 'reason': f'pixhost upload failed with status code {response.status_code}'}
+
+                try:
+                    response_data = response.json()
+                    if 'th_url' not in response_data:
+                        console.print("[yellow]pixhost failed: Invalid response format")
+                        return {'status': 'failed', 'reason': 'Invalid response from pixhost'}
+
+                    raw_url = response_data['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
+                    img_url = response_data['th_url']
+                    web_url = response_data['show_url']
+
+                    if meta['debug']:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+                except ValueError as e:
+                    console.print(f"[red]Invalid JSON response from pixhost: {e}")
+                    return {'status': 'failed', 'reason': 'Invalid JSON response'}
+
+            except requests.exceptions.Timeout:
+                console.print("[red]Request to pixhost timed out. The server took too long to respond.")
+                return {'status': 'failed', 'reason': 'Request timed out'}
+
+            except requests.exceptions.RequestException as e:
+                console.print(f"[red]pixhost request failed with error: {e}")
+                return {'status': 'failed', 'reason': str(e)}
 
         elif img_host == "lensdump":
             url = "https://lensdump.com/api/1/upload"
@@ -323,11 +348,18 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
         existing_images = []
         existing_count = 0
     else:
-        image_glob = glob.glob("*.png")
+        image_patterns = ["*.png", ".[!.]*.png"]
+        image_glob = []
+        for pattern in image_patterns:
+            image_glob.extend(glob.glob(pattern))
+
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files = set()
         for pattern in unwanted_patterns:
             unwanted_files.update(glob.glob(pattern))
+            if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
+                hidden_pattern = "." + pattern
+                unwanted_files.update(glob.glob(hidden_pattern))
 
         image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
@@ -367,8 +399,8 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
     # Track running tasks for cancellation
     running_tasks = set()
 
-    async def async_upload(task):
-        """Upload image with concurrency control."""
+    async def async_upload(task, retry_count=0, max_retries=3):
+        """Upload image with concurrency control and retry logic."""
         index, *task_args = task
         async with semaphore:
             try:
@@ -380,17 +412,31 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
                 if result.get('status') == 'success':
                     return (index, result)
                 else:
-                    console.print(f"[red]{result}")
-                    return None
+                    reason = result.get('reason', 'Unknown error')
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {reason}[/yellow]")
+                        await asyncio.sleep(1.1 * retry_count)
+                        return await async_upload(task, retry_count, max_retries)
+                    else:
+                        console.print(f"[red]Failed to upload image {index} after {max_retries} attempts: {reason}[/red]")
+                        return None
             except asyncio.CancelledError:
-                console.print(f"[red]Upload task {index} cancelled.")
+                console.print(f"[red]Upload task {index} cancelled.[/red]")
                 return None
             except Exception as e:
-                console.print(f"[red]Error during upload: {str(e)}")
-                return None
+                if retry_count < max_retries:
+                    retry_count += 1
+                    console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {str(e)}[/yellow]")
+                    await asyncio.sleep(1.5 * retry_count)
+                    return await async_upload(task, retry_count, max_retries)
+                else:
+                    console.print(f"[red]Error during upload for image {index} after {max_retries} attempts: {str(e)}[/red]")
+                    return None
 
     try:
-        upload_results = await asyncio.gather(*[async_upload(task) for task in upload_tasks])
+        max_retries = 3
+        upload_results = await asyncio.gather(*[async_upload(task, 0, max_retries) for task in upload_tasks])
         results = [res for res in upload_results if res is not None]
         results.sort(key=lambda x: x[0])
 
