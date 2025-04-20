@@ -464,6 +464,7 @@ async def get_bluray_releases(meta):
                                 region_code = map_country_to_region_code(selected_release['country'])
                                 meta['region'] = region_code
                                 meta['distributor'] = selected_release['publisher'].upper()
+                                meta['release_url'] = selected_release['url']
                                 cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
 
                                 return [selected_release]

@@ -1006,12 +1006,6 @@ class Prep():
                         meta['aka'] = f"AKA {aka.strip()}"
                         meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
 
-        if meta.get('tag', None) is None:
-            meta['tag'] = await self.get_tag(video, meta)
-        else:
-            if not meta['tag'].startswith('-') and meta['tag'] != "":
-                meta['tag'] = f"-{meta['tag']}"
-
         if meta['category'] == "TV":
             if not meta.get('not_anime', False):
                 meta = await get_season_episode(video, meta)
@@ -1112,6 +1106,12 @@ class Prep():
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
+
+        if meta.get('tag', None) is None:
+            meta['tag'] = await self.get_tag(video, meta)
+        else:
+            if not meta['tag'].startswith('-') and meta['tag'] != "":
+                meta['tag'] = f"-{meta['tag']}"
 
         meta = await self.tag_override(meta)
 
@@ -2299,16 +2299,19 @@ class Prep():
 
             if description.tell() != 0:
                 description.write("\n")
-            return meta
 
         # Fallback if no description is provided
         if not meta.get('skip_gen_desc', False):
-            description_text = meta['description'] if meta['description'] else ""
+            description_text = meta['description'] if meta.get('description', '') else ""
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                 if len(description_text) > 0:
                     description.write(description_text + "\n")
 
-            return meta
+                bluray_link = self.config['DEFAULT'].get("add_bluray_link", False)
+                if bluray_link and meta.get('release_url', ''):
+                    description.write(f"[center]{meta['release_url']}[/center]\n")
+
+        return meta
 
     async def tag_override(self, meta):
         with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:

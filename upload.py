@@ -298,8 +298,6 @@ async def process_meta(meta, base_dir):
 
         if 'saved_description' in meta and meta['saved_description'] is False:
             meta = await prep.gen_desc(meta)
-        else:
-            meta = await prep.gen_desc(meta)
 
         if meta.get('description') in ('None', '', ' '):
             meta['description'] = None
