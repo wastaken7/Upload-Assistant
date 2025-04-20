@@ -1255,7 +1255,7 @@ async def process_all_releases(releases, meta):
                 score -= 80
                 console.print("[red]✗[/red] No specifications available for this release")
 
-            console.print(f"[blue]Final score for release {idx}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
+            console.print(f"[blue]Final score: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
             console.print("=" * 80)
             scored_releases.append((score, release))
 
