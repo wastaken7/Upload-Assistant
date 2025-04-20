@@ -182,6 +182,7 @@ config = {
 
         # If processing a bluray disc, get bluray information from bluray.com
         # This will set region and distribution info
+        # Must have imdb id to work
         "get_bluray_info": False,
 
         # Add bluray.com link to description

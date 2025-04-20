@@ -1221,13 +1221,48 @@ async def process_all_releases(releases, meta):
             best_score, best_release = scored_releases[0]
             close_matches = [release for score, release in scored_releases if best_score - score <= 30]
 
-            if len(close_matches) == 1 and best_score == 100:
+            if len(scored_releases) == 1 and best_score == 100:
                 cli_ui.info(f"Single perfect match found: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                 region_code = map_country_to_region_code(best_release['country'])
                 meta['region'] = region_code
                 meta['distributor'] = best_release['publisher'].upper()
                 meta['release_url'] = best_release['url']
                 console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+
+            elif len(scored_releases) == 1:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    cli_ui.info(f"Single match found: {close_matches[0]['title']} ({close_matches[0]['country']}) with score {best_score:.1f}/100")
+                    while True:
+                        user_input = input("Do you want to use this release? (y/n): ").strip().lower()
+                        try:
+                            if user_input == 'y':
+                                region_code = map_country_to_region_code(close_matches[0]['country'])
+                                meta['region'] = region_code
+                                meta['distributor'] = close_matches[0]['publisher'].upper()
+                                meta['release_url'] = close_matches[0]['url']
+                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
+                                break
+                            elif user_input == 'n':
+                                cli_ui.warning("No release selected.")
+                                detailed_releases = []
+                                break
+                            else:
+                                console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                        except ValueError:
+                            console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                        except KeyboardInterrupt:
+                            console.print("[red]Operation cancelled.[/red]")
+                            break
+                elif best_score > bluray_score:
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    region_code = map_country_to_region_code(best_release['country'])
+                    meta['region'] = region_code
+                    meta['distributor'] = best_release['publisher'].upper()
+                    meta['release_url'] = best_release['url']
+                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+                else:
+                    cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    detailed_releases = []
 
             elif len(close_matches) > 1:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -1258,6 +1293,41 @@ async def process_all_releases(releases, meta):
                                 console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
                         except ValueError:
                             console.print("[red]Invalid input. Please enter a number or 'n'.[/red]")
+                        except KeyboardInterrupt:
+                            console.print("[red]Operation cancelled.[/red]")
+                            break
+                elif best_score > bluray_score:
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    region_code = map_country_to_region_code(best_release['country'])
+                    meta['region'] = region_code
+                    meta['distributor'] = best_release['publisher'].upper()
+                    meta['release_url'] = best_release['url']
+                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                else:
+                    cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    detailed_releases = []
+
+            else:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    console.print("[red]This is the probably the best match, but it is not a perfect match.[/red]")
+                    while True:
+                        user_input = input("Do you want to use this release? (y/n): ").strip().lower()
+                        try:
+                            if user_input == 'y':
+                                region_code = map_country_to_region_code(best_release['country'])
+                                meta['region'] = region_code
+                                meta['distributor'] = best_release['publisher'].upper()
+                                meta['release_url'] = best_release['url']
+                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                                break
+                            elif user_input == 'n':
+                                cli_ui.warning("No release selected.")
+                                detailed_releases = []
+                                break
+                            else:
+                                console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                        except ValueError:
+                            console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
                         except KeyboardInterrupt:
                             console.print("[red]Operation cancelled.[/red]")
                             break
