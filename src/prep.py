@@ -1943,13 +1943,15 @@ class Prep():
             try:
                 edition = guessit(bdinfo['label'])['edition']
             except Exception as e:
-                print(f"BDInfo Edition Guess Error: {e}")
+                if meta['debug']:
+                    print(f"BDInfo Edition Guess Error: {e}")
                 edition = ""
         else:
             try:
                 edition = guess.get('edition', "")
             except Exception as e:
-                print(f"Video Edition Guess Error: {e}")
+                if meta['debug']:
+                    print(f"Video Edition Guess Error: {e}")
                 edition = ""
 
         if isinstance(edition, list):
@@ -2007,7 +2009,8 @@ class Prep():
                 # Clean up extra spaces
                 while '  ' in edition:
                     edition = edition.replace('  ', ' ')
-            console.print(f"Final Edition: {edition}")
+            if edition != "":
+                console.print(f"Final Edition: {edition}")
         return edition, repack
 
     async def get_name(self, meta):
