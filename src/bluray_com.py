@@ -832,9 +832,15 @@ async def process_all_releases(releases, meta):
                 # Parse the subtitles section
                 for line in lines:
                     line = line.strip()
+                    subtitle_line = None
                     if line.startswith("Subtitle:"):
+                        subtitle_line = line
+                    elif line.startswith("* Subtitle:"):
+                        subtitle_line = line[2:].strip()
+
+                    if subtitle_line:
                         # Extract the subtitle language and bitrate
-                        subtitle_match = re.match(r"Subtitle:\s+(\w+)\s+/\s+([\d.]+)\s+kbps", line)
+                        subtitle_match = re.match(r"Subtitle:\s+(\w+)\s+/\s+([\d.]+)\s+kbps", subtitle_line)
                         if subtitle_match:
                             language = subtitle_match.group(1)
                             bitrate = float(subtitle_match.group(2))
