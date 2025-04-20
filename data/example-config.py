@@ -188,10 +188,11 @@ config = {
         # Add bluray.com link to description
         "add_bluray_link": False,
 
-        # A release with 100% score will have complete matching details
-        # Setting 95% will allow for one non matching audio OR subtitle track (each missing has a 5.0 penalty)
+        # A release with 100% score will have complete matching details between bluray.com and bdinfo
+        # Each missing Audio OR Subtitle track will reduce the score by 5
         # Partial matched audio tracks have a 2.5 score penalty
-        # If only a single track, penalty is doubled
+        # If only a single bdinfo track, penalties is doubled
+        # Video codec/resolution and disc size mismatches have huge penalities
         # Only useful in unattended mode. If not unattended you will be prompted to confirm release
         "bluray_score": 95,
 
