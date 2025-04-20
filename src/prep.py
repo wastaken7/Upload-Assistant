@@ -431,11 +431,6 @@ class Prep():
             meta = await self.get_source_override(meta, other_id=True)
             meta['no_override'] = True
 
-        get_bluray_info = int(self.config['DEFAULT'].get('get_bluray_info', False))
-        meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
-        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
-            await get_bluray_releases(meta)
-
         if meta['debug']:
             console.print("ID inputs into prep")
             console.print("category:", meta.get("category"))
@@ -1010,6 +1005,11 @@ class Prep():
                             aka = aka.replace(f"({year})", "").strip()
                         meta['aka'] = f"AKA {aka.strip()}"
                         meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
+
+        get_bluray_info = int(self.config['DEFAULT'].get('get_bluray_info', False))
+        meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
+        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
+            await get_bluray_releases(meta)
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)

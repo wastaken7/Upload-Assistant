@@ -1147,7 +1147,7 @@ async def process_all_releases(releases, meta):
                         full_match_percentage = (audio_matches / total_tracks) * 100
                         partial_match_percentage = (partial_audio_matches / total_tracks) * 100
 
-                        audio_penalty = 40 * (missing_audio_tracks / total_tracks) + 10 * (partial_audio_matches / total_tracks)
+                        audio_penalty = 5
                         if meta['debug']:
                             console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
@@ -1194,7 +1194,7 @@ async def process_all_releases(releases, meta):
                     total_subs = len(meta_subtitles)
                     if total_subs > 0:
                         match_percentage = (sub_matches / total_subs) * 100
-                        sub_penalty = 40 * (missing_subs / total_subs)
+                        sub_penalty = 5
                         if meta['debug']:
                             console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
                         score -= sub_penalty
