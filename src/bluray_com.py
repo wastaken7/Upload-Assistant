@@ -645,6 +645,15 @@ async def parse_release_details(response_text, release, meta):
                     if meta['debug']:
                         console.print(f"[dim]Region Notes: {specs['playback']['region_notes']}[/dim]")
 
+        if meta.get('use_bluray_images', False):
+            cover_images = extract_cover_images(response_text)
+            if cover_images:
+                release['cover_images'] = cover_images
+                if meta['debug']:
+                    console.print(f"[green]Found {len(cover_images)} cover images:[/green]")
+                    for img_type, url in cover_images.items():
+                        console.print(f"[dim]  - {img_type}: {url}[/dim]")
+
         release['specs'] = specs
         if meta['debug']:
             console.print(f"[green]Successfully parsed details for {release['title']}[/green]")
@@ -654,6 +663,111 @@ async def parse_release_details(response_text, release, meta):
         console.print(f"[red]Error parsing release details: {str(e)}[/red]")
         console.print_exception()
         return release
+
+
+async def download_cover_images(meta):
+    if 'cover_images' not in meta or not meta['cover_images']:
+        console.print("[yellow]No cover images to download[/yellow]")
+        return False
+
+    temp_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "covers.json")
+    if os.path.exists(reuploaded_images_path):
+        return True
+
+    downloaded_images = {}
+    console.print("[blue]Downloading cover images...[/blue]")
+
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        for img_type, url in meta['cover_images'].items():
+            file_ext = os.path.splitext(url)[1]
+            local_filename = f"{temp_dir}/cover_{img_type}{file_ext}"
+
+            try:
+                console.print(f"[dim]Downloading {img_type} cover from {url}[/dim]")
+                response = await client.get(url)
+
+                if response.status_code == 200:
+                    with open(local_filename, "wb") as f:
+                        f.write(response.content)
+                    downloaded_images[img_type] = local_filename
+                    console.print(f"[green]✓[/green] Downloaded {img_type} cover to {local_filename}")
+                else:
+                    console.print(f"[red]Failed to download {img_type} cover: HTTP {response.status_code}[/red]")
+            except Exception as e:
+                console.print(f"[red]Error downloading {img_type} cover: {str(e)}[/red]")
+
+    if downloaded_images:
+        meta['downloaded_cover_images'] = downloaded_images
+        console.print(f"[green]Successfully downloaded {len(downloaded_images)} cover images[/green]")
+        return True
+    else:
+        console.print("[yellow]No cover images were downloaded[/yellow]")
+        return False
+
+
+def extract_cover_images(html_content):
+    cover_images = {}
+    soup = BeautifulSoup(html_content, 'html.parser')
+    scripts = soup.find_all('script', string=lambda s: s and "$(document).ready" in s and "append('<img id=" in s)
+
+    for script in scripts:
+        script_text = script.string
+        img_id_match = re.search(r"'<img id=\"(\w+)\"", script_text)
+        url_match = re.search(r"src=\"([^\"]+)\"", script_text)
+
+        if img_id_match and url_match:
+            img_id = img_id_match.group(1)
+            url = url_match.group(1)
+            url = clean_image_url(url)
+
+            if "front" in img_id.lower():
+                cover_images["front"] = url
+            elif "back" in img_id.lower():
+                cover_images["back"] = url
+            elif "slip" in img_id.lower():
+                cover_images["slip"] = url
+            else:
+                cover_images[img_id] = url
+
+    if not cover_images:
+        overlay_divs = soup.find_all('div', class_='simple_overlay')
+        for div in overlay_divs:
+            img = div.find('img')
+            if img and 'id' in img.attrs and 'src' in img.attrs:
+                img_id = img['id']
+                url = img['src']
+
+                if "front" in img_id.lower():
+                    cover_images["front"] = url
+                elif "back" in img_id.lower():
+                    cover_images["back"] = url
+                elif "slip" in img_id.lower():
+                    cover_images["slip"] = url
+                else:
+                    cover_images[img_id] = url
+
+    return cover_images
+
+
+def clean_image_url(url):
+    if not url:
+        return url
+
+    extensions = ['.jpg', '.png', '.gif', '.jpeg', '.webp']
+    end_pos = None
+
+    for ext in extensions:
+        pos = url.lower().find(ext)
+        if pos > 0:
+            end_pos = pos + len(ext)
+            break
+
+    if end_pos:
+        return url[:end_pos]
+    return url
 
 
 async def fetch_release_details(release, meta):
@@ -1305,6 +1419,9 @@ async def process_all_releases(releases, meta):
                 meta['region'] = region_code
                 meta['distributor'] = best_release['publisher'].upper()
                 meta['release_url'] = best_release['url']
+                if 'cover_images' in best_release:
+                    meta['cover_images'] = best_release['cover_images']
+                    await download_cover_images(meta)
                 console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
 
             elif len(scored_releases) == 1:
@@ -1318,6 +1435,9 @@ async def process_all_releases(releases, meta):
                                 meta['region'] = region_code
                                 meta['distributor'] = close_matches[0]['publisher'].upper()
                                 meta['release_url'] = close_matches[0]['url']
+                                if 'cover_images' in close_matches[0]:
+                                    meta['cover_images'] = close_matches[0]['cover_images']
+                                    await download_cover_images(meta)
                                 console.print(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
                                 break
                             elif user_input == 'n':
@@ -1337,6 +1457,9 @@ async def process_all_releases(releases, meta):
                     meta['region'] = region_code
                     meta['distributor'] = best_release['publisher'].upper()
                     meta['release_url'] = best_release['url']
+                    if 'cover_images' in best_release:
+                        meta['cover_images'] = best_release['cover_images']
+                        await download_cover_images(meta)
                     console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1384,6 +1507,9 @@ async def process_all_releases(releases, meta):
                                     meta['region'] = region_code
                                     meta['distributor'] = selected_release['publisher'].upper()
                                     meta['release_url'] = selected_release['url']
+                                    if 'cover_images' in selected_release:
+                                        meta['cover_images'] = selected_release['cover_images']
+                                        await download_cover_images(meta)
                                     console.print(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
                                     break
                                 else:
@@ -1399,6 +1525,9 @@ async def process_all_releases(releases, meta):
                     meta['region'] = region_code
                     meta['distributor'] = best_release['publisher'].upper()
                     meta['release_url'] = best_release['url']
+                    if 'cover_images' in best_release:
+                        meta['cover_images'] = best_release['cover_images']
+                        await download_cover_images(meta)
                     console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1421,6 +1550,9 @@ async def process_all_releases(releases, meta):
                                 meta['region'] = region_code
                                 meta['distributor'] = best_release['publisher'].upper()
                                 meta['release_url'] = best_release['url']
+                                if 'cover_images' in best_release:
+                                    meta['cover_images'] = best_release['cover_images']
+                                    await download_cover_images(meta)
                                 console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                                 break
                             elif user_input == 'n':
@@ -1440,6 +1572,9 @@ async def process_all_releases(releases, meta):
                     meta['region'] = region_code
                     meta['distributor'] = best_release['publisher'].upper()
                     meta['release_url'] = best_release['url']
+                    if 'cover_images' in best_release:
+                        meta['cover_images'] = best_release['cover_images']
+                        await download_cover_images(meta)
                     console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")

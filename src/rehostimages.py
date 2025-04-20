@@ -18,6 +18,7 @@ def match_host(hostname, approved_hosts):
 
 
 async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approved_image_hosts=None):
+    console.print(f"[yellow]Reuploading images for {tracker}...")
     new_images_key = f'{tracker}_images_key'
     if new_images_key not in meta:
         meta[new_images_key] = []
@@ -57,7 +58,10 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
             console.print(f"[green]All existing images are from approved hosts for {tracker}.")
             return meta[new_images_key], False, False
 
-    reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "reuploaded_images.json")
+    if tracker == "covers":
+        reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "covers.json")
+    else:
+        reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "reuploaded_images.json")
     reuploaded_images = []
 
     if os.path.exists(reuploaded_images_path):
@@ -87,7 +91,10 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
 
     if valid_reuploaded_images:
         meta[new_images_key] = valid_reuploaded_images
-        console.print("[green]Using valid images from reuploaded_images.json.")
+        if tracker == "covers":
+            console.print("[green]Using valid images from covers.json.")
+        else:
+            console.print("[green]Using valid images from reuploaded_images.json.")
         return meta[new_images_key], False, False
 
     # Check if the tracker-specific key has valid images
@@ -215,8 +222,17 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 if screen not in all_screenshots:
                     all_screenshots.append(screen)
 
+    if tracker == "covers":
+        existing_screens = await asyncio.to_thread(glob.glob, f"{meta['base_dir']}/tmp/{meta['uuid']}/cover_*.jpg")
+        for screen in existing_screens:
+            if screen not in all_screenshots:
+                all_screenshots.append(screen)
+
     # Ensure we have unique screenshots
     all_screenshots = list(set(all_screenshots))
+
+    if tracker == "covers":
+        multi_screens = len(all_screenshots)
 
     # If we still don't have enough screenshots, generate new ones
     if len(all_screenshots) < multi_screens:
@@ -293,7 +309,10 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
         remaining = [s for s in all_screenshots if s not in final_screenshots]
         final_screenshots.extend(remaining[:multi_screens - len(final_screenshots)])
 
-    all_screenshots = final_screenshots[:multi_screens]
+    if tracker == "covers":
+        all_screenshots = all_screenshots
+    else:
+        all_screenshots = final_screenshots[:multi_screens]
 
     if meta.get('debug'):
         console.print(f"[green]Using {len(all_screenshots)} screenshots:")
@@ -357,7 +376,11 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
             for image in meta[new_images_key]
         ):
             if new_images_key in meta and isinstance(meta[new_images_key], list):
-                output_file = os.path.join(screenshots_dir, "reuploaded_images.json")
+                if tracker == "covers":
+                    output_file = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "covers.json")
+                else:
+                    output_file = os.path.join(screenshots_dir, "reuploaded_images.json")
+
                 try:
                     async with aiofiles.open(output_file, 'r', encoding='utf-8') as f:
                         existing_data = await f.read()

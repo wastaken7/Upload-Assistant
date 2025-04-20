@@ -108,6 +108,26 @@ class COMMON():
                 logo_size = self.config["DEFAULT"].get("logo_size", 420)
                 if logo != "":
                     descfile.write(f"[center][img={logo_size}]{logo}[/img][/center]\n\n")
+            bluray_link = self.config['DEFAULT'].get("add_bluray_link", False)
+            if meta.get('is_disc') == "BDMV" and bluray_link and meta.get('release_url', ''):
+                descfile.write(f"[center]{meta['release_url']}[/center]\n")
+            covers = False
+            if os.path.exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"):
+                covers = True
+            if meta.get('is_disc') == "BDMV" and self.config['DEFAULT'].get('use_bluray_images', False) and covers:
+                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json", 'r', encoding='utf-8') as f:
+                    cover_data = json.load(f)
+                if isinstance(cover_data, list):
+                    descfile.write("[center]")
+                    thumb_size = self.config['DEFAULT'].get('thumbnail_size', '350')
+
+                    for img_data in cover_data:
+                        if 'raw_url' in img_data and 'web_url' in img_data:
+                            web_url = img_data['web_url']
+                            raw_url = img_data['raw_url']
+                            descfile.write(f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]")
+
+                    descfile.write("[/center]\n\n")
             season_name = meta.get('tvdb_season_name') if meta.get('tvdb_season_name') is not None and meta.get('tvdb_season_name') != "" else None
             season_number = meta.get('tvdb_season_number') if meta.get('tvdb_season_number') is not None and meta.get('tvdb_season_number') != "" else None
             episode_number = meta.get('tvdb_episode_number') if meta.get('tvdb_episode_number') is not None and meta.get('tvdb_episode_number') != "" else None

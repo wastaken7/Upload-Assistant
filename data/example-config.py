@@ -186,7 +186,12 @@ config = {
         "get_bluray_info": False,
 
         # Add bluray.com link to description
+        # Requires "get_bluray_info" to be set to True
         "add_bluray_link": False,
+
+        # Add cover/back/slip images from bluray.com to description if available
+        # Requires "get_bluray_info" to be set to True
+        "use_bluray_images": False,
 
         # A release with 100% score will have complete matching details between bluray.com and bdinfo
         # Each missing Audio OR Subtitle track will reduce the score by 5

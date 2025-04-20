@@ -1105,8 +1105,20 @@ class Prep():
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
         meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
+        meta['use_bluray_images'] = self.config['DEFAULT'].get('use_bluray_images', False)
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
+
+        if meta.get('is_disc') == "BDMV" and meta.get('use_bluray_images', False):
+            from src.rehostimages import check_hosts
+            url_host_mapping = {
+                "ibb.co": "imgbb",
+                "pixhost.to": "pixhost",
+                "imgbox.com": "imgbox",
+            }
+
+            approved_image_hosts = ['imgbox', 'imgbb', 'pixhost']
+            await check_hosts(meta, "covers", url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
@@ -2307,10 +2319,6 @@ class Prep():
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                 if len(description_text) > 0:
                     description.write(description_text + "\n")
-
-                bluray_link = self.config['DEFAULT'].get("add_bluray_link", False)
-                if bluray_link and meta.get('release_url', ''):
-                    description.write(f"[center]{meta['release_url']}[/center]\n")
 
         return meta
 
