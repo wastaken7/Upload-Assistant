@@ -848,10 +848,16 @@ class COMMON():
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.get('region') and attributes.get('region_id'):
-                    meta['region'] = attributes.get('region')
-                if not meta.get('distributor') and attributes.get('distributor_id'):
-                    meta['distributor'] = attributes.get('distributor')
+                if not meta.get('region') and meta.get('is_disc') == "BDMV":
+                    region_id = attributes.get('region_id')
+                    region_name = await self.unit3d_region_ids(None, reverse=True, region_id=region_id)
+                    if region_name:
+                        meta['region'] = region_name
+                if not meta.get('distributor') and meta.get('is_disc') == "BDMV":
+                    distributor_id = attributes.get('distributor_id')
+                    distributor_name = await self.unit3d_distributor_ids(None, reverse=True, distributor_id=distributor_id)
+                    if distributor_name:
+                        meta['distributor'] = distributor_name
             else:
                 # Handle response when searching by ID
                 if id and not data:
@@ -869,10 +875,16 @@ class COMMON():
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.get('region') and attributes.get('region_id'):
-                        meta['region'] = attributes.get('region')
-                    if not meta.get('distributor') and attributes.get('distributor_id'):
-                        meta['distributor'] = attributes.get('distributor')
+                    if not meta.get('region') and meta.get('is_disc') == "BDMV":
+                        region_id = attributes.get('region_id')
+                        region_name = await self.unit3d_region_ids(None, reverse=True, region_id=region_id)
+                        if region_name:
+                            meta['region'] = region_name
+                    if not meta.get('distributor') and meta.get('is_disc') == "BDMV":
+                        distributor_id = attributes.get('distributor_id')
+                        distributor_name = await self.unit3d_distributor_ids(None, reverse=True, distributor_id=distributor_id)
+                        if distributor_name:
+                            meta['distributor'] = distributor_name
                     # Handle file name extraction
                     files = attributes.get('files', [])
                     if files:
