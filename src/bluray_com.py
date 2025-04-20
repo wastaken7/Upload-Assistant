@@ -816,7 +816,7 @@ async def process_all_releases(releases, meta):
             meta_audio_specs = bdinfo['audio']
             for track in meta_audio_specs:
                 if meta['debug']:
-                    console.print(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')}")
+                    console.print(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')} {track.get('bitrate', '')}")
 
         bd_summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
         filtered_languages = []
@@ -991,8 +991,8 @@ async def process_all_releases(releases, meta):
                     partial_audio_matches = 0
                     missing_audio_tracks = 0
                     available_release_tracks = specs.get('audio', [])[:]
-
-                    for meta_track in meta_audio_specs:
+                    reduced_penalty_count = 0
+                    for meta_idx, meta_track in enumerate(meta_audio_specs):
                         meta_lang = meta_track.get('language', '').lower()
                         meta_format = meta_track.get('codec', '').lower().replace('audio', '')
                         meta_channels = meta_track.get('channels', '').lower().replace('audio', '')
@@ -1029,6 +1029,12 @@ async def process_all_releases(releases, meta):
                         # Skip bit depth if it contains "DN -" (Dolby Digital Normalization)
                         if 'dn -' in meta_bit_depth:
                             meta_bit_depth = ""
+
+                        reduced_penalty = False
+                        if meta_idx > 0 and meta_bitrate and "kbps" in meta_bitrate:
+                            bitrate_value = int(meta_bitrate.replace("kbps", "").strip())
+                            if bitrate_value <= 258:
+                                reduced_penalty = True
 
                         best_match_score = 0
                         best_match_core_score = 0
@@ -1156,7 +1162,11 @@ async def process_all_releases(releases, meta):
 
                         else:
                             missing_audio_tracks += 1
-                            log_and_print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} track", release_logs)
+                            if reduced_penalty:
+                                reduced_penalty_count += 1
+                                log_and_print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} track (Low bitrate, half penalty)", release_logs)
+                            else:
+                                log_and_print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} {meta_bitrate} track", release_logs)
 
                     total_tracks = len(meta_audio_specs)
                     if total_tracks > 0:
@@ -1178,7 +1188,9 @@ async def process_all_releases(releases, meta):
                             audio_penalty = 0
                             audio_penalty += partial_audio_matches * 2.5
                             missing_tracks = total_tracks - (audio_matches + partial_audio_matches)
-                            audio_penalty += missing_tracks * 5.0
+                            normal_missing = missing_audio_tracks - reduced_penalty_count
+                            audio_penalty += normal_missing * 5.0
+                            audio_penalty += reduced_penalty_count * 2.5
 
                         if meta['debug']:
                             log_and_print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]", release_logs)
