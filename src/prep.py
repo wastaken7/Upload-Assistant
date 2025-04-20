@@ -432,7 +432,8 @@ class Prep():
                     console.print("[yellow]No matches found on any trackers.[/yellow]")
 
                 # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
-                if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV":
+                ping_unit3d = self.config['DEFAULT'].get('ping_unit3d', False)
+                if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV" and ping_unit3d:
                     from src.trackers.COMMON import COMMON
                     common = COMMON(config)
 

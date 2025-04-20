@@ -180,6 +180,11 @@ config = {
         # set true to not delete existing meta.json file before running
         "keep_meta": False,
 
+        # If there is no region/distributor ids specified, we can use existing torrents to check
+        # This will use data from matching torrents in qBitTorrent/RuTorrent to find matching site ids
+        # and then try and find region/distributor ids from those sites
+        "ping_unit3d": False,
+
     },
 
     # these are used for DB links on AR
