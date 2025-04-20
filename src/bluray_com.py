@@ -789,9 +789,10 @@ async def process_all_releases(releases, meta):
     if not releases:
         return []
 
-    console.print()
-    console.print("Processing Local Details")
-    console.print("----------------------------")
+    if meta['debug']:
+        console.print()
+        console.print("Processing Local Details")
+        console.print("----------------------------")
 
     disc_count = len(meta.get('discs', []))
     if meta['debug']:
@@ -824,7 +825,7 @@ async def process_all_releases(releases, meta):
         if os.path.exists(bd_summary_path):
             if meta['debug']:
                 console.print(f"[blue]Opening BD_SUMMARY file: {bd_summary_path}[/blue]")
-            console.print("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
+                console.print("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
             try:
                 with open(bd_summary_path, "r", encoding="utf-8") as f:
                     lines = f.readlines()
@@ -849,9 +850,10 @@ async def process_all_releases(releases, meta):
                             if bitrate >= 1.0:
                                 filtered_languages.append(language.lower())
                                 meta_subtitles.append(language)  # Add to meta_subtitles directly
-                                console.print(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
+                                if meta['debug']:
+                                    console.print(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
                             else:
-                                console.print(f"[red]✗ Discarding subtitle: {language} ({bitrate} kbps)[/red]")
+                                console.print(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
 
                 if meta_subtitles:
                     if meta['debug']:
@@ -871,15 +873,25 @@ async def process_all_releases(releases, meta):
         detailed_release = await fetch_release_details(release, meta)
         detailed_releases.append(detailed_release)
 
-    console.print()
-    cli_ui.info_section("Processing Complete")
+    if meta['debug']:
+        console.print()
+        cli_ui.info_section("Processing Complete")
     cli_ui.info(f"Successfully processed {len(detailed_releases)} releases")
+
+    logs = []  # Initialize a list to store logs for each release
+
+    def log_and_print(message, log_list):
+        if meta['debug']:
+            console.print(message)
+        log_list.append(message)
 
     if detailed_releases:
         scored_releases = []
         for idx, release in enumerate(detailed_releases, 1):
-            console.print(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
-            console.print(f"[blue]Release URL: {release['url']}[/blue]")
+            release_logs = []
+            if meta['debug']:
+                console.print(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
+            log_and_print(f"[blue]Release URL: {release['url']}[/blue]", release_logs)
             score = 100.0
 
             if 'specs' in release:
@@ -888,16 +900,16 @@ async def process_all_releases(releases, meta):
                 # Check for completeness of data (penalty for missing info)
                 if not specs.get('video', {}):
                     score -= 10  # Missing video info
-                    console.print("[red]✗[/red] Missing video info")
+                    log_and_print("[red]✗[/red] Missing video info", release_logs)
                 if not specs.get('audio', []):
                     score -= 5  # Missing audio info
-                    console.print("[red]✗[/red] Missing audio info")
+                    log_and_print("[red]✗[/red] Missing audio info", release_logs)
                 if meta_subtitles and not specs.get('subtitles', []):
                     score -= 5  # Missing subtitle info when bdinfo has subtitles
-                    console.print("[red]✗[/red] Missing subtitle info")
+                    log_and_print("[red]✗[/red] Missing subtitle info", release_logs)
                 if not specs.get('discs', {}):
                     score -= 10  # Missing disc info
-                    console.print("[red]✗[/red] Missing disc info")
+                    log_and_print("[red]✗[/red] Missing disc info", release_logs)
 
                 # Disc format check
                 if 'discs' in specs and 'format' in specs['discs'] and 'discs' in meta and 'bdinfo' in meta['discs'][0]:
@@ -917,12 +929,12 @@ async def process_all_releases(releases, meta):
                     format_match = False
                     if expected_format and expected_format in release_format:
                         format_match = True
-                        console.print(f"[green]✓[/green] Disc format match: {specs['discs']['format']} matches size {disc_size_gb:.2f} GB")
+                        log_and_print(f"[green]✓[/green] Disc format match: {specs['discs']['format']} matches size {disc_size_gb:.2f} GB", release_logs)
                     elif expected_format:
                         score -= 50
-                        console.print(f"[yellow]⚠[/yellow] Disc format mismatch: {specs['discs']['format']} vs expected {expected_format.upper()} (size: {disc_size_gb:.2f} GB)")
+                        log_and_print(f"[yellow]⚠[/yellow] Disc format mismatch: {specs['discs']['format']} vs expected {expected_format.upper()} (size: {disc_size_gb:.2f} GB)", release_logs)
                         if meta['debug']:
-                            console.print("[dim]Penalty for disc format mismatch 50.0[/dim]")
+                            log_and_print("[dim]Penalty for disc format mismatch 50.0[/dim]", release_logs)
 
                 # Video format checks
                 if 'video' in specs and meta_video_specs:
@@ -933,25 +945,25 @@ async def process_all_releases(releases, meta):
                     if ('avc' in release_codec and 'avc' in meta_codec) or \
                        ('h.264' in release_codec and ('avc' in meta_codec or 'h.264' in meta_codec)):
                         codec_match = True
-                        console.print("[green]✓[/green] Video codec match: AVC/H.264")
+                        log_and_print("[green]✓[/green] Video codec match: AVC/H.264", release_logs)
                     elif ('hevc' in release_codec and 'hevc' in meta_codec) or \
                          ('h.265' in release_codec and ('hevc' in meta_codec or 'h.265' in meta_codec)):
                         codec_match = True
-                        console.print("[green]✓[/green] Video codec match: HEVC/H.265")
+                        log_and_print("[green]✓[/green] Video codec match: HEVC/H.265", release_logs)
                     elif ('vc-1' in release_codec and 'vc-1' in meta_codec) or \
                          ('vc1' in release_codec and 'vc1' in meta_codec):
                         codec_match = True
-                        console.print("[green]✓[/green] Video codec match: VC-1")
+                        log_and_print("[green]✓[/green] Video codec match: VC-1", release_logs)
                     elif ('mpeg-2' in release_codec and 'mpeg-2' in meta_codec) or \
                          ('mpeg2' in release_codec and 'mpeg2' in meta_codec):
                         codec_match = True
-                        console.print("[green]✓[/green] Video codec match: MPEG-2")
+                        log_and_print("[green]✓[/green] Video codec match: MPEG-2", release_logs)
 
                     if not codec_match:
                         score -= 80
-                        console.print(f"[red]✗[/red] Video codec mismatch: {release_codec} vs {meta_codec}")
+                        log_and_print(f"[red]✗[/red] Video codec mismatch: {release_codec} vs {meta_codec}", release_logs)
                         if meta['debug']:
-                            console.print("[dim]Penalty for video codec mismatch 80.0[/dim]")
+                            log_and_print("[dim]Penalty for video codec mismatch 80.0[/dim]", release_logs)
 
                     # Resolution match check
                     release_res = specs['video'].get('resolution', '').lower()
@@ -960,19 +972,19 @@ async def process_all_releases(releases, meta):
                     res_match = False
                     if '1080' in release_res and '1080' in meta_res:
                         res_match = True
-                        console.print("[green]✓[/green] Resolution match: 1080p")
+                        log_and_print("[green]✓[/green] Resolution match: 1080p", release_logs)
                     elif ('2160' in release_res or '4k' in release_res) and ('2160' in meta_res or '4k' in meta_res):
                         res_match = True
-                        console.print("[green]✓[/green] Resolution match: 4K/2160p")
+                        log_and_print("[green]✓[/green] Resolution match: 4K/2160p", release_logs)
 
                     if not res_match:
                         score -= 80
-                        console.print(f"[red]✗[/red] Resolution mismatch: {release_res} vs {meta_res}")
+                        log_and_print(f"[red]✗[/red] Resolution mismatch: {release_res} vs {meta_res}", release_logs)
                         if meta['debug']:
-                            console.print("[dim]Penalty for resolution mismatch 80.0[/dim]")
+                            log_and_print("[dim]Penalty for resolution mismatch 80.0[/dim]", release_logs)
                 else:
                     score -= 20
-                    console.print("[yellow]?[/yellow] Cannot compare video formats")
+                    log_and_print("[yellow]?[/yellow] Cannot compare video formats", release_logs)
 
                 # Audio track checks
                 if 'audio' in specs and meta_audio_specs:
@@ -1135,17 +1147,17 @@ async def process_all_releases(releases, meta):
 
                             if core_match_quality >= 1:
                                 audio_matches += 1
-                                console.print(f"[green]✓[/green] Found good match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: 100%)")
+                                log_and_print(f"[green]✓[/green] Found good match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: 100%)", release_logs)
                             else:
                                 partial_audio_matches += 1
                                 percent = int(core_match_quality * 100)
-                                console.print(f"[yellow]⚠[/yellow] Found partial match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: {percent}%)")
+                                log_and_print(f"[yellow]⚠[/yellow] Found partial match for {meta_lang} {meta_format} {meta_channels} track: '{matched_track}' (match quality: {percent}%)", release_logs)
 
                             available_release_tracks.pop(best_match_idx)
 
                         else:
                             missing_audio_tracks += 1
-                            console.print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} track")
+                            log_and_print(f"[red]✗[/red] No match found for {meta_lang} {meta_format} {meta_channels} track", release_logs)
 
                     total_tracks = len(meta_audio_specs)
                     if total_tracks > 0:
@@ -1170,34 +1182,34 @@ async def process_all_releases(releases, meta):
                             audio_penalty += missing_tracks * 5.0
 
                         if meta['debug']:
-                            console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
+                            log_and_print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]", release_logs)
                         score -= audio_penalty
 
                         if audio_matches > 0:
-                            console.print(f"[green]✓[/green] Audio tracks with good matches: {audio_matches}/{total_tracks} ({full_match_percentage:.1f}% of tracks)")
+                            log_and_print(f"[green]✓[/green] Audio tracks with good matches: {audio_matches}/{total_tracks} ({full_match_percentage:.1f}% of tracks)", release_logs)
                             if partial_audio_matches > 0:
-                                console.print(f"[yellow]⚠[/yellow] Audio tracks with partial matches: {partial_audio_matches}/{total_tracks} ({partial_match_percentage:.1f}% of tracks)")
+                                log_and_print(f"[yellow]⚠[/yellow] Audio tracks with partial matches: {partial_audio_matches}/{total_tracks} ({partial_match_percentage:.1f}% of tracks)", release_logs)
                         elif partial_audio_matches > 0:
-                            console.print(f"[yellow]⚠[/yellow] There were only partial audio track matches: {partial_audio_matches}/{total_tracks}")
+                            log_and_print(f"[yellow]⚠[/yellow] There were only partial audio track matches: {partial_audio_matches}/{total_tracks}", release_logs)
                         else:
-                            console.print("[red]✗[/red] No audio tracks match!")
+                            log_and_print("[red]✗[/red] No audio tracks match!", release_logs)
 
                         extra_audio_tracks = []
                         if available_release_tracks:
                             for release_track in available_release_tracks:
                                 extra_audio_tracks.append(release_track)
-                                console.print(f"[yellow]⚠[/yellow] Release has extra audio track not in BDInfo: {release_track}")
+                                log_and_print(f"[yellow]⚠[/yellow] Release has extra audio track not in BDInfo: {release_track}", release_logs)
 
                         if extra_audio_tracks:
                             extra_penalty = len(extra_audio_tracks * 5)
                             score -= extra_penalty
-                            console.print(f"[red]-[/red] Found {len(extra_audio_tracks)} additional audio tracks in release not in BDInfo")
+                            log_and_print(f"[red]-[/red] Found {len(extra_audio_tracks)} additional audio tracks in release not in BDInfo", release_logs)
                             if meta['debug']:
-                                console.print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]")
+                                log_and_print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]", release_logs)
 
                 else:
                     score -= 10
-                    console.print("[yellow]?[/yellow] Cannot compare audio tracks")
+                    log_and_print("[yellow]?[/yellow] Cannot compare audio tracks", release_logs)
 
                 # Subtitle checks
                 if 'subtitles' in specs and meta_subtitles:
@@ -1220,11 +1232,11 @@ async def process_all_releases(releases, meta):
                         if sub_found and matched_idx >= 0:
                             matched_sub = available_release_subs[matched_idx]
                             sub_matches += 1
-                            console.print(f"[green]✓[/green] Subtitle match found: {meta_sub} -> {matched_sub}")
+                            log_and_print(f"[green]✓[/green] Subtitle match found: {meta_sub} -> {matched_sub}", release_logs)
                             available_release_subs.pop(matched_idx)
                         else:
                             missing_subs += 1
-                            console.print(f"[red]✗[/red] No match found for subtitle: {meta_sub}")
+                            log_and_print(f"[red]✗[/red] No match found for subtitle: {meta_sub}", release_logs)
 
                     total_subs = len(meta_subtitles)
                     if total_subs > 0:
@@ -1235,37 +1247,38 @@ async def process_all_releases(releases, meta):
                         else:
                             sub_penalty = 5.0 * missing_tracks
                         if meta['debug']:
-                            console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
+                            log_and_print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]", release_logs)
                         score -= sub_penalty
 
                         if sub_matches > 0:
-                            console.print(f"[green]✓[/green] Subtitle matches: {sub_matches}/{total_subs} ({match_percentage:.1f}%)")
+                            log_and_print(f"[green]✓[/green] Subtitle matches: {sub_matches}/{total_subs} ({match_percentage:.1f}%)", release_logs)
                         else:
-                            console.print("[red]✗[/red] No subtitle tracks match!")
+                            log_and_print("[red]✗[/red] No subtitle tracks match!", release_logs)
 
                         extra_subtitles = []
                         if available_release_subs:
                             for release_sub in available_release_subs:
                                 extra_subtitles.append(release_sub)
-                                console.print(f"[yellow]⚠[/yellow] Release has extra subtitle not in BDInfo: {release_sub}")
+                                log_and_print(f"[yellow]⚠[/yellow] Release has extra subtitle not in BDInfo: {release_sub}", release_logs)
 
                         if extra_subtitles:
                             extra_penalty = len(extra_subtitles * 5)
                             score -= extra_penalty
-                            console.print(f"[red]-[/red] Found {len(extra_subtitles)} additional subtitles in release not in BDInfo")
+                            log_and_print(f"[red]-[/red] Found {len(extra_subtitles)} additional subtitles in release not in BDInfo", release_logs)
                             if meta['debug']:
-                                console.print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]")
+                                log_and_print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]", release_logs)
 
                 else:
                     score -= 10
-                    console.print("[yellow]?[/yellow] Cannot compare subtitles")
+                    log_and_print("[yellow]?[/yellow] Cannot compare subtitles", release_logs)
             else:
                 score -= 80
-                console.print("[red]✗[/red] No specifications available for this release")
+                log_and_print("[red]✗[/red] No specifications available for this release", release_logs)
 
-            console.print(f"[blue]Final score: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
-            console.print("=" * 80)
+            log_and_print(f"[blue]Final score: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]", release_logs)
+            log_and_print("", release_logs)
             scored_releases.append((score, release))
+            logs.append((release, release_logs))
 
         scored_releases.sort(reverse=True, key=lambda x: x[0])
 
@@ -1325,31 +1338,50 @@ async def process_all_releases(releases, meta):
                         score = next(score for score, r in scored_releases if r == release)
                         console.print(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
 
-                    console.print("Enter the number of the release to use, or 'n' to skip:")
                     while True:
+                        console.print("Enter the number of the release to use, 'p' to print logs for a release, or 'n' to skip:")
                         user_input = input("Selection: ").strip().lower()
                         if user_input == 'n':
                             cli_ui.warning("No release selected.")
                             detailed_releases = []
                             break
-                        try:
-                            selected_idx = int(user_input)
-                            if 1 <= selected_idx <= len(close_matches):
-                                selected_release = close_matches[selected_idx - 1]
-                                cli_ui.info(f"Selected: {selected_release['title']} ({selected_release['country']})")
-                                region_code = map_country_to_region_code(selected_release['country'])
-                                meta['region'] = region_code
-                                meta['distributor'] = selected_release['publisher'].upper()
-                                meta['release_url'] = selected_release['url']
-                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
+                        elif user_input == 'p':
+                            try:
+                                release_idx = int(input(f"Enter the release number (1-{len(close_matches)}) to print logs: ").strip())
+                                if 1 <= release_idx <= len(close_matches):
+                                    selected_release = close_matches[release_idx - 1]
+                                    for logged_release, release_logs in logs:
+                                        if logged_release == selected_release:
+                                            console.print(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
+                                            for log in release_logs:
+                                                console.print(log)
+                                            break
+                                else:
+                                    console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
+                            except ValueError:
+                                console.print("[red]Invalid input. Please enter a valid number.[/red]")
+                            except KeyboardInterrupt:
+                                console.print("[red]Operation cancelled.[/red]")
                                 break
-                            else:
-                                console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
-                        except ValueError:
-                            console.print("[red]Invalid input. Please enter a number or 'n'.[/red]")
-                        except KeyboardInterrupt:
-                            console.print("[red]Operation cancelled.[/red]")
-                            break
+                        else:
+                            try:
+                                selected_idx = int(user_input)
+                                if 1 <= selected_idx <= len(close_matches):
+                                    selected_release = close_matches[selected_idx - 1]
+                                    cli_ui.info(f"Selected: {selected_release['title']} ({selected_release['country']})")
+                                    region_code = map_country_to_region_code(selected_release['country'])
+                                    meta['region'] = region_code
+                                    meta['distributor'] = selected_release['publisher'].upper()
+                                    meta['release_url'] = selected_release['url']
+                                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
+                                    break
+                                else:
+                                    console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
+                            except ValueError:
+                                console.print("[red]Invalid input. Please enter a number or 'n'.[/red]")
+                            except KeyboardInterrupt:
+                                console.print("[red]Operation cancelled.[/red]")
+                                break
                 elif best_score > bluray_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     region_code = map_country_to_region_code(best_release['country'])
@@ -1364,7 +1396,12 @@ async def process_all_releases(releases, meta):
             else:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                     console.print("[red]This is the probably the best match, but it is not a perfect match.[/red]")
-                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
+                    console.print("[yellow]All other releases have a score at least 30 points lower.")
+                    for logged_release, release_logs in logs:
+                        if logged_release == best_release:
+                            console.print(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
+                            for log in release_logs:
+                                console.print(log)
                     while True:
                         user_input = input("Do you want to use this release? (y/n): ").strip().lower()
                         try:
