@@ -905,16 +905,14 @@ async def process_all_releases(releases, meta):
                     disc_size_gb = meta['discs'][0]['bdinfo'].get('size', 0)
 
                     expected_format = ""
-                    if disc_size_gb > 90:  # BD-100 typically holds around 100GB
-                        expected_format = "bd-100"
-                    elif disc_size_gb > 60:  # BD-66 typically holds around 66GB
-                        expected_format = "bd-66"
-                    elif disc_size_gb > 40:  # BD-50 typically holds around 50GB
-                        expected_format = "bd-50"
-                    elif disc_size_gb > 20:  # BD-25 typically holds around 25GB
+                    if disc_size_gb < 25:
                         expected_format = "bd-25"
-                    elif disc_size_gb > 7:  # Single-layer BD
-                        expected_format = "bd"
+                    elif disc_size_gb < 50:
+                        expected_format = "bd-50"
+                    elif disc_size_gb < 66:
+                        expected_format = "bd-66"
+                    else:
+                        expected_format = "bd-100"
 
                     format_match = False
                     if expected_format and expected_format in release_format:
