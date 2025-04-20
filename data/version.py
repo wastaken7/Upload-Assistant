@@ -1,3 +1,29 @@
+__version__ = "4.1.9"
+
+"""
+Changelog for version 4.1.9 (2025-04-20):
+
+## What's Changed
+* PTP. Do not ask if files with en-GB subs are trumpable. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/459
+* Add tag for releases without a group name (PSS) by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/461
+* In PTP descriptions, do not replace [code] by [quote]. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/463
+* In HDB descriptions, do not replace [code] by [quote]. by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/466
+* handle cleanup on mac os without termination by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/465
+* Refactor CBR.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/467
+* Description Customization by @zercsy in https://github.com/Audionut/Upload-Assistant/pull/468
+* Fixed THR
+* Added an option that allows sites to skip upload when content does not contain English
+* Fixed cleanup on Mac OS
+* Fixed an error causing regenerated torrents to fail being added to client
+* Added fallback search for HDB when no IMDB
+* Other minor fixes
+
+## New Contributors
+* @zercsy made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/468
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.8.1...4.1.9
+"""
+
 __version__ = "4.1.8.1"
 
 """
