@@ -1732,12 +1732,13 @@ class Prep():
         return tag
 
     async def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
-        try:
-            with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-                mi = json.load(f)
-        except Exception:
-            if meta['debug']:
-                console.print("No mediainfo.json")
+        if not meta.get('is_disc') == "BDMV":
+            try:
+                with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
+                    mi = json.load(f)
+            except Exception:
+                if meta['debug']:
+                    console.print("No mediainfo.json")
         try:
             if meta.get('manual_source', None):
                 source = meta['manual_source']
