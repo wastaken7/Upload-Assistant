@@ -181,11 +181,15 @@ config = {
         "keep_meta": False,
 
         # If processing a bluray disc, get bluray information from bluray.com
-        # This will add a bluray.com link to the description and set region and distribution info
+        # This will set region and distribution info
         "get_bluray_info": False,
-        # A release with 100% score will have complete matching details with the bdinfo
-        # Setting 95% will allow for one not matching audio or subtitle track from bdinfo
-        # Most useful in unattended mode. If not unattended you may wish to lower this value to check more releases
+
+        # Add bluray.com link to description
+        "add_bluray_link": False,
+
+        # A release with 100% score will have complete matching details
+        # Setting 95% will allow for one non matching audio OR subtitle track
+        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
         "bluray_score": 95,
 
     },

@@ -916,6 +916,8 @@ async def process_all_releases(releases, meta):
                     elif expected_format:
                         score -= 50
                         console.print(f"[yellow]⚠[/yellow] Disc format mismatch: {specs['discs']['format']} vs expected {expected_format.upper()} (size: {disc_size_gb:.2f} GB)")
+                        if meta['debug']:
+                            console.print("[dim]Penalty for disc format mismatch 50.0[/dim]")
 
                 # Video format checks
                 if 'video' in specs and meta_video_specs:
@@ -943,6 +945,8 @@ async def process_all_releases(releases, meta):
                     if not codec_match:
                         score -= 80
                         console.print(f"[red]✗[/red] Video codec mismatch: {release_codec} vs {meta_codec}")
+                        if meta['debug']:
+                            console.print("[dim]Penalty for video codec mismatch 80.0[/dim]")
 
                     # Resolution match check
                     release_res = specs['video'].get('resolution', '').lower()
@@ -959,6 +963,8 @@ async def process_all_releases(releases, meta):
                     if not res_match:
                         score -= 80
                         console.print(f"[red]✗[/red] Resolution mismatch: {release_res} vs {meta_res}")
+                        if meta['debug']:
+                            console.print("[dim]Penalty for resolution mismatch 80.0[/dim]")
                 else:
                     score -= 20
                     console.print("[yellow]?[/yellow] Cannot compare video formats")
@@ -1142,7 +1148,8 @@ async def process_all_releases(releases, meta):
                         partial_match_percentage = (partial_audio_matches / total_tracks) * 100
 
                         audio_penalty = 40 * (missing_audio_tracks / total_tracks) + 10 * (partial_audio_matches / total_tracks)
-                        console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
+                        if meta['debug']:
+                            console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
 
                         if audio_matches > 0:
@@ -1188,7 +1195,8 @@ async def process_all_releases(releases, meta):
                     if total_subs > 0:
                         match_percentage = (sub_matches / total_subs) * 100
                         sub_penalty = 40 * (missing_subs / total_subs)
-                        console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
+                        if meta['debug']:
+                            console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
                         score -= sub_penalty
 
                         if sub_matches > 0:
@@ -1211,7 +1219,7 @@ async def process_all_releases(releases, meta):
         if scored_releases:
             bluray_score = meta.get('bluray_score', 100)
             best_score, best_release = scored_releases[0]
-            close_matches = [release for score, release in scored_releases if best_score - score <= 20]
+            close_matches = [release for score, release in scored_releases if best_score - score <= 30]
 
             if len(close_matches) == 1 and best_score == 100:
                 cli_ui.info(f"Single perfect match found: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1223,7 +1231,7 @@ async def process_all_releases(releases, meta):
 
             elif len(close_matches) > 1:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                    console.print("[yellow]Multiple releases are within 20% of the best match. Please confirm which release to use:[/yellow]")
+                    console.print("[yellow]Multiple releases are within 30% of the best match. Please confirm which release to use:[/yellow]")
                     for idx, release in enumerate(close_matches, 1):
                         score = next(score for score, r in scored_releases if r == release)
                         console.print(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
