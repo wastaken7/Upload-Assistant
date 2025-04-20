@@ -868,8 +868,7 @@ async def process_all_releases(releases, meta):
 
     detailed_releases = []
     for idx, release in enumerate(releases, 1):
-        if meta['debug']:
-            cli_ui.info(f"Processing release {idx}/{len(releases)}: {release['title']} ({release['country']})")
+        console.print(f"[cyan]Processing release {idx}/{len(releases)}: {release['title']} ({release['country']})")
         detailed_release = await fetch_release_details(release, meta)
         detailed_releases.append(detailed_release)
 
