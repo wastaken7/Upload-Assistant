@@ -194,10 +194,11 @@ config = {
         # If only a single bdinfo audio/subtitle track, penalties are doubled
         # Video codec/resolution and disc size mismatches have huge penalities
         # Only useful in unattended mode. If not unattended you will be prompted to confirm release
-        "bluray_score": 95,
+        # Final score must be greater than this value to be considered a match
+        "bluray_score": 94.5,
 
         # If there is only a single release on bluray.com, you may wish to relax the score a little
-        "bluray_single_score": 90,
+        "bluray_single_score": 89.5,
 
     },
 
