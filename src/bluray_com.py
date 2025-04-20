@@ -1150,17 +1150,21 @@ async def process_all_releases(releases, meta):
 
                         if audio_matches == total_tracks:
                             audio_penalty = 0
-                        elif audio_matches + partial_audio_matches == total_tracks:
-                            if total_tracks == 1 and audio_matches == 0:
+                        # Single bdinfo track penalty adjustment
+                        elif total_tracks == 1:
+                            if audio_matches == 1:
+                                audio_penalty = 0
+                            elif partial_audio_matches == 1:
                                 audio_penalty = 5.0
                             else:
-                                audio_penalty = 2.5
-                        else:
-                            missing_tracks = total_tracks - (audio_matches + partial_audio_matches)
-                            if total_tracks == 1 and audio_matches == 0:
                                 audio_penalty = 10.0
-                            else:
-                                audio_penalty = 5.0 * missing_tracks
+                        # Multiple bdinfo tracks penalty adjustment
+                        else:
+                            audio_penalty = 0
+                            audio_penalty += partial_audio_matches * 2.5
+                            missing_tracks = total_tracks - (audio_matches + partial_audio_matches)
+                            audio_penalty += missing_tracks * 5.0
+
                         if meta['debug']:
                             console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
