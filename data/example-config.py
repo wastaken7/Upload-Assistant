@@ -189,9 +189,14 @@ config = {
         "add_bluray_link": False,
 
         # A release with 100% score will have complete matching details
-        # Setting 95% will allow for one non matching audio OR subtitle track
+        # Setting 95% will allow for one non matching audio OR subtitle track (each missing has a 5.0 penalty)
+        # Partial matched audio tracks have a 2.5 score penalty
+        # If only a single track, penalty is doubled
         # Only useful in unattended mode. If not unattended you will be prompted to confirm release
         "bluray_score": 95,
+
+        # If there is only a single release on bluray.com, you may wish to relax the score a little
+        "bluray_single_score": 90,
 
     },
 

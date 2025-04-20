@@ -1148,7 +1148,18 @@ async def process_all_releases(releases, meta):
                         full_match_percentage = (audio_matches / total_tracks) * 100
                         partial_match_percentage = (partial_audio_matches / total_tracks) * 100
 
-                        audio_penalty = 5
+                        if audio_matches == total_tracks:
+                            audio_penalty = 0
+                        elif audio_matches + partial_audio_matches == total_tracks:
+                            if total_tracks == 1 and audio_matches == 0:
+                                audio_penalty = 5.0
+                            else:
+                                audio_penalty = 2.5
+                        else:
+                            if total_tracks == 1 and audio_matches == 0:
+                                audio_penalty = 10.0
+                            else:
+                                audio_penalty = 5.0
                         if meta['debug']:
                             console.print(f"[dim]Audio penalty: {audio_penalty:.1f}[/dim]")
                         score -= audio_penalty
@@ -1195,7 +1206,10 @@ async def process_all_releases(releases, meta):
                     total_subs = len(meta_subtitles)
                     if total_subs > 0:
                         match_percentage = (sub_matches / total_subs) * 100
-                        sub_penalty = 5
+                        if total_subs == 1 and sub_matches == 0:
+                            sub_penalty = 10.0
+                        else:
+                            sub_penalty = 5
                         if meta['debug']:
                             console.print(f"[dim]Subtitle penalty: {sub_penalty:.1f}[/dim]")
                         score -= sub_penalty
@@ -1211,7 +1225,7 @@ async def process_all_releases(releases, meta):
                 score -= 80
                 console.print("[red]✗[/red] No specifications available for this release")
 
-            console.print(f"[blue]Final score for release {idx}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
+            console.print(f"[blue]Final score for release {idx + 1}/{len(detailed_releases)}: {score:.1f}/100 for {release['title']} ({release['country']})[/blue]")
             console.print("=" * 80)
             scored_releases.append((score, release))
 
@@ -1219,6 +1233,7 @@ async def process_all_releases(releases, meta):
 
         if scored_releases:
             bluray_score = meta.get('bluray_score', 100)
+            bluray_single_score = meta.get('bluray_single_score', 100)
             best_score, best_release = scored_releases[0]
             close_matches = [release for score, release in scored_releases if best_score - score <= 30]
 
@@ -1254,7 +1269,7 @@ async def process_all_releases(releases, meta):
                         except KeyboardInterrupt:
                             console.print("[red]Operation cancelled.[/red]")
                             break
-                elif best_score > bluray_score:
+                elif best_score > bluray_single_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     region_code = map_country_to_region_code(best_release['country'])
                     meta['region'] = region_code
@@ -1311,6 +1326,7 @@ async def process_all_releases(releases, meta):
             else:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                     console.print("[red]This is the probably the best match, but it is not a perfect match.[/red]")
+                    cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     while True:
                         user_input = input("Do you want to use this release? (y/n): ").strip().lower()
                         try:

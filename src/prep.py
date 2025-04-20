@@ -1104,6 +1104,7 @@ class Prep():
 
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
+        meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
 
