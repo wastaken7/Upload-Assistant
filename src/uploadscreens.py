@@ -306,6 +306,8 @@ thread_pool = ThreadPoolExecutor(max_workers=10)
 
 
 async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
+    if 'image_list' not in meta:
+        meta['image_list'] = []
     if meta['debug']:
         upload_start_time = time.time()
 

@@ -185,6 +185,36 @@ config = {
         # and then try and find region/distributor ids from those sites
         "ping_unit3d": False,
 
+        # If processing a bluray disc, get bluray information from bluray.com
+        # This will set region and distribution info
+        # Must have imdb id to work
+        "get_bluray_info": False,
+
+        # Add bluray.com link to description
+        # Requires "get_bluray_info" to be set to True
+        "add_bluray_link": False,
+
+        # Add cover/back/slip images from bluray.com to description if available
+        # Requires "get_bluray_info" to be set to True
+        "use_bluray_images": False,
+
+        # Size of bluray.com cover images.
+        # bbcode is width limited, cover images are mostly hight dominant
+        # So you probably want a smaller size than screenshots for instance
+        "bluray_image_size": "250",
+
+        # A release with 100% score will have complete matching details between bluray.com and bdinfo
+        # Each missing Audio OR Subtitle track will reduce the score by 5
+        # Partial matched audio tracks have a 2.5 score penalty
+        # If only a single bdinfo audio/subtitle track, penalties are doubled
+        # Video codec/resolution and disc size mismatches have huge penalities
+        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
+        # Final score must be greater than this value to be considered a match
+        "bluray_score": 94.5,
+
+        # If there is only a single release on bluray.com, you may wish to relax the score a little
+        "bluray_single_score": 89.5,
+
     },
 
     # these are used for DB links on AR

@@ -13,6 +13,7 @@ from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.btnid import get_btn_torrents, get_bhd_torrents
 from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes
+from src.bluray_com import get_bluray_releases
 
 try:
     import traceback
@@ -1100,12 +1101,6 @@ class Prep():
                         meta['aka'] = f"AKA {aka.strip()}"
                         meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
 
-        if meta.get('tag', None) is None:
-            meta['tag'] = await self.get_tag(video, meta)
-        else:
-            if not meta['tag'].startswith('-') and meta['tag'] != "":
-                meta['tag'] = f"-{meta['tag']}"
-
         if meta['category'] == "TV":
             if not meta.get('not_anime', False):
                 meta = await get_season_episode(video, meta)
@@ -1201,6 +1196,30 @@ class Prep():
                         meta['season_int'] = meta['tvdb_season_int']
                         meta['season'] = "S" + str(meta['season_int']).zfill(2)
                         meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
+
+        get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
+        meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
+        meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
+        meta['use_bluray_images'] = self.config['DEFAULT'].get('use_bluray_images', False)
+        if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
+            await get_bluray_releases(meta)
+
+        if meta.get('is_disc') == "BDMV" and meta.get('use_bluray_images', False):
+            from src.rehostimages import check_hosts
+            url_host_mapping = {
+                "ibb.co": "imgbb",
+                "pixhost.to": "pixhost",
+                "imgbox.com": "imgbox",
+            }
+
+            approved_image_hosts = ['imgbox', 'imgbb', 'pixhost']
+            await check_hosts(meta, "covers", url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
+
+        if meta.get('tag', None) is None:
+            meta['tag'] = await self.get_tag(video, meta)
+        else:
+            if not meta['tag'].startswith('-') and meta['tag'] != "":
+                meta['tag'] = f"-{meta['tag']}"
 
         meta = await self.tag_override(meta)
 
@@ -2394,16 +2413,15 @@ class Prep():
 
             if description.tell() != 0:
                 description.write("\n")
-            return meta
 
         # Fallback if no description is provided
         if not meta.get('skip_gen_desc', False):
-            description_text = meta['description'] if meta['description'] else ""
+            description_text = meta['description'] if meta.get('description', '') else ""
             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                 if len(description_text) > 0:
                     description.write(description_text + "\n")
 
-            return meta
+        return meta
 
     async def tag_override(self, meta):
         with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:
