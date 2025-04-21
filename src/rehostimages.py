@@ -141,6 +141,7 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
 
 
 async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_hosts=None, img_host_index=1, file=None):
+    original_imghost = meta.get('imghost')
     retry_mode = False
     images_reuploaded = False
     new_images_key = f'{tracker}_images_key'
@@ -365,6 +366,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
 
             if mapped_host not in approved_image_hosts:
                 console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
+                if original_imghost:
+                    meta['imghost'] = original_imghost
                 return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
 
         # Ensure all uploaded images are valid
@@ -403,6 +406,10 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
             else:
                 console.print("[red]new_images_key is not a valid key in meta or is not a list.")
 
+            if original_imghost:
+                meta['imghost'] = original_imghost
             return meta[new_images_key], False, images_reuploaded
     else:
+        if original_imghost:
+            meta['imghost'] = original_imghost
         return meta[new_images_key], False, images_reuploaded
