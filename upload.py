@@ -279,7 +279,7 @@ async def process_meta(meta, base_dir):
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         if not os.path.exists(torrent_path):
             reuse_torrent = None
-            if meta.get('rehash', False) is False:
+            if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
@@ -571,13 +571,6 @@ async def do_the_thing(base_dir):
                 start_time = time.time()
 
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
-
-            meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
-            hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
-            tracker_ids = ['ptp', 'bhd', 'hdb', 'blu', 'btn', 'oe', 'aither', 'lst']
-
-            if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids):
-                await client.get_pathed_torrents(path, meta)
 
             await process_meta(meta, base_dir)
 
