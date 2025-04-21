@@ -234,6 +234,7 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                     all_screenshots.append(screen)
 
     if tracker == "covers":
+        all_screenshots = []
         existing_screens = await asyncio.to_thread(glob.glob, f"{meta['base_dir']}/tmp/{meta['uuid']}/cover_*.jpg")
         for screen in existing_screens:
             if screen not in all_screenshots:
