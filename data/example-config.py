@@ -193,6 +193,11 @@ config = {
         # Requires "get_bluray_info" to be set to True
         "use_bluray_images": False,
 
+        # Size of bluray.com cover images.
+        # bbcode is width limited, cover images are mostly hight dominant
+        # So you probably want a smaller size than screenshots for instance
+        "bluray_image_size": "250",
+
         # A release with 100% score will have complete matching details between bluray.com and bdinfo
         # Each missing Audio OR Subtitle track will reduce the score by 5
         # Partial matched audio tracks have a 2.5 score penalty
