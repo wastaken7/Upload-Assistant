@@ -675,7 +675,33 @@ async def download_cover_images(meta):
 
     reuploaded_images_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], "covers.json")
     if os.path.exists(reuploaded_images_path):
-        return True
+        try:
+            with open(reuploaded_images_path, 'r', encoding='utf-8') as f:
+                existing_covers = json.load(f)
+
+            matching_release = False
+            if isinstance(existing_covers, list) and len(existing_covers) > 0:
+                for cover in existing_covers:
+                    if cover.get('release_url') == meta.get('release_url'):
+                        if meta['debug']:
+                            console.print(f"[green]Found existing cover images for this release URL: {meta.get('release_url')}[/green]")
+                        matching_release = True
+                        return True
+
+            if not matching_release:
+                if meta['debug']:
+                    console.print(f"[yellow]Existing covers.json found but none match current release URL: {meta.get('release_url')}[/yellow]")
+                    console.print("[yellow]Deleting outdated covers.json file[/yellow]")
+                os.remove(reuploaded_images_path)
+
+        except Exception as e:
+            console.print(f"[red]Error reading covers.json: {str(e)}[/red]")
+            try:
+                os.remove(reuploaded_images_path)
+                if meta['debug']:
+                    console.print("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
+            except Exception as delete_error:
+                console.print(f"[red]Failed to delete corrupted covers.json: {str(delete_error)}[/red]")
 
     downloaded_images = {}
     console.print("[blue]Downloading cover images...[/blue]")

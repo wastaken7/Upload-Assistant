@@ -78,6 +78,16 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
         if not raw_url:
             continue
 
+        # For covers, verify the release_url matches
+        if tracker == "covers" and "release_url" in meta:
+            if "release_url" not in image or image["release_url"] != meta["release_url"]:
+                if meta.get('debug'):
+                    if "release_url" not in image:
+                        console.print(f"[yellow]Skipping image without release_url: {raw_url}")
+                    else:
+                        console.print(f"[yellow]Skipping image with mismatched release_url: {image['release_url']} != {meta['release_url']}")
+                continue
+
         parsed_url = urlparse(raw_url)
         hostname = parsed_url.netloc
         mapped_host = match_host(hostname, url_host_mapping.keys())
@@ -397,10 +407,32 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 updated_data = existing_data + meta[new_images_key]
                 updated_data = [dict(s) for s in {tuple(d.items()) for d in updated_data}]
 
+                if tracker == "covers" and "release_url" in meta:
+                    for image in updated_data:
+                        if "release_url" not in image:
+                            image["release_url"] = meta["release_url"]
+                    console.print(f"[green]Added release URL to {len(updated_data)} cover images: {meta['release_url']}")
+
                 try:
                     async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                         await f.write(json.dumps(updated_data, indent=4))
                     console.print(f"[green]Successfully updated reuploaded images in {output_file}.")
+
+                    if tracker == "covers":
+                        deleted_count = 0
+                        for screenshot in all_screenshots:
+                            try:
+                                if os.path.exists(screenshot):
+                                    os.remove(screenshot)
+                                    deleted_count += 1
+                                    if meta.get('debug'):
+                                        console.print(f"[dim]Deleted cover image file: {screenshot}[/dim]")
+                            except Exception as e:
+                                console.print(f"[yellow]Failed to delete cover image file {screenshot}: {str(e)}[/yellow]")
+
+                        if deleted_count > 0:
+                            console.print(f"[green]Cleaned up {deleted_count} cover image files after successful upload[/green]")
+
                 except Exception as e:
                     console.print(f"[red]Failed to save reuploaded images: {e}")
             else:
