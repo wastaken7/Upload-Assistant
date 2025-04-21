@@ -628,17 +628,33 @@ async def parse_release_details(response_text, release, meta):
                 if meta['debug']:
                     console.print(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
 
-            disc_count_match = re.search(r'Single disc \(1 ([^)]+)\)|(\d+)-disc set', disc_section)
+            disc_count_match = re.search(r'Single disc \(1 ([^)]+)\)|(One|Two|Three|Four|Five|\d+)[ -]disc set(?:\s*\(([^)]+)\))?', disc_section)
+            console.print(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
             if disc_count_match:
                 if disc_count_match.group(1):
                     specs['discs']['count'] = 1
                     specs['discs']['format'] = disc_count_match.group(1).strip()
                 else:
-                    specs['discs']['count'] = int(disc_count_match.group(2))
-                    specs['discs']['format'] = "multiple discs"
-                if meta['debug']:
-                    console.print(f"[blue]Disc Count: {specs['discs']['count']}[/blue]")
-                    console.print(f"[blue]Disc Format: {specs['discs']['format']}[/blue]")
+                    disc_count = disc_count_match.group(2)
+                    if disc_count.isdigit():
+                        specs['discs']['count'] = int(disc_count)
+                    else:
+                        number_map = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+                        specs['discs']['count'] = number_map.get(disc_count, 1)
+
+                    if disc_count_match.group(3):
+                        bd_format_match = re.search(r'(\d+\s*BD-\d+|\d+\s*BD)', disc_count_match.group(3))
+                        console.print(f"[dim]BD Format Match: {bd_format_match}[/dim]")
+                        if bd_format_match:
+                            specs['discs']['format'] = bd_format_match.group(1).strip()
+                        else:
+                            bd_match = re.search(r'(\d+\s*BD-\d+)', disc_count_match.group(3))
+                            if bd_match:
+                                specs['discs']['format'] = bd_match.group(1).strip()
+                            else:
+                                specs['discs']['format'] = "multiple discs"
+                    else:
+                        specs['discs']['format'] = "multiple discs"
 
         # Parse playback section
         playback_section = extract_section(specs_td, 'Playback')
@@ -1044,19 +1060,28 @@ async def process_all_releases(releases, meta):
             if 'specs' in release:
                 specs = release['specs']
 
+                specs_missing = False
                 # Check for completeness of data (penalty for missing info)
                 if not specs.get('video', {}):
-                    score -= 10  # Missing video info
+                    score -= 5  # Missing video info
+                    specs_missing = True
                     log_and_print("[red]✗[/red] Missing video info", release_logs)
+                    log_and_print("[dim]Penalty for missing video info: 5.0[/dim]", release_logs)
                 if not specs.get('audio', []):
                     score -= 5  # Missing audio info
+                    specs_missing = True
                     log_and_print("[red]✗[/red] Missing audio info", release_logs)
+                    log_and_print("[dim]Penalty for missing audio info: 5.0[/dim]", release_logs)
                 if meta_subtitles and not specs.get('subtitles', []):
                     score -= 5  # Missing subtitle info when bdinfo has subtitles
+                    specs_missing = True
                     log_and_print("[red]✗[/red] Missing subtitle info", release_logs)
+                    log_and_print("[dim]Penalty for missing subtitle info: 5.0[/dim]", release_logs)
                 if not specs.get('discs', {}):
-                    score -= 10  # Missing disc info
+                    score -= 5  # Missing disc info
+                    specs_missing = True
                     log_and_print("[red]✗[/red] Missing disc info", release_logs)
+                    log_and_print("[dim]Penalty for missing disc info: 5.0[/dim]", release_logs)
 
                 # Disc format check
                 if 'discs' in specs and 'format' in specs['discs'] and 'discs' in meta and 'bdinfo' in meta['discs'][0]:
@@ -1074,14 +1099,22 @@ async def process_all_releases(releases, meta):
                         expected_format = "bd-100"
 
                     format_match = False
-                    if expected_format and expected_format in release_format:
+                    if release_format == "bd" or "bd" == release_format:
+                        format_match = "generic"
+                        log_and_print(f"[yellow]⚠[/yellow] Generic BD format found: {specs['discs']['format']} for size {disc_size_gb:.2f} GB", release_logs)
+                    elif expected_format and expected_format in release_format:
                         format_match = True
                         log_and_print(f"[green]✓[/green] Disc format match: {specs['discs']['format']} matches size {disc_size_gb:.2f} GB", release_logs)
                     elif expected_format:
                         score -= 50
                         log_and_print(f"[yellow]⚠[/yellow] Disc format mismatch: {specs['discs']['format']} vs expected {expected_format.upper()} (size: {disc_size_gb:.2f} GB)", release_logs)
                         if meta['debug']:
-                            log_and_print("[dim]Penalty for disc format mismatch 50.0[/dim]", release_logs)
+                            log_and_print("[dim]Penalty for disc format mismatch: 50.0[/dim]", release_logs)
+
+                    if format_match == "generic":
+                        score -= 5
+                        if meta['debug']:
+                            log_and_print("[dim]Reduced penalty for generic BD format: 5.0[/dim]", release_logs)
 
                 # Video format checks
                 if 'video' in specs and meta_video_specs:
@@ -1130,7 +1163,7 @@ async def process_all_releases(releases, meta):
                         if meta['debug']:
                             log_and_print("[dim]Penalty for resolution mismatch 80.0[/dim]", release_logs)
                 else:
-                    score -= 20
+                    score -= 5
                     log_and_print("[yellow]?[/yellow] Cannot compare video formats", release_logs)
 
                 # Audio track checks
@@ -1367,7 +1400,7 @@ async def process_all_releases(releases, meta):
                                 log_and_print(f"[dim]Extra audio tracks penalty: {extra_penalty:.1f} points[/dim]", release_logs)
 
                 else:
-                    score -= 10
+                    score -= 5
                     log_and_print("[yellow]?[/yellow] Cannot compare audio tracks", release_logs)
 
                 # Subtitle checks
@@ -1428,7 +1461,7 @@ async def process_all_releases(releases, meta):
                                 log_and_print(f"[dim]Extra subtitles penalty: {extra_penalty:.1f} points[/dim]", release_logs)
 
                 else:
-                    score -= 10
+                    score -= 5
                     log_and_print("[yellow]?[/yellow] Cannot compare subtitles", release_logs)
             else:
                 score -= 80
@@ -1445,7 +1478,7 @@ async def process_all_releases(releases, meta):
             bluray_score = meta.get('bluray_score', 100)
             bluray_single_score = meta.get('bluray_single_score', 100)
             best_score, best_release = scored_releases[0]
-            close_matches = [release for score, release in scored_releases if best_score - score <= 30]
+            close_matches = [release for score, release in scored_releases if best_score - score <= 40]
 
             if len(scored_releases) == 1 and best_score == 100:
                 cli_ui.info(f"Single perfect match found: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1501,7 +1534,11 @@ async def process_all_releases(releases, meta):
 
             elif len(close_matches) > 1:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                    console.print("[yellow]Multiple releases are within 30% of the best match. Please confirm which release to use:[/yellow]")
+                    console.print("[yellow]Multiple releases are within 40 points of the best match. Please confirm which release to use:[/yellow]")
+                    if format_match == "generic":
+                        console.print("[red]Note: Generic BD format found, please confirm the release.[/red]")
+                    if specs_missing:
+                        console.print("[red]Note: Missing specs in release, please confirm the release.[/red]")
                     for idx, release in enumerate(close_matches, 1):
                         score = next(score for score, r in scored_releases if r == release)
                         console.print(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
@@ -1570,7 +1607,7 @@ async def process_all_releases(releases, meta):
             else:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
                     console.print("[red]This is the probably the best match, but it is not a perfect match.[/red]")
-                    console.print("[yellow]All other releases have a score at least 30 points lower.")
+                    console.print("[yellow]All other releases have a score at least 40 points lower.")
                     for logged_release, release_logs in logs:
                         if logged_release == best_release:
                             console.print(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
