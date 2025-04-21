@@ -467,6 +467,14 @@ async def get_bluray_releases(meta):
                                 meta['release_url'] = selected_release['url']
                                 cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
 
+                                if meta.get('use_bluray_images', False):
+                                    console.print("[yellow]Fetching release details to get cover images...[/yellow]")
+                                    selected_release = await fetch_release_details(selected_release, meta)
+
+                                    if 'cover_images' in selected_release and selected_release['cover_images']:
+                                        meta['cover_images'] = selected_release['cover_images']
+                                        await download_cover_images(meta)
+
                                 return [selected_release]
                             else:
                                 cli_ui.warning(f"Invalid selection: {selected_idx}. Must be between 1 and {len(matching_releases)}")
