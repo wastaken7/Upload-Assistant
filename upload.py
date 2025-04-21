@@ -279,7 +279,7 @@ async def process_meta(meta, base_dir):
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         if not os.path.exists(torrent_path):
             reuse_torrent = None
-            if meta.get('rehash', False) is False:
+            if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
