@@ -401,44 +401,69 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
     # Track running tasks for cancellation
     running_tasks = set()
 
-    async def async_upload(task, retry_count=0, max_retries=3):
+    async def async_upload(task, max_retries=3):
         """Upload image with concurrency control and retry logic."""
         index, *task_args = task
-        async with semaphore:
-            try:
-                future = asyncio.create_task(asyncio.to_thread(upload_image_task, task_args))
-                running_tasks.add(future)
-                result = await future
-                running_tasks.discard(future)
+        retry_count = 0
 
-                if result.get('status') == 'success':
-                    return (index, result)
-                else:
-                    reason = result.get('reason', 'Unknown error')
+        async with semaphore:
+            while retry_count <= max_retries:
+                future = None
+                try:
+                    future = asyncio.create_task(asyncio.to_thread(upload_image_task, task_args))
+                    running_tasks.add(future)
+
+                    try:
+                        result = await asyncio.wait_for(future, timeout=60.0)
+                        running_tasks.discard(future)
+
+                        if result.get('status') == 'success':
+                            return (index, result)
+                        else:
+                            reason = result.get('reason', 'Unknown error')
+                            if retry_count < max_retries:
+                                retry_count += 1
+                                console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {reason}[/yellow]")
+                                await asyncio.sleep(1.1 * retry_count)
+                                continue
+                            else:
+                                console.print(f"[red]Failed to upload image {index} after {max_retries} attempts: {reason}[/red]")
+                                return None
+
+                    except asyncio.TimeoutError:
+                        console.print(f"[red]Upload task {index} timed out after 60 seconds[/red]")
+                        if future in running_tasks:
+                            future.cancel()
+                            running_tasks.discard(future)
+
+                        if retry_count < max_retries:
+                            retry_count += 1
+                            console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index} after timeout[/yellow]")
+                            await asyncio.sleep(1.1 * retry_count)
+                            continue
+                        return None
+
+                except asyncio.CancelledError:
+                    console.print(f"[red]Upload task {index} cancelled.[/red]")
+                    if future and future in running_tasks:
+                        future.cancel()
+                        running_tasks.discard(future)
+                    return None
+
+                except Exception as e:
+                    console.print(f"[red]Error during upload for image {index}: {str(e)}[/red]")
                     if retry_count < max_retries:
                         retry_count += 1
-                        console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {reason}[/yellow]")
-                        await asyncio.sleep(1.1 * retry_count)
-                        return await async_upload(task, retry_count, max_retries)
+                        console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {str(e)}[/yellow]")
+                        await asyncio.sleep(1.5 * retry_count)
+                        continue
                     else:
-                        console.print(f"[red]Failed to upload image {index} after {max_retries} attempts: {reason}[/red]")
+                        console.print(f"[red]Error during upload for image {index} after {max_retries} attempts: {str(e)}[/red]")
                         return None
-            except asyncio.CancelledError:
-                console.print(f"[red]Upload task {index} cancelled.[/red]")
-                return None
-            except Exception as e:
-                if retry_count < max_retries:
-                    retry_count += 1
-                    console.print(f"[yellow]Retry {retry_count}/{max_retries} for image {index}: {str(e)}[/yellow]")
-                    await asyncio.sleep(1.5 * retry_count)
-                    return await async_upload(task, retry_count, max_retries)
-                else:
-                    console.print(f"[red]Error during upload for image {index} after {max_retries} attempts: {str(e)}[/red]")
-                    return None
 
     try:
         max_retries = 3
-        upload_results = await asyncio.gather(*[async_upload(task, 0, max_retries) for task in upload_tasks])
+        upload_results = await asyncio.gather(*[async_upload(task, max_retries) for task in upload_tasks])
         results = [res for res in upload_results if res is not None]
         results.sort(key=lambda x: x[0])
 
