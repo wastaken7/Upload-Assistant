@@ -278,17 +278,34 @@ class THR():
 
     async def login(self):
         url = 'https://www.torrenthr.org/takelogin.php'
+
+        if not self.username or not self.password:
+            console.print('[red]Missing THR credentials in config.py')
+            return None
+
         payload = {
             'username': self.username,
             'password': self.password,
             'ssl': 'yes'
         }
         headers = {
-            'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})',
+            'Referer': 'https://www.torrenthr.org/login.php'
         }
 
-        async with httpx.AsyncClient() as session:
-            resp = await session.post(url, headers=headers, data=payload)
-            if resp.url == "https://www.torrenthr.org/index.php":
-                console.print('[green]Successfully logged in')
-            return session
+        async with httpx.AsyncClient(follow_redirects=True) as session:
+            try:
+                await session.get('https://www.torrenthr.org/login.php')
+                resp = await session.post(url, headers=headers, data=payload)
+
+                if "index.php" in str(resp.url) or "logout.php" in resp.text:
+                    console.print('[green]Successfully logged in to THR')
+                    return session
+                else:
+                    console.print('[red]Failed to log in to THR')
+                    console.print(f"[red]Response text: {resp.text[:500]}...")
+                    return None
+
+            except Exception as e:
+                console.print(f"[red]Error during THR login: {str(e)}")
+                return None
