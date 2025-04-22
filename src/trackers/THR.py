@@ -217,9 +217,21 @@ class THR():
             desc.write(base)
             # REHOST IMAGES
             os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
-            image_glob = glob.glob("*.png")
-            if 'POSTER.png' in image_glob:
-                image_glob.remove('POSTER.png')
+            image_patterns = ["*.png", ".[!.]*.png"]
+            image_glob = []
+            for pattern in image_patterns:
+                image_glob.extend(glob.glob(pattern))
+
+            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+            unwanted_files = set()
+            for pattern in unwanted_patterns:
+                unwanted_files.update(glob.glob(pattern))
+                if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
+                    hidden_pattern = "." + pattern
+                    unwanted_files.update(glob.glob(hidden_pattern))
+
+            image_glob = [file for file in image_glob if file not in unwanted_files]
+            image_glob = list(set(image_glob))
             image_list = []
             for image in image_glob:
                 url = "https://img2.torrenthr.org/api/1/upload"
