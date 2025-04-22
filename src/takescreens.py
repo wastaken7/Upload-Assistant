@@ -265,7 +265,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
 
                         random_time = random.uniform(0, length)
                         screenshot_response = await capture_disc_task(
-                            (index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
+                            index, file, random_time, image_path, keyframe, loglevel, hdr_tonemap, meta
                         )
                         if optimize_images:
                             optimize_image_task(screenshot_response)
@@ -662,7 +662,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                     try:
                         # Ensure `capture_dvd_screenshot()` always returns a tuple
                         screenshot_response = await capture_dvd_screenshot(
-                            (index, input_file, image, adjusted_time, meta, width, height, w_sar, h_sar)
+                            index, input_file, image, adjusted_time, meta, width, height, w_sar, h_sar
                         )
 
                         # Ensure it is a tuple before unpacking
@@ -1035,7 +1035,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
                     random_time = random.uniform(0, length)
                     screenshot_response = await capture_screenshot(
-                        (index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
+                        index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta
                     )
 
                     if not os.path.exists(screenshot_response):
