@@ -280,27 +280,58 @@ class THR():
 
     async def search_existing(self, meta, disctype):
         imdb_id = meta.get('imdb', '')
-        search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
+        base_search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes = []
-        if meta['debug']:
-            console.print(f"[yellow]Searching for existing torrents on THR using URL {search_url}")
+        console.print(f"[yellow]Searching for existing torrents on THR using URL {base_search_url}")
 
         if not imdb_id:
             console.print("[red]No IMDb ID available for search", style="bold red")
             return dupes
 
         try:
-            console.print("[dim]Attempting to log in for search")
             cookies = await self.login()
 
+            client_args = {'timeout': 10.0, 'follow_redirects': True}
             if cookies:
-                if meta['debug']:
-                    console.print("[dim]Using authenticated session for search")
-                async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
-                    response = await client.get(search_url)
-                    return await self._process_search_response(response, meta, dupes)
+                client_args['cookies'] = cookies
             else:
-                console.print("[dim]Login failed, proceeding with unauthenticated search")
+                console.print("[red]Failed to log in to THR for search")
+                return dupes
+
+            async with httpx.AsyncClient(**client_args) as client:
+                # Start with first page (page 0 in THR's system)
+                current_page = 0
+                more_pages = True
+                page_count = 0
+                all_titles_seen = set()
+
+                while more_pages:
+                    page_url = base_search_url
+                    if current_page > 0:
+                        page_url += f"&page={current_page}"
+
+                    page_count += 1
+                    if meta.get('debug', False):
+                        console.print(f"[dim]Searching page {page_count}...")
+                    response = await client.get(page_url)
+
+                    page_dupes, has_next_page, next_page_number = await self._process_search_response(
+                        response, meta, all_titles_seen, current_page)
+
+                    for dupe in page_dupes:
+                        if dupe not in dupes:
+                            dupes.append(dupe)
+                            all_titles_seen.add(dupe)
+
+                    if meta.get('debug', False) and has_next_page:
+                        console.print(f"[dim]Next page available: page {next_page_number}")
+
+                    if has_next_page:
+                        current_page = next_page_number
+
+                        await asyncio.sleep(1)
+                    else:
+                        more_pages = False
 
         except httpx.TimeoutException:
             console.print("[bold red]Request timed out while searching for existing torrents.")
@@ -312,20 +343,27 @@ class THR():
 
         return dupes
 
-    async def _process_search_response(self, response, meta, dupes):
+    async def _process_search_response(self, response, meta, existing_dupes, current_page):
+        page_dupes = []
+        has_next_page = False
+        next_page_number = current_page
+
         if response.status_code == 200 or response.status_code == 302:
             html_length = len(response.text)
+            if meta.get('debug', False):
+                console.print(f"[dim]Response HTML length: {html_length} bytes")
+
             if html_length < 1000:
                 console.print(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
                 if meta.get('debug', False):
                     console.print(f"[yellow]Response content: {response.text[:500]}")
+                return page_dupes, False, current_page
 
             soup = BeautifulSoup(response.text, 'html.parser')
 
             result_table = soup.find('table', {'class': 'torrentlist'}) or soup.find('table', {'align': 'center'})
             if not result_table:
-                if meta['debug']:
-                    console.print("[yellow]No results table found in HTML - either no results or page structure changed")
+                console.print("[yellow]No results table found in HTML - either no results or page structure changed")
 
             link_count = 0
             onmousemove_count = 0
@@ -338,19 +376,45 @@ class THR():
                         try:
                             dupe = link['onmousemove'].split("','/images")[0]
                             dupe = dupe.replace("return overlibImage('", "")
-                            dupes.append(dupe)
+                            page_dupes.append(dupe)
                         except Exception as parsing_error:
-                            console.print(f"[yellow]Error parsing link {link}: {parsing_error}")
+                            if meta.get('debug', False):
+                                console.print(f"[yellow]Error parsing link: {parsing_error}")
 
-            if meta['debug']:
-                console.print(f"[dim]Found {link_count} detail links, {onmousemove_count} with onmousemove, {len(dupes)} parsed successfully")
+            page_number_display = current_page + 1
+            if meta.get('debug', False):
+                console.print(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
 
+            pagination_text = None
+            for p_tag in soup.find_all('p', align="center"):
+                if p_tag.text and ('Prev' in p_tag.text or 'Next' in p_tag.text):
+                    pagination_text = p_tag
+                    if meta.get('debug', False):
+                        console.print(f"[dim]Found pagination: {pagination_text.text.strip()}")
+                    break
+
+            if pagination_text:
+                next_links = pagination_text.find_all('a')
+                for link in next_links:
+                    if 'Next' in link.text:
+                        has_next_page = True
+                        href = link.get('href', '')
+
+                        if meta.get('debug', False):
+                            console.print(f"[dim]Next page URL: {href}")
+
+                        page_match = re.search(r'page=(\d+)', href)
+                        if page_match:
+                            next_page_number = int(page_match.group(1))
+                            if meta.get('debug', False):
+                                console.print(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
+                            break
         else:
             console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
             if meta.get('debug', False):
                 console.print(f"[red]Response: {response.text[:500]}...")
 
-        return dupes
+        return page_dupes, has_next_page, next_page_number
 
     async def login(self):
         console.print("[yellow]Logging in to THR...")
