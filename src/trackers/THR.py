@@ -255,7 +255,7 @@ class THR():
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(search_url)
-                if response.status_code == 200:
+                if response.status_code == 200 or response.status_code == 302:
                     soup = BeautifulSoup(response.text, 'html.parser')
                     for link in soup.find_all('a', href=True):
                         if link['href'].startswith('details.php'):
