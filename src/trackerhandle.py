@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-import requests
 import cli_ui
 from src.trackers.THR import THR
 from src.trackers.PTP import PTP
@@ -144,15 +143,13 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 thr = THR(config=config)
                 try:
-                    with requests.Session() as session:
-                        console.print("[yellow]Logging in to THR")
-                        session = thr.login(session)
-                        try:
-                            await thr.upload(session, meta, disctype)
-                        except Exception as e:
-                            console.print(f"[red]Upload failed: {e}")
-                            return
-                        await client.add_to_client(meta, "THR")
+                    session = await tracker_class.login()
+                    try:
+                        await thr.upload(session, meta, disctype)
+                    except Exception as e:
+                        console.print(f"[red]Upload failed: {e}")
+                        return
+                    await client.add_to_client(meta, "THR")
                 except Exception:
                     console.print(traceback.format_exc())
                     return

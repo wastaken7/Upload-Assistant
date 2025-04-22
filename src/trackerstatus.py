@@ -39,6 +39,9 @@ async def process_all_trackers(meta):
             tracker_class = tracker_class_map[tracker_name](config=config)
             if tracker_name in http_trackers:
                 await tracker_class.validate_credentials(meta)
+            if tracker_name == "THR":
+                console.print("[yellow]Logging in to THR")
+                await tracker_class.login()
             if tracker_name in {"THR", "PTP"}:
                 if local_meta.get('imdb_id', 0) == 0:
                     imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(

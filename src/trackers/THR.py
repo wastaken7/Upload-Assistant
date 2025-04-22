@@ -276,7 +276,7 @@ class THR():
 
         return dupes
 
-    def login(self, session):
+    async def login(self):
         url = 'https://www.torrenthr.org/takelogin.php'
         payload = {
             'username': self.username,
@@ -286,7 +286,9 @@ class THR():
         headers = {
             'User-Agent': f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
         }
-        resp = session.post(url, headers=headers, data=payload)
-        if resp.url == "https://www.torrenthr.org/index.php":
-            console.print('[green]Successfully logged in')
-        return session
+
+        async with httpx.AsyncClient() as session:
+            resp = await session.post(url, headers=headers, data=payload)
+            if resp.url == "https://www.torrenthr.org/index.php":
+                console.print('[green]Successfully logged in')
+            return session
