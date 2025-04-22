@@ -143,7 +143,7 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 thr = THR(config=config)
                 try:
-                    session = await tracker_class.login()
+                    session = await thr.login()
                     try:
                         await thr.upload(session, meta, disctype)
                     except Exception as e:
