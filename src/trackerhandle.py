@@ -143,16 +143,11 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 thr = THR(config=config)
                 try:
-                    session = await thr.login()
-                    try:
-                        await thr.upload(session, meta, disctype)
-                    except Exception as e:
-                        console.print(f"[red]Upload failed: {e}")
-                        return
-                    await client.add_to_client(meta, "THR")
-                except Exception:
-                    console.print(traceback.format_exc())
+                    await thr.upload(meta, disctype)
+                except Exception as e:
+                    console.print(f"[red]Upload failed: {e}")
                     return
+                await client.add_to_client(meta, "THR")
 
         elif tracker == "PTP":
             tracker_status = meta.get('tracker_status', {})

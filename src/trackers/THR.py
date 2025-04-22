@@ -24,7 +24,7 @@ class THR():
         self.banned_groups = [""]
         pass
 
-    async def upload(self, session, meta, disctype):
+    async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
@@ -32,7 +32,7 @@ class THR():
         pronfo = await self.edit_desc(meta)  # noqa #F841
         thr_name = unidecode(meta['name'].replace('DD+', 'DDP'))
 
-        # Confirm the correct naming order for FL
+        # Confirm the correct naming order for THR
         cli_ui.info(f"THR name: {thr_name}")
         if meta.get('unattended', False) is False:
             thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
@@ -90,23 +90,55 @@ class THR():
             thr_upload_prompt = True
         else:
             thr_upload_prompt = cli_ui.ask_yes_no("send to takeupload.php?", default=False)
+
         if thr_upload_prompt is True:
             await asyncio.sleep(0.5)
-            response = session.post(url=url, files=files, data=payload, headers=headers)
             try:
+                cookies = await self.login()
+
+                if cookies:
+                    console.print("[green]Using authenticated session for upload")
+
+                    async with httpx.AsyncClient(cookies=cookies, follow_redirects=True) as session:
+                        response = await session.post(url=url, files=files, data=payload, headers=headers)
+
+                        if meta['debug']:
+                            console.print(f"[dim]Response status: {response.status_code}")
+                            console.print(f"[dim]Response URL: {response.url}")
+                            console.print(response.text[:500] + "...")
+
+                        if "uploaded=1" in str(response.url):
+                            console.print(f'[green]Successfully Uploaded at: {response.url}')
+                            return True
+                        else:
+                            console.print(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
+                            soup = BeautifulSoup(response.text, 'html.parser')
+                            error_text = soup.find('h2', string=lambda text: text and 'Error' in text)
+
+                            if error_text:
+                                error_message = error_text.find_next('p')
+                                if error_message:
+                                    console.print(f"[red]Upload error: {error_message.text}")
+
+                            return False
+                else:
+                    console.print("[red]Failed to log in to THR for upload")
+                    return False
+
+            except Exception as e:
+                console.print(f"[red]Error during upload: {str(e)}")
+                console.print_exception()
                 if meta['debug']:
-                    console.print(response.text)
-                if response.url.endswith('uploaded=1'):
-                    console.print(f'[green]Successfully Uploaded at: {response.url}')
-                # Check if actually uploaded
-            except Exception:
-                if meta['debug']:
-                    console.print(response.text)
-                console.print("It may have uploaded, go check")
-                return
+                    try:
+                        console.print(f"[red]Response: {response.text[:500]}...")
+                    except Exception:
+                        pass
+                console.print("[yellow]It may have uploaded, please check THR manually")
+                return False
         else:
             console.print("[cyan]Request Data:")
             console.print(payload)
+            return False
 
     async def get_cat_id(self, meta):
         if meta['category'] == "MOVIE":
@@ -250,21 +282,25 @@ class THR():
         imdb_id = meta.get('imdb', '')
         search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes = []
-        console.print("[yellow]Searching for existing torrents on THR...")
+        if meta['debug']:
+            console.print(f"[yellow]Searching for existing torrents on THR using URL {search_url}")
+
+        if not imdb_id:
+            console.print("[red]No IMDb ID available for search", style="bold red")
+            return dupes
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(search_url)
-                if response.status_code == 200 or response.status_code == 302:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    for link in soup.find_all('a', href=True):
-                        if link['href'].startswith('details.php'):
-                            if link.get('onmousemove', False):
-                                dupe = link['onmousemove'].split("','/images")[0]
-                                dupe = dupe.replace("return overlibImage('", "")
-                                dupes.append(dupe)
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            console.print("[dim]Attempting to log in for search")
+            cookies = await self.login()
+
+            if cookies:
+                if meta['debug']:
+                    console.print("[dim]Using authenticated session for search")
+                async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
+                    response = await client.get(search_url)
+                    return await self._process_search_response(response, meta, dupes)
+            else:
+                console.print("[dim]Login failed, proceeding with unauthenticated search")
 
         except httpx.TimeoutException:
             console.print("[bold red]Request timed out while searching for existing torrents.")
@@ -276,7 +312,48 @@ class THR():
 
         return dupes
 
+    async def _process_search_response(self, response, meta, dupes):
+        if response.status_code == 200 or response.status_code == 302:
+            html_length = len(response.text)
+            if html_length < 1000:
+                console.print(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
+                if meta.get('debug', False):
+                    console.print(f"[yellow]Response content: {response.text[:500]}")
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            result_table = soup.find('table', {'class': 'torrentlist'}) or soup.find('table', {'align': 'center'})
+            if not result_table:
+                if meta['debug']:
+                    console.print("[yellow]No results table found in HTML - either no results or page structure changed")
+
+            link_count = 0
+            onmousemove_count = 0
+
+            for link in soup.find_all('a', href=True):
+                if link['href'].startswith('details.php'):
+                    link_count += 1
+                    if link.get('onmousemove', False):
+                        onmousemove_count += 1
+                        try:
+                            dupe = link['onmousemove'].split("','/images")[0]
+                            dupe = dupe.replace("return overlibImage('", "")
+                            dupes.append(dupe)
+                        except Exception as parsing_error:
+                            console.print(f"[yellow]Error parsing link {link}: {parsing_error}")
+
+            if meta['debug']:
+                console.print(f"[dim]Found {link_count} detail links, {onmousemove_count} with onmousemove, {len(dupes)} parsed successfully")
+
+        else:
+            console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            if meta.get('debug', False):
+                console.print(f"[red]Response: {response.text[:500]}...")
+
+        return dupes
+
     async def login(self):
+        console.print("[yellow]Logging in to THR...")
         url = 'https://www.torrenthr.org/takelogin.php'
 
         if not self.username or not self.password:
@@ -295,17 +372,25 @@ class THR():
 
         async with httpx.AsyncClient(follow_redirects=True) as session:
             try:
-                await session.get('https://www.torrenthr.org/login.php')
+                login_page = await session.get('https://www.torrenthr.org/login.php')
+                login_soup = BeautifulSoup(login_page.text, 'html.parser')
+
+                for input_tag in login_soup.find_all('input', type='hidden'):
+                    if input_tag.get('name') and input_tag.get('value'):
+                        payload[input_tag['name']] = input_tag['value']
+
                 resp = await session.post(url, headers=headers, data=payload)
 
                 if "index.php" in str(resp.url) or "logout.php" in resp.text:
                     console.print('[green]Successfully logged in to THR')
-                    return session
+                    return dict(session.cookies)
                 else:
                     console.print('[red]Failed to log in to THR')
-                    console.print(f"[red]Response text: {resp.text[:500]}...")
+                    console.print(f'[red]Login response URL: {resp.url}')
+                    console.print(f'[red]Login status code: {resp.status_code}')
                     return None
 
             except Exception as e:
                 console.print(f"[red]Error during THR login: {str(e)}")
+                console.print_exception()
                 return None
