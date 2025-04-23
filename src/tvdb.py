@@ -1,5 +1,4 @@
 import httpx
-import re
 from src.console import console
 from data.config import config
 
@@ -29,7 +28,7 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                 # Only attempt a retry once to prevent infinite loops
                 if api_key and not retry_attempted:
                     console.print("[yellow]Unauthorized access. Refreshing TVDb token...[/yellow]")
-                    new_token = await get_tvdb_token(api_key)
+                    new_token = await get_tvdb_token(api_key, base_dir)
                     if new_token:
                         # Retry the request with the new token
                         return await get_tvdb_episode_data(
@@ -132,19 +131,28 @@ async def get_tvdb_token(api_key, base_dir):
                     with open(config_path, 'r', encoding='utf-8') as file:
                         config_data = file.read()
 
-                    # Update the tvdb_token value in the config file
-                    # This regex looks for "tvdb_token": "old_value" and replaces it with the new token
-                    new_config_data = re.sub(
-                        r'("tvdb_token":\s*")[^"]*("))',  # Match the token value between double quotes
-                        rf'\1{token}\2',  # Replace with new token while preserving the structure
-                        config_data
-                    )
+                    token_pattern = '"tvdb_token":'
+                    if token_pattern in config_data:
+                        # Find the line with tvdb_token
+                        lines = config_data.splitlines()
+                        for i, line in enumerate(lines):
+                            if token_pattern in line:
+                                # Split the line at the colon and keep everything before it
+                                prefix = line.split(':', 1)[0]
+                                # Create a new line with the updated token
+                                lines[i] = f'{prefix}: "{token}",'
+                                break
 
-                    # Write the updated config back to the file
-                    with open(config_path, 'w', encoding='utf-8') as file:
-                        file.write(new_config_data)
+                        # Rejoin the lines and write back to the file
+                        new_config_data = '\n'.join(lines)
+                        with open(config_path, 'w', encoding='utf-8') as file:
+                            file.write(new_config_data)
 
-                    console.print(f"[bold green]TVDb token successfully saved to {config_path}[/bold green]")
+                        console.print(f"[bold green]TVDb token successfully saved to {config_path}[/bold green]")
+                    else:
+                        console.print("[yellow]Warning: Could not find tvdb_token in configuration file[/yellow]")
+                        console.print("[yellow]The token will be used for this session only.[/yellow]")
+
                 except Exception as e:
                     console.print(f"[yellow]Warning: Could not update TVDb token in configuration file: {e}[/yellow]")
                     console.print("[yellow]The token will be used for this session only.[/yellow]")
