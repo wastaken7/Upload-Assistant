@@ -190,10 +190,11 @@ class AL():
         for audio_track in tracks:
             channels_str = await self.get_correct_channels_str(audio_track['channels'])
             audio_codec = await self.get_correct_audio_codec_str(audio_track['codec'])
-            audio_format = f"{channels_str}-{audio_codec}"
+            audio_format = f"{audio_codec} {channels_str}"
             audio_language = await self.get_correct_language_str(audio_track['language'])
             if (formats.get(audio_format, False)):
-                formats[audio_format] += f"-{audio_language}"
+                if audio_language not in formats[audio_format]:
+                    formats[audio_format] += f"-{audio_language}"
             else:
                 formats[audio_format] = audio_language
 
