@@ -151,7 +151,7 @@ class AL():
             name += f" {video_encode.strip()}"
 
         if tag == '':
-            tag = 'NoGroup'
+            tag = '-NoGroup'
         if 'AVC' in video_codec and '264' in video_encode:
             name += f"{tag.strip()}"
         else:
