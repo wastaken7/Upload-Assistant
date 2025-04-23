@@ -56,6 +56,12 @@ class UploadHelper:
         console.print()
         console.print(f"[bold]Overview:[/bold] {meta['overview']}")
         console.print()
+        if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('auto_episode_title'):
+            console.print(f"[bold]Episode Title:[/bold] {meta['auto_episode_title']}")
+            console.print()
+        if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('overview_meta'):
+            console.print(f"[bold]Episode overview:[/bold] {meta['overview_meta']}")
+            console.print()
         console.print(f"[bold]Genre:[/bold] {meta['genres']}")
         console.print()
         if str(meta.get('demographic', '')) != '':
