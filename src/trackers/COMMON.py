@@ -74,7 +74,7 @@ class COMMON():
         thumb_size = int(self.config['DEFAULT'].get('pack_thumb_size', '300'))
         cover_size = int(self.config['DEFAULT'].get('bluray_image_size', '250'))
         process_limit = int(self.config['DEFAULT'].get('processLimit', 10))
-        episode_overview = int(self.config['DEFAULT'].get('episode_overview', False)) or meta.get('episode_overview', None)
+        episode_overview = int(self.config['DEFAULT'].get('episode_overview', False))
         try:
             # If tracker has screenshot header specified in config, use that. Otherwise, check if screenshot default is used. Otherwise, fall back to None
             screenheader = self.config['TRACKERS'][tracker].get('custom_screenshot_header', self.config['DEFAULT'].get('screenshot_header', None))
