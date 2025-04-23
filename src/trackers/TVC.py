@@ -143,6 +143,9 @@ class TVC():
         if not meta['is_disc']:
             self.get_subs_info(meta, mi)
 
+        if meta['video_codec'] == 'HEVC':
+            tvc_name = tvc_name.replace(']', ' HEVC]')
+
         if 'eng_subs' in meta and meta['eng_subs']:
             tvc_name = tvc_name.replace(']', ' SUBS]')
         if 'sdh_subs' in meta and meta['eng_subs']:
@@ -293,9 +296,9 @@ class TVC():
 
         dupes = []
 
-        # UHD, Discs, HEVC and remux are not allowed on TVC. HEVC is also not allowed but that is changing it seems to i will leave it
-        if meta['resolution'] == '2160p' or (meta['is_disc'] or "REMUX" in meta['type']) or meta['video_codec'] == 'HEVC':
-            console.print("[bold red]No UHD, Discs, HEVC or Remuxes allowed at TVC[/bold red]")
+        # UHD, Discs, remux and non-1080p HEVC are not allowed on TVC.
+        if meta['resolution'] == '2160p' or (meta['is_disc'] or "REMUX" in meta['type']) or (meta['video_codec'] == 'HEVC' and meta['resolution'] != '1080p'):
+            console.print("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
             meta['skipping'] = "TVC"
             return []
 
