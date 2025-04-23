@@ -264,6 +264,8 @@ class AL():
             return '5.0'
         elif channels_str == '2':
             return '2.0'
+        elif channels_str == '1':
+            return '1.0'
         else:
             return channels_str
 
