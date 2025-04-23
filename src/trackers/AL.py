@@ -151,7 +151,7 @@ class AL():
             name += f" {video_encode.strip()}"
 
         if tag == '':
-            tag = 'NoGroup'
+            tag = '-NoGroup'
         if 'AVC' in video_codec and '264' in video_encode:
             name += f"{tag.strip()}"
         else:
@@ -190,10 +190,11 @@ class AL():
         for audio_track in tracks:
             channels_str = await self.get_correct_channels_str(audio_track['channels'])
             audio_codec = await self.get_correct_audio_codec_str(audio_track['codec'])
-            audio_format = f"{channels_str}-{audio_codec}"
+            audio_format = f"{audio_codec} {channels_str}"
             audio_language = await self.get_correct_language_str(audio_track['language'])
             if (formats.get(audio_format, False)):
-                formats[audio_format] += f"-{audio_language}"
+                if audio_language not in formats[audio_format]:
+                    formats[audio_format] += f"-{audio_language}"
             else:
                 formats[audio_format] = audio_language
 
@@ -263,6 +264,8 @@ class AL():
             return '5.0'
         elif channels_str == '2':
             return '2.0'
+        elif channels_str == '1':
+            return '1.0'
         else:
             return channels_str
 
