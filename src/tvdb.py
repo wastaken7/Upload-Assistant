@@ -32,7 +32,7 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                     if new_token:
                         # Retry the request with the new token
                         return await get_tvdb_episode_data(
-                            new_token, tvdb_id, season, episode, api_key, True
+                            base_dir, new_token, tvdb_id, season, episode, api_key, True
                         )
                     else:
                         console.print("[red]Failed to refresh TVDb token[/red]")
@@ -51,7 +51,7 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                     new_token = await get_tvdb_token(api_key, base_dir)
                     if new_token:
                         return await get_tvdb_episode_data(
-                            new_token, tvdb_id, season, episode, api_key, True
+                            base_dir, new_token, tvdb_id, season, episode, api_key, True
                         )
                     else:
                         console.print("[red]Failed to refresh TVDb token[/red]")
