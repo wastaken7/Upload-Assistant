@@ -81,8 +81,8 @@ class PT():
         resolution_id = await self.get_res_id(meta['resolution'])
         pt_name = await self.edit_name(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
-        region_id = await common.unit3d_region_ids(meta.get('region'))
-        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        # region_id = await common.unit3d_region_ids(meta.get('region'))
+        # distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
@@ -128,8 +128,8 @@ class PT():
 
         if region_id != 0:
             data['region_id'] = region_id
-        if distributor_id != 0:
-            data['distributor_id'] = distributor_id
+        # if distributor_id != 0:
+        #    data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')
