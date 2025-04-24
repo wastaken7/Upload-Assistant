@@ -1,3 +1,17 @@
+__version__ = "4.2.0.1"
+
+"""
+Changelog for version 4.2.0.1 (2025-04-24):
+
+- OE - only allow with English subs if not English audio
+- Fixed the bad copy/paste that missed the ULCX torrent url
+- Added the new trackers args auto api to example config
+- Fixed overwriting custom descriptions with bad data
+- Updated HDR check to find  and correctly check for relevant strings.
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.0...4.2.0.1
+"""
+
 __version__ = "4.2.0"
 
 """
