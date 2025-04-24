@@ -1952,7 +1952,12 @@ class Prep():
                 hdr_mi = video_track['colour_primaries']
                 if hdr_mi in ("BT.2020", "REC.2020"):
                     hdr = ""
-                    hdr_format_string = video_track.get('HDR_Format_Compatibility', video_track.get('HDR_Format_String', video_track.get('HDR_Format', "")))
+                    hdr_fields = [
+                        video_track.get('HDR_Format_Compatibility', ''),
+                        video_track.get('HDR_Format_String', ''),
+                        video_track.get('HDR_Format', '')
+                    ]
+                    hdr_format_string = next((v for v in hdr_fields if isinstance(v, str) and v.strip()), "")
                     if "HDR10+" in hdr_format_string:
                         hdr = "HDR10+"
                     elif "HDR10" in hdr_format_string:
