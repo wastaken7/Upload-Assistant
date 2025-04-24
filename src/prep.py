@@ -814,7 +814,7 @@ class Prep():
                             meta['auto_episode_title'] = None
 
                     # Process overview
-                    if meta['tvdb_episode_data'].get('overview') and meta.get('original_language') == "en":
+                    if meta['tvdb_episode_data'].get('overview'):
                         overview = meta['tvdb_episode_data'].get('overview')
                         if overview and isinstance(overview, str) and overview.strip():
                             meta['overview_meta'] = overview.strip()
