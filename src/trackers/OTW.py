@@ -77,6 +77,21 @@ class OTW():
         otw_name = otw_name.replace(meta["aka"], '')
         if meta['is_disc'] == "DVD":
             otw_name = otw_name.replace(source, f"{source} {resolution}")
+        if meta['category'] == "TV":
+            try:
+                year = meta['year']
+                if not year:
+                    raise ValueError("No TMDB Year Found..trying IMDB")
+            except (KeyError, ValueError):
+                try:
+                    year = meta['imdb_info']['year']
+                    if not year:
+                        raise ValueError("No IMDB Year Found..")
+                except (KeyError, ValueError):
+                    year = ""
+
+            if meta.get('no_year', False) is False:
+                otw_name = otw_name.replace(meta['title'], f"{meta['title']} {year}", 1)
 
         return otw_name
 
