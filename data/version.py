@@ -1,3 +1,26 @@
+__version__ = "4.2.0"
+
+"""
+Changelog for version 4.2.0 (2025-04-24):
+
+## What's Changed
+* store and use any found torrent data by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/452
+* Automated bluray region-distributor parsing by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/471
+* add image upload retry logic by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/472
+* TVC Allow 1080p HEVC by @yoyo292949158 in https://github.com/Audionut/Upload-Assistant/pull/478
+* Small fixes to AL title formatting by @b-igu in https://github.com/Audionut/Upload-Assistant/pull/477
+* fixed a bug that skipped tvdb episode data handling
+* made THR work
+
+## Config additions
+* A bunch of new config options starting here: https://github.com/Audionut/Upload-Assistant/blob/b382ece4fde22425dd307d1098198fb3fc9e0289/data/example-config.py#L183
+
+## New Contributors
+* @yoyo292949158 made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/478
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.1.9...4.2.0
+"""
+
 __version__ = "4.1.9"
 
 """
