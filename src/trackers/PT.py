@@ -126,8 +126,8 @@ class PT():
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
 
-        if region_id != 0:
-            data['region_id'] = region_id
+        # if region_id != 0:
+        #     data['region_id'] = region_id
         # if distributor_id != 0:
         #    data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
