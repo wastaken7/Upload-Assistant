@@ -6,10 +6,11 @@ import platform
 import re
 import os
 import cli_ui
+import httpx
 from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
-import httpx
+from src.dupe_checking import check_for_english
 
 
 class OE():
@@ -150,7 +151,7 @@ class OE():
                 oe_name = oe_name.replace(f"{meta['source']}", f"{resolution}", 1)
                 oe_name = oe_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
 
-        if not meta['is_disc']:
+        if not meta['is_disc'] == "BDMV":
             def has_english_audio(media_info_text=None):
                 if media_info_text:
                     audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
@@ -331,6 +332,10 @@ class OE():
             console.print('[bold red]Erotic not allowed at RF.')
             meta['skipping'] = "OE"
             return
+
+        tracker = self.tracker
+        await check_for_english(meta, tracker)
+
         dupes = []
         console.print("[yellow]Searching for existing torrents on OE...")
         params = {
