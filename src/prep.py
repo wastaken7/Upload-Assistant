@@ -1953,14 +1953,14 @@ class Prep():
                 if hdr_mi in ("BT.2020", "REC.2020"):
                     hdr = ""
                     hdr_format_string = video_track.get('HDR_Format_Compatibility', video_track.get('HDR_Format_String', video_track.get('HDR_Format', "")))
-                    if "HDR10" in hdr_format_string:
-                        hdr = "HDR"
                     if "HDR10+" in hdr_format_string:
                         hdr = "HDR10+"
+                    elif "HDR10" in hdr_format_string:
+                        hdr = "HDR"
+                    elif "SMPTE ST 2094 App 4" in hdr_format_string:
+                        hdr = "HDR"
                     if hdr_format_string and "HLG" in hdr_format_string:
                         hdr = f"{hdr} HLG"
-                    elif hdr_format_string and "SMPTE ST 2094 App 4" in hdr_format_string:
-                        hdr = "HDR"
                     if hdr_format_string == "" and "PQ" in (video_track.get('transfer_characteristics'), video_track.get('transfer_characteristics_Original', None)):
                         hdr = "PQ10"
                     transfer_characteristics = video_track.get('transfer_characteristics_Original', None)
