@@ -5,6 +5,7 @@ import requests
 import platform
 import httpx
 import re
+import os
 from src.trackers.COMMON import COMMON
 from src.console import console
 
@@ -55,10 +56,6 @@ class PT():
         }.get(resolution, '10')
         return resolution_id
 
-    ###############################################################
-    ######   STOP HERE UNLESS EXTRA MODIFICATION IS NEEDED   ###### noqa E266
-    ###############################################################
-
     async def edit_name(self, meta):
         name = meta['name'].replace(' ', '.')
 
@@ -72,6 +69,97 @@ class PT():
             pt_name = f"{pt_name}-NOGROUP"
 
         return pt_name
+        
+    def get_audio(self, meta):
+        found_portuguese_audio = False
+
+        if meta.get('is_disc') == "BDMV":
+            bdinfo = meta.get('bdinfo', {})
+            audio_tracks = bdinfo.get("audio", [])
+            if audio_tracks:
+                for track in audio_tracks:
+                    lang = track.get("language", "")
+                    if lang and lang.lower() == "portuguese":
+                        found_portuguese_audio = True
+                        break
+
+        needs_mediainfo_check = (meta.get('is_disc') != "BDMV") or (meta.get('is_disc') == "BDMV" and not found_portuguese_audio)
+
+        if needs_mediainfo_check:
+            base_dir = meta.get('base_dir', '.')
+            uuid = meta.get('uuid', 'default_uuid')
+            media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
+
+            try:
+                if os.path.exists(media_info_path):
+                    with open(media_info_path, 'r', encoding='utf-8') as f:
+                        media_info_text = f.read()
+
+                    if not found_portuguese_audio:
+                        audio_sections = re.findall(r'Audio(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+                        for section in audio_sections:
+                            language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
+                            if language_match:
+                                lang_raw = language_match.group(1).strip()
+                                # Clean "Portuguese (Brazil)" variation. 
+                                lang_clean = re.sub(r'[/\\].*|\(.*?\)', '', lang_raw).strip()
+                                if lang_clean.lower() == "portuguese":
+                                    found_portuguese_audio = True
+                                    break
+
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"ERRO: Falha ao processar MediaInfo para verificar áudio Português: {e}")
+
+        return 1 if found_portuguese_audio else 0
+
+    def get_subtitles(self, meta):
+        found_portuguese_subtitle = False
+
+        if meta.get('is_disc') == "BDMV":
+            bdinfo = meta.get('bdinfo', {})
+            subtitle_tracks = bdinfo.get("subtitles", [])
+            if subtitle_tracks:
+                found_portuguese_subtitle = False
+                for track in subtitle_tracks:
+                    if isinstance(track, str) and track.lower() == "portuguese":
+                        found_portuguese_subtitle = True
+                        break
+
+        needs_mediainfo_check = (meta.get('is_disc') != "BDMV") or (meta.get('is_disc') == "BDMV" and not found_portuguese_subtitle)
+
+        if needs_mediainfo_check:
+            base_dir = meta.get('base_dir', '.')
+            uuid = meta.get('uuid', 'default_uuid')
+            media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
+
+            try:
+                if os.path.exists(media_info_path):
+                    with open(media_info_path, 'r', encoding='utf-8') as f:
+                        media_info_text = f.read()
+
+                    if not found_portuguese_subtitle:
+                        text_sections = re.findall(r'Text(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+                        if not text_sections:
+                            text_sections = re.findall(r'Subtitle(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+
+                        for section in text_sections:
+                            language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
+                            if language_match:
+                                lang_raw = language_match.group(1).strip()
+                                # Clean "Portuguese (Brazil)" variation.
+                                lang_clean = re.sub(r'[/\\].*|\(.*?\)', '', lang_raw).strip()
+                                if lang_clean.lower() == "portuguese":
+                                    found_portuguese_subtitle = True
+                                    break
+
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"ERRO: Falha ao processar MediaInfo para verificar legenda Português: {e}")
+
+        return 1 if found_portuguese_subtitle else 0
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
@@ -80,6 +168,8 @@ class PT():
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         pt_name = await self.edit_name(meta)
+        audio_flag = self.get_audio(meta)
+        subtitle_flag = self.get_subtitles(meta)
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         # region_id = await common.unit3d_region_ids(meta.get('region'))
         # distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
@@ -110,6 +200,8 @@ class PT():
             'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,
+            'audio_pt': audio_flag,
+            'legenda_pt': subtitle_flag,
             'anonymous': anon,
             'stream': meta['stream'],
             'sd': meta['sd'],
