@@ -336,6 +336,7 @@ config = {
             # "anon" : False,
         },
         "HUNO": {
+            "useAPI": False,  # Set to True if using HUNO for automatic ID searching
             "api_key": "HUNO api key",
             "announce_url": "https://hawke.uno/announce/customannounceurl",
             # "anon" : False,
@@ -509,6 +510,7 @@ config = {
             # "anon" : False,
         },
         "ULCX": {
+            "useAPI": False,  # Set to True if using ULCX for automatic ID searching or description parsing
             "api_key": "ULCX api key",
             "announce_url": "https://upload.cx/announce/customannounceurl",
             # "anon" : False,
