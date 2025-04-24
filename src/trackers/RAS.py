@@ -12,7 +12,7 @@ class RAS():
     def __init__(self, config):
         self.config = config
         self.tracker = 'RAS'
-        self.source_flag = 'RASTASTUGAN'
+        self.source_flag = 'Rastastugan'
         self.upload_url = 'https://rastastugan.org/api/torrents/upload'
         self.search_url = 'https://rastastugan.org/api/torrents/filter'
         self.torrent_url = 'https://rastastugan.org/torrents/'
