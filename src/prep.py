@@ -1959,6 +1959,8 @@ class Prep():
                         hdr = "HDR10+"
                     if hdr_format_string and "HLG" in hdr_format_string:
                         hdr = f"{hdr} HLG"
+                    if hdr_format_string and "SMPTE ST 2094 App 4" in hdr_format_string:
+                        hdr = "HDR"
                     if hdr_format_string == "" and "PQ" in (video_track.get('transfer_characteristics'), video_track.get('transfer_characteristics_Original', None)):
                         hdr = "PQ10"
                     transfer_characteristics = video_track.get('transfer_characteristics_Original', None)
