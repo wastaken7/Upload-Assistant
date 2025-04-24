@@ -69,7 +69,7 @@ class PT():
             pt_name = f"{pt_name}-NOGROUP"
 
         return pt_name
-        
+
     def get_audio(self, meta):
         found_portuguese_audio = False
 
@@ -101,7 +101,7 @@ class PT():
                             language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
                             if language_match:
                                 lang_raw = language_match.group(1).strip()
-                                # Clean "Portuguese (Brazil)" variation. 
+                                # Clean "Portuguese (Brazil)" variation.
                                 lang_clean = re.sub(r'[/\\].*|\(.*?\)', '', lang_raw).strip()
                                 if lang_clean.lower() == "portuguese":
                                     found_portuguese_audio = True
