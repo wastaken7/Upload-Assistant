@@ -73,6 +73,7 @@ async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_k
                     "season_name": episode_data.get("seasonName", ""),
                     "series_name": series_data.get("name", ""),
                     "series_overview": series_data.get("overview", ""),
+                    'series_year': series_data.get("year", ""),
                 }
 
                 if debug:
