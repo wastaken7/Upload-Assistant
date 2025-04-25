@@ -90,13 +90,13 @@ class OTW():
 
             series_year = meta.get('tvdb_episode_data', {}).get('series_year')
             if series_year and str(series_year).isdigit():
-		years.append(int(series_year))
+                years.append(int(series_year))
             # Use the oldest year if any found, else empty string
             year = str(min(years)) if years else ""
             if meta.get('no_year', False) is False:
                 otw_name = otw_name.replace(meta['title'], f"{meta['title']} {year}", 1)
 
-	    return otw_name
+        return otw_name
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
