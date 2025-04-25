@@ -228,9 +228,9 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS
+        # Available tracker: ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PT, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS
         # Remove the trackers from the default_trackers list that are not used, to save being asked everytime about tracker you do not have access too.
-        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS",
+        "default_trackers": "ACM, AITHER, AL, ANT, AR, BHD, BHDTV, BLU, CBR, DP, FNP, FRIKI, HDB, HDT, HHD, HUNO, ITT, LCD, LST, LT, MTV, NBL, OE, OTW, PSS, PT, PTER, PTP, PTT, R4E, RAS, RF, RTF, SAM, SN, STC, THR, TIK, TL, TOCA, UHD, ULCX, UTP, YOINK, YUS",
 
         "ACM": {
             "api_key": "ACM api key",
@@ -387,6 +387,11 @@ config = {
         "OTW": {
             "api_key": "OTW api key",
             "announce_url": "https://oldtoons.world/announce/customannounceurl",
+            # "anon" : False,
+        },
+        "PT": {
+            "api_key": "PT api key",
+            "announce_url": "https://portugas.org/announce/customannounceurl",
             # "anon" : False,
         },
         "PSS": {
