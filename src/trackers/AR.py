@@ -236,7 +236,7 @@ class AR():
         description += "\n" + subheading + "Links" + heading_end + "\n"
         if 'IMAGES' in self.config:
             if movie['imdb_id'] != 0:
-                description += f"[URL=https://www.imdb.com/title/tt{movie['imdb_id']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
+                description += f"[URL=https://www.imdb.com/title/tt{movie['imdb']}][img]{self.config['IMAGES']['imdb_75']}[/img][/URL]"
             if movie['tmdb'] != 0:
                 description += f" [URL=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/URL]"
             if movie['tvdb_id'] != 0:
@@ -247,7 +247,7 @@ class AR():
                 description += f" [URL=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/URL]"
         else:
             if movie['imdb_id'] != 0:
-                description += f"https://www.imdb.com/title/tt{movie['imdb_id']}"
+                description += f"https://www.imdb.com/title/tt{movie['imdb']}"
             if movie['tmdb'] != 0:
                 description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
             if movie['tvdb_id'] != 0:
@@ -455,7 +455,7 @@ class AR():
             # adding tags
             tags = ""
             if meta['imdb_id'] != 0:
-                tags += f"tt{meta.get('imdb_id', '')}, "
+                tags += f"tt{meta.get('imdb', '')}, "
             # no special chars can be used in tags. keep to minimum working tags only.
             tags += f"{genres}, "
             # Get initial response and extract auth key
