@@ -81,16 +81,16 @@ class OTW():
             years = []
 
             tmdb_year = meta.get('year')
-                if tmdb_year and str(tmdb_year).isdigit():
+            if tmdb_year and str(tmdb_year).isdigit():
                 years.append(int(tmdb_year))
 
             imdb_year = meta.get('imdb_info', {}).get('year')
-                if imdb_year and str(imdb_year).isdigit():
+            if imdb_year and str(imdb_year).isdigit():
                 years.append(int(imdb_year))
 
             series_year = meta.get('tvdb_episode_data', {}).get('series_year')
-                if series_year and str(series_year).isdigit():
-                years.append(int(series_year))
+            if series_year and str(series_year).isdigit():
+		years.append(int(series_year))
             # Use the oldest year if any found, else empty string
             year = str(min(years)) if years else ""
             if meta.get('no_year', False) is False:
