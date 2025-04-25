@@ -541,26 +541,36 @@ class PTP():
         }
         opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys()))
         trumpable = []
-        if opts:
-            for t, v in trumpable_values.items():
-                if t in ''.join(opts):
-                    if v is None:
-                        break
-                    elif v != 50:  # Hardcoded, Forced
-                        trumpable.append(v)
-                    elif v == "OTHER":  # Hardcoded, Non-English
-                        trumpable.append(14)
-                        hc_sub_langs = cli_ui.ask_string("Enter language code for HC Subtitle languages")
-                        for lang, subID in self.sub_lang_map.items():
-                            if any(hc_sub_langs.strip() == x for x in list(lang)):
-                                sub_langs.append(subID)
-                    else:
-                        sub_langs.append(v)
-                        trumpable.append(4)
-
+        for opt in opts:
+            v = trumpable_values.get(opt)
+            if v is None:
+                continue
+            elif v == 4:
+                trumpable.append(4)
+                if 3 not in sub_langs:
+                    sub_langs.append(3)
+                if 44 in sub_langs:
+                    sub_langs.remove(44)
+            elif v == 50:
+                trumpable.append(50)
+                if 50 not in sub_langs:
+                    sub_langs.append(50)
+                if 44 in sub_langs:
+                    sub_langs.remove(44)
+            elif v == 14:
+                trumpable.append(14)
+                if 44 not in sub_langs:
+                    sub_langs.append(44)
+            elif v == "OTHER":
+                trumpable.append(14)
+                hc_sub_langs = cli_ui.ask_string("Enter language code for HC Subtitle languages")
+                for lang, subID in self.sub_lang_map.items():
+                    if any(hc_sub_langs.strip() == x for x in list(lang)):
+                        if subID not in sub_langs:
+                            sub_langs.append(subID)
         sub_langs = list(set(sub_langs))
         trumpable = list(set(trumpable))
-        if trumpable == []:
+        if not trumpable:
             trumpable = None
         return trumpable, sub_langs
 
@@ -1167,15 +1177,21 @@ class PTP():
                     english_audio = False
 
         ptp_trumpable = None
-        if meta['debug']:
-            console.print("ptp_subtitles", ptp_subtitles)
         if meta['hardcoded-subs']:
             ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-            if ptp_trumpable == 4:
+            if ptp_trumpable and 4 in ptp_trumpable:
                 if 44 in ptp_subtitles:
                     ptp_subtitles.remove(44)
                 if 3 not in ptp_subtitles:
                     ptp_subtitles.append(3)
+            if ptp_trumpable and 50 in ptp_trumpable:
+                ptp_trumpable.remove(50)
+                ptp_trumpable.append(4)
+            if ptp_trumpable and 14 in ptp_trumpable:
+                ptp_trumpable.append(4)
+                if 44 in ptp_subtitles:
+                    ptp_subtitles.remove(44)
+
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
@@ -1184,7 +1200,7 @@ class PTP():
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-                if ptp_trumpable == 4:
+                if ptp_trumpable and 4 in ptp_trumpable:
                     if 44 in ptp_subtitles:
                         ptp_subtitles.remove(44)
                     if 3 not in ptp_subtitles:
@@ -1192,6 +1208,7 @@ class PTP():
 
         if meta['debug']:
             console.print("ptp_trumpable", ptp_trumpable)
+            console.print("ptp_subtitles", ptp_subtitles)
         data = {
             "submit": "true",
             "remaster_year": "",
