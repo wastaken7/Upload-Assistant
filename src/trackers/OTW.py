@@ -77,26 +77,26 @@ class OTW():
         otw_name = otw_name.replace(meta["aka"], '')
         if meta['is_disc'] == "DVD":
             otw_name = otw_name.replace(source, f"{source} {resolution}")
-	if meta['category'] == "TV":
-	    years = []
+        if meta['category'] == "TV":
+        years = []
 
 	    tmdb_year = meta.get('year')
-	    if tmdb_year and str(tmdb_year).isdigit():
-	        years.append(int(tmdb_year))
+            if tmdb_year and str(tmdb_year).isdigit():
+            years.append(int(tmdb_year))
 
 	    imdb_year = meta.get('imdb_info', {}).get('year')
-	    if imdb_year and str(imdb_year).isdigit():
-	        years.append(int(imdb_year))
+            if imdb_year and str(imdb_year).isdigit():
+            years.append(int(imdb_year))
 
 	    series_year = meta.get('tvdb_episode_data', {}).get('series_year')
-	    if series_year and str(series_year).isdigit():
-	        years.append(int(series_year))
-	    # Use the oldest year if any found, else empty string
+            if series_year and str(series_year).isdigit():
+            years.append(int(series_year))
+            # Use the oldest year if any found, else empty string
 	    year = str(min(years)) if years else ""
 	    if meta.get('no_year', False) is False:
-	        otw_name = otw_name.replace(meta['title'], f"{meta['title']} {year}", 1)
+            otw_name = otw_name.replace(meta['title'], f"{meta['title']} {year}", 1)
 
-        return otw_name
+	    return otw_name
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
