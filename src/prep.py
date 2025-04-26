@@ -1157,7 +1157,7 @@ class Prep():
 
                     # fallback to tmdb data if no other data is not available
                     if (meta.get('auto_episode_title') is None or meta.get('overview_meta') is None):
-                        if meta.get('tvdb_episode_int') != meta.get('episode_int'):
+                        if 'tvdb_episode_int' in meta and meta.get('tvdb_episode_int') != 0 and meta.get('tvdb_episode_int') != meta.get('episode_int'):
                             episode = meta.get('episode_int')
                             season = meta.get('tvdb_season_int')
                             if meta['debug']:
