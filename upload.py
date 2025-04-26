@@ -539,7 +539,7 @@ async def do_the_thing(base_dir):
 
                 keep_meta = config['DEFAULT'].get('keep_meta', False)
 
-                if not keep_meta:
+                if not keep_meta or meta.get('delete_meta', False):
                     if os.path.exists(meta_file):
                         try:
                             os.remove(meta_file)
@@ -550,10 +550,6 @@ async def do_the_thing(base_dir):
                     else:
                         if meta['debug']:
                             console.print(f"[yellow]No metadata file found at {meta_file}")
-
-                if meta.get('delete_meta') and os.path.exists(meta_file):
-                    os.remove(meta_file)
-                    console.print("[bold red]Successfully deleted meta.json")
 
                 if keep_meta and os.path.exists(meta_file):
                     with open(meta_file, "r") as f:
