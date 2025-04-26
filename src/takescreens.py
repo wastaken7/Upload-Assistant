@@ -871,7 +871,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     if manual_frames and meta['debug']:
         console.print(f"[yellow]Using manual frames: {manual_frames}")
-
+    ss_times = []
     try:
         if isinstance(manual_frames, str):
             manual_frames_list = [int(frame.strip()) for frame in manual_frames.split(',') if frame.strip()]
@@ -880,17 +880,20 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         else:
             manual_frames_list = []
         num_screens = len(manual_frames_list)
-
-        ss_times = [frame / frame_rate for frame in manual_frames_list]
+        if num_screens > 0:
+            ss_times = [frame / frame_rate for frame in manual_frames_list]
     except (TypeError, ValueError) as e:
         if meta['debug'] and manual_frames:
             console.print(f"[red]Error processing manual frames: {e}[/red]")
-        ss_times = await valid_ss_time([], num_screens, length, frame_rate)
+            sys.exit(1)
 
-    if num_screens is None:
+    if num_screens is None or num_screens <= 0:
         num_screens = screens - len(existing_images)
     if num_screens <= 0:
         return
+
+    if not ss_times:
+        ss_times = await valid_ss_time([], num_screens, length, frame_rate)
 
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
@@ -1046,63 +1049,90 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                 retake = True
 
         if retake:
-            retry_attempts = 3
+            retry_attempts = 5
+            retry_offsets = [5.0, 10.0, -10.0, 100.0, -100.0]
+            frame_rate = meta.get('frame_rate', 24.0)
+            original_index = int(image_path.rsplit('-', 1)[-1].split('.')[0])
+            original_time = ss_times[original_index] if 'ss_times' in locals() and original_index < len(ss_times) else None
+
             for attempt in range(1, retry_attempts + 1):
-                console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts})[/yellow]")
-                try:
-                    index = int(image_path.rsplit('-', 1)[-1].split('.')[0])
+                if original_time is not None:
+                    for offset in retry_offsets:
+                        adjusted_time = max(0, original_time + offset)
+                        console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at {adjusted_time:.2f}s (offset {offset:+.2f}s)[/yellow]")
+                        try:
+                            if os.path.exists(image_path):
+                                os.remove(image_path)
 
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
+                            screenshot_response = await capture_screenshot((
+                                original_index, path, adjusted_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta
+                            ))
 
-                    random_time = random.uniform(0, length)
-                    screenshot_response = await capture_screenshot(
-                        index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta
-                    )
+                            if not isinstance(screenshot_response, tuple) or len(screenshot_response) != 2:
+                                continue
 
-                    if not os.path.exists(screenshot_response):
-                        raise FileNotFoundError(f"Screenshot {screenshot_response} was not created successfully.")
+                            _, screenshot_path = screenshot_response
 
-                    if optimize_images:
-                        optimize_image_task(screenshot_response)
-                    new_size = os.path.getsize(screenshot_response)
-                    valid_image = False
+                            if not screenshot_path or not os.path.exists(screenshot_path):
+                                continue
 
-                    if "imgbb" in img_host and 75000 < new_size <= 31000000:
-                        console.print(f"[green]Successfully retaken screenshot for: {screenshot_response} ({new_size} bytes)[/green]")
-                        valid_image = True
-                    elif 75000 < new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
-                        console.print(f"[green]Successfully retaken screenshot for: {screenshot_response} ({new_size} bytes)[/green]")
-                        valid_image = True
-                    elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
-                        console.print(f"[green]Successfully retaken screenshot for: {screenshot_response} ({new_size} bytes)[/green]")
-                        valid_image = True
+                            if optimize_images:
+                                optimize_image_task(screenshot_path)
+                            new_size = os.path.getsize(screenshot_path)
+                            valid_image = False
 
-                    if valid_image:
-                        valid_results.append(screenshot_response)
-                        break  # Exit retry loop on success
+                            if "imgbb" in img_host and 75000 < new_size <= 31000000:
+                                valid_image = True
+                            elif 75000 < new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
+                                valid_image = True
+                            elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
+                                valid_image = True
+
+                            if valid_image:
+                                valid_results.append(screenshot_response)
+                                break
+                        except Exception as e:
+                            console.print(f"[red]Error retaking screenshot for {image_path} at {adjusted_time:.2f}s: {e}[/red]")
                     else:
-                        console.print(f"[red]Retaken image {screenshot_response} does not meet the size requirements for {img_host}. Retrying...[/red]")
+                        continue
+                    break
+                else:
+                    # Fallback: use random time if original_time is not available
+                    random_time = random.uniform(0, length)
+                    console.print(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at random time {random_time:.2f}s[/yellow]")
+                    try:
+                        if os.path.exists(image_path):
+                            os.remove(image_path)
 
-                except asyncio.CancelledError:
-                    gc.collect()
-                    raise  # Ensure cancellation propagates
+                        screenshot_response = await capture_screenshot((
+                            original_index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta
+                        ))
 
-                except FileNotFoundError as e:
-                    console.print(f"[red]File error during screenshot retake: {e}[/red]")
+                        if not isinstance(screenshot_response, tuple) or len(screenshot_response) != 2:
+                            continue
 
-                except OSError as e:
-                    console.print(f"[red]OS error while processing {image_path}: {e}[/red]")
+                        _, screenshot_path = screenshot_response
 
-                except ValueError as e:
-                    console.print(f"[red]Value error in screenshot retake process: {e}[/red]")
+                        if not screenshot_path or not os.path.exists(screenshot_path):
+                            continue
 
-                except Exception as e:
-                    console.print(f"[red]Unexpected error retaking screenshot for {image_path}: {e}[/red]")
+                        if optimize_images:
+                            optimize_image_task(screenshot_path)
+                        new_size = os.path.getsize(screenshot_path)
+                        valid_image = False
 
-                finally:
-                    gc.collect()
+                        if "imgbb" in img_host and 75000 < new_size <= 31000000:
+                            valid_image = True
+                        elif 75000 < new_size <= 10000000 and any(host in ["imgbox", "pixhost"] for host in img_host):
+                            valid_image = True
+                        elif new_size > 75000 and any(host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] for host in img_host):
+                            valid_image = True
 
+                        if valid_image:
+                            valid_results.append(screenshot_response)
+                            break
+                    except Exception as e:
+                        console.print(f"[red]Error retaking screenshot for {image_path} at random time {random_time:.2f}s: {e}[/red]")
             else:
                 console.print(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
                 remaining_retakes.append(image_path)
