@@ -813,21 +813,41 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print(f"[yellow]There are already at least {cutoff} images in the image list. Skipping additional screenshots.")
         return
 
-    if num_screens is None:
-        num_screens = screens - len(existing_images)
-    if num_screens <= 0:
-        return
-
     try:
         with open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", encoding='utf-8') as f:
             mi = json.load(f)
             video_track = mi['media']['track'][1]
-            length = float(video_track.get('Duration', mi['media']['track'][0]['Duration']))
-            width = float(video_track.get('Width'))
-            height = float(video_track.get('Height'))
-            par = float(video_track.get('PixelAspectRatio', 1))
-            dar = float(video_track.get('DisplayAspectRatio'))
-            frame_rate = float(video_track.get('FrameRate', 24.0)) if isinstance(video_track.get('FrameRate'), str) else 24.0
+
+            def safe_float(value, default=0.0, field_name=""):
+                if isinstance(value, (int, float)):
+                    return float(value)
+                elif isinstance(value, str):
+                    try:
+                        return float(value)
+                    except ValueError:
+                        console.print(f"[yellow]Warning: Could not convert string '{value}' to float for {field_name}, using default {default}[/yellow]")
+                        return default
+                elif isinstance(value, dict):
+                    for key in ['#value', 'value', 'duration', 'Duration']:
+                        if key in value:
+                            return safe_float(value[key], default, field_name)
+                    console.print(f"[yellow]Warning: {field_name} is a dict but no usable value found: {value}, using default {default}[/yellow]")
+                    return default
+                else:
+                    console.print(f"[yellow]Warning: Unable to convert to float: {type(value)} {value} for {field_name}, using default {default}[/yellow]")
+                    return default
+
+            length = safe_float(
+                video_track.get('Duration'),
+                safe_float(mi['media']['track'][0].get('Duration'), 3600.0, "General Duration"),
+                "Video Duration"
+            )
+
+            width = safe_float(video_track.get('Width'), 1920.0, "Width")
+            height = safe_float(video_track.get('Height'), 1080.0, "Height")
+            par = safe_float(video_track.get('PixelAspectRatio'), 1.0, "PixelAspectRatio")
+            dar = safe_float(video_track.get('DisplayAspectRatio'), 16.0/9.0, "DisplayAspectRatio")
+            frame_rate = safe_float(video_track.get('FrameRate'), 24.0, "FrameRate")
 
             if par == 1:
                 sar = w_sar = h_sar = 1
@@ -841,27 +861,36 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
                 h_sar = 1
     except Exception as e:
         console.print(f"[red]Error processing MediaInfo.json: {e}")
+        if meta.get('debug', False):
+            import traceback
+            console.print(traceback.format_exc())
         return
-
+    meta['frame_rate'] = frame_rate
     loglevel = 'verbose' if meta.get('ffdebug', False) else 'quiet'
     os.chdir(f"{base_dir}/tmp/{folder_id}")
 
-    if manual_frames:
-        if meta.get('debug', False):
-            console.print(f"[yellow]Using manual frames: {manual_frames}")
+    if manual_frames and meta['debug']:
+        console.print(f"[yellow]Using manual frames: {manual_frames}")
 
-        try:
-            if isinstance(manual_frames, str):
-                manual_frames = [int(frame.strip()) for frame in manual_frames.split(',')]
-            elif isinstance(manual_frames, list):
-                manual_frames = [int(frame) if isinstance(frame, str) else frame for frame in manual_frames]
+    try:
+        if isinstance(manual_frames, str):
+            manual_frames_list = [int(frame.strip()) for frame in manual_frames.split(',') if frame.strip()]
+        elif isinstance(manual_frames, list):
+            manual_frames_list = [int(frame) if isinstance(frame, str) else frame for frame in manual_frames]
+        else:
+            manual_frames_list = []
+        num_screens = len(manual_frames_list)
 
-            ss_times = [frame / frame_rate for frame in manual_frames]
-        except (TypeError, ValueError) as e:
-            console.print(f"[red]Error processing manual frames: {e}. Using auto-generated frames.[/red]")
-            ss_times = await valid_ss_time([], num_screens, length, frame_rate)
-    else:
+        ss_times = [frame / frame_rate for frame in manual_frames_list]
+    except (TypeError, ValueError) as e:
+        if meta['debug'] and manual_frames:
+            console.print(f"[red]Error processing manual frames: {e}[/red]")
         ss_times = await valid_ss_time([], num_screens, length, frame_rate)
+
+    if num_screens is None:
+        num_screens = screens - len(existing_images)
+    if num_screens <= 0:
+        return
 
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
@@ -875,7 +904,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     existing_images_count = 0
     existing_image_paths = []
-    for i in range(num_screens + 1):
+    for i in range(num_screens):
         image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
         if os.path.exists(image_path) and not meta.get('retake', False):
             existing_images_count += 1
@@ -889,7 +918,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [
             get_frame_info(path, ss_times[i], meta)
-            for i in range(num_screens + 1)
+            for i in range(num_screens)
             if not os.path.exists(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
             or meta.get('retake', False)
         ]
@@ -903,7 +932,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if meta['debug']:
             console.print(f"[cyan]Collected frame information for {len(frame_info_results)} frames")
 
-    num_capture = num_screens + 1 - existing_images_count
+    num_capture = num_screens - existing_images_count
     num_tasks = num_capture
     num_workers = min(num_tasks, task_limit)
 
@@ -911,7 +940,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print(f"Using {num_workers} worker(s) for {num_capture} image(s)")
 
     capture_tasks = []
-    for i in range(num_screens + 1):
+    for i in range(num_screens):
         image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
@@ -950,13 +979,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
     console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
-
-    if len(capture_results) > num_screens:
-        smallest = min(capture_results, key=os.path.getsize)
-        if meta['debug']:
-            console.print(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
-        os.remove(smallest)
-        capture_results.remove(smallest)
 
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
