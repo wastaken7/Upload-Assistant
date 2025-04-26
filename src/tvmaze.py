@@ -135,7 +135,7 @@ async def _make_tvmaze_request(url, params):
 
 
 async def get_tvmaze_episode_data(tvmaze_id, season, episode):
-    console.print(f"[cyan]Fetching TVMaze episode data for S{season}E{episode}...[/cyan]")
+    console.print(f"[cyan]Fetching TVMaze episode data for ID: {tvmaze_id} and S{season}E{episode}...[/cyan]")
 
     url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodebynumber"
     params = {

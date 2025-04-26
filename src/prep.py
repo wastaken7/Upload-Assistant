@@ -1143,7 +1143,6 @@ class Prep():
 
                     # fallback to tvmaze data if tvdb data is available
                     if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None and not meta.get('we_asked_tvmaze', False):
-                        console.print("[yellow]Fetching TVMaze episode metadata...")
                         tvmaze_episode_data = await get_tvmaze_episode_data(meta.get('tvmaze_id'), meta.get('season_int'), meta.get('episode_int'))
                         if tvmaze_episode_data:
                             meta['tvmaze_episode_data'] = tvmaze_episode_data
