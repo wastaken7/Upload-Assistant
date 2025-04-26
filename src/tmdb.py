@@ -994,8 +994,9 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
 
             return episode_info
 
-        except Exception as e:
-            console.print(f"[red]Error fetching episode details for {tmdb_id}: {e}[/red]")
+        except Exception:
+            console.print(f"[red]Error fetching episode details for {tmdb_id}[/red]")
+            console.print(f"[red]Season: {season_number}, Episode: {episode_number}[/red]")
             return {}
 
 
