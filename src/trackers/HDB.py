@@ -516,11 +516,12 @@ class HDB():
                                 group_names.append(group_name)
 
                             comparison_header = " vs ".join(group_names)
+                            descfile.write("[/b]\n")
                             descfile.write(f"Screenshot comparison\n{comparison_header}")
                         else:
                             descfile.write("Screenshot comparison")
 
-                        descfile.write("[/b]\n")
+                        descfile.write("\n\n")
                         descfile.write(f"{hdbimg_bbcode}")
                         descfile.write("[/center]")
                     else:
