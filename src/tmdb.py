@@ -398,7 +398,7 @@ async def tmdb_other_meta(
             if movie_data['release_date']:
                 year = datetime.strptime(movie_data['release_date'], '%Y-%m-%d').year
             else:
-                console.print('[yellow]TMDB does not have a release date, using year from filename instead (if it exists)')
+                console.print('[yellow]TMDB does not have a release date, using manual year or year from filename instead (if it exists)')
                 year = search_year
 
             # Get external IDs
@@ -527,7 +527,7 @@ async def tmdb_other_meta(
             if tv_data['first_air_date']:
                 year = datetime.strptime(tv_data['first_air_date'], '%Y-%m-%d').year
             else:
-                console.print('[yellow]TMDB does not have a release date, using year from filename instead (if it exists)')
+                console.print('[yellow]TMDB does not have a release date, using manual year or year from filename instead (if it exists)')
                 year = search_year
 
             # Get external IDs

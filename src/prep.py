@@ -261,7 +261,10 @@ class Prep():
 
             if meta.get('resolution', None) is None:
                 meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
-            meta['sd'] = await self.is_sd(meta['resolution'])
+        meta['sd'] = await self.is_sd(meta['resolution'])
+
+        if not meta.get('search_year', None):
+            meta['search_year'] = meta.get('manual_year', None)
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
