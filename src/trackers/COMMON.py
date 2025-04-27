@@ -418,7 +418,7 @@ class COMMON():
                     for group_idx in sorted_group_indices:
                         group_data = comparison_groups[group_idx]
                         group_name = group_data.get('name', f'Group {group_idx}')
-                        comp_sources.append(group_name.capitalize())
+                        comp_sources.append(group_name)
 
                     sources_string = ", ".join(comp_sources)
                     descfile.write(f"[comparison={sources_string}]\n")
