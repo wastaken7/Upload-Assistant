@@ -34,7 +34,8 @@ Common options:
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
   -c, --category             Category (movie, tv, fanres)
   -t, --type                 Type (disc, remux, encode, webdl, etc.)
-  --source                    Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
+  --source                   Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
+  -comps, --comparison       Use comparison images from a folder (input folder path): see -comps_index
   -debug, --debug            Prints more information, runs everything without actually uploading
 
 Use --help for a full list of options.
@@ -78,8 +79,8 @@ class Args():
         parser.add_argument('-lq', '--limit-queue', dest='limit_queue', nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
         parser.add_argument('--unit3d', action='store_true', required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
         parser.add_argument('-s', '--screens', nargs=1, required=False, help="Number of screenshots", default=int(self.config['DEFAULT']['screens']))
-        parser.add_argument('-comps', '--comparison', nargs='+', required=False, help="Use comparison images from this folder (input folder path)", default=None)
-        parser.add_argument('-comps_index', '--comparison_index', nargs=1, required=False, help="Which of your comparison indexes is the main images", type=int, default=None)
+        parser.add_argument('-comps', '--comparison', nargs='+', required=False, help="Use comparison images from a folder (input folder path)", default=None)
+        parser.add_argument('-comps_index', '--comparison_index', nargs=1, required=False, help="Which of your comparison indexes is the main images (required when comps)", type=int, default=None)
         parser.add_argument('-mf', '--manual_frames', nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
         parser.add_argument('-c', '--category', nargs=1, required=False, help="Category [MOVIE, TV, FANRES]", choices=['movie', 'tv', 'fanres'])
         parser.add_argument('-t', '--type', nargs=1, required=False, help="Type [DISC, REMUX, ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP]", choices=['disc', 'remux', 'encode', 'webdl', 'web-dl', 'webrip', 'hdtv', 'dvdrip'], dest="manual_type")
