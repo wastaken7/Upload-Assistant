@@ -201,8 +201,8 @@ class HDB():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await self.edit_desc(meta)
-        hdb_name = await self.edit_name(meta)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
+        hdb_name = await self.edit_name(meta)
         cat_id = await self.get_type_category_id(meta)
         codec_id = await self.get_type_codec_id(meta)
         medium_id = await self.get_type_medium_id(meta)
@@ -435,11 +435,6 @@ class HDB():
             with requests.Session() as session:
                 session.cookies.update(await common.parseCookieFile(cookiefile))
                 resp = session.get(url=url)
-                if meta['debug']:
-                    console.print('[cyan]Cookies:')
-                    console.print(session.cookies.get_dict())
-                    console.print("\n\n")
-                    console.print(resp.text)
                 if resp.text.find("""<a href="/logout.php">Logout</a>""") != -1:
                     return True
                 else:
@@ -508,7 +503,28 @@ class HDB():
                 console.print("[green]Rehosting Images...")
                 hdbimg_bbcode = await self.hdbimg_upload(meta)
                 if hdbimg_bbcode is not None:
-                    descfile.write(f"{hdbimg_bbcode}")
+                    if meta.get('comparison', False):
+                        descfile.write("[center]")
+                        descfile.write("[b]")
+                        if meta.get('comparison_groups'):
+                            group_names = []
+                            sorted_group_indices = sorted(meta['comparison_groups'].keys(), key=lambda x: int(x))
+
+                            for group_idx in sorted_group_indices:
+                                group_data = meta['comparison_groups'][group_idx]
+                                group_name = group_data.get('name', f'Group {group_idx}')
+                                group_names.append(group_name)
+
+                            comparison_header = " vs ".join(group_names)
+                            descfile.write(f"Screenshot comparison\n{comparison_header}")
+                        else:
+                            descfile.write("Screenshot comparison")
+
+                        descfile.write("[/b]\n")
+                        descfile.write(f"{hdbimg_bbcode}")
+                        descfile.write("[/center]")
+                    else:
+                        descfile.write(f"{hdbimg_bbcode}")
             else:
                 images = meta['image_list']
                 if len(images) > 0:
@@ -523,62 +539,150 @@ class HDB():
             descfile.close()
 
     async def hdbimg_upload(self, meta):
-        image_path = os.path.join(meta['base_dir'], "tmp", os.path.basename(meta['path']), "*.png")
-        image_glob = glob.glob(image_path)
-        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
-        unwanted_files = set()
-        for pattern in unwanted_patterns:
-            unwanted_files.update(glob.glob(pattern))
+        if meta.get('comparison', False):
+            comparison_path = meta.get('comparison')
+            thumb_size = 'w250'
+            if not os.path.isdir(comparison_path):
+                console.print(f"[red]Comparison path not found: {comparison_path}")
+                return None
 
-        image_glob = [file for file in image_glob if file not in unwanted_files]
-        images = list(set(image_glob))
+            console.print(f"[green]Uploading comparison images from {comparison_path} to HDB Image Host")
+
+            group_images = {}
+            max_images_per_group = 0
+
+            if meta.get('comparison_groups'):
+                for group_idx, group_data in meta['comparison_groups'].items():
+                    files_list = group_data.get('files', [])
+                    sorted_files = sorted(files_list, key=lambda f: int(re.match(r"(\d+)-", f).group(1)) if re.match(r"(\d+)-", f) else 0)
+
+                    group_images[group_idx] = []
+                    for filename in sorted_files:
+                        file_path = os.path.join(comparison_path, filename)
+                        if os.path.exists(file_path):
+                            group_images[group_idx].append(file_path)
+
+                    max_images_per_group = max(max_images_per_group, len(group_images[group_idx]))
+            else:
+                files = [f for f in os.listdir(comparison_path) if f.lower().endswith('.png')]
+                pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
+
+                for f in files:
+                    match = pattern.match(f)
+                    if match:
+                        first, second, suffix = match.groups()
+                        if second not in group_images:
+                            group_images[second] = []
+                        file_path = os.path.join(comparison_path, f)
+                        group_images[second].append((int(first), file_path))
+
+                for group_idx in group_images:
+                    group_images[group_idx].sort(key=lambda x: x[0])
+                    group_images[group_idx] = [item[1] for item in group_images[group_idx]]
+                    max_images_per_group = max(max_images_per_group, len(group_images[group_idx]))
+
+            # Interleave images for correct ordering
+            all_image_files = []
+            sorted_group_indices = sorted(group_images.keys(), key=lambda x: int(x))
+
+            for image_idx in range(max_images_per_group):
+                for group_idx in sorted_group_indices:
+                    if image_idx < len(group_images[group_idx]):
+                        all_image_files.append(group_images[group_idx][image_idx])
+
+            if meta['debug']:
+                console.print("[cyan]Images will be uploaded in this order:")
+                for i, path in enumerate(all_image_files):
+                    console.print(f"[cyan]{i}: {os.path.basename(path)}")
+        else:
+            thumb_size = 'w300'
+            image_path = os.path.join(meta['base_dir'], "tmp", os.path.basename(meta['path']), "*.png")
+            image_glob = glob.glob(image_path)
+            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+            unwanted_files = set()
+            for pattern in unwanted_patterns:
+                unwanted_files.update(glob.glob(pattern))
+
+            image_glob = [file for file in image_glob if file not in unwanted_files]
+            all_image_files = list(set(image_glob))
+
+        # At this point, all_image_files contains paths to all images we want to upload
+        if not all_image_files:
+            console.print("[red]No images found for upload")
+            return None
+
         url = "https://img.hdbits.org/upload_api.php"
-
         data = {
             'username': self.username,
             'passkey': self.passkey,
             'galleryoption': '1',
             'galleryname': meta['name'],
-            'thumbsize': 'w300'
+            'thumbsize': thumb_size
         }
-        if meta['debug']:
-            print(f"[DEBUG] Uploading to: {url}")
-            print(f"[DEBUG] Metadata: {data}")
-            print(f"[DEBUG] Found {len(images)} images")
 
-        # Set max screenshots to 3 for TV singles, 6 otherwise
-        hdbimg_screen_count = 3 if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 else 6
-        hdbimg_screen_count = min(len(images), hdbimg_screen_count)
+        if meta.get('comparison', False):
+            # Use everything
+            upload_count = len(all_image_files)
+        else:
+            # Set max screenshots to 3 for TV singles, 6 otherwise
+            upload_count = 3 if meta['category'] == "TV" and meta.get('tv_pack', 0) == 0 else 6
+            upload_count = min(len(all_image_files), upload_count)
+
         if meta['debug']:
-            print(f"[DEBUG] Using {hdbimg_screen_count} images for upload")
+            console.print(f"[cyan]Uploading {upload_count} images to HDB Image Host")
 
         files = {}
-        if hdbimg_screen_count > 0:
-            for i in range(hdbimg_screen_count):
-                file_path = images[i]
-                try:
-                    files[f'images_files[{i}]'] = (f'image_{i}.png', open(file_path, 'rb'), 'image/png')
-                    if meta['debug']:
-                        print(f"[DEBUG] Added file {file_path} as images_files[{i}]")
-                except Exception as e:
-                    print(f"[ERROR] Failed to open {file_path}: {e}")
-                    return None
-
+        for i in range(upload_count):
+            file_path = all_image_files[i]
             try:
-                response = requests.post(url, data=data, files=files)
+                filename = os.path.basename(file_path)
+                files[f'images_files[{i}]'] = (filename, open(file_path, 'rb'), 'image/png')
                 if meta['debug']:
-                    print(f"[DEBUG] HTTP Response Code: {response.status_code}")
-                    print(f"[DEBUG] Response Text: {response.text[:500]}")  # Limit output for readability
-                return response.text
-            except requests.RequestException as e:
-                print(f"[ERROR] HTTP Request failed: {e}")
+                    console.print(f"[cyan]Added file {filename} as images_files[{i}]")
+            except Exception as e:
+                console.print(f"[red]Failed to open {file_path}: {e}")
+                continue
+
+        try:
+            if not files:
+                console.print("[red]No files to upload")
                 return None
-            finally:
-                # Close files to prevent resource leaks
-                for f in files.values():
-                    f[1].close()
-                    if meta['debug']:
-                        print(f"[DEBUG] Closed file {f[0]}")
+
+            if meta['debug']:
+                console.print(f"[green]Uploading {len(files)} images to HDB...")
+            response = requests.post(url, data=data, files=files)
+
+            if response.status_code == 200:
+                console.print("[green]Upload successful!")
+                bbcode = response.text
+                if meta.get('comparison', False):
+                    matches = re.findall(r'\[url=.*?\]\[img\].*?\[/img\]\[/url\]', bbcode)
+                    formatted_bbcode = ""
+                    num_groups = len(sorted_group_indices) if sorted_group_indices else 3
+
+                    for i in range(0, len(matches), num_groups):
+                        line = " ".join(matches[i:i+num_groups])
+                        if i + num_groups < len(matches):
+                            formatted_bbcode += line + "\n"
+                        else:
+                            formatted_bbcode += line
+
+                    bbcode = formatted_bbcode
+
+                if meta['debug']:
+                    console.print(f"[cyan]Response formatted with {num_groups} images per line")
+
+                return bbcode
+            else:
+                console.print(f"[red]Upload failed with status code {response.status_code}")
+                return None
+        except requests.RequestException as e:
+            console.print(f"[red]HTTP Request failed: {e}")
+            return None
+        finally:
+            # Close files to prevent resource leaks
+            for f in files.values():
+                f[1].close()
 
     async def get_info_from_torrent_id(self, hdb_id):
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = None
