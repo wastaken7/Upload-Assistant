@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import cli_ui
 from collections import defaultdict
 from src.uploadscreens import upload_screens
 from data.config import config
@@ -90,6 +91,15 @@ async def add_comparison(meta):
         }
 
     comparison_index = meta.get('comparison_index')
+    if not comparison_index:
+        console.print("[red]No comparison index provided. Please specify a comparison index matching the input file.")
+        while True:
+            cli_input = cli_ui.input("Enter comparison index number: ")
+            try:
+                comparison_index = str(int(cli_input.strip()))
+                break
+            except Exception:
+                console.print(f"[red]Invalid comparison index: {cli_input.strip()}")
     if comparison_index and comparison_index in meta_comparisons:
         if 'image_list' not in meta:
             meta['image_list'] = []
