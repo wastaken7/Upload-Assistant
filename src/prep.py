@@ -264,7 +264,7 @@ class Prep():
         meta['sd'] = await self.is_sd(meta['resolution'])
 
         if not meta.get('search_year', None):
-            meta['search_year'] = meta.get('manual_year', None)
+            meta['search_year'] = meta.get('manual_year', "")
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
