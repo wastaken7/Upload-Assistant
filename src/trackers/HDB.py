@@ -541,7 +541,6 @@ class HDB():
     async def hdbimg_upload(self, meta):
         if meta.get('comparison', False):
             comparison_path = meta.get('comparison')
-            thumb_size = 'w250'
             if not os.path.isdir(comparison_path):
                 console.print(f"[red]Comparison path not found: {comparison_path}")
                 return None
@@ -584,6 +583,10 @@ class HDB():
             # Interleave images for correct ordering
             all_image_files = []
             sorted_group_indices = sorted(group_images.keys(), key=lambda x: int(x))
+            if len(sorted_group_indices) < 4:
+                thumb_size = 'w250'
+            else:
+                thumb_size = 'w100'
 
             for image_idx in range(max_images_per_group):
                 for group_idx in sorted_group_indices:
