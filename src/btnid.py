@@ -1,6 +1,7 @@
 import httpx
 import uuid
 from src.bbcode import BBCODE
+from src.trackermeta import check_images_concurrently
 
 
 async def generate_guid():
@@ -156,7 +157,10 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
             meta["flux"] = True
         description, imagelist = bbcode.clean_bhd_description(description, meta)
         meta["description"] = description
-        meta["image_list"] = imagelist
+        if imagelist:
+            valid_images = await check_images_concurrently(imagelist, meta)
+            if valid_images:
+                meta['image_list'] = valid_images
 
     print("BHD IMDb ID:", meta.get("imdb_id"))
     print("BHD TMDb ID:", meta.get("tmdb_id"))
