@@ -38,6 +38,7 @@ config = {
         # custom zipline url
         "zipline_url": "zipline URL",
         "zipline_api_key": "zipline API KEY",
+        "passtheima_ge_api": "",
 
         # Order of image hosts, and backup image hosts
         "img_host_1": "imgbb",
@@ -49,6 +50,7 @@ config = {
         "img_host_7": "oeimg",
         "img_host_8": "dalexni",
         "img_host_9": "zipline",
+        "img_host_10": "passtheimage",
 
         # Whether to add a logo for the show/movie from TMDB to the top of the description
         "add_logo": False,
