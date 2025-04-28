@@ -305,6 +305,55 @@ def upload_image_task(args):
                 console.print(f"[red]Request failed with error: {e}")
                 return {'status': 'failed', 'reason': str(e)}
 
+        elif img_host == "passtheimage":
+            url = "https://passtheima.ge/api/1/upload"
+            try:
+                pass_api_key = config['DEFAULT'].get('passtheima_ge_api')
+                if not pass_api_key:
+                    console.print("[red]Passtheimage API key not found in config.")
+                    return {'status': 'failed', 'reason': 'Missing Passtheimage API key'}
+
+                headers = {
+                    'X-API-Key': pass_api_key
+                }
+
+                with open(image, 'rb') as img_file:
+                    files = {'source': (os.path.basename(image), img_file)}
+                    response = requests.post(url, headers=headers, files=files, timeout=timeout)
+
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    response_data = response.json()
+                else:
+                    console.print(f"[red]Passtheimage did not return JSON. Status: {response.status_code}, Response: {response.text[:200]}")
+                    return {'status': 'failed', 'reason': f'Non-JSON response from passtheimage: {response.status_code}'}
+
+                if response.status_code != 200 or response_data.get('status_code') != 200:
+                    error_message = response_data.get('error', {}).get('message', 'Unknown error')
+                    error_code = response_data.get('error', {}).get('code', 'Unknown code')
+                    console.print(f"[yellow]Passtheimage failed (code: {error_code}): {error_message}")
+                    return {'status': 'failed', 'reason': f'passtheimage upload failed: {error_message}'}
+
+                if 'image' in response_data:
+                    img_url = response_data['image']['url']
+                    raw_url = response_data['image']['url']
+                    web_url = response_data['image']['url_viewer']
+
+                if not img_url or not raw_url or not web_url:
+                    console.print(f"[yellow]Incomplete URL data from passtheimage response: {response_data}")
+                    return {'status': 'failed', 'reason': 'Incomplete URL data from passtheimage'}
+
+                return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url, 'local_file_path': image}
+
+            except requests.exceptions.Timeout:
+                console.print("[red]Request to passtheimage timed out after 60 seconds")
+                return {'status': 'failed', 'reason': 'Request timed out'}
+            except requests.exceptions.RequestException as e:
+                console.print(f"[red]Request to passtheimage failed with error: {e}")
+                return {'status': 'failed', 'reason': str(e)}
+            except Exception as e:
+                console.print(f"[red]Unexpected error with passtheimage: {str(e)}")
+                return {'status': 'failed', 'reason': f'Unexpected error: {str(e)}'}
+
         if img_url and raw_url and web_url:
             return {
                 'status': 'success',
@@ -393,7 +442,7 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
 
     # Concurrency Control
     default_pool_size = len(upload_tasks)
-    host_limits = {"oeimg": 6, "ptscreens": 1, "lensdump": 1}
+    host_limits = {"oeimg": 6, "ptscreens": 1, "lensdump": 1, "passtheimage": 6}
     pool_size = host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
     semaphore = asyncio.Semaphore(max_workers)

@@ -31,6 +31,21 @@ async def check_images_concurrently(imagelist, meta):
     if 'image_sizes' not in meta:
         meta['image_sizes'] = {}
 
+    seen_urls = set()
+    unique_images = []
+
+    for img in imagelist:
+        img_url = img.get('raw_url')
+        if img_url and img_url not in seen_urls:
+            seen_urls.add(img_url)
+            unique_images.append(img)
+        elif img_url:
+            if meta.get('debug'):
+                console.print(f"[yellow]Removing duplicate image URL: {img_url}[/yellow]")
+
+    if len(unique_images) < len(imagelist) and meta['debug']:
+        console.print(f"[yellow]Removed {len(imagelist) - len(unique_images)} duplicate images from the list.[/yellow]")
+
     # Map fixed resolution names to vertical resolutions
     resolution_map = {
         '8640p': 8640,
@@ -137,7 +152,7 @@ async def check_images_concurrently(imagelist, meta):
         async with semaphore:
             return await check_and_collect(image_dict)
 
-    tasks = [bounded_check(image_dict) for image_dict in imagelist]
+    tasks = [bounded_check(image_dict) for image_dict in unique_images]
 
     try:
         results = await asyncio.gather(*tasks, return_exceptions=False)

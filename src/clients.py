@@ -1555,10 +1555,10 @@ class Clients():
                                 if status_code == 2:
                                     has_working_tracker = True
                                     if meta['debug']:
-                                        console.print(f"[green]Tracker working: {url} - {status_text}")
+                                        console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
                                 elif meta['debug']:
                                     msg = tracker.get('msg', '')
-                                    console.print(f"[yellow]Tracker not working: {url} - {status_text}{f' - {msg}' if msg else ''}")
+                                    console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
 
                             if not has_working_tracker:
                                 if meta['debug']:

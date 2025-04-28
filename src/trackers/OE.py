@@ -11,6 +11,7 @@ from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.dupe_checking import check_for_english
+from src.rehostimages import check_hosts
 
 
 class OE():
@@ -49,6 +50,18 @@ class OE():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
+        approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'oeimg', 'ptscreens', "passtheimage"]
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "ptpimg.me": "ptpimg",
+            "imgbox.com": "imgbox",
+            "imgoe.download": "oeimg",
+            "imagebam.com": "bam",
+            "ptscreens.com": "ptscreens",
+            "img.passtheima.ge": "passtheimage",
+        }
+
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
         await self.edit_desc(meta, self.tracker, self.signature)
         if "oe_no_language" in meta:
             console.print("[red]No language detected in MEDIAINFO.txt[/red]")
@@ -313,7 +326,10 @@ class OE():
 
             desc = desc.replace('[img]', '[img=300]')
             descfile.write(desc)
-            images = meta['image_list']
+            if f'{self.tracker}_images_key' in meta:
+                images = meta[f'{self.tracker}_images_key']
+            else:
+                images = meta['image_list']
             if len(images) > 0:
                 descfile.write("[center]")
                 for each in range(len(images[:int(meta['screens'])])):

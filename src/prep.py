@@ -261,7 +261,10 @@ class Prep():
 
             if meta.get('resolution', None) is None:
                 meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
-            meta['sd'] = await self.is_sd(meta['resolution'])
+        meta['sd'] = await self.is_sd(meta['resolution'])
+
+        if not meta.get('search_year', None):
+            meta['search_year'] = meta.get('manual_year', "")
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
@@ -1143,7 +1146,6 @@ class Prep():
 
                     # fallback to tvmaze data if tvdb data is available
                     if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None and not meta.get('we_asked_tvmaze', False):
-                        console.print("[yellow]Fetching TVMaze episode metadata...")
                         tvmaze_episode_data = await get_tvmaze_episode_data(meta.get('tvmaze_id'), meta.get('season_int'), meta.get('episode_int'))
                         if tvmaze_episode_data:
                             meta['tvmaze_episode_data'] = tvmaze_episode_data
@@ -1157,7 +1159,7 @@ class Prep():
 
                     # fallback to tmdb data if no other data is not available
                     if (meta.get('auto_episode_title') is None or meta.get('overview_meta') is None):
-                        if meta.get('tvdb_episode_int') != meta.get('episode_int'):
+                        if 'tvdb_episode_int' in meta and meta.get('tvdb_episode_int') != 0 and meta.get('tvdb_episode_int') != meta.get('episode_int'):
                             episode = meta.get('episode_int')
                             season = meta.get('tvdb_season_int')
                             if meta['debug']:

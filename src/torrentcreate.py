@@ -219,8 +219,7 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
             meta['mkbrr'] = False
         except Exception as e:
             console.print(f"[bold red]Error using mkbrr: {str(e)}")
-            console.print("[yellow]Falling back to CustomTorrent method")
-            meta['mkbrr'] = False
+            raise sys.exit(1)
 
     overall_start_time = time.time()
     initial_size = 0

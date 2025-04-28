@@ -99,7 +99,8 @@ class BHD():
             data['pack'] = 1
         if meta.get('season', None) == "S00":
             data['special'] = 1
-        if meta.get('region', "") != "":
+        allowed_regions = ['AUS', 'CAN', 'CEE', 'CHN', 'ESP', 'EUR', 'FRA', 'GBR', 'GER', 'HKG', 'ITA', 'JPN', 'KOR', 'NOR', 'NLD', 'RUS', 'TWN', 'USA']
+        if meta.get('region', "") in allowed_regions:
             data['region'] = meta['region']
         if custom is True:
             data['custom_edition'] = edition
