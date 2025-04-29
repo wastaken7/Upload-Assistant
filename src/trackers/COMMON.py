@@ -409,15 +409,36 @@ class COMMON():
 
             # Handle single file case
             if len(filelist) == 1:
-                if meta['debug']:
-                    mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", 'r', encoding='utf-8').read()
-                    if mi_dump:
-                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
-                        formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
-                        for i, file in enumerate(filelist):
-                            if i == 0:
-                                filename = os.path.splitext(os.path.basename(file.strip()))[0]
-                                descfile.write(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler]\n")
+                if meta.get('comparison') and meta.get('comparison_groups'):
+                    descfile.write("[center]")
+                    comparison_groups = meta.get('comparison_groups', {})
+                    sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(x))
+
+                    comp_sources = []
+                    for group_idx in sorted_group_indices:
+                        group_data = comparison_groups[group_idx]
+                        group_name = group_data.get('name', f'Group {group_idx}')
+                        comp_sources.append(group_name)
+
+                    sources_string = ", ".join(comp_sources)
+                    descfile.write(f"[comparison={sources_string}]\n")
+
+                    images_per_group = min([
+                        len(comparison_groups[idx].get('urls', []))
+                        for idx in sorted_group_indices
+                    ])
+
+                    for img_idx in range(images_per_group):
+                        for group_idx in sorted_group_indices:
+                            group_data = comparison_groups[group_idx]
+                            urls = group_data.get('urls', [])
+                            if img_idx < len(urls):
+                                img_url = urls[img_idx].get('raw_url', '')
+                                if img_url:
+                                    descfile.write(f"{img_url}\n")
+
+                    descfile.write("[/comparison][/center]\n\n")
+
                 if screenheader is not None:
                     descfile.write(screenheader + '\n')
                 descfile.write("[center]")
@@ -425,8 +446,6 @@ class COMMON():
                     web_url = images[img_index]['web_url']
                     raw_url = images[img_index]['raw_url']
                     descfile.write(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url]")
-
-                    # If screensPerRow is set and we have reached that number of screenshots, add a new line
                     if screensPerRow and (img_index + 1) % screensPerRow == 0:
                         descfile.write("\n")
                 descfile.write("[/center]")

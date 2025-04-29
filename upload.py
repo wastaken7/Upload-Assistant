@@ -26,6 +26,7 @@ from src.uphelper import UploadHelper
 from src.trackerstatus import process_all_trackers
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 from src.cleanup import cleanup
+from src.add_comparison import add_comparison
 if os.name == "posix":
     import termios
 
@@ -156,123 +157,127 @@ async def process_meta(meta, base_dir):
             meta['manual_frames'] = {}
         manual_frames = meta['manual_frames']
 
-        image_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json"
-        if os.path.exists(image_data_file) and not meta.get('image_list'):
+        if meta.get('comparison', False):
+            await add_comparison(meta)
+
+        else:
+            image_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json"
+            if os.path.exists(image_data_file) and not meta.get('image_list'):
+                try:
+                    with open(image_data_file, 'r') as img_file:
+                        image_data = json.load(img_file)
+
+                        if 'image_list' in image_data and not meta.get('image_list'):
+                            meta['image_list'] = image_data['image_list']
+                            if meta.get('debug'):
+                                console.print(f"[cyan]Loaded {len(image_data['image_list'])} previously saved image links")
+
+                        if 'image_sizes' in image_data and not meta.get('image_sizes'):
+                            meta['image_sizes'] = image_data['image_sizes']
+                            if meta.get('debug'):
+                                console.print("[cyan]Loaded previously saved image sizes")
+                except Exception as e:
+                    console.print(f"[yellow]Could not load saved image data: {str(e)}")
+
+            # Take Screenshots
             try:
-                with open(image_data_file, 'r') as img_file:
-                    image_data = json.load(img_file)
+                if meta['is_disc'] == "BDMV":
+                    use_vs = meta.get('vapoursynth', False)
+                    try:
+                        await disc_screenshots(
+                            meta, bdmv_filename, bdinfo, meta['uuid'], base_dir, use_vs,
+                            meta.get('image_list', []), meta.get('ffdebug', False), None
+                        )
+                    except asyncio.CancelledError:
+                        console.print("[red]Screenshot capture was cancelled. Cleaning up...[/red]")
+                        await cleanup_screenshot_temp_files(meta)  # Cleanup only on cancellation
+                        raise  # Ensure cancellation propagates properly
+                    except Exception as e:
+                        console.print(f"[red]Error during BDMV screenshot capture: {e}[/red]", highlight=False)
+                        await cleanup_screenshot_temp_files(meta)  # Cleanup only on error
 
-                    if 'image_list' in image_data and not meta.get('image_list'):
-                        meta['image_list'] = image_data['image_list']
-                        if meta.get('debug'):
-                            console.print(f"[cyan]Loaded {len(image_data['image_list'])} previously saved image links")
+                elif meta['is_disc'] == "DVD":
+                    try:
+                        await dvd_screenshots(
+                            meta, 0, None, None
+                        )
+                    except asyncio.CancelledError:
+                        console.print("[red]DVD screenshot capture was cancelled. Cleaning up...[/red]")
+                        await cleanup_screenshot_temp_files(meta)
+                        raise
+                    except Exception as e:
+                        console.print(f"[red]Error during DVD screenshot capture: {e}[/red]", highlight=False)
+                        await cleanup_screenshot_temp_files(meta)
 
-                    if 'image_sizes' in image_data and not meta.get('image_sizes'):
-                        meta['image_sizes'] = image_data['image_sizes']
-                        if meta.get('debug'):
-                            console.print("[cyan]Loaded previously saved image sizes")
-            except Exception as e:
-                console.print(f"[yellow]Could not load saved image data: {str(e)}")
+                else:
+                    try:
+                        if meta['debug']:
+                            console.print(f"videopath: {videopath}, filename: {filename}, meta: {meta['uuid']}, base_dir: {base_dir}, manual_frames: {manual_frames}")
 
-        # Take Screenshots
-        try:
-            if meta['is_disc'] == "BDMV":
-                use_vs = meta.get('vapoursynth', False)
-                try:
-                    await disc_screenshots(
-                        meta, bdmv_filename, bdinfo, meta['uuid'], base_dir, use_vs,
-                        meta.get('image_list', []), meta.get('ffdebug', False), None
-                    )
-                except asyncio.CancelledError:
-                    console.print("[red]Screenshot capture was cancelled. Cleaning up...[/red]")
-                    await cleanup_screenshot_temp_files(meta)  # Cleanup only on cancellation
-                    raise  # Ensure cancellation propagates properly
-                except Exception as e:
-                    console.print(f"[red]Error during BDMV screenshot capture: {e}[/red]", highlight=False)
-                    await cleanup_screenshot_temp_files(meta)  # Cleanup only on error
+                        await screenshots(
+                            videopath, filename, meta['uuid'], base_dir, meta,
+                            manual_frames=manual_frames  # Pass additional kwargs directly
+                        )
+                    except asyncio.CancelledError:
+                        console.print("[red]Generic screenshot capture was cancelled. Cleaning up...[/red]")
+                        await cleanup_screenshot_temp_files(meta)
+                        raise
+                    except Exception as e:
+                        console.print(f"[red]Error during generic screenshot capture: {e}[/red]", highlight=False)
+                        console.print(traceback.format_exc())
+                        await cleanup_screenshot_temp_files(meta)
 
-            elif meta['is_disc'] == "DVD":
-                try:
-                    await dvd_screenshots(
-                        meta, 0, None, None
-                    )
-                except asyncio.CancelledError:
-                    console.print("[red]DVD screenshot capture was cancelled. Cleaning up...[/red]")
-                    await cleanup_screenshot_temp_files(meta)
-                    raise
-                except Exception as e:
-                    console.print(f"[red]Error during DVD screenshot capture: {e}[/red]", highlight=False)
-                    await cleanup_screenshot_temp_files(meta)
-
-            else:
-                try:
-                    if meta['debug']:
-                        console.print(f"videopath: {videopath}, filename: {filename}, meta: {meta['uuid']}, base_dir: {base_dir}, manual_frames: {manual_frames}")
-
-                    await screenshots(
-                        videopath, filename, meta['uuid'], base_dir, meta,
-                        manual_frames=manual_frames  # Pass additional kwargs directly
-                    )
-                except asyncio.CancelledError:
-                    console.print("[red]Generic screenshot capture was cancelled. Cleaning up...[/red]")
-                    await cleanup_screenshot_temp_files(meta)
-                    raise
-                except Exception as e:
-                    console.print(f"[red]Error during generic screenshot capture: {e}[/red]", highlight=False)
-                    await cleanup_screenshot_temp_files(meta)
-
-        except asyncio.CancelledError:
-            console.print("[red]Process was cancelled. Performing cleanup...[/red]")
-            await cleanup_screenshot_temp_files(meta)
-            raise
-        except Exception as e:
-            console.print(f"[red]Unexpected error occurred: {e}[/red]")
-            await cleanup_screenshot_temp_files(meta)
-        finally:
-            await asyncio.sleep(0.1)
-            await cleanup()
-            gc.collect()
-            reset_terminal()
-
-        meta['cutoff'] = int(config['DEFAULT'].get('cutoff_screens', 1))
-        if 'image_list' not in meta:
-            meta['image_list'] = []
-        if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
-            return_dict = {}
-            try:
-                new_images, dummy_var = await upload_screens(
-                    meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict
-                )
             except asyncio.CancelledError:
-                console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
-                return
+                console.print("[red]Process was cancelled. Performing cleanup...[/red]")
+                await cleanup_screenshot_temp_files(meta)
+                raise
             except Exception as e:
-                console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
+                console.print(f"[red]Unexpected error occurred: {e}[/red]")
+                await cleanup_screenshot_temp_files(meta)
             finally:
-                reset_terminal()
-                console.print("[yellow]Cleaning up resources...[/yellow]")
+                await asyncio.sleep(0.1)
+                await cleanup()
                 gc.collect()
+                reset_terminal()
 
-        elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
-            meta['image_list'] = []
+            if 'image_list' not in meta:
+                meta['image_list'] = []
+            if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
+                return_dict = {}
+                try:
+                    new_images, dummy_var = await upload_screens(
+                        meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict
+                    )
+                except asyncio.CancelledError:
+                    console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
+                    return
+                except Exception as e:
+                    console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
+                finally:
+                    reset_terminal()
+                    console.print("[yellow]Cleaning up resources...[/yellow]")
+                    gc.collect()
 
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
-            json.dump(meta, f, indent=4)
+            elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
+                meta['image_list'] = []
 
-        if 'image_list' in meta and meta['image_list']:
-            try:
-                image_data = {
-                    "image_list": meta.get('image_list', []),
-                    "image_sizes": meta.get('image_sizes', {})
-                }
+            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
+                json.dump(meta, f, indent=4)
 
-                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json", 'w') as img_file:
-                    json.dump(image_data, img_file, indent=4)
+            if 'image_list' in meta and meta['image_list']:
+                try:
+                    image_data = {
+                        "image_list": meta.get('image_list', []),
+                        "image_sizes": meta.get('image_sizes', {})
+                    }
 
-                if meta.get('debug'):
-                    console.print(f"[cyan]Saved {len(meta['image_list'])} images to image_data.json")
-            except Exception as e:
-                console.print(f"[yellow]Failed to save image data: {str(e)}")
+                    with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/image_data.json", 'w') as img_file:
+                        json.dump(image_data, img_file, indent=4)
+
+                    if meta.get('debug'):
+                        console.print(f"[cyan]Saved {len(meta['image_list'])} images to image_data.json")
+                except Exception as e:
+                    console.print(f"[yellow]Failed to save image data: {str(e)}")
 
         if not meta['mkbrr']:
             meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))

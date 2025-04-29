@@ -244,6 +244,35 @@ class BHD():
                             desc.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n")
                             desc.write("\n")
             desc.write(base.replace("[img]", "[img width=300]"))
+            if meta.get('comparison') and meta.get('comparison_groups'):
+                desc.write("[center]")
+                comparison_groups = meta.get('comparison_groups', {})
+                sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(x))
+
+                comp_sources = []
+                for group_idx in sorted_group_indices:
+                    group_data = comparison_groups[group_idx]
+                    group_name = group_data.get('name', f'Group {group_idx}')
+                    comp_sources.append(group_name)
+
+                sources_string = ", ".join(comp_sources)
+                desc.write(f"[comparison={sources_string}]\n")
+
+                images_per_group = min([
+                    len(comparison_groups[idx].get('urls', []))
+                    for idx in sorted_group_indices
+                ])
+
+                for img_idx in range(images_per_group):
+                    for group_idx in sorted_group_indices:
+                        group_data = comparison_groups[group_idx]
+                        urls = group_data.get('urls', [])
+                        if img_idx < len(urls):
+                            img_url = urls[img_idx].get('raw_url', '')
+                            if img_url:
+                                desc.write(f"{img_url}\n")
+
+                desc.write("[/comparison][/center]\n\n")
             if f'{self.tracker}_images_key' in meta:
                 images = meta[f'{self.tracker}_images_key']
             else:

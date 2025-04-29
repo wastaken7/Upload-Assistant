@@ -933,6 +933,30 @@ class PTP():
                 if base2ptp.strip() != "":
                     desc.write(base2ptp)
                     desc.write("\n\n")
+                if meta.get('comparison', None):
+                    if 'comparison_groups' in meta and meta['comparison_groups']:
+                        desc.write("\n")
+
+                        comparison_groups = meta['comparison_groups']
+                        group_keys = sorted(comparison_groups.keys(), key=lambda x: int(x))
+                        comparison_names = [comparison_groups[key].get('name', f'Group {key}') for key in group_keys]
+                        comparison_header = ', '.join(comparison_names)
+                        desc.write(f"[comparison={comparison_header}]\n")
+
+                        num_images = min([len(comparison_groups[key]['urls']) for key in group_keys])
+
+                        for img_index in range(num_images):
+                            for key in group_keys:
+                                group = comparison_groups[key]
+                                if img_index < len(group['urls']):
+                                    img_data = group['urls'][img_index]
+                                    raw_url = img_data.get('raw_url', '')
+                                    if raw_url:
+                                        desc.write(f"[img]{raw_url}[/img] ")
+                            desc.write("\n")
+
+                        desc.write("[/comparison]\n\n")
+
                 for img_index in range(len(images[:int(meta['screens'])])):
                     raw_url = meta['image_list'][img_index]['raw_url']
                     desc.write(f"[img]{raw_url}[/img]\n")
