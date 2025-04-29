@@ -1,3 +1,28 @@
+__version__ = "4.2.1"
+
+"""
+Changelog for version 4.2.1 (2025-04-29):
+
+## What's Changed
+* Update RAS.py by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/483
+* Add support for Portugas by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/482
+* OTW - use year in TV title by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/481
+* Adding ADN as a provider by @ppkhoa in https://github.com/Audionut/Upload-Assistant/pull/484
+* Allow '-s 0' option when uploading to HDB by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/485
+* CBR: Refactor get_audio function to handle multiple languages by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/488
+* Screens handling updates by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/486
+* Add comparison images by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/487
+* Should be improvements to PTP hardcoded subs handling
+* Corrected AR imdb url
+* Fixed an issue in a tmdb episode pathway that would fail without tvdb
+* Cleaned more private details from debug prints
+* Fixed old BHD code to respect only supported BDMV regions
+* Update OE against their image hosts rule
+* Added passtheima.ge support
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.0.1...4.2.1
+"""
+
 __version__ = "4.2.0.1"
 
 """
