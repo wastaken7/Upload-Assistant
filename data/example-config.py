@@ -521,6 +521,7 @@ config = {
             "api_key": "ULCX api key",
             "announce_url": "https://upload.cx/announce/customannounceurl",
             # "anon" : False,
+            # "modq" : False,  # Send to modq for staff approval
         },
         # "UNIT3D_TEMPLATE": {
         #    "api_key": "UNIT3D_TEMPLATE api key",
