@@ -6,7 +6,7 @@ from data.config import config
 from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze, get_tvmaze_episode_data
 from src.imdb import get_imdb_info_api, search_imdb
-from src.trackermeta import update_metadata_from_tracker
+from src.trackermeta import update_metadata_from_tracker, check_images_concurrently
 from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id, get_episode_details
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
@@ -416,10 +416,18 @@ class Prep():
                                 await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
                                 if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
                                     found_match = True
+                                if meta.get('image_list'):
+                                    valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                                    if valid_images:
+                                        meta['image_list'] = valid_images
                             else:
                                 await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, torrent_id=meta['bhd'])
                                 if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
                                     found_match = True
+                                if meta.get('image_list'):
+                                    valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                                    if valid_images:
+                                        meta['image_list'] = valid_images
                         else:
                             console.print("[yellow]No BHD ID found, skipping BHD tracker update.[/yellow]")
                     else:
