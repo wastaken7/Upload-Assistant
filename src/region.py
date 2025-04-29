@@ -111,7 +111,7 @@ async def get_service(video=None, tag=None, audio=None, guess_title=None, get_se
         'MAX': 'MAX', 'MBC': 'MBC', 'MNBC': 'MNBC', 'MSNBC': 'MNBC', 'MTOD': 'MTOD', 'Motor Trend OnDemand': 'MTOD', 'MTV': 'MTV',
         'MUBI': 'MUBI', 'NATG': 'NATG', 'National Geographic': 'NATG', 'NBA': 'NBA', 'NBA TV': 'NBA', 'NBC': 'NBC', 'NF': 'NF',
         'Netflix': 'NF', 'National Film Board': 'NFB', 'NFL': 'NFL', 'NFLN': 'NFLN', 'NFL Now': 'NFLN', 'NICK': 'NICK',
-        'Nickelodeon': 'NICK', 'NOW': 'NOW', 'NRK': 'NRK', 'Norsk Rikskringkasting': 'NRK', 'OnDemandKorea': 'ODK', 'Opto': 'OPTO',
+        'Nickelodeon': 'NICK', 'NOW': 'NOW', 'NOWTV': 'NOW', 'NRK': 'NRK', 'Norsk Rikskringkasting': 'NRK', 'OnDemandKorea': 'ODK', 'Opto': 'OPTO',
         'ORF': 'ORF', 'ORF ON': 'ORF', 'Oprah Winfrey Network': 'OWN', 'PA': 'PA', 'PBS': 'PBS', 'PBSK': 'PBSK', 'PBS Kids': 'PBSK',
         'PCOK': 'PCOK', 'Peacock': 'PCOK', 'PLAY': 'PLAY', 'PLUZ': 'PLUZ', 'Pluzz': 'PLUZ', 'PMNP': 'PMNP', 'PMNT': 'PMNT',
         'PMTP': 'PMTP', 'POGO': 'POGO', 'PokerGO': 'POGO', 'PSN': 'PSN', 'Playstation Network': 'PSN', 'PUHU': 'PUHU', 'QIBI': 'QIBI',
