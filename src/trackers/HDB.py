@@ -495,6 +495,11 @@ class HDB():
             desc = base
             # desc = bbcode.convert_code_to_quote(desc)
             desc = desc.replace("[code]", "[font=monospace]").replace("[/code]", "[/font]")
+            desc = desc.replace("[user]", "").replace("[/user]", "")
+            desc = desc.replace("[list]", "").replace("[/list]", "")
+            desc = desc.replace("[ul]", "").replace("[/ul]", "")
+            desc = desc.replace("[ol]", "").replace("[/ol]", "")
+            desc = desc.replace("[*]", "* ")
             desc = bbcode.convert_spoiler_to_hide(desc)
             desc = bbcode.convert_comparison_to_centered(desc, 1000)
             desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)

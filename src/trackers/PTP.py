@@ -652,6 +652,9 @@ class PTP():
         desc = desc.replace("[right]", "[align=right]").replace("[/right]", "[/align]")
         # desc = desc.replace("[code]", "[quote]").replace("[/code]", "[/quote]")
         desc = desc.replace("[h3]", "").replace("[/h3]", "")
+        desc = desc.replace("[list]", "").replace("[/list]", "")
+        desc = desc.replace("[ul]", "").replace("[/ul]", "")
+        desc = desc.replace("[ol]", "").replace("[/ol]", "")
         desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return desc
 
