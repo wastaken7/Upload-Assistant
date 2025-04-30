@@ -172,7 +172,7 @@ class COMMON():
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             desc = desc.replace("[user]", "").replace("[/user]", "")
-            desc = desc.replace("[list]", "").replace("[/list]", "")
+            desc = desc.replace("[hr]", "").replace("[/hr]", "")
             desc = desc.replace("[ul]", "").replace("[/ul]", "")
             desc = desc.replace("[ol]", "").replace("[/ol]", "")
             if comparison is False:
