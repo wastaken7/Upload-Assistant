@@ -1206,7 +1206,7 @@ class PTP():
         ptp_trumpable = None
         if meta['hardcoded-subs']:
             ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-            if ptp_trumpable and 4 in ptp_trumpable:
+            if ptp_trumpable and 4 in ptp_trumpable and 14 not in ptp_trumpable:
                 if 44 in ptp_subtitles:
                     ptp_subtitles.remove(44)
                 if 3 not in ptp_subtitles:
@@ -1227,7 +1227,7 @@ class PTP():
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-                if ptp_trumpable and 4 in ptp_trumpable:
+                if ptp_trumpable and 4 in ptp_trumpable and 14 not in ptp_trumpable:
                     if 44 in ptp_subtitles:
                         ptp_subtitles.remove(44)
                     if 3 not in ptp_subtitles:

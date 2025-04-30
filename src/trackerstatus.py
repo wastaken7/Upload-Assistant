@@ -9,6 +9,7 @@ from src.clients import Clients
 from src.uphelper import UploadHelper
 from src.torrentcreate import create_base_from_existing_torrent
 from src.dupe_checking import filter_dupes
+from src.imdb import get_imdb_info_api
 import cli_ui
 import copy
 
@@ -41,30 +42,37 @@ async def process_all_trackers(meta):
                 await tracker_class.validate_credentials(meta)
             if tracker_name in {"THR", "PTP"}:
                 if local_meta.get('imdb_id', 0) == 0:
-                    imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(
-                        "Unable to find IMDB id, please enter e.g.(tt1234567)"
-                    ).strip()
+                    while True:
+                        imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(
+                            f"Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to {tracker_name}:",
+                        )
+                        if imdb_id is None or imdb_id.strip() == "":
+                            local_meta['imdb_id'] = 0
+                            local_tracker_status['skipped'] = True
+                            break
 
-                    if not imdb_id:
-                        meta['imdb'] = '0'
-                    else:
-                        imdb_id = imdb_id.lower()
+                        imdb_id = imdb_id.strip().lower()
                         if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
-                            meta['imdb'] = imdb_id[2:].zfill(7)
+                            local_meta['imdb_id'] = int(imdb_id[2:])
+                            local_meta['imdb'] = str(imdb_id[2:].zfill(7))
+                            local_meta['imdb_info'] = await get_imdb_info_api(local_meta['imdb_id'], local_meta)
+                            break
                         else:
                             cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
-                            meta['imdb'] = '0'
 
             if tracker_name == "PTP":
-                console.print("[yellow]Searching for Group ID on PTP")
-                ptp = PTP(config=config)
-                groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
-                if groupID is None:
-                    console.print("[yellow]No Existing Group found")
-                    if local_meta.get('youtube', None) is None or "youtube" not in str(local_meta.get('youtube', '')):
-                        youtube = "" if local_meta['unattended'] else cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
-                        meta['youtube'] = youtube
-                meta['ptp_groupID'] = groupID
+                if local_meta.get('imdb_id', 0) != 0:
+                    console.print("[yellow]Searching for Group ID on PTP")
+                    ptp = PTP(config=config)
+                    groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
+                    if groupID is None:
+                        console.print("[yellow]No Existing Group found")
+                        if local_meta.get('youtube', None) is None or "youtube" not in str(local_meta.get('youtube', '')):
+                            youtube = "" if local_meta['unattended'] else cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                            local_meta['youtube'] = youtube
+                    local_meta['ptp_groupID'] = groupID
+                else:
+                    local_tracker_status['skipped'] = True
 
             result = await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta)
             if result:
@@ -72,7 +80,7 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['banned'] = False
 
-            if not local_tracker_status['banned']:
+            if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                 if tracker_name == "AITHER":
                     if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
                         local_tracker_status['skipped'] = True
