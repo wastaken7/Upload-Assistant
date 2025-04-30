@@ -51,7 +51,6 @@ class BLU():
         modq = await self.get_flag(meta, 'modq')
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        await self.edit_desc(meta)
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
@@ -137,17 +136,6 @@ class BLU():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
-
-    async def edit_desc(self, meta):
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", encoding='utf-8') as descfile:
-            desc = descfile.read()
-            desc = desc.replace("[user]", "").replace("[/user]", "")
-            desc = desc.replace("[list]", "").replace("[/list]", "")
-            desc = desc.replace("[ul]", "").replace("[/ul]", "")
-            desc = desc.replace("[ol]", "").replace("[/ol]", "")
-        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as descfile:
-            descfile.write(desc)
-        return
 
     async def edit_name(self, meta):
         blu_name = meta['name']
