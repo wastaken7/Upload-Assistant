@@ -1215,6 +1215,20 @@ class Prep():
 
         if meta.get('tag', None) is None:
             meta['tag'] = await self.get_tag(video, meta)
+            # all lowercase filenames will have bad group tag, it's probably a scene release.
+            # some extracted files do not match release name so lets double check if it really is a scene release
+            if not meta.get('scene') and meta['tag']:
+                base = os.path.basename(video)
+                match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+                if match and (not meta['is_disc'] or meta.get('keep_folder', False)):
+                    base = match.group(1)
+                    is_all_lowercase = base.islower()
+                    if is_all_lowercase:
+                        release_name = await self.is_scene(videopath, meta, meta.get('imdb_id', 0), lower=True)
+                        if release_name is not None:
+                            meta['scene_name'] = release_name
+                            meta['tag'] = await self.get_tag(release_name, meta)
+
         else:
             if not meta['tag'].startswith('-') and meta['tag'] != "":
                 meta['tag'] = f"-{meta['tag']}"
@@ -1440,18 +1454,19 @@ class Prep():
     """
     Is a scene release?
     """
-    async def is_scene(self, video, meta, imdb=None):
+    async def is_scene(self, video, meta, imdb=None, lower=False):
         scene = False
         base = os.path.basename(video)
         match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
 
         if match and (not meta['is_disc'] or meta['keep_folder']):
             base = match.group(1)
+            is_all_lowercase = base.islower()
         base = urllib.parse.quote(base)
-        url = f"https://api.srrdb.com/v1/search/r:{base}"
-        if meta['debug']:
-            console.print("Using SRRDB url", url)
-        if 'scene' not in meta:
+        if 'scene' not in meta and not lower:
+            url = f"https://api.srrdb.com/v1/search/r:{base}"
+            if meta['debug']:
+                console.print("Using SRRDB url", url)
             try:
                 response = requests.get(url, timeout=30)
                 response_json = response.json()
@@ -1465,6 +1480,8 @@ class Prep():
                     scene = True
                     if scene and meta.get('isdir', False) and meta.get('queue') is not None:
                         meta['keep_folder'] = True
+                    if is_all_lowercase and not meta.get('tag'):
+                        meta['tag'] = await self.get_tag(meta['scene_name'], meta)
 
                     # NFO Download Handling
                     if not meta.get('nfo'):
@@ -1533,6 +1550,57 @@ class Prep():
 
             except Exception as e:
                 console.print(f"[yellow]SRRDB: No match found, or request has timed out: {e}")
+
+        elif not scene and lower:
+            release_name = None
+            name = meta.get('filename', None).replace(" ", ".")
+            tag = meta.get('tag', None).replace("-", "")
+            url = f"https://api.srrdb.com/v1/search/start:{name}/group:{tag}"
+            if meta['debug']:
+                console.print("Using SRRDB url", url)
+
+            try:
+                response = requests.get(url, timeout=10)
+                response_json = response.json()
+
+                if int(response_json.get('resultsCount', 0)) > 0:
+                    first_result = response_json['results'][0]
+                    imdb_str = first_result['imdbId']
+                    if imdb_str and imdb_str == str(meta.get('imdb_id')).zfill(7) and meta.get('imdb_id') != 0:
+                        meta['scene'] = True
+                        release_name = first_result['release']
+
+                        # NFO Download Handling
+                        if not meta.get('nfo'):
+                            if first_result.get("hasNFO") == "yes":
+                                try:
+                                    release = first_result['release']
+                                    release_lower = release.lower()
+                                    nfo_url = f"https://www.srrdb.com/download/file/{release}/{base}.nfo"
+
+                                    # Define path and create directory
+                                    save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+                                    os.makedirs(save_path, exist_ok=True)
+                                    nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+
+                                    # Download the NFO file
+                                    nfo_response = requests.get(nfo_url, timeout=30)
+                                    if nfo_response.status_code == 200:
+                                        with open(nfo_file_path, 'wb') as f:
+                                            f.write(nfo_response.content)
+                                            meta['nfo'] = True
+                                            meta['auto_nfo'] = True
+                                        console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                                    else:
+                                        console.print("[yellow]NFO file not available for download.")
+                                except Exception as e:
+                                    console.print("[yellow]Failed to download NFO file:", e)
+
+                    return release_name
+
+            except Exception as e:
+                console.print(f"[yellow]SRRDB search failed: {e}")
+                return None
 
         return video, scene, imdb
 
