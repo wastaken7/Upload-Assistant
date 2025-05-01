@@ -461,7 +461,8 @@ class BBCODE:
         for comp in comparisons:
             line = []
             output = []
-            comp_sources = comp.split(']', 1)[0].replace('[comparison=', '').replace(' ', '').split(',')
+            comp_sources = comp.split(']', 1)[0].replace('[comparison=', '').strip()
+            comp_sources = re.split(r"\s*,\s*", comp_sources)
             comp_images = comp.split(']', 1)[1].replace('[/comparison]', '').replace(',', '\n').replace(' ', '\n')
             comp_images = re.findall(r"(https?:\/\/.*\.(?:png|jpg))", comp_images, flags=re.IGNORECASE)
             screens_per_line = len(comp_sources)
