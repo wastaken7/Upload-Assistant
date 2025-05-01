@@ -78,7 +78,12 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
         async with httpx.AsyncClient() as client:
             response = await client.post(post_query_url, headers=headers, json=post_data, timeout=10)
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError as e:
+                print(f"[ERROR] Failed to parse BHD response as JSON: {e}")
+                print(f"Response content: {response.text[:200]}...")
+                return meta
     except (httpx.RequestError, httpx.HTTPStatusError) as e:
         print(f"[ERROR] Failed to fetch BHD data: {e}")
         return meta
