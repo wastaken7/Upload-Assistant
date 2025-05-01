@@ -43,10 +43,16 @@ async def process_all_trackers(meta):
             if tracker_name in {"THR", "PTP"}:
                 if local_meta.get('imdb_id', 0) == 0:
                     while True:
-                        imdb_id = 0 if local_meta.get('unattended', False) else cli_ui.ask_string(
-                            f"Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to {tracker_name}:",
+                        if local_meta.get('unattended', False):
+                            local_meta['imdb_id'] = 0
+                            local_tracker_status['skipped'] = True
+                            break
+
+                        imdb_id = cli_ui.ask_string(
+                            f"Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to {tracker_name}:"
                         )
-                        if imdb_id == 0 or imdb_id is None or imdb_id.strip() == "":
+
+                        if imdb_id is None or imdb_id.strip() == "":
                             local_meta['imdb_id'] = 0
                             local_tracker_status['skipped'] = True
                             break
