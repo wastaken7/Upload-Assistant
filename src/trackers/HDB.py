@@ -693,7 +693,7 @@ class HDB():
                 f[1].close()
 
     async def get_info_from_torrent_id(self, hdb_id):
-        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = None
+        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = None
         url = "https://hdbits.org/api/torrents"
         data = {
             "username": self.username,
@@ -702,23 +702,31 @@ class HDB():
         }
 
         try:
-            response = requests.get(url, json=data)
+            response = requests.post(url, json=data)
             if response.ok:
-                response = response.json()
-                if response.get('data'):
-                    first_entry = response['data'][0]
+                response_json = response.json()
+
+                if response_json.get('status') == 0 and response_json.get('data'):
+                    first_entry = response_json['data'][0]
 
                     hdb_imdb = int(first_entry.get('imdb', {}).get('id') or 0)
                     hdb_tvdb = int(first_entry.get('tvdb', {}).get('id') or 0)
                     hdb_name = first_entry.get('name', None)
                     hdb_torrenthash = first_entry.get('hash', None)
+                    hdb_description = first_entry.get('descr')
+
+                else:
+                    status_code = response_json.get('status', 'unknown')
+                    message = response_json.get('message', 'No error message provided')
+                    console.print(f"[red]API returned error status {status_code}: {message}[/red]")
 
         except requests.exceptions.RequestException as e:
-            console.print(f"Request error: {e}")
-        except Exception:
+            console.print(f"[red]Request error: {e}[/red]")
+        except Exception as e:
+            console.print(f"[red]Unexpected error: {e}[/red]")
             console.print_exception()
 
-        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash
+        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
 
     async def search_filename(self, search_term, search_file_folder, meta):
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_id = None

@@ -482,12 +482,15 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
 
             # Use get_info_from_torrent_id function if ID is found in meta
-            imdb, tvdb_id, hdb_name, meta['ext_torrenthash'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
+            imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], meta['hdb_description'] = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
 
             if imdb or tvdb_id:
                 meta['imdb_id'] = imdb if imdb else 0
                 meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
+                from src.bbcode import BBCODE
+                bbcode = BBCODE()
+                meta['description'], meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
                 found_match = True
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
             else:
