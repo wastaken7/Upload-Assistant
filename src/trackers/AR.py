@@ -210,15 +210,17 @@ class AR():
                     console.print("[yellow]Loaded cookies:", cookie_dict)
 
                 try:
-                    async with self.session.get(f'{self.base_url}/torrents.php', timeout=5) as response:
+                    async with self.session.get(f'{self.base_url}/torrents.php', timeout=10) as response:
                         if response.status == 200:
                             console.print("[green]Session validated successfully.[/green]")
                             return True  # Session is valid
                         else:
                             console.print(f"[yellow]Session validation failed with status {response.status}, retrying...[/yellow]")
+                            return False
 
-                except aiohttp.ClientError as e:
+                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     console.print(f"[yellow]Session might be invalid: {e}. Retrying...[/yellow]")
+                    return False
 
             except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
                 console.print(f"[red]Session loading error: {e}. Closing session and retrying.[/red]")
@@ -228,7 +230,6 @@ class AR():
             retry_count += 1
 
         console.print("[red]Failed to reuse session after retries. Either try again or delete the cookie.[/red]")
-        return aiohttp
         return False
 
     def get_links(self, movie, subheading, heading_end):
