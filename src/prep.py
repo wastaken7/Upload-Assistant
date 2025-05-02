@@ -1906,7 +1906,7 @@ class Prep():
             tag = ""
 
         # Remove generic "no group" tags
-        if tag and tag[1:].lower() in ["nogroup", "nogrp"]:
+        if tag and tag[1:].lower() in ["nogroup", "nogrp", "hd.ma.5.1"]:
             tag = ""
 
         return tag
