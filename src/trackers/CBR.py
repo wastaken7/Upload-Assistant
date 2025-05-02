@@ -44,6 +44,7 @@ class CBR():
             'DISC': '1',
             'REMUX': '2',
             'ENCODE': '3',
+            'DVDRIP': '3',
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6'
