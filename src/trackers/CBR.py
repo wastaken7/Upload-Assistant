@@ -110,6 +110,23 @@ class CBR():
     async def edit_name(self, meta):
         name = meta['name'].replace('DD+ ', 'DDP').replace('DD ', 'DD').replace('AAC ', 'AAC').replace('FLAC ', 'FLAC')
 
+        # Se for Series ou Anime, remove o ano do título
+        if meta.get('category') in ['TV', 'ANIMES']:
+            year = str(meta.get('year', ''))
+            if year and year in name:
+                name = name.replace(year, '').replace(f"({year})", '').strip()
+                name = re.sub(r'\s{2,}', ' ', name)
+
+        # Remove o título AKA, exceto se for nacional
+        if meta.get('original_language') != 'pt':
+            name = name.replace(meta["aka"], '')
+
+        # Se for nacional, usa apenas o título de AKA, apagando o título estrangeiro
+        if meta.get('original_language') == 'pt' and meta.get('aka'):
+            aka_clean = meta['aka'].replace('AKA', '').strip()
+            title = meta.get('title')
+            name = name.replace(meta["aka"], '').replace(title, aka_clean).strip()
+
         cbr_name = name
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
