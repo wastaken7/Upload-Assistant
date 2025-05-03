@@ -1,3 +1,31 @@
+__version__ = "4.2.2"
+
+"""
+Changelog for version 4.2.2 (2025-05-03):
+
+## What's Changed
+* Update Service Mapping NOW by @yoyo292949158 in https://github.com/Audionut/Upload-Assistant/pull/494
+* (Add) mod queue opt-in option to ULCX tracker by @AnabolicsAnonymous in https://github.com/Audionut/Upload-Assistant/pull/491
+* Fix typo in HDB comps by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/492
+* Check lowercase names against srrdb for proper tag by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/495
+* Additional bbcode editing on PTP/HDB/BHD/BLU by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/493
+* Further bbcode conversions by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/496
+* Stop convert_comparison_to_centered to crush spaces in names by @GizmoBal in https://github.com/Audionut/Upload-Assistant/pull/500
+* TOCA remove EUR as region by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/501
+* CBR - add dvdrip by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/502
+* CBR - aka and year updats for name by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/503
+* Added validation to BHD description images
+* Fixed an issue with PTP/THR when no IMDB
+* BHD/AR graceful error handling
+* Fix PTT tracker setup
+* Added 'hd.ma.5.1' as a bad group tag to skip
+
+## New Contributors
+* @AnabolicsAnonymous made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/491
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.1...4.2.2
+"""
+
 __version__ = "4.2.1"
 
 """
