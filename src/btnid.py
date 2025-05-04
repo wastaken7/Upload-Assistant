@@ -20,12 +20,21 @@ async def get_btn_torrents(btn_api, btn_id, meta):
             50
         ]
     }
-
     headers = {"Content-Type": "application/json"}
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(post_query_url, headers=headers, json=post_data)
-        data = response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(post_query_url, headers=headers, json=post_data, timeout=10)
+            response.raise_for_status()
+            try:
+                data = response.json()
+            except ValueError as e:
+                print(f"[ERROR] Failed to parse BTN response as JSON: {e}")
+                print(f"Response content: {response.text[:200]}...")
+                return meta
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch BTN data: {e}")
+        return meta
 
     if "result" in data and "torrents" in data["result"]:
         torrents = data["result"]["torrents"]
