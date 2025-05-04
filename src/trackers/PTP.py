@@ -432,6 +432,8 @@ class PTP():
             if meta.get('mode', 'discord') == 'cli':
                 ptpTypeList = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
                 ptpType = cli_ui.ask_choice("Select the proper type", choices=ptpTypeList)
+                if ptpType == "Concert":
+                    ptpType = "Live Performance"
         return ptpType
 
     def get_codec(self, meta):
