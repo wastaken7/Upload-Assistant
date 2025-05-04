@@ -27,10 +27,9 @@ class PSS():
         self.upload_url = 'https://privatesilverscreen.cc/api/torrents/upload'
         self.search_url = 'https://privatesilverscreen.cc/api/torrents/filter'
         self.signature = '\n[center][url=https://privatesilverscreen.cc/pages/1]Please Seed[/url][/center]'
-        self.banned_groups = ['4K4U', 'AROMA', 'd3g', 'edge2020', 'EMBER', 'EVO', 'FGT', 'NeXus', 'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'nikt0', 'OEPlus', 'OFT', 'OsC', 'PYC',
-                              'QxR', 'Ralphy', 'RARBG', 'SAMPA', 'Sicario', 'Silence', 'STUTTERSHIT', 'Tigole', 'TSP', 'TSPxL', 'Will1869', 'x0r', 'YIFY', 'core', 'ZMNT',
-                              'msd', 'nikt0', 'aXXo', 'BRrip', 'CM8', 'CrEwSaDe', 'DNL', 'FaNGDiNG0', 'FRDS', 'HD2DVD', 'HDTime', 'Leffe', 'mHD', 'mSD', 'nHD', 'nSD', 'NhaNc3', 'PRODJi',
-                              'RDN', 'SANTi', 'ViSION', 'WAF', 'YTS', 'FROZEN', 'UTR', 'Grym', 'GrymLegacy', 'CK4', 'ProRes', 'MezRips', 'GalaxyRG', 'RCDiVX', 'LycanHD']
+        self.banned_groups = ['AROMA', 'd3g', 'EVO', 'FGT', 'NeXus', 'LAMA', 'MeGusta', 'RARBG', 'STUTTERSHIT', 'TSP', 'TSPxL', 'Will1869', 'x0r', 'YIFY', 'core', 'ZMNT', 'iPlanet', 'STC',
+                              'msd', 'nikt0', 'aXXo', 'BRrip', 'CM8', 'CrEwSaDe', 'DNL', 'FaNGDiNG0', 'FRDS', 'HD2DVD', 'HDTime', 'Leffe', 'mHD', 'nHD', 'nSD', 'NhaNc3', 'PRODJi', 'C4K',
+                              'RDN', 'SANTi', 'ViSION', 'WAF', 'YTS', 'FROZEN', 'UTR', 'Grym', 'GrymLegacy', 'ProRes', 'MezRips', 'GalaxyRG', 'RCDiVX', 'LycanHD', '$andra', 'AR', 'KiNGDOM']
         pass
 
     async def get_cat_id(self, category_name):
