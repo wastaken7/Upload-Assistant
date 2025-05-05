@@ -561,10 +561,8 @@ class PTP():
                     sub_langs.remove(44)
             elif v == 14:
                 trumpable.append(14)
-                if 44 not in sub_langs:
-                    sub_langs.append(44)
             elif v == "OTHER":
-                trumpable.append(14)
+                trumpable.append(15)
                 hc_sub_langs = cli_ui.ask_string("Enter language code for HC Subtitle languages")
                 for lang, subID in self.sub_lang_map.items():
                     if any(hc_sub_langs.strip() == x for x in list(lang)):
@@ -1213,18 +1211,17 @@ class PTP():
         ptp_trumpable = None
         if meta['hardcoded-subs']:
             ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-            if ptp_trumpable and 4 in ptp_trumpable and 14 not in ptp_trumpable:
-                if 44 in ptp_subtitles:
-                    ptp_subtitles.remove(44)
-                if 3 not in ptp_subtitles:
-                    ptp_subtitles.append(3)
             if ptp_trumpable and 50 in ptp_trumpable:
                 ptp_trumpable.remove(50)
                 ptp_trumpable.append(4)
             if ptp_trumpable and 14 in ptp_trumpable:
-                ptp_trumpable.append(4)
                 if 44 in ptp_subtitles:
                     ptp_subtitles.remove(44)
+            if ptp_trumpable and 15 in ptp_trumpable:
+                ptp_trumpable.remove(15)
+                ptp_trumpable.append(4)
+                if (not any(x in [3, 50] for x in ptp_subtitles)):
+                    ptp_trumpable.append(14)
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
@@ -1234,11 +1231,6 @@ class PTP():
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
-                if ptp_trumpable and 4 in ptp_trumpable and 14 not in ptp_trumpable:
-                    if 44 in ptp_subtitles:
-                        ptp_subtitles.remove(44)
-                    if 3 not in ptp_subtitles:
-                        ptp_subtitles.append(3)
 
         if meta['debug']:
             console.print("ptp_trumpable", ptp_trumpable)
