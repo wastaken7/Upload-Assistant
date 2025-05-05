@@ -1222,7 +1222,7 @@ class PTP():
                 ptp_trumpable.append(4)
                 if 44 in ptp_subtitles:
                     ptp_subtitles.remove(44)
-                if (not any(x in [3, 50] for x in ptp_subtitles)):
+                if not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
                     ptp_trumpable.append(14)
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
