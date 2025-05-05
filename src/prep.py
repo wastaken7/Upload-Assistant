@@ -356,6 +356,7 @@ class Prep():
             meta['we_checked_them_all'] = False
         if meta.get('infohash') is not None and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
             meta = await client.get_ptp_from_hash(meta)
+
         if not meta.get('image_list') and not meta.get('edit', False):
             # Reuse information from trackers with fallback
             found_match = False
@@ -435,6 +436,11 @@ class Prep():
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO", "ULCX"]
+
+                    initial_cat_check = await self.get_initial_cat(video, meta)
+                    if initial_cat_check == "TV" or meta.get('category') == "TV":
+                        console.print("[yellow]Detected TV content, skipping PTP tracker check")
+                        tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
                     for tracker_name in tracker_order:
                         if not found_match:  # Stop checking once a match is found
@@ -1299,6 +1305,48 @@ class Prep():
             console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
 
         return meta
+
+    async def get_initial_cat(self, video, meta):
+        if meta.get('category'):
+            return meta.get('category')
+
+        path_patterns = [
+            r'(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]',
+            r'(?i)[\\/](?:season\s*\d+|s\d+|complete)[\\/]',
+            r'(?i)[\\/](?:s\d{1,2}e\d{1,2}|s\d{1,2}|season\s*\d+)',
+            r'(?i)(?:complete series|tv pack|season\s*\d+\s*complete)'
+        ]
+
+        filename_patterns = [
+            r'(?i)s\d{1,2}e\d{1,2}',
+            r'(?i)\d{1,2}x\d{2}',
+            r'(?i)(?:season|series)\s*\d+',
+            r'(?i)e\d{2,3}\s*\-',
+            r'(?i)(?:complete|full)\s*(?:season|series)'
+        ]
+
+        path = meta.get('path', '')
+        uuid = meta.get('uuid', '')
+
+        for pattern in path_patterns:
+            if re.search(pattern, path):
+                return "TV"
+
+        for pattern in filename_patterns:
+            if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
+                return "TV"
+
+        try:
+            category = guessit(video.replace('1.0', ''))['type']
+            if category.lower() == "movie":
+                category = "MOVIE"  # 1
+            elif category.lower() in ("tv", "episode"):
+                category = "TV"  # 2
+            else:
+                category = "TV"
+            return category
+        except Exception:
+            return "TV"
 
     """
     Determine if disc and if so, get bdinfo
