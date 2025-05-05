@@ -1,3 +1,13 @@
+__version__ = "4.2.3.1"
+
+"""
+Changelog for version 4.2.3.1 (2025-05-05):
+
+* Fix cat call
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.3...4.2.3.1
+"""
+
 __version__ = "4.2.3"
 
 """
