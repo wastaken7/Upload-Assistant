@@ -437,7 +437,7 @@ class Prep():
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO", "ULCX"]
 
-                    initial_cat_check = await self.get_initial_cat(video, meta)
+                    initial_cat_check = await self.get_cat(video, meta)
                     if initial_cat_check == "TV" or meta.get('category') == "TV":
                         if meta['debug']:
                             console.print("[yellow]Detected TV content, skipping PTP tracker check")
@@ -1307,7 +1307,7 @@ class Prep():
 
         return meta
 
-    async def get_initial_cat(self, video, meta):
+    async def get_cat(self, video, meta):
         if meta.get('category'):
             return meta.get('category')
 
@@ -1680,17 +1680,6 @@ class Prep():
             else:
                 type = "ENCODE"
         return type
-
-    async def get_cat(self, video):
-        # if category is None:
-        category = guessit(video.replace('1.0', ''))['type']
-        if category.lower() == "movie":
-            category = "MOVIE"  # 1
-        elif category.lower() in ("tv", "episode"):
-            category = "TV"  # 2
-        else:
-            category = "MOVIE"
-        return category
 
     """
     Mediainfo/Bdinfo > meta
