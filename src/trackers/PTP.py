@@ -1220,6 +1220,8 @@ class PTP():
             if ptp_trumpable and 15 in ptp_trumpable:
                 ptp_trumpable.remove(15)
                 ptp_trumpable.append(4)
+                if 44 in ptp_subtitles:
+                    ptp_subtitles.remove(44)
                 if (not any(x in [3, 50] for x in ptp_subtitles)):
                     ptp_trumpable.append(14)
 
