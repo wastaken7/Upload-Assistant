@@ -559,7 +559,7 @@ class Prep():
             meta['original_langauge'] = meta.get('manual_language').lower()
         meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
         if meta.get('category', None) is None:
-            meta['category'] = await self.get_cat(video)
+            meta['category'] = await self.get_cat(video, meta)
         else:
             meta['category'] = meta['category'].upper()
 
