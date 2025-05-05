@@ -1,3 +1,21 @@
+__version__ = "4.2.3"
+
+"""
+Changelog for version 4.2.3 (2025-05-05):
+
+## What's Changed
+* Update PSS banned release groups by @backstab5983 in https://github.com/Audionut/Upload-Assistant/pull/504
+* Add BR streaming services by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/505
+* Fixed PTP manual concert type
+* Fixed PTP trump/subs logic (again)
+* Fixed PT that I broke when fixing PTT
+* Catch imdb str id from HUNO
+* Skip auto PTP searching if TV - does not effect manual ID or client searching
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.2...4.2.3
+"""
+
 __version__ = "4.2.2"
 
 """
