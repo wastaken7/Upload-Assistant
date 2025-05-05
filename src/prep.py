@@ -439,7 +439,8 @@ class Prep():
 
                     initial_cat_check = await self.get_initial_cat(video, meta)
                     if initial_cat_check == "TV" or meta.get('category') == "TV":
-                        console.print("[yellow]Detected TV content, skipping PTP tracker check")
+                        if meta['debug']:
+                            console.print("[yellow]Detected TV content, skipping PTP tracker check")
                         tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
                     for tracker_name in tracker_order:
