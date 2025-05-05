@@ -216,7 +216,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
         if meta['debug']:
             console.print("set TMDB ID:", meta['tmdb_id'])
     if imdb:
-        meta['imdb_id'] = imdb
+        meta['imdb_id'] = int(imdb)
         if meta['debug']:
             console.print("set IMDB ID:", meta['imdb_id'])
     if tvdb:
