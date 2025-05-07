@@ -872,20 +872,21 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if manual_frames and meta['debug']:
         console.print(f"[yellow]Using manual frames: {manual_frames}")
     ss_times = []
-    try:
-        if isinstance(manual_frames, str):
-            manual_frames_list = [int(frame.strip()) for frame in manual_frames.split(',') if frame.strip()]
-        elif isinstance(manual_frames, list):
-            manual_frames_list = [int(frame) if isinstance(frame, str) else frame for frame in manual_frames]
-        else:
-            manual_frames_list = []
-        num_screens = len(manual_frames_list)
-        if num_screens > 0:
-            ss_times = [frame / frame_rate for frame in manual_frames_list]
-    except (TypeError, ValueError) as e:
-        if meta['debug'] and manual_frames:
-            console.print(f"[red]Error processing manual frames: {e}[/red]")
-            sys.exit(1)
+    if manual_frames and not force_screenshots:
+        try:
+            if isinstance(manual_frames, str):
+                manual_frames_list = [int(frame.strip()) for frame in manual_frames.split(',') if frame.strip()]
+            elif isinstance(manual_frames, list):
+                manual_frames_list = [int(frame) if isinstance(frame, str) else frame for frame in manual_frames]
+            else:
+                manual_frames_list = []
+            num_screens = len(manual_frames_list)
+            if num_screens > 0:
+                ss_times = [frame / frame_rate for frame in manual_frames_list]
+        except (TypeError, ValueError) as e:
+            if meta['debug'] and manual_frames:
+                console.print(f"[red]Error processing manual frames: {e}[/red]")
+                sys.exit(1)
 
     if num_screens is None or num_screens <= 0:
         num_screens = screens - len(existing_images)
