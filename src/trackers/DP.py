@@ -178,16 +178,11 @@ class DP():
 
     async def edit_name(self, meta):
         dp_name = meta.get('name')
-        season = meta.get('season')
-        episode = meta.get('episode')
-        year = meta.get('year')
-        nordic = "NORDiC"
         nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
         english_languages = ['english']
         meta['dp_skipping'] = False
 
         if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
-            has_nordic_lang = False
             has_english_audio = False
             has_nordic_audio = False
 
@@ -197,7 +192,6 @@ class DP():
                         audio_lang = audio_track['language'].lower()
                         if audio_lang in nordic_languages:
                             has_nordic_audio = True
-                            has_nordic_lang = True
                             break
                         elif audio_lang in english_languages:
                             has_english_audio = True
@@ -208,92 +202,47 @@ class DP():
                     for subtitle in meta['bdinfo']['subtitles']:
                         if subtitle.lower() in nordic_languages:
                             has_nordic_subtitle = True
-                            has_nordic_lang = True
                             break
 
                     if not has_nordic_subtitle:
                         meta['dp_skipping'] = True
                         return dp_name
 
-            if has_nordic_lang:
-                if meta['category'] == "TV":
-                    if meta['tv_pack']:
-                        dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
-                    else:
-                        dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
-                else:
-                    dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
-
         elif not meta['is_disc'] == "BDMV":
-            def has_nordic(media_info_text=None):
-                if media_info_text:
-                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-
-                    has_nordic_audio = False
-                    has_english_audio = False
-                    for language in audio_section:
-                        language = language.lower().strip()
-                        if language in nordic_languages:
-                            has_nordic_audio = True
-                            return True
-                        elif language in english_languages:
-                            has_english_audio = True
-
-                    if not has_english_audio and not has_nordic_audio:
-                        has_nordic_sub = False
-                        for language in subtitle_section:
-                            language = language.lower().strip()
-                            if language in nordic_languages:
-                                has_nordic_sub = True
-                                return True
-
-                        if not has_nordic_sub:
-                            meta['dp_skipping'] = True
-                            return False
-
-                    for language in subtitle_section:
-                        language = language.lower().strip()
-                        if language in nordic_languages:
-                            return True
-                return False
-
-            def get_audio_lang(media_info_text=None):
-                if media_info_text:
-                    if meta['debug']:
-                        console.print("Checking for audio language...")
-                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    if match:
-                        return match.group(1).upper()
-                return ""
-
-            def get_subtitle_lang(media_info_text=None):
-                if media_info_text:
-                    if meta['debug']:
-                        console.print("Checking for subtitle language...")
-                    match = re.search(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    if match:
-                        return match.group(1).upper()
-                return ""
-
+            media_info_text = None
             try:
                 media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
                 with open(media_info_path, 'r', encoding='utf-8') as f:
                     media_info_text = f.read()
-
-                if has_nordic(media_info_text=media_info_text):
-                    audio_lang = get_audio_lang(media_info_text=media_info_text)
-                    subtitle_lang = get_subtitle_lang(media_info_text=media_info_text)
-                    if audio_lang or subtitle_lang:
-                        if meta['category'] == "TV":
-                            if meta['tv_pack']:
-                                dp_name = dp_name.replace(f"{season}", f"{season} {nordic}")
-                            else:
-                                dp_name = dp_name.replace(f"{season}{episode}", f"{season}{episode} {nordic}")
-                        else:
-                            dp_name = dp_name.replace(f"{year}", f"{year} {nordic}")
             except (FileNotFoundError, KeyError) as e:
                 print(f"Error processing MEDIAINFO.txt: {e}")
+
+            if media_info_text:
+                audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+                subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
+
+                has_nordic_audio = False
+                has_english_audio = False
+                for language in audio_section:
+                    language = language.lower().strip()
+                    if language in nordic_languages:
+                        has_nordic_audio = True
+                        break
+                    elif language in english_languages:
+                        has_english_audio = True
+                        break
+
+                if not has_english_audio and not has_nordic_audio:
+                    has_nordic_sub = False
+                    for language in subtitle_section:
+                        language = language.lower().strip()
+                        if language in nordic_languages:
+                            has_nordic_sub = True
+                            break
+
+                    if not has_nordic_sub:
+                        meta['dp_skipping'] = True
+                        return dp_name
 
         return dp_name
 
