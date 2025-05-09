@@ -156,6 +156,12 @@ class COMMON():
                 else:
                     descfile.write("[/center]\n\n")
 
+            try:
+                if meta.get('tonemapped', False) and self.config['DEFAULT'].get('tonemapped_header', None):
+                    await descfile.write(self.config['DEFAULT'].get('tonemapped_header'))
+            except Exception as e:
+                console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+
             bbcode = BBCODE()
             discs = meta.get('discs', [])
             filelist = meta.get('filelist', [])

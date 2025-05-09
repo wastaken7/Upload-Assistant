@@ -105,6 +105,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
 
     if tone_map and "HDR" in meta['hdr']:
         hdr_tonemap = True
+        meta['tonemapped'] = True
     else:
         hdr_tonemap = False
 
@@ -903,6 +904,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     if tone_map and "HDR" in meta['hdr']:
         hdr_tonemap = True
+        meta['tonemapped'] = True
     else:
         hdr_tonemap = False
 

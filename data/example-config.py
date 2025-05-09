@@ -82,6 +82,9 @@ config = {
         "algorithm": "mobius",
         "desat": "10.0",
 
+        # Add header above screenshots in description when screens have been tonemapped
+        # "tonemapped_header": "[center][code] Screenshots have been tonemapped for reference [/code][/center]",
+
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
         # description, skip creating and uploading any further screenshots.
@@ -104,7 +107,7 @@ config = {
         # threads that self terminate with time), thus while this value sets the number of threads
         # used for each optimization worker, the total amount of threads spawned equals:
         # (8) + threads * ('process_limit' OR 'screens')
-        # Defaults to 1 if not set. Uncomment line before and set a value
+        # Defaults to 1 if not set. Uncomment line below and set a value
         # "threads": "1",
 
         # Providing the option to change the size of the screenshot thumbnails where supported.
