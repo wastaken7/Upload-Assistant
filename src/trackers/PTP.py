@@ -1270,7 +1270,7 @@ class PTP():
 
         if groupID is None:  # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
-            if data["imdb"] == "0":
+            if data["imdb_id"] == 0:
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
                 tinfo = await self.get_torrent_info(meta.get("imdb"), meta)
