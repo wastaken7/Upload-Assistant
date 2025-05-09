@@ -158,7 +158,7 @@ class COMMON():
 
             try:
                 if meta.get('tonemapped', False) and self.config['DEFAULT'].get('tonemapped_header', None):
-                    await descfile.write(self.config['DEFAULT'].get('tonemapped_header'))
+                    descfile.write(self.config['DEFAULT'].get('tonemapped_header'))
             except Exception as e:
                 console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
 
