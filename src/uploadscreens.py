@@ -1,5 +1,4 @@
 from src.console import console
-from data.config import config
 import os
 import pyimgbox
 import asyncio
@@ -11,6 +10,13 @@ import re
 import gc
 import json
 from concurrent.futures import ThreadPoolExecutor
+
+try:
+    from data.config import config
+except Exception:
+    print("[red]Error: Unable to import config. Ensure the config file is in the correct location.[/red]")
+    print("[red]Follow the setup instructions: https://github.com/Audionut/Upload-Assistant")
+    exit(1)
 
 
 def upload_image_task(args):
