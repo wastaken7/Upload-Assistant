@@ -775,7 +775,8 @@ class Prep():
                     meta.get('search_year'),
                     filename,
                     debug=meta.get('debug', False),
-                    mode=meta.get('mode', 'discord')
+                    mode=meta.get('mode', 'discord'),
+                    category_preference=meta.get('category')
                 ),
                 search_tvmaze(
                     filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tvdb_id', 0),
@@ -1011,7 +1012,8 @@ class Prep():
                 meta.get('search_year'),
                 filename,
                 debug=meta.get('debug', False),
-                mode=meta.get('mode', 'discord')
+                mode=meta.get('mode', 'discord'),
+                category_preference=meta.get('category')
             )
 
             meta['category'] = category
