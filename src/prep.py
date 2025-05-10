@@ -1201,6 +1201,12 @@ class Prep():
                         meta['season'] = "S" + str(meta['season_int']).zfill(2)
                         meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
 
+        if meta['debug']:
+            console.print(f"[yellow]tvdb series name: {meta.get('tvdb_episode_data').get('series_name')}")
+        if tvdb_api and tvdb_token:
+            if meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
+                meta['title'] = meta.get('tvdb_episode_data').get('series_name')
+
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
         meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
