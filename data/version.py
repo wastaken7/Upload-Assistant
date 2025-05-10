@@ -1,3 +1,23 @@
+__version__ = "4.2.4"
+
+"""
+Changelog for version 4.2.4 (2025-05-10):
+
+## What's Changed
+* Update PTT.py by @btTeddy in https://github.com/Audionut/Upload-Assistant/pull/511
+* Update OTW banned release groups by @backstab5983 in https://github.com/Audionut/Upload-Assistant/pull/512
+* tmdb from imdb updates by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/515
+* Use TVDB title by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/516
+* HDB descriptions by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/498
+* Fixed manual frame code changes breaking packed images handling
+* DP - removed nordic from name per their request
+* Fixed PTP groupID not being set in meta
+* Added a config option for screenshot header when tonemapping
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.3.1...4.2.4
+"""
+
 __version__ = "4.2.3.1"
 
 """
