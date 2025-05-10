@@ -1,5 +1,5 @@
 from src.console import console
-from src.imdb import get_imdb_aka_api, get_imdb_info_api
+from src.imdb import get_imdb_aka_api, get_imdb_info_api, search_imdb
 from src.args import Args
 from data.config import config
 import re
@@ -308,6 +308,24 @@ async def get_tmdb_id(filename, search_year, meta, category, untouched_filename=
 
         # No match found, prompt user if in CLI mode
         console.print(f"[bold red]Unable to find TMDb match for {filename}[/bold red]")
+
+        meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
+        console.print(f"[yellow]IMDB ID: {meta['imdb_id']}[/yellow]")
+        if meta['imdb_id'] != 0:
+            category, tmdb_id, original_language = await get_tmdb_from_imdb(
+                meta['imdb_id'],
+                meta.get('tvdb_id'),
+                meta.get('search_year'),
+                filename,
+                debug=meta.get('debug', False),
+                mode=meta.get('mode', 'discord'),
+                category_preference=meta.get('category')
+            )
+            if tmdb_id != 0:
+                meta['tmdb_id'] = tmdb_id
+                meta['category'] = category
+                meta['original_language'] = original_language
+                return meta
 
         if meta.get('mode', 'discord') == 'cli':
             tmdb_id = cli_ui.ask_string("Please enter TMDb ID in this format: tv/12345 or movie/12345")

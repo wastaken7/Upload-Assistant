@@ -1,4 +1,3 @@
-from imdb import Cinemagoer
 from src.console import console
 import json
 import httpx
@@ -297,13 +296,84 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
 
 
 async def search_imdb(filename, search_year):
-    imdbID = '0'
-    ia = Cinemagoer()
-    search = ia.search_movie(filename)
-    for movie in search:
-        if filename in movie.get('title', ''):
-            if movie.get('year') == search_year:
-                imdbID = int(str(movie.movieID).replace('tt', '').strip())
-        else:
-            imdbID = 0
+    import re
+    filename = re.sub(r'\s+[A-Z]{2}$', '', filename.strip())
+    console.print(f"[yellow]Searching IMDb (GraphQL) for {filename} and year {search_year}...[/yellow]")
+    imdbID = 0
+    url = "https://api.graphql.imdb.com/"
+    query = {
+        "query": f"""
+            {{
+                advancedTitleSearch(
+                    first: 10,
+                    constraints: {{ titleTextConstraint: {{ searchTerm: "{filename}" }} }}
+                ) {{
+                    total
+                    edges {{
+                        node {{
+                            title {{
+                                id
+                                titleText {{
+                                    text
+                                }}
+                                titleType {{
+                                    text
+                                }}
+                                releaseYear {{
+                                    year
+                                }}
+                                plot {{
+                                    plotText {{
+                                    plainText
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        """
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=query, headers={"Content-Type": "application/json"}, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+    except Exception as e:
+        console.print(f"[red]IMDb GraphQL API error: {e}[/red]")
+        return 0
+
+    # Parse results
+    results = data.get("data", {}).get("advancedTitleSearch", {}).get("edges", [])
+    console.print(f"[yellow]Found {len(results)} results...[/yellow]")
+    for idx, edge in enumerate(results):
+        node = edge.get("node", {})
+        title = node.get("title", {})
+        title_text = title.get("titleText", {}).get("text", "")
+        release_year_obj = title.get("releaseYear")
+        year = release_year_obj.get("year", None) if isinstance(release_year_obj, dict) else None
+        imdb_id = title.get("id", "")
+        title_type = title.get("titleType", {}).get("text", "")
+        plot = title.get("plot", {}).get("plotText", {}).get("plainText", "")
+        console.print(f"[cyan]Result {idx+1}: {title_text} - ({year}) - {imdb_id} - Type: {title_type}[/cyan]")
+        if plot:
+            console.print(f"[green]Plot: {plot}[/green]")
+
+    if results:
+        console.print("[yellow]Enter the number of the correct entry, or 0 for none:[/yellow]")
+        try:
+            user_input = input("> ").strip()
+            if user_input.isdigit():
+                selection = int(user_input)
+                if 1 <= selection <= len(results):
+                    selected = results[selection - 1]
+                    imdb_id = selected.get("node", {}).get("title", {}).get("id", "")
+                    if imdb_id:
+                        imdbID = int(imdb_id.replace('tt', '').strip())
+                        return imdbID
+                # If 0 or invalid, fall through to return imdbID = 0
+        except Exception as e:
+            console.print(f"[red]Error reading input: {e}[/red]")
+
     return imdbID
