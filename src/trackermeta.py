@@ -491,7 +491,6 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
                 meta['description'], meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
-                console.print(f"image_list: {meta['image_list']}")
                 found_match = True
                 if meta.get('image_list'):
                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
