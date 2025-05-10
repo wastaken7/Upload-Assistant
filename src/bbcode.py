@@ -114,16 +114,18 @@ class BBCODE:
                 desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
                 continue
 
+            raw_url = img_url
+            if "thumbs2.imgbox.com" in img_url:
+                raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com")
+                raw_url = raw_url.replace("_t.png", "_o.png")
+
             image_dict = {
                 'img_url': img_url,
-                'raw_url': img_url,
+                'raw_url': raw_url,
                 'web_url': web_url
             }
             imagelist.append(image_dict)
             desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
-
-        description = desc.strip()
-        return description, imagelist
 
     def clean_bhd_description(self, description, meta):
         # Unescape html

@@ -477,6 +477,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             found_match = False
 
     elif tracker_name == "HDB":
+        from src.bbcode import BBCODE
+        bbcode = BBCODE()
         if meta.get('hdb') is not None:
             meta[manual_key] = meta[tracker_key]
             console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
@@ -488,10 +490,14 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 meta['imdb_id'] = imdb if imdb else 0
                 meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
-                from src.bbcode import BBCODE
-                bbcode = BBCODE()
                 meta['description'], meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
+                console.print(f"image_list: {meta['image_list']}")
                 found_match = True
+                if meta.get('image_list'):
+                    valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                    if valid_images:
+                        meta['image_list'] = valid_images
+                        await handle_image_list(meta, tracker_name, valid_images)
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta['tvdb_id']}, HDB Name: {meta['hdb_name']}[/green]")
             else:
                 console.print(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
@@ -500,7 +506,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             console.print("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
 
             # Use search_filename function if ID is not found in meta
-            imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
+            imdb, tvdb_id, hdb_name, meta['ext_torrenthash'], meta['hdb_description'], tracker_id = await tracker_instance.search_filename(search_term, search_file_folder, meta)
             meta['hdb_name'] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id
@@ -513,6 +519,33 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         meta['imdb_id'] = imdb if imdb else meta.get('imdb_id')
                         meta['tvdb_id'] = tvdb_id if tvdb_id else meta.get('tvdb_id')
                         found_match = True
+                        if meta['hdb_description'] and len(meta['hdb_description']) > 0:
+                            desc, meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
+                            console.print("[bold green]Successfully grabbed description from HDB")
+                            console.print(f"Description content:\n{desc[:1000]}...", markup=False)
+                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+
+                            if edit_choice.lower() == 'e':
+                                edited_description = click.edit(desc)
+                                if edited_description:
+                                    desc = edited_description.strip()
+                                    meta['description'] = desc
+                                    meta['saved_description'] = True
+                                console.print(f"[green]Final description after editing:[/green] {desc}", markup=False)
+                            elif edit_choice.lower() == 'd':
+                                desc = None
+                                meta['hdb_description'] = ""
+                                console.print("[yellow]Description discarded.[/yellow]")
+                            else:
+                                console.print("[green]Keeping the original description.[/green]")
+                                meta['description'] = desc
+                                meta['saved_description'] = True
+                            if meta.get('image_list'):
+                                valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                                if valid_images:
+                                    meta['image_list'] = valid_images
+                                    await handle_image_list(meta, tracker_name, valid_images)
                     else:
                         console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
                         meta[tracker_key] = None
