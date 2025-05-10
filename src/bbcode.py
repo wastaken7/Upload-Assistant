@@ -95,10 +95,6 @@ class BBCODE:
         # Double-check for any self-closing URL tags that might have been missed
         desc = re.sub(r"\[url=https?:\/\/[^\]]*hdbits\.org[^\]]*\]\[\/url\]", "", desc, flags=re.IGNORECASE)
 
-        # Remove Images in IMG tags (since we've already extracted the HDBits ones)
-        desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
-
         # Remove empty comparison section headers and center tags
         desc = re.sub(r"\[center\]\s*\[b\].*?(Comparison|vs).*?\[\/b\][\s\S]*?\[\/center\]",
                       "", desc, flags=re.IGNORECASE)
@@ -109,21 +105,22 @@ class BBCODE:
         # Clean up multiple consecutive newlines
         desc = re.sub(r"\n{3,}", "\n\n", desc)
 
-        # Extract loose images and add to imagelist as dictionaries, skipping HDBits ones
-        loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", desc, flags=re.IGNORECASE)
-        for img_url in loose_images:
+        # Extract images wrapped in URL tags (e.g., [url=https://imgbox.com/xxx][img]https://thumbs.imgbox.com/xxx[/img][/url])
+        url_img_pattern = r"\[url=(https?:\/\/[^\]]+)\]\[img\](https?:\/\/[^\]]+)\[\/img\]\[\/url\]"
+        url_img_matches = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
+        for web_url, img_url in url_img_matches:
             # Skip HDBits images
-            if "hdbits.org" in img_url.lower():
-                desc = desc.replace(img_url, '')
+            if "hdbits.org" in web_url.lower() or "hdbits.org" in img_url.lower():
+                desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
                 continue
 
             image_dict = {
                 'img_url': img_url,
                 'raw_url': img_url,
-                'web_url': img_url
+                'web_url': web_url
             }
             imagelist.append(image_dict)
-            desc = desc.replace(img_url, '')
+            desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
 
         description = desc.strip()
         return description, imagelist
