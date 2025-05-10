@@ -688,8 +688,8 @@ class HDB():
 
                     bbcode = formatted_bbcode
 
-                if meta['debug']:
-                    console.print(f"[cyan]Response formatted with {num_groups} images per line")
+                    if meta['debug']:
+                        console.print(f"[cyan]Response formatted with {num_groups} images per line")
 
                 return bbcode
             else:
