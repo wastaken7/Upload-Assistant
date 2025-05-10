@@ -1,3 +1,17 @@
+__version__ = "4.2.4.1"
+
+"""
+Changelog for version 4.2.4.1 (2025-05-10):
+
+## What's Changed
+* Make search imdb not useless by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/517
+* Remove brackets from TVDB titles
+* Fix PTP adding group.
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.4...4.2.4.1
+"""
+
 __version__ = "4.2.4"
 
 """
