@@ -1203,7 +1203,9 @@ class Prep():
 
         if tvdb_api and tvdb_token:
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
-                meta['title'] = meta.get('tvdb_episode_data').get('series_name')
+                series_name = meta.get('tvdb_episode_data').get('series_name', '')
+                series_name = series_name.replace('(', '').replace(')', '').strip()
+                meta['title'] = series_name
                 if meta['debug']:
                     console.print(f"[yellow]tvdb series name: {meta.get('tvdb_episode_data').get('series_name')}")
 
