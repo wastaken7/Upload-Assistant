@@ -15,6 +15,7 @@ from src.metadata_searching import all_ids, imdb_tvdb, imdb_tmdb, get_tv_data, i
 from src.apply_overrides import get_source_override
 from src.is_scene import is_scene
 from src.audio import get_audio_languages, get_audio_v2
+from src.edition import get_edition
 
 try:
     import traceback
@@ -616,7 +617,7 @@ class Prep():
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await self.get_video_encode(mi, meta['type'], bdinfo)
         if meta.get('no_edition') is False:
-            meta['edition'], meta['repack'] = await self.get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
+            meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
             if "REPACK" in meta.get('edition', ""):
                 meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
