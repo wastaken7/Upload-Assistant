@@ -3,14 +3,13 @@ from src.console import console
 from src.exceptions import *  # noqa: F403
 from src.clients import Clients
 from data.config import config
-from src.trackersetup import tracker_class_map
 from src.tvmaze import search_tvmaze, get_tvmaze_episode_data
 from src.imdb import get_imdb_info_api, search_imdb
 from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id, get_episode_details
 from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
-from src.get_tracker_data import get_tracker_data
+from src.get_tracker_data import get_tracker_data, ping_unit3d
 from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes, get_tvdb_series_data
 from src.bluray_com import get_bluray_releases
 
@@ -359,86 +358,9 @@ class Prep():
             console.print("Skipping existing search as meta already populated")
 
         # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
-        ping_unit3d = self.config['DEFAULT'].get('ping_unit3d', False)
-        if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV" and ping_unit3d and not meta.get('edit', False):
-            from src.trackers.COMMON import COMMON
-            common = COMMON(config)
-
-            # Prioritize trackers in this order
-            tracker_order = ["BLU", "AITHER", "ULCX", "LST", "OE"]
-
-            # Check if we have stored torrent comments
-            if meta.get('torrent_comments'):
-                # Try to extract tracker IDs from stored comments
-                for tracker_name in tracker_order:
-                    # Skip if we already have region and distributor
-                    if meta.get('region') and meta.get('distributor'):
-                        if meta.get('debug', False):
-                            console.print(f"[green]Both region ({meta['region']}) and distributor ({meta['distributor']}) found - no need to check more trackers[/green]")
-                        break
-
-                    tracker_id = None
-                    tracker_key = tracker_name.lower()
-                    # Check each stored comment for matching tracker URL
-                    for comment_data in meta.get('torrent_comments', []):
-                        comment = comment_data.get('comment', '')
-
-                        if "blutopia.cc" in comment and tracker_name == "BLU":
-                            match = re.search(r'/(\d+)$', comment)
-                            if match:
-                                tracker_id = match.group(1)
-                                meta[tracker_key] = tracker_id
-                                break
-                        elif "aither.cc" in comment and tracker_name == "AITHER":
-                            match = re.search(r'/(\d+)$', comment)
-                            if match:
-                                tracker_id = match.group(1)
-                                meta[tracker_key] = tracker_id
-                                break
-                        elif "lst.gg" in comment and tracker_name == "LST":
-                            match = re.search(r'/(\d+)$', comment)
-                            if match:
-                                tracker_id = match.group(1)
-                                meta[tracker_key] = tracker_id
-                                break
-                        elif "onlyencodes.cc" in comment and tracker_name == "OE":
-                            match = re.search(r'/(\d+)$', comment)
-                            if match:
-                                tracker_id = match.group(1)
-                                meta[tracker_key] = tracker_id
-                                break
-                        elif "https://upload.cx" in comment and tracker_name == "ULCX":
-                            match = re.search(r'/(\d+)$', comment)
-                            if match:
-                                tracker_id = match.group(1)
-                                meta[tracker_key] = tracker_id
-                                break
-
-                    # If we found a tracker ID, try to get region/distributor data
-                    if tracker_id:
-                        missing_info = []
-                        if not meta.get('region'):
-                            missing_info.append("region")
-                        if not meta.get('distributor'):
-                            missing_info.append("distributor")
-
-                        if meta.get('debug', False):
-                            console.print(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
-
-                        tracker_instance = tracker_class_map[tracker_name](config=config)
-
-                        # Store initial state to detect changes
-                        had_region = bool(meta.get('region'))
-                        had_distributor = bool(meta.get('distributor'))
-                        await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, tracker_id)
-
-                        if meta.get('region') and not had_region:
-                            if meta.get('debug', False):
-                                console.print(f"[green]Found region '{meta['region']}' from {tracker_name}[/green]")
-
-                        if meta.get('distributor') and not had_distributor:
-                            if meta.get('debug', False):
-                                console.print(f"[green]Found distributor '{meta['distributor']}' from {tracker_name}[/green]")
+        ping_unit3d_config = self.config['DEFAULT'].get('ping_unit3d', False)
+        if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV" and ping_unit3d_config and not meta.get('edit', False):
+            await ping_unit3d(meta)
 
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides and (meta.get('imdb_id') != 0 or meta.get('tvdb_id') != 0):

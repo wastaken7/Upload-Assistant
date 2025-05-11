@@ -111,3 +111,85 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
 
     else:
         console.print("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
+
+
+async def ping_unit3d(meta):
+    from src.trackers.COMMON import COMMON
+    common = COMMON(config)
+    import re
+
+    # Prioritize trackers in this order
+    tracker_order = ["BLU", "AITHER", "ULCX", "LST", "OE"]
+
+    # Check if we have stored torrent comments
+    if meta.get('torrent_comments'):
+        # Try to extract tracker IDs from stored comments
+        for tracker_name in tracker_order:
+            # Skip if we already have region and distributor
+            if meta.get('region') and meta.get('distributor'):
+                if meta.get('debug', False):
+                    console.print(f"[green]Both region ({meta['region']}) and distributor ({meta['distributor']}) found - no need to check more trackers[/green]")
+                break
+
+            tracker_id = None
+            tracker_key = tracker_name.lower()
+            # Check each stored comment for matching tracker URL
+            for comment_data in meta.get('torrent_comments', []):
+                comment = comment_data.get('comment', '')
+
+                if "blutopia.cc" in comment and tracker_name == "BLU":
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        tracker_id = match.group(1)
+                        meta[tracker_key] = tracker_id
+                        break
+                elif "aither.cc" in comment and tracker_name == "AITHER":
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        tracker_id = match.group(1)
+                        meta[tracker_key] = tracker_id
+                        break
+                elif "lst.gg" in comment and tracker_name == "LST":
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        tracker_id = match.group(1)
+                        meta[tracker_key] = tracker_id
+                        break
+                elif "onlyencodes.cc" in comment and tracker_name == "OE":
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        tracker_id = match.group(1)
+                        meta[tracker_key] = tracker_id
+                        break
+                elif "https://upload.cx" in comment and tracker_name == "ULCX":
+                    match = re.search(r'/(\d+)$', comment)
+                    if match:
+                        tracker_id = match.group(1)
+                        meta[tracker_key] = tracker_id
+                        break
+
+            # If we found a tracker ID, try to get region/distributor data
+            if tracker_id:
+                missing_info = []
+                if not meta.get('region'):
+                    missing_info.append("region")
+                if not meta.get('distributor'):
+                    missing_info.append("distributor")
+
+                if meta.get('debug', False):
+                    console.print(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
+
+                tracker_instance = tracker_class_map[tracker_name](config=config)
+
+                # Store initial state to detect changes
+                had_region = bool(meta.get('region'))
+                had_distributor = bool(meta.get('distributor'))
+                await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, tracker_id)
+
+                if meta.get('region') and not had_region:
+                    if meta.get('debug', False):
+                        console.print(f"[green]Found region '{meta['region']}' from {tracker_name}[/green]")
+
+                if meta.get('distributor') and not had_distributor:
+                    if meta.get('debug', False):
+                        console.print(f"[green]Found distributor '{meta['distributor']}' from {tracker_name}[/green]")
