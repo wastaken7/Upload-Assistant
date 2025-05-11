@@ -16,6 +16,7 @@ from src.apply_overrides import get_source_override
 from src.is_scene import is_scene
 from src.audio import get_audio_languages, get_audio_v2
 from src.edition import get_edition
+from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr
 
 try:
     import traceback
@@ -608,14 +609,14 @@ class Prep():
         elif meta.get('service'):
             services = await get_service(get_services_only=True)
             meta['service_longname'] = max((k for k, v in services.items() if v == meta['service']), key=len, default=meta['service'])
-        meta['uhd'] = await self.get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
-        meta['hdr'] = await self.get_hdr(mi, bdinfo)
+        meta['uhd'] = await get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
+        meta['hdr'] = await get_hdr(mi, bdinfo)
         meta['distributor'] = await get_distributor(meta['distributor'])
         if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
             meta['region'] = await get_region(bdinfo, meta.get('region', None))
-            meta['video_codec'] = await self.get_video_codec(bdinfo)
+            meta['video_codec'] = await get_video_codec(bdinfo)
         else:
-            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await self.get_video_encode(mi, meta['type'], bdinfo)
+            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await get_video_encode(mi, meta['type'], bdinfo)
         if meta.get('no_edition') is False:
             meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
             if "REPACK" in meta.get('edition', ""):
@@ -1007,217 +1008,6 @@ class Prep():
             source = "BluRay"
 
         return source, type
-
-    async def get_uhd(self, type, guess, resolution, path):
-        try:
-            source = guess['Source']
-            other = guess['Other']
-        except Exception:
-            source = ""
-            other = ""
-        uhd = ""
-        if source == 'Blu-ray' and other == "Ultra HD" or source == "Ultra HD Blu-ray":
-            uhd = "UHD"
-        elif "UHD" in path:
-            uhd = "UHD"
-        elif type in ("DISC", "REMUX", "ENCODE", "WEBRIP"):
-            uhd = ""
-
-        if type in ("DISC", "REMUX", "ENCODE") and resolution == "2160p":
-            uhd = "UHD"
-
-        return uhd
-
-    async def get_hdr(self, mi, bdinfo):
-        hdr = ""
-        dv = ""
-        if bdinfo is not None:  # Disks
-            hdr_mi = bdinfo['video'][0]['hdr_dv']
-            if "HDR10+" in hdr_mi:
-                hdr = "HDR10+"
-            elif hdr_mi == "HDR10":
-                hdr = "HDR"
-            try:
-                if bdinfo['video'][1]['hdr_dv'] == "Dolby Vision":
-                    dv = "DV"
-            except Exception:
-                pass
-        else:
-            video_track = mi['media']['track'][1]
-            try:
-                hdr_mi = video_track['colour_primaries']
-                if hdr_mi in ("BT.2020", "REC.2020"):
-                    hdr = ""
-                    hdr_fields = [
-                        video_track.get('HDR_Format_Compatibility', ''),
-                        video_track.get('HDR_Format_String', ''),
-                        video_track.get('HDR_Format', '')
-                    ]
-                    hdr_format_string = next((v for v in hdr_fields if isinstance(v, str) and v.strip()), "")
-                    if "HDR10+" in hdr_format_string:
-                        hdr = "HDR10+"
-                    elif "HDR10" in hdr_format_string:
-                        hdr = "HDR"
-                    elif "SMPTE ST 2094 App 4" in hdr_format_string:
-                        hdr = "HDR"
-                    if hdr_format_string and "HLG" in hdr_format_string:
-                        hdr = f"{hdr} HLG"
-                    if hdr_format_string == "" and "PQ" in (video_track.get('transfer_characteristics'), video_track.get('transfer_characteristics_Original', None)):
-                        hdr = "PQ10"
-                    transfer_characteristics = video_track.get('transfer_characteristics_Original', None)
-                    if "HLG" in transfer_characteristics:
-                        hdr = "HLG"
-                    if hdr != "HLG" and "BT.2020 (10-bit)" in transfer_characteristics:
-                        hdr = "WCG"
-            except Exception:
-                pass
-
-            try:
-                if "Dolby Vision" in video_track.get('HDR_Format', '') or "Dolby Vision" in video_track.get('HDR_Format_String', ''):
-                    dv = "DV"
-            except Exception:
-                pass
-
-        hdr = f"{dv} {hdr}".strip()
-        return hdr
-
-    async def get_video_codec(self, bdinfo):
-        codecs = {
-            "MPEG-2 Video": "MPEG-2",
-            "MPEG-4 AVC Video": "AVC",
-            "MPEG-H HEVC Video": "HEVC",
-            "VC-1 Video": "VC-1"
-        }
-        codec = codecs.get(bdinfo['video'][0]['codec'], "")
-        return codec
-
-    async def get_video_encode(self, mi, type, bdinfo):
-        video_encode = ""
-        codec = ""
-        bit_depth = '0'
-        has_encode_settings = False
-        try:
-            format = mi['media']['track'][1]['Format']
-            format_profile = mi['media']['track'][1].get('Format_Profile', format)
-            if mi['media']['track'][1].get('Encoded_Library_Settings', None):
-                has_encode_settings = True
-            bit_depth = mi['media']['track'][1].get('BitDepth', '0')
-        except Exception:
-            format = bdinfo['video'][0]['codec']
-            format_profile = bdinfo['video'][0]['profile']
-        if type in ("ENCODE", "WEBRIP", "DVDRIP"):  # ENCODE or WEBRIP or DVDRIP
-            if format == 'AVC':
-                codec = 'x264'
-            elif format == 'HEVC':
-                codec = 'x265'
-            elif format == 'AV1':
-                codec = 'AV1'
-        elif type in ('WEBDL', 'HDTV'):  # WEB-DL
-            if format == 'AVC':
-                codec = 'H.264'
-            elif format == 'HEVC':
-                codec = 'H.265'
-            elif format == 'AV1':
-                codec = 'AV1'
-
-            if type == 'HDTV' and has_encode_settings is True:
-                codec = codec.replace('H.', 'x')
-        elif format == "VP9":
-            codec = "VP9"
-        elif format == "VC-1":
-            codec = "VC-1"
-        if format_profile == 'High 10':
-            profile = "Hi10P"
-        else:
-            profile = ""
-        video_encode = f"{profile} {codec}"
-        video_codec = format
-        if video_codec == "MPEG Video":
-            video_codec = f"MPEG-{mi['media']['track'][1].get('Format_Version')}"
-        return video_encode, video_codec, has_encode_settings, bit_depth
-
-    async def get_edition(self, video, bdinfo, filelist, manual_edition, meta):
-        if video.lower().startswith('dc'):
-            video = video.replace('dc', '', 1)
-
-        guess = guessit(video)
-        tag = guess.get('release_group', 'NOGROUP')
-        repack = ""
-        edition = ""
-
-        if bdinfo is not None:
-            try:
-                edition = guessit(bdinfo['label'])['edition']
-            except Exception as e:
-                if meta['debug']:
-                    print(f"BDInfo Edition Guess Error: {e}")
-                edition = ""
-        else:
-            try:
-                edition = guess.get('edition', "")
-            except Exception as e:
-                if meta['debug']:
-                    print(f"Video Edition Guess Error: {e}")
-                edition = ""
-
-        if isinstance(edition, list):
-            edition = " ".join(edition)
-
-        if len(filelist) == 1:
-            video = os.path.basename(video)
-
-        video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
-
-        if "OPEN MATTE" in video:
-            edition = edition + " Open Matte"
-
-        if manual_edition:
-            if isinstance(manual_edition, list):
-                manual_edition = " ".join(manual_edition)
-            edition = str(manual_edition)
-        edition = edition.replace(",", " ")
-
-        # print(f"Edition After Manual Edition: {edition}")
-
-        if "REPACK" in (video or edition.upper()) or "V2" in video:
-            repack = "REPACK"
-        if "REPACK2" in (video or edition.upper()) or "V3" in video:
-            repack = "REPACK2"
-        if "REPACK3" in (video or edition.upper()) or "V4" in video:
-            repack = "REPACK3"
-        if "PROPER" in (video or edition.upper()):
-            repack = "PROPER"
-        if "PROPER2" in (video or edition.upper()):
-            repack = "PROPER2"
-        if "PROPER3" in (video or edition.upper()):
-            repack = "PROPER3"
-        if "RERIP" in (video or edition.upper()):
-            repack = "RERIP"
-
-        # print(f"Repack after Checks: {repack}")
-
-        # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
-        if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'proper2', 'proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
-            edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
-
-        if edition:
-            from src.region import get_distributor
-            distributors = await get_distributor(edition)
-
-            bad = ['internal', 'limited', 'retail']
-
-            if distributors:
-                bad.append(distributors.lower())
-                meta['distributor'] = distributors
-
-            if any(term.lower() in edition.lower() for term in bad):
-                edition = re.sub(r'\b(?:' + '|'.join(bad) + r')\b', '', edition, flags=re.IGNORECASE).strip()
-                # Clean up extra spaces
-                while '  ' in edition:
-                    edition = edition.replace('  ', ' ')
-            if edition != "":
-                console.print(f"Final Edition: {edition}")
-        return edition, repack
 
     async def stream_optimized(self, stream_opt):
         if stream_opt is True:

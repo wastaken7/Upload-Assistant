@@ -4,7 +4,7 @@ import re
 from src.console import console
 
 
-async def get_edition(self, video, bdinfo, filelist, manual_edition, meta):
+async def get_edition(video, bdinfo, filelist, manual_edition, meta):
     if video.lower().startswith('dc'):
         video = video.replace('dc', '', 1)
 
