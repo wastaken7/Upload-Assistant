@@ -362,8 +362,8 @@ class Prep():
                 # Check if a specific tracker is already set in meta
                 tracker_keys = {
                     'ptp': 'PTP',
-                    'bhd': 'BHD',
                     'btn': 'BTN',
+                    'bhd': 'BHD',
                     'huno': 'HUNO',
                     'hdb': 'HDB',
                     'blu': 'BLU',
@@ -373,7 +373,7 @@ class Prep():
                     'ulcx': 'ULCX',
                 }
 
-                specific_tracker = next((tracker_keys[key] for key in tracker_keys if meta.get(key) is not None), None)
+                specific_tracker = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
 
                 async def process_tracker(tracker_name, meta, only_id):
                     nonlocal found_match
@@ -397,14 +397,15 @@ class Prep():
                     return meta
 
                 # If a specific tracker is found, process only that tracker
-                if specific_tracker:
-                    if specific_tracker == "BTN":
+                for tracker in specific_tracker:
+                    if tracker == "BTN":
                         btn_id = meta.get('btn')
                         btn_api = config['DEFAULT'].get('btn_api')
                         await get_btn_torrents(btn_api, btn_id, meta)
                         if meta.get('imdb_id') != 0:
                             found_match = True
-                    elif specific_tracker == "BHD":
+                            break
+                    elif tracker == "BHD":
                         bhd_api = config['DEFAULT'].get('bhd_api')
                         bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
                         if meta.get('bhd'):
@@ -414,6 +415,7 @@ class Prep():
                                 await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
                                 if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
                                     found_match = True
+                                    break
                                 if meta.get('image_list'):
                                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                                     if valid_images:
@@ -422,6 +424,7 @@ class Prep():
                                 await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, torrent_id=meta['bhd'])
                                 if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
                                     found_match = True
+                                    break
                                 if meta.get('image_list'):
                                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                                     if valid_images:
@@ -429,7 +432,9 @@ class Prep():
                         else:
                             console.print("[yellow]No BHD ID found, skipping BHD tracker update.[/yellow]")
                     else:
-                        meta = await process_tracker(specific_tracker, meta, only_id)
+                        meta = await process_tracker(tracker, meta, only_id)
+                        if found_match:
+                            break
                 else:
                     # Process all trackers with API = true if no specific tracker is set in meta
                     tracker_order = ["PTP", "BHD", "BLU", "AITHER", "LST", "OE", "HDB", "HUNO", "ULCX"]
