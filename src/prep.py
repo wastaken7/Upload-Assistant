@@ -11,7 +11,7 @@ from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.get_tracker_data import get_tracker_data, ping_unit3d
 from src.bluray_com import get_bluray_releases
-from src.metadata_searching import all_ids, imdb_tvdb, imdb_tmdb, get_tv_data
+from src.metadata_searching import all_ids, imdb_tvdb, imdb_tmdb, get_tv_data, imdb_tmdb_tvdb
 
 try:
     import traceback
@@ -396,11 +396,15 @@ class Prep():
         if int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0 and int(meta['tvmaze_id']) != 0:
             meta = await all_ids(meta, tvdb_api, tvdb_token)
 
-        # Check if both IMDb and TVDB IDs are present first
+        # Check if IMDb, TMDb, and TVDb IDs are all present
+        elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0:
+            meta = await imdb_tmdb_tvdb(meta, filename, tvdb_api, tvdb_token)
+
+        # Check if both IMDb and TVDB IDs are present
         elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0:
             meta = await imdb_tvdb(meta, filename, tvdb_api, tvdb_token)
 
-        # Check if both IMDb and TMDb IDs are present next
+        # Check if both IMDb and TMDb IDs are present
         elif int(meta['imdb_id']) != 0 and int(meta['tmdb_id']) != 0:
             meta = await imdb_tmdb(meta, filename)
 
