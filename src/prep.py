@@ -563,6 +563,7 @@ class Prep():
         if meta.get("not_anime", False) and meta.get("category") == "TV":
             meta = await get_season_episode(video, meta)
 
+        tvdb_series_name = None
         meta['we_checked_tvdb'] = False
         meta['we_checked_tmdb'] = False
         meta['we_asked_tvmaze'] = False
