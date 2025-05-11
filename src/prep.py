@@ -12,7 +12,7 @@ from src.region import get_region, get_distributor, get_service
 from src.exportmi import exportInfo, mi_resolution
 from src.getseasonep import get_season_episode
 from src.btnid import get_btn_torrents, get_bhd_torrents
-from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes
+from src.tvdb import get_tvdb_episode_data, get_tvdb_series_episodes, get_tvdb_series_data
 from src.bluray_com import get_bluray_releases
 
 try:
@@ -631,6 +631,18 @@ class Prep():
                     )
                 )
 
+            elif meta.get('category') == 'TV' and meta.get('tv_pack', False):
+                if tvdb_api and tvdb_token:
+                    all_tasks.append(
+                        get_tvdb_series_data(
+                            meta['base_dir'],
+                            tvdb_token,
+                            meta.get('tvdb_id'),
+                            api_key=tvdb_api,
+                            debug=meta.get('debug', False)
+                        )
+                    )
+
             # Execute all tasks in parallel
             results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
@@ -766,6 +778,18 @@ class Prep():
                 elif isinstance(tmdb_episode_data, Exception):
                     console.print(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}")
 
+            elif meta.get('category') == 'TV' and meta.get('tv_pack', False):
+                # Process TVDb series data
+                tvdb_series_data = results[result_index]
+                result_index += 1
+
+                if tvdb_series_data and not isinstance(tvdb_series_data, Exception):
+                    tvdb_series_name = tvdb_series_data
+                    meta['we_checked_tvdb'] = True
+
+                elif isinstance(tvdb_series_data, Exception):
+                    console.print(f"[yellow]TVDb series data retrieval failed: {tvdb_series_data}")
+
         # Check if both IMDb and TVDB IDs are present first
         elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0:
             tasks = [
@@ -846,6 +870,26 @@ class Prep():
                             meta['search_year'] = year_match.group(0)
                         else:
                             meta['search_year'] = ""
+
+            add_name_tasks = (
+                tvdb_api and tvdb_token and
+                meta.get('category') == 'TV' and
+                meta.get('tv_pack', False)
+            )
+
+            if add_name_tasks:
+                tvdb_series_data = await get_tvdb_series_data(
+                    meta['base_dir'],
+                    tvdb_token,
+                    meta.get('tvdb_id'),
+                    api_key=tvdb_api,
+                    debug=meta.get('debug', False)
+                )
+
+                if tvdb_series_data:
+                    console.print("[green]TVDB series data retrieved successfully.[/green]")
+                    tvdb_series_name = tvdb_series_data
+                    meta['we_checked_tvdb'] = True
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             tmdb_result, tvmaze_id, imdb_info_result = results[:3]
@@ -1201,6 +1245,10 @@ class Prep():
                         meta['season'] = "S" + str(meta['season_int']).zfill(2)
                         meta['episode'] = "E" + str(meta['episode_int']).zfill(2)
 
+            elif meta.get('tv_pack', False):
+                if tvdb_api and tvdb_token:
+                    tvdb_series_name = await get_tvdb_series_data(base_dir, tvdb_token, meta.get('tvdb_id'), tvdb_api, debug=meta.get('debug', False))
+
         if tvdb_api and tvdb_token:
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
                 series_name = meta.get('tvdb_episode_data').get('series_name', '')
@@ -1208,6 +1256,12 @@ class Prep():
                 meta['title'] = series_name
                 if meta['debug']:
                     console.print(f"[yellow]tvdb series name: {meta.get('tvdb_episode_data').get('series_name')}")
+            elif tvdb_series_name and tvdb_series_name != "" and meta.get('title') != tvdb_series_name:
+                series_name = tvdb_series_name
+                series_name = series_name.replace('(', '').replace(')', '').strip()
+                meta['title'] = series_name
+                if meta['debug']:
+                    console.print(f"[yellow]tvdb series name: {tvdb_series_name}")
 
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
