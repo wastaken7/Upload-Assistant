@@ -1605,12 +1605,6 @@ class Prep():
                 response = await resp.json()
                 return response
 
-    async def clean_filename(self, name):
-        invalid = '<>:"/\\|?*'
-        for char in invalid:
-            name = name.replace(char, '-')
-        return name
-
     async def gen_desc(self, meta):
         def clean_text(text):
             return text.replace('\r\n', '').replace('\n', '').strip()

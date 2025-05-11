@@ -134,7 +134,7 @@ async def process_meta(meta, base_dir):
                 meta['trackers'] = [meta['trackers']]
         meta['edit'] = True
         meta = await prep.gather_prep(meta=meta, mode='cli')
-        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
         confirm = await helper.get_confirmation(meta)
 
     successful_trackers = await process_all_trackers(meta)

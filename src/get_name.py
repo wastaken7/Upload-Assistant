@@ -1,7 +1,7 @@
 from src.console import console
 
 
-async def get_name(self, meta):
+async def get_name(meta):
     type = meta.get('type', "").upper()
     title = meta.get('title', "")
     alt_title = meta.get('aka', "")
@@ -139,5 +139,12 @@ async def get_name(self, meta):
         exit()
     name_notag = name
     name = name_notag + tag
-    clean_name = await self.clean_filename(name)
+    clean_name = await clean_filename(name)
     return name_notag, name, clean_name, potential_missing
+
+
+async def clean_filename(name):
+    invalid = '<>:"/\\|?*'
+    for char in invalid:
+        name = name.replace(char, '-')
+    return name
