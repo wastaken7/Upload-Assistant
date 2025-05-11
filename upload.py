@@ -27,6 +27,7 @@ from src.trackerstatus import process_all_trackers
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 from src.cleanup import cleanup
 from src.add_comparison import add_comparison
+from src.get_name import get_name
 if os.name == "posix":
     import termios
 
@@ -97,7 +98,7 @@ async def process_meta(meta, base_dir):
         console.print(f"Error in gather_prep: {e}")
         console.print(traceback.format_exc())
         return
-    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
     parser = Args(config)
     helper = UploadHelper()
     if meta.get('trackers'):
