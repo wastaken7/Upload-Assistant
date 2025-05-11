@@ -28,6 +28,7 @@ from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 from src.cleanup import cleanup
 from src.add_comparison import add_comparison
 from src.get_name import get_name
+from src.get_desc import gen_desc
 if os.name == "posix":
     import termios
 
@@ -303,7 +304,7 @@ async def process_meta(meta, base_dir):
                 create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
 
         if 'saved_description' in meta and meta['saved_description'] is False:
-            meta = await prep.gen_desc(meta)
+            meta = await gen_desc(meta)
 
         if meta.get('description') in ('None', '', ' '):
             meta['description'] = None

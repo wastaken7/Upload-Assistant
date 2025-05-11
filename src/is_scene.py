@@ -32,7 +32,7 @@ async def is_scene(self, video, meta, imdb=None, lower=False):
                 if scene and meta.get('isdir', False) and meta.get('queue') is not None:
                     meta['keep_folder'] = True
                 if is_all_lowercase and not meta.get('tag'):
-                    meta['tag'] = await self.get_tag(meta['scene_name'], meta)
+                    meta['we_need_tag'] = True
 
                 # NFO Download Handling
                 if not meta.get('nfo'):
