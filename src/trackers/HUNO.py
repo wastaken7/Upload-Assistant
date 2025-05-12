@@ -101,7 +101,8 @@ class HUNO():
                 data['internal'] = 1
             else:
                 data['internal'] = 0
-
+        if meta.get('freeleech', 0) != 0:
+            data['free'] = meta.get('freeleech', 0)
         if meta.get('category') == 'TV' and meta.get('tv_pack') == 1:
             data['season_pack'] = 1
 
