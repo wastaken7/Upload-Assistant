@@ -1,4 +1,4 @@
-import guessit
+from guessit import guessit
 import os
 import re
 from src.console import console
