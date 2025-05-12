@@ -344,18 +344,18 @@ async def search_imdb(filename, search_year):
         console.print(f"[red]IMDb GraphQL API error: {e}[/red]")
         return 0
 
-    # Parse results
-    results = data.get("data", {}).get("advancedTitleSearch", {}).get("edges", [])
+    results = await safe_get(data, ["data", "advancedTitleSearch", "edges"], [])
     console.print(f"[yellow]Found {len(results)} results...[/yellow]")
+
     for idx, edge in enumerate(results):
-        node = edge.get("node", {})
-        title = node.get("title", {})
-        title_text = title.get("titleText", {}).get("text", "")
-        release_year_obj = title.get("releaseYear")
-        year = release_year_obj.get("year", None) if isinstance(release_year_obj, dict) else None
-        imdb_id = title.get("id", "")
-        title_type = title.get("titleType", {}).get("text", "")
-        plot = title.get("plot", {}).get("plotText", {}).get("plainText", "")
+        node = await safe_get(edge, ["node"], {})
+        title = await safe_get(node, ["title"], {})
+        title_text = await safe_get(title, ["titleText", "text"], "")
+        year = await safe_get(title, ["releaseYear", "year"], None)
+        imdb_id = await safe_get(title, ["id"], "")
+        title_type = await safe_get(title, ["titleType", "text"], "")
+        plot = await safe_get(title, ["plot", "plotText", "plainText"], "")
+
         console.print(f"[cyan]Result {idx+1}: {title_text} - ({year}) - {imdb_id} - Type: {title_type}[/cyan]")
         if plot:
             console.print(f"[green]Plot: {plot}[/green]")
@@ -368,7 +368,7 @@ async def search_imdb(filename, search_year):
                 selection = int(user_input)
                 if 1 <= selection <= len(results):
                     selected = results[selection - 1]
-                    imdb_id = selected.get("node", {}).get("title", {}).get("id", "")
+                    imdb_id = await safe_get(selected, ["node", "title", "id"], "")
                     if imdb_id:
                         imdbID = int(imdb_id.replace('tt', '').strip())
                         return imdbID
