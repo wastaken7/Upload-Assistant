@@ -5,48 +5,143 @@ from src.console import console
 
 
 async def get_edition(video, bdinfo, filelist, manual_edition, meta):
-    if video.lower().startswith('dc'):
-        video = video.replace('dc', '', 1)
-
-    guess = guessit(video)
-    tag = guess.get('release_group', 'NOGROUP')
-    repack = ""
     edition = ""
 
-    if bdinfo is not None:
-        try:
-            edition = guessit(bdinfo['label'])['edition']
-        except Exception as e:
-            if meta['debug']:
-                print(f"BDInfo Edition Guess Error: {e}")
-            edition = ""
-    else:
-        try:
-            edition = guess.get('edition', "")
-        except Exception as e:
-            if meta['debug']:
-                print(f"Video Edition Guess Error: {e}")
-            edition = ""
+    if meta.get('imdb_info', {}).get('edition_details'):
+        if not meta.get('is_disc') == "BDMV" and meta.get('mediainfo', {}).get('media', {}).get('track'):
+            general_track = next((track for track in meta['mediainfo']['media']['track']
+                                  if track.get('@type') == 'General'), None)
 
-    if isinstance(edition, list):
-        edition = " ".join(edition)
+            if general_track and general_track.get('Duration'):
+                try:
+                    media_duration_seconds = float(general_track['Duration'])
+                    console.print(f"[cyan]Found media duration: {media_duration_seconds} seconds[/cyan]")
 
-    if len(filelist) == 1:
-        video = os.path.basename(video)
+                    leeway_seconds = 30
 
-    video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
+                    for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
+                        edition_seconds = edition_info.get('seconds', 0)
+                        difference = abs(media_duration_seconds - edition_seconds)
 
-    if "OPEN MATTE" in video:
-        edition = edition + " Open Matte"
+                        if difference <= leeway_seconds:
+                            console.print(f"[green]Matched edition: {edition_info['display_name']} - duration difference: {difference} seconds[/green]")
 
+                            if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
+                                edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                            else:
+                                edition_name = ""
+
+                            if not manual_edition:
+                                edition = edition_name
+                                console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
+                            break
+                except (ValueError, TypeError) as e:
+                    console.print(f"[yellow]Error parsing duration: {e}[/yellow]")
+
+        elif meta.get('is_disc') == "BDMV" and meta.get('discs'):
+            matched_editions = []
+
+            all_playlists = []
+            for disc in meta['discs']:
+                if disc.get('playlists'):
+                    all_playlists.extend(disc['playlists'])
+
+            console.print(f"[cyan]Found {len(all_playlists)} playlists to check against IMDb editions[/cyan]")
+
+            leeway_seconds = 30
+            matched_editions_with_attributes = []
+            matched_editions_without_attributes = []
+
+            for playlist in all_playlists:
+                if playlist.get('duration'):
+                    playlist_duration = float(playlist['duration'])
+                    console.print(f"[cyan]Checking playlist duration: {playlist_duration} seconds[/cyan]")
+
+                    for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
+                        edition_seconds = edition_info.get('seconds', 0)
+                        difference = abs(playlist_duration - edition_seconds)
+
+                        if difference <= leeway_seconds:
+                            console.print(f"[green]Playlist matches edition: {edition_info['display_name']} - difference: {difference} seconds[/green]")
+
+                            # Split based on whether it has attributes or not
+                            if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
+                                edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                                matched_editions_with_attributes.append(edition_name)
+                                console.print(f"[green]Added edition with attributes: {edition_name}[/green]")
+                            else:
+                                matched_editions_without_attributes.append(runtime_key)  # Just store the runtime key
+                                console.print(f"[yellow]Found edition without attributes (runtime: {runtime_key})[/yellow]")
+                            break
+
+            # Process the matched editions
+            if matched_editions_with_attributes or matched_editions_without_attributes:
+                # Only use "Theatrical Edition" if we have at least one edition with attributes
+                if matched_editions_with_attributes and matched_editions_without_attributes:
+                    matched_editions = matched_editions_with_attributes + ["Theatrical Edition"]
+                    console.print("[cyan]Adding 'Theatrical Edition' label because we have both attribute and non-attribute editions[/cyan]")
+                else:
+                    matched_editions = matched_editions_with_attributes
+                    console.print("[cyan]Using only editions with attributes[/cyan]")
+
+                # Handle final edition formatting
+                if matched_editions:
+                    # If multiple editions, prefix with count
+                    if len(matched_editions) > 1:
+                        unique_editions = list(set(matched_editions))  # Remove duplicates
+                        if len(unique_editions) > 1:
+                            edition = f"{len(unique_editions)}in1 " + " / ".join(unique_editions)
+                        else:
+                            edition = unique_editions[0]  # Just one unique edition
+                    else:
+                        edition = matched_editions[0]
+
+                    console.print(f"[bold green]Setting edition from BDMV playlist matches: {edition}[/bold green]")
+
+    if not edition:
+        if video.lower().startswith('dc'):
+            video = video.replace('dc', '', 1)
+
+        guess = guessit(video)
+        tag = guess.get('release_group', 'NOGROUP')
+        repack = ""
+
+        if bdinfo is not None:
+            try:
+                edition = guessit(bdinfo['label'])['edition']
+            except Exception as e:
+                if meta['debug']:
+                    print(f"BDInfo Edition Guess Error: {e}")
+                edition = ""
+        else:
+            try:
+                edition = guess.get('edition', "")
+            except Exception as e:
+                if meta['debug']:
+                    print(f"Video Edition Guess Error: {e}")
+                edition = ""
+
+        if isinstance(edition, list):
+            edition = " ".join(edition)
+
+        if len(filelist) == 1:
+            video = os.path.basename(video)
+
+        video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
+
+        if "OPEN MATTE" in video:
+            edition = edition + " Open Matte"
+
+    # Manual edition overrides everything
     if manual_edition:
         if isinstance(manual_edition, list):
             manual_edition = " ".join(manual_edition)
         edition = str(manual_edition)
+
     edition = edition.replace(",", " ")
 
-    # print(f"Edition After Manual Edition: {edition}")
-
+    # Handle repack info
+    repack = ""
     if "REPACK" in (video or edition.upper()) or "V2" in video:
         repack = "REPACK"
     if "REPACK2" in (video or edition.upper()) or "V3" in video:
@@ -62,12 +157,11 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
     if "RERIP" in (video or edition.upper()):
         repack = "RERIP"
 
-    # print(f"Repack after Checks: {repack}")
-
-    # Only remove REPACK, RERIP, or PROPER from edition if they're not part of manual_edition
+    # Only remove REPACK, RERIP, or PROPER from edition if not in manual edition
     if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'proper2', 'proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
         edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
 
+    # Handle distributor info
     if edition:
         from src.region import get_distributor
         distributors = await get_distributor(edition)
@@ -83,6 +177,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             # Clean up extra spaces
             while '  ' in edition:
                 edition = edition.replace('  ', ' ')
+
         if edition != "":
             console.print(f"Final Edition: {edition}")
+
     return edition, repack

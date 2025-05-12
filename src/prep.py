@@ -914,7 +914,7 @@ class Prep():
 
         # BDMV validation
         if meta['is_disc'] == "BDMV" and release_group:
-            if f"-{release_group}" not in video:
+            if f"{release_group}" not in video:
                 release_group = None
 
         # Format the tag
