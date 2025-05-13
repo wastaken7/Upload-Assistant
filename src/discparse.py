@@ -88,8 +88,54 @@ class DiscParse():
                             console.print(f"[bold red]Error parsing playlist {mpls_path}: {e}")
 
                 if not valid_playlists:
-                    console.print(f"[bold red]No valid playlists found for disc {path}")
-                    continue
+                    # Find all playlists regardless of duration
+                    all_playlists = []
+                    for file_name in os.listdir(playlists_path):
+                        if file_name.endswith(".mpls"):
+                            mpls_path = os.path.join(playlists_path, file_name)
+                            try:
+                                with open(mpls_path, "rb") as mpls_file:
+                                    header = mpls.load_movie_playlist(mpls_file)
+                                    mpls_file.seek(header.playlist_start_address, os.SEEK_SET)
+                                    playlist_data = mpls.load_playlist(mpls_file)
+
+                                    duration = 0
+                                    items = []
+                                    stream_directory = os.path.join(path, "STREAM")
+                                    file_counts = defaultdict(int)
+                                    file_sizes = {}
+
+                                    for item in playlist_data.play_items:
+                                        duration += (item.outtime - item.intime) / 45000
+                                        try:
+                                            m2ts_file = os.path.join(stream_directory, item.clip_information_filename.strip() + ".m2ts")
+                                            if os.path.exists(m2ts_file):
+                                                size = os.path.getsize(m2ts_file)
+                                                file_counts[m2ts_file] += 1
+                                                file_sizes[m2ts_file] = size
+                                        except AttributeError as e:
+                                            console.print(f"[bold red]Error accessing clip info for item in {file_name}: {e}")
+
+                                    if all(count == 1 for count in file_counts.values()):
+                                        items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
+                                        all_playlists.append({
+                                            "file": file_name,
+                                            "duration": duration,
+                                            "path": mpls_path,
+                                            "items": items
+                                        })
+                            except Exception as e:
+                                console.print(f"[bold red]Error parsing playlist {mpls_path}: {e}")
+
+                    if all_playlists:
+                        console.print("[yellow]Using available playlists with any duration")
+                        # Select the largest playlist by total size
+                        largest_playlist = max(all_playlists, key=lambda p: sum(item['size'] for item in p['items']))
+                        console.print(f"[green]Selected largest playlist {largest_playlist['file']} with duration {largest_playlist['duration']:.2f} seconds")
+                        valid_playlists = [largest_playlist]
+                    else:
+                        console.print(f"[bold red]No playlists found for disc {path}")
+                        continue
 
                 if use_largest:
                     console.print("[yellow]Auto-selecting the largest playlist based on configuration.")
