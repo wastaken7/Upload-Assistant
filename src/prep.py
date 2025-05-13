@@ -16,7 +16,7 @@ from src.apply_overrides import get_source_override
 from src.is_scene import is_scene
 from src.audio import get_audio_languages, get_audio_v2
 from src.edition import get_edition
-from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr
+from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr, get_video, get_resolution, get_type, is_3d, is_sd
 from src.tags import get_tag, tag_override
 from src.get_disc import get_disc
 
@@ -28,7 +28,6 @@ try:
     import ntpath
     from pathlib import Path
     import json
-    import glob
     from pymediainfo import MediaInfo
     import tmdbsimple as tmdb
     import time
@@ -114,7 +113,7 @@ class Prep():
 
             if meta.get('resolution', None) is None:
                 meta['resolution'] = await mi_resolution(bdinfo['video'][0]['res'], guessit(video), width="OTHER", scan="p", height="OTHER", actual_height=0)
-            meta['sd'] = await self.is_sd(meta['resolution'])
+            meta['sd'] = await is_sd(meta['resolution'])
 
             mi = None
 
@@ -137,8 +136,8 @@ class Prep():
                 mi = meta['mediainfo']
 
             meta['dvd_size'] = await self.get_dvd_size(meta['discs'], meta.get('manual_dvds'))
-            meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
-            meta['sd'] = await self.is_sd(meta['resolution'])
+            meta['resolution'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
+            meta['sd'] = await is_sd(meta['resolution'])
 
         elif meta['is_disc'] == "HDDVD":
             video, meta['scene'], meta['imdb_id'] = await is_scene(meta['path'], meta, meta.get('imdb_id', 0))
@@ -158,8 +157,8 @@ class Prep():
                 meta['mediainfo'] = mi
             else:
                 mi = meta['mediainfo']
-            meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
-            meta['sd'] = await self.is_sd(meta['resolution'])
+            meta['resolution'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
+            meta['sd'] = await is_sd(meta['resolution'])
 
         else:
             # handle some specific cases that trouble guessit and then id grabbing
@@ -232,7 +231,7 @@ class Prep():
 
                 return None, None, None
 
-            videopath, meta['filelist'] = await self.get_video(videoloc, meta.get('mode', 'discord'))
+            videopath, meta['filelist'] = await get_video(videoloc, meta.get('mode', 'discord'))
             search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
             search_file_folder = 'file'
 
@@ -267,9 +266,9 @@ class Prep():
                 mi = meta['mediainfo']
 
             if meta.get('resolution', None) is None:
-                meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
+                meta['resolution'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
 
-        meta['sd'] = await self.is_sd(meta['resolution'])
+            meta['sd'] = await is_sd(meta['resolution'])
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
@@ -392,7 +391,7 @@ class Prep():
         if meta.get('manual_language'):
             meta['original_langauge'] = meta.get('manual_language').lower()
 
-        meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
+        meta['type'] = await get_type(video, meta['scene'], meta['is_disc'], meta)
 
         if meta.get('category', None) is None:
             meta['category'] = await self.get_cat(video, meta)
@@ -630,7 +629,7 @@ class Prep():
         if meta.get('no_tag', False):
             meta['tag'] = ""
 
-        meta['3D'] = await self.is_3d(mi, bdinfo)
+        meta['3D'] = await is_3d(mi, bdinfo)
 
         meta['source'], meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
 
@@ -723,129 +722,6 @@ class Prep():
             return category
         except Exception:
             return "TV"
-
-    """
-    Get video files
-
-    """
-    async def get_video(self, videoloc, mode):
-        filelist = []
-        videoloc = os.path.abspath(videoloc)
-        if os.path.isdir(videoloc):
-            globlist = glob.glob1(videoloc, "*.mkv") + glob.glob1(videoloc, "*.mp4") + glob.glob1(videoloc, "*.ts")
-            for file in globlist:
-                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
-                    filelist.append(os.path.abspath(f"{videoloc}{os.sep}{file}"))
-            try:
-                video = sorted(filelist)[0]
-            except IndexError:
-                console.print("[bold red]No Video files found")
-                if mode == 'cli':
-                    exit()
-        else:
-            video = videoloc
-            filelist.append(videoloc)
-        filelist = sorted(filelist)
-        return video, filelist
-
-    """
-    Get Resolution
-    """
-
-    async def get_resolution(self, guess, folder_id, base_dir):
-        with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-            mi = json.load(f)
-            try:
-                width = mi['media']['track'][1]['Width']
-                height = mi['media']['track'][1]['Height']
-            except Exception:
-                width = 0
-                height = 0
-            framerate = mi['media']['track'][1].get('FrameRate', '')
-            try:
-                scan = mi['media']['track'][1]['ScanType']
-            except Exception:
-                scan = "Progressive"
-            if scan == "Progressive":
-                scan = "p"
-            elif scan == "Interlaced":
-                scan = 'i'
-            elif framerate == "25.000":
-                scan = "p"
-            else:
-                # Fallback using regex on meta['uuid'] - mainly for HUNO fun and games.
-                match = re.search(r'\b(1080p|720p|2160p)\b', folder_id, re.IGNORECASE)
-                if match:
-                    scan = "p"  # Assume progressive based on common resolution markers
-                else:
-                    scan = "i"  # Default to interlaced if no indicators are found
-            width_list = [3840, 2560, 1920, 1280, 1024, 960, 854, 720, 15360, 7680, 0]
-            height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
-            width = await self.closest(width_list, int(width))
-            actual_height = int(height)
-            height = await self.closest(height_list, int(height))
-            res = f"{width}x{height}{scan}"
-            resolution = await mi_resolution(res, guess, width, scan, height, actual_height)
-        return resolution
-
-    async def closest(self, lst, K):
-        # Get closest, but not over
-        lst = sorted(lst)
-        mi_input = K
-        res = 0
-        for each in lst:
-            if mi_input > each:
-                pass
-            else:
-                res = each
-                break
-        return res
-
-        # return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
-
-    async def is_sd(self, resolution):
-        if resolution in ("480i", "480p", "576i", "576p", "540p"):
-            sd = 1
-        else:
-            sd = 0
-        return sd
-
-    """
-    Get type and category
-    """
-
-    async def get_type(self, video, scene, is_disc, meta):
-        if meta.get('manual_type'):
-            type = meta.get('manual_type')
-        else:
-            filename = os.path.basename(video).lower()
-            if "remux" in filename:
-                type = "REMUX"
-            elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl"]):
-                type = "WEBDL"
-            elif "webrip" in filename:
-                type = "WEBRIP"
-            # elif scene == True:
-                # type = "ENCODE"
-            elif "hdtv" in filename:
-                type = "HDTV"
-            elif is_disc is not None:
-                type = "DISC"
-            elif "dvdrip" in filename:
-                type = "DVDRIP"
-                # exit()
-            else:
-                type = "ENCODE"
-        return type
-
-    async def is_3d(self, mi, bdinfo):
-        if bdinfo is not None:
-            if bdinfo['video'][0]['3d'] != "":
-                return "3D"
-            else:
-                return ""
-        else:
-            return ""
 
     async def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
         if not meta.get('is_disc') == "BDMV":
