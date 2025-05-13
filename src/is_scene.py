@@ -97,7 +97,8 @@ async def is_scene(video, meta, imdb=None, lower=False):
                     console.print(f"[yellow]Unexpected error during IMDb lookup: {e}")
 
             else:
-                console.print("[yellow]SRRDB: No match found")
+                if meta['debug']:
+                    console.print("[yellow]SRRDB: No match found")
 
         except Exception as e:
             console.print(f"[yellow]SRRDB: No match found, or request has timed out: {e}")
