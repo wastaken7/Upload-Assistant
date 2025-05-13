@@ -29,4 +29,3 @@ langcodes
 transmission_rpc
 psutil
 packaging
-tmdbsimple

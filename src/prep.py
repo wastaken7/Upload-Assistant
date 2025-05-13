@@ -27,7 +27,6 @@ try:
     from guessit import guessit
     import ntpath
     from pathlib import Path
-    import tmdbsimple as tmdb
     import time
     import itertools
     from difflib import SequenceMatcher
@@ -52,7 +51,6 @@ class Prep():
         self.screens = screens
         self.config = config
         self.img_host = img_host.lower()
-        tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
     async def gather_prep(self, meta, mode):
         # set some details we'll need
