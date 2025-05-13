@@ -5,7 +5,7 @@ from guessit import guessit
 from src.console import console
 
 
-async def get_tag(self, video, meta):
+async def get_tag(video, meta):
     # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
     release_group = None
     basename = os.path.basename(video)
@@ -60,7 +60,7 @@ async def get_tag(self, video, meta):
     return tag
 
 
-async def tag_override(self, meta):
+async def tag_override(meta):
     with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:
         tags = json.load(f)
         f.close()
@@ -77,9 +77,13 @@ async def tag_override(self, meta):
                     else:
                         pass
                 elif key == 'personalrelease':
-                    meta[key] = self._is_true(value.get(key, "False"))
+                    meta[key] = _is_true(value.get(key, "False"))
                 elif key == 'template':
                     meta['desc_template'] = value.get(key)
                 else:
                     meta[key] = value.get(key)
     return meta
+
+
+def _is_true(self, value):
+    return str(value).strip().lower() == "true"

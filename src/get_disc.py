@@ -2,7 +2,7 @@ import os
 from src.discparse import DiscParse
 
 
-async def get_disc(self, meta):
+async def get_disc(meta):
     is_disc = None
     videoloc = meta['path']
     bdinfo = None
