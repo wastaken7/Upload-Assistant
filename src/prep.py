@@ -58,6 +58,7 @@ class Prep():
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
     async def gather_prep(self, meta, mode):
+        # set some details we'll need
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
         tvdb_api = str(self.config['DEFAULT'].get('tvdb_api', None))
         tvdb_token = str(self.config['DEFAULT'].get('tvdb_token', None))
@@ -65,6 +66,15 @@ class Prep():
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
         meta['saved_description'] = False
+        client = Clients(config=config)
+        meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
+        hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
+        tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb', 'huno']
+
+        # make sure these are set in meta
+        meta['we_checked_tvdb'] = False
+        meta['we_checked_tmdb'] = False
+        meta['we_asked_tvmaze'] = False
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid', None) is None:
@@ -152,6 +162,7 @@ class Prep():
             meta['sd'] = await self.is_sd(meta['resolution'])
 
         else:
+            # handle some specific cases that trouble guessit and then id grabbing
             def extract_title_and_year(filename):
                 basename = os.path.basename(filename)
                 basename = os.path.splitext(basename)[0]
@@ -257,6 +268,7 @@ class Prep():
 
             if meta.get('resolution', None) is None:
                 meta['resolution'] = await self.get_resolution(guessit(video), meta['uuid'], base_dir)
+
         meta['sd'] = await self.is_sd(meta['resolution'])
 
         if " AKA " in filename.replace('.', ' '):
@@ -273,9 +285,6 @@ class Prep():
                 console.print(f"[red] None of the required languages ({meta['has_languages']}) is available on the file {audio_languages}")
                 raise Exception("No matching languages")
 
-        # Debugging information after population
-        # console.print(f"Debug: meta['filelist'] after population: {meta.get('filelist', 'Not Set')}")
-
         if 'description' not in meta or meta.get('description') is None:
             meta['description'] = ""
 
@@ -286,12 +295,7 @@ class Prep():
             if len(description_text):
                 description.write(description_text)
 
-        client = Clients(config=config)
-
-        meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
-        hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
-        tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb', 'huno']
-
+        # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids):
             await client.get_pathed_torrents(meta['path'], meta)
 
@@ -342,15 +346,18 @@ class Prep():
         if meta.get('category', None) is not None:
             meta['category'] = meta['category'].upper()
 
+        # check if we've already searched torrents
         if 'base_torrent_created' not in meta:
             meta['base_torrent_created'] = False
         if 'we_checked_them_all' not in meta:
             meta['we_checked_them_all'] = False
+
+        # if not auto qbittorrent search, this also checks with the infohash if passed.
         if meta.get('infohash') is not None and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
             meta = await client.get_ptp_from_hash(meta)
 
         if not meta.get('image_list') and not meta.get('edit', False):
-            # Reuse information from trackers with fallback
+            # from the torrent id, get the torrent data
             initial_cat_check = await self.get_cat(video, meta)
             await get_tracker_data(video, meta, search_term, search_file_folder, initial_cat_check)
         else:
@@ -361,6 +368,7 @@ class Prep():
         if (not meta.get('region') or not meta.get('distributor')) and meta['is_disc'] == "BDMV" and ping_unit3d_config and not meta.get('edit', False):
             await ping_unit3d(meta)
 
+        # the first user override check that allows to set metadata ids.
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides and (meta.get('imdb_id') != 0 or meta.get('tvdb_id') != 0):
             meta = await get_source_override(meta, other_id=True)
@@ -374,23 +382,26 @@ class Prep():
             console.print(f"Raw TMDb ID: {meta['tmdb_id']} (type: {type(meta['tmdb_id']).__name__})")
             console.print(f"Raw TVMAZE ID: {meta['tvmaze_id']} (type: {type(meta['tvmaze_id']).__name__})")
             console.print(f"Raw MAL ID: {meta['mal_id']} (type: {type(meta['mal_id']).__name__})")
+
         console.print("[yellow]Building meta data.....")
+
+        # set a timer to check speed
         if meta['debug']:
             meta_start_time = time.time()
+
         if meta.get('manual_language'):
             meta['original_langauge'] = meta.get('manual_language').lower()
+
         meta['type'] = await self.get_type(video, meta['scene'], meta['is_disc'], meta)
+
         if meta.get('category', None) is None:
             meta['category'] = await self.get_cat(video, meta)
         else:
             meta['category'] = meta['category'].upper()
 
+        # if it's not an anime, we can run season/episode checks now to speed the process
         if meta.get("not_anime", False) and meta.get("category") == "TV":
             meta = await get_season_episode(video, meta)
-
-        meta['we_checked_tvdb'] = False
-        meta['we_checked_tmdb'] = False
-        meta['we_asked_tvmaze'] = False
 
         # if we have all of the ids, search everything all at once
         if int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0 and int(meta['tvmaze_id']) != 0:
@@ -408,15 +419,19 @@ class Prep():
         elif int(meta['imdb_id']) != 0 and int(meta['tmdb_id']) != 0:
             meta = await imdb_tmdb(meta, filename)
 
-        # Get TMDB and IMDb metadata only if IDs are still missing
+        # Get TMDB and IMDb metadata only if IDs are still missing, first checking mediainfo
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             console.print("Fetching TMDB ID...")
             meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(
                 mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id']
             )
+
+        # if we're still missing both ids, lets search with the filename
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
             console.print("Fetching TMDB ID from filename...")
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
+
+        # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
         elif meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
             category, tmdb_id, original_language = await get_tmdb_from_imdb(
                 meta['imdb_id'],
@@ -431,19 +446,22 @@ class Prep():
             meta['category'] = category
             meta['tmdb_id'] = int(tmdb_id)
             meta['original_language'] = original_language
-        # Fetch TMDB metadata if available
+
+        # we have tmdb id one way or another, so lets check we have the data
         if int(meta['tmdb_id']) != 0:
-            # Check if essential TMDB metadata is already populated
+            # if we have these fields already, we probably got them from a multi id searching
+
             if not meta.get('edit', False):
                 essential_fields = ['title', 'year', 'genres', 'overview']
                 tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
             else:
+                # if we're in that blastard edit mode, ignore any previous set data and get fresh
                 tmdb_metadata_populated = False
 
+            # otherwise, get it
             if not tmdb_metadata_populated:
                 console.print("Fetching TMDB metadata...")
                 try:
-                    # Extract only the needed parameters
                     tmdb_metadata = await tmdb_other_meta(
                         tmdb_id=meta['tmdb_id'],
                         path=meta.get('path'),
@@ -488,9 +506,8 @@ class Prep():
         else:
             meta.setdefault('tvmaze_id', 0)
 
-        meta['tvmaze'] = meta.get('tvmaze_id', 0)
-
         # If no IMDb ID, search for it
+        # bad filenames are bad
         if meta.get('imdb_id') == 0:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
 
@@ -518,10 +535,13 @@ class Prep():
                         meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
 
         if meta['category'] == "TV":
+            # if it wasn't skipped earlier, make sure we have the season/episode data
             if not meta.get('not_anime', False):
                 meta = await get_season_episode(video, meta)
+            # get all the episode data
             meta = await get_tv_data(meta, base_dir, tvdb_api, tvdb_token)
 
+        # if we're using tvdb, lets use it's series name if it applies
         if tvdb_api and tvdb_token:
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
                 series_name = meta.get('tvdb_episode_data').get('series_name', '')
@@ -536,6 +556,7 @@ class Prep():
                 if meta['debug']:
                     console.print(f"[yellow]tvdb series name: {meta.get('tvdb_series_name')}")
 
+        # bluray.com data if config
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
         meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
         meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
@@ -543,6 +564,7 @@ class Prep():
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
 
+        # and if we getting bluray images, we'll rehost them
         if meta.get('is_disc') == "BDMV" and meta.get('use_bluray_images', False):
             from src.rehostimages import check_hosts
             url_host_mapping = {
@@ -555,6 +577,7 @@ class Prep():
             await check_hosts(meta, "covers", url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
 
         if meta.get('tag', None) is None:
+            # if flagged from scene checking, lets use the scene name which will have proper tags
             if meta.get('we_need_tag', False):
                 meta['tag'] = await get_tag(meta['scene_name'], meta)
             else:
@@ -579,8 +602,10 @@ class Prep():
 
         meta = await tag_override(meta)
 
+        # user override check that only sets data after metadata setting
         if user_overrides and not meta.get('no_override', False):
             meta = await get_source_override(meta)
+
         if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
             bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 and not isinstance(tracks[1].get('BitRate', ''), dict) else ''  # Check that bitrate is not a dict
@@ -594,27 +619,38 @@ class Prep():
                 meta['service'] = "CR"
             elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "720p":
                 meta['service'] = "HIDI"
+
         meta['video'] = video
+
         meta['audio'], meta['channels'], meta['has_commentary'] = await get_audio_v2(mi, meta, bdinfo)
+
         if meta['tag'][1:].startswith(meta['channels']):
             meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
+
         if meta.get('no_tag', False):
             meta['tag'] = ""
+
         meta['3D'] = await self.is_3d(mi, bdinfo)
+
         meta['source'], meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = await get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
             services = await get_service(get_services_only=True)
             meta['service_longname'] = max((k for k, v in services.items() if v == meta['service']), key=len, default=meta['service'])
+
         meta['uhd'] = await get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
         meta['hdr'] = await get_hdr(mi, bdinfo)
+
         meta['distributor'] = await get_distributor(meta['distributor'])
+
         if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
             meta['region'] = await get_region(bdinfo, meta.get('region', None))
             meta['video_codec'] = await get_video_codec(bdinfo)
         else:
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await get_video_encode(mi, meta['type'], bdinfo)
+
         if meta.get('no_edition') is False:
             meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
             if "REPACK" in meta.get('edition', ""):
@@ -637,7 +673,9 @@ class Prep():
             meta['imdb'] = '0'
         meta['mal'] = meta.get('mal_id')
         meta['tvdb'] = meta.get('tvdb_id')
+        meta['tvmaze'] = meta.get('tvmaze_id')
 
+        # we finished the metadata, time it
         if meta['debug']:
             meta_finish_time = time.time()
             console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
