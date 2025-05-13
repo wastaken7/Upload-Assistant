@@ -76,9 +76,9 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
             # Process the matched editions
             if matched_editions_with_attributes or matched_editions_without_attributes:
-                # Only use "Theatrical Edition" if we have at least one edition with attributes
+                # Only use "Theatrical" if we have at least one edition with attributes
                 if matched_editions_with_attributes and matched_editions_without_attributes:
-                    matched_editions = matched_editions_with_attributes + ["Theatrical Edition"]
+                    matched_editions = matched_editions_with_attributes + ["Theatrical"]
                     console.print("[cyan]Adding 'Theatrical Edition' label because we have both attribute and non-attribute editions[/cyan]")
                 else:
                     matched_editions = matched_editions_with_attributes
@@ -89,6 +89,9 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                     # If multiple editions, prefix with count
                     if len(matched_editions) > 1:
                         unique_editions = list(set(matched_editions))  # Remove duplicates
+                        if "Theatrical" in unique_editions:
+                            unique_editions.remove("Theatrical")
+                            unique_editions = ["Theatrical"] + sorted(unique_editions)
                         if len(unique_editions) > 1:
                             edition = f"{len(unique_editions)}in1 " + " / ".join(unique_editions)
                         else:
