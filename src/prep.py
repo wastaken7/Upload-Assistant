@@ -1300,8 +1300,11 @@ class Prep():
                     if is_all_lowercase:
                         release_name = await self.is_scene(videopath, meta, meta.get('imdb_id', 0), lower=True)
                         if release_name is not None:
-                            meta['scene_name'] = release_name
-                            meta['tag'] = await self.get_tag(release_name, meta)
+                            try:
+                                meta['scene_name'] = release_name
+                                meta['tag'] = await self.get_tag(release_name, meta)
+                            except Exception:
+                                console.print("[red]Error getting tag from scene name, check group tag.[/red]")
 
         else:
             if not meta['tag'].startswith('-') and meta['tag'] != "":
@@ -1713,6 +1716,10 @@ class Prep():
                                     console.print("[yellow]Failed to download NFO file:", e)
 
                     return release_name
+                else:
+                    if meta['debug']:
+                        console.print("[yellow]SRRDB: No match found")
+                    return None
 
             except Exception as e:
                 console.print(f"[yellow]SRRDB search failed: {e}")
