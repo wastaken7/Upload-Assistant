@@ -57,9 +57,6 @@ class Prep():
         self.img_host = img_host.lower()
         tmdb.API_KEY = config['DEFAULT']['tmdb_api']
 
-    def _is_true(self, value):
-        return str(value).strip().lower() == "true"
-
     async def gather_prep(self, meta, mode):
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
         tvdb_api = str(self.config['DEFAULT'].get('tvdb_api', None))
