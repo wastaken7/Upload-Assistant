@@ -686,7 +686,8 @@ async def get_tv_data(meta, base_dir, tvdb_api=None, tvdb_token=None):
         if not meta.get('auto_episode_title') or not meta.get('overview_meta') or meta.get('original_language') != "en":
             # prioritze tvdb metadata if available
             if tvdb_api and tvdb_token and not meta.get('we_checked_tvdb', False):
-                console.print("[yellow]Fetching TVDb metadata...")
+                if meta['debug']:
+                    console.print("[yellow]Fetching TVDb metadata...")
                 meta['tvdb_season_int'], meta['tvdb_episode_int'] = await get_tvdb_series_episodes(base_dir, tvdb_token, meta.get('tvdb_id'), meta.get('season_int'), meta.get('episode_int'), tvdb_api, debug=meta.get('debug', False))
                 tvdb_episode_data = await get_tvdb_episode_data(base_dir, tvdb_token, meta['tvdb_id'], meta.get('tvdb_season_int'), meta.get('tvdb_episode_int'), api_key=tvdb_api, debug=meta.get('debug', False))
                 if tvdb_episode_data:
@@ -757,7 +758,8 @@ async def get_tv_data(meta, base_dir, tvdb_api=None, tvdb_token=None):
                     episode = meta.get('episode_int')
                     season = meta.get('season_int')
                 if not meta.get('we_checked_tmdb', False):
-                    console.print("[yellow]Fetching TMDb episode metadata...")
+                    if meta['debug']:
+                        console.print("[yellow]Fetching TMDb episode metadata...")
                     episode_details = await get_episode_details(meta.get('tmdb_id'), season, episode, debug=meta.get('debug', False))
                 else:
                     episode_details = meta.get('tmdb_episode_data', None)

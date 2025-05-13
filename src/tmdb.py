@@ -132,7 +132,8 @@ async def get_tmdb_from_imdb(imdb_id, tvdb_id=None, search_year=None, filename=N
 
 
 async def get_tmdb_id(filename, search_year, meta, category, untouched_filename="", attempted=0):
-    console.print("[bold cyan]Fetching TMDB ID...[/bold cyan]")
+    if meta['debug']:
+        console.print("[bold cyan]Fetching TMDB ID...[/bold cyan]")
 
     search_results = {"results": []}
     secondary_results = {"results": []}

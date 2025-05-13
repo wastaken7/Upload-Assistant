@@ -294,7 +294,6 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
                 }
 
         imdb_info['editions'] = ', '.join(edition_list)
-        console.print(f"[yellow]Editions: {imdb_info['editions']}[/yellow]")
 
     akas_edges = await safe_get(title_data, ['akas', 'edges'], default=[])
     imdb_info['akas'] = [
