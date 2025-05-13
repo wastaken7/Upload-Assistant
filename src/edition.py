@@ -18,7 +18,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                     if meta['debug']:
                         console.print(f"[cyan]Found media duration: {media_duration_seconds} seconds[/cyan]")
 
-                    leeway_seconds = 30
+                    leeway_seconds = 50
 
                     for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
                         edition_seconds = edition_info.get('seconds', 0)
@@ -41,6 +41,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                     console.print(f"[yellow]Error parsing duration: {e}[/yellow]")
 
         elif meta.get('is_disc') == "BDMV" and meta.get('discs'):
+            if meta['debug']:
+                console.print("[cyan]Checking BDMV playlists for edition matches...[/cyan]")
             matched_editions = []
 
             all_playlists = []
@@ -51,30 +53,99 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             if meta['debug']:
                 console.print(f"[cyan]Found {len(all_playlists)} playlists to check against IMDb editions[/cyan]")
 
-            leeway_seconds = 30
+            leeway_seconds = 50
             matched_editions_with_attributes = []
             matched_editions_without_attributes = []
 
             for playlist in all_playlists:
+                if playlist.get('file', None):
+                    playlist_file = playlist['file']
+                else:
+                    playlist_file = ""
+                if playlist.get('edition'):
+                    playlist_edition = playlist['edition']
+                else:
+                    playlist_edition = ""
                 if playlist.get('duration'):
                     playlist_duration = float(playlist['duration'])
+                    formatted_duration = format_duration(playlist_duration)
                     if meta['debug']:
-                        console.print(f"[cyan]Checking playlist duration: {playlist_duration} seconds[/cyan]")
+                        console.print(f"[cyan]Checking playlist duration: {formatted_duration} seconds[/cyan]")
+
+                    matching_editions = []
 
                     for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
                         edition_seconds = edition_info.get('seconds', 0)
                         difference = abs(playlist_duration - edition_seconds)
 
                         if difference <= leeway_seconds:
-                            console.print(f"[green]Playlist matches edition: {edition_info['display_name']} - difference: {difference} seconds[/green]")
-
-                            # Split based on whether it has attributes or not
+                            # Store the complete edition info
                             if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
                                 edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
-                                matched_editions_with_attributes.append(edition_name)
+                            else:
+                                edition_name = f"{edition_info['minutes']} Minute Version (Theatrical)"
+
+                            matching_editions.append({
+                                'name': edition_name,
+                                'display_name': edition_info['display_name'],
+                                'has_attributes': bool(edition_info.get('attributes') and len(edition_info['attributes']) > 0),
+                                'minutes': edition_info['minutes'],
+                                'difference': difference
+                            })
+
+                    # If multiple editions match this playlist, ask the user
+                    if len(matching_editions) > 1:
+                        console.print(f"[yellow]Playlist edition [green]{playlist_edition} [yellow]using file [green]{playlist_file} [yellow]with duration [green]{formatted_duration} [yellow]matches multiple editions:[/yellow]")
+                        for i, ed in enumerate(matching_editions):
+                            console.print(f"[yellow]{i+1}. [green]{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)")
+
+                        try:
+                            choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]")
+
+                            if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
+                                selected = matching_editions[int(choice)-1]
+                            elif choice.strip().lower() == 'e':
+                                selected = playlist_edition
+                            else:
+                                # Default to the closest match (smallest difference)
+                                selected = min(matching_editions, key=lambda x: x['difference'])
+                                console.print(f"[yellow]Using closest match: {selected['name']}[/yellow]")
+
+                            # Add the selected edition to our matches
+                            if selected == playlist_edition:
+                                console.print(f"[green]Using playlist edition: {selected}[/green]")
+                                matched_editions_with_attributes.append(selected)
+                            elif selected['has_attributes']:
+                                if selected['name'] not in matched_editions_with_attributes:
+                                    matched_editions_with_attributes.append(selected['name'])
+                                    console.print(f"[green]Added edition with attributes: {selected['name']}[/green]")
+                            else:
+                                matched_editions_without_attributes.append(str(selected['minutes']))
+                                console.print(f"[yellow]Added edition without attributes: {selected['name']}[/yellow]")
+
+                        except Exception as e:
+                            console.print(f"[red]Error processing selection: {e}. Using closest match.[/red]")
+                            # Default to closest match
+                            selected = min(matching_editions, key=lambda x: x['difference'])
+                            if selected['has_attributes']:
+                                matched_editions_with_attributes.append(selected['name'])
+                            else:
+                                matched_editions_without_attributes.append(str(selected['minutes']))
+
+                    # If just one edition matches, add it directly
+                    elif len(matching_editions) == 1:
+                        edition_info = matching_editions[0]
+                        console.print(f"[green]Playlist matches edition: {edition_info['display_name']}[/green]")
+
+                        if edition_info['has_attributes']:
+                            if edition_info['name'] not in matched_editions_with_attributes:
+                                matched_editions_with_attributes.append(edition_info['name'])
                                 if meta['debug']:
-                                    console.print(f"[green]Added edition with attributes: {edition_name}[/green]")
-                            break
+                                    console.print(f"[green]Added edition with attributes: {edition_info['name']}[/green]")
+                        else:
+                            matched_editions_without_attributes.append(str(edition_info['minutes']))
+                            if meta['debug']:
+                                console.print(f"[yellow]Added edition without attributes: {edition_info['name']}[/yellow]")
 
             # Process the matched editions
             if matched_editions_with_attributes or matched_editions_without_attributes:
@@ -191,3 +262,11 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                 console.print(f"Final Edition: {edition}")
 
     return edition, repack
+
+
+def format_duration(seconds):
+    """Convert seconds to a human-readable HH:MM:SS format."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}"

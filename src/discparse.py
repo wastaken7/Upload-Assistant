@@ -213,6 +213,7 @@ class DiscParse():
                                     user_input = input(f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): ").strip()
                                     if user_input:
                                         bdinfo['edition'] = user_input
+                                        selected_playlists[idx]['edition'] = user_input
                                         console.print(f"[bold green]Edition updated to: {bdinfo['edition']}")
                                 else:
                                     console.print("[bold yellow]Unattended mode: Custom edition not added.")
