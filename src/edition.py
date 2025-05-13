@@ -47,9 +47,12 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
             all_playlists = []
             for disc in meta['discs']:
-                if disc.get('playlists'):
-                    all_playlists.extend(disc['playlists'])
-
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    if disc.get('playlists'):
+                        all_playlists.extend(disc['playlists'])
+                else:
+                    if disc.get('all_valid_playlists'):
+                        all_playlists.extend(disc['all_valid_playlists'])
             if meta['debug']:
                 console.print(f"[cyan]Found {len(all_playlists)} playlists to check against IMDb editions[/cyan]")
 
@@ -95,37 +98,45 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
                     # If multiple editions match this playlist, ask the user
                     if len(matching_editions) > 1:
-                        console.print(f"[yellow]Playlist edition [green]{playlist_edition} [yellow]using file [green]{playlist_file} [yellow]with duration [green]{formatted_duration} [yellow]matches multiple editions:[/yellow]")
-                        for i, ed in enumerate(matching_editions):
-                            console.print(f"[yellow]{i+1}. [green]{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)")
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            console.print(f"[yellow]Playlist edition [green]{playlist_edition} [yellow]using file [green]{playlist_file} [yellow]with duration [green]{formatted_duration} [yellow]matches multiple editions:[/yellow]")
+                            for i, ed in enumerate(matching_editions):
+                                console.print(f"[yellow]{i+1}. [green]{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)")
 
-                        try:
-                            choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]")
+                            try:
+                                choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]")
 
-                            if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
-                                selected = matching_editions[int(choice)-1]
-                            elif choice.strip().lower() == 'e':
-                                selected = playlist_edition
-                            else:
-                                # Default to the closest match (smallest difference)
+                                if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
+                                    selected = matching_editions[int(choice)-1]
+                                elif choice.strip().lower() == 'e':
+                                    selected = playlist_edition
+                                else:
+                                    # Default to the closest match (smallest difference)
+                                    selected = min(matching_editions, key=lambda x: x['difference'])
+                                    console.print(f"[yellow]Using closest match: {selected['name']}[/yellow]")
+
+                                # Add the selected edition to our matches
+                                if selected == playlist_edition:
+                                    console.print(f"[green]Using playlist edition: {selected}[/green]")
+                                    matched_editions_with_attributes.append(selected)
+                                elif selected['has_attributes']:
+                                    if selected['name'] not in matched_editions_with_attributes:
+                                        matched_editions_with_attributes.append(selected['name'])
+                                        console.print(f"[green]Added edition with attributes: {selected['name']}[/green]")
+                                else:
+                                    matched_editions_without_attributes.append(str(selected['minutes']))
+                                    console.print(f"[yellow]Added edition without attributes: {selected['name']}[/yellow]")
+
+                            except Exception as e:
+                                console.print(f"[red]Error processing selection: {e}. Using closest match.[/red]")
+                                # Default to closest match
                                 selected = min(matching_editions, key=lambda x: x['difference'])
-                                console.print(f"[yellow]Using closest match: {selected['name']}[/yellow]")
-
-                            # Add the selected edition to our matches
-                            if selected == playlist_edition:
-                                console.print(f"[green]Using playlist edition: {selected}[/green]")
-                                matched_editions_with_attributes.append(selected)
-                            elif selected['has_attributes']:
-                                if selected['name'] not in matched_editions_with_attributes:
+                                if selected['has_attributes']:
                                     matched_editions_with_attributes.append(selected['name'])
-                                    console.print(f"[green]Added edition with attributes: {selected['name']}[/green]")
-                            else:
-                                matched_editions_without_attributes.append(str(selected['minutes']))
-                                console.print(f"[yellow]Added edition without attributes: {selected['name']}[/yellow]")
-
-                        except Exception as e:
-                            console.print(f"[red]Error processing selection: {e}. Using closest match.[/red]")
-                            # Default to closest match
+                                else:
+                                    matched_editions_without_attributes.append(str(selected['minutes']))
+                        else:
+                            console.print(f"[yellow]Playlist edition [green]{playlist_edition} [yellow]using file [green]{playlist_file} [yellow]with duration [green]{formatted_duration} [yellow]matches multiple editions, but unattended mode is enabled. Using closest match.[/yellow]")
                             selected = min(matching_editions, key=lambda x: x['difference'])
                             if selected['has_attributes']:
                                 matched_editions_with_attributes.append(selected['name'])
