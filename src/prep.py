@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from src.console import console
-from src.exceptions import *  # noqa: F403
 from src.clients import Clients
 from data.config import config
 from src.tvmaze import search_tvmaze
@@ -19,6 +18,7 @@ from src.edition import get_edition
 from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr, get_video, get_resolution, get_type, is_3d, is_sd
 from src.tags import get_tag, tag_override
 from src.get_disc import get_disc
+from src.get_source import get_source
 
 try:
     import traceback
@@ -27,8 +27,6 @@ try:
     from guessit import guessit
     import ntpath
     from pathlib import Path
-    import json
-    from pymediainfo import MediaInfo
     import tmdbsimple as tmdb
     import time
     import itertools
@@ -631,7 +629,7 @@ class Prep():
 
         meta['3D'] = await is_3d(mi, bdinfo)
 
-        meta['source'], meta['type'] = await self.get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+        meta['source'], meta['type'] = await get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
 
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = await get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
@@ -722,85 +720,6 @@ class Prep():
             return category
         except Exception:
             return "TV"
-
-    async def get_source(self, type, video, path, is_disc, meta, folder_id, base_dir):
-        if not meta.get('is_disc') == "BDMV":
-            try:
-                with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
-                    mi = json.load(f)
-            except Exception:
-                if meta['debug']:
-                    console.print("No mediainfo.json")
-        try:
-            if meta.get('manual_source', None):
-                source = meta['manual_source']
-            else:
-                try:
-                    source = guessit(video)['source']
-                except Exception:
-                    try:
-                        source = guessit(path)['source']
-                    except Exception:
-                        source = "BluRay"
-            if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
-                if type == "DISC":
-                    source = "Blu-ray"
-                elif type in ('ENCODE', 'REMUX'):
-                    source = "BluRay"
-            if is_disc == "DVD" or source in ("DVD", "dvd"):
-                try:
-                    if is_disc == "DVD":
-                        mediainfo = MediaInfo.parse(f"{meta['discs'][0]['path']}/VTS_{meta['discs'][0]['main_set'][0][:2]}_0.IFO")
-                    else:
-                        mediainfo = MediaInfo.parse(video)
-                    for track in mediainfo.tracks:
-                        if track.track_type == "Video":
-                            system = track.standard
-                    if system not in ("PAL", "NTSC"):
-                        raise WeirdSystem  # noqa: F405
-                except Exception:
-                    try:
-                        other = guessit(video)['other']
-                        if "PAL" in other:
-                            system = "PAL"
-                        elif "NTSC" in other:
-                            system = "NTSC"
-                    except Exception:
-                        system = ""
-                    if system == "" or system is None:
-                        try:
-                            framerate = mi['media']['track'][1].get('FrameRate', '')
-                            if '25' in framerate or '50' in framerate:
-                                system = "PAL"
-                            elif framerate:
-                                system = "NTSC"
-                            else:
-                                system = ""
-                        except Exception:
-                            system = ""
-                finally:
-                    if system is None:
-                        system = ""
-                    if type == "REMUX":
-                        system = f"{system} DVD".strip()
-                    source = system
-            if source in ("Web", "WEB"):
-                if type == "ENCODE":
-                    type = "WEBRIP"
-            if source in ("HD-DVD", "HD DVD", "HDDVD"):
-                if is_disc == "HDDVD":
-                    source = "HD DVD"
-                if type in ("ENCODE", "REMUX"):
-                    source = "HDDVD"
-            if type in ("WEBDL", 'WEBRIP'):
-                source = "Web"
-            if source == "Ultra HDTV":
-                source = "UHDTV"
-        except Exception:
-            console.print(traceback.format_exc())
-            source = "BluRay"
-
-        return source, type
 
     async def stream_optimized(self, stream_opt):
         if stream_opt is True:
