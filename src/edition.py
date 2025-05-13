@@ -15,7 +15,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             if general_track and general_track.get('Duration'):
                 try:
                     media_duration_seconds = float(general_track['Duration'])
-                    console.print(f"[cyan]Found media duration: {media_duration_seconds} seconds[/cyan]")
+                    if meta['debug']:
+                        console.print(f"[cyan]Found media duration: {media_duration_seconds} seconds[/cyan]")
 
                     leeway_seconds = 30
 
@@ -33,7 +34,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
                             if not manual_edition:
                                 edition = edition_name
-                                console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
+                                if meta['debug']:
+                                    console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
                             break
                 except (ValueError, TypeError) as e:
                     console.print(f"[yellow]Error parsing duration: {e}[/yellow]")
@@ -46,7 +48,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                 if disc.get('playlists'):
                     all_playlists.extend(disc['playlists'])
 
-            console.print(f"[cyan]Found {len(all_playlists)} playlists to check against IMDb editions[/cyan]")
+            if meta['debug']:
+                console.print(f"[cyan]Found {len(all_playlists)} playlists to check against IMDb editions[/cyan]")
 
             leeway_seconds = 30
             matched_editions_with_attributes = []
@@ -55,7 +58,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             for playlist in all_playlists:
                 if playlist.get('duration'):
                     playlist_duration = float(playlist['duration'])
-                    console.print(f"[cyan]Checking playlist duration: {playlist_duration} seconds[/cyan]")
+                    if meta['debug']:
+                        console.print(f"[cyan]Checking playlist duration: {playlist_duration} seconds[/cyan]")
 
                     for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
                         edition_seconds = edition_info.get('seconds', 0)
@@ -68,10 +72,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                             if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
                                 edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
                                 matched_editions_with_attributes.append(edition_name)
-                                console.print(f"[green]Added edition with attributes: {edition_name}[/green]")
-                            else:
-                                matched_editions_without_attributes.append(runtime_key)  # Just store the runtime key
-                                console.print(f"[yellow]Found edition without attributes (runtime: {runtime_key})[/yellow]")
+                                if meta['debug']:
+                                    console.print(f"[green]Added edition with attributes: {edition_name}[/green]")
                             break
 
             # Process the matched editions
@@ -79,10 +81,12 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                 # Only use "Theatrical" if we have at least one edition with attributes
                 if matched_editions_with_attributes and matched_editions_without_attributes:
                     matched_editions = matched_editions_with_attributes + ["Theatrical"]
-                    console.print("[cyan]Adding 'Theatrical Edition' label because we have both attribute and non-attribute editions[/cyan]")
+                    if meta['debug']:
+                        console.print("[cyan]Adding 'Theatrical' label because we have both attribute and non-attribute editions[/cyan]")
                 else:
                     matched_editions = matched_editions_with_attributes
-                    console.print("[cyan]Using only editions with attributes[/cyan]")
+                    if meta['debug']:
+                        console.print("[cyan]Using only editions with attributes[/cyan]")
 
                 # Handle final edition formatting
                 if matched_editions:
@@ -99,7 +103,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                     else:
                         edition = matched_editions[0]
 
-                    console.print(f"[bold green]Setting edition from BDMV playlist matches: {edition}[/bold green]")
+                    if meta['debug']:
+                        console.print(f"[bold green]Setting edition from BDMV playlist matches: {edition}[/bold green]")
 
     if not edition:
         if video.lower().startswith('dc'):
@@ -182,6 +187,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                 edition = edition.replace('  ', ' ')
 
         if edition != "":
-            console.print(f"Final Edition: {edition}")
+            if meta['debug']:
+                console.print(f"Final Edition: {edition}")
 
     return edition, repack
