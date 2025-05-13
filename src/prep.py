@@ -351,10 +351,14 @@ class Prep():
         if meta.get('infohash') is not None and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
             meta = await client.get_ptp_from_hash(meta)
 
+        if not meta.get('category', None):
+            meta['category'] = await self.get_cat(video, meta)
+        else:
+            meta['category'] = meta['category'].upper()
+
         if not meta.get('image_list') and not meta.get('edit', False):
-            # from the torrent id, get the torrent data
-            initial_cat_check = await self.get_cat(video, meta)
-            await get_tracker_data(video, meta, search_term, search_file_folder, initial_cat_check)
+            # Reuse information from trackers with fallback
+            await get_tracker_data(video, meta, search_term, search_file_folder, meta['category'])
         else:
             console.print("Skipping existing search as meta already populated")
 
@@ -368,6 +372,7 @@ class Prep():
         if user_overrides and (meta.get('imdb_id') != 0 or meta.get('tvdb_id') != 0):
             meta = await get_source_override(meta, other_id=True)
             meta['no_override'] = True
+            meta['category'] = meta.get('category', None).upper()
 
         if meta['debug']:
             console.print("ID inputs into prep")
@@ -388,11 +393,6 @@ class Prep():
             meta['original_langauge'] = meta.get('manual_language').lower()
 
         meta['type'] = await get_type(video, meta['scene'], meta['is_disc'], meta)
-
-        if meta.get('category', None) is None:
-            meta['category'] = await self.get_cat(video, meta)
-        else:
-            meta['category'] = meta['category'].upper()
 
         # if it's not an anime, we can run season/episode checks now to speed the process
         if meta.get("not_anime", False) and meta.get("category") == "TV":
