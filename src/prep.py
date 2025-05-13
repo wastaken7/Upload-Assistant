@@ -1027,24 +1027,6 @@ class Prep():
             anon_out = 0
         return anon_out
 
-    async def upload_image(self, session, url, data, headers, files):
-        if headers is None and files is None:
-            async with session.post(url=url, data=data) as resp:
-                response = await resp.json()
-                return response
-        elif headers is None and files is not None:
-            async with session.post(url=url, data=data, files=files) as resp:
-                response = await resp.json()
-                return response
-        elif headers is not None and files is None:
-            async with session.post(url=url, data=data, headers=headers) as resp:
-                response = await resp.json()
-                return response
-        else:
-            async with session.post(url=url, data=data, headers=headers, files=files) as resp:
-                response = await resp.json()
-                return response
-
     async def tag_override(self, meta):
         with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:
             tags = json.load(f)
