@@ -157,8 +157,9 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
     meta["imdb_id"] = int(imdb_id or 0)
 
     raw_tmdb_id = first_result.get("tmdb_id", "")
-    meta["category"], parsed_tmdb_id = await parse_tmdb_id(raw_tmdb_id, meta.get("category"))
-    meta["tmdb_id"] = int(parsed_tmdb_id or 0)
+    if raw_tmdb_id and raw_tmdb_id != "0":
+        meta["category"], parsed_tmdb_id = await parse_tmdb_id(raw_tmdb_id, meta.get("category"))
+        meta["tmdb_id"] = int(parsed_tmdb_id or 0)
 
     if only_id:
         return meta["imdb_id"] or meta["tmdb_id"] or 0
