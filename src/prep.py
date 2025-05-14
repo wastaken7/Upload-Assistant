@@ -572,23 +572,26 @@ class Prep():
             await check_hosts(meta, "covers", url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
 
         if meta.get('tag', None) is None:
-            meta['tag'] = await self.get_tag(video, meta)
-            # all lowercase filenames will have bad group tag, it's probably a scene release.
-            # some extracted files do not match release name so lets double check if it really is a scene release
-            if not meta.get('scene') and meta['tag']:
-                base = os.path.basename(video)
-                match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
-                if match and (not meta['is_disc'] or meta.get('keep_folder', False)):
-                    base = match.group(1)
-                    is_all_lowercase = base.islower()
-                    if is_all_lowercase:
-                        release_name = await self.is_scene(videopath, meta, meta.get('imdb_id', 0), lower=True)
-                        if release_name is not None:
-                            try:
-                                meta['scene_name'] = release_name
-                                meta['tag'] = await self.get_tag(release_name, meta)
-                            except Exception:
-                                console.print("[red]Error getting tag from scene name, check group tag.[/red]")
+            if meta.get('we_need_tag', False):
+                meta['tag'] = await get_tag(meta['scene_name'], meta)
+            else:
+                meta['tag'] = await get_tag(video, meta)
+                # all lowercase filenames will have bad group tag, it's probably a scene release.
+                # some extracted files do not match release name so lets double check if it really is a scene release
+                if not meta.get('scene') and meta['tag']:
+                    base = os.path.basename(video)
+                    match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+                    if match and (not meta['is_disc'] or meta.get('keep_folder', False)):
+                        base = match.group(1)
+                        is_all_lowercase = base.islower()
+                        if is_all_lowercase:
+                            release_name = await is_scene(videopath, meta, meta.get('imdb_id', 0), lower=True)
+                            if release_name is not None:
+                                try:
+                                    meta['scene_name'] = release_name
+                                    meta['tag'] = await self.get_tag(release_name, meta)
+                                except Exception:
+                                    console.print("[red]Error getting tag from scene name, check group tag.[/red]")
 
         else:
             if not meta['tag'].startswith('-') and meta['tag'] != "":
