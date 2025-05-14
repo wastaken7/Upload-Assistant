@@ -490,7 +490,14 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 meta['imdb_id'] = imdb if imdb else 0
                 meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
-                meta['description'], meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
+                if meta['hdb_description'] and len(meta['hdb_description']) > 0 and not only_id:
+                    result = bbcode.clean_hdb_description(meta['hdb_description'])
+                    if result is None:
+                        console.print("[yellow]Failed to clean HDB description, it might be empty or malformed[/yellow]")
+                        meta['description'] = None
+                        meta['image_list'] = []
+                    else:
+                        meta['description'], meta['image_list'] = result
                 found_match = True
                 if meta.get('image_list'):
                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
@@ -519,32 +526,38 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         meta['tvdb_id'] = tvdb_id if tvdb_id else meta.get('tvdb_id')
                         found_match = True
                         if meta['hdb_description'] and len(meta['hdb_description']) > 0:
-                            desc, meta['image_list'] = bbcode.clean_hdb_description(meta['hdb_description'])
-                            console.print("[bold green]Successfully grabbed description from HDB")
-                            console.print(f"Description content:\n{desc[:1000]}...", markup=False)
-                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+                            result = bbcode.clean_hdb_description(meta['hdb_description'])
+                            if result is None:
+                                console.print("[yellow]Failed to clean HDB description, it might be empty or malformed[/yellow]")
+                                desc = None
+                                meta['image_list'] = []
+                            else:
+                                desc, meta['image_list'] = result
+                                console.print("[bold green]Successfully grabbed description from HDB")
+                                console.print(f"Description content:\n{desc[:1000]}...", markup=False)
+                                console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                                edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-                            if edit_choice.lower() == 'e':
-                                edited_description = click.edit(desc)
-                                if edited_description:
-                                    desc = edited_description.strip()
+                                if edit_choice.lower() == 'e':
+                                    edited_description = click.edit(desc)
+                                    if edited_description:
+                                        desc = edited_description.strip()
+                                        meta['description'] = desc
+                                        meta['saved_description'] = True
+                                    console.print(f"[green]Final description after editing:[/green] {desc}", markup=False)
+                                elif edit_choice.lower() == 'd':
+                                    desc = None
+                                    meta['hdb_description'] = ""
+                                    console.print("[yellow]Description discarded.[/yellow]")
+                                else:
+                                    console.print("[green]Keeping the original description.[/green]")
                                     meta['description'] = desc
                                     meta['saved_description'] = True
-                                console.print(f"[green]Final description after editing:[/green] {desc}", markup=False)
-                            elif edit_choice.lower() == 'd':
-                                desc = None
-                                meta['hdb_description'] = ""
-                                console.print("[yellow]Description discarded.[/yellow]")
-                            else:
-                                console.print("[green]Keeping the original description.[/green]")
-                                meta['description'] = desc
-                                meta['saved_description'] = True
-                            if meta.get('image_list'):
-                                valid_images = await check_images_concurrently(meta.get('image_list'), meta)
-                                if valid_images:
-                                    meta['image_list'] = valid_images
-                                    await handle_image_list(meta, tracker_name, valid_images)
+                                if meta.get('image_list'):
+                                    valid_images = await check_images_concurrently(meta.get('image_list'), meta)
+                                    if valid_images:
+                                        meta['image_list'] = valid_images
+                                        await handle_image_list(meta, tracker_name, valid_images)
                     else:
                         console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
                         meta[tracker_key] = None
