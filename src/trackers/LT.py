@@ -44,7 +44,7 @@ class LT():
         elif category_id == '2' and ("telenovela" in meta['keywords'] or "telenovela" in meta['overview']):
             category_id = '8'
         # if is  TURCAS o Asiáticas
-        elif meta["original_language"] in ['ja', 'ko', 'tr'] and category_id == '2' and 'Drama' in meta['genres'] :
+        elif meta["original_language"] in ['ja', 'ko', 'tr'] and category_id == '2' and 'Drama' in meta['genres']:
             category_id = '20'
         return category_id
 
