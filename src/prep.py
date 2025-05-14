@@ -17,7 +17,7 @@ from src.audio import get_audio_languages, get_audio_v2
 from src.edition import get_edition
 from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr, get_video, get_resolution, get_type, is_3d, is_sd
 from src.tags import get_tag, tag_override
-from src.get_disc import get_disc
+from src.get_disc import get_disc, get_dvd_size
 from src.get_source import get_source
 
 try:
@@ -28,7 +28,6 @@ try:
     import ntpath
     from pathlib import Path
     import time
-    import itertools
     from difflib import SequenceMatcher
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
@@ -131,7 +130,7 @@ class Prep():
             else:
                 mi = meta['mediainfo']
 
-            meta['dvd_size'] = await self.get_dvd_size(meta['discs'], meta.get('manual_dvds'))
+            meta['dvd_size'] = await get_dvd_size(meta['discs'], meta.get('manual_dvds'))
             meta['resolution'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
             meta['sd'] = await is_sd(meta['resolution'])
 
@@ -368,11 +367,13 @@ class Prep():
             await ping_unit3d(meta)
 
         # the first user override check that allows to set metadata ids.
+        # it relies on imdb or tvdb already being set.
         user_overrides = config['DEFAULT'].get('user_overrides', False)
         if user_overrides and (meta.get('imdb_id') != 0 or meta.get('tvdb_id') != 0):
             meta = await get_source_override(meta, other_id=True)
-            meta['no_override'] = True
             meta['category'] = meta.get('category', None).upper()
+            # set a flag so that the other check later doesn't run
+            meta['no_override'] = True
 
         if meta['debug']:
             console.print("ID inputs into prep")
@@ -442,18 +443,17 @@ class Prep():
             meta['tmdb_id'] = int(tmdb_id)
             meta['original_language'] = original_language
 
-        # we have tmdb id one way or another, so lets check we have the data
+        # we have tmdb id one way or another, so lets get data is needed
         if int(meta['tmdb_id']) != 0:
-            # if we have these fields already, we probably got them from a multi id searching
-
             if not meta.get('edit', False):
+                # if we have these fields already, we probably got them from a multi id searching
+                # and don't need to fetch them again
                 essential_fields = ['title', 'year', 'genres', 'overview']
                 tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
             else:
                 # if we're in that blastard edit mode, ignore any previous set data and get fresh
                 tmdb_metadata_populated = False
 
-            # otherwise, get it
             if not tmdb_metadata_populated:
                 console.print("Fetching TMDB metadata...")
                 try:
@@ -501,7 +501,7 @@ class Prep():
         else:
             meta.setdefault('tvmaze_id', 0)
 
-        # If no IMDb ID, search for it
+        # If we got to here and still no IMDb ID, search for it
         # bad filenames are bad
         if meta.get('imdb_id') == 0:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'])
@@ -530,14 +530,15 @@ class Prep():
                         meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
 
         if meta['category'] == "TV":
-            # if it wasn't skipped earlier, make sure we have the season/episode data
+            # if it was skipped earlier, make sure we have the season/episode data
             if not meta.get('not_anime', False):
                 meta = await get_season_episode(video, meta)
-            # get all the episode data
+            # all your episode data belongs to us
             meta = await get_tv_data(meta, base_dir, tvdb_api, tvdb_token)
 
         # if we're using tvdb, lets use it's series name if it applies
-        if tvdb_api and tvdb_token:
+        # language check since tvdb returns original language names
+        if tvdb_api and tvdb_token and meta.get('original_language', "") == "en":
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
                 series_name = meta.get('tvdb_episode_data').get('series_name', '')
                 series_name = series_name.replace('(', '').replace(')', '').strip()
@@ -599,6 +600,12 @@ class Prep():
 
         meta = await tag_override(meta)
 
+        if meta['tag'][1:].startswith(meta['channels']):
+            meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
+
+        if meta.get('no_tag', False):
+            meta['tag'] = ""
+
         # user override check that only sets data after metadata setting
         if user_overrides and not meta.get('no_override', False):
             meta = await get_source_override(meta)
@@ -620,12 +627,6 @@ class Prep():
         meta['video'] = video
 
         meta['audio'], meta['channels'], meta['has_commentary'] = await get_audio_v2(mi, meta, bdinfo)
-
-        if meta['tag'][1:].startswith(meta['channels']):
-            meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
-
-        if meta.get('no_tag', False):
-            meta['tag'] = ""
 
         meta['3D'] = await is_3d(mi, bdinfo)
 
@@ -658,10 +659,9 @@ class Prep():
 
         meta.get('stream', False)
         meta['stream'] = await self.stream_optimized(meta['stream'])
-        meta.get('anon', False)
-        meta['anon'] = self.is_anon(meta['anon'])
 
         # return duplicate ids so I don't have to catch every site file
+        # this has the other adavantage of stringifying immb for this object
         meta['tmdb'] = meta.get('tmdb_id')
         if int(meta.get('imdb_id')) != 0:
             imdb_str = str(meta['imdb_id']).zfill(7)
@@ -727,33 +727,3 @@ class Prep():
         else:
             stream = 0
         return stream
-
-    def is_anon(self, anon_in):
-        anon = self.config['DEFAULT'].get("Anon", "False")
-        if anon.lower() == "true":
-            console.print("[bold red]Global ANON has been removed in favor of per-tracker settings. Please update your config accordingly.")
-            time.sleep(10)
-        if anon_in is True:
-            anon_out = 1
-        else:
-            anon_out = 0
-        return anon_out
-
-    async def get_dvd_size(self, discs, manual_dvds):
-        sizes = []
-        dvd_sizes = []
-        for each in discs:
-            sizes.append(each['size'])
-        grouped_sizes = [list(i) for j, i in itertools.groupby(sorted(sizes))]
-        for each in grouped_sizes:
-            if len(each) > 1:
-                dvd_sizes.append(f"{len(each)}x{each[0]}")
-            else:
-                dvd_sizes.append(each[0])
-        dvd_sizes.sort()
-        compact = " ".join(dvd_sizes)
-
-        if manual_dvds:
-            compact = str(manual_dvds)
-
-        return compact

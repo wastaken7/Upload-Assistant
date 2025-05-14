@@ -1,4 +1,5 @@
 import os
+import itertools
 from src.discparse import DiscParse
 
 
@@ -63,3 +64,23 @@ async def get_disc(meta):
         export.close()
     discs = sorted(discs, key=lambda d: d['name'])
     return is_disc, videoloc, bdinfo, discs
+
+
+async def get_dvd_size(self, discs, manual_dvds):
+    sizes = []
+    dvd_sizes = []
+    for each in discs:
+        sizes.append(each['size'])
+    grouped_sizes = [list(i) for j, i in itertools.groupby(sorted(sizes))]
+    for each in grouped_sizes:
+        if len(each) > 1:
+            dvd_sizes.append(f"{len(each)}x{each[0]}")
+        else:
+            dvd_sizes.append(each[0])
+    dvd_sizes.sort()
+    compact = " ".join(dvd_sizes)
+
+    if manual_dvds:
+        compact = str(manual_dvds)
+
+    return compact
