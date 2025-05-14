@@ -705,7 +705,7 @@ async def get_tv_data(meta, base_dir, tvdb_api=None, tvdb_token=None):
                         else:
                             meta['auto_episode_title'] = None
 
-                    if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('overview') and meta.get('original_language') == "en":
+                    if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('overview') and meta.get('original_language', "") == "en":
                         overview = meta['tvdb_episode_data'].get('overview')
                         if overview and isinstance(overview, str) and overview.strip():
                             meta['overview_meta'] = overview.strip()
