@@ -1180,7 +1180,7 @@ class Prep():
                                 else:
                                     meta['auto_episode_title'] = None
 
-                            if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('overview') and meta.get('original_language') == "en":
+                            if meta.get('tvdb_episode_data') and meta['tvdb_episode_data'].get('overview') and meta.get('original_language', "") == "en":
                                 overview = meta['tvdb_episode_data'].get('overview')
                                 if overview and isinstance(overview, str) and overview.strip():
                                     meta['overview_meta'] = overview.strip()
@@ -1255,7 +1255,7 @@ class Prep():
                 if tvdb_api and tvdb_token:
                     tvdb_series_name = await get_tvdb_series_data(base_dir, tvdb_token, meta.get('tvdb_id'), tvdb_api, debug=meta.get('debug', False))
 
-        if tvdb_api and tvdb_token:
+        if tvdb_api and tvdb_token and meta.get('original_language', "") == "en":
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
                 series_name = meta.get('tvdb_episode_data').get('series_name', '')
                 series_name = series_name.replace('(', '').replace(')', '').strip()
