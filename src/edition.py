@@ -7,7 +7,7 @@ from src.console import console
 async def get_edition(video, bdinfo, filelist, manual_edition, meta):
     edition = ""
 
-    if meta.get('imdb_info', {}).get('edition_details'):
+    if meta.get('imdb_info', {}).get('edition_details') and not manual_edition:
         if not meta.get('is_disc') == "BDMV" and meta.get('mediainfo', {}).get('media', {}).get('track'):
             general_track = next((track for track in meta['mediainfo']['media']['track']
                                   if track.get('@type') == 'General'), None)
@@ -15,28 +15,81 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             if general_track and general_track.get('Duration'):
                 try:
                     media_duration_seconds = float(general_track['Duration'])
+                    formatted_duration = format_duration(media_duration_seconds)
                     if meta['debug']:
-                        console.print(f"[cyan]Found media duration: {media_duration_seconds} seconds[/cyan]")
+                        console.print(f"[cyan]Found media duration: {formatted_duration} ({media_duration_seconds} seconds)[/cyan]")
 
                     leeway_seconds = 50
+                    matching_editions = []
 
+                    # Find all matching editions
                     for runtime_key, edition_info in meta['imdb_info']['edition_details'].items():
                         edition_seconds = edition_info.get('seconds', 0)
+                        edition_formatted = format_duration(edition_seconds)
                         difference = abs(media_duration_seconds - edition_seconds)
 
                         if difference <= leeway_seconds:
-                            console.print(f"[green]Matched edition: {edition_info['display_name']} - duration difference: {difference} seconds[/green]")
+                            has_attributes = bool(edition_info.get('attributes') and len(edition_info['attributes']) > 0)
+                            if meta['debug']:
+                                console.print(f"[green]Potential match: {edition_info['display_name']} - duration {edition_formatted}, difference: {format_duration(difference)}[/green]")
 
-                            if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
+                            if has_attributes:
                                 edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
-                            else:
-                                edition_name = ""
 
-                            if not manual_edition:
-                                edition = edition_name
+                                matching_editions.append({
+                                    'name': edition_name,
+                                    'display_name': edition_info['display_name'],
+                                    'has_attributes': bool(edition_info.get('attributes') and len(edition_info['attributes']) > 0),
+                                    'minutes': edition_info['minutes'],
+                                    'difference': difference,
+                                    'formatted_duration': edition_formatted
+                                })
+                            else:
                                 if meta['debug']:
-                                    console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
-                            break
+                                    console.print("[yellow]Edition without attributes are theatrical editions and skipped[/yellow]")
+
+                    if len(matching_editions) > 1:
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            console.print(f"[yellow]Media file duration {formatted_duration} matches multiple editions:[/yellow]")
+                            for i, ed in enumerate(matching_editions):
+                                diff_formatted = format_duration(ed['difference'])
+                                console.print(f"[yellow]{i+1}. [green]{ed['name']} ({ed['display_name']}, duration: {ed['formatted_duration']}, diff: {diff_formatted})[/yellow]")
+
+                            try:
+                                choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}) or press Enter to use the closest match: [/yellow]")
+
+                                if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
+                                    selected = matching_editions[int(choice)-1]
+                                else:
+                                    selected = min(matching_editions, key=lambda x: x['difference'])
+                                    console.print(f"[yellow]Using closest match: {selected['name']}[/yellow]")
+                            except Exception as e:
+                                console.print(f"[red]Error processing selection: {e}. Using closest match.[/red]")
+                                selected = min(matching_editions, key=lambda x: x['difference'])
+                        else:
+                            selected = min(matching_editions, key=lambda x: x['difference'])
+                            console.print(f"[yellow]Multiple matches found in unattended mode. Using closest match: {selected['name']}[/yellow]")
+
+                        if selected['has_attributes']:
+                            edition = selected['name']
+                        else:
+                            edition = ""
+
+                        console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
+
+                    elif len(matching_editions) == 1:
+                        selected = matching_editions[0]
+                        if selected['has_attributes']:
+                            edition = selected['name']
+                        else:
+                            edition = ""  # No special edition for single matches without attributes
+
+                        console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
+
+                    else:
+                        if meta['debug']:
+                            console.print(f"[yellow]No matching editions found within {leeway_seconds} seconds of media duration[/yellow]")
+
                 except (ValueError, TypeError) as e:
                     console.print(f"[yellow]Error parsing duration: {e}[/yellow]")
 
@@ -146,7 +199,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                     # If just one edition matches, add it directly
                     elif len(matching_editions) == 1:
                         edition_info = matching_editions[0]
-                        console.print(f"[green]Playlist matches edition: {edition_info['display_name']}[/green]")
+                        console.print(f"[green]Playlist {playlist_edition} matches edition: {edition_info['display_name']} {edition_name}[/green]")
 
                         if edition_info['has_attributes']:
                             if edition_info['name'] not in matched_editions_with_attributes:
