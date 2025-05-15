@@ -241,24 +241,26 @@ class MTV():
         else:
             mtv_name = meta['name']
             prefix_removed = False
-            tokens = ("Dual-Audio ", "Dubbed ")
+            replacement_prefix = ""
 
-            for token in tokens:
-                index = mtv_name.find(token)
-                if index != -1:
-                    prefix_removed = True
-                    prefix_index = index
-                    # Remove only the first occurrence of the token.
-                    mtv_name = mtv_name[:index] + mtv_name[index + len(token):]
-                    break
+            # Check for Dual-Audio or Dubbed prefix
+            if "Dual-Audio " in mtv_name:
+                prefix_removed = True
+                prefix_index = mtv_name.find("Dual-Audio ")
+                replacement_prefix = "DUAL "
+                mtv_name = mtv_name[:prefix_index] + mtv_name[prefix_index + len("Dual-Audio "):]
+            elif "Dubbed " in mtv_name:
+                prefix_removed = True
+                prefix_index = mtv_name.find("Dubbed ")
+                replacement_prefix = "DUBBED "
+                mtv_name = mtv_name[:prefix_index] + mtv_name[prefix_index + len("Dubbed "):]
+
             audio_str = meta['audio']
             if prefix_removed:
-                # Remove the token from the audio string too.
-                for token in tokens:
-                    audio_str = audio_str.replace(token, "")
+                audio_str = audio_str.replace("Dual-Audio ", "").replace("Dubbed ", "")
 
             if prefix_removed and prefix_index != -1:
-                mtv_name = f"{mtv_name[:prefix_index]}DUAL {mtv_name[prefix_index:].lstrip()}"
+                mtv_name = f"{mtv_name[:prefix_index]}{replacement_prefix}{mtv_name[prefix_index:].lstrip()}"
 
             if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE') and "DD" in audio_str:
                 mtv_name = mtv_name.replace(audio_str, audio_str.replace(' ', '', 1))
