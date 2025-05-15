@@ -443,7 +443,7 @@ class Prep():
             meta['tmdb_id'] = int(tmdb_id)
             meta['original_language'] = original_language
 
-        # we have tmdb id one way or another, so lets get data is needed
+        # we have tmdb id one way or another, so lets get data if needed
         if int(meta['tmdb_id']) != 0:
             if not meta.get('edit', False):
                 # if we have these fields already, we probably got them from a multi id searching
