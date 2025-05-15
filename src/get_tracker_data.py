@@ -2,8 +2,8 @@ import aiohttp
 import requests
 from data.config import config
 from src.console import console
-from src.trackermeta import update_metadata_from_tracker, check_images_concurrently
-from src.btnid import get_btn_torrents, get_bhd_torrents
+from src.trackermeta import update_metadata_from_tracker
+from src.btnid import get_btn_torrents
 from src.clients import Clients
 from src.trackersetup import tracker_class_map
 
@@ -61,32 +61,6 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
                 if meta.get('imdb_id') != 0:
                     found_match = True
                     break
-            elif tracker == "BHD":
-                bhd_api = config['DEFAULT'].get('bhd_api')
-                bhd_rss_key = config['DEFAULT'].get('bhd_rss_key')
-                if meta.get('bhd'):
-                    if len(str(meta['bhd'])) > 8:
-                        if not meta.get('infohash'):
-                            meta['infohash'] = meta['bhd']
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, info_hash=meta['infohash'])
-                        if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
-                            found_match = True
-                            break
-                        if meta.get('image_list'):
-                            valid_images = await check_images_concurrently(meta.get('image_list'), meta)
-                            if valid_images:
-                                meta['image_list'] = valid_images
-                    else:
-                        await get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id, torrent_id=meta['bhd'])
-                        if meta.get('imdb_id') != 0 or meta.get('tmdb_id') != 0:
-                            found_match = True
-                            break
-                        if meta.get('image_list'):
-                            valid_images = await check_images_concurrently(meta.get('image_list'), meta)
-                            if valid_images:
-                                meta['image_list'] = valid_images
-                else:
-                    console.print("[yellow]No BHD ID found, skipping BHD tracker update.[/yellow]")
             else:
                 meta = await process_tracker(tracker, meta, only_id)
                 if found_match:
