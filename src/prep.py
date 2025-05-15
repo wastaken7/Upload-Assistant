@@ -572,6 +572,54 @@ class Prep():
             approved_image_hosts = ['imgbox', 'imgbb', 'pixhost']
             await check_hosts(meta, "covers", url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
 
+        # user override check that only sets data after metadata setting
+        if user_overrides and not meta.get('no_override', False):
+            meta = await get_source_override(meta)
+
+        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
+            tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
+            bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 and not isinstance(tracks[1].get('BitRate', ''), dict) else ''  # Check that bitrate is not a dict
+            bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 and not isinstance(tracks[0].get('OverallBitRate', ''), dict) else ''  # Check for old MediaInfo
+            meta['episode_title'] = ""
+            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.get('resolution') == "1080p":  # 8Mbps for 1080p
+                meta['service'] = "CR"
+            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "1080p":  # Only assign if at least one bitrate is present, otherwise leave it to user
+                meta['service'] = "HIDI"
+            elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.get('resolution') == "720p":  # 4Mbps for 720p
+                meta['service'] = "CR"
+            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "720p":
+                meta['service'] = "HIDI"
+
+        meta['video'] = video
+
+        meta['audio'], meta['channels'], meta['has_commentary'] = await get_audio_v2(mi, meta, bdinfo)
+
+        meta['3D'] = await is_3d(mi, bdinfo)
+
+        meta['source'], meta['type'] = await get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
+
+        meta['uhd'] = await get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
+        meta['hdr'] = await get_hdr(mi, bdinfo)
+
+        meta['distributor'] = await get_distributor(meta['distributor'])
+
+        if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
+            meta['region'] = await get_region(bdinfo, meta.get('region', None))
+            meta['video_codec'] = await get_video_codec(bdinfo)
+        else:
+            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await get_video_encode(mi, meta['type'], bdinfo)
+
+        if meta.get('no_edition') is False:
+            meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
+            if "REPACK" in meta.get('edition', ""):
+                meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
+                meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
+        else:
+            meta['edition'] = ""
+
+        meta.get('stream', False)
+        meta['stream'] = await self.stream_optimized(meta['stream'])
+
         if meta.get('tag', None) is None:
             if meta.get('we_need_tag', False):
                 meta['tag'] = await get_tag(meta['scene_name'], meta)
@@ -606,59 +654,11 @@ class Prep():
         if meta.get('no_tag', False):
             meta['tag'] = ""
 
-        # user override check that only sets data after metadata setting
-        if user_overrides and not meta.get('no_override', False):
-            meta = await get_source_override(meta)
-
-        if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
-            tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
-            bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 and not isinstance(tracks[1].get('BitRate', ''), dict) else ''  # Check that bitrate is not a dict
-            bitrate_oldMediaInfo = tracks[0].get('OverallBitRate', '') if len(tracks) > 0 and not isinstance(tracks[0].get('OverallBitRate', ''), dict) else ''  # Check for old MediaInfo
-            meta['episode_title'] = ""
-            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.get('resolution') == "1080p":  # 8Mbps for 1080p
-                meta['service'] = "CR"
-            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "1080p":  # Only assign if at least one bitrate is present, otherwise leave it to user
-                meta['service'] = "HIDI"
-            elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.get('resolution') == "720p":  # 4Mbps for 720p
-                meta['service'] = "CR"
-            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.get('resolution') == "720p":
-                meta['service'] = "HIDI"
-
-        meta['video'] = video
-
-        meta['audio'], meta['channels'], meta['has_commentary'] = await get_audio_v2(mi, meta, bdinfo)
-
-        meta['3D'] = await is_3d(mi, bdinfo)
-
-        meta['source'], meta['type'] = await get_source(meta['type'], video, meta['path'], meta['is_disc'], meta, folder_id, base_dir)
-
         if meta.get('service', None) in (None, ''):
             meta['service'], meta['service_longname'] = await get_service(video, meta.get('tag', ''), meta['audio'], meta['filename'])
         elif meta.get('service'):
             services = await get_service(get_services_only=True)
             meta['service_longname'] = max((k for k, v in services.items() if v == meta['service']), key=len, default=meta['service'])
-
-        meta['uhd'] = await get_uhd(meta['type'], guessit(meta['path']), meta['resolution'], meta['path'])
-        meta['hdr'] = await get_hdr(mi, bdinfo)
-
-        meta['distributor'] = await get_distributor(meta['distributor'])
-
-        if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
-            meta['region'] = await get_region(bdinfo, meta.get('region', None))
-            meta['video_codec'] = await get_video_codec(bdinfo)
-        else:
-            meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await get_video_encode(mi, meta['type'], bdinfo)
-
-        if meta.get('no_edition') is False:
-            meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
-            if "REPACK" in meta.get('edition', ""):
-                meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
-                meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')
-        else:
-            meta['edition'] = ""
-
-        meta.get('stream', False)
-        meta['stream'] = await self.stream_optimized(meta['stream'])
 
         # return duplicate ids so I don't have to catch every site file
         # this has the other adavantage of stringifying immb for this object
