@@ -1270,8 +1270,8 @@ class Prep():
                     console.print(f"[yellow]tvdb series name: {tvdb_series_name}")
 
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
-        meta['bluray_score'] = int(self.config['DEFAULT'].get('bluray_score', 100))
-        meta['bluray_single_score'] = int(self.config['DEFAULT'].get('bluray_single_score', 100))
+        meta['bluray_score'] = int(float(self.config['DEFAULT'].get('bluray_score', 100)))
+        meta['bluray_single_score'] = int(float(self.config['DEFAULT'].get('bluray_single_score', 100)))
         meta['use_bluray_images'] = self.config['DEFAULT'].get('use_bluray_images', False)
         if meta.get('is_disc') == "BDMV" and get_bluray_info and (meta.get('distributor') is None or meta.get('region') is None) and meta.get('imdb_id') != 0:
             await get_bluray_releases(meta)
