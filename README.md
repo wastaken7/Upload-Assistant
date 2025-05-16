@@ -42,13 +42,14 @@ mkbrr support with binaries from https://github.com/autobrr/mkbrr
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
       - On linux systems, get it from your favorite package manager
    - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` - or download a zip of the source
+   - Install necessary python modules `pip3 install --user -U -r requirements.txt`
+   - From the installation directory, run `python3 config-generator.py`
+   - OR
    - Copy and Rename `data/example-config.py` to `data/config.py`
    - Edit `config.py` to use your information (more detailed information in the [wiki](https://github.com/Audionut/Upload-Assistant/wiki))
-      - tmdb_api (v3) key can be obtained from https://developers.themoviedb.org/3/getting-started/introduction
+      - tmdb_api key can be obtained from https://www.themoviedb.org/settings/api
       - image host api keys can be obtained from their respective sites
-   - Install necessary python modules `pip3 install --user -U -r requirements.txt`
      
-   
    **Additional Resources are found in the [wiki](https://github.com/Audionut/Upload-Assistant/wiki)**
    
    Feel free to contact me if you need help, I'm not that hard to find.
@@ -58,6 +59,7 @@ mkbrr support with binaries from https://github.com/autobrr/mkbrr
   - Run a `git pull` to grab latest updates
   - Or download a fresh zip and overwrite existing files
   - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
+  - Run `python3 config-generator.py` 
 
 ## **CLI Usage:**
   
