@@ -255,8 +255,8 @@ async def get_audio_v2(mi, meta, bdinfo):
     if format == "MPEG Audio":
         if format_profile == "Layer 2":
             codec = "MP2"
-        else:
-            codec = track.get('CodecID_Hint', '')
+        elif format_profile == "Layer 3":
+            codec = "MP3"
 
     if codec == "DD" and chan == "7.1":
         console.print("[warning] Detected codec is DD but channel count is 7.1, correcting to DD+")
