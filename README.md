@@ -74,29 +74,29 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
 Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
 
 <a href="https://github.com/autobrr/mkbrr">
-  <img src="https://github.com/autobrr/mkbrr/blob/main/.github/assets/mkbrr-dark.png?raw=true" alt="mkbrr" height="50px"/>
-</a>&nbsp;
+  <img src="https://github.com/autobrr/mkbrr/blob/main/.github/assets/mkbrr-dark.png?raw=true" alt="mkbrr" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://ffmpeg.org/">
-  <img src="https://i.postimg.cc/G2tgFz21/FFmpeg-Logo-new-svg.png" alt="FFmpeg" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/xdj3BS7S/FFmpeg-Logo-new-svg.png" alt="FFmpeg" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://mediaarea.net/en/MediaInfo">
-  <img src="https://i.postimg.cc/5t9TNLZD/45c0bef-bd47360.png" alt="Mediainfo" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/vTkjXmHh/Media-Info-Logo-svg.png" alt="Mediainfo" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://www.themoviedb.org/">
-  <img src="https://i.postimg.cc/1tpXHx3k/blue-square-2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png" alt="TMDb" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/1tpXHx3k/blue-square-2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png" alt="TMDb" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://www.imdb.com/">
-  <img src="https://i.postimg.cc/CLVmvwr1/IMDb-Logo-Rectangle-Gold-CB443386186.png" alt="IMDb" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/CLVmvwr1/IMDb-Logo-Rectangle-Gold-CB443386186.png" alt="IMDb" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://thetvdb.com/">
-  <img src="https://i.postimg.cc/Hs1KKqsS/logo1.png" alt="TheTVDB" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/Hs1KKqsS/logo1.png" alt="TheTVDB" height="40px;"/>
+</a>&nbsp;&nbsp;
 
 <a href="https://www.tvmaze.com/">
-  <img src="https://i.postimg.cc/2jdRzkJp/tvm-header-logo.png" alt="TVmaze" height="50px"/>
-</a>&nbsp;
+  <img src="https://i.postimg.cc/2jdRzkJp/tvm-header-logo.png" alt="TVmaze" height="40px;"/>
+</a>&nbsp;&nbsp;
