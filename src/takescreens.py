@@ -22,7 +22,7 @@ from src.cleanup import cleanup
 img_host = [
     config["DEFAULT"][key].lower()
     for key in sorted(config["DEFAULT"].keys())
-    if key.startswith("img_host_1")
+    if key.startswith("img_host_1") and not key.endswith("0")
 ]
 task_limit = int(config['DEFAULT'].get('process_limit', 1))
 threads = str(config['DEFAULT'].get('threads', '1'))
