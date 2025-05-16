@@ -393,6 +393,7 @@ config = {
             "api_key": "OTW api key",
             "announce_url": "https://oldtoons.world/announce/customannounceurl",
             # "anon" : False,
+            # "modq" : False, # Send to modq for staff approval
         },
         "PT": {
             "api_key": "PT api key",
