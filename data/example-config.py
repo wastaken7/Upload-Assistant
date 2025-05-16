@@ -5,7 +5,7 @@ config = {
         # will print the changelog if an update is available
         "verbose_notification": False,
 
-        # tmdb api key
+        # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
 
@@ -33,7 +33,7 @@ config = {
         "zipline_url": "",
         "zipline_api_key": "",
 
-        # Order of image hosts, and backup image hosts
+        # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, oeimg, dalexni, zipline, passtheimage
         "img_host_1": "",
         "img_host_2": "",
@@ -46,10 +46,10 @@ config = {
         "add_logo": False,
 
         # Logo image size
-        "logo_size": "420",
+        "logo_size": "300",
 
-        # Accepted logo language (ISO 639-1)
-        # If a logo with this language cannot be found, English will be used instead
+        # logo language (ISO 639-1)
+        # If a logo with this language cannot be found, en (English) will be used instead
         "logo_language": "",
 
         # Number of screenshots to capture
@@ -57,16 +57,15 @@ config = {
 
         # Number of screenshots per row in the description. Default is single row.
         # Only for sites that use common description for now
-        "screens_per_row": "3",
+        "screens_per_row": "",
 
-        # Add some overlay details to the screenshots
-        # Frame number/type and "Tonemapped" if applicable
+        # Overlay Frame number/type and "Tonemapped" if applicable to screenshots
         "frame_overlay": False,
 
         # Overlay text size (scales with resolution)
         "overlay_text_size": "18",
 
-        # Tonemap HDR screenshots
+        # Tonemap HDR - DV+HDR screenshots
         "tone_map": False,
 
         # Tonemap HDR screenshots with the following settings
@@ -74,7 +73,7 @@ config = {
         "algorithm": "mobius",
         "desat": "10.0",
 
-        # Add header above screenshots in description when screens have been tonemapped (in bbcode)
+        # Add this header above screenshots in description when screens have been tonemapped (in bbcode)
         "tonemapped_header": "[center][code] Screenshots have been tonemapped for reference [/code][/center]",
 
         # Number of cutoff screenshots

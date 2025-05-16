@@ -39,6 +39,11 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
       - On linux systems, get it from your favorite package manager
    - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` - or download a zip of the source
    - Install necessary python modules `pip3 install --user -U -r requirements.txt`
+      - `sudo apt install pip` if needed
+  - If you receive an error about externally managed environment
+      - Install virtual python environment `python3 -m venv venv`
+      - Activate the virtual environment `source venv/bin/activate`
+      - Then install the requirements `pip install -r requirents.txt`
    - From the installation directory, run `python3 config-generator.py`
    - OR
    - Copy and Rename `data/example-config.py` to `data/config.py`

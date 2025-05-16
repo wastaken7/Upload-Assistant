@@ -531,87 +531,113 @@ if __name__ == "__main__":
     existing_config, existing_path = load_existing_config()
 
     if existing_config and example_config:
-        use_existing = input("\nExisting config found. Would you like to edit instead of starting fresh? (Y/n): ").lower()
-        if use_existing == "n":
-            print("\n[i] Starting with fresh configuration.")
-            config_data = {}
+        just_updating = input("\nExisting config found. Are you just updating for the latest UA config options? (Y/n): ").lower()
+        if just_updating == "n":
+            use_existing = input("\nWould you like to edit instead of starting fresh? (Y/n): ").lower()
+            if use_existing == "n":
+                print("\n[i] Starting with fresh configuration.")
+                print("Enter to accept the default values/skip, or enter your own values.")
+                config_data = {}
 
-            # DEFAULT section
-            example_defaults = example_config.get("DEFAULT", {})
-            config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments)
-            # Set default client name if not set
-            config_data["DEFAULT"]["default_torrent_client"] = config_data["DEFAULT"].get("default_torrent_client", "qbittorrent")
-
-            # TRACKERS section
-            example_trackers = example_config.get("TRACKERS", {})
-            config_data["TRACKERS"] = configure_trackers({}, example_trackers, config_comments)
-
-            # TORRENT_CLIENTS section
-            example_clients = example_config.get("TORRENT_CLIENTS", {})
-            default_client = None
-            client_configs, default_client = configure_torrent_clients(
-                {}, example_clients, default_client, config_comments
-            )
-            config_data["TORRENT_CLIENTS"] = client_configs
-            config_data["DEFAULT"]["default_torrent_client"] = default_client
-
-            generate_config_file(config_data)
-        else:
-            print("\n[i] Using existing configuration as a template.")
-            print("[i] Existing config will be renamed config.py.bak.")
-
-            # Check for unexpected keys in existing config
-            existing_config = validate_config(existing_config, example_config)
-
-            # Start with the existing config
-            config_data = existing_config.copy()
-
-            # Ask about updating each main section separately
-            print("\nYou can choose which sections of the configuration to update:")
-            print("This allows you to edit your already defined settings in these sections.")
-
-            # DEFAULT section
-            update_default = input("Update DEFAULT section? (y/n): ").lower() == "y"
-            if update_default:
-                existing_defaults = existing_config.get("DEFAULT", {})
+                # DEFAULT section
                 example_defaults = example_config.get("DEFAULT", {})
-                config_data["DEFAULT"] = configure_default_section(existing_defaults, example_defaults, config_comments)
-                # Set default client name (if needed)
+                config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments)
+                # Set default client name if not set
                 config_data["DEFAULT"]["default_torrent_client"] = config_data["DEFAULT"].get("default_torrent_client", "qbittorrent")
-            else:
-                print("[i] Keeping existing DEFAULT section")
-                print()
 
-            # TRACKERS section
-            update_trackers = input("Update TRACKERS section? (y/n): ").lower() == "y"
-            if update_trackers:
-                existing_trackers = existing_config.get("TRACKERS", {})
+                # TRACKERS section
                 example_trackers = example_config.get("TRACKERS", {})
-                config_data["TRACKERS"] = configure_trackers(existing_trackers, example_trackers, config_comments)
-            else:
-                print("[i] Keeping existing TRACKERS section")
-                print()
+                config_data["TRACKERS"] = configure_trackers({}, example_trackers, config_comments)
 
-            # TORRENT_CLIENTS section
-            update_clients = input("Update TORRENT_CLIENTS section? (y/n): ").lower() == "y"
-            if update_clients:
-                print("\n====== TORRENT CLIENT ======")
-                existing_clients = existing_config.get("TORRENT_CLIENTS", {})
+                # TORRENT_CLIENTS section
                 example_clients = example_config.get("TORRENT_CLIENTS", {})
-                default_client = config_data["DEFAULT"].get("default_torrent_client", None)
-
-                # Get updated client config and default client name
+                default_client = None
                 client_configs, default_client = configure_torrent_clients(
-                    existing_clients, example_clients, default_client, config_comments
+                    {}, example_clients, default_client, config_comments
                 )
-
-                # Update client configs and default client name
                 config_data["TORRENT_CLIENTS"] = client_configs
                 config_data["DEFAULT"]["default_torrent_client"] = default_client
-            else:
-                print("[i] Keeping existing TORRENT_CLIENTS section")
-                print()
 
+                generate_config_file(config_data)
+            else:
+                print("\n[i] Using existing configuration as a template.")
+                print("[i] Existing config will be renamed config.py.bak.")
+                print("Enter to accept the default values/skip, or enter your own values.")
+
+                # Check for unexpected keys in existing config
+                existing_config = validate_config(existing_config, example_config)
+
+                # Start with the existing config
+                config_data = existing_config.copy()
+
+                # Ask about updating each main section separately
+                print("\nYou can choose which sections of the configuration to update:")
+                print("This allows you to edit your already defined settings in these sections.")
+
+                # DEFAULT section
+                update_default = input("Update DEFAULT section? (y/n): ").lower() == "y"
+                if update_default:
+                    existing_defaults = existing_config.get("DEFAULT", {})
+                    example_defaults = example_config.get("DEFAULT", {})
+                    config_data["DEFAULT"] = configure_default_section(existing_defaults, example_defaults, config_comments)
+                    # Set default client name (if needed)
+                    config_data["DEFAULT"]["default_torrent_client"] = config_data["DEFAULT"].get("default_torrent_client", "qbittorrent")
+                else:
+                    print("[i] Keeping existing DEFAULT section")
+                    print()
+
+                # TRACKERS section
+                update_trackers = input("Update TRACKERS section? (y/n): ").lower() == "y"
+                if update_trackers:
+                    existing_trackers = existing_config.get("TRACKERS", {})
+                    example_trackers = example_config.get("TRACKERS", {})
+                    config_data["TRACKERS"] = configure_trackers(existing_trackers, example_trackers, config_comments)
+                else:
+                    print("[i] Keeping existing TRACKERS section")
+                    print()
+
+                # TORRENT_CLIENTS section
+                update_clients = input("Update TORRENT_CLIENTS section? (y/n): ").lower() == "y"
+                if update_clients:
+                    print("\n====== TORRENT CLIENT ======")
+                    existing_clients = existing_config.get("TORRENT_CLIENTS", {})
+                    example_clients = example_config.get("TORRENT_CLIENTS", {})
+                    default_client = config_data["DEFAULT"].get("default_torrent_client", None)
+
+                    # Get updated client config and default client name
+                    client_configs, default_client = configure_torrent_clients(
+                        existing_clients, example_clients, default_client, config_comments
+                    )
+
+                    # Update client configs and default client name
+                    config_data["TORRENT_CLIENTS"] = client_configs
+                    config_data["DEFAULT"]["default_torrent_client"] = default_client
+                else:
+                    print("[i] Keeping existing TORRENT_CLIENTS section")
+                    print()
+
+                missing_default_keys = []
+                if "DEFAULT" in example_config and "DEFAULT" in config_data:
+                    def find_missing_default_keys(example_section, existing_section, path=""):
+                        for key in example_section:
+                            if key not in existing_section:
+                                missing_default_keys.append(key)
+                    find_missing_default_keys(example_config["DEFAULT"], config_data["DEFAULT"])
+
+                if missing_default_keys:
+                    print("\n[!] Your existing config is missing these keys from example-config:")
+
+                    # Only prompt for the missing keys
+                    missing_defaults = {k: example_config["DEFAULT"][k] for k in missing_default_keys}
+                    # Use empty dict for existing values so only defaults are shown
+                    added_defaults = configure_default_section({}, missing_defaults, config_comments)
+                    config_data["DEFAULT"].update(added_defaults)
+
+                # Generate the updated config file
+                generate_config_file(config_data, existing_path)
+        else:
+            existing_config = validate_config(existing_config, example_config)
+            config_data = existing_config.copy()
             missing_default_keys = []
             if "DEFAULT" in example_config and "DEFAULT" in config_data:
                 def find_missing_default_keys(example_section, existing_section, path=""):
@@ -634,6 +660,7 @@ if __name__ == "__main__":
 
     else:
         print("\n[i] No existing configuration found. Creating a new one.")
+        print("Enter to accept the default values/skip, or enter your own values.")
 
         config_data = {}
 
