@@ -1,4 +1,4 @@
-[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)
+[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml) [![Test run](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml)
 
 Discord support https://discord.gg/QHHAZu7e2A
 
