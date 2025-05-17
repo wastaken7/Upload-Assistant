@@ -83,10 +83,18 @@ async def all_ids(meta, tvdb_api=None, tvdb_token=None):
             )
 
     # Execute all tasks in parallel
-    results = await asyncio.gather(*all_tasks, return_exceptions=True)
+    try:
+        results = await asyncio.gather(*all_tasks, return_exceptions=True)
+    except Exception as e:
+        console.print(f"[red]Error occurred while gathering tasks: {e}[/red]")
+        return meta
 
     # Process core metadata results
-    tmdb_metadata, imdb_info = results[0:2]
+    try:
+        tmdb_metadata, imdb_info = results[0:2]
+    except Exception as e:
+        console.print(f"[red]Error occurred while processing core metadata: {e}[/red]")
+        return meta
     result_index = 2  # Start processing episode data from this index
 
     # Process TMDB metadata
@@ -328,7 +336,8 @@ async def imdb_tmdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
                     if f"({year})" in aka:
                         aka = aka.replace(f"({year})", "").strip()
                     meta['aka'] = f"AKA {aka.strip()}"
-                    meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
+                    title = meta.get('imdb_info', {}).get('title', "")
+                    meta['title'] = title.strip()
         elif isinstance(imdb_info, Exception):
             console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
             meta['imdb_info'] = meta.get('imdb_info', {})
@@ -552,7 +561,8 @@ async def imdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
                 if f"({year})" in aka:
                     aka = aka.replace(f"({year})", "").strip()
                 meta['aka'] = f"AKA {aka.strip()}"
-                meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
+                title = meta.get('imdb_info', {}).get('title', "")
+                meta['title'] = title.strip()
     elif isinstance(imdb_info_result, Exception):
         console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -651,7 +661,8 @@ async def imdb_tmdb(meta, filename):
                 if f"({year})" in aka:
                     aka = aka.replace(f"({year})", "").strip()
                 meta['aka'] = f"AKA {aka.strip()}"
-                meta['title'] = f"{meta.get('imdb_info', {}).get('title', "").strip()}"
+                title = meta.get('imdb_info', {}).get('title', "")
+                meta['title'] = title.strip()
     elif isinstance(imdb_info_result, Exception):
         console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
