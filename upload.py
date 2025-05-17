@@ -234,8 +234,8 @@ async def process_meta(meta, base_dir):
                 await cleanup_screenshot_temp_files(meta)
                 raise
             except Exception as e:
-                console.print(f"[red]Unexpected error occurred: {e}[/red]")
                 await cleanup_screenshot_temp_files(meta)
+                raise e
             finally:
                 await asyncio.sleep(0.1)
                 await cleanup()
@@ -254,7 +254,7 @@ async def process_meta(meta, base_dir):
                     console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
                     return
                 except Exception as e:
-                    console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
+                    raise e
                 finally:
                     reset_terminal()
                     console.print("[yellow]Cleaning up resources...[/yellow]")
