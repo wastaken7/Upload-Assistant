@@ -1,0 +1,110 @@
+name: Run upload test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Oxipng
+        run: |
+          OXIPNG_LATEST_URL=$(curl -s "https://api.github.com/repos/shssoichiro/oxipng/releases/latest" | grep -oP '"browser_download_url": "\K(.*x86_64-unknown-linux-musl.tar.gz)(?=")')
+          if [ -z "$OXIPNG_LATEST_URL" ]; then
+            echo "Failed to find latest Oxipng release URL for x86_64-unknown-linux-musl"
+            exit 1
+          fi
+          echo "Downloading Oxipng from $OXIPNG_LATEST_URL"
+          curl -L -o oxipng.tar.gz "$OXIPNG_LATEST_URL"
+          tar -xzf oxipng.tar.gz
+          # The extracted folder name might include the version, e.g., oxipng-vX.Y.Z-x86_64-unknown-linux-musl
+          # Find the binary within the extracted folder and move it
+          sudo mv oxipng-*/oxipng /usr/local/bin/
+          sudo chmod +x /usr/local/bin/oxipng
+          oxipng --version # Verify installation
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Download test video
+        run: |
+          curl -L -o big.buck.bunny.2008.m4v "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_640x360.m4v"
+
+      - name: Copy config template
+        run: cp data/templates/config.py data/config.py
+
+      - name: Insert API key into config.py
+        run: |
+          echo "Attempting to insert API key."
+          echo "Length of MY_API_KEY environment variable: ${#MY_API_KEY}"
+          if [ -z "${MY_API_KEY}" ]; then
+            echo "Warning: MY_API_KEY environment variable is empty or not set."
+          else
+            echo "MY_API_KEY environment variable is set."
+          fi
+          sed -i "s|\${API_KEY}|${MY_API_KEY}|g" data/config.py
+        env:
+          MY_API_KEY: ${{ secrets.MY_API_KEY }}
+
+      - name: Run upload.py with test file and check for errors
+        run: |
+          set -e # Exit immediately if a command exits with a non-zero status.
+          set -o pipefail # Causes a pipeline to return the exit status of the last command in the pipe that returned a non-zero return value.
+
+          OUTPUT_FILE="upload_output.txt"
+          
+          # Run the script, redirecting both stdout and stderr to the console and to a file
+          python upload.py big.buck.bunny.2008.m4v -ua -ns --debug 2>&1 | tee $OUTPUT_FILE
+          
+          # The 'python' command above will cause the script to exit if 'upload.py' itself exits non-zero,
+          # due to 'set -e' and 'set -o pipefail'.
+          # Now, we check the content of $OUTPUT_FILE for errors that the script might have printed
+          # even if it exited with code 0.
+
+          echo "--- Full Upload Script Output (for debugging) ---"
+          cat $OUTPUT_FILE
+          echo "--- End of Full Upload Script Output ---"
+          
+          # Define error patterns to search for. Add more specific patterns as needed.
+          # Note: Escape special characters for grep if using complex regex.
+          ERROR_PATTERNS=(
+            "Traceback (most recent call last):"
+            "An unexpected error occurred:"
+            "Connection refused"
+            "\[Errno 111\] Connection refused" # Escaped for grep
+            "Error: Unable to import config."
+            # Add any other critical error messages your script might print
+          )
+
+          ERROR_FOUND=0
+          for pattern in "${ERROR_PATTERNS[@]}"; do
+            if grep -q "$pattern" $OUTPUT_FILE; then
+              echo "::error::Detected error pattern in script output: $pattern"
+              ERROR_FOUND=1
+            fi
+          done
+          
+          if [ $ERROR_FOUND -eq 1 ]; then
+            echo "Critical error patterns found in script output. Failing the step."
+            exit 1
+          else
+            echo "No critical error patterns detected in script output."
+          fi
+
+      - name: Cleanup config.py
+        if: always()
+        run: rm -f data/config.py
