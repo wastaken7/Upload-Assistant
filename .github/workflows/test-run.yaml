@@ -105,6 +105,55 @@ jobs:
             echo "No critical error patterns detected in script output."
           fi
 
+      - name: Download test video
+        run: |
+          curl -L -o tears.of.steel.2012.mkv "https://media.xiph.org/tearsofsteel/tears_of_steel_1080p.webm"
+
+      - name: Run upload.py with test file and check for errors
+        run: |
+          set -e # Exit immediately if a command exits with a non-zero status.
+          set -o pipefail # Causes a pipeline to return the exit status of the last command in the pipe that returned a non-zero return value.
+
+          OUTPUT_FILE="upload_output.txt"
+          
+          # Run the script, redirecting both stdout and stderr to the console and to a file
+          python upload.py tears.of.steel.2012.mkv -ua -ns --debug 2>&1 | tee $OUTPUT_FILE
+          
+          # The 'python' command above will cause the script to exit if 'upload.py' itself exits non-zero,
+          # due to 'set -e' and 'set -o pipefail'.
+          # Now, we check the content of $OUTPUT_FILE for errors that the script might have printed
+          # even if it exited with code 0.
+
+          echo "--- Full Upload Script Output (for debugging) ---"
+          cat $OUTPUT_FILE
+          echo "--- End of Full Upload Script Output ---"
+          
+          # Define error patterns to search for. Add more specific patterns as needed.
+          # Note: Escape special characters for grep if using complex regex.
+          ERROR_PATTERNS=(
+            "Traceback (most recent call last):"
+            "An unexpected error occurred:"
+            "Connection refused"
+            "\[Errno 111\] Connection refused" # Escaped for grep
+            "Error: Unable to import config."
+            # Add any other critical error messages your script might print
+          )
+
+          ERROR_FOUND=0
+          for pattern in "${ERROR_PATTERNS[@]}"; do
+            if grep -q "$pattern" $OUTPUT_FILE; then
+              echo "::error::Detected error pattern in script output: $pattern"
+              ERROR_FOUND=1
+            fi
+          done
+          
+          if [ $ERROR_FOUND -eq 1 ]; then
+            echo "Critical error patterns found in script output. Failing the step."
+            exit 1
+          else
+            echo "No critical error patterns detected in script output."
+          fi
+
       - name: Cleanup config.py
         if: always()
         run: rm -f data/config.py
