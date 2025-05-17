@@ -61,27 +61,31 @@ async def get_tag(video, meta):
 
 
 async def tag_override(meta):
-    with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:
-        tags = json.load(f)
-        f.close()
+    try:
+        with open(f"{meta['base_dir']}/data/tags.json", 'r', encoding="utf-8") as f:
+            tags = json.load(f)
+            f.close()
 
-    for tag in tags:
-        value = tags.get(tag)
-        if value.get('in_name', "") == tag and tag in meta['path']:
-            meta['tag'] = f"-{tag}"
-        if meta['tag'][1:] == tag:
-            for key in value:
-                if key == 'type':
-                    if meta[key] == "ENCODE":
-                        meta[key] = value.get(key)
+        for tag in tags:
+            value = tags.get(tag)
+            if value.get('in_name', "") == tag and tag in meta['path']:
+                meta['tag'] = f"-{tag}"
+            if meta['tag'][1:] == tag:
+                for key in value:
+                    if key == 'type':
+                        if meta[key] == "ENCODE":
+                            meta[key] = value.get(key)
+                        else:
+                            pass
+                    elif key == 'personalrelease':
+                        meta[key] = _is_true(value.get(key, "False"))
+                    elif key == 'template':
+                        meta['desc_template'] = value.get(key)
                     else:
-                        pass
-                elif key == 'personalrelease':
-                    meta[key] = _is_true(value.get(key, "False"))
-                elif key == 'template':
-                    meta['desc_template'] = value.get(key)
-                else:
-                    meta[key] = value.get(key)
+                        meta[key] = value.get(key)
+    except Exception as e:
+        console.print(f"Error while loading tags.json: {e}")
+        return meta
     return meta
 
 
