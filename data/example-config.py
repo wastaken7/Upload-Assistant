@@ -85,7 +85,7 @@ config = {
         # The optimization task is resource intensive.
         # The final value used will be the lowest value of either 'number of screens'
         # or this value. Recommended value is enough to cover your normal number of screens.
-        # If you're on a shared seedbox you may need to limit this to avoid hogging resources.
+        # If you're on a shared seedbox you may want to limit this to avoid hogging resources.
         "process_limit": "4",
 
         # When optimizing images, limit to this many threads spawned by each process above.
@@ -300,20 +300,20 @@ config = {
             "api_key": "",
             "announce_url": "https://frikibar.com/announce/<PASSKEY>",
         },
-        # for HDB you **MUST** have been granted uploading approval via Offers, you've been warned
-        # for HDB to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-        # cookies need to be in netscape format and need to be in data/cookies/HDB.txt
         "HDB": {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
+            # for HDB you **MUST** have been granted uploading approval via Offers, you've been warned
+            # for HDB to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/HDB.txt
             "username": "",
             "passkey": "",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             "img_rehost": True,
         },
-        # for HDT to work you need to export cookies from https://hd-torrent.net/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-        # cookies need to be in netscape format and need to be in data/cookies/HDT.txt
         "HDT": {
+            # for HDT to work you need to export cookies from https://hd-torrent.net/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/HDT.txt
             "username": "",
             "password": "",
             "my_announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",

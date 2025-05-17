@@ -4,7 +4,6 @@ import os
 import re
 import json
 from pathlib import Path
-import getpass
 import ast
 
 
@@ -145,7 +144,8 @@ def validate_config(existing_config, example_config):
         for i, (key_path, parent_dict, key) in enumerate(unexpected_keys):
             print(f"  {i+1}. {key_path}")
 
-        print("\nYou can choose what to do with each key:")
+        print("\n\n[i] The keys have been removed or renamed.")
+        print("[i] You can choose what to do with each key:")
 
         for i, (key_path, parent_dict, key) in enumerate(unexpected_keys):
             value = parent_dict[key]
@@ -208,8 +208,13 @@ def get_user_input(prompt, default="", is_password=False, existing_value=None):
 
     # If we have an existing value, show it as an option
     if existing_value is not None:
-        # Mask passwords in display
-        display_value = "********" if is_password and existing_value else existing_value
+        # For password fields: show first 6 chars and mask the rest
+        if is_password and existing_value:
+            visible_part = existing_value[:6]
+            masked_part = "*" * max(0, len(existing_value) - 6)
+            display_value = f"{visible_part}{masked_part}" if len(existing_value) > 6 else existing_value
+        else:
+            display_value = existing_value
         display = f"{prompt} [existing: {display_value}]"
 
     # Show default if available
@@ -219,10 +224,7 @@ def get_user_input(prompt, default="", is_password=False, existing_value=None):
     display = f"{display}: "
 
     # Prompt for input
-    if is_password:
-        value = getpass.getpass(display)
-    else:
-        value = input(display)
+    value = input(display)
 
     # Use existing value if user just pressed Enter and we have an existing value
     if value == "" and existing_value is not None:
@@ -249,7 +251,7 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
             continue
 
         if key in config_comments:
-            print("\n" + "\n".join(config_comments[key]))
+            print("\n[i] " + "\n[i] ".join(config_comments[key]))
 
         # Handle different value types
         if isinstance(default_value, bool):
@@ -260,12 +262,16 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
                                    existing_value=existing_value)
             config_defaults[key] = value
         else:
+            # Check if this is a password/sensitive field
+            is_password = key in ["api_key", "passkey", "rss_key", "tvdb_token", "tmdb_api", "tvdb_api", "btn_api",
+                                  "imgbb_api", "ptpimg_api", "lensdump_api", "ptscreens_api", "oeimg_api", "dalexni_api",
+                                  "zipline_api_key", "passtheima_ge_api", "bhd_api", "bhd_rss_key"] or "password" in key.lower()
             config_defaults[key] = get_user_input(
                 f"Setting '{key}'",
                 default=str(default_value),
+                is_password=is_password,
                 existing_value=existing_defaults.get(key)
             )
-
     return config_defaults
 
 
@@ -282,32 +288,39 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
         if t != "default_trackers" and isinstance(example_trackers[t], dict)
     ]
     if example_tracker_list:
-        print(f"Available trackers in example config: {', '.join(example_tracker_list)}")
+        print(f"[i] Available trackers in example config: {', '.join(example_tracker_list)}")
+        print("\n[i] Only add the trackers you want to upload to on a regular basis.")
+        print("[i] You can add other tracker configs later if needed.")
 
     existing_tracker_list = existing_trackers.get("default_trackers", "").split(",") if existing_trackers.get("default_trackers") else []
     existing_tracker_list = [t.strip() for t in existing_tracker_list if t.strip()]
     existing_trackers_str = ", ".join(existing_tracker_list)
 
     trackers_input = get_user_input(
-        "Enter tracker acronyms separated by commas (e.g., BHD,PTP,AITHER)",
+        "\nEnter tracker acronyms separated by commas (e.g., BHD, PTP, AITHER)",
         existing_value=existing_trackers_str
-    )
+    ).upper()
     trackers_list = [t.strip().upper() for t in trackers_input.split(",") if t.strip()]
 
     trackers_config = {"default_trackers": ", ".join(trackers_list)}
 
     # Configure trackers from the list
     for tracker in trackers_list:
-        print(f"\nConfiguring {tracker}:")
+        print(f"\n\nConfiguring **{tracker}**:")
         existing_tracker_config = existing_trackers.get(tracker, {})
         example_tracker = example_trackers.get(tracker, {})
         tracker_config = {}
 
         if example_tracker and isinstance(example_tracker, dict):
             for key, default_value in example_tracker.items():
+                # Skip keys that should not be prompted
+                if tracker == "HDT" and key == "announce_url":
+                    tracker_config[key] = example_tracker[key]
+                    continue
+
                 comment_key = f"TRACKERS.{tracker}.{key}"
                 if comment_key in config_comments:
-                    print("\n" + "\n".join(config_comments[comment_key]))
+                    print("\n[i] " + "\n[i] ".join(config_comments[comment_key]))
 
                 if isinstance(default_value, bool):
                     default_str = str(default_value)
@@ -317,7 +330,7 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
                                            existing_value=existing_value)
                     tracker_config[key] = value
                 else:
-                    is_password = key in ["api_key", "passkey", "rss_key"]
+                    is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_url"] or key.endswith("rss_key")
                     tracker_config[key] = get_user_input(
                         f"Tracker setting '{key}'",
                         default=str(default_value) if default_value else "",
@@ -332,23 +345,27 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
     # Offer to add more trackers from the example config
     remaining_trackers = [t for t in example_tracker_list if t.upper() not in [x.upper() for x in trackers_list]]
     if remaining_trackers:
-        print("\nOther trackers available in the example config that are not in your list:")
+        print("\n[i] Other trackers available in the example config that are not in your list:")
         print(", ".join(remaining_trackers))
+        print("\n[i] This just adds the tracker config, not to your list of default trackers.")
         add_more = get_user_input(
-            "Enter any additional tracker acronyms to add (comma separated), or leave blank to skip"
+            "\nEnter any additional tracker acronyms to add (comma separated), or leave blank to skip"
         )
         additional = [t.strip().upper() for t in add_more.split(",") if t.strip()]
         for tracker in additional:
             if tracker in trackers_config:
                 continue  # Already configured
-            print(f"\nConfiguring {tracker}:")
+            print(f"\n\nConfiguring **{tracker}**:")
             example_tracker = example_trackers.get(tracker, {})
             tracker_config = {}
             if example_tracker and isinstance(example_tracker, dict):
                 for key, default_value in example_tracker.items():
+                    if tracker == "HDT" and key == "announce_url":
+                        tracker_config[key] = example_tracker[key]
+                        continue
                     comment_key = f"TRACKERS.{tracker}.{key}"
                     if comment_key in config_comments:
-                        print("\n" + "\n".join(config_comments[comment_key]))
+                        print("\n[i] " + "\n[i] ".join(config_comments[comment_key]))
 
                     if isinstance(default_value, bool):
                         default_str = str(default_value)
@@ -356,7 +373,7 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
                                                default=default_str)
                         tracker_config[key] = value
                     else:
-                        is_password = key in ["api_key", "passkey", "rss_key"]
+                        is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_url"] or key.endswith("rss_key")
                         tracker_config[key] = get_user_input(
                             f"Tracker setting '{key}'",
                             default=str(default_value) if default_value else "",
@@ -381,7 +398,7 @@ def configure_torrent_clients(existing_clients=None, example_clients=None, defau
 
     # Only use default_client_name if provided and in existing_clients
     if default_client_name and default_client_name in existing_clients:
-        keep_existing_client = input(f"Do you want to keep the existing client '{default_client_name}'? (y/n): ").lower() == "y"
+        keep_existing_client = input(f"\nDo you want to keep the existing client '{default_client_name}'? (y/n): ").lower() == "y"
         if not keep_existing_client:
             print("What client do you want to use instead?")
             print("Available clients in example config:")
@@ -414,20 +431,21 @@ def configure_torrent_clients(existing_clients=None, example_clients=None, defau
 
     print(f"\nConfiguring client: {default_client_name}")
 
-    # Set the client type from the example config, never prompt the user
+    # Set the client type from the example config
     client_type = example_client_config.get("torrent_client", default_client_name)
     client_config = {"torrent_client": client_type}
 
     # Process all other client settings
     for key, default_value in example_client_config.items():
+        # this is never edited
         if key == "torrent_client":
-            continue  # Already handled above
+            continue
 
         comment_key = f"TORRENT_CLIENTS.{default_client_name}.{key}"
         if comment_key in config_comments:
-            print("\n" + "\n".join(config_comments[comment_key]))
+            print("\n[i] " + "\n[i] ".join(config_comments[comment_key]))
         elif key in config_comments:
-            print("\n" + "\n".join(config_comments[key]))
+            print("\n[i] " + "\n[i] ".join(config_comments[key]))
 
         if isinstance(default_value, bool):
             default_str = str(default_value)
@@ -533,7 +551,7 @@ if __name__ == "__main__":
     if existing_config and example_config:
         just_updating = input("\nExisting config found. Are you just updating for the latest UA config options? (Y/n): ").lower()
         if just_updating == "n":
-            use_existing = input("\nWould you like to edit instead of starting fresh? (Y/n): ").lower()
+            use_existing = input("\nWould you like to edit existing instead of starting fresh? (Y/n): ").lower()
             if use_existing == "n":
                 print("\n[i] Starting with fresh configuration.")
                 print("Enter to accept the default values/skip, or enter your own values.")
@@ -562,7 +580,7 @@ if __name__ == "__main__":
             else:
                 print("\n[i] Using existing configuration as a template.")
                 print("[i] Existing config will be renamed config.py.bak.")
-                print("Enter to accept the default values/skip, or enter your own values.")
+                print("[i] Press enter to accept the default values/skip, or input your own values.")
 
                 # Check for unexpected keys in existing config
                 existing_config = validate_config(existing_config, example_config)
@@ -571,11 +589,11 @@ if __name__ == "__main__":
                 config_data = existing_config.copy()
 
                 # Ask about updating each main section separately
-                print("\nYou can choose which sections of the configuration to update:")
-                print("This allows you to edit your already defined settings in these sections.")
+                print("\n\n[i] Lets work on one section at a time.")
+                print()
 
                 # DEFAULT section
-                update_default = input("Update DEFAULT section? (y/n): ").lower() == "y"
+                update_default = input("Do you want to update something in the DEFAULT section? (y/n): ").lower() == "y"
                 if update_default:
                     existing_defaults = existing_config.get("DEFAULT", {})
                     example_defaults = example_config.get("DEFAULT", {})
@@ -587,7 +605,7 @@ if __name__ == "__main__":
                     print()
 
                 # TRACKERS section
-                update_trackers = input("Update TRACKERS section? (y/n): ").lower() == "y"
+                update_trackers = input("Do you want to update something in thee TRACKERS section? (y/n): ").lower() == "y"
                 if update_trackers:
                     existing_trackers = existing_config.get("TRACKERS", {})
                     example_trackers = example_config.get("TRACKERS", {})
@@ -597,7 +615,7 @@ if __name__ == "__main__":
                     print()
 
                 # TORRENT_CLIENTS section
-                update_clients = input("Update TORRENT_CLIENTS section? (y/n): ").lower() == "y"
+                update_clients = input("\nDo you want to update something in the TORRENT_CLIENTS section? (y/n): ").lower() == "y"
                 if update_clients:
                     print("\n====== TORRENT CLIENT ======")
                     existing_clients = existing_config.get("TORRENT_CLIENTS", {})
@@ -625,7 +643,7 @@ if __name__ == "__main__":
                     find_missing_default_keys(example_config["DEFAULT"], config_data["DEFAULT"])
 
                 if missing_default_keys:
-                    print("\n[!] Your existing config is missing these keys from example-config:")
+                    print("\n\n[!] Your existing config is missing these keys from example-config:")
 
                     # Only prompt for the missing keys
                     missing_defaults = {k: example_config["DEFAULT"][k] for k in missing_default_keys}
@@ -660,7 +678,7 @@ if __name__ == "__main__":
 
     else:
         print("\n[i] No existing configuration found. Creating a new one.")
-        print("Enter to accept the default values/skip, or enter your own values.")
+        print("[i] Enter to accept the default values/skip, or enter your own values.")
 
         config_data = {}
 
