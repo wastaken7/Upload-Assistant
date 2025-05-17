@@ -20,19 +20,6 @@ config = {
         # btn api key used to get details from btn
         "btn_api": "",
 
-        # image host api keys
-        "imgbb_api": "",
-        "ptpimg_api": "",
-        "lensdump_api": "",
-        "ptscreens_api": "",
-        "oeimg_api": "",
-        "dalexni_api": "",
-        "passtheima_ge_api": "",
-
-        # custom zipline url
-        "zipline_url": "",
-        "zipline_api_key": "",
-
         # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, oeimg, dalexni, zipline, passtheimage
         "img_host_1": "",
@@ -42,14 +29,26 @@ config = {
         "img_host_5": "",
         "img_host_6": "",
 
+        # image host api keys
+        "imgbb_api": "",
+        "ptpimg_api": "",
+        "lensdump_api": "",
+        "ptscreens_api": "",
+        "oeimg_api": "",
+        "dalexni_api": "",
+        "passtheima_ge_api": "",
+        # custom zipline url
+        "zipline_url": "",
+        "zipline_api_key": "",
+
         # Whether to add a logo for the show/movie from TMDB to the top of the description
         "add_logo": False,
 
         # Logo image size
         "logo_size": "300",
 
-        # logo language (ISO 639-1)
-        # If a logo with this language cannot be found, en (English) will be used instead
+        # logo language (ISO 639-1) - default is 'en' (English)
+        # If a logo with this language cannot be found, English will be used instead
         "logo_language": "",
 
         # Number of screenshots to capture
@@ -66,9 +65,9 @@ config = {
         "overlay_text_size": "18",
 
         # Tonemap HDR - DV+HDR screenshots
-        "tone_map": False,
+        "tone_map": True,
 
-        # Tonemap HDR screenshots with the following settings
+        # Tonemap screenshots with the following settings
         # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
         "algorithm": "mobius",
         "desat": "10.0",
@@ -153,7 +152,7 @@ config = {
         "only_id": False,
 
         # set true to use mkbrr for torrent creation
-        "mkbrr": False,
+        "mkbrr": True,
 
         # set true to use argument overrides from data/templates/user-args.json
         "user_overrides": False,
@@ -553,6 +552,7 @@ config = {
         # See https://github.com/Audionut/Upload-Assistant/wiki
         "qbittorrent": {
             "torrent_client": "qbit",
+            # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,
             "qbit_url": "http://127.0.0.1",
             "qbit_port": "8080",
@@ -563,7 +563,6 @@ config = {
             "qbit_tag": "",
             "qbit_cat": "",
             "content_layout": "Original",
-            "VERIFY_WEBUI_CERTIFICATE": True,
             # here you can chose to use either symbolic or hard links, or None to use original path
             # this will disable any automatic torrent management if set
             # use either "symlink" or "hardlink"
@@ -580,6 +579,9 @@ config = {
             # only set qBitTorrent torrent_storage_dir if API searching does not work
             # use double-backslash on windows eg: "C:\\client\\backup"
             # "torrent_storage_dir": "path/to/BT_backup folder",
+
+            # Set to False to skip verify certificate for HTTPS connections; for instance, if the connection is using a self-signed certificate.
+            # "VERIFY_WEBUI_CERTIFICATE": True,
         },
         "rtorrent": {
             "torrent_client": "rtorrent",
@@ -618,7 +620,7 @@ config = {
             "transmission_path": "/transmission/rpc",
             #  path/to/config/torrents folder
             "torrent_storage_dir": "",
-            "transmission_label": "Add this label to all uploads",
+            "transmission_label": "",
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             "local_path": "",
             "remote_path": "",

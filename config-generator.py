@@ -202,7 +202,7 @@ def find_missing_keys(existing_config, example_config):
     return missing_keys
 
 
-def get_user_input(prompt, default="", is_password=False, existing_value=None):
+def get_user_input(prompt, default="", is_password=False, is_announce_url=False, existing_value=None):
     """Get input from user with default value and optional existing value"""
     display = prompt
 
@@ -211,8 +211,16 @@ def get_user_input(prompt, default="", is_password=False, existing_value=None):
         # For password fields: show first 6 chars and mask the rest
         if is_password and existing_value:
             visible_part = existing_value[:6]
-            masked_part = "*" * max(0, len(existing_value) - 6)
+            masked_part = "*" * min(8, max(0, len(existing_value) - 6))
             display_value = f"{visible_part}{masked_part}" if len(existing_value) > 6 else existing_value
+        elif is_announce_url and existing_value:
+            # For announce_urls, show the first 10 chars and last 6 chars with * in between
+            if len(existing_value) > 20:  # Only mask if long enough
+                visible_prefix = existing_value[:15]
+                visible_suffix = existing_value[-6:]
+                masked_length = len(existing_value) - 16
+                masked_part = "*" * min(masked_length, 15)  # Limit number of asterisks
+                display_value = f"{visible_prefix}...{masked_part}...{visible_suffix}"
         else:
             display_value = existing_value
         display = f"{prompt} [existing: {display_value}]"
@@ -237,7 +245,7 @@ def get_user_input(prompt, default="", is_password=False, existing_value=None):
     return value
 
 
-def configure_default_section(existing_defaults, example_defaults, config_comments):
+def configure_default_section(existing_defaults, example_defaults, config_comments, quick_setup=False):
     """
     Helper to configure the DEFAULT section.
     Returns a dict with the configured DEFAULT values.
@@ -245,9 +253,28 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
     print("\n====== DEFAULT CONFIGURATION ======")
     config_defaults = {}
 
+    # Define essential settings that are always prompted
+    essential_settings = [
+        "tmdb_api",
+        "img_host_1"
+    ]
+
+    # If this is a fresh config (no existing defaults), offer quick setup
+    if quick_setup:
+        quick_setup = input("\n[i] Do you want to quick setup with just essential settings? (y/N): ").lower() == "y"
+        if quick_setup:
+            print("[i] Quick setup selected. You'll only be prompted for essential settings.")
+
+    # Process all settings or just essential ones based on quick_setup choice
     for key, default_value in example_defaults.items():
         # Skip special keys that we'll handle separately
         if key in ["default_torrent_client"]:
+            continue
+
+        # Skip non-essential settings in quick setup mode
+        if quick_setup and key not in essential_settings:
+            # Copy from example config
+            config_defaults[key] = default_value
             continue
 
         if key in config_comments:
@@ -272,6 +299,10 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
                 is_password=is_password,
                 existing_value=existing_defaults.get(key)
             )
+
+    if quick_setup:
+        print("\n[i] Applied default values from example config for non-essential settings.")
+
     return config_defaults
 
 
@@ -288,8 +319,8 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
         if t != "default_trackers" and isinstance(example_trackers[t], dict)
     ]
     if example_tracker_list:
-        print(f"[i] Available trackers in example config: {', '.join(example_tracker_list)}")
-        print("\n[i] Only add the trackers you want to upload to on a regular basis.")
+        print(f"[i] Available trackers in example config: \n{', '.join(example_tracker_list)}")
+        print("\n[i] (default trackers list) Only add the trackers you want to upload to on a regular basis.")
         print("[i] You can add other tracker configs later if needed.")
 
     existing_tracker_list = existing_trackers.get("default_trackers", "").split(",") if existing_trackers.get("default_trackers") else []
@@ -297,15 +328,34 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
     existing_trackers_str = ", ".join(existing_tracker_list)
 
     trackers_input = get_user_input(
-        "\nEnter tracker acronyms separated by commas (e.g., BHD, PTP, AITHER)",
+        "\nEnter tracker acronyms separated by commas (e.g. BHD, PTP, AITHER)",
         existing_value=existing_trackers_str
     ).upper()
     trackers_list = [t.strip().upper() for t in trackers_input.split(",") if t.strip()]
 
     trackers_config = {"default_trackers": ", ".join(trackers_list)}
 
-    # Configure trackers from the list
+    # Ask if user wants to update all trackers or specific ones
+    update_all = input("\n[i] Do you want to update ALL trackers in your default trackers list? (Y/n): ").lower() != "n"
+
+    if not update_all:
+        # Ask which specific trackers to update
+        update_specific = input("\nEnter tracker acronyms to update (comma separated), or leave blank to skip all: ").upper()
+        update_trackers_list = [t.strip() for t in update_specific.split(",") if t.strip()]
+    else:
+        # Update all trackers in the list
+        update_trackers_list = trackers_list.copy()
+
+    # Only update trackers in the update list
     for tracker in trackers_list:
+        # Skip if not in update list (unless updating all)
+        if not update_all and tracker not in update_trackers_list:
+            print(f"\nSkipping configuration for {tracker}")
+            # Copy existing config if available
+            if tracker in existing_trackers:
+                trackers_config[tracker] = existing_trackers[tracker]
+            continue
+
         print(f"\n\nConfiguring **{tracker}**:")
         existing_tracker_config = existing_trackers.get(tracker, {})
         example_tracker = example_trackers.get(tracker, {})
@@ -330,11 +380,13 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
                                            existing_value=existing_value)
                     tracker_config[key] = value
                 else:
-                    is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_url"] or key.endswith("rss_key")
+                    is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_uri"] or key.endswith("rss_key")
+                    is_announce_url = key.endswith("announce_url")
                     tracker_config[key] = get_user_input(
                         f"Tracker setting '{key}'",
                         default=str(default_value) if default_value else "",
                         is_password=is_password,
+                        is_announce_url=is_announce_url,
                         existing_value=existing_tracker_config.get(key)
                     )
         else:
@@ -345,9 +397,10 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
     # Offer to add more trackers from the example config
     remaining_trackers = [t for t in example_tracker_list if t.upper() not in [x.upper() for x in trackers_list]]
     if remaining_trackers:
-        print("\n[i] Other trackers available in the example config that are not in your list:")
+        print("\n[i] Other trackers available in the example config that are not in your default list:")
         print(", ".join(remaining_trackers))
-        print("\n[i] This just adds the tracker config, not to your list of default trackers.")
+        print("\n[i] This just adds the tracker config, for example so you can use with -tk")
+        print("\nnot to your list of default trackers.")
         add_more = get_user_input(
             "\nEnter any additional tracker acronyms to add (comma separated), or leave blank to skip"
         )
@@ -373,11 +426,13 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
                                                default=default_str)
                         tracker_config[key] = value
                     else:
-                        is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_url"] or key.endswith("rss_key")
+                        is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_uri"] or key.endswith("rss_key")
+                        is_announce_url = key.endswith("announce_url")
                         tracker_config[key] = get_user_input(
                             f"Tracker setting '{key}'",
                             default=str(default_value) if default_value else "",
-                            is_password=is_password
+                            is_password=is_password,
+                            is_announce_url=is_announce_url
                         )
             else:
                 print(f"[!] No example config found for tracker '{tracker}'.")
@@ -484,11 +539,14 @@ def generate_config_file(config_data, existing_path=None):
             print(f"\n[✓] Created backup of existing config at {backup_path}")
     else:
         config_path = Path("data/config.py")
+        backup_path = Path("data/config.py.bak")
         if config_path.exists():
             overwrite = input(f"{config_path} already exists. Overwrite? (y/n): ").lower()
             if overwrite != "y":
-                print("Aborted.")
-                return False
+                with open(config_path, "r", encoding="utf-8") as src:
+                    with open(backup_path, "w", encoding="utf-8") as dst:
+                        dst.write(src.read())
+                print(f"\n[✓] Created backup of existing config at {backup_path}")
 
     # Convert boolean values in config to proper Python booleans
     def format_config(obj):
@@ -539,7 +597,7 @@ def generate_config_file(config_data, existing_path=None):
 
 
 if __name__ == "__main__":
-    print("Upload Assistant Configuration Generator")
+    print("\nUpload Assistant Configuration Generator")
     print("========================================")
 
     # Get example configuration structure first
@@ -549,7 +607,7 @@ if __name__ == "__main__":
     existing_config, existing_path = load_existing_config()
 
     if existing_config and example_config:
-        just_updating = input("\nExisting config found. Are you just updating for the latest UA config options? (Y/n): ").lower()
+        just_updating = input("\nExisting config found. Are you just updating to grab any new UA config options? (Y/n): ").lower()
         if just_updating == "n":
             use_existing = input("\nWould you like to edit existing instead of starting fresh? (Y/n): ").lower()
             if use_existing == "n":
@@ -559,7 +617,7 @@ if __name__ == "__main__":
 
                 # DEFAULT section
                 example_defaults = example_config.get("DEFAULT", {})
-                config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments)
+                config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments, quick_setup=True)
                 # Set default client name if not set
                 config_data["DEFAULT"]["default_torrent_client"] = config_data["DEFAULT"].get("default_torrent_client", "qbittorrent")
 
@@ -684,7 +742,7 @@ if __name__ == "__main__":
 
         # DEFAULT section
         example_defaults = example_config.get("DEFAULT", {})
-        config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments)
+        config_data["DEFAULT"] = configure_default_section({}, example_defaults, config_comments, quick_setup=True)
         # Set default client name if not set
         config_data["DEFAULT"]["default_torrent_client"] = config_data["DEFAULT"].get("default_torrent_client", "qbittorrent")
 
