@@ -556,7 +556,7 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
-            # Use the 3 letter tracker acronym as a tag
+            # Use the UA tracker acronym as a tag in qBitTorrent
             "use_tracker_as_tag": False,
             "qbit_tag": "",
             "qbit_cat": "",
@@ -570,10 +570,11 @@ config = {
             # if using hardlinking, the linked folder must be on the same drive/volume as the original contnt,
             # with UA mapping the correct location if multiple paths are specified.
             # Use local paths, remote path mapping will be handled.
+            # only single \ on windows, path will be handled by UA
             "linked_folder": [""],
             # Remote path mapping (docker/etc.) CASE SENSITIVE
-            "local_path": "",
-            "remote_path": "",
+            "local_path": [""],
+            "remote_path": [""],
             # only set qBitTorrent torrent_storage_dir if API searching does not work
             # use double-backslash on windows eg: "C:\\client\\backup"
             # "torrent_storage_dir": "path/to/BT_backup folder",
@@ -592,8 +593,8 @@ config = {
             "linking": "",
             "linked_folder": [""],
             # Remote path mapping (docker/etc.) CASE SENSITIVE
-            "local_path": "",
-            "remote_path": "",
+            "local_path": [""],
+            "remote_path": [""],
         },
         "deluge": {
             "torrent_client": "deluge",
@@ -604,8 +605,8 @@ config = {
             # path/to/session folder
             "torrent_storage_dir": "",
             # Remote path mapping (docker/etc.) CASE SENSITIVE
-            "local_path": "",
-            "remote_path": "",
+            "local_path": [""],
+            "remote_path": [""],
         },
         "transmission": {
             "torrent_client": "transmission",
@@ -620,8 +621,8 @@ config = {
             "torrent_storage_dir": "",
             "transmission_label": "",
             # Remote path mapping (docker/etc.) CASE SENSITIVE
-            "local_path": "",
-            "remote_path": "",
+            "local_path": [""],
+            "remote_path": [""],
         },
         "watch": {
             "torrent_client": "watch",
