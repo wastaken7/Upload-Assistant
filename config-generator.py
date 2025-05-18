@@ -253,34 +253,67 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
     print("\n====== DEFAULT CONFIGURATION ======")
     config_defaults = {}
 
-    # Define essential settings that are always prompted
-    essential_settings = [
-        "tmdb_api",
-        "img_host_1"
-    ]
+    # Settings that should only be prompted if a parent setting has a specific value
+    linked_settings = {
+        "update_notification": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["verbose_notification"]
+        },
+        "tone_map": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["algorithm", "desat", "tonemapped_header"]
+        },
+        "add_logo": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["logo_size", "logo_language"]
+        },
+        "frame_overlay": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["overlay_text_size"]
+        },
+        "multiScreens": {
+            "condition": lambda value: (value.isdigit() and int(value) > 0),
+            "settings": ["pack_thumb_size", "charLimit", "fileLimit", "processLimit", ]
+        },
+        "get_bluray_info": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["add_bluray_link", "use_bluray_images", "bluray_image_size", "bluray_score", "bluray_single_score"]
+        }
+    }
+
+    # Store which settings should be skipped based on linked settings
+    skip_settings = set()
 
     # If this is a fresh config (no existing defaults), offer quick setup
+    do_quick_setup = False
     if quick_setup:
-        quick_setup = input("\n[i] Do you want to quick setup with just essential settings? (y/N): ").lower() == "y"
-        if quick_setup:
+        do_quick_setup = input("\n[i] Do you want to quick setup with just essential settings? (y/N): ").lower() == "y"
+        if do_quick_setup:
             print("[i] Quick setup selected. You'll only be prompted for essential settings.")
 
-    # Process all settings or just essential ones based on quick_setup choice
+    # Define essential settings for quick setup mode
+    essential_settings = [
+        "tmdb_api"
+    ]
+
     for key, default_value in example_defaults.items():
-        # Skip special keys that we'll handle separately
         if key in ["default_torrent_client"]:
             continue
 
+        # Skip if this setting should be skipped based on linked settings
+        if key in skip_settings:
+            # Copy default value from example config
+            config_defaults[key] = default_value
+            continue
+
         # Skip non-essential settings in quick setup mode
-        if quick_setup and key not in essential_settings:
-            # Copy from example config
+        if do_quick_setup and key not in essential_settings:
             config_defaults[key] = default_value
             continue
 
         if key in config_comments:
             print("\n[i] " + "\n[i] ".join(config_comments[key]))
 
-        # Handle different value types
         if isinstance(default_value, bool):
             default_str = str(default_value)
             existing_value = str(existing_defaults.get(key, default_value))
@@ -288,11 +321,16 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
                                    default=default_str,
                                    existing_value=existing_value)
             config_defaults[key] = value
+
+            # Check if this is a linked setting that controls other settings
+            if key in linked_settings:
+                linked_group = linked_settings[key]
+                # If the condition is not met, add all linked settings to the skip list
+                if not linked_group["condition"](value):
+                    print(f"[i] Skipping {key}-related settings since {key} is {value}")
+                    skip_settings.update(linked_group["settings"])
         else:
-            # Check if this is a password/sensitive field
-            is_password = key in ["api_key", "passkey", "rss_key", "tvdb_token", "tmdb_api", "tvdb_api", "btn_api",
-                                  "imgbb_api", "ptpimg_api", "lensdump_api", "ptscreens_api", "oeimg_api", "dalexni_api",
-                                  "zipline_api_key", "passtheima_ge_api", "bhd_api", "bhd_rss_key"] or "password" in key.lower()
+            is_password = key in ["api_key", "passkey", "rss_key", "tvdb_token", "tmdb_api", "tvdb_api", "btn_api"] or "password" in key.lower() or key.endswith("_key") or key.endswith("_api") or key.endswith("_url")
             config_defaults[key] = get_user_input(
                 f"Setting '{key}'",
                 default=str(default_value),
@@ -300,10 +338,114 @@ def configure_default_section(existing_defaults, example_defaults, config_commen
                 existing_value=existing_defaults.get(key)
             )
 
-    if quick_setup:
+            if key in linked_settings:
+                linked_group = linked_settings[key]
+                if not linked_group["condition"](config_defaults[key]):
+                    print(f"[i] Skipping {key}-related settings since {key} is {config_defaults[key]}")
+                    skip_settings.update(linked_group["settings"])
+
+    if do_quick_setup:
+        get_img_host(config_defaults, existing_defaults, example_defaults, config_comments)
         print("\n[i] Applied default values from example config for non-essential settings.")
 
     return config_defaults
+
+
+# Process image hosts
+def get_img_host(config_defaults, existing_defaults, example_defaults, config_comments):
+    img_host_api_map = {
+        "imgbb": "imgbb_api",
+        "ptpimg": "ptpimg_api",
+        "lensdump": "lensdump_api",
+        "ptscreens": "ptscreens_api",
+        "oeimg": "oeimg_api",
+        "dalexni": "dalexni_api",
+        "ziplinestudio": ["zipline_url", "zipline_api_key"],
+        "passtheimage": "passtheima_ge_api",
+        "imgbox": None,
+        "pixhost": None
+    }
+
+    print("\n==== IMAGE HOST CONFIGURATION ====")
+    print("[i] Available image hosts: " + ", ".join(img_host_api_map.keys()))
+    print("[i] Note: imgbox and pixhost don't require API keys")
+
+    # Get existing image hosts if available
+    existing_hosts = []
+    for i in range(1, 11):
+        key = f"image_host_{i}"
+        if key in existing_defaults and existing_defaults[key]:
+            existing_hosts.append(existing_defaults[key].strip().lower())
+
+    if existing_hosts:
+        print(f"\n[i] Your existing image hosts: {', '.join(existing_hosts)}")
+
+    try:
+        default_count = len(existing_hosts) if existing_hosts else 1
+        number_hosts = int(input(f"\n[i] How many image hosts would you like to configure? (1-10) [default: {default_count}]: ") or default_count)
+        number_hosts = max(1, min(10, number_hosts))  # Limit between 1 and 10
+    except ValueError:
+        print(f"[!] Invalid input. Defaulting to {default_count} image host(s).")
+        number_hosts = default_count
+
+    # Ask for each image host in sequence
+    for i in range(1, number_hosts + 1):
+        # Get existing value for this position if available
+        existing_host = existing_hosts[i-1] if i <= len(existing_hosts) else None
+        existing_display = f" [existing: {existing_host}]" if existing_host else ""
+
+        valid_host = False
+        while not valid_host:
+            host_input = input(f"\n[i] Enter image host #{i}{existing_display} (e.g., ptpimg, imgbb, imgbox): ").strip().lower()
+
+            if host_input == "" and existing_host:
+                host_input = existing_host
+
+            if host_input in img_host_api_map:
+                valid_host = True
+                host_key = f"image_host_{i}"
+                config_defaults[host_key] = host_input
+
+                # Configure API key(s) for this host, if needed
+                api_keys = img_host_api_map.get(host_input)
+                if api_keys is None:
+                    print(f"[i] {host_input} doesn't require an API key.")
+                    continue
+
+                # Convert single string to list for consistent handling
+                if isinstance(api_keys, str):
+                    api_keys = [api_keys]
+
+                # Process each key for this host
+                for api_key in api_keys:
+                    if api_key in example_defaults:
+                        if api_key in config_comments:
+                            print("\n[i] " + "\n[i] ".join(config_comments[api_key]))
+
+                        is_password = api_key.endswith("_url") or api_key.endswith("_key") or api_key.endswith("_api")
+                        config_defaults[api_key] = get_user_input(
+                            f"Setting '{api_key}' for {host_input}",
+                            default=str(example_defaults.get(api_key, "")),
+                            is_password=is_password,
+                            existing_value=existing_defaults.get(api_key)
+                        )
+            else:
+                print(f"[!] Invalid host: {host_input}. Available hosts: {', '.join(img_host_api_map.keys())}")
+
+    # Set unused image host API keys to empty string
+    for host, api_key_item in img_host_api_map.items():
+        if api_key_item is None:
+            # Skip hosts that don't need API keys
+            continue
+
+        if isinstance(api_key_item, str):
+            api_keys = [api_key_item]
+        else:
+            api_keys = api_key_item
+
+        for api_key in api_keys:
+            if api_key in example_defaults and api_key not in config_defaults:
+                config_defaults[api_key] = ""
 
 
 def configure_trackers(existing_trackers, example_trackers, config_comments):
@@ -399,8 +541,8 @@ def configure_trackers(existing_trackers, example_trackers, config_comments):
     if remaining_trackers:
         print("\n[i] Other trackers available in the example config that are not in your default list:")
         print(", ".join(remaining_trackers))
-        print("\n[i] This just adds the tracker config, for example so you can use with -tk")
-        print("\nnot to your list of default trackers.")
+        print("\n[i] This just adds the tracker config, not to your list of default trackers.")
+        print("\nFor example so you can use with -tk.")
         add_more = get_user_input(
             "\nEnter any additional tracker acronyms to add (comma separated), or leave blank to skip"
         )

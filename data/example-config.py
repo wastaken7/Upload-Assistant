@@ -27,7 +27,6 @@ config = {
         "img_host_3": "",
         "img_host_4": "",
         "img_host_5": "",
-        "img_host_6": "",
 
         # image host api keys
         "imgbb_api": "",
@@ -51,8 +50,20 @@ config = {
         # If a logo with this language cannot be found, English will be used instead
         "logo_language": "",
 
+        # set true to add episode overview to description
+        "episode_overview": False,
+
         # Number of screenshots to capture
         "screens": "4",
+
+        # Number of cutoff screenshots
+        # If there are at least this many screenshots already, perhaps pulled from existing
+        # description, skip creating and uploading any further screenshots.
+        "cutoff_screens": "4",
+
+        # Providing the option to change the size of the screenshot thumbnails where supported.
+        # Default is 350, ie [img=350]
+        "thumbnail_size": "350",
 
         # Number of screenshots per row in the description. Default is single row.
         # Only for sites that use common description for now
@@ -75,11 +86,6 @@ config = {
         # Add this header above screenshots in description when screens have been tonemapped (in bbcode)
         "tonemapped_header": "[center][code] Screenshots have been tonemapped for reference [/code][/center]",
 
-        # Number of cutoff screenshots
-        # If there are at least this many screenshots already, perhaps pulled from existing
-        # description, skip creating and uploading any further screenshots.
-        "cutoff_screens": "4",
-
         # MULTI PROCESSING
         # The optimization task is resource intensive.
         # The final value used will be the lowest value of either 'number of screens'
@@ -92,10 +98,6 @@ config = {
         # This is equivalent to the old shared_seedbox setting, however the existing process
         # only used a single process. You probably need to limit this to 1 or 2 to avoid hogging resources.
         "threads": "10",
-
-        # Providing the option to change the size of the screenshot thumbnails where supported.
-        # Default is 350, ie [img=350]
-        "thumbnail_size": "350",
 
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
@@ -157,17 +159,10 @@ config = {
         # set true to use argument overrides from data/templates/user-args.json
         "user_overrides": False,
 
-        # set true to add episode overview to description
-        "episode_overview": False,
-
         # set true to skip automated client torrent searching
         # this will search qbittorrent clients for matching torrents
         # and use found torrent id's for existing hash and site searching
         'skip_auto_torrent': False,
-
-        # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING
-        # set true to not delete existing meta.json file before running
-        "keep_meta": False,
 
         # If there is no region/distributor ids specified, we can use existing torrents to check
         # This will use data from matching torrents in qBitTorrent/RuTorrent to find matching site ids
@@ -205,6 +200,9 @@ config = {
         # If there is only a single release on bluray.com, you may wish to relax the score a little
         "bluray_single_score": 89.5,
 
+        # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING
+        # set true to not delete existing meta.json file before running
+        "keep_meta": False,
     },
 
     # these are used for DB links on AR
