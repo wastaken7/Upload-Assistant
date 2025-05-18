@@ -27,6 +27,8 @@ from src.trackerstatus import process_all_trackers
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 from src.cleanup import cleanup
 from src.add_comparison import add_comparison
+from src.get_name import get_name
+from src.get_desc import gen_desc
 if os.name == "posix":
     import termios
 
@@ -97,7 +99,7 @@ async def process_meta(meta, base_dir):
         console.print(f"Error in gather_prep: {e}")
         console.print(traceback.format_exc())
         return
-    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+    meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
     parser = Args(config)
     helper = UploadHelper()
     if meta.get('trackers'):
@@ -133,7 +135,7 @@ async def process_meta(meta, base_dir):
                 meta['trackers'] = [meta['trackers']]
         meta['edit'] = True
         meta = await prep.gather_prep(meta=meta, mode='cli')
-        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
+        meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
         confirm = await helper.get_confirmation(meta)
 
     successful_trackers = await process_all_trackers(meta)
@@ -232,8 +234,8 @@ async def process_meta(meta, base_dir):
                 await cleanup_screenshot_temp_files(meta)
                 raise
             except Exception as e:
-                console.print(f"[red]Unexpected error occurred: {e}[/red]")
                 await cleanup_screenshot_temp_files(meta)
+                raise e
             finally:
                 await asyncio.sleep(0.1)
                 await cleanup()
@@ -252,7 +254,7 @@ async def process_meta(meta, base_dir):
                     console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
                     return
                 except Exception as e:
-                    console.print(f"\n[red]Unexpected error during upload: {e}[/red]")
+                    raise e
                 finally:
                     reset_terminal()
                     console.print("[yellow]Cleaning up resources...[/yellow]")
@@ -302,7 +304,7 @@ async def process_meta(meta, base_dir):
                 create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
 
         if 'saved_description' in meta and meta['saved_description'] is False:
-            meta = await prep.gen_desc(meta)
+            meta = await gen_desc(meta)
 
         if meta.get('description') in ('None', '', ' '):
             meta['description'] = None
