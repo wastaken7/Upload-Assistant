@@ -31,24 +31,27 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - ALL WITH MINIMAL INPUT!
   - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs.
 
-Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
-
-mkbrr support with binaries from https://github.com/autobrr/mkbrr
-
 ## **Setup:**
    - **REQUIRES AT LEAST PYTHON 3.9 AND PIP3**
    - Needs [mono](https://www.mono-project.com/) on linux systems for BDInfo
    - Also needs MediaInfo and ffmpeg installed on your system
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
       - On linux systems, get it from your favorite package manager
-   - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` - or download a zip of the source
+   - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` 
+      - or download a zip of the source
+   - Install necessary python modules `pip3 install --user -U -r requirements.txt`
+      - `sudo apt install pip` if needed
+  - If you receive an error about externally managed environment
+      - Install virtual python environment `python3 -m venv venv`
+      - Activate the virtual environment `source venv/bin/activate`
+      - Then install the requirements `pip install -r requirents.txt`
+   - From the installation directory, run `python3 config-generator.py`
+   - OR
    - Copy and Rename `data/example-config.py` to `data/config.py`
    - Edit `config.py` to use your information (more detailed information in the [wiki](https://github.com/Audionut/Upload-Assistant/wiki))
-      - tmdb_api (v3) key can be obtained from https://developers.themoviedb.org/3/getting-started/introduction
+      - tmdb_api key can be obtained from https://www.themoviedb.org/settings/api
       - image host api keys can be obtained from their respective sites
-   - Install necessary python modules `pip3 install --user -U -r requirements.txt`
      
-   
    **Additional Resources are found in the [wiki](https://github.com/Audionut/Upload-Assistant/wiki)**
    
    Feel free to contact me if you need help, I'm not that hard to find.
@@ -58,6 +61,7 @@ mkbrr support with binaries from https://github.com/autobrr/mkbrr
   - Run a `git pull` to grab latest updates
   - Or download a fresh zip and overwrite existing files
   - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
+  - Run `python3 config-generator.py` and select to grab new UA config options.
 
 ## **CLI Usage:**
   
@@ -70,3 +74,17 @@ mkbrr support with binaries from https://github.com/autobrr/mkbrr
   Visit our wonderful [docker usage wiki page](https://github.com/Audionut/Upload-Assistant/wiki/Docker)
 
   Also see this excellent video put together by a community memeber https://videos.badkitty.zone/ua
+
+## **Attributions:**
+
+Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
+
+<p>
+  <a href="https://github.com/autobrr/mkbrr"><img src="https://github.com/autobrr/mkbrr/blob/main/.github/assets/mkbrr-dark.png?raw=true" alt="mkbrr" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://ffmpeg.org/"><img src="https://i.postimg.cc/xdj3BS7S/FFmpeg-Logo-new-svg.png" alt="FFmpeg" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://mediaarea.net/en/MediaInfo"><img src="https://i.postimg.cc/vTkjXmHh/Media-Info-Logo-svg.png" alt="Mediainfo" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://www.themoviedb.org/"><img src="https://i.postimg.cc/1tpXHx3k/blue-square-2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png" alt="TMDb" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://www.imdb.com/"><img src="https://i.postimg.cc/CLVmvwr1/IMDb-Logo-Rectangle-Gold-CB443386186.png" alt="IMDb" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://thetvdb.com/"><img src="https://i.postimg.cc/Hs1KKqsS/logo1.png" alt="TheTVDB" height="40px;"></a>&nbsp;&nbsp;
+  <a href="https://www.tvmaze.com/"><img src="https://i.postimg.cc/2jdRzkJp/tvm-header-logo.png" alt="TVmaze" height="40px"></a>
+</p>
