@@ -37,7 +37,8 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
    - Also needs MediaInfo and ffmpeg installed on your system
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
       - On linux systems, get it from your favorite package manager
-   - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` - or download a zip of the source
+   - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git` 
+      - or download a zip of the source
    - Install necessary python modules `pip3 install --user -U -r requirements.txt`
       - `sudo apt install pip` if needed
   - If you receive an error about externally managed environment
@@ -60,7 +61,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - Run a `git pull` to grab latest updates
   - Or download a fresh zip and overwrite existing files
   - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
-  - Run `python3 config-generator.py` 
+  - Run `python3 config-generator.py` and select to grab new UA config options.
 
 ## **CLI Usage:**
   
