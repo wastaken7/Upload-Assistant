@@ -381,11 +381,12 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                                 edited_description = click.edit(description)
                                 if edited_description:
                                     desc = edited_description.strip()
-                                    meta['description'] = description
+                                    meta['description'] = desc
                                     meta['saved_description'] = True
-                                console.print(f"[green]Final description after editing:[/green] {desc}")
+                                console.print(f"[green]Final description after editing:[/green] {meta['description']}", markup=False)
                             elif edit_choice.lower() == 'd':
-                                description = ""
+                                meta['description'] = ""
+                                meta['image_list'] = []
                                 console.print("[yellow]Description discarded.[/yellow]")
                             else:
                                 console.print("[green]Keeping the original description.[/green]")
@@ -406,7 +407,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                                     edit_choice = input("Enter 'd' to discard, or press Enter to keep it as is: ")
 
                                     if edit_choice.lower() == 'd':
-                                        description = ""
+                                        meta['description'] = ""
+                                        meta['image_list'] = []
                                         nfo_file_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'], "bhd.nfo")
                                         nfo_file.close()
 
@@ -447,7 +449,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     meta['tmdb_id'] = 0
                     meta["framestor"] = False
                     meta["flux"] = False
-                    meta["description"] = None
+                    meta["description"] = ""
                     meta["image_list"] = []
                     meta['nfo'] = False
                     meta['bhd_nfo'] = False
@@ -517,7 +519,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     result = bbcode.clean_hdb_description(meta['hdb_description'])
                     if result is None:
                         console.print("[yellow]Failed to clean HDB description, it might be empty or malformed[/yellow]")
-                        meta['description'] = None
+                        meta['description'] = ""
                         meta['image_list'] = []
                     else:
                         meta['description'], meta['image_list'] = result
@@ -552,7 +554,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                             result = bbcode.clean_hdb_description(meta['hdb_description'])
                             if result is None:
                                 console.print("[yellow]Failed to clean HDB description, it might be empty or malformed[/yellow]")
-                                desc = None
+                                meta['description'] = ""
                                 meta['image_list'] = []
                             else:
                                 desc, meta['image_list'] = result
@@ -569,7 +571,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                                         meta['saved_description'] = True
                                     console.print(f"[green]Final description after editing:[/green] {desc}", markup=False)
                                 elif edit_choice.lower() == 'd':
-                                    desc = None
+                                    meta['description'] = ""
                                     meta['hdb_description'] = ""
                                     console.print("[yellow]Description discarded.[/yellow]")
                                 else:
