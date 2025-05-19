@@ -3,6 +3,7 @@ import os
 import json
 import aiofiles
 import asyncio
+import re
 from src.console import console
 from urllib.parse import urlparse
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
@@ -15,6 +16,11 @@ def match_host(hostname, approved_hosts):
         if hostname == approved_host or hostname.endswith(f".{approved_host}"):
             return approved_host
     return hostname
+
+
+async def sanitize_filename(filename):
+    # Replace invalid characters like colons with an underscore
+    return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 
 async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approved_image_hosts=None):
@@ -53,6 +59,7 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
             else:
                 need_reupload = True
 
+        # If all images are approved, use them directly
         if approved_images and len(approved_images) == len(meta.get('image_list', [])) and not need_reupload:
             meta[new_images_key] = approved_images.copy()
             console.print(f"[green]All existing images are from approved hosts for {tracker}.")
@@ -208,7 +215,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
 
         # Also check for any screenshots that match the title pattern as a fallback
         if filename and len(all_screenshots) < multi_screens:
-            title_pattern_files = [f for f in all_png_files if os.path.basename(f).startswith(filename)]
+            sanitized_title = await sanitize_filename(filename)
+            title_pattern_files = [f for f in all_png_files if os.path.basename(f).startswith(sanitized_title)]
             if title_pattern_files:
                 # Only add title pattern files that aren't already in all_screenshots
                 for file in title_pattern_files:
@@ -359,7 +367,6 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
             meta, multi_screens, img_host_index, 0, multi_screens,
             all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
         )
-
         if uploaded_images:
             meta[new_images_key] = uploaded_images
 
