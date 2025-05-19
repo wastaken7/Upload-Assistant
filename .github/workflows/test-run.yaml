@@ -157,6 +157,45 @@ jobs:
             echo "No critical error patterns detected in script output."
           fi
 
+      - name: Update README badge for master branch
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+        run: |
+          DATE_STR=$(date -u "+%Y-%m-%d %H:%M UTC")
+          NEW_BADGE="[![Test run (Master Branch)](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=master&label=Test%20run%20(Master%20Branch%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3Amaster)"
+          # Replace the old master badge line or insert if not present
+          if grep -q '\[!\[Test run (Master Branch)\](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=master&label=Test%20run%20(Master%20Branch' README.md; then
+            sed -i "s|\[!\[Test run (Master Branch)\](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=master&label=Test%20run%20(Master%20Branch[^\)]*)\)](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml)|$NEW_BADGE|" README.md
+          else
+            sed -i "1s|^|$NEW_BADGE\n|" README.md
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update master branch badge with latest run date [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: Update README badge for latest tag
+        if: github.event_name == 'release'
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          DATE_STR=$(date -u "+%Y-%m-%d %H:%M UTC")
+          # Escape special characters for sed
+          ESCAPED_TAG=$(printf '%s\n' "$TAG_NAME" | sed 's/[][\.*^$/]/\\&/g')
+          # Build the new badge markdown
+          NEW_BADGE="[![Test run (${TAG_NAME})](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=${TAG_NAME}&label=Test%20run%20(${TAG_NAME}%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3A${TAG_NAME})"
+          # Replace the old badge line (matching previous tag) or insert if not present
+          if grep -qE '\[!\[Test run \([^)]+\)\]\(https://img\.shields\.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run\.yaml\?branch=[^)]+&label=Test%20run%20\([^)]+\)\)\]\(https://github\.com/Audionut/Upload-Assistant/actions/workflows/test-run\.yaml\?query=branch%3A[^)]+\)' README.md; then
+            sed -i "s|\[!\[Test run ([^)]*)\](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=[^&]*&label=Test%20run%20([^)]*))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3A[^)]*)|$NEW_BADGE|" README.md
+          else
+            # If not found, append to the top
+            sed -i "1s|^|$NEW_BADGE\n|" README.md
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update badge for tag ${TAG_NAME} [skip ci]" || echo "No changes to commit"
+          git push
+
       - name: Cleanup config.py
         if: always()
         run: rm -f data/config.py
