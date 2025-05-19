@@ -66,7 +66,7 @@ async def get_disc(meta):
     return is_disc, videoloc, bdinfo, discs
 
 
-async def get_dvd_size(self, discs, manual_dvds):
+async def get_dvd_size(discs, manual_dvds):
     sizes = []
     dvd_sizes = []
     for each in discs:
