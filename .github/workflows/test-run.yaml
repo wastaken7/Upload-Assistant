@@ -223,7 +223,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
           git commit -m "Update badge for tag ${TAG_NAME} [skip ci]" || echo "No changes to commit"
-          git push
+          git checkout master
+          git cherry-pick HEAD@{1}  # Apply the commit we just made
+          git push origin master
 
       - name: Cleanup config.py
         if: always()
