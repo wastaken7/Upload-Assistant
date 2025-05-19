@@ -109,7 +109,7 @@ async def gen_desc(meta):
             description.write("\n")
 
     # Fallback if no description is provided
-    if not meta.get('skip_gen_desc', False):
+    if not meta.get('skip_gen_desc', False) and not content_written:
         description_text = meta['description'] if meta.get('description', '') else ""
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(description_text) > 0:
