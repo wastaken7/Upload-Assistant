@@ -565,7 +565,7 @@ config = {
             # this will disable any automatic torrent management if set
             # use either "symlink" or "hardlink"
             # on windows, symlinks needs admin privs, both link types need ntfs/refs filesytem (and same drive)
-            "linking": None,
+            "linking": "",
             # A folder or list of folders that will contain the linked content
             # if using hardlinking, the linked folder must be on the same drive/volume as the original contnt,
             # with UA mapping the correct location if multiple paths are specified.
