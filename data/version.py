@@ -1,3 +1,14 @@
+__version__ = "5.0.1"
+
+"""
+Changelog for version 5.0.1 (2025-05-19):
+
+* Fixes DVD
+* Fixes BHD description handling
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.0...5.0.1
+"""
+
 __version__ = "5.0.0"
 
 """
