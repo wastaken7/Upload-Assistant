@@ -217,6 +217,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
         if filename and len(all_screenshots) < multi_screens:
             sanitized_title = await sanitize_filename(filename)
             title_pattern_files = [f for f in all_png_files if os.path.basename(f).startswith(sanitized_title)]
+            if meta['debug']:
+                console.print(f"[yellow]Searching for screenshots with pattern: {sanitized_title}*.png")
             if title_pattern_files:
                 # Only add title pattern files that aren't already in all_screenshots
                 for file in title_pattern_files:
@@ -229,7 +231,10 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     # If we haven't found enough screenshots yet, search for files in the normal way
     if len(all_screenshots) < multi_screens:
         for i, file in enumerate(filelist):
-            filename_pattern = f"{filename}*.png"
+            sanitized_title = await sanitize_filename(filename)
+            filename_pattern = f"{sanitized_title}*.png"
+            if meta['debug']:
+                console.print(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
 
             if meta['is_disc'] == "DVD":
                 existing_screens = await asyncio.to_thread(glob.glob, f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['discs'][0]['name']}-*.png")
@@ -240,6 +245,35 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
             for screen in existing_screens:
                 if screen not in all_screenshots:
                     all_screenshots.append(screen)
+
+    # Fallback: glob for indexed screenshots if still not enough
+    if len(all_screenshots) < multi_screens:
+        image_patterns = ["*.png", ".[!.]*.png"]
+        image_glob = []
+        for pattern in image_patterns:
+            image_glob.extend(glob.glob(os.path.join(screenshots_dir, pattern)))
+
+        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_files = set()
+        for pattern in unwanted_patterns:
+            unwanted_files.update(glob.glob(os.path.join(screenshots_dir, pattern)))
+            # Also check for hidden versions
+            hidden_pattern = os.path.join(screenshots_dir, "." + pattern)
+            unwanted_files.update(glob.glob(hidden_pattern))
+
+        # Remove unwanted files
+        image_glob = [file for file in image_glob if file not in unwanted_files]
+        image_glob = list(set(image_glob))
+
+        # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
+        import re
+        indexed_pattern = re.compile(r".*-\d+\.png$")
+        indexed_files = [file for file in image_glob if indexed_pattern.match(os.path.basename(file))]
+
+        # Add any new indexed screenshots to our list
+        for screen in indexed_files:
+            if screen not in all_screenshots:
+                all_screenshots.append(screen)
 
     if tracker == "covers":
         all_screenshots = []
