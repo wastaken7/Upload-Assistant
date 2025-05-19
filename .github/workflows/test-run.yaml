@@ -198,27 +198,27 @@ jobs:
         run: |
           TAG_NAME="${{ github.event.release.tag_name }}"
           DATE_STR=$(date -u "+%Y-%m-%d %H:%M UTC")
-          # Build the new badge markdown
-          NEW_BADGE="[![Test run (${TAG_NAME})](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=${TAG_NAME}&label=Test%20run%20(${TAG_NAME}%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3A${TAG_NAME})"
           
-          # Try to find any existing tag badge with pattern "Test run (digits.digits.digits)" or similar
-          if grep -q "Test run ([0-9]\+\.[0-9]\+\.[0-9]\+)" README.md || grep -q "Test run ([0-9]\+\.[0-9]\+)" README.md; then
-            # Escape all special characters in NEW_BADGE for sed
-            ESCAPED_BADGE=$(echo "$NEW_BADGE" | sed 's/[\/&]/\\&/g')
-            # Find the line number with any tag badge
-            LINE_NUM=$(grep -n "Test run ([0-9]\+\.[0-9]\+)" README.md | head -1 | cut -d':' -f1)
-            if [ -z "$LINE_NUM" ]; then
-              LINE_NUM=$(grep -n "Test run ([0-9]\+\.[0-9]\+\.[0-9]\+)" README.md | head -1 | cut -d':' -f1)
-            fi
-            # Replace the badge on that line
-            sed -i "${LINE_NUM}s/\[\!\[Test run ([^)]*)\](https:\/\/img\.shields\.io\/github\/actions\/workflow\/status\/Audionut\/Upload-Assistant\/test-run\.yaml?[^)]*)/$ESCAPED_BADGE/" README.md
-          else
-            # If no tag badge found, append to the end of the first line
-            FIRST_LINE=$(head -n 1 README.md)
-            NEW_FIRST_LINE="$FIRST_LINE $NEW_BADGE"
-            sed -i "1s/.*/$NEW_FIRST_LINE/" README.md
+          # Extract the current version tag from the README
+          CURRENT_TAG=$(grep -o "Test run ([0-9]\+\.[0-9]\+\.[0-9]\+)" README.md | head -1 | sed 's/Test run (\([0-9.]*\))/\1/')
+          if [ -z "$CURRENT_TAG" ]; then
+            # Try with two-digit version if three-digit not found
+            CURRENT_TAG=$(grep -o "Test run ([0-9]\+\.[0-9]\+)" README.md | head -1 | sed 's/Test run (\([0-9.]*\))/\1/')
           fi
           
+          # Create badges
+          DOCKER_BADGE="[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)"
+          MASTER_BADGE="[![Test run (Master Branch)](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=master&label=Test%20run%20(Master%20Branch))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3Amaster)"
+          TAG_BADGE="[![Test run (${TAG_NAME})](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=${TAG_NAME}&label=Test%20run%20(${TAG_NAME}%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3A${TAG_NAME})"
+          
+          # Combine badges and update the first line
+          echo "$DOCKER_BADGE $MASTER_BADGE $TAG_BADGE" > README.md.new
+          # Get rest of file (skip first line)
+          tail -n +2 README.md >> README.md.new
+          # Replace the file
+          mv README.md.new README.md
+          
+          # Commit and push
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
