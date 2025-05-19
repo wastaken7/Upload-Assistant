@@ -1,6 +1,7 @@
 {
     "SubsPlease" : {
-        "type" : "WEBDL"
+        "type" : "WEBDL",
+        "source": "WEB"
     },
     "Pasta" : {
         "type" : "WEBRIP"
