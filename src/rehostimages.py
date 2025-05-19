@@ -180,6 +180,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
     meta[new_images_key] = []
 
     screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
+    if meta['debug']:
+        console.print(f"[yellow]Searching for screenshots in {screenshots_dir}...")
     all_screenshots = []
 
     # First check if there are any saved screenshots matching those in the image_list
@@ -248,32 +250,40 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
 
     # Fallback: glob for indexed screenshots if still not enough
     if len(all_screenshots) < multi_screens:
+        os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
         image_patterns = ["*.png", ".[!.]*.png"]
         image_glob = []
         for pattern in image_patterns:
-            image_glob.extend(glob.glob(os.path.join(screenshots_dir, pattern)))
+            image_glob.extend(glob.glob(pattern))
+            if meta['debug']:
+                console.print(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
 
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files = set()
         for pattern in unwanted_patterns:
-            unwanted_files.update(glob.glob(os.path.join(screenshots_dir, pattern)))
-            # Also check for hidden versions
-            hidden_pattern = os.path.join(screenshots_dir, "." + pattern)
-            unwanted_files.update(glob.glob(hidden_pattern))
+            unwanted_files.update(glob.glob(pattern))
+            if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
+                hidden_pattern = "." + pattern
+                unwanted_files.update(glob.glob(hidden_pattern))
 
         # Remove unwanted files
         image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
+        if meta['debug']:
+            console.print(f"[cyan]Filtered out {len(unwanted_files)} unwanted files, remaining: {len(image_glob)}")
 
         # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
-        import re
         indexed_pattern = re.compile(r".*-\d+\.png$")
         indexed_files = [file for file in image_glob if indexed_pattern.match(os.path.basename(file))]
+        if meta['debug']:
+            console.print(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
 
         # Add any new indexed screenshots to our list
         for screen in indexed_files:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
+                if meta.get('debug'):
+                    console.print(f"[green]Found indexed screenshot: {os.path.basename(screen)}")
 
     if tracker == "covers":
         all_screenshots = []
