@@ -1,6 +1,9 @@
 name: Run upload test
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 jobs:
