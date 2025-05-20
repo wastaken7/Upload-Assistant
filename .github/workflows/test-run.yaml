@@ -218,13 +218,24 @@ jobs:
           # Replace the file
           mv README.md.new README.md
           
-          # Commit and push
+          # First commit change to the current detached HEAD
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
           git commit -m "Update badge for tag ${TAG_NAME} [skip ci]" || echo "No changes to commit"
+          
+          # Now fetch master branch and apply the same changes there
+          git fetch origin master:master
           git checkout master
-          git cherry-pick HEAD@{1}  # Apply the commit we just made
+          
+          # Create badges with the same content for master branch
+          echo "$DOCKER_BADGE $MASTER_BADGE $TAG_BADGE" > README.md.new
+          tail -n +2 README.md >> README.md.new
+          mv README.md.new README.md
+          
+          # Commit and push to master
+          git add README.md
+          git commit -m "Update badge for tag ${TAG_NAME} [skip ci]" || echo "No changes to commit"
           git push origin master
 
       - name: Cleanup config.py
