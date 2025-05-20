@@ -89,5 +89,5 @@ async def tag_override(meta):
     return meta
 
 
-def _is_true(self, value):
+def _is_true(value):
     return str(value).strip().lower() == "true"
