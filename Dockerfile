@@ -56,6 +56,7 @@ RUN arch=$(uname -m) && \
 
 # Create tmp directory with appropriate permissions
 RUN mkdir -p /Upload-Assistant/tmp && chmod 777 /Upload-Assistant/tmp
+ENV TMPDIR=/Upload-Assistant/tmp
 
 # Set the entry point for the container
 ENTRYPOINT ["python", "/Upload-Assistant/upload.py"]
