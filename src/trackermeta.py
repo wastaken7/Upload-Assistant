@@ -221,8 +221,12 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
             console.print("set IMDB ID:", meta['imdb_id'])
     if tvdb:
         meta['tvdb_id'] = tvdb
+        if meta['debug']:
+            console.print("set TVDB ID:", meta['tvdb_id'])
     if mal:
         meta['mal_id'] = mal
+        if meta['debug']:
+            console.print("set MAL ID:", meta['mal_id'])
     if desc and not only_id:
         meta['description'] = desc
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
@@ -262,18 +266,18 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         meta['imdb_id'] = imdb_id
                         found_match = True
                         meta['ptp'] = ptp_torrent_id
+                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         if not only_id:
-                            ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                             if ptp_desc and len(ptp_desc) > 0:
                                 meta['description'] = ptp_desc
                                 with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                                     description.write((ptp_desc or "") + "\n")
 
-                            if ptp_desc and not meta.get('image_list'):
-                                valid_images = await check_images_concurrently(ptp_imagelist, meta)
-                                if valid_images:
-                                    meta['image_list'] = valid_images
-                                    await handle_image_list(meta, tracker_name, valid_images)
+                        if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):
+                            valid_images = await check_images_concurrently(ptp_imagelist, meta)
+                            if valid_images:
+                                meta['image_list'] = valid_images
+                                await handle_image_list(meta, tracker_name, valid_images)
 
                     else:
                         found_match = False
@@ -283,18 +287,18 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 else:
                     found_match = True
                     meta['imdb_id'] = imdb_id
+                    ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                     if not only_id:
-                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
                         if ptp_desc and len(ptp_desc) > 0:
                             meta['description'] = ptp_desc
                             with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                                 description.write((ptp_desc or "") + "\n")
                             meta['saved_description'] = True
 
-                        if ptp_desc and not meta.get('image_list'):
-                            valid_images = await check_images_concurrently(ptp_imagelist, meta)
-                            if valid_images:
-                                meta['image_list'] = valid_images
+                    if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):
+                        valid_images = await check_images_concurrently(ptp_imagelist, meta)
+                        if valid_images:
+                            meta['image_list'] = valid_images
             else:
                 console.print("[yellow]Skipping PTP as no match found[/yellow]")
                 found_match = False
@@ -308,18 +312,18 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 console.print(f"[green]IMDb ID found: tt{meta['imdb_id']}[/green]")
                 found_match = True
                 meta['skipit'] = True
+                ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                 if not only_id:
-                    ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
                     if ptp_desc and len(ptp_desc) > 0:
                         meta['description'] = ptp_desc
                         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
                             description.write(ptp_desc + "\n")
                         meta['saved_description'] = True
-                    if ptp_desc and not meta.get('image_list'):  # Only handle images if image_list is not already populated
-                        valid_images = await check_images_concurrently(ptp_imagelist, meta)
-                        if valid_images:
-                            meta['image_list'] = valid_images
-                            console.print("[green]PTP images added to metadata.[/green]")
+                if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):  # Only handle images if image_list is not already populated
+                    valid_images = await check_images_concurrently(ptp_imagelist, meta)
+                    if valid_images:
+                        meta['image_list'] = valid_images
+                        console.print("[green]PTP images added to metadata.[/green]")
             else:
                 console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                 found_match = False
@@ -515,8 +519,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 meta['imdb_id'] = imdb if imdb else 0
                 meta['tvdb_id'] = tvdb_id if tvdb_id else 0
                 meta['hdb_name'] = hdb_name
+                result = bbcode.clean_hdb_description(meta['hdb_description'])
                 if meta['hdb_description'] and len(meta['hdb_description']) > 0 and not only_id:
-                    result = bbcode.clean_hdb_description(meta['hdb_description'])
                     if result is None:
                         console.print("[yellow]Failed to clean HDB description, it might be empty or malformed[/yellow]")
                         meta['description'] = ""
@@ -524,7 +528,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     else:
                         meta['description'], meta['image_list'] = result
                 found_match = True
-                if meta.get('image_list'):
+                if meta.get('image_list') and meta.get('keep_images'):
                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                     if valid_images:
                         meta['image_list'] = valid_images

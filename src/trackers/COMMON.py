@@ -957,36 +957,38 @@ class COMMON():
                     except (KeyboardInterrupt, EOFError):
                         sys.exit(1)
 
-            if description and not only_id:
+            if description:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
-                console.print(f"[green]Successfully grabbed description from {tracker}")
-                console.print(f"Extracted description: {description}", markup=False)
+                if not only_id:
+                    console.print(f"[green]Successfully grabbed description from {tracker}")
+                    console.print(f"Extracted description: {description}", markup=False)
 
-                if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('huno') or meta.get('ulcx')):
-                    meta['description'] = description
-                    meta['saved_description'] = True
-                else:
-                    console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                    edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
-
-                    if edit_choice.lower() == 'e':
-                        edited_description = click.edit(description)
-                        if edited_description:
-                            description = edited_description.strip()
+                    if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('huno') or meta.get('ulcx')):
                         meta['description'] = description
                         meta['saved_description'] = True
-                    elif edit_choice.lower() == 'd':
-                        description = None
-                        imagelist = []
-                        console.print("[yellow]Description discarded.[/yellow]")
                     else:
-                        console.print("[green]Keeping the original description.[/green]")
-                        meta['description'] = description
-                        meta['saved_description'] = True
-            else:
-                description = ""
-                imagelist = []
+                        console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                        edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
+
+                        if edit_choice.lower() == 'e':
+                            edited_description = click.edit(description)
+                            if edited_description:
+                                description = edited_description.strip()
+                            meta['description'] = description
+                            meta['saved_description'] = True
+                        elif edit_choice.lower() == 'd':
+                            description = None
+                            imagelist = []
+                            console.print("[yellow]Description discarded.[/yellow]")
+                        else:
+                            console.print("[green]Keeping the original description.[/green]")
+                            meta['description'] = description
+                            meta['saved_description'] = True
+                else:
+                    description = ""
+                    if not meta.get('keep_images'):
+                        imagelist = []
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 

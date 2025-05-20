@@ -150,7 +150,10 @@ config = {
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
 
-        # set true to only grab meta id's from trackers, not descriptions and images
+        # Set False to skip getting images from tracker descriptions
+        "keep_images": True,
+
+        # set true to only grab meta id's from trackers, not descriptions
         "only_id": False,
 
         # set true to use mkbrr for torrent creation

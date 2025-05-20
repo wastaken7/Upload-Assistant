@@ -12,6 +12,7 @@ client = Clients(config=config)
 
 async def get_tracker_data(video, meta, search_term=None, search_file_folder=None, cat=None):
     only_id = config['DEFAULT'].get('only_id', False) if not meta.get('only_id') else False
+    meta['keep_images'] = config['DEFAULT'].get('keep_images', True) if not meta.get('keep_images') else True
     found_match = False
 
     if search_term:
