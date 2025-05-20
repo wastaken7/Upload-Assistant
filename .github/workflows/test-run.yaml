@@ -120,7 +120,7 @@ jobs:
           OUTPUT_FILE="upload_output.txt"
           
           # Run the script, redirecting both stdout and stderr to the console and to a file
-          python upload.py tears.of.steel.2012.mkv -ua -ns --debug 2>&1 | tee $OUTPUT_FILE
+          python upload.py tears.of.steel.2012.mkv -ua -ns -siu --tmdb movie/133701 --imdb tt2285752 --tvdb 37711 --debug 2>&1 | tee $OUTPUT_FILE
           
           # The 'python' command above will cause the script to exit if 'upload.py' itself exits non-zero,
           # due to 'set -e' and 'set -o pipefail'.

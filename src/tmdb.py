@@ -11,6 +11,7 @@ from difflib import SequenceMatcher
 import requests
 import json
 import httpx
+import asyncio
 
 TMDB_API_KEY = config['DEFAULT'].get('tmdb_api', False)
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
@@ -443,296 +444,197 @@ async def tmdb_other_meta(
     year = None
 
     async with httpx.AsyncClient() as client:
+        # Get main media details first (movie or TV show)
+        main_url = f"{TMDB_BASE_URL}/{('movie' if category == 'MOVIE' else 'tv')}/{tmdb_id}"
+
+        # Make the main API call to get basic data
+        response = await client.get(main_url, params={"api_key": TMDB_API_KEY})
+        try:
+            response.raise_for_status()
+            media_data = response.json()
+        except Exception:
+            console.print(f"[bold red]Failed to fetch media data: {response.status_code}[/bold red]")
+            return {}
+
+        if debug:
+            console.print(f"[cyan]TMDB Response: {json.dumps(media_data, indent=2)[:600]}...")
+
+        # Extract basic info from media_data
         if category == "MOVIE":
-            # Get movie details
-            response = await client.get(
-                f"{TMDB_BASE_URL}/movie/{tmdb_id}",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                response.raise_for_status()
-                movie_data = response.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch movie data: {response.status_code}[/bold red]")
-                return {}
-
-            if debug:
-                console.print(f"[cyan]TMDB Response: {json.dumps(movie_data, indent=2)[:600]}...")
-
-            title = movie_data['title']
-            year = None
-            if movie_data['release_date']:
-                year = datetime.strptime(movie_data['release_date'], '%Y-%m-%d').year
-            else:
-                console.print('[yellow]TMDB does not have a release date, using manual year or year from filename instead (if it exists)')
-                year = search_year
-
-            # Get external IDs
-            external_resp = await client.get(
-                f"{TMDB_BASE_URL}/movie/{tmdb_id}/external_ids",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                external_resp.raise_for_status()
-                external = external_resp.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch external ids: {response.status_code}[/bold red]")
-                return {}
-
-            if imdb_id == 0:
-                imdb_id_str = external.get('imdb_id', None)
-
-                if not imdb_id_str or imdb_id_str in ["", " ", "None", None]:
-                    imdb_id = 0
-                else:
-                    imdb_id_clean = imdb_id_str.lstrip('t')  # Remove 'tt' prefix safely
-                    if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                        imdb_id = int(imdb_id_clean)
-                    else:
-                        console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id_str}[/bold red]")
-                        imdb_id = 0
-            else:
-                imdb_id = int(imdb_id)
-
-            # TVDB ID Handling
-            if tvdb_id == 0:
-                tvdb_id = external.get('tvdb_id', None)
-                if tvdb_id in ["", " ", "None", None]:
-                    tvdb_id = 0
-
-            # Get videos
-            try:
-                videos_resp = await client.get(
-                    f"{TMDB_BASE_URL}/movie/{tmdb_id}/videos",
-                    params={"api_key": TMDB_API_KEY}
-                )
-                videos_resp.raise_for_status()
-                videos = videos_resp.json()
-
-                for each in videos.get('results', []):
-                    if each.get('site', "") == 'YouTube' and each.get('type', "") == "Trailer":
-                        youtube = f"https://www.youtube.com/watch?v={each.get('key')}"
-                        break
-            except Exception:
-                console.print('[yellow]Unable to grab videos from TMDb.')
-
-            retrieved_aka, retrieved_original_language = await get_imdb_aka_api(imdb_id, manual_language)
-
-            if retrieved_original_language is not None:
-                original_language = retrieved_original_language
-            else:
-                original_language = movie_data['original_language']
-
-            original_title = movie_data.get('original_title', title)
-
-            # Get keywords
-            keywords_resp = await client.get(
-                f"{TMDB_BASE_URL}/movie/{tmdb_id}/keywords",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                keywords_resp.raise_for_status()
-                keywords_data = keywords_resp.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch keywords: {response.status_code}[/bold red]")
-                return {}
-            keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in keywords_data.get('keywords', [])])
-
-            # Get genres
-            genres_data = await get_genres(movie_data)  # or tv_data
-            genres = genres_data['genre_names']
-            genre_ids = genres_data['genre_ids']
-
-            # Get directors
-            credits_resp = await client.get(
-                f"{TMDB_BASE_URL}/movie/{tmdb_id}/credits",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                credits_resp.raise_for_status()
-                credits_data = credits_resp.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch credits: {response.status_code}[/bold red]")
-                return {}
-
-            directors = []
-            for each in credits_data.get('cast', []) + credits_data.get('crew', []):
-                if each.get('known_for_department', '') == "Directing" or each.get('job', '') == "Director":
-                    directors.append(each.get('original_name', each.get('name')))
-
-            mal_id = 0
-            demographic = ''
-
-            if not anime:
-                mal_id, retrieved_aka, anime, demographic = await get_anime(
-                    movie_data,
-                    {'title': title, 'aka': retrieved_aka, 'mal_id': 0}
-                )
-
-            if mal_manual is not None and mal_manual != 0:
-                mal_id = mal_manual
-
-            poster_path = movie_data.get('poster_path', "")
-            if poster is None and poster_path:
-                poster = f"https://image.tmdb.org/t/p/original{poster_path}"
-
-            backdrop = movie_data.get('backdrop_path', "")
-            if backdrop:
-                backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
-
-            if config['DEFAULT'].get('add_logo', False):
-                logo_path = await get_logo(tmdb_id, category, debug, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL)
-
-            overview = movie_data['overview']
+            title = media_data['title']
+            original_title = media_data.get('original_title', title)
+            year = datetime.strptime(media_data['release_date'], '%Y-%m-%d').year if media_data['release_date'] else search_year
+            runtime = media_data.get('runtime', 60)
             tmdb_type = 'Movie'
-            runtime = movie_data.get('runtime', 60)
-            certification = movie_data.get('certification', '')
+        else:  # TV show
+            title = media_data['name']
+            original_title = media_data.get('original_name', title)
+            year = datetime.strptime(media_data['first_air_date'], '%Y-%m-%d').year if media_data['first_air_date'] else search_year
+            runtime_list = media_data.get('episode_run_time', [60])
+            runtime = runtime_list[0] if runtime_list else 60
+            tmdb_type = media_data.get('type', 'Scripted')
 
-        elif category == "TV":
-            # Get TV show details
-            response = await client.get(
-                f"{TMDB_BASE_URL}/tv/{tmdb_id}",
-                params={"api_key": TMDB_API_KEY}
+        overview = media_data['overview']
+        original_language_from_tmdb = media_data['original_language']
+
+        poster_path = media_data.get('poster_path', '')
+        if poster is None and poster_path:
+            poster = f"https://image.tmdb.org/t/p/original{poster_path}"
+
+        backdrop = media_data.get('backdrop_path', '')
+        if backdrop:
+            backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
+
+        # Prepare all API endpoints for concurrent requests
+        endpoints = [
+            # External IDs
+            client.get(f"{main_url}/external_ids", params={"api_key": TMDB_API_KEY}),
+            # Videos
+            client.get(f"{main_url}/videos", params={"api_key": TMDB_API_KEY}),
+            # Keywords
+            client.get(f"{main_url}/keywords", params={"api_key": TMDB_API_KEY}),
+            # Credits
+            client.get(f"{main_url}/credits", params={"api_key": TMDB_API_KEY})
+        ]
+
+        # Add logo request if needed
+        if config['DEFAULT'].get('add_logo', False):
+            endpoints.append(
+                client.get(f"{TMDB_BASE_URL}/{('movie' if category == 'MOVIE' else 'tv')}/{tmdb_id}/images",
+                           params={"api_key": TMDB_API_KEY})
             )
-            try:
-                response.raise_for_status()
-                tv_data = response.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch TV data: {response.status_code}[/bold red]")
-                return {}
 
-            if debug:
-                console.print(f"[cyan]TMDB Response: {json.dumps(tv_data, indent=2)[:600]}...")
+        # Add IMDB API call if we already have an IMDB ID
+        if imdb_id != 0:
+            # Get AKA and original language from IMDB immediately, don't wait
+            endpoints.append(get_imdb_aka_api(imdb_id, manual_language))
 
-            title = tv_data['name']
-            year = None
-            if tv_data['first_air_date']:
-                year = datetime.strptime(tv_data['first_air_date'], '%Y-%m-%d').year
+        # Make all requests concurrently
+        results = await asyncio.gather(*endpoints, return_exceptions=True)
+
+        # Process results with the correct indexing
+        external_data, videos_data, keywords_data, credits_data, *rest = results
+        idx = 0
+        logo_data = None
+        imdb_data = None
+
+        # Get logo data if it was requested
+        if config['DEFAULT'].get('add_logo', False):
+            logo_data = rest[idx]
+            idx += 1
+
+        # Get IMDB data if it was requested
+        if imdb_id != 0:
+            imdb_data = rest[idx]
+            # Process IMDB data
+            if isinstance(imdb_data, Exception):
+                console.print("[yellow]Failed to get AKA and original language from IMDB[/yellow]")
+                retrieved_aka, retrieved_original_language = "", None
             else:
-                console.print('[yellow]TMDB does not have a release date, using manual year or year from filename instead (if it exists)')
-                year = search_year
+                retrieved_aka, retrieved_original_language = imdb_data
 
-            # Get external IDs
-            external_resp = await client.get(
-                f"{TMDB_BASE_URL}/tv/{tmdb_id}/external_ids",
-                params={"api_key": TMDB_API_KEY}
-            )
+        # Process external IDs
+        if isinstance(external_data, Exception):
+            console.print("[bold red]Failed to fetch external IDs[/bold red]")
+        else:
             try:
-                external_resp.raise_for_status()
-                external = external_resp.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch external ids: {response.status_code}[/bold red]")
-                return {}
-
-            if imdb_id == 0:
-                imdb_id_str = external.get('imdb_id', None)
-
-                if not imdb_id_str or imdb_id_str in ["", " ", "None", None]:
-                    imdb_id = 0
+                external = external_data.json()
+                # Process IMDB ID
+                if imdb_id == 0:
+                    imdb_id_str = external.get('imdb_id', None)
+                    if imdb_id_str and imdb_id_str not in ["", " ", "None", None]:
+                        imdb_id_clean = imdb_id_str.lstrip('t')
+                        if imdb_id_clean.isdigit():
+                            imdb_id = int(imdb_id_clean)
                 else:
-                    imdb_id_clean = imdb_id_str.lstrip('t')  # Remove 'tt' prefix safely
-                    if imdb_id_clean.isdigit():  # Ensure it's a valid numeric string
-                        imdb_id = int(imdb_id_clean)
-                    else:
-                        console.print(f"[bold red]Invalid IMDb ID returned: {imdb_id_str}[/bold red]")
-                        imdb_id = 0
-            else:
-                imdb_id = int(imdb_id)
+                    imdb_id = int(imdb_id)
 
-            # TVDB ID Handling
-            if tvdb_id == 0:
-                tvdb_id = external.get('tvdb_id', None)
-                if tvdb_id in ["", " ", "None", None]:
-                    tvdb_id = 0
+                # Process TVDB ID
+                if tvdb_id == 0:
+                    tvdb_id = external.get('tvdb_id', None)
+                    if tvdb_id in ["", " ", "None", None]:
+                        tvdb_id = 0
+            except Exception:
+                console.print("[bold red]Failed to process external IDs[/bold red]")
 
-            # Get videos
+        # Process videos
+        if isinstance(videos_data, Exception):
+            console.print("[yellow]Unable to grab videos from TMDb.[/yellow]")
+        else:
             try:
-                videos_resp = await client.get(
-                    f"{TMDB_BASE_URL}/tv/{tmdb_id}/videos",
-                    params={"api_key": TMDB_API_KEY}
-                )
-                try:
-                    videos_resp.raise_for_status()
-                    videos = videos_resp.json()
-                except Exception:
-                    console.print(f"[bold red]Failed to fetch videos: {response.status_code}[/bold red]")
-                    return {}
-
+                videos = videos_data.json()
                 for each in videos.get('results', []):
                     if each.get('site', "") == 'YouTube' and each.get('type', "") == "Trailer":
                         youtube = f"https://www.youtube.com/watch?v={each.get('key')}"
                         break
             except Exception:
-                console.print('[yellow]Unable to grab videos from TMDb.')
+                console.print("[yellow]Unable to process videos from TMDb.[/yellow]")
 
-            retrieved_aka, retrieved_original_language = await get_imdb_aka_api(imdb_id, manual_language)
-
-            if retrieved_original_language is not None:
-                original_language = retrieved_original_language
-            else:
-                original_language = tv_data['original_language']
-
-            original_title = tv_data.get('original_name', title)
-
-            # Get keywords
-            keywords_resp = await client.get(
-                f"{TMDB_BASE_URL}/tv/{tmdb_id}/keywords",
-                params={"api_key": TMDB_API_KEY}
-            )
+        # Process keywords
+        if isinstance(keywords_data, Exception):
+            console.print("[bold red]Failed to fetch keywords[/bold red]")
+            keywords = ""
+        else:
             try:
-                keywords_resp.raise_for_status()
-                keywords_data = keywords_resp.json()
+                kw_json = keywords_data.json()
+                if category == "MOVIE":
+                    keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in kw_json.get('keywords', [])])
+                else:  # TV
+                    keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in kw_json.get('results', [])])
             except Exception:
-                console.print(f"[bold red]Failed to fetch keywords: {response.status_code}[/bold red]")
-                return {}
-            keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in keywords_data.get('results', [])])
+                console.print("[bold red]Failed to process keywords[/bold red]")
+                keywords = ""
 
-            # Get genres
-            genres_data = await get_genres(tv_data)
-            genres = genres_data['genre_names']
-            genre_ids = genres_data['genre_ids']
-            # Get directors/creators
-            credits_resp = await client.get(
-                f"{TMDB_BASE_URL}/tv/{tmdb_id}/credits",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                credits_resp.raise_for_status()
-                credits_data = credits_resp.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch credits: {response.status_code}[/bold red]")
-                return {}
-
+        # Process credits
+        if isinstance(credits_data, Exception):
+            console.print("[bold red]Failed to fetch credits[/bold red]")
             directors = []
-            for each in credits_data.get('cast', []) + credits_data.get('crew', []):
-                if each.get('known_for_department', '') == "Directing" or each.get('job', '') == "Director":
-                    directors.append(each.get('original_name', each.get('name')))
+        else:
+            try:
+                credits = credits_data.json()
+                directors = []
+                for each in credits.get('cast', []) + credits.get('crew', []):
+                    if each.get('known_for_department', '') == "Directing" or each.get('job', '') == "Director":
+                        directors.append(each.get('original_name', each.get('name')))
+            except Exception:
+                console.print("[bold red]Failed to process credits[/bold red]")
+                directors = []
 
-            mal_id, retrieved_aka, anime, demographic = await get_anime(
-                tv_data,
-                {'title': title, 'aka': aka if aka else retrieved_aka, 'mal_id': mal_manual if mal_manual else 0}
-            )
+        # Process genres
+        genres_data = await get_genres(media_data)
+        genres = genres_data['genre_names']
+        genre_ids = genres_data['genre_ids']
 
-            if mal_manual is not None and mal_manual != 0:
-                mal_id = mal_manual
+        # Process logo if needed
+        if config['DEFAULT'].get('add_logo', False) and logo_data and not isinstance(logo_data, Exception):
+            try:
+                logo_json = logo_data.json()
+                logo_path = await get_logo(tmdb_id, category, debug, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL, logo_json=logo_json)
+            except Exception:
+                console.print("[yellow]Failed to process logo[/yellow]")
+                logo_path = ""
 
-            poster_path = tv_data.get('poster_path', '')
-            if poster is None and poster_path:
-                poster = f"https://image.tmdb.org/t/p/original{poster_path}"
+    # Get AKA and original language from IMDB if needed
+    if imdb_id != 0 and imdb_data is None:
+        retrieved_aka, retrieved_original_language = await get_imdb_aka_api(imdb_id, manual_language)
+    elif imdb_data is None:
+        retrieved_aka, retrieved_original_language = "", None
 
-            backdrop = tv_data.get('backdrop_path', "")
-            if backdrop:
-                backdrop = f"https://image.tmdb.org/t/p/original{backdrop}"
+    # Use retrieved original language or fallback to TMDB's value
+    if retrieved_original_language is not None:
+        original_language = retrieved_original_language
+    else:
+        original_language = original_language_from_tmdb
 
-            if config['DEFAULT'].get('add_logo', False):
-                logo_path = await get_logo(tmdb_id, category, debug, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL)
+    # Get anime information if applicable
+    if not anime:
+        mal_id, retrieved_aka, anime, demographic = await get_anime(
+            media_data,
+            {'title': title, 'aka': retrieved_aka, 'mal_id': 0}
+        )
 
-            overview = tv_data['overview']
-            tmdb_type = tv_data.get('type', 'Scripted')
-
-            runtime_list = tv_data.get('episode_run_time', [60])
-            runtime = runtime_list[0] if runtime_list else 60
-            certification = tv_data.get('certification', '')
+    if mal_manual is not None and mal_manual != 0:
+        mal_id = mal_manual
 
     # Check if AKA is too similar to title and clear it if needed
     if retrieved_aka:
@@ -1118,7 +1020,7 @@ async def get_episode_details(tmdb_id, season_number, episode_number, debug=Fals
             return {}
 
 
-async def get_logo(tmdb_id, category, debug=False, logo_languages=None, TMDB_API_KEY=None, TMDB_BASE_URL=None):
+async def get_logo(tmdb_id, category, debug=False, logo_languages=None, TMDB_API_KEY=None, TMDB_BASE_URL=None, logo_json=None):
     logo_path = ""
     if logo_languages and isinstance(logo_languages, str) and ',' in logo_languages:
         logo_languages = [lang.strip() for lang in logo_languages.split(',')]
@@ -1138,42 +1040,51 @@ async def get_logo(tmdb_id, category, debug=False, logo_languages=None, TMDB_API
         console.print(f"[cyan]Looking for logos in languages (in order): {logo_languages}[/cyan]")
 
     try:
-        async with httpx.AsyncClient() as client:
-            endpoint = "tv" if category == "TV" else "movie"
-            image_response = await client.get(
-                f"{TMDB_BASE_URL}/{endpoint}/{tmdb_id}/images",
-                params={"api_key": TMDB_API_KEY}
-            )
-            try:
-                image_response.raise_for_status()
-                image_data = image_response.json()
-            except Exception:
-                console.print(f"[bold red]Failed to fetch image data: {image_response.status_code}[/bold red]")
-                return ""
+        # Use provided logo_json if available, otherwise fetch it
+        image_data = None
+        if logo_json:
+            image_data = logo_json
             if debug:
-                console.print(f"[cyan]Image Data: {json.dumps(image_data, indent=2)[:500]}...")
+                console.print("[cyan]Using provided logo_json data instead of making an HTTP request[/cyan]")
+        else:
+            # Make HTTP request only if logo_json is not provided
+            async with httpx.AsyncClient() as client:
+                endpoint = "tv" if category == "TV" else "movie"
+                image_response = await client.get(
+                    f"{TMDB_BASE_URL}/{endpoint}/{tmdb_id}/images",
+                    params={"api_key": TMDB_API_KEY}
+                )
+                try:
+                    image_response.raise_for_status()
+                    image_data = image_response.json()
+                except Exception:
+                    console.print(f"[bold red]Failed to fetch image data: {image_response.status_code}[/bold red]")
+                    return ""
 
-            logos = image_data.get('logos', [])
+        if debug and image_data:
+            console.print(f"[cyan]Image Data: {json.dumps(image_data, indent=2)[:500]}...")
 
-            # Only look for logos that match our specified languages
-            for language in logo_languages:
-                matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), "")
-                if matching_logo:
-                    logo_path = f"https://image.tmdb.org/t/p/original{matching_logo['file_path']}"
-                    if debug:
-                        console.print(f"[cyan]Found logo in language '{language}': {logo_path}[/cyan]")
-                    break
+        logos = image_data.get('logos', [])
 
-            # fallback to getting logo with null language if no match found, espicially useful for movies it seems
-            if not logo_path:
-                null_language_logo = next((logo for logo in logos if logo.get('iso_639_1') is None or logo.get('iso_639_1') == ''), None)
-                if null_language_logo:
-                    logo_path = f"https://image.tmdb.org/t/p/original{null_language_logo['file_path']}"
-                    if debug:
-                        console.print(f"[cyan]Found logo with null language: {logo_path}[/cyan]")
+        # Only look for logos that match our specified languages
+        for language in logo_languages:
+            matching_logo = next((logo for logo in logos if logo.get('iso_639_1') == language), "")
+            if matching_logo:
+                logo_path = f"https://image.tmdb.org/t/p/original{matching_logo['file_path']}"
+                if debug:
+                    console.print(f"[cyan]Found logo in language '{language}': {logo_path}[/cyan]")
+                break
 
-            if not logo_path and debug:
-                console.print("[yellow]No suitable logo found in preferred languages or null language[/yellow]")
+        # fallback to getting logo with null language if no match found, especially useful for movies it seems
+        if not logo_path:
+            null_language_logo = next((logo for logo in logos if logo.get('iso_639_1') is None or logo.get('iso_639_1') == ''), None)
+            if null_language_logo:
+                logo_path = f"https://image.tmdb.org/t/p/original{null_language_logo['file_path']}"
+                if debug:
+                    console.print(f"[cyan]Found logo with null language: {logo_path}[/cyan]")
+
+        if not logo_path and debug:
+            console.print("[yellow]No suitable logo found in preferred languages or null language[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error fetching logo: {e}[/red]")
