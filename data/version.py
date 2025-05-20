@@ -1,3 +1,14 @@
+__version__ = "5.0.2"
+
+"""
+Changelog for version 5.0.2 (2025-05-20):
+
+- gather tmdb tasks to speed process
+- add backup config to git ignore
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.1...5.0.2
+"""
+
 __version__ = "5.0.1"
 
 """
