@@ -216,11 +216,9 @@ class AR():
                             return True  # Session is valid
                         else:
                             console.print(f"[yellow]Session validation failed with status {response.status}, retrying...[/yellow]")
-                            return False
 
                 except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     console.print(f"[yellow]Session might be invalid: {e}. Retrying...[/yellow]")
-                    return False
 
             except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
                 console.print(f"[red]Session loading error: {e}. Closing session and retrying.[/red]")
