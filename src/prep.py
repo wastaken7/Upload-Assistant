@@ -610,7 +610,7 @@ class Prep():
             meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await get_video_encode(mi, meta['type'], bdinfo)
 
         if meta.get('no_edition') is False:
-            meta['edition'], meta['repack'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
+            meta['edition'], meta['repack'], meta['webdv'] = await get_edition(meta['path'], bdinfo, meta['filelist'], meta.get('manual_edition'), meta)
             if "REPACK" in meta.get('edition', ""):
                 meta['repack'] = re.search(r"REPACK[\d]?", meta['edition'])[0]
                 meta['edition'] = re.sub(r"REPACK[\d]?", "", meta['edition']).strip().replace('  ', ' ')

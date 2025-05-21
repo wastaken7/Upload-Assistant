@@ -245,7 +245,7 @@ class HUNO():
             video_encode = video_encode.replace('H', 'x')
         dvd_size = meta.get('dvd_size', "")
         edition = meta.get('edition', "")
-        hybrid = "Hybrid" if "HYBRID" in basename.upper() else ""
+        hybrid = meta.get('webdv', "")
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
 
         # YAY NAMING FUN

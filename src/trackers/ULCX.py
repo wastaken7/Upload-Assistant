@@ -184,6 +184,12 @@ class ULCX():
                 else:
                     distributor_id = "SKIPPED"
 
+        if meta.get('webdv', False):
+            if meta.get('repack', "") != "":
+                ulcx_name = ulcx_name.replace(f"{meta['repack']} {meta['resolution']}", f"HYBRID {meta['repack']} {meta['resolution']}", 1)
+            else:
+                ulcx_name = ulcx_name.replace(f"{meta['resolution']}", f"HYBRID {meta['resolution']}", 1)
+
         return ulcx_name, region_id, distributor_id
 
     async def get_flag(self, meta, flag_name):

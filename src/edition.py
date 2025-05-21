@@ -304,6 +304,13 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
     if not manual_edition or all(tag.lower() not in ['repack', 'repack2', 'repack3', 'proper', 'proper2', 'proper3', 'rerip'] for tag in manual_edition.strip().lower().split()):
         edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
 
+    if not meta.get('webdv', False):
+        hybrid = False
+        if "HYBRID" in video.upper():
+            hybrid = True
+    else:
+        hybrid = meta.get('webdv', False)
+
     # Handle distributor info
     if edition:
         from src.region import get_distributor
@@ -325,7 +332,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             if meta['debug']:
                 console.print(f"Final Edition: {edition}")
 
-    return edition, repack
+    return edition, repack, hybrid
 
 
 def format_duration(seconds):
