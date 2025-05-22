@@ -1194,7 +1194,7 @@ class Clients():
                     if meta.get('debug', False):
                         console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
-                    if "https://passthepopcorn.me" in comment:
+                    if "passthepopcorn.me" in comment:
                         match = re.search(r'torrentid=(\d+)', comment)
                         if match:
                             meta['ptp'] = match.group(1)
@@ -1347,7 +1347,7 @@ class Clients():
                 console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
             # Handle various tracker URL formats in the comment
-            if "https://passthepopcorn.me" in comment:
+            if "passthepopcorn.me" in comment:
                 match = re.search(r'torrentid=(\d+)', comment)
                 if match:
                     meta['ptp'] = match.group(1)
