@@ -1421,7 +1421,7 @@ class Clients():
 
             # If we found matches, use the hash from the first exact match
             if matching_torrents:
-                exact_matches = [t for t in matching_torrents if t['match_type'] == 'exact']
+                exact_matches = [t for t in matching_torrents]
                 if exact_matches:
                     meta['infohash'] = exact_matches[0]['hash']
                     console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
