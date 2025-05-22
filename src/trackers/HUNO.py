@@ -215,6 +215,9 @@ class HUNO():
         # Copied from Prep.get_name() then modified to match HUNO's naming convention.
         # It was much easier to build the name from scratch than to alter the existing name.
 
+        region_name = None
+        distributor_name = None
+
         if meta.get('is_disc') == "BDMV":
             common = COMMON(config=self.config)
             if not region_id:
@@ -258,8 +261,14 @@ class HUNO():
         hdr = meta.get('hdr', "")
         if not hdr.strip():
             hdr = "SDR"
-        distributor = distributor_name.title() if distributor_name and distributor_name.upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY'] else ""
-        region = region_name if region_name else ""
+        if distributor_name and distributor_name.upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY']:
+            distributor = distributor_name.title()
+        else:
+            distributor = meta.get('distributor', "").title() if meta.get('distributor') else ""
+        if region_name:
+            region = region_name
+        else:
+            region = meta.get('region', "")
         video_codec = meta.get('video_codec', "")
         video_encode = meta.get('video_encode', "").replace(".", "")
         if 'x265' in basename and not meta.get('type') == "WEBDL":
