@@ -160,6 +160,7 @@ async def get_video(videoloc, mode):
 
 
 async def get_resolution(guess, folder_id, base_dir):
+    hfr = False
     with open(f'{base_dir}/tmp/{folder_id}/MediaInfo.json', 'r', encoding='utf-8') as f:
         mi = json.load(f)
         try:
@@ -169,6 +170,8 @@ async def get_resolution(guess, folder_id, base_dir):
             width = 0
             height = 0
         framerate = mi['media']['track'][1].get('FrameRate', '')
+        if int(float(framerate)) > 30:
+            hfr = True
         try:
             scan = mi['media']['track'][1]['ScanType']
         except Exception:
@@ -193,7 +196,7 @@ async def get_resolution(guess, folder_id, base_dir):
         height = await closest(height_list, int(height))
         res = f"{width}x{height}{scan}"
         resolution = await mi_resolution(res, guess, width, scan, height, actual_height)
-    return resolution
+    return resolution, hfr
 
 
 async def closest(lst, K):
