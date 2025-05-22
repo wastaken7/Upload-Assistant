@@ -245,7 +245,8 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
     if filename:
         meta[f'{tracker_name.lower()}_filename'] = filename
 
-    console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
+    if meta['debug']:
+        console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
 
 
 async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, search_term, search_file_folder, only_id=False):
@@ -500,7 +501,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             )
 
         if any(item not in [None, '0'] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
-            console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
+            if meta['debug']:
+                console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
             await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id)
             found_match = True
         else:

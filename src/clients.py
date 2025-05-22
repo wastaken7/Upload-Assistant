@@ -1424,7 +1424,8 @@ class Clients():
                 exact_matches = [t for t in matching_torrents]
                 if exact_matches:
                     meta['infohash'] = exact_matches[0]['hash']
-                    console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
+                    if meta['debug']:
+                        console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
 
             else:
                 if meta['debug']:
@@ -1436,7 +1437,8 @@ class Clients():
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path, meta):
-        console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
+        if meta.get('debug'):
+            console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             if meta.get('client', None) is None:
                 default_torrent_client = self.config['DEFAULT']['default_torrent_client']

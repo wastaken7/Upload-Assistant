@@ -187,7 +187,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         num_tasks = len(valid_images)
         num_workers = min(num_tasks, task_limit)
         if optimize_images:
-            console.print("[yellow]Now optimizing images...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Now optimizing images...[/yellow]")
 
             loop = asyncio.get_running_loop()
             stop_event = asyncio.Event()
@@ -586,7 +587,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
             if num_workers == 0:
                 console.print("[red]No valid images found for optimization.[/red]")
                 return
-            console.print("[yellow]Now optimizing images...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Now optimizing images...[/yellow]")
 
             loop = asyncio.get_running_loop()
             stop_event = asyncio.Event()
@@ -614,7 +616,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                 console.print("[red]All tasks cancelled. Exiting.[/red]")
                 sys.exit(1)
             finally:
-                console.print("[yellow]Shutting down optimization workers...[/yellow]")
+                if meta['debug']:
+                    console.print("[yellow]Shutting down optimization workers...[/yellow]")
                 await asyncio.sleep(0.1)
                 await kill_all_child_processes()
                 executor.shutdown(wait=False)
@@ -982,7 +985,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     finally:
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
-        console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
+        if meta['debug']:
+            console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
     console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
@@ -990,8 +994,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     valid_images = [image for image in capture_results if os.path.exists(image)]
     num_workers = min(task_limit, len(capture_results))
     if optimize_images:
-        console.print("[yellow]Now optimizing images...[/yellow]")
         if meta['debug']:
+            console.print("[yellow]Now optimizing images...[/yellow]")
             console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
 
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
@@ -1011,7 +1015,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             gc.collect()
             sys.exit(1)
         finally:
-            console.print("[yellow]Shutting down optimization workers...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Shutting down optimization workers...[/yellow]")
             await asyncio.sleep(0.1)
             executor.shutdown(wait=True, cancel_futures=True)
             for task in tasks:
@@ -1150,7 +1155,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if remaining_retakes:
         console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully processed {len(valid_results)} screenshots.")
+    if meta['debug']:
+        console.print(f"[green]Successfully processed {len(valid_results)} screenshots.")
 
     if meta['debug']:
         finish_time = time.time()

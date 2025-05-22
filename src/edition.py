@@ -88,7 +88,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                             console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
 
                         else:
-                            console.print(f"[yellow]No matching editions found within {leeway_seconds} seconds of media duration[/yellow]")
+                            if meta['debug']:
+                                console.print(f"[yellow]No matching editions found within {leeway_seconds} seconds of media duration[/yellow]")
 
                     except (ValueError, TypeError) as e:
                         console.print(f"[yellow]Error parsing duration: {e}[/yellow]")

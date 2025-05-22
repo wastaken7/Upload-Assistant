@@ -854,13 +854,16 @@ class COMMON():
         # Determine the search method and add parameters accordingly
         if file_name:
             params['file_name'] = file_name   # Add file_name to params
-            console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+            if meta.get('debug'):
+                console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
             url = f"{torrent_url}{id}"
-            console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
+            if meta.get('debug'):
+                console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
-            console.print("[red]No ID or file name provided for search.[/red]")
+            if meta.get('debug'):
+                console.print("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, None, None
 
         # Make the GET request with proper encoding handled by 'params'
@@ -942,7 +945,8 @@ class COMMON():
                         else:
                             file_name = [file['name'] for file in files[:5]]  # Return up to 5 filenames
 
-                    console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+                    if meta.get('debug'):
+                        console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
                     # Skip the ID selection prompt if searching by ID
                     console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}, MAL: {mal}[/green]")

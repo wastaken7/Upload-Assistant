@@ -45,7 +45,8 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
                 )
                 if match:
                     found_match = True
-                    console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
+                    if meta.get('debug'):
+                        console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
                 return updated_meta
             except aiohttp.ClientSSLError:
                 print(f"{tracker_name} tracker request failed due to SSL error.")

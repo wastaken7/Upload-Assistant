@@ -257,7 +257,8 @@ async def process_meta(meta, base_dir):
                     raise e
                 finally:
                     reset_terminal()
-                    console.print("[yellow]Cleaning up resources...[/yellow]")
+                    if meta['debug']:
+                        console.print("[yellow]Cleaning up resources...[/yellow]")
                     gc.collect()
 
             elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
@@ -614,7 +615,7 @@ async def do_the_thing(base_dir):
 
             if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
                 if (processed_files_count - skipped_files_count) >= int(meta['limit_queue']):
-                    console.print(f"[red]Uploading limit of {meta['limit_queue']} files reached. Stopping queue processing.")
+                    console.print(f"[red]Uploading limit of {meta['limit_queue']} files reached. Stopping queue processing. {skipped_files_count} skipped files.")
                     break
 
             if meta['debug']:
