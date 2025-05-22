@@ -277,7 +277,7 @@ class HUNO():
         edition = meta.get('edition', "")
         hybrid = 'Hybrid' if meta.get('webdv', "") else ''
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
-        hfr = meta.get('hfr', "")
+        hfr = "HFR" if meta.get('hfr') else ""
 
         # YAY NAMING FUN
         if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
