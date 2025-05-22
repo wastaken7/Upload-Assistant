@@ -208,35 +208,40 @@ class PTP():
 
         ptp_desc = response.text
         # console.print(f"[yellow]Raw description received:\n{ptp_desc}...")  # Show first 500 characters for brevity
-
+        desc = None
+        imagelist = []
         bbcode = BBCODE()
-        desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
+        desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc, meta)
 
-        console.print("[bold green]Successfully grabbed description from PTP")
-        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
+        if meta.get('only_id') is False:
+            console.print("[bold green]Successfully grabbed description from PTP")
+            console.print(f"Description after cleaning:\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
 
-        if not meta.get('skipit') and not meta['unattended']:
-            # Allow user to edit or discard the description
-            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+            if not meta.get('skipit') and not meta['unattended']:
+                # Allow user to edit or discard the description
+                console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-            if edit_choice.lower() == 'e':
-                edited_description = click.edit(desc)
-                if edited_description:
-                    desc = edited_description.strip()
+                if edit_choice.lower() == 'e':
+                    edited_description = click.edit(desc)
+                    if edited_description:
+                        desc = edited_description.strip()
+                        meta['description'] = desc
+                        meta['saved_description'] = True
+                    console.print(f"[green]Final description after editing:[/green] {desc}")
+                elif edit_choice.lower() == 'd':
+                    desc = None
+                    console.print("[yellow]Description discarded.[/yellow]")
+                else:
+                    console.print("[green]Keeping the original description.[/green]")
                     meta['description'] = desc
                     meta['saved_description'] = True
-                console.print(f"[green]Final description after editing:[/green] {desc}")
-            elif edit_choice.lower() == 'd':
-                desc = None
-                console.print("[yellow]Description discarded.[/yellow]")
             else:
-                console.print("[green]Keeping the original description.[/green]")
                 meta['description'] = desc
                 meta['saved_description'] = True
-        else:
-            meta['description'] = desc
-            meta['saved_description'] = True
+        elif meta.get('keep_images'):
+            console.print("[green]Only keeping images from PTP description")
+            imagelist = imagelist
 
         return desc, imagelist
 

@@ -255,25 +255,27 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
     if tracker_name == "PTP":
         imdb_id = None
+        ptp_desc = None
         if meta.get('ptp') is None:
             imdb_id, ptp_torrent_id, ptp_torrent_hash = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             if ptp_torrent_id:
                 if imdb_id:
-                    console.print(f"[green]{tracker_name} IMDb ID found: tt{imdb_id}[/green]")
+                    console.print(f"[green]{tracker_name} IMDb ID found: tt{str(imdb_id).zfill(7)}[/green]")
 
                 if not meta['unattended']:
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
                         meta['imdb_id'] = imdb_id
                         found_match = True
                         meta['ptp'] = ptp_torrent_id
-                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
-                        if not only_id:
-                            if ptp_desc and len(ptp_desc) > 0:
-                                meta['description'] = ptp_desc
-                                with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                                    description.write((ptp_desc or "") + "\n")
 
-                        if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):
+                        if not only_id or meta.get('keep_images'):
+                            ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
+                        if not only_id and (ptp_desc and len(ptp_desc) > 0):
+                            meta['description'] = ptp_desc
+                            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                                description.write((ptp_desc or "") + "\n")
+
+                        if not meta.get('image_list') and (ptp_desc and meta.get('keep_images')):
                             valid_images = await check_images_concurrently(ptp_imagelist, meta)
                             if valid_images:
                                 meta['image_list'] = valid_images
@@ -287,15 +289,15 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 else:
                     found_match = True
                     meta['imdb_id'] = imdb_id
-                    ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
-                    if not only_id:
-                        if ptp_desc and len(ptp_desc) > 0:
-                            meta['description'] = ptp_desc
-                            with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                                description.write((ptp_desc or "") + "\n")
-                            meta['saved_description'] = True
+                    if not only_id or meta.get('keep_images'):
+                        ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(ptp_torrent_id, meta, meta.get('is_disc', False))
+                    if not only_id and (ptp_desc and len(ptp_desc) > 0):
+                        meta['description'] = ptp_desc
+                        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                            description.write((ptp_desc or "") + "\n")
+                        meta['saved_description'] = True
 
-                    if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):
+                    if not meta.get('image_list') and (ptp_desc and meta.get('keep_images')):
                         valid_images = await check_images_concurrently(ptp_imagelist, meta)
                         if valid_images:
                             meta['image_list'] = valid_images
@@ -309,17 +311,17 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             imdb_id, _, meta['ext_torrenthash'] = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
             if imdb_id:
                 meta['imdb_id'] = imdb_id
-                console.print(f"[green]IMDb ID found: tt{meta['imdb_id']}[/green]")
+                console.print(f"[green]IMDb ID found: tt{str(meta['imdb_id']).zfill(7)}[/green]")
                 found_match = True
                 meta['skipit'] = True
-                ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
-                if not only_id:
-                    if ptp_desc and len(ptp_desc) > 0:
-                        meta['description'] = ptp_desc
-                        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
-                            description.write(ptp_desc + "\n")
-                        meta['saved_description'] = True
-                if ptp_desc and not meta.get('image_list') and meta.get('keep_images'):  # Only handle images if image_list is not already populated
+                if not only_id or meta.get('keep_images'):
+                    ptp_desc, ptp_imagelist = await tracker_instance.get_ptp_description(meta['ptp'], meta, meta.get('is_disc', False))
+                if not only_id and (ptp_desc and len(ptp_desc) > 0):
+                    meta['description'] = ptp_desc
+                    with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+                        description.write(ptp_desc + "\n")
+                    meta['saved_description'] = True
+                if not meta.get('image_list') and (ptp_desc and meta.get('keep_images')):
                     valid_images = await check_images_concurrently(ptp_imagelist, meta)
                     if valid_images:
                         meta['image_list'] = valid_images
