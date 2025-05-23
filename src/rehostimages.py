@@ -62,7 +62,8 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
         # If all images are approved, use them directly
         if approved_images and len(approved_images) == len(meta.get('image_list', [])) and not need_reupload:
             meta[new_images_key] = approved_images.copy()
-            console.print(f"[green]All existing images are from approved hosts for {tracker}.")
+            if meta['debug']:
+                console.print(f"[green]All existing images are from approved hosts for {tracker}.")
             return meta[new_images_key], False, False
 
     if tracker == "covers":
@@ -131,7 +132,8 @@ async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approve
         console.print(f"[green]Using valid images from {new_images_key}.")
         return meta[new_images_key], False, False
 
-    console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
+    if meta['debug']:
+        console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
     max_retries = len(approved_image_hosts)
@@ -468,7 +470,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                 try:
                     async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                         await f.write(json.dumps(updated_data, indent=4))
-                    console.print(f"[green]Successfully updated reuploaded images in {output_file}.")
+                    if meta['debug']:
+                        console.print(f"[green]Successfully updated reuploaded images in {output_file}.")
 
                     if tracker == "covers":
                         deleted_count = 0
@@ -483,7 +486,8 @@ async def handle_image_upload(meta, tracker, url_host_mapping, approved_image_ho
                                 console.print(f"[yellow]Failed to delete cover image file {screenshot}: {str(e)}[/yellow]")
 
                         if deleted_count > 0:
-                            console.print(f"[green]Cleaned up {deleted_count} cover image files after successful upload[/green]")
+                            if meta['debug']:
+                                console.print(f"[green]Cleaned up {deleted_count} cover image files after successful upload[/green]")
 
                 except Exception as e:
                     console.print(f"[red]Failed to save reuploaded images: {e}")

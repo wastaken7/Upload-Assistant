@@ -629,7 +629,8 @@ async def parse_release_details(response_text, release, meta):
                     console.print(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
 
             disc_count_match = re.search(r'Single disc \(1 ([^)]+)\)|(One|Two|Three|Four|Five|\d+)[ -]disc set(?:\s*\(([^)]+)\))?', disc_section)
-            console.print(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
+            if meta['debug']:
+                console.print(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
             if disc_count_match:
                 if disc_count_match.group(1):
                     specs['discs']['count'] = 1
@@ -644,7 +645,8 @@ async def parse_release_details(response_text, release, meta):
 
                     if disc_count_match.group(3):
                         bd_format_match = re.search(r'(\d+\s*BD-\d+|\d+\s*BD)', disc_count_match.group(3))
-                        console.print(f"[dim]BD Format Match: {bd_format_match}[/dim]")
+                        if meta['debug']:
+                            console.print(f"[dim]BD Format Match: {bd_format_match}[/dim]")
                         if bd_format_match:
                             specs['discs']['format'] = bd_format_match.group(1).strip()
                         else:
@@ -1017,7 +1019,8 @@ async def process_all_releases(releases, meta):
                                 if meta['debug']:
                                     console.print(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
                             else:
-                                console.print(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
+                                if meta['debug']:
+                                    console.print(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
 
                 if meta_subtitles:
                     if meta['debug']:
