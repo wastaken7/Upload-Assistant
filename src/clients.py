@@ -830,8 +830,8 @@ class Clients():
                 if meta['debug']:
                     console.print(f"[yellow]Skipping linking, path already exists: {dst}")
             else:
+                fallback_to_original = False
                 if use_hardlink:
-                    fallback_to_original = False
                     try:
                         # Check if we're linking a file or directory
                         if os.path.isfile(src):
