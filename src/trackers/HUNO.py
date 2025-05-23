@@ -242,7 +242,7 @@ class HUNO():
         resolution = meta.get('resolution', "")
         audio = await self.get_audio(meta)
         if "SKIPPED" in audio:
-            return "SKIPPED"
+            return "SKIPPED", "SKIPPED", "SKIPPED"
         service = meta.get('service', "")
         season = meta.get('season', "")
         if meta.get('tvdb_season_number'):
