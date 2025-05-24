@@ -264,7 +264,10 @@ class HUNO():
         if distributor_name and distributor_name.upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY']:
             distributor = distributor_name.title()
         else:
-            distributor = meta.get('distributor', "").title() if meta.get('distributor') else ""
+            if meta.get('distributor', "") and meta.get('distributor').upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY']:
+                distributor = meta.get('distributor').title()
+            else:
+                distributor = ""
         if region_name:
             region = region_name
         else:
