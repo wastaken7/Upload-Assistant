@@ -245,10 +245,10 @@ class HUNO():
             return "SKIPPED", "SKIPPED", "SKIPPED"
         service = meta.get('service', "")
         season = meta.get('season', "")
-        if meta.get('tvdb_season_number'):
+        if meta.get('tvdb_season_number', ""):
             season = meta.get('tvdb_season_number')
         episode = meta.get('episode', "")
-        if meta.get('tvdb_episode_number'):
+        if meta.get('tvdb_episode_number', ""):
             episode = meta.get('tvdb_episode_number')
         repack = meta.get('repack', "")
         if repack.strip():
@@ -280,7 +280,7 @@ class HUNO():
         edition = meta.get('edition', "")
         hybrid = 'Hybrid' if meta.get('webdv', "") else ''
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
-        hfr = "HFR" if meta.get('hfr') else ""
+        hfr = "HFR" if meta.get('hfr', '') else ""
 
         # YAY NAMING FUN
         if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
