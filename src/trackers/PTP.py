@@ -34,7 +34,7 @@ class PTP():
         self.username = config['TRACKERS']['PTP'].get('username', '').strip()
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
         self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
-        self.user_agent = f'Upload Assistant/2.1 ({platform.system()} {platform.release()})'
+        self.user_agent = f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
                               'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
                               'WAF', 'x0r', 'YIFY', 'LAMA', 'WORLD']
@@ -208,35 +208,40 @@ class PTP():
 
         ptp_desc = response.text
         # console.print(f"[yellow]Raw description received:\n{ptp_desc}...")  # Show first 500 characters for brevity
-
+        desc = None
+        imagelist = []
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
-        console.print("[bold green]Successfully grabbed description from PTP")
-        console.print(f"[cyan]Description after cleaning:[yellow]\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
+        if meta.get('only_id') is False:
+            console.print("[bold green]Successfully grabbed description from PTP")
+            console.print(f"Description after cleaning:\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
 
-        if not meta.get('skipit') and not meta['unattended']:
-            # Allow user to edit or discard the description
-            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-            edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+            if not meta.get('skipit') and not meta['unattended']:
+                # Allow user to edit or discard the description
+                console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-            if edit_choice.lower() == 'e':
-                edited_description = click.edit(desc)
-                if edited_description:
-                    desc = edited_description.strip()
+                if edit_choice.lower() == 'e':
+                    edited_description = click.edit(desc)
+                    if edited_description:
+                        desc = edited_description.strip()
+                        meta['description'] = desc
+                        meta['saved_description'] = True
+                    console.print(f"[green]Final description after editing:[/green] {desc}")
+                elif edit_choice.lower() == 'd':
+                    desc = None
+                    console.print("[yellow]Description discarded.[/yellow]")
+                else:
+                    console.print("[green]Keeping the original description.[/green]")
                     meta['description'] = desc
                     meta['saved_description'] = True
-                console.print(f"[green]Final description after editing:[/green] {desc}")
-            elif edit_choice.lower() == 'd':
-                desc = None
-                console.print("[yellow]Description discarded.[/yellow]")
             else:
-                console.print("[green]Keeping the original description.[/green]")
                 meta['description'] = desc
                 meta['saved_description'] = True
-        else:
-            meta['description'] = desc
-            meta['saved_description'] = True
+        elif meta.get('keep_images'):
+            console.print("[green]Only keeping images from PTP description")
+            imagelist = imagelist
 
         return desc, imagelist
 
@@ -1266,11 +1271,11 @@ class PTP():
         if int(meta.get("imdb_id")) == 0:
             data["imdb"] = "0"
         else:
-            data["imdb"] = meta["imdb"]
+            data["imdb"] = str(meta["imdb_id"]).zfill(7)
 
         if groupID is None:  # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
-            if data["imdb_id"] == 0:
+            if data["imdb"] == '0':
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
                 tinfo = await self.get_torrent_info(meta.get("imdb"), meta)

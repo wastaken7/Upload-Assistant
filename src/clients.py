@@ -1194,7 +1194,7 @@ class Clients():
                     if meta.get('debug', False):
                         console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
-                    if "https://passthepopcorn.me" in comment:
+                    if "passthepopcorn.me" in comment:
                         match = re.search(r'torrentid=(\d+)', comment)
                         if match:
                             meta['ptp'] = match.group(1)
@@ -1227,7 +1227,9 @@ class Clients():
                         if match:
                             meta['btn'] = match.group(1)
                     elif "https://beyond-hd.me" in comment:
-                        meta['bhd'] = info_hash_v1
+                        match = re.search(r'details/(\d+)', comment)
+                        if match:
+                            meta['bhd'] = match.group(1)
                     elif "/torrents/" in comment:
                         match = re.search(r'/(\d+)$', comment)
                         if match:
@@ -1345,7 +1347,7 @@ class Clients():
                 console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
             # Handle various tracker URL formats in the comment
-            if "https://passthepopcorn.me" in comment:
+            if "passthepopcorn.me" in comment:
                 match = re.search(r'torrentid=(\d+)', comment)
                 if match:
                     meta['ptp'] = match.group(1)
@@ -1374,7 +1376,9 @@ class Clients():
                 if match:
                     meta['btn'] = match.group(1)
             elif "https://beyond-hd.me" in comment:
-                meta['bhd'] = info_hash_v1
+                match = re.search(r'details/(\d+)', comment)
+                if match:
+                    meta['bhd'] = match.group(1)
 
             # If we found a tracker ID, log it
             for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
@@ -1417,10 +1421,11 @@ class Clients():
 
             # If we found matches, use the hash from the first exact match
             if matching_torrents:
-                exact_matches = [t for t in matching_torrents if t['match_type'] == 'exact']
+                exact_matches = [t for t in matching_torrents]
                 if exact_matches:
                     meta['infohash'] = exact_matches[0]['hash']
-                    console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
+                    if meta['debug']:
+                        console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
 
             else:
                 if meta['debug']:
@@ -1432,7 +1437,8 @@ class Clients():
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path, meta):
-        console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
+        if meta.get('debug'):
+            console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             if meta.get('client', None) is None:
                 default_torrent_client = self.config['DEFAULT']['default_torrent_client']
@@ -1445,12 +1451,24 @@ class Clients():
             client_config = self.config['TORRENT_CLIENTS'][default_torrent_client]
             torrent_client = client_config['torrent_client']
 
-            local_path, remote_path = await self.remote_path_map(meta)
-
             if torrent_client != 'qbit':
                 return []
 
-            # Connect to qBittorrent
+            tracker_patterns = {
+                'ptp': {"url": "passthepopcorn.me", "pattern": r'torrentid=(\d+)'},
+                'aither': {"url": "https://aither.cc", "pattern": r'/(\d+)$'},
+                'lst': {"url": "https://lst.gg", "pattern": r'/(\d+)$'},
+                'oe': {"url": "https://onlyencodes.cc", "pattern": r'/(\d+)$'},
+                'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
+                'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
+                'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
+                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
+                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
+                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
+            }
+
+            tracker_priority = ['aither', 'ulcx', 'lst', 'blu', 'oe', 'btn', 'bhd', 'huno', 'hdb', 'ptp']
+
             try:
                 qbt_client = qbittorrentapi.Client(
                     host=client_config['qbit_url'],
@@ -1478,26 +1496,11 @@ class Clients():
                 console.print("[bold red]Failed to connect to qBittorrent - check host/port")
                 return []
 
-            # Get all torrents
             torrents = await asyncio.to_thread(qbt_client.torrents_info)
             if meta['debug']:
                 console.print(f"[cyan]Found {len(torrents)} torrents in qBittorrent")
 
             matching_torrents = []
-
-            # Define known tracker URL patterns
-            tracker_patterns = {
-                'ptp': {"url": "https://passthepopcorn.me", "pattern": r'torrentid=(\d+)'},
-                'aither': {"url": "https://aither.cc", "pattern": r'/(\d+)$'},
-                'lst': {"url": "https://lst.gg", "pattern": r'/(\d+)$'},
-                'oe': {"url": "https://onlyencodes.cc", "pattern": r'/(\d+)$'},
-                'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
-                'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
-                'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
-                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
-                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
-                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
-            }
 
             # First collect exact path matches
             for torrent in torrents:
@@ -1517,11 +1520,9 @@ class Clients():
                     if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
                         if torrent_name == meta['uuid'] and len(torrent.files) == len(meta.get('filelist', [])):
                             is_match = True
-                            match_type = 'name_exact'
                     else:
                         if torrent_name == meta['uuid']:
                             is_match = True
-                            match_type = 'name_exact'
 
                     if not is_match:
                         continue
@@ -1530,35 +1531,14 @@ class Clients():
 
                     if is_match:
                         try:
-                            torrent_trackers = await asyncio.to_thread(qbt_client.torrents_trackers, torrent_hash=torrent.hash)
                             display_trackers = []
 
                             # Filter out DHT, PEX, LSD "trackers"
-                            for tracker in torrent_trackers:
-                                if tracker.get('url', '').startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
+                            for tracker in torrents:
+                                if tracker.get('tracker', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
                                     continue
                                 display_trackers.append(tracker)
-
-                            # Check if any tracker is working (status code 2)
-                            for tracker in display_trackers:
-                                url = tracker.get('url', 'Unknown URL')
-                                status_code = tracker.get('status', 0)
-
-                                status_text = {
-                                    0: "Disabled",
-                                    1: "Not contacted",
-                                    2: "Working",
-                                    3: "Updating",
-                                    4: "Error"
-                                }.get(status_code, f"Unknown ({status_code})")
-
-                                if status_code == 2:
-                                    has_working_tracker = True
-                                    if meta['debug']:
-                                        console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
-                                elif meta['debug']:
-                                    msg = tracker.get('msg', '')
-                                    console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
+                                has_working_tracker = True
 
                             if not has_working_tracker:
                                 if meta['debug']:
@@ -1569,16 +1549,6 @@ class Clients():
                             if meta['debug']:
                                 console.print(f"[yellow]Error getting trackers for torrent {torrent.name}: {str(e)}")
 
-                        # Get torrent properties to check comment
-                        try:
-                            torrent_properties = await asyncio.to_thread(qbt_client.torrents_properties, torrent_hash=torrent.hash)
-                            comment = torrent_properties.get('comment', '')
-                            created_by = torrent_properties.get('created_by', '')
-                        except Exception as e:
-                            if meta['debug']:
-                                console.print(f"[yellow]Error getting properties for torrent {torrent.name}: {str(e)}")
-                            comment = ""
-
                         if 'torrent_comments' not in meta:
                             meta['torrent_comments'] = []
 
@@ -1586,18 +1556,16 @@ class Clients():
                             'hash': torrent.hash,
                             'name': torrent.name,
                             'save_path': torrent.save_path,
-                            'content_path': os.path.normpath(os.path.join(torrent.save_path, torrent.name)).lower(),
+                            'content_path': os.path.normpath(os.path.join(torrent.save_path, torrent.name)),
                             'size': torrent.size,
                             'category': torrent.category,
-                            'match_type': match_type,
-                            'trackers': url,
+                            'seeders': torrent.num_complete,
+                            'trackers': torrent.tracker,
                             'has_working_tracker': has_working_tracker,
-                            'comment': comment,
-                            'created_by': created_by
+                            'comment': torrent.comment,
                         }
 
                         # Initialize a list for found tracker IDs
-                        tracker_priority = ['ptp', 'bhd', 'btn', 'huno', 'aither', 'blu', 'ulcx', 'lst', 'oe', 'hdb']
                         tracker_found = False
                         tracker_urls = []
 
@@ -1606,8 +1574,8 @@ class Clients():
                             if not tracker_info:
                                 continue
 
-                            if tracker_info["url"] in comment:
-                                match = re.search(tracker_info["pattern"], comment)
+                            if tracker_info["url"] in torrent.comment:
+                                match = re.search(tracker_info["pattern"], torrent.comment)
                                 if match:
                                     tracker_id_value = match.group(1)
                                     tracker_urls.append({
@@ -1617,26 +1585,23 @@ class Clients():
                                     meta[tracker_id] = tracker_id_value
                                     tracker_found = True
 
-                        if created_by and 'Edited by HUNO' in created_by:
-                            if meta['debug']:
-                                console.print(f"[green]Found HUNO signature in 'Created By' field: {created_by}")
-
+                        if torrent.tracker and 'hawke.uno' in torrent.tracker:
                             # Try to extract torrent ID from the comment first
-                            huno_id = None
-                            if "/torrents/" in comment:
-                                match = re.search(r'/torrents/(\d+)', comment)
-                                if match:
-                                    huno_id = match.group(1)
+                            if not has_working_tracker:
+                                huno_id = None
+                                if "/torrents/" in torrent.comment:
+                                    match = re.search(r'/torrents/(\d+)', torrent.comment)
+                                    if match:
+                                        huno_id = match.group(1)
 
-                            # If we found an ID, use it
-                            if huno_id:
-                                tracker_urls.append({
-                                    'id': 'huno',
-                                    'tracker_id': huno_id,
-                                    'source': 'created_by_with_id'
-                                })
-                                meta['huno'] = huno_id
-                                tracker_found = True
+                                # If we found an ID, use it
+                                if huno_id:
+                                    tracker_urls.append({
+                                        'id': 'huno',
+                                        'tracker_id': huno_id,
+                                    })
+                                    meta['huno'] = huno_id
+                                    tracker_found = True
 
                         match_info['tracker_urls'] = tracker_urls
                         match_info['has_tracker'] = tracker_found
@@ -1644,11 +1609,10 @@ class Clients():
                         if tracker_found:
                             meta['found_tracker_match'] = True
 
-                        meta['torrent_comments'].append(match_info)
-
                         if meta.get('debug', False):
-                            console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
+                            console.print(f"[cyan]Stored comment for torrent: {torrent.comment[:100]}...")
 
+                        meta['torrent_comments'].append(match_info)
                         matching_torrents.append(match_info)
 
                 except Exception as e:

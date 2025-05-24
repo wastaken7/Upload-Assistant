@@ -103,12 +103,13 @@ class OTW():
         otw_name = await self.edit_name(meta)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
+        modq = await self.get_flag(meta, 'modq')
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -153,6 +154,7 @@ class OTW():
             'featured': 0,
             'free': 0,
             'doubleup': 0,
+            'mod_queue_opt_in': modq,
             'sticky': 0,
         }
         # Internal
@@ -188,6 +190,13 @@ class OTW():
             console.print("[cyan]Request Data:")
             console.print(data)
         open_torrent.close()
+
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag is not None:
+            return 1 if config_flag else 0
+
+        return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta, disctype):
         if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):

@@ -1,4 +1,3 @@
-from imdb import Cinemagoer
 from src.console import console
 import json
 import httpx
@@ -185,6 +184,22 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
                 total
                 }}
             }}
+            runtimes(first: 10) {{
+                edges {{
+                    node {{
+                        id
+                        seconds
+                        displayableProperty {{
+                            value {{
+                                plainText
+                            }}
+                        }}
+                        attributes {{
+                            text
+                        }}
+                    }}
+                }}
+            }}
             akas(first: 100) {{
             edges {{
                 node {{
@@ -250,6 +265,36 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
                         imdb_info['directors'].append(name_id)
                 break
 
+    editions = await safe_get(title_data, ['runtimes', 'edges'], [])
+    if editions:
+        edition_list = []
+        imdb_info['edition_details'] = {}
+
+        for edge in editions:
+            node = await safe_get(edge, ['node'], {})
+            seconds = await safe_get(node, ['seconds'], 0)
+            minutes = seconds // 60 if seconds else 0
+            displayable_property = await safe_get(node, ['displayableProperty', 'value', 'plainText'], '')
+            attributes = await safe_get(node, ['attributes'], [])
+            attribute_texts = [attr.get('text') for attr in attributes if isinstance(attr, dict)] if attributes else []
+
+            edition_display = f"{displayable_property} ({minutes} min)"
+            if attribute_texts:
+                edition_display += f" [{', '.join(attribute_texts)}]"
+
+            if seconds and displayable_property:
+                edition_list.append(edition_display)
+
+                runtime_key = str(minutes)
+                imdb_info['edition_details'][runtime_key] = {
+                    'display_name': displayable_property,
+                    'seconds': seconds,
+                    'minutes': minutes,
+                    'attributes': attribute_texts
+                }
+
+        imdb_info['editions'] = ', '.join(edition_list)
+
     akas_edges = await safe_get(title_data, ['akas', 'edges'], default=[])
     imdb_info['akas'] = [
         {
@@ -297,13 +342,84 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
 
 
 async def search_imdb(filename, search_year):
-    imdbID = '0'
-    ia = Cinemagoer()
-    search = ia.search_movie(filename)
-    for movie in search:
-        if filename in movie.get('title', ''):
-            if movie.get('year') == search_year:
-                imdbID = int(str(movie.movieID).replace('tt', '').strip())
-        else:
-            imdbID = 0
+    import re
+    filename = re.sub(r'\s+[A-Z]{2}$', '', filename.strip())
+    console.print(f"[yellow]Searching IMDb (GraphQL) for {filename} and year {search_year}...[/yellow]")
+    imdbID = 0
+    url = "https://api.graphql.imdb.com/"
+    query = {
+        "query": f"""
+            {{
+                advancedTitleSearch(
+                    first: 10,
+                    constraints: {{ titleTextConstraint: {{ searchTerm: "{filename}" }} }}
+                ) {{
+                    total
+                    edges {{
+                        node {{
+                            title {{
+                                id
+                                titleText {{
+                                    text
+                                }}
+                                titleType {{
+                                    text
+                                }}
+                                releaseYear {{
+                                    year
+                                }}
+                                plot {{
+                                    plotText {{
+                                    plainText
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        """
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=query, headers={"Content-Type": "application/json"}, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+    except Exception as e:
+        console.print(f"[red]IMDb GraphQL API error: {e}[/red]")
+        return 0
+
+    results = await safe_get(data, ["data", "advancedTitleSearch", "edges"], [])
+    console.print(f"[yellow]Found {len(results)} results...[/yellow]")
+
+    for idx, edge in enumerate(results):
+        node = await safe_get(edge, ["node"], {})
+        title = await safe_get(node, ["title"], {})
+        title_text = await safe_get(title, ["titleText", "text"], "")
+        year = await safe_get(title, ["releaseYear", "year"], None)
+        imdb_id = await safe_get(title, ["id"], "")
+        title_type = await safe_get(title, ["titleType", "text"], "")
+        plot = await safe_get(title, ["plot", "plotText", "plainText"], "")
+
+        console.print(f"[cyan]Result {idx+1}: {title_text} - ({year}) - {imdb_id} - Type: {title_type}[/cyan]")
+        if plot:
+            console.print(f"[green]Plot: {plot}[/green]")
+
+    if results:
+        console.print("[yellow]Enter the number of the correct entry, or 0 for none:[/yellow]")
+        try:
+            user_input = input("> ").strip()
+            if user_input.isdigit():
+                selection = int(user_input)
+                if 1 <= selection <= len(results):
+                    selected = results[selection - 1]
+                    imdb_id = await safe_get(selected, ["node", "title", "id"], "")
+                    if imdb_id:
+                        imdbID = int(imdb_id.replace('tt', '').strip())
+                        return imdbID
+                # If 0 or invalid, fall through to return imdbID = 0
+        except Exception as e:
+            console.print(f"[red]Error reading input: {e}[/red]")
+
     return imdbID

@@ -6,7 +6,8 @@ config = config
 
 
 async def get_tvdb_episode_data(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False, debug=False):
-    console.print(f"[cyan]Fetching TVDb episode data for S{season}E{episode}...[/cyan]")
+    if debug:
+        console.print(f"[cyan]Fetching TVDb episode data for S{season}E{episode}...[/cyan]")
 
     url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/episodes/default"
     params = {
@@ -175,7 +176,8 @@ async def get_tvdb_token(api_key, base_dir):
 
 
 async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, api_key=None, retry_attempted=False, debug=False):
-    console.print(f"[cyan]Fetching episode list for series ID {tvdb_id}...[/cyan]")
+    if debug:
+        console.print(f"[cyan]Fetching episode list for series ID {tvdb_id}...[/cyan]")
 
     url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/extended?meta=episodes&short=false"
     headers = {
@@ -411,3 +413,68 @@ async def get_tvdb_series_episodes(base_dir, token, tvdb_id, season, episode, ap
         import traceback
         console.print(f"[dim]{traceback.format_exc()}[/dim]")
         return (season, episode)
+
+
+async def get_tvdb_series_data(base_dir, token, tvdb_id, api_key=None, retry_attempted=False, debug=False):
+    url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}"
+    headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=30.0)
+
+            if response.status_code == 401:
+                if api_key and not retry_attempted:
+                    console.print("[yellow]Unauthorized access. Refreshing TVDb token...[/yellow]")
+                    new_token = await get_tvdb_token(api_key, base_dir)
+                    if new_token:
+                        return await get_tvdb_series_data(
+                            base_dir, new_token, tvdb_id, api_key, True, debug
+                        )
+                    else:
+                        console.print("[red]Failed to refresh TVDb token[/red]")
+                        return None
+                else:
+                    console.print("[red]Unauthorized access to TVDb API[/red]")
+                    return None
+
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("message") == "Unauthorized":
+                if api_key and not retry_attempted:
+                    console.print("[yellow]Token invalid or expired. Refreshing TVDb token...[/yellow]")
+                    new_token = await get_tvdb_token(api_key, base_dir)
+                    if new_token:
+                        return await get_tvdb_series_data(
+                            base_dir, new_token, tvdb_id, api_key, True, debug
+                        )
+                    else:
+                        console.print("[red]Failed to refresh TVDb token[/red]")
+                        return None
+                else:
+                    console.print("[red]Unauthorized response from TVDb API[/red]")
+                    return None
+
+            if data.get("status") == "success" and data.get("data"):
+                series_data = data["data"]
+                series_name = series_data.get("name")
+                if debug:
+                    console.print(f"[bold cyan]TVDB series name: {series_name}[/bold cyan]")
+                return series_name
+            else:
+                console.print(f"[yellow]No TVDb series data found for {tvdb_id}[/yellow]")
+                return None
+
+    except httpx.HTTPStatusError as e:
+        console.print(f"[red]HTTP error occurred: {e.response.status_code} - {e.response.text}[/red]")
+        return None
+    except httpx.RequestError as e:
+        console.print(f"[red]Request error occurred: {e}[/red]")
+        return None
+    except Exception as e:
+        console.print(f"[red]Error fetching TVDb series data: {e}[/red]")
+        return None

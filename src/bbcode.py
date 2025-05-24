@@ -37,6 +37,96 @@ class BBCODE:
     def __init__(self):
         pass
 
+    def clean_hdb_description(self, description):
+        console.print("[yellow]Cleaning HDB description...")
+        # Unescape html
+        desc = html.unescape(description)
+        desc = desc.replace('\r\n', '\n')
+        imagelist = []
+
+        # First pass: Remove entire comparison sections
+        # Start by finding section headers for comparisons
+        comparison_sections = re.finditer(r"\[center\]\s*\[b\].*?(Comparison|vs).*?\[\/b\][\s\S]*?\[\/center\]",
+                                          desc, flags=re.IGNORECASE)
+        for section in comparison_sections:
+            section_text = section.group(0)
+            # If section contains hdbits.org, remove the entire section
+            if re.search(r"hdbits\.org", section_text, flags=re.IGNORECASE):
+                desc = desc.replace(section_text, '')
+
+        # Handle individual comparison lines
+        comparison_lines = re.finditer(r"(.*comparison.*)\n", desc, flags=re.IGNORECASE)
+        for comp_match in comparison_lines:
+            comp_pos = comp_match.start()
+
+            # Get the next lines after the comparison line
+            next_lines = desc[comp_pos:comp_pos+500].split('\n', 3)[:3]  # Get comparison line + 2 more lines
+            next_lines_text = '\n'.join(next_lines)
+
+            # Check if any of these lines contain HDBits URLs
+            if re.search(r"hdbits\.org", next_lines_text, flags=re.IGNORECASE):
+                # Replace the entire section (comparison line + next 2 lines)
+                line_end_pos = comp_pos + len(next_lines_text)
+                to_remove = desc[comp_pos:line_end_pos]
+                desc = desc.replace(to_remove, '')
+
+        # Remove all empty URL tags containing hdbits.org
+        desc = re.sub(r"\[url=https?:\/\/(img\.|t\.)?hdbits\.org[^\]]*\]\[\/url\]", "", desc, flags=re.IGNORECASE)
+
+        # Remove URL tags with visible content
+        hdbits_urls = re.findall(r"(\[url[\=\]]https?:\/\/(img\.|t\.)?hdbits\.org[^\]]+\])(.*?)(\[\/url\])?", desc, flags=re.IGNORECASE)
+        for url_parts in hdbits_urls:
+            full_url = ''.join(url_parts)
+            desc = desc.replace(full_url, '')
+
+        # Remove HDBits image tags
+        hdbits_imgs = re.findall(r"\[img\][\s\S]*?(img\.|t\.)?hdbits\.org[\s\S]*?\[\/img\]", desc, flags=re.IGNORECASE)
+        for img_tag in hdbits_imgs:
+            desc = desc.replace(img_tag, '')
+
+        # Remove any standalone HDBits URLs
+        standalone_urls = re.findall(r"https?:\/\/(img\.|t\.)?hdbits\.org\/[^\s\[\]]+", desc, flags=re.IGNORECASE)
+        for url in standalone_urls:
+            desc = desc.replace(url, '')
+
+        # Catch any remaining URL tags with hdbits.org in them
+        desc = re.sub(r"\[url[^\]]*hdbits\.org[^\]]*\](.*?)\[\/url\]", "", desc, flags=re.IGNORECASE)
+
+        # Double-check for any self-closing URL tags that might have been missed
+        desc = re.sub(r"\[url=https?:\/\/[^\]]*hdbits\.org[^\]]*\]\[\/url\]", "", desc, flags=re.IGNORECASE)
+
+        # Remove empty comparison section headers and center tags
+        desc = re.sub(r"\[center\]\s*\[b\].*?(Comparison|vs).*?\[\/b\][\s\S]*?\[\/center\]",
+                      "", desc, flags=re.IGNORECASE)
+
+        # Remove any empty center tags that might be left
+        desc = re.sub(r"\[center\]\s*\[\/center\]", "", desc, flags=re.IGNORECASE)
+
+        # Clean up multiple consecutive newlines
+        desc = re.sub(r"\n{3,}", "\n\n", desc)
+
+        # Extract images wrapped in URL tags (e.g., [url=https://imgbox.com/xxx][img]https://thumbs.imgbox.com/xxx[/img][/url])
+        url_img_pattern = r"\[url=(https?:\/\/[^\]]+)\]\[img\](https?:\/\/[^\]]+)\[\/img\]\[\/url\]"
+        url_img_matches = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
+        for web_url, img_url in url_img_matches:
+            # Skip HDBits images
+            if "hdbits.org" in web_url.lower() or "hdbits.org" in img_url.lower():
+                desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
+                continue
+
+            raw_url = img_url
+            if "thumbs2.imgbox.com" in img_url:
+                raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com")
+                raw_url = raw_url.replace("_t.png", "_o.png")
+
+            image_dict = {
+                'img_url': img_url,
+                'raw_url': raw_url,
+                'web_url': web_url
+            }
+            imagelist.append(image_dict)
+            desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
+
     def clean_bhd_description(self, description, meta):
         # Unescape html
         desc = html.unescape(description)

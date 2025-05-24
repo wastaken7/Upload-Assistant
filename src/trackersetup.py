@@ -163,11 +163,11 @@ class TRACKER_SETUP:
 
         if meta['debug']:
             console.print("Total banned groups retrieved:", len(all_data))
-        await self.write_banned_groups_to_file(file_path, all_data)
+        await self.write_banned_groups_to_file(file_path, all_data, debug=meta['debug'])
 
         return file_path
 
-    async def write_banned_groups_to_file(self, file_path, json_data):
+    async def write_banned_groups_to_file(self, file_path, json_data, debug=False):
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -185,8 +185,8 @@ class TRACKER_SETUP:
             }
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
-
-            console.print(f"File '{file_path}' updated successfully with {len(names)} groups.")
+            if debug:
+                console.print(f"File '{file_path}' updated successfully with {len(names)} groups.")
         except Exception as e:
             console.print(f"An error occurred: {e}")
 
@@ -261,7 +261,7 @@ class TRACKER_SETUP:
 
         return False
 
-    async def write_internal_claims_to_file(self, file_path, data):
+    async def write_internal_claims_to_file(self, file_path, data, debug=False):
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -285,7 +285,8 @@ class TRACKER_SETUP:
                 })
 
             if not extracted_data:
-                console.print("No valid claims found to write.")
+                if debug:
+                    console.print("No valid claims found to write.")
                 return
 
             titles_csv = ', '.join([data['title'] for data in extracted_data])
@@ -298,8 +299,8 @@ class TRACKER_SETUP:
             }
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
-
-            console.print(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
+            if debug:
+                console.print(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
         except Exception as e:
             console.print(f"An error occurred: {e}")
 
@@ -357,7 +358,7 @@ class TRACKER_SETUP:
 
         if meta['debug']:
             console.print("Total claims retrieved:", len(all_data))
-        await self.write_internal_claims_to_file(file_path, all_data)
+        await self.write_internal_claims_to_file(file_path, all_data, debug=meta['debug'])
 
         return await self.check_tracker_claims(meta, tracker)
 

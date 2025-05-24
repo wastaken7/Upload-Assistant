@@ -1,3 +1,98 @@
+__version__ = "5.0.2"
+
+"""
+Changelog for version 5.0.2 (2025-05-20):
+
+- gather tmdb tasks to speed process
+- add backup config to git ignore
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.1...5.0.2
+"""
+
+__version__ = "5.0.1"
+
+"""
+Changelog for version 5.0.1 (2025-05-19):
+
+* Fixes DVD
+* Fixes BHD description handling
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.0...5.0.1
+"""
+
+__version__ = "5.0.0"
+
+"""
+Changelog for version 5.0.0 (2025-05-19):
+
+## A major version bump given some significant code changes
+
+## What's Changed
+* Get edition from IMDB by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/519
+* Update LT.py by @Aerglonus in https://github.com/Audionut/Upload-Assistant/pull/520
+* (Add) mod queue opt-in option to OTW tracker by @AnabolicsAnonymous in https://github.com/Audionut/Upload-Assistant/pull/524
+* Add test run action by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/525
+* Prep is getting out of hand by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/518
+* Config generator and updater by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/522
+* Image rehosting use os.chdir as final fallback by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/529
+* Get edition from IMDB by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/519
+* Added a fallback to cover issue that causes glob to not find images when site rehosting images
+* Fixed an issue that send dubbed as dual audio to MTV
+* Fixed an issue when HDB descriptions returned None from bbcode cleaning
+* Stopped using non-English names from TVDB when original language is not English
+* Caught an error when TMDB is None from BHD
+* Added function so that series packs can get TVDB name
+* Other little tweaks and fixes
+
+## NOTES
+- There is now a config generator and updater. config-generator.py. Usage is in the readme and docker wiki. As the name implies, you can generate new configs and update existing configs.
+- If you are an existing user wanting to use the config-generator, I highly recommend to update your client names to match those set in the example-config https://github.com/Audionut/Upload-Assistant/blob/5f27e01a7f179e0ea49796dcbcae206718366423/data/example-config.py#L551
+- The names that match what you set as the default_torrent_client https://github.com/Audionut/Upload-Assistant/blob/5f27e01a7f179e0ea49796dcbcae206718366423/data/example-config.py#L140
+- This will make your experience with the config-generator much more pleasurable.
+- BHD api/rss keys for BHD id/description parsing are now located with the BHD tracker settings and not within the DEFAULT settings section. It will continue to work with a notice being printed for the meantime, but please update your configs as I will permanently retire the old settings in time.
+- modq for UNIT3D sites has been fixed in the UNIT3D source thanks to @AnabolicsAnonymous let me know if a site you use has updated to the latest UNIT3D source code with modq api fix, and it can be added to that sites UA file.
+- You may notice that the main landing page now contains some Test Run passing displays. This does some basic checking that won't catch every error, but it may be useful for those who update directly from master branch. I'll keep adding to this over time to better catch any errors, If this display shows error, probably don't git pull.
+
+## New Contributors
+* @Aerglonus made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/520
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.4.1...5.0.0
+"""
+
+__version__ = "4.2.4.1"
+
+"""
+Changelog for version 4.2.4.1 (2025-05-10):
+
+## What's Changed
+* Make search imdb not useless by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/517
+* Remove brackets from TVDB titles
+* Fix PTP adding group.
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.4...4.2.4.1
+"""
+
+__version__ = "4.2.4"
+
+"""
+Changelog for version 4.2.4 (2025-05-10):
+
+## What's Changed
+* Update PTT.py by @btTeddy in https://github.com/Audionut/Upload-Assistant/pull/511
+* Update OTW banned release groups by @backstab5983 in https://github.com/Audionut/Upload-Assistant/pull/512
+* tmdb from imdb updates by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/515
+* Use TVDB title by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/516
+* HDB descriptions by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/498
+* Fixed manual frame code changes breaking packed images handling
+* DP - removed nordic from name per their request
+* Fixed PTP groupID not being set in meta
+* Added a config option for screenshot header when tonemapping
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/4.2.3.1...4.2.4
+"""
+
 __version__ = "4.2.3.1"
 
 """

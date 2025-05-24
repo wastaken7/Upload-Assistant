@@ -137,10 +137,15 @@ class AR():
                 return True
         else:
             console.print("[yellow]No session file found. Attempting to log in...")
-            if await self.login(meta):
-                console.print("[green]Login successful, session file created.")
-                await self.save_session(meta)
-                return True
+            if await self.login():
+                console.print("[green]Login successful, saving session file.")
+                valid = await self.save_session(meta)
+                if valid:
+                    if meta['debug']:
+                        console.print("[blue]Session file saved successfully.")
+                    return True
+                else:
+                    return False
             else:
                 console.print('[red]Failed to validate credentials. Please confirm that the site is up and your passkey is valid. Exiting')
 
@@ -157,7 +162,7 @@ class AR():
             return False
         return True
 
-    async def login(self, meta):
+    async def login(self):
         data = {
             "username": self.username,
             "password": self.password,
@@ -166,20 +171,23 @@ class AR():
         }
         async with self.session.post(self.login_url, data=data) as response:
             if await self.validate_login(await response.text()):
-                await self.save_session(meta)
                 return True
         return False
 
     async def save_session(self, meta):
-        session_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.pkl")
-        os.makedirs(os.path.dirname(session_file), exist_ok=True)
-        cookies = self.session.cookie_jar
-        cookie_dict = {}
-        for cookie in cookies:
-            cookie_dict[cookie.key] = cookie.value
+        try:
+            session_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.pkl")
+            os.makedirs(os.path.dirname(session_file), exist_ok=True)
+            cookies = self.session.cookie_jar
+            cookie_dict = {}
+            for cookie in cookies:
+                cookie_dict[cookie.key] = cookie.value
 
-        with open(session_file, 'wb') as f:
-            pickle.dump(cookie_dict, f)
+            with open(session_file, 'wb') as f:
+                pickle.dump(cookie_dict, f)
+        except Exception as e:
+            console.print(f"[red]Error saving session: {e}[/red]")
+            return False
 
     async def load_session(self, meta):
         import aiohttp
@@ -216,11 +224,9 @@ class AR():
                             return True  # Session is valid
                         else:
                             console.print(f"[yellow]Session validation failed with status {response.status}, retrying...[/yellow]")
-                            return False
 
                 except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     console.print(f"[yellow]Session might be invalid: {e}. Retrying...[/yellow]")
-                    return False
 
             except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
                 console.print(f"[red]Session loading error: {e}. Closing session and retrying.[/red]")

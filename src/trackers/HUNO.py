@@ -56,7 +56,7 @@ class HUNO():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -101,7 +101,8 @@ class HUNO():
                 data['internal'] = 1
             else:
                 data['internal'] = 0
-
+        if meta.get('freeleech', 0) != 0:
+            data['free'] = meta.get('freeleech', 0)
         if meta.get('category') == 'TV' and meta.get('tv_pack') == 1:
             data['season_pack'] = 1
 
@@ -244,7 +245,7 @@ class HUNO():
             video_encode = video_encode.replace('H', 'x')
         dvd_size = meta.get('dvd_size', "")
         edition = meta.get('edition', "")
-        hybrid = "Hybrid" if "HYBRID" in basename.upper() else ""
+        hybrid = 'Hybrid' if meta.get('webdv', "") else ''
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
 
         # YAY NAMING FUN

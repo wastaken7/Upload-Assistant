@@ -688,8 +688,8 @@ class HDB():
 
                     bbcode = formatted_bbcode
 
-                if meta['debug']:
-                    console.print(f"[cyan]Response formatted with {num_groups} images per line")
+                    if meta['debug']:
+                        console.print(f"[cyan]Response formatted with {num_groups} images per line")
 
                 return bbcode
             else:
@@ -704,7 +704,7 @@ class HDB():
                 f[1].close()
 
     async def get_info_from_torrent_id(self, hdb_id):
-        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = None
+        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = None
         url = "https://hdbits.org/api/torrents"
         data = {
             "username": self.username,
@@ -713,26 +713,34 @@ class HDB():
         }
 
         try:
-            response = requests.get(url, json=data)
+            response = requests.post(url, json=data)
             if response.ok:
-                response = response.json()
-                if response.get('data'):
-                    first_entry = response['data'][0]
+                response_json = response.json()
+
+                if response_json.get('status') == 0 and response_json.get('data'):
+                    first_entry = response_json['data'][0]
 
                     hdb_imdb = int(first_entry.get('imdb', {}).get('id') or 0)
                     hdb_tvdb = int(first_entry.get('tvdb', {}).get('id') or 0)
                     hdb_name = first_entry.get('name', None)
                     hdb_torrenthash = first_entry.get('hash', None)
+                    hdb_description = first_entry.get('descr')
+
+                else:
+                    status_code = response_json.get('status', 'unknown')
+                    message = response_json.get('message', 'No error message provided')
+                    console.print(f"[red]API returned error status {status_code}: {message}[/red]")
 
         except requests.exceptions.RequestException as e:
-            console.print(f"Request error: {e}")
-        except Exception:
+            console.print(f"[red]Request error: {e}[/red]")
+        except Exception as e:
+            console.print(f"[red]Unexpected error: {e}[/red]")
             console.print_exception()
 
-        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash
+        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
 
     async def search_filename(self, search_term, search_file_folder, meta):
-        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_id = None
+        hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = hdb_id = None
         url = "https://hdbits.org/api/torrents"
 
         # Handle disc case
@@ -759,11 +767,11 @@ class HDB():
                     # console.print(f"[yellow]Using this data: {data}")
                 else:
                     console.print(f"[red]Error: 'Disc Title' not found in {bd_summary_path}[/red]")
-                    return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                    return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
             except FileNotFoundError:
                 console.print(f"[red]Error: File not found at {bd_summary_path}[/red]")
-                return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
         else:  # Handling non-disc case
             data = {
@@ -776,7 +784,7 @@ class HDB():
             # console.print(f"[yellow]Using this data: {data}")
 
         try:
-            response = requests.get(url, json=data)
+            response = requests.post(url, json=data)
             if response.ok:
                 try:
                     response_json = response.json()
@@ -792,10 +800,11 @@ class HDB():
                         hdb_name = each.get('name', None)
                         hdb_torrenthash = each.get('hash', None)
                         hdb_id = each.get('id', None)
+                        hdb_description = each.get('descr')
 
                         console.print(f'[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]')
 
-                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
                     console.print('[yellow]No data found in the HDB API response[/yellow]')
 
@@ -809,4 +818,4 @@ class HDB():
             console.print(f"[red]Request error: {str(e)}[/red]")
 
         console.print('[yellow]Could not find a matching release on HDB[/yellow]')
-        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id

@@ -8,7 +8,8 @@ async def generate_guid():
 
 
 async def get_btn_torrents(btn_api, btn_id, meta):
-    print("Fetching BTN data...")
+    if meta['debug']:
+        print("Fetching BTN data...")
     post_query_url = "https://api.broadcasthe.net/"
     post_data = {
         "jsonrpc": "2.0",
@@ -58,7 +59,8 @@ async def get_btn_torrents(btn_api, btn_id, meta):
 
 
 async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=None, filename=None, foldername=None, torrent_id=None):
-    print("Fetching BHD data...")
+    if meta['debug']:
+        print("Fetching BHD data...")
     post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
     if torrent_id is not None:
@@ -155,25 +157,30 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
     meta["imdb_id"] = int(imdb_id or 0)
 
     raw_tmdb_id = first_result.get("tmdb_id", "")
-    meta["category"], parsed_tmdb_id = await parse_tmdb_id(raw_tmdb_id, meta.get("category"))
-    meta["tmdb_id"] = int(parsed_tmdb_id or 0)
+    if raw_tmdb_id and raw_tmdb_id != "0":
+        meta["category"], parsed_tmdb_id = await parse_tmdb_id(raw_tmdb_id, meta.get("category"))
+        meta["tmdb_id"] = int(parsed_tmdb_id or 0)
 
-    if only_id:
+    if only_id and not meta.get('keep_images'):
         return meta["imdb_id"] or meta["tmdb_id"] or 0
 
-    if description:
-        bbcode = BBCODE()
-        imagelist = []
-        if "framestor" in name:
-            meta["framestor"] = True
-        elif "flux" in name:
-            meta["flux"] = True
-        description, imagelist = bbcode.clean_bhd_description(description, meta)
+    bbcode = BBCODE()
+    imagelist = []
+    if "framestor" in name:
+        meta["framestor"] = True
+    elif "flux" in name:
+        meta["flux"] = True
+    description, imagelist = bbcode.clean_bhd_description(description, meta)
+    if description and not only_id:
         meta["description"] = description
         meta["image_list"] = imagelist
+    elif description and meta.get('keep_images'):
+        meta["description"] = ""
+        meta["image_list"] = imagelist
 
-    print("BHD IMDb ID:", meta.get("imdb_id"))
-    print("BHD TMDb ID:", meta.get("tmdb_id"))
+    if meta['debug']:
+        print("BHD IMDb ID:", meta.get("imdb_id"))
+        print("BHD TMDb ID:", meta.get("tmdb_id"))
 
     return meta["imdb_id"] or meta["tmdb_id"] or 0
 

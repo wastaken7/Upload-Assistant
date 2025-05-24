@@ -854,13 +854,16 @@ class COMMON():
         # Determine the search method and add parameters accordingly
         if file_name:
             params['file_name'] = file_name   # Add file_name to params
-            console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+            if meta.get('debug'):
+                console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
             url = f"{torrent_url}{id}"
-            console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
+            if meta.get('debug'):
+                console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
-            console.print("[red]No ID or file name provided for search.[/red]")
+            if meta.get('debug'):
+                console.print("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, None, None
 
         # Make the GET request with proper encoding handled by 'params'
@@ -942,7 +945,8 @@ class COMMON():
                         else:
                             file_name = [file['name'] for file in files[:5]]  # Return up to 5 filenames
 
-                    console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+                    if meta.get('debug'):
+                        console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
                     # Skip the ID selection prompt if searching by ID
                     console.print(f"[green]Valid IDs found: TMDb: {tmdb}, IMDb: {imdb}, TVDb: {tvdb}, MAL: {mal}[/green]")
@@ -957,36 +961,38 @@ class COMMON():
                     except (KeyboardInterrupt, EOFError):
                         sys.exit(1)
 
-            if description and not only_id:
+            if description:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
-                console.print(f"[green]Successfully grabbed description from {tracker}")
-                console.print(f"Extracted description: {description}", markup=False)
+                if not only_id:
+                    console.print(f"[green]Successfully grabbed description from {tracker}")
+                    console.print(f"Extracted description: {description}", markup=False)
 
-                if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('huno') or meta.get('ulcx')):
-                    meta['description'] = description
-                    meta['saved_description'] = True
-                else:
-                    console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                    edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
-
-                    if edit_choice.lower() == 'e':
-                        edited_description = click.edit(description)
-                        if edited_description:
-                            description = edited_description.strip()
+                    if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('huno') or meta.get('ulcx')):
                         meta['description'] = description
                         meta['saved_description'] = True
-                    elif edit_choice.lower() == 'd':
-                        description = None
-                        imagelist = []
-                        console.print("[yellow]Description discarded.[/yellow]")
                     else:
-                        console.print("[green]Keeping the original description.[/green]")
-                        meta['description'] = description
-                        meta['saved_description'] = True
-            else:
-                description = ""
-                imagelist = []
+                        console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                        edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
+
+                        if edit_choice.lower() == 'e':
+                            edited_description = click.edit(description)
+                            if edited_description:
+                                description = edited_description.strip()
+                            meta['description'] = description
+                            meta['saved_description'] = True
+                        elif edit_choice.lower() == 'd':
+                            description = None
+                            imagelist = []
+                            console.print("[yellow]Description discarded.[/yellow]")
+                        else:
+                            console.print("[green]Keeping the original description.[/green]")
+                            meta['description'] = description
+                            meta['saved_description'] = True
+                else:
+                    description = ""
+                    if not meta.get('keep_images'):
+                        imagelist = []
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 

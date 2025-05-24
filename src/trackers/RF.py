@@ -40,7 +40,7 @@ class RF():
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         rf_name = await self.edit_name(meta)
-        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -91,7 +91,8 @@ class RF():
         if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
             if meta['tag'] != "" and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
                 data['internal'] = 1
-
+        if meta.get('freeleech', 0) != 0:
+            data['free'] = meta.get('freeleech', 0)
         if region_id != 0:
             data['region_id'] = region_id
         if distributor_id != 0:
