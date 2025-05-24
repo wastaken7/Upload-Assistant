@@ -486,7 +486,6 @@ class DiscParse():
                         stdout, stderr = await process.communicate()
 
                         if process.returncode == 0:
-                            console.print(f"[green]DVD MediaInfo binary found: {mediainfo_binary}")
                             vob_set_mi = stdout.decode()
                         else:
                             console.print(f"[yellow]DVD MediaInfo failed for {ifo_file}: {stderr.decode()}")
