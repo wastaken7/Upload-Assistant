@@ -253,16 +253,20 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
     mediainfo_cmd = None
     if is_dvd:
         console.print("[bold yellow]DVD detected, using specialized MediaInfo binary...")
-        if platform.system() == "Windows":
-            mediainfo_cmd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "MI", "windows", "mediainfo.exe")
-        else:
-            mediainfo_cmd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "MI", "linux", "mediainfo")
+        mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "mediainfo.exe")
 
-        if not os.path.exists(mediainfo_cmd):
-            console.print("[bold red]Specialized MediaInfo binary not found, falling back to standard MediaInfo")
-            mediainfo_cmd = None
+        if platform.system() == "Linux":
+            if os.path.exists(mediainfo_binary):
+                mediainfo_cmd = ["mono", mediainfo_binary]
+                console.print(f"[bold green]Using MediaInfo binary with mono: {mediainfo_binary}")
+            else:
+                console.print("[bold red]Specialized MediaInfo binary not found, falling back to standard MediaInfo")
         else:
-            console.print(f"[bold green]Using MediaInfo binary: {mediainfo_cmd}")
+            if os.path.exists(mediainfo_binary):
+                mediainfo_cmd = mediainfo_binary
+                console.print(f"[bold green]Using MediaInfo binary: {mediainfo_binary}")
+            else:
+                console.print("[bold red]Specialized MediaInfo binary not found, falling back to standard MediaInfo")
 
     if not os.path.exists(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt") and export_text:
         console.print("[bold yellow]Exporting MediaInfo...")
@@ -272,7 +276,11 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
         if mediainfo_cmd:
             import subprocess
             try:
-                result = subprocess.run([mediainfo_cmd, video], capture_output=True, text=True)
+                # Handle both string and list command formats
+                if isinstance(mediainfo_cmd, list):
+                    result = subprocess.run(mediainfo_cmd + [video], capture_output=True, text=True)
+                else:
+                    result = subprocess.run([mediainfo_cmd, video], capture_output=True, text=True)
                 media_info = result.stdout
             except Exception as e:
                 console.print(f"[bold red]Error using specialized MediaInfo binary: {e}")
@@ -302,7 +310,11 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
         if mediainfo_cmd:
             import subprocess
             try:
-                result = subprocess.run([mediainfo_cmd, "--Output=JSON", video], capture_output=True, text=True)
+                # Handle both string and list command formats
+                if isinstance(mediainfo_cmd, list):
+                    result = subprocess.run(mediainfo_cmd + ["--Output=JSON", video], capture_output=True, text=True)
+                else:
+                    result = subprocess.run([mediainfo_cmd, "--Output=JSON", video], capture_output=True, text=True)
                 media_info_json = result.stdout
                 media_info_dict = json.loads(media_info_json)
             except Exception as e:
