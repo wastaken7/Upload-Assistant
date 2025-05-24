@@ -830,6 +830,7 @@ class Clients():
                 if meta['debug']:
                     console.print(f"[yellow]Skipping linking, path already exists: {dst}")
             else:
+                allow_fallback = self.config['TRACKERS'].get('allow_fallback', True)
                 fallback_to_original = False
                 if use_hardlink:
                     try:
@@ -842,9 +843,10 @@ class Clients():
                                     console.print(f"[green]Hard link created: {dst} -> {src}")
                             except OSError as e:
                                 console.print(f"[yellow]Hard link failed: {e}")
-                                console.print(f"[yellow]Using original path without linking: {src}")
-                                use_hardlink = False
-                                fallback_to_original = True
+                                if allow_fallback:
+                                    console.print(f"[yellow]Using original path without linking: {src}")
+                                    use_hardlink = False
+                                    fallback_to_original = True
                         else:
                             # For directories, we need to link each file inside
                             console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
@@ -869,8 +871,9 @@ class Clients():
                                             console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
                                     except OSError as e:
                                         console.print(f"[yellow]Hard link failed for file {file}: {e}")
-                                        console.print(f"[yellow]Using original path without linking: {src}")
-                                        fallback_to_original = True
+                                        if allow_fallback:
+                                            console.print(f"[yellow]Using original path without linking: {src}")
+                                            fallback_to_original = True
                                         break
 
                         if fallback_to_original:
@@ -886,11 +889,12 @@ class Clients():
                         # Global exception handler for any linking operation
                         error_msg = f"Failed to create hard link: {e}"
                         console.print(f"[bold red]{error_msg}")
-                        console.print(f"[yellow]Using original path without linking: {src}")
-                        use_hardlink = False
-                        if meta['debug']:
-                            console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
-                            console.print(f"[yellow]Destination: {dst}")
+                        if allow_fallback:
+                            console.print(f"[yellow]Using original path without linking: {src}")
+                            use_hardlink = False
+                            if meta['debug']:
+                                console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                                console.print(f"[yellow]Destination: {dst}")
 
                 elif use_symlink:
                     try:
@@ -905,8 +909,9 @@ class Clients():
                     except OSError as e:
                         error_msg = f"Failed to create symlink: {e}"
                         console.print(f"[bold red]{error_msg}")
-                        console.print(f"[yellow]Using original path without linking: {src}")
-                        use_symlink = False
+                        if allow_fallback:
+                            console.print(f"[yellow]Using original path without linking: {src}")
+                            use_symlink = False
 
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
