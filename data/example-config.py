@@ -157,13 +157,11 @@ config = {
         "only_id": False,
 
         # set true to use sonarr for tv show searching
-        # needs tvdb id input to work
         "use_sonarr": False,
         "sonarr_url": "http://localhost:8989",
         "sonarr_api_key": "",
 
         # set true to use radarr for movie searching
-        # needs tmdb id input to work
         "use_radarr": False,
         "radarr_url": "http://localhost:7878",
         "radarr_api_key": "",

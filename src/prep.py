@@ -356,7 +356,7 @@ class Prep():
             meta['category'] = meta['category'].upper()
 
         sonarr_data = None
-        if meta.get('category', None) == "TV":
+        if meta.get('category', None) == "TV" and use_sonarr and meta.get('tvdb_id', 0) == 0:
             sonarr_data = await get_sonarr_data(filename=meta.get('path', ''), title=meta.get('filename', None), debug=meta.get('debug', False))
             ids = await extract_show_data(sonarr_data)
             if ids:
@@ -384,7 +384,7 @@ class Prep():
                     meta['manual_year'] = ids['year']
 
         radarr_data = None
-        if meta.get('category', None) == "MOVIE" and use_radarr:
+        if meta.get('category', None) == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) == 0:
             radarr_data = await get_radarr_data(filename=meta.get('uuid', ''), debug=meta.get('debug', False))
             ids = await extract_movie_data(radarr_data, filename=meta.get('uuid', ''))
             if ids:
