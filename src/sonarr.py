@@ -4,7 +4,7 @@ from src.console import console
 
 
 async def get_sonar_from_id(tvdb_id, debug=False):
-    if config['DEFAULT']['sonarr_api_key']:
+    if config['DEFAULT'].get('sonarr_api_key', ""):
         url = f"{config['DEFAULT']['sonarr_url']}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"
         headers = {
             "X-Api-Key": config['DEFAULT']['sonarr_api_key'],

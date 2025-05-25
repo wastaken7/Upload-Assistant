@@ -20,6 +20,7 @@ from src.tags import get_tag, tag_override
 from src.get_disc import get_disc, get_dvd_size
 from src.get_source import get_source
 from src.sonarr import get_sonar_from_id, extract_show_data
+from src.radarr import get_radarr_from_id, extract_movie_data
 
 try:
     import traceback
@@ -66,6 +67,7 @@ class Prep():
         hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
         tracker_ids = ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb', 'huno']
         use_sonarr = config['DEFAULT'].get('use_sonarr', False)
+        use_radarr = config['DEFAULT'].get('use_radarr', False)
 
         # make sure these are set in meta
         meta['we_checked_tvdb'] = False
@@ -389,6 +391,17 @@ class Prep():
                 meta['imdb_id'] = ids['imdb_id']
             if meta.get('tvmaze_id', 0) == 0 and ids['tvmaze_id'] is not None:
                 meta['tvmaze_id'] = ids['tvmaze_id']
+            if meta.get('tmdb_id', 0) == 0 and ids['tmdb_id'] is not None:
+                meta['tmdb_id'] = ids['tmdb_id']
+        elif meta['category'] == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) != 0 and meta.get('imdb_id', 0) == 0:
+            radarr_data = await get_radarr_from_id(meta.get('tmdb_id', 0), debug=meta.get('debug', False))
+            ids = await extract_movie_data(radarr_data)
+            if meta['debug']:
+                console.print(f"IMDB ID: {ids['imdb_id']}")
+                console.print(f"TMDB ID: {ids['tmdb_id']}")
+                console.print(f"Genres: {ids['genres']}")
+            if meta.get('imdb_id', 0) == 0 and ids['imdb_id'] is not None:
+                meta['imdb_id'] = ids['imdb_id']
             if meta.get('tmdb_id', 0) == 0 and ids['tmdb_id'] is not None:
                 meta['tmdb_id'] = ids['tmdb_id']
 
