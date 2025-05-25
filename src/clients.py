@@ -1531,23 +1531,39 @@ class Clients():
 
                     if is_match:
                         try:
+                            torrent_trackers = await asyncio.to_thread(qbt_client.torrents_trackers, torrent_hash=torrent.hash)
                             display_trackers = []
 
                             # Filter out DHT, PEX, LSD "trackers"
-                            for tracker in torrents:
-                                if tracker.get('tracker', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
+                            for tracker in torrent_trackers:
+                                if tracker.get('url', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
                                     continue
                                 display_trackers.append(tracker)
-                                has_working_tracker = True
 
-                            if not has_working_tracker:
-                                if meta['debug']:
-                                    console.print(f"[yellow]Skipping torrent: {torrent.name} - No working trackers")
-                                continue
+                                for tracker in display_trackers:
+                                    url = tracker.get('url', 'Unknown URL')
+                                    status_code = tracker.get('status', 0)
+                                    status_text = {
+                                        0: "Disabled",
+                                        1: "Not contacted",
+                                        2: "Working",
+                                        3: "Updating",
+                                        4: "Error"
+                                    }.get(status_code, f"Unknown ({status_code})")
 
-                        except Exception as e:
+                                    if status_code == 2:
+                                        has_working_tracker = True
+                                        if meta['debug']:
+                                            console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
+
+                                    elif meta['debug']:
+                                        msg = tracker.get('msg', '')
+                                        console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
+
+                        except qbittorrentapi.APIError as e:
                             if meta['debug']:
-                                console.print(f"[yellow]Error getting trackers for torrent {torrent.name}: {str(e)}")
+                                console.print(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
+                            continue
 
                         if 'torrent_comments' not in meta:
                             meta['torrent_comments'] = []
@@ -1560,7 +1576,7 @@ class Clients():
                             'size': torrent.size,
                             'category': torrent.category,
                             'seeders': torrent.num_complete,
-                            'trackers': torrent.tracker,
+                            'trackers': url,
                             'has_working_tracker': has_working_tracker,
                             'comment': torrent.comment,
                         }
