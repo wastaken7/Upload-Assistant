@@ -414,8 +414,6 @@ class Prep():
         if not meta.get('image_list') and not meta.get('edit', False) and (not sonarr_data and not radarr_data):
             # Reuse information from trackers with fallback
             await get_tracker_data(video, meta, search_term, search_file_folder, meta['category'])
-        else:
-            console.print("Skipping existing search as meta already populated")
 
         if meta.get('category', None) == "TV" and use_sonarr and meta.get('tvdb_id', 0) != 0 and sonarr_data is None:
             sonarr_data = await get_sonarr_data(tvdb_id=meta.get('tvdb_id', 0), debug=meta.get('debug', False))
