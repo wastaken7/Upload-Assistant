@@ -3,9 +3,12 @@ from data.config import config
 from src.console import console
 
 
-async def get_sonar_from_id(tvdb_id, debug=False):
+async def get_sonarr_data(tvdb_id=None, filename=None, title=None, debug=False):
     if config['DEFAULT'].get('sonarr_api_key', ""):
-        url = f"{config['DEFAULT']['sonarr_url']}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"
+        if tvdb_id:
+            url = f"{config['DEFAULT']['sonarr_url']}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"
+        elif filename:
+            url = f"{config['DEFAULT']['sonarr_url']}/api/v3/parse?title={title}&path={filename}"
         headers = {
             "X-Api-Key": config['DEFAULT']['sonarr_api_key'],
             "Content-Type": "application/json"
@@ -41,7 +44,7 @@ async def get_sonar_from_id(tvdb_id, debug=False):
 
 
 async def extract_show_data(sonarr_data):
-    if not sonarr_data or not isinstance(sonarr_data, list) or len(sonarr_data) == 0:
+    if not sonarr_data:
         return {
             "tvdb_id": None,
             "imdb_id": None,
@@ -50,13 +53,41 @@ async def extract_show_data(sonarr_data):
             "genres": []
         }
 
-    # Extract the first series from the list
-    series = sonarr_data[0]
+    # Handle response from /api/v3/parse endpoint
+    if isinstance(sonarr_data, dict) and 'series' in sonarr_data:
+        series = sonarr_data['series']
+        release_group = sonarr_data.get('parsedEpisodeInfo', {}).get('releaseGroup')
 
+        return {
+            "tvdb_id": series.get("tvdbId"),
+            "imdb_id": int(series.get("imdbId", "tt0").replace("tt", "")) if series.get("imdbId") else None,
+            "tvmaze_id": series.get("tvMazeId"),
+            "tmdb_id": series.get("tmdbId"),
+            "genres": series.get("genres", []),
+            "release_group": release_group,
+            "year": series.get("year")
+        }
+
+    # Handle response from /api/v3/series endpoint (list format)
+    elif isinstance(sonarr_data, list) and len(sonarr_data) > 0:
+        series = sonarr_data[0]
+
+        return {
+            "tvdb_id": series.get("tvdbId"),
+            "imdb_id": int(series.get("imdbId", "tt0").replace("tt", "")) if series.get("imdbId") else None,
+            "tvmaze_id": series.get("tvMazeId"),
+            "tmdb_id": series.get("tmdbId"),
+            "genres": series.get("genres", []),
+            "title": series.get("title"),
+            "year": series.get("year"),
+            "release_group": series.get("releaseGroup")
+        }
+
+    # Return empty data if the format doesn't match any expected structure
     return {
-        "tvdb_id": series.get("tvdbId"),
-        "imdb_id": int(series.get("imdbId", "tt").replace("tt", "")) if series.get("imdbId") else None,
-        "tvmaze_id": series.get("tvMazeId"),
-        "tmdb_id": series.get("tmdbId"),
-        "genres": series.get("genres", [])
+        "tvdb_id": None,
+        "imdb_id": None,
+        "tvmaze_id": None,
+        "tmdb_id": None,
+        "genres": []
     }

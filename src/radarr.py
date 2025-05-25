@@ -3,9 +3,12 @@ from data.config import config
 from src.console import console
 
 
-async def get_radarr_from_id(tmdb_id, debug=False):
+async def get_radarr_data(tmdb_id=None, filename=None, debug=False):
     if config['DEFAULT'].get('radarr_api_key', ""):
-        url = f"{config['DEFAULT']['radarr_url']}/api/v3/movie?tmdbId={tmdb_id}&excludeLocalCovers=true"
+        if tmdb_id:
+            url = f"{config['DEFAULT']['radarr_url']}/api/v3/movie?tmdbId={tmdb_id}&excludeLocalCovers=true"
+        elif filename:
+            url = f"{config['DEFAULT']['radarr_url']}/api/v3/movie/lookup?term={filename}"
         headers = {
             "X-Api-Key": config['DEFAULT']['radarr_api_key'],
             "Content-Type": "application/json"
@@ -40,19 +43,34 @@ async def get_radarr_from_id(tmdb_id, debug=False):
         return None
 
 
-async def extract_movie_data(radarr_data):
+async def extract_movie_data(radarr_data, filename=None):
     if not radarr_data or not isinstance(radarr_data, list) or len(radarr_data) == 0:
         return {
             "imdb_id": None,
             "tmdb_id": None,
-            "genres": []
+            "year": None,
+            "genres": [],
+            "release_group": None
         }
 
-    # Extract the first series from the list
-    movie = radarr_data[0]
+    if filename:
+        for item in radarr_data:
+            if item.get("movieFile") and item["movieFile"].get("originalFilePath") == filename:
+                movie = item
+                break
+        else:
+            return None
+    else:
+        movie = radarr_data[0]
+
+    release_group = None
+    if movie.get("movieFile") and movie["movieFile"].get("releaseGroup"):
+        release_group = movie["movieFile"]["releaseGroup"]
 
     return {
-        "imdb_id": int(movie.get("imdbId", "tt").replace("tt", "")) if movie.get("imdbId") else None,
+        "imdb_id": int(movie.get("imdbId", "tt0").replace("tt", "")) if movie.get("imdbId") else None,
         "tmdb_id": movie.get("tmdbId"),
-        "genres": movie.get("genres", [])
+        "year": movie.get("year"),
+        "genres": movie.get("genres", []),
+        "release_group": release_group
     }
