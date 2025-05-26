@@ -1,3 +1,43 @@
+__version__ = "5.0.3"
+
+"""
+Changelog for version 5.0.3 (2025-05-26):
+
+## What's Changed
+* update mediainfo by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/514
+* HUNO - naming update by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/535
+* add arr support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/538
+* Tracker specific custom link_dir and linking fallback by @brah in https://github.com/Audionut/Upload-Assistant/pull/537
+* Group tagging fixes
+* Updated PTP url checking to catch old PTP torrent comments with non-ssl addy. (match more torrents)
+* Whole bunch of console print cleaning
+* Changed Limit Queue to only limit based on successful uploads
+* Fixed PTP to not grab description in instances where it was not needed
+* Set the TMP directory in docker to ensure description editing works in all cases
+* Other little tweaks and fixes
+
+## NOTES
+* Added specific mediainfo binary for DVD's. Update pymediainfo to use latest mediainfo for everything else. Defaulting to user installation because normal site-packages is not writeable
+Collecting pymediainfo
+  Downloading pymediainfo-7.0.1-py3-none-manylinux_2_27_x86_64.whl.metadata (9.0 kB)
+Downloading pymediainfo-7.0.1-py3-none-manylinux_2_27_x86_64.whl (6.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.0/6.0 MB 100.6 MB/s eta 0:00:00
+Installing collected packages: pymediainfo
+Successfully installed pymediainfo-7.0.1
+* With arr support, if the file is in your sonarr/radarr instance, it will pull data from the arr.
+* Updated --webdv as the HYBRID title set. Works better than using --edition
+
+## New configs
+*  for tracker specific linking directory name instead of tracker acronym.
+*  to use original folder client injection model if linking failure.
+*  to keep description images when  is True
+
+## New Contributors
+* @brah made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/537
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.2...5.0.3
+"""
+
 __version__ = "5.0.2"
 
 """
