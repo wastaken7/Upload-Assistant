@@ -1,3 +1,13 @@
+__version__ = "5.0.3.1"
+
+"""
+Changelog for version 5.0.3.1 (2025-05-26):
+
+* Fixed a bad await breaking HUNO
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.3...5.0.3.1
+"""
+
 __version__ = "5.0.3"
 
 """
