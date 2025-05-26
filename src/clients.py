@@ -510,9 +510,9 @@ class Clients():
             # Create tracker-specific directory inside linked folder
             if use_symlink or use_hardlink:
                 # allow overridden folder name with link_dir_name config var
-                tracker_cfg   = self.config["TRACKERS"].get(tracker.upper(), {})
+                tracker_cfg = self.config["TRACKERS"].get(tracker.upper(), {})
                 link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
-                tracker_dir   = os.path.join(link_target, link_dir_name or tracker)
+                tracker_dir = os.path.join(link_target, link_dir_name or tracker)
                 os.makedirs(tracker_dir, exist_ok=True)
 
                 if meta.get('debug', False):
@@ -818,9 +818,9 @@ class Clients():
         # Create tracker-specific directory inside linked folder
         if use_symlink or use_hardlink:
             # allow overridden folder name with link_dir_name config var
-            tracker_cfg   = self.config["TRACKERS"].get(tracker.upper(), {})
+            tracker_cfg = self.config["TRACKERS"].get(tracker.upper(), {})
             link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
-            tracker_dir   = os.path.join(link_target, link_dir_name or tracker)
+            tracker_dir = os.path.join(link_target, link_dir_name or tracker)
             os.makedirs(tracker_dir, exist_ok=True)
 
             if meta['debug']:
