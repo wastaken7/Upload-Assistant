@@ -22,10 +22,20 @@ async def get_tag(video, meta):
     else:
         if not meta.get('is_disc') == "BDMV":
             # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
-            basename_stripped = os.path.splitext(basename)[0]
+            if os.path.isdir(video):
+                # If video is a directory, use the directory name as basename
+                basename_stripped = os.path.basename(os.path.normpath(video))
+            else:
+                # If video is a file, use the filename without extension
+                basename_stripped = os.path.splitext(os.path.basename(video))[0]
             non_anime_match = re.search(r'(?<=-)((?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
             if non_anime_match:
                 release_group = non_anime_match.group(1).strip()
+                if "Z0N3" in release_group:
+                    release_group = release_group.replace("Z0N3", "D-Z0N3")
+                if not meta.get('scene', False):
+                    if release_group and len(release_group) > 12:
+                        release_group = None
                 if meta['debug']:
                     console.print(f"Non-anime regex match: {release_group}")
 
