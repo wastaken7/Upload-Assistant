@@ -50,7 +50,10 @@ async def extract_show_data(sonarr_data):
             "imdb_id": None,
             "tvmaze_id": None,
             "tmdb_id": None,
-            "genres": []
+            "genres": [],
+            "title": "",
+            "year": None,
+            "release_group": None
         }
 
     # Handle response from /api/v3/parse endpoint
@@ -59,13 +62,13 @@ async def extract_show_data(sonarr_data):
         release_group = sonarr_data.get('parsedEpisodeInfo', {}).get('releaseGroup')
 
         return {
-            "tvdb_id": series.get("tvdbId"),
+            "tvdb_id": series.get("tvdbId", None),
             "imdb_id": int(series.get("imdbId", "tt0").replace("tt", "")) if series.get("imdbId") else None,
-            "tvmaze_id": series.get("tvMazeId"),
-            "tmdb_id": series.get("tmdbId"),
+            "tvmaze_id": series.get("tvMazeId", None),
+            "tmdb_id": series.get("tmdbId", None),
             "genres": series.get("genres", []),
-            "release_group": release_group,
-            "year": series.get("year")
+            "release_group": release_group if release_group else None,
+            "year": series.get("year", None)
         }
 
     # Handle response from /api/v3/series endpoint (list format)
@@ -73,14 +76,14 @@ async def extract_show_data(sonarr_data):
         series = sonarr_data[0]
 
         return {
-            "tvdb_id": series.get("tvdbId"),
+            "tvdb_id": series.get("tvdbId", None),
             "imdb_id": int(series.get("imdbId", "tt0").replace("tt", "")) if series.get("imdbId") else None,
-            "tvmaze_id": series.get("tvMazeId"),
-            "tmdb_id": series.get("tmdbId"),
+            "tvmaze_id": series.get("tvMazeId", None),
+            "tmdb_id": series.get("tmdbId", None),
             "genres": series.get("genres", []),
-            "title": series.get("title"),
-            "year": series.get("year"),
-            "release_group": series.get("releaseGroup")
+            "title": series.get("title", ""),
+            "year": series.get("year", None),
+            "release_group": series.get("releaseGroup") if series.get("releaseGroup") else None
         }
 
     # Return empty data if the format doesn't match any expected structure
@@ -89,5 +92,8 @@ async def extract_show_data(sonarr_data):
         "imdb_id": None,
         "tvmaze_id": None,
         "tmdb_id": None,
-        "genres": []
+        "genres": [],
+        "title": "",
+        "year": None,
+        "release_group": None
     }

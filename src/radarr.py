@@ -69,8 +69,8 @@ async def extract_movie_data(radarr_data, filename=None):
 
     return {
         "imdb_id": int(movie.get("imdbId", "tt0").replace("tt", "")) if movie.get("imdbId") else None,
-        "tmdb_id": movie.get("tmdbId"),
-        "year": movie.get("year"),
+        "tmdb_id": movie.get("tmdbId", None),
+        "year": movie.get("year", None),
         "genres": movie.get("genres", []),
-        "release_group": release_group
+        "release_group": release_group if release_group else None
     }
