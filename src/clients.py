@@ -1780,7 +1780,6 @@ class Clients():
                                             console.print(f"[yellow]Alternative torrent {alt_torrent_hash} also invalid")
                                             if os.path.exists(alt_torrent_file_path) and alt_torrent_file_path.startswith(extracted_torrent_dir):
                                                 os.remove(alt_torrent_file_path)
-                                            meta['we_checked_them_all'] = True
 
                                 if not found_valid_torrent:
                                     console.print("[bold red]No valid torrents found after checking all matches")
