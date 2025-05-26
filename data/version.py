@@ -1,3 +1,13 @@
+__version__ = "5.0.3.2"
+
+"""
+Changelog for version 5.0.3.2 (2025-05-26):
+
+* Fix arr always return valid data
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.3.1...5.0.3.2
+"""
+
 __version__ = "5.0.3.1"
 
 """
