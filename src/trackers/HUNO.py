@@ -240,7 +240,7 @@ class HUNO():
         title = meta.get('title', "")
         year = meta.get('year', "")
         resolution = meta.get('resolution', "")
-        audio = await self.get_audio(meta)
+        audio = self.get_audio(meta)
         if "SKIPPED" in audio:
             return "SKIPPED", "SKIPPED", "SKIPPED"
         service = meta.get('service', "")
