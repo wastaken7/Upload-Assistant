@@ -31,8 +31,8 @@ async def get_tag(video, meta):
             non_anime_match = re.search(r'(?<=-)((?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
             if non_anime_match:
                 release_group = non_anime_match.group(1).strip()
-                if "ZON3" in release_group:
-                    release_group = release_group.replace("ZON3", "D-ZON3")
+                if "Z0N3" in release_group:
+                    release_group = release_group.replace("Z0N3", "D-Z0N3")
                 if not meta.get('scene', False):
                     if release_group and len(release_group) > 12:
                         release_group = None
