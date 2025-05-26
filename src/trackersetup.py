@@ -358,6 +358,10 @@ class TRACKER_SETUP:
 
         if meta['debug']:
             console.print("Total claims retrieved:", len(all_data))
+
+        if not all_data:
+            return False
+
         await self.write_internal_claims_to_file(file_path, all_data, debug=meta['debug'])
 
         return await self.check_tracker_claims(meta, tracker)
