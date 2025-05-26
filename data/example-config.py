@@ -426,8 +426,8 @@ config = {
             "announce_url": "https://privatesilverscreen.cc/announce/customannounceurl",
             "anon": False,
         },
-        "PTER": {
-            "link_dir_name": "",  # Does not appear to be working at all
+        "PTER": { # Does not appear to be working at all
+            "link_dir_name": "",
             "passkey": 'passkey',
             "img_rehost": False,
             "username": "",
