@@ -185,8 +185,8 @@ class RTF():
 
                     # Find the RTF tracker and replace the api_key value
                     new_config_data = re.sub(
-                        r'("RTF":\s*{[^}]*"api_key":\s*\')[^\']*(\'[^\}]*})',  # Match the api_key content only between single quotes
-                        rf'\1{token}\2',  # Replace only the content inside the quotes without adding extra backslashes
+                        r'("RTF":\s*{[^}]*"api_key":\s*)([\'"])[^\'"]*([\'"])([^\}]*})',
+                        rf'\1\2{token}\3\4',
                         config_data
                     )
 
