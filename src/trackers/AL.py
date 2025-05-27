@@ -31,13 +31,12 @@ class AL():
         pass
 
     async def get_cat_id(self, category_name, meta):
-        mal_rating = await self.get_mal_rating(meta['mal'])
         category_id = {
             'MOVIE': '1',
             'TV': '2',
         }.get(category_name, '0')
 
-        if 'HENTAI' in str(mal_rating).upper() or 'HENTAI' in str(meta.get('keywords', '')).upper():
+        if 'HENTAI' in meta.get('mal_rating', "") or 'HENTAI' in str(meta.get('keywords', '')).upper():
             category_id = 7
 
         return category_id
@@ -83,7 +82,7 @@ class AL():
         }.get(resolution_to_compare, '10')
         return resolution_id
 
-    async def edit_name(self, meta):
+    async def edit_name(self, meta, mal_title=None):
         category = meta['category']
         title = ''
         try:
@@ -91,7 +90,6 @@ class AL():
         except Exception as e:
             console.log(e)
             title = meta['title']
-        mal_title = await self.get_mal_title(meta['mal'])
         year = ''
         service = meta.get('service', '')
         try:
@@ -119,7 +117,7 @@ class AL():
         video_codec = meta['video_codec']
 
         name = f"{title}"
-        if title.upper() != mal_title.upper():
+        if mal_title and title.upper() != mal_title.upper():
             name += f" ({mal_title})"
         if category == 'MOVIE':
             name += f" {year}"
@@ -166,15 +164,12 @@ class AL():
         console.print(f"[yellow]Corrected title : [green]{name}")
         return name
 
-    async def get_mal_rating(self, anime_id):
+    async def get_mal_data(self, anime_id, meta):
         response = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
         content = response.json()
-        return content['data']['rating']
-
-    async def get_mal_title(self, anime_id):
-        response = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
-        content = response.json()
-        return content['data']['title']
+        title = content['data']['title'] if content['data']['title'] else meta['title']
+        meta['mal_rating'] = content['data']['rating'].upper() if content['data']['rating'] else None
+        return title
 
     async def format_audios(self, tracks):
         formats = {}
@@ -295,6 +290,7 @@ class AL():
             return audio_codec_str
 
     async def upload(self, meta, disctype):
+        title = await self.get_mal_data(meta['mal'], meta)
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'], meta)
@@ -303,7 +299,7 @@ class AL():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        name = await self.edit_name(meta)
+        name = await self.edit_name(meta, mal_title=title)
         if not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
