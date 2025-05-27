@@ -382,6 +382,8 @@ class Prep():
                     meta['tag'] = ids['release_group']
                 if meta.get('manual_year', 0) == 0 and ids['year'] is not None:
                     meta['manual_year'] = ids['year']
+            else:
+                sonarr_data = None
 
         radarr_data = None
         if meta.get('category', None) == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) == 0:
@@ -402,6 +404,8 @@ class Prep():
                     meta['manual_year'] = ids['year']
                 if meta.get('tag', None) is None:
                     meta['tag'] = ids['release_group']
+            else:
+                radarr_data = None
 
         # check if we've already searched torrents
         if 'base_torrent_created' not in meta:
@@ -441,6 +445,8 @@ class Prep():
                     meta['tag'] = ids['release_group']
                 if meta.get('manual_year', 0) == 0 and ids['year'] is not None:
                     meta['manual_year'] = ids['year']
+            else:
+                sonarr_data = None
 
         if meta.get('category', None) == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) != 0 and radarr_data is None:
             radarr_data = await get_radarr_data(tmdb_id=meta.get('tmdb_id', 0), debug=meta.get('debug', False))
@@ -460,6 +466,8 @@ class Prep():
                     meta['manual_year'] = ids['year']
                 if meta.get('tag', None) is None:
                     meta['tag'] = ids['release_group']
+            else:
+                radarr_data = None
 
         # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
         ping_unit3d_config = self.config['DEFAULT'].get('ping_unit3d', False)
