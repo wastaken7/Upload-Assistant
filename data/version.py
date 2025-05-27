@@ -1,3 +1,15 @@
+__version__ = "5.0.3.3"
+
+"""
+Changelog for version 5.0.3.3 (2025-05-27):
+
+* Fix unnecessary error feedback on empty aither claims
+* implement same for banned groups detection
+* fix DVD error
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.3.2...5.0.3.3
+"""
+
 __version__ = "5.0.3.2"
 
 """
