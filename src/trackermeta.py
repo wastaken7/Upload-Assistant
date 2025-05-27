@@ -255,6 +255,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
     found_match = False
 
     if tracker_name == "PTP":
+        if only_id and not meta.get('keep_images') and meta.get('imdb_id', 0) != 0:
+            return meta, False
         imdb_id = None
         ptp_desc = None
         if meta.get('ptp') is None:
