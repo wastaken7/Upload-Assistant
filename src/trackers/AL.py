@@ -167,7 +167,7 @@ class AL():
     async def get_mal_data(self, anime_id, meta):
         response = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
         content = response.json()
-        title = content['data']['title'] if content['data']['title'] else meta['title']
+        title = content['data']['title'] if content['data']['title'] else None
         meta['mal_rating'] = content['data']['rating'].upper() if content['data']['rating'] else None
         return title
 
