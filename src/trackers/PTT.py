@@ -64,6 +64,13 @@ class PTT():
         }.get(resolution, '10')
         return resolution_id
 
+    async def edit_name(self, meta):
+        ptt_name = meta['name']
+        if meta.get('original_language', '') == 'pl' and meta.get('imdb_info'):
+            ptt_name = ptt_name.replace(meta.get('aka', ''), '')
+            ptt_name = ptt_name.replace(meta['title'], meta['imdb_info']['aka'])
+        return ptt_name.strip()
+
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
@@ -73,6 +80,7 @@ class PTT():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        ptt_name = await self.edit_name(meta)
         if not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
@@ -97,7 +105,7 @@ class PTT():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': meta['name'],
+            'name': ptt_name,
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
