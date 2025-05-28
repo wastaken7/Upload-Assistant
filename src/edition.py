@@ -317,7 +317,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
         from src.region import get_distributor
         distributors = await get_distributor(edition)
 
-        bad = ['internal', 'limited', 'retail']
+        bad = ['internal', 'limited', 'retail', 'version']
 
         if distributors:
             bad.append(distributors.lower())
