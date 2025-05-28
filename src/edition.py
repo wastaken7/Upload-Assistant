@@ -35,7 +35,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                                     console.print(f"[green]Potential match: {edition_info['display_name']} - duration {edition_formatted}, difference: {format_duration(difference)}[/green]")
 
                                 if has_attributes:
-                                    edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                                    edition_name = " ".join(smart_title(attr) for attr in edition_info['attributes'])
 
                                     matching_editions.append({
                                         'name': edition_name,
@@ -138,7 +138,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                             if difference <= leeway_seconds:
                                 # Store the complete edition info
                                 if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
-                                    edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                                    edition_name = " ".join(smart_title(attr) for attr in edition_info['attributes'])
                                 else:
                                     edition_name = f"{edition_info['minutes']} Minute Version (Theatrical)"
 
@@ -342,3 +342,10 @@ def format_duration(seconds):
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def smart_title(s):
+    """Custom title function that doesn't capitalize after apostrophes"""
+    result = s.title()
+    # Fix capitalization after apostrophes
+    return re.sub(r"(\w)'(\w)", lambda m: f"{m.group(1)}'{m.group(2).lower()}", result)
