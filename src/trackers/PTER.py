@@ -330,11 +330,13 @@ class PTER():
         if not os.path.exists(desc_file):
             await self.edit_desc(meta)
 
-        pter_name = await self.edit_name(meta)
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 'no'
         else:
             anon = 'yes'
+
+        pter_name = await self.edit_name(meta)
+
         if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8')
         else:

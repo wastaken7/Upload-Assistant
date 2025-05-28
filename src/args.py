@@ -138,6 +138,7 @@ class Args():
         parser.add_argument('-k', '--keywords', nargs=1, required=False, help="Add comma seperated keywords e.g. 'keyword, keyword2, etc'")
         parser.add_argument('-kf', '--keep-folder', action='store_true', required=False, help="Keep the folder containing the single file. Works only when supplying a directory as input. For uploads with poor filenames, like some scene.")
         parser.add_argument('-reg', '--region', nargs=1, required=False, help="Region for discs")
+        parser.add_argument('-a', '--anon', action='store_true', required=False, help="Upload anonymously")
         parser.add_argument('-st', '--stream', action='store_true', required=False, help="Stream Optimized Upload")
         parser.add_argument('-webdv', '--webdv', action='store_true', required=False, help="Contains a Dolby Vision layer converted using dovi_tool (HYBRID)")
         parser.add_argument('-hc', '--hardcoded-subs', action='store_true', required=False, help="Contains hardcoded subs", dest="hardcoded-subs")

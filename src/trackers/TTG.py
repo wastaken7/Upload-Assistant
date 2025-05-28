@@ -104,11 +104,6 @@ class TTG():
         await self.edit_desc(meta)
         ttg_name = await self.edit_name(meta)
 
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
-            anon = 'no'
-        else:
-            anon = 'yes'
-
         # FORM
         # type = category dropdown
         # name = name
@@ -118,6 +113,11 @@ class TTG():
         # imdb_c = tt123456
         #
         # POST > upload/upload
+
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
+            anon = 'no'
+        else:
+            anon = 'yes'
 
         if meta['bdinfo'] is not None:
             mi_dump = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8')
