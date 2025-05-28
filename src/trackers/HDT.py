@@ -193,6 +193,10 @@ class HDT():
         return
 
     async def search_existing(self, meta, disctype):
+        if meta['resolution'] not in ['2160p', '1080p', '1080i', '720p']:
+            console.print('[bold red]Resolution must be at least 720p resolution for HDT.')
+            meta['skipping'] = "HDT"
+            return
         dupes = []
         with requests.Session() as session:
             common = COMMON(config=self.config)
