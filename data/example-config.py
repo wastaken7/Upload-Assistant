@@ -161,10 +161,20 @@ config = {
         "sonarr_url": "http://localhost:8989",
         "sonarr_api_key": "",
 
+        # details for a second sonarr instance
+        # additional sonarr instances can be added by adding more sonarr_url_x and sonarr_api_key_x entries
+        "sonarr_url_1": "http://my-second-instance:8989",
+        "sonarr_api_key_1": "",
+
         # set true to use radarr for movie searching
         "use_radarr": False,
         "radarr_url": "http://localhost:7878",
         "radarr_api_key": "",
+
+        # details for a second radarr instance
+        # additional radarr instances can be added by adding more radarr_url_x and radarr_api_key_x entries
+        "radarr_url_1": "http://my-second-instance:7878",
+        "radarr_api_key_1": "",
 
         # set true to use mkbrr for torrent creation
         "mkbrr": True,
