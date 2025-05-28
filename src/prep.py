@@ -19,8 +19,8 @@ from src.video import get_video_codec, get_video_encode, get_uhd, get_hdr, get_v
 from src.tags import get_tag, tag_override
 from src.get_disc import get_disc, get_dvd_size
 from src.get_source import get_source
-from src.sonarr import get_sonarr_data, extract_show_data
-from src.radarr import get_radarr_data, extract_movie_data
+from src.sonarr import get_sonarr_data
+from src.radarr import get_radarr_data
 
 try:
     import traceback
