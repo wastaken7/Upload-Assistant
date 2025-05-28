@@ -246,10 +246,12 @@ class HUNO():
         service = meta.get('service', "")
         season = meta.get('season', "")
         if meta.get('tvdb_season_number', ""):
-            season = meta.get('tvdb_season_number')
+            season_int = meta.get('tvdb_season_number')
+            season = f"S{str(season_int).zfill(2)}"
         episode = meta.get('episode', "")
         if meta.get('tvdb_episode_number', ""):
-            episode = meta.get('tvdb_episode_number')
+            episode_int = meta.get('tvdb_episode_number')
+            episode = f"E{str(episode_int).zfill(2)}"
         repack = meta.get('repack', "")
         if repack.strip():
             repack = f"[{repack}]"
