@@ -1,3 +1,25 @@
+__version__ = "5.0.4"
+
+"""
+Changelog for version 5.0.4 (2025-05-28):
+
+## What's Changed
+* Add additional arr instance support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/544
+* fixed anon arg
+* fixed tvdb season/episode naming at HUNO
+* fixed python title handling for edition and added some bad editions to skip
+* fixed blank BHD descriptions also skipping images
+* HDT - added quick skip for non-supported resolutions
+* more tag regex shenanigans
+* PTT - use only Polish name when original language is Polish (no aka)
+* arr handling fixes
+* PTP - if only_id, then skip if imdb_id != 0
+* reduced is_scene to one api all
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.3.3...5.0.4
+"""
+
 __version__ = "5.0.3.3"
 
 """
