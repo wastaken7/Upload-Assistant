@@ -487,9 +487,10 @@ class COMMON():
                     # console.print("[yellow]Skipping processing more files as they exceed the process limit.")
                     continue
                 if multi_screens != 0:
-                    processed_count += 1
-                    filename = os.path.basename(file)
-                    print(f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}", end="", flush=True)
+                    if total_files_to_process > 1:
+                        processed_count += 1
+                        filename = os.path.basename(file)
+                        print(f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}", end="", flush=True)
                     if i > 0:
                         new_images_key = f'new_images_file_{i}'
                         # Check for saved images first
