@@ -24,7 +24,8 @@ async def sanitize_filename(filename):
 
 
 async def check_hosts(meta, tracker, url_host_mapping, img_host_index=1, approved_image_hosts=None):
-    console.print(f"[yellow]Reuploading images for {tracker}...")
+    if meta['debug']:
+        console.print(f"[yellow]Checking existing image hosts for {tracker}...")
     new_images_key = f'{tracker}_images_key'
     if new_images_key not in meta:
         meta[new_images_key] = []
