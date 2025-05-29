@@ -116,14 +116,18 @@ class HUNO():
         }
 
         if meta['debug'] is False:
-            response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
+                response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
                 console.print(response.json())
+            except Exception as e:
+                console.print(f"[bold red]Error uploading torrent: {e}")
+                return
+            try:
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://hawke.uno/torrents/" + t_id)
             except Exception:
-                console.print("It may have uploaded, go check")
+                console.print("Error getting torrent ID from response.")
                 return
         else:
             console.print("[cyan]Request Data:")
