@@ -233,7 +233,7 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
             if len(desc) > 0:
                 description.write((desc or "") + "\n")
     if category and ('MOVIE' in category.upper() or 'TV' in category.upper()):
-        meta['category'] = category
+        meta['category'] = category.upper()
         if meta['debug']:
             console.print("set Category:", meta['category'])
 
