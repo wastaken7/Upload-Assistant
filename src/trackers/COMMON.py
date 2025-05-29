@@ -293,8 +293,9 @@ class COMMON():
 
                 total_discs_to_process = min(len(discs), process_limit)
                 processed_count = 0
-                console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
-                console.print(f"[cyan]{total_discs_to_process} files (processLimit)[/cyan]")
+                if multi_screens != 0:
+                    console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+                    console.print(f"[cyan]{total_discs_to_process} files (processLimit)[/cyan]")
 
                 for i, each in enumerate(discs):
                     # Set a unique key per disc for managing images
@@ -476,8 +477,9 @@ class COMMON():
             other_files_spoiler_open = False  # Track if "Other files" spoiler has been opened
             total_files_to_process = min(len(filelist), process_limit)
             processed_count = 0
-            console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
-            console.print(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
+            if multi_screens != 0 and total_files_to_process > 1:
+                console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+                console.print(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
 
             # First Pass: Create and Upload Images for Each File
             for i, file in enumerate(filelist):
