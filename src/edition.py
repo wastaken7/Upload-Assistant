@@ -307,7 +307,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
     if not meta.get('webdv', False):
         hybrid = False
-        if "HYBRID" in video.upper():
+        if "HYBRID" in video.upper() or "HYBRID" in edition.upper():
             hybrid = True
     else:
         hybrid = meta.get('webdv', False)
