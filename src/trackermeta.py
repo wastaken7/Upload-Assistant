@@ -508,7 +508,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 only_id=only_id
             )
 
-        if any(item not in [None, '0'] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
+        if any(item not in [None, 0] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
             if meta['debug']:
                 console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
             await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id)
