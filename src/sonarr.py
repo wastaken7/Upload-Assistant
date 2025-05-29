@@ -65,8 +65,6 @@ async def get_sonarr_data(tvdb_id=None, filename=None, title=None, debug=False):
                     if show_data and (show_data.get("tvdb_id") or show_data.get("imdb_id") or show_data.get("tmdb_id")):
                         console.print(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                         return show_data
-                    else:
-                        console.print(f"[yellow]Response from Sonarr instance {instance_index if instance_index > 0 else 'default'} didn't contain valid show data, trying next...[/yellow]")
                 else:
                     console.print(f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
 

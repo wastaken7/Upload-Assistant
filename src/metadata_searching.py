@@ -240,7 +240,8 @@ async def all_ids(meta, tvdb_api=None, tvdb_token=None):
 
 
 async def imdb_tmdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
-    console.print("[yellow]IMDb, TMDb, and TVDb IDs are all present[/yellow]")
+    if meta['debug']:
+        console.print("[yellow]IMDb, TMDb, and TVDb IDs are all present[/yellow]")
     # Core metadata tasks that run in parallel
     tasks = [
         tmdb_other_meta(

@@ -174,7 +174,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             except Exception as e:
                 console.print(f"[red]Error removing smallest image: {str(e)}")
 
-        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
+        if not force_screenshots:
+            console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
         optimized_results = []
         valid_images = [image for image in capture_results if os.path.exists(image)]
@@ -227,7 +228,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             if meta['debug']:
                 console.print("Optimized results:", optimized_results)
 
-            console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+            if not force_screenshots:
+                console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
         else:
             optimized_results = valid_images
 
@@ -300,7 +302,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+    if not force_screenshots:
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
     if meta['debug']:
         finish_time = time.time()
@@ -627,7 +630,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
             if meta['debug']:
                 console.print("Optimized results:", optimized_results)
-            console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
+            if not retry_cap:
+                console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
             executor.shutdown(wait=True)  # Ensure cleanup
         else:
@@ -701,7 +705,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+    if not retry_cap:
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
     await cleanup()
 
 
@@ -988,7 +993,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if meta['debug']:
             console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
-    console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
+    if not force_screenshots:
+        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
@@ -1026,7 +1032,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
         # Filter out failed results
         optimized_results = [res for res in optimized_results if isinstance(res, str) and "Error" not in res]
-        console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+        if not force_screenshots:
+            console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
     else:
         optimized_results = valid_images
 

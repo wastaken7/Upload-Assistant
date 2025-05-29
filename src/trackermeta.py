@@ -482,7 +482,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
     elif tracker_name in ["HUNO", "BLU", "AITHER", "LST", "OE", "ULCX"]:
         if meta.get(tracker_key) is not None:
-            console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+            if meta['debug']:
+                console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
                 tracker_instance.torrent_url,
@@ -492,7 +493,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 only_id=only_id
             )
         else:
-            console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
+            if meta['debug']:
+                console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
                 tracker_instance.torrent_url,
@@ -508,7 +510,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id)
             found_match = True
         else:
-            console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+            if meta['debug']:
+                console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             found_match = False
 
     elif tracker_name == "HDB":

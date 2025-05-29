@@ -291,6 +291,11 @@ class COMMON():
                 if 'retry_count' not in meta:
                     meta['retry_count'] = 0
 
+                total_discs_to_process = min(len(discs), process_limit)
+                processed_count = 0
+                console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+                console.print(f"[cyan]{total_discs_to_process} files (processLimit)[/cyan]")
+
                 for i, each in enumerate(discs):
                     # Set a unique key per disc for managing images
                     new_images_key = f'new_images_disc_{i}'
@@ -322,6 +327,9 @@ class COMMON():
                         descfile.write("[/center]\n\n")
                     else:
                         if multi_screens != 0:
+                            processed_count += 1
+                            disc_name = each.get('name', f"Disc {i}")
+                            print(f"\rProcessing disc {processed_count}/{total_discs_to_process}: {disc_name[:40]}{'...' if len(disc_name) > 40 else ''}", end="", flush=True)
                             # Check if screenshots exist for the current disc key
                             # Check for saved images first
                             if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
@@ -416,6 +424,7 @@ class COMMON():
                                 meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
                                 with open(meta_filename, 'w') as f:
                                     json.dump(meta, f, indent=4)
+                    console.print()
 
             # Handle single file case
             if len(filelist) == 1:
@@ -465,6 +474,10 @@ class COMMON():
             char_count = 0
             max_char_limit = char_limit  # Character limit
             other_files_spoiler_open = False  # Track if "Other files" spoiler has been opened
+            total_files_to_process = min(len(filelist), process_limit)
+            processed_count = 0
+            console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+            console.print(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
 
             # First Pass: Create and Upload Images for Each File
             for i, file in enumerate(filelist):
@@ -472,6 +485,9 @@ class COMMON():
                     # console.print("[yellow]Skipping processing more files as they exceed the process limit.")
                     continue
                 if multi_screens != 0:
+                    processed_count += 1
+                    filename = os.path.basename(file)
+                    print(f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}", end="", flush=True)
                     if i > 0:
                         new_images_key = f'new_images_file_{i}'
                         # Check for saved images first
@@ -588,8 +604,9 @@ class COMMON():
                     descfile.write("[/spoiler][/center]\n")
                     char_count += len("[/spoiler][/center]\n")
 
-            if char_count >= 1:
+            if char_count >= 1 and meta['debug']:
                 console.print(f"[yellow]Total characters written to description: {char_count}")
+            console.print()
 
             # Append signature if provided
             if signature:

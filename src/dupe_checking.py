@@ -181,7 +181,7 @@ async def filter_dupes(dupes, meta, tracker_name):
         if not await process_exclusion(each):
             new_dupes.append(each)
 
-    if new_dupes and not meta.get('unattended', False):
+    if new_dupes and not meta.get('unattended', False) and meta['debug']:
         console.print(f"[cyan]Final dupes on {tracker_name}: {new_dupes}")
 
     return new_dupes

@@ -65,8 +65,6 @@ async def get_radarr_data(tmdb_id=None, filename=None, debug=False):
                     if movie_data and (movie_data.get("imdb_id") or movie_data.get("tmdb_id")):
                         console.print(f"[green]Found valid movie data from Radarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                         return movie_data
-                    else:
-                        console.print(f"[yellow]Response from Radarr instance {instance_index if instance_index > 0 else 'default'} didn't contain valid movie data, trying next...[/yellow]")
                 else:
                     console.print(f"[yellow]Failed to fetch from Radarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
 
