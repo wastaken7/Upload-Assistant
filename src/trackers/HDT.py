@@ -94,6 +94,8 @@ class HDT():
             hdt_name = hdt_name.replace(meta['audio'], meta['audio'].replace(' ', '', 1))
         if 'DV' in meta.get('hdr', ''):
             hdt_name = hdt_name.replace(' DV ', ' DoVi ')
+        if 'BluRay REMUX' in hdt_name:
+            hdt_name = hdt_name.replace('BluRay REMUX', 'Blu-ray Remux')
 
         hdt_name = ' '.join(hdt_name.split())
         hdt_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", hdt_name)
