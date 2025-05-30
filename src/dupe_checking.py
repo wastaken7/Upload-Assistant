@@ -128,7 +128,7 @@ async def filter_dupes(dupes, meta, tracker_name):
             if target_resolution and target_resolution not in each:
                 await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                 return True
-            if not await has_matching_hdr(file_hdr, target_hdr, meta):
+            if not await has_matching_hdr(file_hdr, target_hdr, meta, tracker=tracker_name):
                 await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                 return True
 
@@ -248,11 +248,11 @@ async def refine_hdr_terms(hdr):
     return terms
 
 
-async def has_matching_hdr(file_hdr, target_hdr, meta):
+async def has_matching_hdr(file_hdr, target_hdr, meta, tracker=None):
     """
     Check if the HDR terms match or are compatible.
     """
-    def simplify_hdr(hdr_set):
+    def simplify_hdr(hdr_set, tracker=None):
         """Simplify HDR terms to just HDR and DV."""
         simplified = set()
         if any(h in hdr_set for h in {"HDR", "HDR10", "HDR10+"}):
@@ -261,10 +261,12 @@ async def has_matching_hdr(file_hdr, target_hdr, meta):
             simplified.add("DV")
             if "framestor" in meta['tag'].lower():
                 simplified.add("HDR")
+            if tracker == "ANT":
+                simplified.add("HDR")
         return simplified
 
-    file_hdr_simple = simplify_hdr(file_hdr)
-    target_hdr_simple = simplify_hdr(target_hdr)
+    file_hdr_simple = simplify_hdr(file_hdr, tracker)
+    target_hdr_simple = simplify_hdr(target_hdr, tracker)
 
     if file_hdr_simple == {"DV", "HDR"} or file_hdr_simple == {"HDR", "DV"}:
         file_hdr_simple = {"HDR"}
