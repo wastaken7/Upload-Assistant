@@ -1,3 +1,17 @@
+__version__ = "5.0.4.1"
+
+"""
+Changelog for version 5.0.4.1 (2025-05-30):
+
+* Fixed an issue from the last release that broke existing torrent validation in qbittorent
+* DP - added modq option
+* Better handling of REPACK detection
+* Console cleaning
+* Add Hybrid to filename detection 
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.4...5.0.4.1
+"""
+
 __version__ = "5.0.4"
 
 """
