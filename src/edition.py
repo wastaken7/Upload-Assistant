@@ -273,7 +273,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
         video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
 
-        if "OPEN MATTE" in video:
+        if "OPEN MATTE" in video.upper():
             edition = edition + " Open Matte"
 
     # Manual edition overrides everything
@@ -286,19 +286,19 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
     # Handle repack info
     repack = ""
-    if "REPACK" in (video or edition.upper()) or "V2" in video:
+    if "REPACK" in (video.upper() or edition.upper()) or "V2" in video:
         repack = "REPACK"
-    if "REPACK2" in (video or edition.upper()) or "V3" in video:
+    if "REPACK2" in (video.upper() or edition.upper()) or "V3" in video:
         repack = "REPACK2"
-    if "REPACK3" in (video or edition.upper()) or "V4" in video:
+    if "REPACK3" in (video.upper() or edition.upper()) or "V4" in video:
         repack = "REPACK3"
-    if "PROPER" in (video or edition.upper()):
+    if "PROPER" in (video.upper() or edition.upper()):
         repack = "PROPER"
-    if "PROPER2" in (video or edition.upper()):
+    if "PROPER2" in (video.upper() or edition.upper()):
         repack = "PROPER2"
-    if "PROPER3" in (video or edition.upper()):
+    if "PROPER3" in (video.upper() or edition.upper()):
         repack = "PROPER3"
-    if "RERIP" in (video or edition.upper()):
+    if "RERIP" in (video.upper() or edition.upper()):
         repack = "RERIP"
 
     # Only remove REPACK, RERIP, or PROPER from edition if not in manual edition
