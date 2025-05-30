@@ -425,7 +425,7 @@ class COMMON():
                                 meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
                                 with open(meta_filename, 'w') as f:
                                     json.dump(meta, f, indent=4)
-                    console.print()
+                            console.print()
 
             # Handle single file case
             if len(filelist) == 1:
@@ -609,7 +609,8 @@ class COMMON():
 
             if char_count >= 1 and meta['debug']:
                 console.print(f"[yellow]Total characters written to description: {char_count}")
-            console.print()
+            if total_files_to_process > 1:
+                console.print()
 
             # Append signature if provided
             if signature:
