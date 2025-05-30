@@ -324,6 +324,8 @@ config = {
             "api_key": "",
             "announce_url": "https://darkpeers.org/announce/customannounceurl",
             "anon": False,
+            # Send uploads to DP modq for staff approval
+            "modq": False,
         },
         "FL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
