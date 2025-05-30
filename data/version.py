@@ -1,3 +1,13 @@
+__version__ = "5.0.4.2"
+
+"""
+Changelog for version 5.0.4.2 (2025-05-30):
+
+* Fix the validation check when torrent_storage_dir
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.4.1...5.0.4.2
+"""
+
 __version__ = "5.0.4.1"
 
 """
