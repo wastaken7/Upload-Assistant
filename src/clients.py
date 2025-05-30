@@ -392,39 +392,39 @@ class Clients():
                     console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
                     continue  # Skip this torrent if unable to fetch
 
-                # **Validate the .torrent file**
-                try:
-                    valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
-                except Exception as e:
-                    console.print(f"[bold red]Error validating torrent {torrent_hash}: {e}")
-                    valid = False
-                    torrent_path = None
+            # **Validate the .torrent file**
+            try:
+                valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
+            except Exception as e:
+                console.print(f"[bold red]Error validating torrent {torrent_hash}: {e}")
+                valid = False
+                torrent_path = None
 
-                if valid:
-                    console.print("prefersmallpieces", prefer_small_pieces)
-                    if prefer_small_pieces:
-                        # **Track best match based on piece size**
-                        try:
-                            torrent_data = Torrent.read(torrent_file_path)
-                            piece_size = torrent_data.piece_size
-                            if best_match is None or piece_size < best_match['piece_size']:
-                                best_match = {
-                                    'hash': torrent_hash,
-                                    'torrent_path': torrent_path if torrent_path else torrent_file_path,
-                                    'piece_size': piece_size
-                                }
-                                console.print(f"[green]Updated best match: {best_match}")
-                        except Exception as e:
-                            console.print(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
-                            continue
-                    else:
-                        # If `prefer_small_pieces` is False, return first valid torrent
-                        console.print(f"[green]Returning first valid torrent: {torrent_hash}")
-                        return torrent_hash
+            if valid:
+                console.print("prefersmallpieces", prefer_small_pieces)
+                if prefer_small_pieces:
+                    # **Track best match based on piece size**
+                    try:
+                        torrent_data = Torrent.read(torrent_file_path)
+                        piece_size = torrent_data.piece_size
+                        if best_match is None or piece_size < best_match['piece_size']:
+                            best_match = {
+                                'hash': torrent_hash,
+                                'torrent_path': torrent_path if torrent_path else torrent_file_path,
+                                'piece_size': piece_size
+                            }
+                            console.print(f"[green]Updated best match: {best_match}")
+                    except Exception as e:
+                        console.print(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
+                        continue
                 else:
-                    if meta['debug']:
-                        console.print(f"[bold red]{torrent_hash} failed validation")
-                    os.remove(torrent_file_path)
+                    # If `prefer_small_pieces` is False, return first valid torrent
+                    console.print(f"[green]Returning first valid torrent: {torrent_hash}")
+                    return torrent_hash
+            else:
+                if meta['debug']:
+                    console.print(f"[bold red]{torrent_hash} failed validation")
+                os.remove(torrent_file_path)
 
         # **Return the best match if `prefer_small_pieces` is enabled**
         if best_match:
