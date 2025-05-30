@@ -111,6 +111,10 @@ async def filter_dupes(dupes, meta, tracker_name):
             if any(str(res) in each for res in [1080, 720, 2160]):
                 return False
 
+        if target_hdr and '1080p' in target_resolution and '2160p' in each:
+            await log_exclusion("No 1080p HDR when 4K exists", each)
+            return False
+
         if tracker_name in ["AITHER", "LST"] and is_dvd:
             return True
 
