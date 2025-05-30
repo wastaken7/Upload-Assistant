@@ -368,29 +368,29 @@ class Clients():
             except Exception as e:
                 console.print(f"[bold red]Unexpected error while handling {torrent_hash}: {e}")
 
-                # **Use `torrent_storage_dir` if available**
-                if torrent_storage_dir:
-                    torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
-                    if not os.path.exists(torrent_file_path):
-                        console.print(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
-                        continue
-                else:
-                    # **Fetch from qBittorrent API if no `torrent_storage_dir`**
+            # **Use `torrent_storage_dir` if available**
+            if torrent_storage_dir:
+                torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
+                if not os.path.exists(torrent_file_path):
+                    console.print(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
+                    continue
+            else:
+                # **Fetch from qBittorrent API if no `torrent_storage_dir`**
+                if meta['debug']:
+                    console.print(f"[cyan]Exporting .torrent file for {torrent_hash}")
+
+                try:
+                    torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
+                    torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+
+                    with open(torrent_file_path, "wb") as f:
+                        f.write(torrent_file_content)
                     if meta['debug']:
-                        console.print(f"[cyan]Exporting .torrent file for {torrent_hash}")
+                        console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
 
-                    try:
-                        torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
-                        torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
-
-                        with open(torrent_file_path, "wb") as f:
-                            f.write(torrent_file_content)
-                        if meta['debug']:
-                            console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
-
-                    except qbittorrentapi.APIError as e:
-                        console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
-                        continue  # Skip this torrent if unable to fetch
+                except qbittorrentapi.APIError as e:
+                    console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
+                    continue  # Skip this torrent if unable to fetch
 
                 # **Validate the .torrent file**
                 try:
