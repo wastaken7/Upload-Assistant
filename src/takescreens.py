@@ -27,6 +27,7 @@ img_host = [
 task_limit = int(config['DEFAULT'].get('process_limit', 1))
 threads = str(config['DEFAULT'].get('threads', '1'))
 cutoff = int(config['DEFAULT'].get('cutoff_screens', 1))
+ffmpeg_limit = config['DEFAULT'].get('ffmpeg_limit', False)
 
 try:
     task_limit = int(task_limit)  # Convert to integer
@@ -1175,6 +1176,10 @@ async def capture_screenshot(args):
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
+        def set_ffmpeg_threads():
+            threads_value = '1'
+            os.environ['FFREPORT'] = 'level=32'  # Reduce ffmpeg logging overhead
+            return ['-threads', threads_value]
         if width <= 0 or height <= 0:
             return "Error: Invalid width or height for scaling"
 
@@ -1208,7 +1213,15 @@ async def capture_screenshot(args):
             console.print(f"[cyan]Processing file: {path}[/cyan]")
 
         # Proceed with screenshot capture
-        ff = ffmpeg.input(path, ss=ss_time)
+        threads_value = set_ffmpeg_threads()
+        threads_val = threads_value[1]
+        if ffmpeg_limit:
+            ff = (
+                ffmpeg
+                .input(path, ss=ss_time, threads=threads_val)
+            )
+        else:
+            ff = ffmpeg.input(path, ss=ss_time)
         if w_sar != 1 or h_sar != 1:
             ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
@@ -1290,12 +1303,20 @@ async def capture_screenshot(args):
             # Use the filtered output with frame info
             ff = base_text
 
-        command = (
-            ff
-            .output(image_path, vframes=1, pix_fmt="rgb24")
-            .overwrite_output()
-            .global_args('-loglevel', loglevel)
-        )
+        if ffmpeg_limit:
+            command = (
+                ff
+                .output(image_path, vframes=1, pix_fmt="rgb24", **{'threads': threads_val})
+                .overwrite_output()
+                .global_args('-loglevel', loglevel)
+            )
+        else:
+            command = (
+                ff
+                .output(image_path, vframes=1, pix_fmt="rgb24")
+                .overwrite_output()
+                .global_args('-loglevel', loglevel)
+            )
 
         # Print the command for debugging
         if loglevel == 'verbose' or (meta and meta.get('debug', False)):

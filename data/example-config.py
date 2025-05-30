@@ -99,6 +99,9 @@ config = {
         # only used a single process. You probably need to limit this to 1 or 2 to avoid hogging resources.
         "threads": "10",
 
+        # Set true to limit the amount of CPU when running ffmpeg.
+        "ffmpeg_limit": False,
+
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
         # This setting also affects PTP, however PTP requries at least 2 images for each.
