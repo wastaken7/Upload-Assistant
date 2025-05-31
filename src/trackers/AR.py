@@ -475,11 +475,15 @@ class AR():
                 raise Exception("Session cookie not found.")
 
             # must use scene name if scene release
+            KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
             if meta['scene']:
-                ar_name = meta['scene_name']
+                ar_name = meta.get('scene_name')
             else:
-                # name must have . instead of spaces
-                ar_name = meta['name'].replace(' ', ".").replace("'", '').replace(':', '')
+                ar_name = meta['uuid']
+                base, ext = os.path.splitext(ar_name)
+                if ext.lower() in KNOWN_EXTENSIONS:
+                    ar_name = base
+                ar_name = ar_name.replace(' ', ".").replace("'", '').replace(':', '')
 
             if meta['tag'] == "":
                 # replacing spaces with . as per rules
