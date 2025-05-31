@@ -320,7 +320,7 @@ config = {
             "api_key": "",
             "announce_url": "https://capybarabr.com/announce/customannounceurl",
             "anon": False,
-            # Send uploads to DP modq for staff approval
+            # Send uploads to CBR modq for staff approval
             "modq": False,
         },
         "DP": {

@@ -149,6 +149,7 @@ class CBR():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
+        modq = await self.get_flag(meta, 'modq')
         cat_id = await self.get_cat_id(meta['category'], meta)
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
@@ -170,7 +171,6 @@ class CBR():
         desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
         files = {'torrent': open_torrent}
-        modq = await self.get_flag(meta, 'modq')
         data = {
             'name': cbr_name,
             'description': desc,
@@ -264,11 +264,10 @@ class CBR():
             await asyncio.sleep(5)
 
         return dupes
-        
 
     async def get_flag(self, meta, flag_name):
-            config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
-            if config_flag is not None:
-                return 1 if config_flag else 0
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag is not None:
+            return 1 if config_flag else 0
 
-            return 1 if meta.get(flag_name, False) else 0
+        return 1 if meta.get(flag_name, False) else 0
