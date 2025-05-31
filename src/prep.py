@@ -614,23 +614,23 @@ class Prep():
             imdb_info = await get_imdb_info_api(meta['imdb_id'], manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
             meta['imdb_info'] = imdb_info
             meta['tv_year'] = imdb_info.get('tv_year', None)
-            check_valid_data = meta.get('imdb_info', {}).get('title', "")
-            if check_valid_data:
-                aka = meta.get('imdb_info', {}).get('aka', "").strip()
-                title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-                year = str(meta.get('imdb_info', {}).get('year', ""))
+        check_valid_data = meta.get('imdb_info', {}).get('title', "")
+        if check_valid_data:
+            aka = meta.get('imdb_info', {}).get('aka', "").strip()
+            title = meta.get('imdb_info', {}).get('title', "").strip().lower()
+            year = str(meta.get('imdb_info', {}).get('year', ""))
 
-                if aka and not meta.get('aka'):
-                    aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
-                    difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-                    if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                        aka = None
+            if aka and not meta.get('aka'):
+                aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
+                difference = SequenceMatcher(None, title, aka_trimmed).ratio()
+                if difference >= 0.7 or not aka_trimmed or aka_trimmed in title:
+                    aka = None
 
-                    if aka is not None:
-                        if f"({year})" in aka:
-                            aka = aka.replace(f"({year})", "").strip()
-                        meta['aka'] = f"AKA {aka.strip()}"
-                        meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
+                if aka is not None:
+                    if f"({year})" in aka:
+                        aka = aka.replace(f"({year})", "").strip()
+                    meta['aka'] = f"AKA {aka.strip()}"
+                    meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
 
         if meta['category'] == "TV":
             # if it was skipped earlier, make sure we have the season/episode data

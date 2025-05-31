@@ -1,6 +1,5 @@
 import re
 import asyncio
-from difflib import SequenceMatcher
 from src.console import console
 from src.tvmaze import search_tvmaze, get_tvmaze_episode_data
 from src.imdb import get_imdb_info_api
@@ -107,20 +106,7 @@ async def all_ids(meta, tvdb_api=None, tvdb_token=None):
     if isinstance(imdb_info, dict):
         meta['imdb_info'] = imdb_info
         meta['tv_year'] = imdb_info.get('tv_year', None)
-        aka = meta.get('imdb_info', {}).get('aka', "").strip()
-        title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-        year = str(meta.get('imdb_info', {}).get('year', ""))
-        if aka and not meta.get('aka'):
-            aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
-            difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-            if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                aka = None
 
-            if aka is not None:
-                if f"({year})" in aka:
-                    aka = aka.replace(f"({year})", "").strip()
-                meta['aka'] = f"AKA {aka.strip()}"
-                meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
     elif isinstance(imdb_info, Exception):
         console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
         meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -323,22 +309,7 @@ async def imdb_tmdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
         if isinstance(imdb_info, dict):
             meta['imdb_info'] = imdb_info
             meta['tv_year'] = imdb_info.get('tv_year', None)
-            aka = meta.get('imdb_info', {}).get('aka', "").strip()
-            title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-            year = str(meta.get('imdb_info', {}).get('year', ""))
 
-            if aka and not meta.get('aka'):
-                aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
-                difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-                if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                    aka = None
-
-                if aka is not None:
-                    if f"({year})" in aka:
-                        aka = aka.replace(f"({year})", "").strip()
-                    meta['aka'] = f"AKA {aka.strip()}"
-                    title = meta.get('imdb_info', {}).get('title', "")
-                    meta['title'] = title.strip()
         elif isinstance(imdb_info, Exception):
             console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
             meta['imdb_info'] = meta.get('imdb_info', {})
@@ -438,7 +409,8 @@ async def imdb_tmdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
 
 
 async def imdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
-    console.print("[yellow]Both IMDb and TVDB IDs are present[/yellow]")
+    if meta['debug']:
+        console.print("[yellow]Both IMDb and TVDB IDs are present[/yellow]")
     tasks = [
         get_tmdb_from_imdb(
             meta['imdb_id'],
@@ -549,21 +521,7 @@ async def imdb_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
     if isinstance(imdb_info_result, dict):
         meta['imdb_info'] = imdb_info_result
         meta['tv_year'] = imdb_info_result.get('tv_year', None)
-        aka = meta.get('imdb_info', {}).get('aka', "").strip()
-        title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-        year = str(meta.get('imdb_info', {}).get('year', ""))
-        if aka and not meta.get('aka'):
-            aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
-            difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-            if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                aka = None
 
-            if aka is not None:
-                if f"({year})" in aka:
-                    aka = aka.replace(f"({year})", "").strip()
-                meta['aka'] = f"AKA {aka.strip()}"
-                title = meta.get('imdb_info', {}).get('title', "")
-                meta['title'] = title.strip()
     elif isinstance(imdb_info_result, Exception):
         console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists
@@ -649,21 +607,7 @@ async def imdb_tmdb(meta, filename):
     if isinstance(imdb_info_result, dict):
         meta['imdb_info'] = imdb_info_result
         meta['tv_year'] = imdb_info_result.get('tv_year', None)
-        aka = meta.get('imdb_info', {}).get('aka', "").strip()
-        title = meta.get('imdb_info', {}).get('title', "").strip().lower()
-        year = str(meta.get('imdb_info', {}).get('year', ""))
-        if aka and not meta.get('aka'):
-            aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
-            difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-            if difference >= 0.9 or not aka_trimmed or aka_trimmed in title:
-                aka = None
 
-            if aka is not None:
-                if f"({year})" in aka:
-                    aka = aka.replace(f"({year})", "").strip()
-                meta['aka'] = f"AKA {aka.strip()}"
-                title = meta.get('imdb_info', {}).get('title', "")
-                meta['title'] = title.strip()
     elif isinstance(imdb_info_result, Exception):
         console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta['imdb_info'] = meta.get('imdb_info', {})  # Keep previous IMDb info if it exists

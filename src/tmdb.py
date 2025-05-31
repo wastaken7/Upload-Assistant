@@ -659,7 +659,7 @@ async def tmdb_other_meta(
         'mal_id': mal_id,
         'anime': anime,
         'demographic': demographic,
-        'aka': retrieved_aka,
+        'retrieved_aka': retrieved_aka,
         'poster': poster,
         'tmdb_poster': poster_path,
         'logo': logo_path,
