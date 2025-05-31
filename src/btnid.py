@@ -171,10 +171,10 @@ async def get_bhd_torrents(bhd_api, bhd_rss_key, meta, only_id=False, info_hash=
     elif "flux" in name:
         meta["flux"] = True
     description, imagelist = bbcode.clean_bhd_description(description, meta)
-    if description and not only_id:
+    if not only_id:
         meta["description"] = description
         meta["image_list"] = imagelist
-    elif description and meta.get('keep_images'):
+    elif meta.get('keep_images'):
         meta["description"] = ""
         meta["image_list"] = imagelist
 

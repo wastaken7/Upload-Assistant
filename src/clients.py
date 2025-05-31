@@ -256,10 +256,10 @@ class Clients():
 
                     # Piece size and count validations
                     if not meta.get('prefer_small_pieces', False):
-                        if reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8388608:
+                        if reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8488608:
                             console.print("[bold red]Torrent needs to have less than 8000 pieces with a 8 MiB piece size, regenerating")
                             valid = False
-                        elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4194304:
+                        elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304:
                             console.print("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size, regenerating")
                             valid = False
                     elif 'max_piece_size' not in meta and reuse_torrent.pieces >= 12000:
@@ -365,36 +365,46 @@ class Clients():
 
                 processed_hashes.add(torrent_hash)
 
-                # **Use `torrent_storage_dir` if available**
-                if torrent_storage_dir:
-                    torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
-                    if not os.path.exists(torrent_file_path):
-                        console.print(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
-                        continue
-                else:
-                    # **Fetch from qBittorrent API if no `torrent_storage_dir`**
+            except Exception as e:
+                console.print(f"[bold red]Unexpected error while handling {torrent_hash}: {e}")
+
+            # **Use `torrent_storage_dir` if available**
+            if torrent_storage_dir:
+                torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
+                if not os.path.exists(torrent_file_path):
+                    console.print(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
+                    continue
+            else:
+                # **Fetch from qBittorrent API if no `torrent_storage_dir`**
+                if meta['debug']:
+                    console.print(f"[cyan]Exporting .torrent file for {torrent_hash}")
+
+                try:
+                    torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
+                    torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+
+                    with open(torrent_file_path, "wb") as f:
+                        f.write(torrent_file_content)
                     if meta['debug']:
-                        console.print(f"[cyan]Exporting .torrent file for {torrent_hash}")
+                        console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
 
-                    try:
-                        torrent_file_content = qbt_client.torrents_export(torrent_hash=torrent_hash)
-                        torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+                except qbittorrentapi.APIError as e:
+                    console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
+                    continue  # Skip this torrent if unable to fetch
 
-                        with open(torrent_file_path, "wb") as f:
-                            f.write(torrent_file_content)
-                        if meta['debug']:
-                            console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
-
-                    except qbittorrentapi.APIError as e:
-                        console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
-                        continue  # Skip this torrent if unable to fetch
-
-                # **Validate the .torrent file**
+            # **Validate the .torrent file**
+            try:
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client, print_err=False)
+            except Exception as e:
+                console.print(f"[bold red]Error validating torrent {torrent_hash}: {e}")
+                valid = False
+                torrent_path = None
 
-                if valid:
-                    if prefer_small_pieces:
-                        # **Track best match based on piece size**
+            if valid:
+                console.print("prefersmallpieces", prefer_small_pieces)
+                if prefer_small_pieces:
+                    # **Track best match based on piece size**
+                    try:
                         torrent_data = Torrent.read(torrent_file_path)
                         piece_size = torrent_data.piece_size
                         if best_match is None or piece_size < best_match['piece_size']:
@@ -404,17 +414,17 @@ class Clients():
                                 'piece_size': piece_size
                             }
                             console.print(f"[green]Updated best match: {best_match}")
-                    else:
-                        # If `prefer_small_pieces` is False, return first valid torrent
-                        console.print(f"[green]Returning first valid torrent: {torrent_hash}")
-                        return torrent_hash
+                    except Exception as e:
+                        console.print(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
+                        continue
                 else:
-                    if meta['debug']:
-                        console.print(f"[bold red]{torrent_hash} failed validation")
-                    os.remove(torrent_file_path)
-
-            except Exception as e:
-                console.print(f"[bold red]Unexpected error while handling {torrent_hash}: {e}")
+                    # If `prefer_small_pieces` is False, return first valid torrent
+                    console.print(f"[green]Returning first valid torrent: {torrent_hash}")
+                    return torrent_hash
+            else:
+                if meta['debug']:
+                    console.print(f"[bold red]{torrent_hash} failed validation")
+                os.remove(torrent_file_path)
 
         # **Return the best match if `prefer_small_pieces` is enabled**
         if best_match:
@@ -507,7 +517,10 @@ class Clients():
 
             # Create tracker-specific directory inside linked folder
             if use_symlink or use_hardlink:
-                tracker_dir = os.path.join(link_target, tracker)
+                # allow overridden folder name with link_dir_name config var
+                tracker_cfg = self.config["TRACKERS"].get(tracker.upper(), {})
+                link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
+                tracker_dir = os.path.join(link_target, link_dir_name or tracker)
                 os.makedirs(tracker_dir, exist_ok=True)
 
                 if meta.get('debug', False):
@@ -812,7 +825,10 @@ class Clients():
 
         # Create tracker-specific directory inside linked folder
         if use_symlink or use_hardlink:
-            tracker_dir = os.path.join(link_target, tracker)
+            # allow overridden folder name with link_dir_name config var
+            tracker_cfg = self.config["TRACKERS"].get(tracker.upper(), {})
+            link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
+            tracker_dir = os.path.join(link_target, link_dir_name or tracker)
             os.makedirs(tracker_dir, exist_ok=True)
 
             if meta['debug']:
@@ -828,14 +844,23 @@ class Clients():
                 if meta['debug']:
                     console.print(f"[yellow]Skipping linking, path already exists: {dst}")
             else:
+                allow_fallback = self.config['TRACKERS'].get('allow_fallback', True)
+                fallback_to_original = False
                 if use_hardlink:
                     try:
                         # Check if we're linking a file or directory
                         if os.path.isfile(src):
                             # For a single file, create a hardlink directly
-                            os.link(src, dst)
-                            if meta['debug']:
-                                console.print(f"[green]Hard link created: {dst} -> {src}")
+                            try:
+                                os.link(src, dst)
+                                if meta['debug']:
+                                    console.print(f"[green]Hard link created: {dst} -> {src}")
+                            except OSError as e:
+                                console.print(f"[yellow]Hard link failed: {e}")
+                                if allow_fallback:
+                                    console.print(f"[yellow]Using original path without linking: {src}")
+                                    use_hardlink = False
+                                    fallback_to_original = True
                         else:
                             # For directories, we need to link each file inside
                             console.print("[yellow]Cannot hardlink directories directly. Creating directory structure...")
@@ -859,17 +884,31 @@ class Clients():
                                         if meta['debug'] and files.index(file) == 0:
                                             console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
                                     except OSError as e:
-                                        console.print(f"[red]Failed to create hard link for file {file}: {e}")
+                                        console.print(f"[yellow]Hard link failed for file {file}: {e}")
+                                        if allow_fallback:
+                                            console.print(f"[yellow]Using original path without linking: {src}")
+                                            fallback_to_original = True
+                                        break
 
-                            if meta['debug']:
-                                console.print(f"[green]Directory structure and files linked: {dst}")
+                        if fallback_to_original:
+                            use_hardlink = False
+                            link_target = None
+                            # Clean up the partially created directory
+                            try:
+                                shutil.rmtree(dst)
+                            except Exception as cleanup_error:
+                                console.print(f"[red]Warning: Failed to clean up partial directory {dst}: {cleanup_error}")
+
                     except OSError as e:
+                        # Global exception handler for any linking operation
                         error_msg = f"Failed to create hard link: {e}"
                         console.print(f"[bold red]{error_msg}")
-                        if meta['debug']:
-                            console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
-                            console.print(f"[yellow]Destination: {dst}")
-                        raise OSError(error_msg)
+                        if allow_fallback:
+                            console.print(f"[yellow]Using original path without linking: {src}")
+                            use_hardlink = False
+                            if meta['debug']:
+                                console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                                console.print(f"[yellow]Destination: {dst}")
 
                 elif use_symlink:
                     try:
@@ -884,7 +923,9 @@ class Clients():
                     except OSError as e:
                         error_msg = f"Failed to create symlink: {e}"
                         console.print(f"[bold red]{error_msg}")
-                        raise OSError(error_msg)
+                        if allow_fallback:
+                            console.print(f"[yellow]Using original path without linking: {src}")
+                            use_symlink = False
 
         # Initialize qBittorrent client
         qbt_client = qbittorrentapi.Client(
@@ -990,7 +1031,6 @@ class Clients():
         qbt_client.torrents_resume(torrent.infohash)
         if client.get("use_tracker_as_tag", False) and tracker:
             qbt_client.torrents_add_tags(tags=tracker, torrent_hashes=torrent.infohash)
-
         if client.get('qbit_tag'):
             qbt_client.torrents_add_tags(tags=client['qbit_tag'], torrent_hashes=torrent.infohash)
         if meta and meta.get('qbit_tag'):
@@ -1166,6 +1206,8 @@ class Clients():
                 exit(1)
 
             info_hash_v1 = meta.get('infohash')
+            if meta['debug']:
+                console.print(f"[cyan]Searching for infohash: {info_hash_v1}")
             torrents = qbt_client.torrents_info()
             found = False
 
@@ -1194,7 +1236,7 @@ class Clients():
                     if meta.get('debug', False):
                         console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
-                    if "https://passthepopcorn.me" in comment:
+                    if "passthepopcorn.me" in comment:
                         match = re.search(r'torrentid=(\d+)', comment)
                         if match:
                             meta['ptp'] = match.group(1)
@@ -1347,7 +1389,7 @@ class Clients():
                 console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
             # Handle various tracker URL formats in the comment
-            if "https://passthepopcorn.me" in comment:
+            if "passthepopcorn.me" in comment:
                 match = re.search(r'torrentid=(\d+)', comment)
                 if match:
                     meta['ptp'] = match.group(1)
@@ -1421,10 +1463,11 @@ class Clients():
 
             # If we found matches, use the hash from the first exact match
             if matching_torrents:
-                exact_matches = [t for t in matching_torrents if t['match_type'] == 'exact']
+                exact_matches = [t for t in matching_torrents]
                 if exact_matches:
                     meta['infohash'] = exact_matches[0]['hash']
-                    console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
+                    if meta['debug']:
+                        console.print(f"[green]Found exact torrent match with hash: {meta['infohash']}")
 
             else:
                 if meta['debug']:
@@ -1436,7 +1479,8 @@ class Clients():
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path, meta):
-        console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
+        if meta.get('debug'):
+            console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             if meta.get('client', None) is None:
                 default_torrent_client = self.config['DEFAULT']['default_torrent_client']
@@ -1449,12 +1493,24 @@ class Clients():
             client_config = self.config['TORRENT_CLIENTS'][default_torrent_client]
             torrent_client = client_config['torrent_client']
 
-            local_path, remote_path = await self.remote_path_map(meta)
-
             if torrent_client != 'qbit':
                 return []
 
-            # Connect to qBittorrent
+            tracker_patterns = {
+                'ptp': {"url": "passthepopcorn.me", "pattern": r'torrentid=(\d+)'},
+                'aither': {"url": "https://aither.cc", "pattern": r'/(\d+)$'},
+                'lst': {"url": "https://lst.gg", "pattern": r'/(\d+)$'},
+                'oe': {"url": "https://onlyencodes.cc", "pattern": r'/(\d+)$'},
+                'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
+                'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
+                'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
+                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
+                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
+                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
+            }
+
+            tracker_priority = ['aither', 'ulcx', 'lst', 'blu', 'oe', 'btn', 'bhd', 'huno', 'hdb', 'ptp']
+
             try:
                 qbt_client = qbittorrentapi.Client(
                     host=client_config['qbit_url'],
@@ -1482,26 +1538,11 @@ class Clients():
                 console.print("[bold red]Failed to connect to qBittorrent - check host/port")
                 return []
 
-            # Get all torrents
             torrents = await asyncio.to_thread(qbt_client.torrents_info)
             if meta['debug']:
                 console.print(f"[cyan]Found {len(torrents)} torrents in qBittorrent")
 
             matching_torrents = []
-
-            # Define known tracker URL patterns
-            tracker_patterns = {
-                'ptp': {"url": "https://passthepopcorn.me", "pattern": r'torrentid=(\d+)'},
-                'aither': {"url": "https://aither.cc", "pattern": r'/(\d+)$'},
-                'lst': {"url": "https://lst.gg", "pattern": r'/(\d+)$'},
-                'oe': {"url": "https://onlyencodes.cc", "pattern": r'/(\d+)$'},
-                'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
-                'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
-                'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
-                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
-                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
-                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
-            }
 
             # First collect exact path matches
             for torrent in torrents:
@@ -1521,11 +1562,9 @@ class Clients():
                     if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
                         if torrent_name == meta['uuid'] and len(torrent.files) == len(meta.get('filelist', [])):
                             is_match = True
-                            match_type = 'name_exact'
                     else:
                         if torrent_name == meta['uuid']:
                             is_match = True
-                            match_type = 'name_exact'
 
                     if not is_match:
                         continue
@@ -1539,49 +1578,34 @@ class Clients():
 
                             # Filter out DHT, PEX, LSD "trackers"
                             for tracker in torrent_trackers:
-                                if tracker.get('url', '').startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
+                                if tracker.get('url', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
                                     continue
                                 display_trackers.append(tracker)
 
-                            # Check if any tracker is working (status code 2)
-                            for tracker in display_trackers:
-                                url = tracker.get('url', 'Unknown URL')
-                                status_code = tracker.get('status', 0)
+                                for tracker in display_trackers:
+                                    url = tracker.get('url', 'Unknown URL')
+                                    status_code = tracker.get('status', 0)
+                                    status_text = {
+                                        0: "Disabled",
+                                        1: "Not contacted",
+                                        2: "Working",
+                                        3: "Updating",
+                                        4: "Error"
+                                    }.get(status_code, f"Unknown ({status_code})")
 
-                                status_text = {
-                                    0: "Disabled",
-                                    1: "Not contacted",
-                                    2: "Working",
-                                    3: "Updating",
-                                    4: "Error"
-                                }.get(status_code, f"Unknown ({status_code})")
+                                    if status_code == 2:
+                                        has_working_tracker = True
+                                        if meta['debug']:
+                                            console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
 
-                                if status_code == 2:
-                                    has_working_tracker = True
-                                    if meta['debug']:
-                                        console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
-                                elif meta['debug']:
-                                    msg = tracker.get('msg', '')
-                                    console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
+                                    elif meta['debug']:
+                                        msg = tracker.get('msg', '')
+                                        console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
 
-                            if not has_working_tracker:
-                                if meta['debug']:
-                                    console.print(f"[yellow]Skipping torrent: {torrent.name} - No working trackers")
-                                continue
-
-                        except Exception as e:
+                        except qbittorrentapi.APIError as e:
                             if meta['debug']:
-                                console.print(f"[yellow]Error getting trackers for torrent {torrent.name}: {str(e)}")
-
-                        # Get torrent properties to check comment
-                        try:
-                            torrent_properties = await asyncio.to_thread(qbt_client.torrents_properties, torrent_hash=torrent.hash)
-                            comment = torrent_properties.get('comment', '')
-                            created_by = torrent_properties.get('created_by', '')
-                        except Exception as e:
-                            if meta['debug']:
-                                console.print(f"[yellow]Error getting properties for torrent {torrent.name}: {str(e)}")
-                            comment = ""
+                                console.print(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
+                            continue
 
                         if 'torrent_comments' not in meta:
                             meta['torrent_comments'] = []
@@ -1590,18 +1614,16 @@ class Clients():
                             'hash': torrent.hash,
                             'name': torrent.name,
                             'save_path': torrent.save_path,
-                            'content_path': os.path.normpath(os.path.join(torrent.save_path, torrent.name)).lower(),
+                            'content_path': os.path.normpath(os.path.join(torrent.save_path, torrent.name)),
                             'size': torrent.size,
                             'category': torrent.category,
-                            'match_type': match_type,
+                            'seeders': torrent.num_complete,
                             'trackers': url,
                             'has_working_tracker': has_working_tracker,
-                            'comment': comment,
-                            'created_by': created_by
+                            'comment': torrent.comment,
                         }
 
                         # Initialize a list for found tracker IDs
-                        tracker_priority = ['ptp', 'bhd', 'btn', 'huno', 'aither', 'blu', 'ulcx', 'lst', 'oe', 'hdb']
                         tracker_found = False
                         tracker_urls = []
 
@@ -1610,8 +1632,8 @@ class Clients():
                             if not tracker_info:
                                 continue
 
-                            if tracker_info["url"] in comment:
-                                match = re.search(tracker_info["pattern"], comment)
+                            if tracker_info["url"] in torrent.comment:
+                                match = re.search(tracker_info["pattern"], torrent.comment)
                                 if match:
                                     tracker_id_value = match.group(1)
                                     tracker_urls.append({
@@ -1621,26 +1643,23 @@ class Clients():
                                     meta[tracker_id] = tracker_id_value
                                     tracker_found = True
 
-                        if created_by and 'Edited by HUNO' in created_by:
-                            if meta['debug']:
-                                console.print(f"[green]Found HUNO signature in 'Created By' field: {created_by}")
-
+                        if torrent.tracker and 'hawke.uno' in torrent.tracker:
                             # Try to extract torrent ID from the comment first
-                            huno_id = None
-                            if "/torrents/" in comment:
-                                match = re.search(r'/torrents/(\d+)', comment)
-                                if match:
-                                    huno_id = match.group(1)
+                            if not has_working_tracker:
+                                huno_id = None
+                                if "/torrents/" in torrent.comment:
+                                    match = re.search(r'/torrents/(\d+)', torrent.comment)
+                                    if match:
+                                        huno_id = match.group(1)
 
-                            # If we found an ID, use it
-                            if huno_id:
-                                tracker_urls.append({
-                                    'id': 'huno',
-                                    'tracker_id': huno_id,
-                                    'source': 'created_by_with_id'
-                                })
-                                meta['huno'] = huno_id
-                                tracker_found = True
+                                # If we found an ID, use it
+                                if huno_id:
+                                    tracker_urls.append({
+                                        'id': 'huno',
+                                        'tracker_id': huno_id,
+                                    })
+                                    meta['huno'] = huno_id
+                                    tracker_found = True
 
                         match_info['tracker_urls'] = tracker_urls
                         match_info['has_tracker'] = tracker_found
@@ -1648,11 +1667,10 @@ class Clients():
                         if tracker_found:
                             meta['found_tracker_match'] = True
 
-                        meta['torrent_comments'].append(match_info)
-
                         if meta.get('debug', False):
-                            console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
+                            console.print(f"[cyan]Stored comment for torrent: {torrent.comment[:100]}...")
 
+                        meta['torrent_comments'].append(match_info)
                         matching_torrents.append(match_info)
 
                 except Exception as e:
@@ -1804,7 +1822,6 @@ class Clients():
                                             console.print(f"[yellow]Alternative torrent {alt_torrent_hash} also invalid")
                                             if os.path.exists(alt_torrent_file_path) and alt_torrent_file_path.startswith(extracted_torrent_dir):
                                                 os.remove(alt_torrent_file_path)
-                                            meta['we_checked_them_all'] = True
 
                                 if not found_valid_torrent:
                                     console.print("[bold red]No valid torrents found after checking all matches")

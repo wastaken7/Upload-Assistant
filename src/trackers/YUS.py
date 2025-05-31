@@ -25,7 +25,7 @@ class YUS():
         self.torrent_url = 'https://yu-scene.net/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = ['KiNGDOM', 'Lama', 'MeGusta', 'MezRips', 'mHD', 'mRS', 'msd', 'NeXus', 'NhaNc3', 'nHD', 'RARBG', 'Radarr',
-                              'RCDiVX', 'RDN', 'SANTi', 'Will1869', 'x0r', 'XS', 'YIFY', 'YTS', 'ZKBL', 'ZmN', 'ZMNT']
+                              'RCDiVX', 'RDN', 'SANTi', 'VXT', 'Will1869', 'x0r', 'XS', 'YIFY', 'YTS', 'ZKBL', 'ZmN', 'ZMNT']
         pass
 
     async def get_cat_id(self, category_name):
@@ -71,7 +71,7 @@ class YUS():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -144,6 +144,11 @@ class YUS():
         open_torrent.close()
 
     async def search_existing(self, meta, disctype):
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'softcore'}
+        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
+            console.print('[bold red]Adult animation not allowed at YUS.')
+            meta['skipping'] = "YUS"
+            return []
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
         params = {

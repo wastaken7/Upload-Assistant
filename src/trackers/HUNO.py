@@ -33,9 +33,11 @@ class HUNO():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        huno_name = await self.get_name(meta)
-        if huno_name == "SKIPPED":
-            console.print("[bold red]Skipping upload to HUNO due to missing audio language")
+        region_id = await common.unit3d_region_ids(meta.get('region'))
+        distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
+        huno_name, region_id, distributor_id = await self.get_name(meta, region_id=region_id, distributor_id=distributor_id)
+        if (huno_name or region_id) == "SKIPPED":
+            console.print("[bold red]Skipping upload to HUNO due to missing audio language or region/distributor.")
             return
 
         url_host_mapping = {
@@ -56,7 +58,7 @@ class HUNO():
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -114,14 +116,18 @@ class HUNO():
         }
 
         if meta['debug'] is False:
-            response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
+                response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
                 console.print(response.json())
+            except Exception as e:
+                console.print(f"[bold red]Error uploading torrent: {e}")
+                return
+            try:
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://hawke.uno/torrents/" + t_id)
             except Exception:
-                console.print("It may have uploaded, go check")
+                console.print("Error getting torrent ID from response.")
                 return
         else:
             console.print("[cyan]Request Data:")
@@ -209,23 +215,47 @@ class HUNO():
         path = next(iter(meta['filelist']), meta['path'])
         return os.path.basename(path)
 
-    async def get_name(self, meta):
+    async def get_name(self, meta, region_id=None, distributor_id=None):
         # Copied from Prep.get_name() then modified to match HUNO's naming convention.
         # It was much easier to build the name from scratch than to alter the existing name.
 
+        region_name = None
+        distributor_name = None
+
+        if meta.get('is_disc') == "BDMV":
+            common = COMMON(config=self.config)
+            if not region_id:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    region_name = cli_ui.ask_string("ULCX: Region code not found for disc. Please enter it manually (UPPERCASE): ")
+                    region_id = await common.unit3d_region_ids(region_name)
+                else:
+                    region_id = "SKIPPED"
+            if not distributor_id:
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    distributor_name = cli_ui.ask_string("ULCX: Distributor code not found for disc. Please enter it manually (UPPERCASE): ")
+                    distributor_id = await common.unit3d_distributor_ids(distributor_name)
+
         basename = self.get_basename(meta)
-        hc = meta.get('hardcoded-subs')
+        if meta.get('hardcoded-subs'):
+            hc = "Hardsubbed"
+        else:
+            hc = ""
         type = meta.get('type', "").upper()
         title = meta.get('title', "")
-        alt_title = meta.get('aka', "")  # noqa F841
         year = meta.get('year', "")
         resolution = meta.get('resolution', "")
         audio = self.get_audio(meta)
         if "SKIPPED" in audio:
-            return "SKIPPED"
+            return "SKIPPED", "SKIPPED", "SKIPPED"
         service = meta.get('service', "")
         season = meta.get('season', "")
+        if meta.get('tvdb_season_number', ""):
+            season_int = meta.get('tvdb_season_number')
+            season = f"S{str(season_int).zfill(2)}"
         episode = meta.get('episode', "")
+        if meta.get('tvdb_episode_number', ""):
+            episode_int = meta.get('tvdb_episode_number')
+            episode = f"E{str(episode_int).zfill(2)}"
         repack = meta.get('repack', "")
         if repack.strip():
             repack = f"[{repack}]"
@@ -234,11 +264,20 @@ class HUNO():
         if tag == "":
             tag = "- NOGRP"
         source = meta.get('source', "").replace("Blu-ray", "BluRay")
-        uhd = meta.get('uhd', "")
         hdr = meta.get('hdr', "")
         if not hdr.strip():
             hdr = "SDR"
-        distributor = meta.get('distributor', "")  # noqa F841
+        if distributor_name and distributor_name.upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY']:
+            distributor = distributor_name.title()
+        else:
+            if meta.get('distributor', "") and meta.get('distributor').upper() in ['CRITERION', 'BFI', 'SHOUT FACTORY']:
+                distributor = meta.get('distributor').title()
+            else:
+                distributor = ""
+        if region_name:
+            region = region_name
+        else:
+            region = meta.get('region', "")
         video_codec = meta.get('video_codec', "")
         video_encode = meta.get('video_encode', "").replace(".", "")
         if 'x265' in basename and not meta.get('type') == "WEBDL":
@@ -247,48 +286,49 @@ class HUNO():
         edition = meta.get('edition', "")
         hybrid = 'Hybrid' if meta.get('webdv', "") else ''
         scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
+        hfr = "HFR" if meta.get('hfr', '') else ""
 
         # YAY NAMING FUN
         if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
-                    name = f"{title} ({year}) {three_d} {edition} ({resolution} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {distributor} {edition} {hc} ({resolution} {region} {three_d} {source} {hybrid} {video_codec} {hfr} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'DVD':
-                    name = f"{title} ({year}) {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {distributor} {edition} {hc} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
-                    name = f"{title} ({year}) {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {distributor} {edition} {hc} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source == "BluRay":  # BluRay Remux
-                name = f"{title} ({year}) {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {edition} ({resolution} {three_d} {source} {hybrid} REMUX {video_codec} {hfr} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
-                name = f"{title} ({year}) {edition} ({resolution} DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {edition} {hc} ({resolution} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "ENCODE":  # Encode
-                name = f"{title} ({year}) {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {edition} {hc} ({resolution} {scale} {source} {hybrid} {video_encode} {hfr} {hdr} {audio} {tag}) {repack}"
             elif type in ("WEBDL", "WEBRIP"):  # WEB
-                name = f"{title} ({year}) {edition} ({resolution} {scale} {uhd} {service} WEB-DL {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {edition} {hc} ({resolution} {scale} {service} WEB-DL {hybrid} {video_encode} {hfr} {hdr} {audio} {tag}) {repack}"
             elif type == "HDTV":  # HDTV
-                name = f"{title} ({year}) {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {edition} {hc} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
         elif meta['category'] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
                 if meta['is_disc'] == 'BDMV':
-                    name = f"{title} ({year}) {season}{episode} {three_d} {edition} ({resolution} {uhd} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {season}{episode} {distributor} {edition} {hc} ({resolution} {region} {three_d} {source} {hybrid} {video_codec} {hfr} {hdr} {audio} {tag}) {repack}"
                 if meta['is_disc'] == 'DVD':
-                    name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
+                    name = f"{title} ({year}) {season}{episode} {distributor} {edition} {hc} ({resolution} {source} {dvd_size} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
                 elif meta['is_disc'] == 'HDDVD':
                     name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {hybrid} {video_codec} {hdr} {audio} {tag}) {repack}"
             elif type == "REMUX" and source == "BluRay":  # BluRay Remux
-                name = f"{title} ({year}) {season}{episode} {three_d} {edition} ({resolution} {uhd} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"  # SOURCE
+                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {three_d} {source} {hybrid} REMUX {video_codec} {hfr} {hdr} {audio} {tag}) {repack}"  # SOURCE
             elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
-                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} DVD {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"  # SOURCE
+                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {source} {hybrid} REMUX {video_codec} {hdr} {audio} {tag}) {repack}"  # SOURCE
             elif type == "ENCODE":  # Encode
-                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {scale} {uhd} {source} {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"  # SOURCE
+                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {scale} {source} {hybrid} {video_encode} {hfr} {hdr} {audio} {tag}) {repack}"  # SOURCE
             elif type in ("WEBDL", "WEBRIP"):  # WEB
-                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {scale} {uhd} {service} WEB-DL {hybrid} {video_encode} {hdr} {audio} {tag}) {repack}"
+                name = f"{title} ({year}) {season}{episode} {edition} ({resolution} {scale} {service} WEB-DL {hybrid} {video_encode} {hfr} {hdr} {audio} {tag}) {repack}"
             elif type == "HDTV":  # HDTV
                 name = f"{title} ({year}) {season}{episode} {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
 
         if hc:
             name = re.sub(r'((\([0-9]{4}\)))', r'\1 Ensubbed', name)
-        return ' '.join(name.split()).replace(": ", " - ")
+        return ' '.join(name.split()).replace(": ", " - "), region_id, distributor_id
 
     async def get_cat_id(self, category_name):
         category_id = {

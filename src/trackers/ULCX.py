@@ -75,7 +75,7 @@ class ULCX():
         if region_id == "SKIPPED" or distributor_id == "SKIPPED":
             console.print("Region or Distributor ID not found; skipping ULCX upload.")
             return
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -183,12 +183,6 @@ class ULCX():
                     distributor_id = await common.unit3d_distributor_ids(distributor_name)
                 else:
                     distributor_id = "SKIPPED"
-
-        if meta.get('webdv', False):
-            if meta.get('repack', "") != "":
-                ulcx_name = ulcx_name.replace(f"{meta['repack']} {meta['resolution']}", f"HYBRID {meta['repack']} {meta['resolution']}", 1)
-            else:
-                ulcx_name = ulcx_name.replace(f"{meta['resolution']}", f"HYBRID {meta['resolution']}", 1)
 
         return ulcx_name, region_id, distributor_id
 

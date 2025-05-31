@@ -27,6 +27,7 @@ img_host = [
 task_limit = int(config['DEFAULT'].get('process_limit', 1))
 threads = str(config['DEFAULT'].get('threads', '1'))
 cutoff = int(config['DEFAULT'].get('cutoff_screens', 1))
+ffmpeg_limit = config['DEFAULT'].get('ffmpeg_limit', False)
 
 try:
     task_limit = int(task_limit)  # Convert to integer
@@ -174,7 +175,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             except Exception as e:
                 console.print(f"[red]Error removing smallest image: {str(e)}")
 
-        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
+        if not force_screenshots:
+            console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
         optimized_results = []
         valid_images = [image for image in capture_results if os.path.exists(image)]
@@ -187,7 +189,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         num_tasks = len(valid_images)
         num_workers = min(num_tasks, task_limit)
         if optimize_images:
-            console.print("[yellow]Now optimizing images...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Now optimizing images...[/yellow]")
 
             loop = asyncio.get_running_loop()
             stop_event = asyncio.Event()
@@ -226,7 +229,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
             if meta['debug']:
                 console.print("Optimized results:", optimized_results)
 
-            console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+            if not force_screenshots:
+                console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
         else:
             optimized_results = valid_images
 
@@ -299,7 +303,8 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+    if not force_screenshots:
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
 
     if meta['debug']:
         finish_time = time.time()
@@ -586,7 +591,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
             if num_workers == 0:
                 console.print("[red]No valid images found for optimization.[/red]")
                 return
-            console.print("[yellow]Now optimizing images...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Now optimizing images...[/yellow]")
 
             loop = asyncio.get_running_loop()
             stop_event = asyncio.Event()
@@ -614,7 +620,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                 console.print("[red]All tasks cancelled. Exiting.[/red]")
                 sys.exit(1)
             finally:
-                console.print("[yellow]Shutting down optimization workers...[/yellow]")
+                if meta['debug']:
+                    console.print("[yellow]Shutting down optimization workers...[/yellow]")
                 await asyncio.sleep(0.1)
                 await kill_all_child_processes()
                 executor.shutdown(wait=False)
@@ -624,7 +631,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
 
             if meta['debug']:
                 console.print("Optimized results:", optimized_results)
-            console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
+            if not retry_cap:
+                console.print(f"[green]Successfully optimized {len(optimized_results)} images.")
 
             executor.shutdown(wait=True)  # Ensure cleanup
         else:
@@ -698,7 +706,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
         if remaining_retakes:
             console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
+    if not retry_cap:
+        console.print(f"[green]Successfully captured {len(valid_results)} screenshots.")
     await cleanup()
 
 
@@ -982,16 +991,18 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     finally:
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
-        console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
+        if meta['debug']:
+            console.print("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
-    console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
+    if not force_screenshots:
+        console.print(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
     num_workers = min(task_limit, len(capture_results))
     if optimize_images:
-        console.print("[yellow]Now optimizing images...[/yellow]")
         if meta['debug']:
+            console.print("[yellow]Now optimizing images...[/yellow]")
             console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
 
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
@@ -1011,7 +1022,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             gc.collect()
             sys.exit(1)
         finally:
-            console.print("[yellow]Shutting down optimization workers...[/yellow]")
+            if meta['debug']:
+                console.print("[yellow]Shutting down optimization workers...[/yellow]")
             await asyncio.sleep(0.1)
             executor.shutdown(wait=True, cancel_futures=True)
             for task in tasks:
@@ -1021,7 +1033,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
         # Filter out failed results
         optimized_results = [res for res in optimized_results if isinstance(res, str) and "Error" not in res]
-        console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
+        if not force_screenshots:
+            console.print(f"[green]Successfully optimized {len(optimized_results)} images.[/green]")
     else:
         optimized_results = valid_images
 
@@ -1150,7 +1163,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if remaining_retakes:
         console.print(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
-    console.print(f"[green]Successfully processed {len(valid_results)} screenshots.")
+    if meta['debug']:
+        console.print(f"[green]Successfully processed {len(valid_results)} screenshots.")
 
     if meta['debug']:
         finish_time = time.time()
@@ -1162,6 +1176,10 @@ async def capture_screenshot(args):
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
+        def set_ffmpeg_threads():
+            threads_value = '1'
+            os.environ['FFREPORT'] = 'level=32'  # Reduce ffmpeg logging overhead
+            return ['-threads', threads_value]
         if width <= 0 or height <= 0:
             return "Error: Invalid width or height for scaling"
 
@@ -1195,7 +1213,15 @@ async def capture_screenshot(args):
             console.print(f"[cyan]Processing file: {path}[/cyan]")
 
         # Proceed with screenshot capture
-        ff = ffmpeg.input(path, ss=ss_time)
+        threads_value = set_ffmpeg_threads()
+        threads_val = threads_value[1]
+        if ffmpeg_limit:
+            ff = (
+                ffmpeg
+                .input(path, ss=ss_time, threads=threads_val)
+            )
+        else:
+            ff = ffmpeg.input(path, ss=ss_time)
         if w_sar != 1 or h_sar != 1:
             ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
@@ -1277,12 +1303,20 @@ async def capture_screenshot(args):
             # Use the filtered output with frame info
             ff = base_text
 
-        command = (
-            ff
-            .output(image_path, vframes=1, pix_fmt="rgb24")
-            .overwrite_output()
-            .global_args('-loglevel', loglevel)
-        )
+        if ffmpeg_limit:
+            command = (
+                ff
+                .output(image_path, vframes=1, pix_fmt="rgb24", **{'threads': threads_val})
+                .overwrite_output()
+                .global_args('-loglevel', loglevel)
+            )
+        else:
+            command = (
+                ff
+                .output(image_path, vframes=1, pix_fmt="rgb24")
+                .overwrite_output()
+                .global_args('-loglevel', loglevel)
+            )
 
         # Print the command for debugging
         if loglevel == 'verbose' or (meta and meta.get('debug', False)):

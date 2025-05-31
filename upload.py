@@ -257,7 +257,8 @@ async def process_meta(meta, base_dir):
                     raise e
                 finally:
                     reset_terminal()
-                    console.print("[yellow]Cleaning up resources...[/yellow]")
+                    if meta['debug']:
+                        console.print("[yellow]Cleaning up resources...[/yellow]")
                     gc.collect()
 
             elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
@@ -348,12 +349,22 @@ async def load_processed_files(log_file):
 
 async def save_processed_file(log_file, file_path):
     """
-    Adds a processed file to the log.
+    Adds a processed file to the log, deduplicating and always appending to the end.
     """
-    processed_files = await load_processed_files(log_file)
-    processed_files.add(file_path)
+    if os.path.exists(log_file):
+        with open(log_file, "r") as f:
+            try:
+                processed_files = json.load(f)
+            except Exception:
+                processed_files = []
+    else:
+        processed_files = []
+
+    processed_files = [entry for entry in processed_files if entry != file_path]
+    processed_files.append(file_path)
+
     with open(log_file, "w") as f:
-        json.dump(list(processed_files), f, indent=4)
+        json.dump(processed_files, f, indent=4)
 
 
 def reset_terminal():
@@ -521,6 +532,7 @@ async def do_the_thing(base_dir):
         queue, log_file = await handle_queue(path, meta, paths, base_dir)
 
         processed_files_count = 0
+        skipped_files_count = 0
         base_meta = {k: v for k, v in meta.items()}
         for path in queue:
             total_files = len(queue)
@@ -579,7 +591,8 @@ async def do_the_thing(base_dir):
                 console.print("we are not uploading.......")
                 if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
-                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                    skipped_files_count += 1
+                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.")
                     if not meta['debug']:
                         if log_file:
                             await save_processed_file(log_file, path)
@@ -589,9 +602,9 @@ async def do_the_thing(base_dir):
                 if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
                     if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
-                        console.print(f"[cyan]Processed {processed_files_count} of {meta['limit_queue']} in limit with {total_files} files.")
+                        console.print(f"[cyan]Sucessfully uploaded {processed_files_count - skipped_files_count} of {meta['limit_queue']} in limit with {total_files} files.")
                     else:
-                        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                        console.print(f"[cyan]Sucessfully uploaded {processed_files_count - skipped_files_count}/{total_files} files.")
                     if not meta['debug']:
                         if log_file:
                             await save_processed_file(log_file, path)
@@ -601,8 +614,8 @@ async def do_the_thing(base_dir):
                     reset_terminal()
 
             if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
-                if processed_files_count >= int(meta['limit_queue']):
-                    console.print(f"[red]Processing limit of {meta['limit_queue']} files reached. Stopping queue processing.")
+                if (processed_files_count - skipped_files_count) >= int(meta['limit_queue']):
+                    console.print(f"[red]Uploading limit of {meta['limit_queue']} files reached. Stopping queue processing. {skipped_files_count} skipped files.")
                     break
 
             if meta['debug']:

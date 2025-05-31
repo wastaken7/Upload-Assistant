@@ -119,7 +119,7 @@ class Args():
         parser.add_argument('-tik', '--tik', nargs=1, required=False, help="TIK torrent id/link", type=str)
         parser.add_argument('-hdb', '--hdb', nargs=1, required=False, help="HDB torrent id/link", type=str)
         parser.add_argument('-btn', '--btn', nargs=1, required=False, help="BTN torrent id/link", type=str)
-        parser.add_argument('-bhd', '--bhd', nargs=1, required=False, help="BHD infohash or torrent_id", type=str)
+        parser.add_argument('-bhd', '--bhd', nargs=1, required=False, help="BHD torrent_id/link", type=str)
         parser.add_argument('-huno', '--huno', nargs=1, required=False, help="HUNO torrent id/link", type=str)
         parser.add_argument('-ulcx', '--ulcx', nargs=1, required=False, help="ULCX torrent id/link", type=str)
         parser.add_argument('-onlyID', '--onlyID', action='store_true', required=False, help="Only grab meta ids (tmdb/imdb/etc) from tracker, not description/image links.")

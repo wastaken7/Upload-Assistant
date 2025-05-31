@@ -149,6 +149,7 @@ class CBR():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
+        modq = await self.get_flag(meta, 'modq')
         cat_id = await self.get_cat_id(meta['category'], meta)
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
@@ -156,7 +157,7 @@ class CBR():
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
-        if not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
             anon = 1
@@ -193,6 +194,7 @@ class CBR():
             'free': 0,
             'doubleup': 0,
             'sticky': 0,
+            'mod_queue_opt_in': modq,
         }
         # Internal
         if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
@@ -262,3 +264,10 @@ class CBR():
             await asyncio.sleep(5)
 
         return dupes
+
+    async def get_flag(self, meta, flag_name):
+        config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
+        if config_flag is not None:
+            return 1 if config_flag else 0
+
+        return 1 if meta.get(flag_name, False) else 0

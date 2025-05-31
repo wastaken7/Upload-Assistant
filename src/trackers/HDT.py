@@ -94,6 +94,8 @@ class HDT():
             hdt_name = hdt_name.replace(meta['audio'], meta['audio'].replace(' ', '', 1))
         if 'DV' in meta.get('hdr', ''):
             hdt_name = hdt_name.replace(' DV ', ' DoVi ')
+        if 'BluRay REMUX' in hdt_name:
+            hdt_name = hdt_name.replace('BluRay REMUX', 'Blu-ray Remux')
 
         hdt_name = ' '.join(hdt_name.split())
         hdt_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", hdt_name)
@@ -160,7 +162,7 @@ class HDT():
                 data['season'] = 'false'
 
             # Anonymous check
-            if not self.config['TRACKERS'][self.tracker].get('anon', False):
+            if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
                 data['anonymous'] = 'false'
             else:
                 data['anonymous'] = 'true'
@@ -193,6 +195,10 @@ class HDT():
         return
 
     async def search_existing(self, meta, disctype):
+        if meta['resolution'] not in ['2160p', '1080p', '1080i', '720p']:
+            console.print('[bold red]Resolution must be at least 720p resolution for HDT.')
+            meta['skipping'] = "HDT"
+            return
         dupes = []
         with requests.Session() as session:
             common = COMMON(config=self.config)

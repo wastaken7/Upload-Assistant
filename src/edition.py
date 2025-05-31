@@ -35,7 +35,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                                     console.print(f"[green]Potential match: {edition_info['display_name']} - duration {edition_formatted}, difference: {format_duration(difference)}[/green]")
 
                                 if has_attributes:
-                                    edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                                    edition_name = " ".join(smart_title(attr) for attr in edition_info['attributes'])
 
                                     matching_editions.append({
                                         'name': edition_name,
@@ -88,7 +88,8 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                             console.print(f"[bold green]Setting edition from duration match: {edition}[/bold green]")
 
                         else:
-                            console.print(f"[yellow]No matching editions found within {leeway_seconds} seconds of media duration[/yellow]")
+                            if meta['debug']:
+                                console.print(f"[yellow]No matching editions found within {leeway_seconds} seconds of media duration[/yellow]")
 
                     except (ValueError, TypeError) as e:
                         console.print(f"[yellow]Error parsing duration: {e}[/yellow]")
@@ -137,7 +138,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                             if difference <= leeway_seconds:
                                 # Store the complete edition info
                                 if edition_info.get('attributes') and len(edition_info['attributes']) > 0:
-                                    edition_name = " ".join(attr.title() for attr in edition_info['attributes'])
+                                    edition_name = " ".join(smart_title(attr) for attr in edition_info['attributes'])
                                 else:
                                     edition_name = f"{edition_info['minutes']} Minute Version (Theatrical)"
 
@@ -272,7 +273,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
         video = video.upper().replace('.', ' ').replace(tag.upper(), '').replace('-', '')
 
-        if "OPEN MATTE" in video:
+        if "OPEN MATTE" in video.upper():
             edition = edition + " Open Matte"
 
     # Manual edition overrides everything
@@ -285,19 +286,19 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
     # Handle repack info
     repack = ""
-    if "REPACK" in (video or edition.upper()) or "V2" in video:
+    if "REPACK" in (video.upper() or edition.upper()) or "V2" in video:
         repack = "REPACK"
-    if "REPACK2" in (video or edition.upper()) or "V3" in video:
+    if "REPACK2" in (video.upper() or edition.upper()) or "V3" in video:
         repack = "REPACK2"
-    if "REPACK3" in (video or edition.upper()) or "V4" in video:
+    if "REPACK3" in (video.upper() or edition.upper()) or "V4" in video:
         repack = "REPACK3"
-    if "PROPER" in (video or edition.upper()):
+    if "PROPER" in (video.upper() or edition.upper()):
         repack = "PROPER"
-    if "PROPER2" in (video or edition.upper()):
+    if "PROPER2" in (video.upper() or edition.upper()):
         repack = "PROPER2"
-    if "PROPER3" in (video or edition.upper()):
+    if "PROPER3" in (video.upper() or edition.upper()):
         repack = "PROPER3"
-    if "RERIP" in (video or edition.upper()):
+    if "RERIP" in (video.upper() or edition.upper()):
         repack = "RERIP"
 
     # Only remove REPACK, RERIP, or PROPER from edition if not in manual edition
@@ -306,7 +307,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
     if not meta.get('webdv', False):
         hybrid = False
-        if "HYBRID" in video.upper():
+        if "HYBRID" in video.upper() or "HYBRID" in edition.upper():
             hybrid = True
     else:
         hybrid = meta.get('webdv', False)
@@ -316,7 +317,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
         from src.region import get_distributor
         distributors = await get_distributor(edition)
 
-        bad = ['internal', 'limited', 'retail']
+        bad = ['internal', 'limited', 'retail', 'version', 'remastered']
 
         if distributors:
             bad.append(distributors.lower())
@@ -341,3 +342,10 @@ def format_duration(seconds):
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def smart_title(s):
+    """Custom title function that doesn't capitalize after apostrophes"""
+    result = s.title()
+    # Fix capitalization after apostrophes
+    return re.sub(r"(\w)'(\w)", lambda m: f"{m.group(1)}'{m.group(2).lower()}", result)

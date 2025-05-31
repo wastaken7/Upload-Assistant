@@ -232,6 +232,10 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             if len(desc) > 0:
                 description.write((desc or "") + "\n")
+    if category and ('MOVIE' in category.upper() or 'TV' in category.upper()):
+        meta['category'] = category.upper()
+        if meta['debug']:
+            console.print("set Category:", meta['category'])
 
     if not meta.get('image_list'):  # Only handle images if image_list is not already populated
         if imagelist:  # Ensure imagelist is not empty before setting
@@ -245,7 +249,8 @@ async def update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id
     if filename:
         meta[f'{tracker_name.lower()}_filename'] = filename
 
-    console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
+    if meta['debug']:
+        console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
 
 
 async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, search_term, search_file_folder, only_id=False):
@@ -254,6 +259,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
     found_match = False
 
     if tracker_name == "PTP":
+        if only_id and not meta.get('keep_images') and meta.get('imdb_id', 0) != 0:
+            return meta, False
         imdb_id = None
         ptp_desc = None
         if meta.get('ptp') is None:
@@ -479,7 +486,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
 
     elif tracker_name in ["HUNO", "BLU", "AITHER", "LST", "OE", "ULCX"]:
         if meta.get(tracker_key) is not None:
-            console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+            if meta['debug']:
+                console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
                 tracker_instance.torrent_url,
@@ -489,7 +497,8 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 only_id=only_id
             )
         else:
-            console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
+            if meta['debug']:
+                console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
                 tracker_instance.torrent_url,
@@ -499,12 +508,14 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 only_id=only_id
             )
 
-        if any(item not in [None, '0'] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
-            console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
+        if any(item not in [None, 0] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
+            if meta['debug']:
+                console.print(f"[green]Valid data found on {tracker_name}, setting meta values[/green]")
             await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, only_id)
             found_match = True
         else:
-            console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+            if meta['debug']:
+                console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             found_match = False
 
     elif tracker_name == "HDB":
