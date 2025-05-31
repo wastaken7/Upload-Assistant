@@ -6,7 +6,6 @@ anitopy
 cli-ui
 qbittorrent-api
 deluge-client
-pyrobase
 requests
 pyimgbox
 nest_asyncio

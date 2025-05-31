@@ -7,7 +7,6 @@ import qbittorrentapi
 from deluge_client import DelugeRPCClient
 import transmission_rpc
 import base64
-from pyrobase.parts import Bunch
 import errno
 import asyncio
 import ssl
@@ -1110,10 +1109,10 @@ class Clients():
         if single:
             if os.path.isdir(datapath):
                 datapath = os.path.join(datapath, metainfo["info"]["name"])
-            files = [Bunch(
-                path=[os.path.abspath(datapath)],
-                length=metainfo["info"]["length"],
-            )]
+            files = [{
+                "path": [os.path.abspath(datapath)],
+                "length": metainfo["info"]["length"],
+            }]
 
         # Prepare resume data
         resume = metainfo.setdefault("libtorrent_resume", {})
