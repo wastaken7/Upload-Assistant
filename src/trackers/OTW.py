@@ -74,7 +74,9 @@ class OTW():
         otw_name = meta['name']
         source = meta['source']
         resolution = meta['resolution']
-        otw_name = otw_name.replace(meta["aka"], '')
+        aka = meta.get('aka', '')
+        if aka:
+            otw_name = otw_name.replace(meta["aka"], '')
         if meta['is_disc'] == "DVD":
             otw_name = otw_name.replace(source, f"{source} {resolution}")
         if meta['category'] == "TV":
