@@ -418,7 +418,7 @@ class Prep():
             # Reuse information from trackers with fallback
             await get_tracker_data(video, meta, search_term, search_file_folder, meta['category'])
 
-        if meta.get('category', None) == "TV" and use_sonarr and meta.get('tvdb_id', 0) != 0 and ids is None:
+        if meta.get('category', None) == "TV" and use_sonarr and meta.get('tvdb_id', 0) != 0 and ids is None and not meta.get('matched_tracker', None):
             ids = await get_sonarr_data(tvdb_id=meta.get('tvdb_id', 0), debug=meta.get('debug', False))
             if ids:
                 if meta['debug']:
@@ -444,7 +444,7 @@ class Prep():
             else:
                 ids = None
 
-        if meta.get('category', None) == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) != 0 and ids is None:
+        if meta.get('category', None) == "MOVIE" and use_radarr and meta.get('tmdb_id', 0) != 0 and ids is None and not meta.get('matched_tracker', None):
             ids = await get_radarr_data(tmdb_id=meta.get('tmdb_id', 0), debug=meta.get('debug', False))
             if ids:
                 if meta['debug']:
