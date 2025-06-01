@@ -631,6 +631,8 @@ class Prep():
                         aka = aka.replace(f"({year})", "").strip()
                     meta['aka'] = f"AKA {aka.strip()}"
                     meta['title'] = f"{meta.get('imdb_info', {}).get('title', '').strip()}"
+        if meta.get('aka', None) is None:
+            meta['aka'] = ""
 
         if meta['category'] == "TV":
             # if it was skipped earlier, make sure we have the season/episode data
