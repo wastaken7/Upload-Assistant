@@ -671,7 +671,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
                     try:
                         # Ensure `capture_dvd_screenshot()` always returns a tuple
                         screenshot_response = await capture_dvd_screenshot(
-                            index, input_file, image, adjusted_time, meta, width, height, w_sar, h_sar
+                            (index, input_file, image, adjusted_time, meta, width, height, w_sar, h_sar)
                         )
 
                         # Ensure it is a tuple before unpacking
