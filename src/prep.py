@@ -56,8 +56,16 @@ class Prep():
     async def gather_prep(self, meta, mode):
         # set some details we'll need
         meta['cutoff'] = int(self.config['DEFAULT'].get('cutoff_screens', 1))
-        tvdb_api = str(self.config['DEFAULT'].get('tvdb_api', None))
-        tvdb_token = str(self.config['DEFAULT'].get('tvdb_token', None))
+        tvdb_api_get = str(self.config['DEFAULT'].get('tvdb_api', None))
+        if tvdb_api_get is None or len(tvdb_api_get) < 20:
+            tvdb_api = None
+        else:
+            tvdb_api = tvdb_api_get
+        tvdb_token_get = str(self.config['DEFAULT'].get('tvdb_token', None))
+        if tvdb_token_get is None or len(tvdb_token_get) < 20:
+            tvdb_token = None
+        else:
+            tvdb_token = tvdb_token_get
         meta['mode'] = mode
         meta['isdir'] = os.path.isdir(meta['path'])
         base_dir = meta['base_dir']
