@@ -253,7 +253,7 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
     mediainfo_cmd = None
     if is_dvd:
         console.print("[bold yellow]DVD detected, using specialized MediaInfo binary...")
-        mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "Mediainfo.exe")
+        mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "MediaInfo.exe")
 
         if platform.system() == "Linux":
             if os.path.exists(mediainfo_binary):
