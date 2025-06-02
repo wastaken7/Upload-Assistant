@@ -1,3 +1,25 @@
+__version__ = "5.0.5"
+
+"""
+Changelog for version 5.0.5 (2025-06-02):
+
+## What's Changed
+* CBR - Initial modq setup by @a1Thiago in https://github.com/Audionut/Upload-Assistant/pull/546
+* Remove 'pyrobase' requirement by @ambroisie in https://github.com/Audionut/Upload-Assistant/pull/547
+* DP - fixed to allow when en subs
+* fixed cat set from auto unit3d
+* updated AR naming to take either scene name or folder/file name.
+* changed the aka diff check to only allow (automated) aka when difference is greater than 70%
+* protect screenshots from ptp through bbcode shenanigans
+* added some filtering for automated imdb edition handling
+
+## New Contributors
+* @a1Thiago made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/546
+* @ambroisie made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/547
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.4.2...5.0.5
+"""
+
 __version__ = "5.0.4.2"
 
 """
