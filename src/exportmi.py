@@ -257,8 +257,8 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
 
         if platform.system() == "Linux":
             if os.path.exists(mediainfo_binary):
-                mediainfo_cmd = ["mono", mediainfo_binary]
-                console.print(f"[bold green]Using MediaInfo binary with mono: {mediainfo_binary}")
+                mediainfo_cmd = ["wine", mediainfo_binary]
+                console.print(f"[bold green]Using MediaInfo binary with wine: {mediainfo_binary}")
             else:
                 console.print("[bold red]Specialized MediaInfo binary not found, falling back to standard MediaInfo")
         else:

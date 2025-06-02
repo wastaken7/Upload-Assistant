@@ -479,7 +479,7 @@ class DiscParse():
                             )
                         else:  # Linux or macOS
                             process = await asyncio.create_subprocess_exec(
-                                "mono", mediainfo_binary, "--Output=JSON", ifo_file,
+                                "wine", mediainfo_binary, "--Output=JSON", ifo_file,
                                 stdout=asyncio.subprocess.PIPE,
                                 stderr=asyncio.subprocess.PIPE
                             )
@@ -537,7 +537,7 @@ class DiscParse():
                         )
                     else:
                         process = await asyncio.create_subprocess_exec(
-                            "mono", mediainfo_binary, os.path.basename(vob),
+                            "wine", mediainfo_binary, os.path.basename(vob),
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE
                         )
@@ -561,7 +561,7 @@ class DiscParse():
                         )
                     else:
                         process = await asyncio.create_subprocess_exec(
-                            "mono", mediainfo_binary, os.path.basename(ifo),
+                            "wine", mediainfo_binary, os.path.basename(ifo),
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE
                         )
@@ -585,7 +585,7 @@ class DiscParse():
                         )
                     else:
                         process = await asyncio.create_subprocess_exec(
-                            "mono", mediainfo_binary, vob,
+                            "wine", mediainfo_binary, vob,
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE
                         )
@@ -609,7 +609,7 @@ class DiscParse():
                         )
                     else:
                         process = await asyncio.create_subprocess_exec(
-                            "mono", mediainfo_binary, ifo,
+                            "wine", mediainfo_binary, ifo,
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE
                         )
