@@ -464,7 +464,7 @@ class DiscParse():
                     filesdict[trimmed[:2]] = []
                 filesdict[trimmed[:2]].append(trimmed)
             main_set_duration = 0
-            mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "mediainfo.exe")
+            mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "Mediainfo.exe")
 
             for vob_set in filesdict.values():
                 try:
@@ -526,7 +526,7 @@ class DiscParse():
             each['ifo'] = ifo = f"{path}/VTS_{set}_0.IFO"
 
             try:
-                mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "mediainfo.exe")
+                mediainfo_binary = os.path.join(base_dir, "bin", "MI", "windows", "Mediainfo.exe")
 
                 try:
                     if platform.system() == "Windows":

@@ -17,7 +17,7 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
   - Generates and Parses MediaInfo/BDInfo.
   - Generates and Uploads screenshots. HDR tonemapping if config.
   - Uses srrdb to fix scene names used at sites.
-  - Can grab descriptions from PTP/BLU/Aither/LST/OE (with config option automatically on filename match, or using arg).
+  - Can grab descriptions from PTP/BLU/Aither/LST/OE/BHD (with config option automatically on filename match, or using arg).
   - Can strip and use existing screenshots from descriptions to skip screenshot generation and uploading.
   - Obtains TMDb/IMDb/MAL/TVDB/TVMAZE identifiers.
   - Converts absolute to season episode numbering for Anime. Non-Anime support with TVDB credentials
