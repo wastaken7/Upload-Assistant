@@ -766,6 +766,11 @@ config = {
             # /Path/To/Watch/Folder
             "watch_folder": "",
         },
-
+    },
+    "DISCORD": {
+        "discord_bot_token": "",
+        "discord_channel_id": "",
+        "discord_bot_description": "",
+        "command_prefix": "!"
     },
 }
