@@ -30,7 +30,6 @@ from src.cleanup import cleanup
 from src.add_comparison import add_comparison
 from src.get_name import get_name
 from src.get_desc import gen_desc
-from discordbot import send_discord_notification
 from discordbot import send_discord_notification, send_upload_status_notification
 if os.name == "posix":
     import termios
