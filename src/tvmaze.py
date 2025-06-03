@@ -9,6 +9,8 @@ async def search_tvmaze(filename, year, imdbID, tvdbID, manual_date=None, tvmaze
     - If `return_full_tuple=True`, returns `(tvmaze_id, imdbID, tvdbID)`.
     - Otherwise, only returns `tvmaze_id`.
     """
+    if debug:
+        console.print(f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year})[/cyan]")
     # Convert TVDB ID to integer
     try:
         tvdbID = int(tvdbID) if tvdbID not in (None, '', '0') else 0
