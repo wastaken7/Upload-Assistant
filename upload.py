@@ -31,6 +31,7 @@ from src.add_comparison import add_comparison
 from src.get_name import get_name
 from src.get_desc import gen_desc
 from discordbot import send_discord_notification
+from discordbot import send_discord_notification, send_upload_status_notification
 if os.name == "posix":
     import termios
 
@@ -603,6 +604,7 @@ async def do_the_thing(base_dir, bot):
 
             else:
                 await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers, bot=bot)
+                await send_upload_status_notification(config, bot, meta)
                 if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
                     if 'limit_queue' in meta and int(meta['limit_queue']) > 0:

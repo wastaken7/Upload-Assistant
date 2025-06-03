@@ -6,7 +6,6 @@ from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP
 from src.trackers.COMMON import COMMON
 from src.manualpackage import package
-from discordbot import send_discord_notification
 
 
 async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
@@ -34,7 +33,7 @@ async def check_mod_q_and_draft(tracker_class, meta, debug, disctype):
     return modq, draft
 
 
-async def process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers, bot=None):
+async def process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers):
     common = COMMON(config=config)
     tracker_setup = TRACKER_SETUP(config=config)
     enabled_trackers = tracker_setup.trackers_enabled(meta)
@@ -65,7 +64,6 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                         console.print(f"(draft: {draft})")
                     try:
                         await tracker_class.upload(meta, disctype)
-                        await send_discord_notification(config, bot, f"✅ Upload completed: {tracker}", debug=debug)
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         return

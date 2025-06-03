@@ -130,6 +130,37 @@ async def send_discord_notification(config, bot, message, debug=False):
         return False
 
 
+async def send_upload_status_notification(config, bot, meta):
+    """Send Discord notification with successful uploads only."""
+    if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
+        return False
+
+    tracker_status = meta.get('tracker_status', {})
+    if not tracker_status:
+        return False
+
+    # Get list of trackers where upload is True
+    successful_uploads = [
+        tracker for tracker, status in tracker_status.items()
+        if status.get('upload', False)
+    ]
+
+    if successful_uploads:
+        release_name = meta.get('name', meta.get('title', 'Unknown Release'))
+        message = f"✅ **Uploaded to:** {', '.join(successful_uploads)} - {release_name}"
+
+        try:
+            channel_id = int(config['DISCORD']['discord_channel_id'])
+            channel = bot.get_channel(channel_id)
+            if channel:
+                await channel.send(message)
+                return True
+        except Exception as e:
+            console.print(f"[yellow]Discord notification error: {e}")
+
+    return False
+
+
 if __name__ == '__main__':
     # Only used when running discordbot.py directly
     from data.config import config
