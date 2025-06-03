@@ -528,14 +528,12 @@ class Prep():
 
         # Get TMDB and IMDb metadata only if IDs are still missing, first checking mediainfo
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
-            console.print("Fetching TMDB ID...")
             meta['category'], meta['tmdb_id'], meta['imdb_id'] = await get_tmdb_imdb_from_mediainfo(
                 mi, meta['category'], meta['is_disc'], meta['tmdb_id'], meta['imdb_id']
             )
 
         # if we're still missing both ids, lets search with the filename
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
-            console.print("Fetching TMDB ID from filename...")
             meta = await get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
 
         # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
