@@ -564,7 +564,6 @@ class Prep():
                 tmdb_metadata_populated = False
 
             if not tmdb_metadata_populated:
-                console.print("Fetching TMDB metadata...")
                 try:
                     tmdb_metadata = await tmdb_other_meta(
                         tmdb_id=meta['tmdb_id'],
