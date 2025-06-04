@@ -392,27 +392,54 @@ async def search_imdb(filename, search_year, quickie=False, category=None, debug
         return 0
 
     results = await safe_get(data, ["data", "advancedTitleSearch", "edges"], [])
+
     if debug:
         console.print(f"[yellow]Found {len(results)} results...[/yellow]")
+        console.print(f"quickie: {quickie}, category: {category}, search_year: {search_year}")
 
     if quickie:
         if results:
             first_result = results[0]
-            type = await safe_get(first_result, ["titleType"], "")
-            year = await safe_get(first_result, ["releaseYear", "year"], None)
-            if type and type.get("text").lower() == "tv series" and category and category.lower() == "tv":
-                imdb_id = await safe_get(first_result, ["node", "title", "id"], "")
-            elif type and type.get("text").lower() != "tv series" and category and category.lower() == "movie":
-                imdb_id = await safe_get(first_result, ["node", "title", "id"], "")
-            if imdb_id:
+            if debug:
+                console.print(f"[cyan]Quickie search result: {first_result}[/cyan]")
+            node = await safe_get(first_result, ["node"], {})
+            title = await safe_get(node, ["title"], {})
+            type_info = await safe_get(title, ["titleType"], {})
+            year = await safe_get(title, ["releaseYear", "year"], None)
+            imdb_id = await safe_get(title, ["id"], "")
+
+            type_matches = False
+            if type_info:
+                title_type = type_info.get("text", "").lower()
+                if category and category.lower() == "tv" and "tv series" in title_type:
+                    type_matches = True
+                elif category and category.lower() == "movie" and "tv series" not in title_type:
+                    type_matches = True
+
+            if imdb_id and type_matches:
                 if year and search_year:
-                    if year != search_year:
+                    if year == search_year:
+                        imdbID = int(imdb_id.replace('tt', '').strip())
+                        return imdbID
+                    else:
+                        if debug:
+                            console.print(f"[yellow]Year mismatch: found {year}, expected {search_year}[/yellow]")
                         imdbID = 0
                 else:
                     imdbID = int(imdb_id.replace('tt', '').strip())
                     return imdbID
             else:
+                if not imdb_id and debug:
+                    console.print("[yellow]No IMDb ID found in quickie result[/yellow]")
+                if not type_matches and debug:
+                    console.print(f"[yellow]Type mismatch: found {type_info.get('text', '')}, expected {category}[/yellow]")
                 imdbID = 0
+        else:
+            console.print("[yellow]No results found for quickie search[/yellow]")
+            imdbID = 0
+
+        return imdbID
+
     else:
         for idx, edge in enumerate(results):
             node = await safe_get(edge, ["node"], {})
