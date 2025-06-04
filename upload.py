@@ -87,7 +87,7 @@ async def process_meta(meta, base_dir, bot=None):
     """Process the metadata for each queued path."""
 
     if use_discord and bot:
-        await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False))
+        await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False), meta=meta)
 
     if meta['imghost'] is None:
         meta['imghost'] = config['DEFAULT']['img_host_1']
@@ -631,7 +631,7 @@ async def do_the_thing(base_dir, bot):
                 console.print(f"Uploads processed in {finish_time - start_time:.4f} seconds")
 
             if use_discord and bot:
-                await send_discord_notification(config, bot, f"Finsished uploading: {meta['path']}", debug=meta.get('debug', False))
+                await send_discord_notification(config, bot, f"Finsished uploading: {meta['path']}", debug=meta.get('debug', False), meta=meta)
 
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}")
@@ -653,20 +653,15 @@ def check_python_version():
 async def main():
     if use_discord and config['DISCORD'].get('discord_bot_token'):
         try:
-            console.print("[cyan]Starting bot initialization...")
+            console.print("[cyan]Starting Discord bot initialization...")
             intents = discord.Intents.default()
             intents.message_content = True
-
-            console.print("[cyan]Creating bot instance...")
             bot = discord.Client(intents=intents)
             token = config['DISCORD']['discord_bot_token']
             await asyncio.wait_for(bot.login(token), timeout=10)
-
-            console.print("[cyan]Starting connection task...")
             connect_task = asyncio.create_task(bot.connect())
 
             try:
-                console.print("[cyan]Waiting for bot to be ready (timeout: 20s)...")
                 await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
                 console.print("[green]Bot is ready!")
             except asyncio.TimeoutError:

@@ -97,7 +97,7 @@ class Bot(commands.Bot):
         await self.process_commands(message)
 
 
-async def send_discord_notification(config, bot, message, debug=False):
+async def send_discord_notification(config, bot, message, debug=False, meta=None):
     """
     Send a notification message to Discord channel.
 
@@ -109,6 +109,9 @@ async def send_discord_notification(config, bot, message, debug=False):
     Returns:
         bool: True if message was sent successfully, False otherwise
     """
+    only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
+    if only_unattended and meta and not meta.get('unattended', False):
+        return False
     if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
         if debug:
             console.print("[yellow]Discord bot not ready - skipping notifications")
@@ -132,6 +135,9 @@ async def send_discord_notification(config, bot, message, debug=False):
 
 async def send_upload_status_notification(config, bot, meta):
     """Send Discord notification with upload status including failed trackers."""
+    only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
+    if only_unattended and meta and not meta.get('unattended', False):
+        return False
     if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
         return False
 
