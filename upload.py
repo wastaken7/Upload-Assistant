@@ -53,6 +53,7 @@ except Exception:
 from src.prep import Prep  # noqa E402
 client = Clients(config=config)
 parser = Args(config)
+use_discord = config['DISCORD'].get('use_discord', False)
 
 
 async def merge_meta(meta, saved_meta, path):
@@ -85,7 +86,8 @@ async def merge_meta(meta, saved_meta, path):
 async def process_meta(meta, base_dir, bot=None):
     """Process the metadata for each queued path."""
 
-    await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False))
+    if use_discord and bot:
+        await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False))
 
     if meta['imghost'] is None:
         meta['imghost'] = config['DEFAULT']['img_host_1']
@@ -602,8 +604,9 @@ async def do_the_thing(base_dir, bot):
                             await save_processed_file(log_file, path)
 
             else:
-                await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers, bot=bot)
-                await send_upload_status_notification(config, bot, meta)
+                await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
+                if use_discord and bot:
+                    await send_upload_status_notification(config, bot, meta)
                 if 'queue' in meta and meta.get('queue') is not None:
                     processed_files_count += 1
                     if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
@@ -627,6 +630,9 @@ async def do_the_thing(base_dir, bot):
                 finish_time = time.time()
                 console.print(f"Uploads processed in {finish_time - start_time:.4f} seconds")
 
+            if use_discord and bot:
+                await send_discord_notification(config, bot, f"Finsished uploading: {meta['path']}", debug=meta.get('debug', False))
+
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}")
         console.print(traceback.format_exc())
@@ -645,34 +651,38 @@ def check_python_version():
 
 
 async def main():
-    try:
-        console.print("[cyan]Starting bot initialization...")
-        intents = discord.Intents.default()
-        intents.message_content = True
-
-        console.print("[cyan]Creating bot instance...")
-        bot = discord.Client(intents=intents)
-        token = config['DISCORD']['discord_bot_token']
-        await asyncio.wait_for(bot.login(token), timeout=10)
-
-        console.print("[cyan]Starting connection task...")
-        connect_task = asyncio.create_task(bot.connect())
-
+    if use_discord and config['DISCORD'].get('discord_bot_token'):
         try:
-            console.print("[cyan]Waiting for bot to be ready (timeout: 20s)...")
-            await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
-            console.print("[green]Bot is ready!")
-        except asyncio.TimeoutError:
-            console.print("[bold red]Bot failed to connect within timeout period.")
-            console.print("[yellow]Continuing without Discord integration...")
-            if 'connect_task' in locals():
-                connect_task.cancel()
-            await do_the_thing(base_dir, None)
-            return
+            console.print("[cyan]Starting bot initialization...")
+            intents = discord.Intents.default()
+            intents.message_content = True
 
-        console.print("[cyan]Bot is ready! Starting main processing...")
+            console.print("[cyan]Creating bot instance...")
+            bot = discord.Client(intents=intents)
+            token = config['DISCORD']['discord_bot_token']
+            await asyncio.wait_for(bot.login(token), timeout=10)
+
+            console.print("[cyan]Starting connection task...")
+            connect_task = asyncio.create_task(bot.connect())
+
+            try:
+                console.print("[cyan]Waiting for bot to be ready (timeout: 20s)...")
+                await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
+                console.print("[green]Bot is ready!")
+            except asyncio.TimeoutError:
+                console.print("[bold red]Bot failed to connect within timeout period.")
+                console.print("[yellow]Continuing without Discord integration...")
+                if 'connect_task' in locals():
+                    connect_task.cancel()
+        except discord.LoginFailure:
+            console.print("[bold red]Discord bot token is invalid. Please check your configuration.")
+        except discord.ClientException as e:
+            console.print(f"[bold red]Discord client exception: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error during Discord bot initialization: {e}")
+
+    try:
         await do_the_thing(base_dir, bot)
-
     except asyncio.CancelledError:
         console.print("[red]Tasks were cancelled. Exiting safely.[/red]")
     except KeyboardInterrupt:

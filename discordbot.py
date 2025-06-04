@@ -131,7 +131,7 @@ async def send_discord_notification(config, bot, message, debug=False):
 
 
 async def send_upload_status_notification(config, bot, meta):
-    """Send Discord notification with successful uploads only."""
+    """Send Discord notification with upload status including failed trackers."""
     if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
         return False
 
@@ -145,18 +145,39 @@ async def send_upload_status_notification(config, bot, meta):
         if status.get('upload', False)
     ]
 
-    if successful_uploads:
-        release_name = meta.get('name', meta.get('title', 'Unknown Release'))
-        message = f"✅ **Uploaded to:** {', '.join(successful_uploads)} - {release_name}"
+    # Get list of failed trackers with reasons
+    failed_trackers = []
+    for tracker, status in tracker_status.items():
+        if not status.get('upload', False):
+            if status.get('banned', False):
+                failed_trackers.append(f"{tracker} (banned)")
+            elif status.get('skipped', False):
+                failed_trackers.append(f"{tracker} (skipped)")
+            elif status.get('dupe', False):
+                failed_trackers.append(f"{tracker} (dupe)")
 
-        try:
-            channel_id = int(config['DISCORD']['discord_channel_id'])
-            channel = bot.get_channel(channel_id)
-            if channel:
-                await channel.send(message)
-                return True
-        except Exception as e:
-            console.print(f"[yellow]Discord notification error: {e}")
+    release_name = meta.get('name', meta.get('title', 'Unknown Release'))
+    message_parts = []
+
+    if successful_uploads:
+        message_parts.append(f"✅ **Uploaded to:** {', '.join(successful_uploads)} - {release_name}")
+
+    if failed_trackers:
+        message_parts.append(f"❌ **Failed:** {', '.join(failed_trackers)}")
+
+    if not message_parts:
+        return False
+
+    message = "\n".join(message_parts)
+
+    try:
+        channel_id = int(config['DISCORD']['discord_channel_id'])
+        channel = bot.get_channel(channel_id)
+        if channel:
+            await channel.send(message)
+            return True
+    except Exception as e:
+        console.print(f"[yellow]Discord notification error: {e}")
 
     return False
 

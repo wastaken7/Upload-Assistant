@@ -768,6 +768,7 @@ config = {
         },
     },
     "DISCORD": {
+        "use_discord": False,
         "discord_bot_token": "",
         "discord_channel_id": "",
         "discord_bot_description": "",
