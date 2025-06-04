@@ -619,11 +619,25 @@ async def imdb_tmdb(meta, filename):
     if meta['category'] == 'TV':
         if len(results) > 2:
             tvmaze_result = results[2]
-            if isinstance(tvmaze_result, int):
+            if isinstance(tvmaze_result, tuple) and len(tvmaze_result) == 3:
+                # Handle tuple return: (tvmaze_id, imdbID, tvdbID)
+                tvmaze_id, imdb_id, tvdb_id = tvmaze_result
+                meta['tvmaze_id'] = tvmaze_id if isinstance(tvmaze_id, int) else 0
+
+                # Set tvdb_id if not already set and we got a valid one
+                if not meta.get('tvdb_id', 0) and isinstance(tvdb_id, int) and tvdb_id > 0:
+                    meta['tvdb_id'] = tvdb_id
+                    if meta.get('debug'):
+                        console.print(f"[green]Set TVDb ID from TVMaze: {tvdb_id}[/green]")
+
+            elif isinstance(tvmaze_result, int):
                 meta['tvmaze_id'] = tvmaze_result
             elif isinstance(tvmaze_result, Exception):
                 console.print(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
                 meta['tvmaze_id'] = 0  # Set default value if an exception occurred
+            else:
+                console.print(f"[yellow]Unexpected TVMaze result type: {type(tvmaze_result)}[/yellow]")
+                meta['tvmaze_id'] = 0
 
         # Process TMDb episode details if they were included
         if len(results) > 3:
