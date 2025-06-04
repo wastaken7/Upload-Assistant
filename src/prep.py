@@ -526,6 +526,7 @@ class Prep():
             meta['category'] = category
             meta['tmdb_id'] = int(tmdb_id)
             meta['imdb_id'] = int(imdb_result)
+            meta['quickie_search'] = True
 
         # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
         elif meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
