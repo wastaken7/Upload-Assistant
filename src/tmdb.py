@@ -347,7 +347,8 @@ async def tmdb_other_meta(
     poster=None,
     debug=False,
     mode="discord",
-    tvdb_id=0
+    tvdb_id=0,
+    quickie_search=False
 ):
     """
     Fetch metadata from TMDB for a movie or TV show.
@@ -374,6 +375,7 @@ async def tmdb_other_meta(
     tmdb_type = ""
     mal_id = 0
     demographic = ""
+    imdb_mismatch = False
 
     if tmdb_id == 0:
         try:
@@ -437,8 +439,10 @@ async def tmdb_other_meta(
             original_title = media_data.get('original_title', title)
             year = datetime.strptime(media_data['release_date'], '%Y-%m-%d').year if media_data['release_date'] else search_year
             runtime = media_data.get('runtime', 60)
-            if not imdb_id:
+            if quickie_search or not imdb_id:
                 imdb_id_str = str(media_data.get('imdb_id', '')).replace('tt', '')
+                if imdb_id and imdb_id_str and (int(imdb_id_str) != imdb_id):
+                    imdb_mismatch = True
                 imdb_id = int(imdb_id_str) if imdb_id_str.isdigit() else 0
             tmdb_type = 'Movie'
         else:  # TV show
@@ -515,11 +519,13 @@ async def tmdb_other_meta(
             try:
                 external = external_data.json()
                 # Process IMDB ID
-                if imdb_id == 0:
+                if quickie_search or imdb_id == 0:
                     imdb_id_str = external.get('imdb_id', None)
                     if imdb_id_str and imdb_id_str not in ["", " ", "None", None]:
                         imdb_id_clean = imdb_id_str.lstrip('t')
                         if imdb_id_clean.isdigit():
+                            if imdb_id_clean != imdb_id:
+                                imdb_mismatch = True
                             imdb_id = int(imdb_id_clean)
                 else:
                     imdb_id = int(imdb_id)
@@ -643,7 +649,8 @@ async def tmdb_other_meta(
         'tmdb_type': tmdb_type,
         'runtime': runtime,
         'youtube': youtube,
-        'certification': certification
+        'certification': certification,
+        'imdb_mismatch': imdb_mismatch
     }
 
     return tmdb_metadata

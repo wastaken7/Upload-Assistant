@@ -609,7 +609,8 @@ class Prep():
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=meta.get('debug', False))
 
         # Ensure IMDb info is retrieved if it wasn't already fetched
-        if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
+        # rerun if imdb_mismatch, since it means tmdb return and quickie search did not match and we'll prefer tmdb return
+        if (meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0) or meta.get('imdb_mismatch'):
             imdb_info = await get_imdb_info_api(meta['imdb_id'], manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
             meta['imdb_info'] = imdb_info
             meta['tv_year'] = imdb_info.get('tv_year', None)

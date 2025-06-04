@@ -548,7 +548,8 @@ async def imdb_tmdb(meta, filename):
             poster=meta.get('poster'),
             debug=meta.get('debug', False),
             mode=meta.get('mode', 'cli'),
-            tvdb_id=meta.get('tvdb_id', 0)
+            tvdb_id=meta.get('tvdb_id', 0),
+            quickie_search=meta.get('quickie_search', False)
         ),
         get_imdb_info_api(
             meta['imdb_id'],
