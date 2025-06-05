@@ -1,5 +1,6 @@
 import re
 import cli_ui
+import aiofiles
 from src.console import console
 
 
@@ -280,63 +281,80 @@ async def has_matching_hdr(file_hdr, target_hdr, meta, tracker=None):
     return file_hdr_simple == target_hdr_simple
 
 
-async def check_for_english(meta, tracker):
+async def check_for_languages(meta, tracker):
     english_languages = ['english']
+    portuguese_languages = ['portuguese', 'português']
     if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
-        async def has_english_stuff():
-            has_english_audio = False
+        async def has_proper_stuff():
+            has_audio = False
             if 'audio' in meta['bdinfo']:
                 for audio_track in meta['bdinfo']['audio']:
                     if 'language' in audio_track:
                         audio_lang = audio_track['language'].lower()
-                        if audio_lang in english_languages:
-                            has_english_audio = True
+                        if tracker != "CBR" and audio_lang in english_languages:
+                            has_audio = True
+                            return True
+                        elif tracker == "CBR" and audio_lang in portuguese_languages:
+                            has_audio = True
                             return True
 
-            if not has_english_audio:
-                has_english_subtitle = False
+            if not has_audio:
+                has_subtitle = False
                 if 'subtitles' in meta['bdinfo']:
                     for subtitle in meta['bdinfo']['subtitles']:
-                        if subtitle.lower() in english_languages:
-                            has_english_subtitle = True
+                        if tracker != "CBR" and subtitle.lower() in english_languages:
+                            has_subtitle = True
+                            return True
+                        elif tracker == "CBR" and subtitle.lower() in portuguese_languages:
+                            has_subtitle = True
                             return True
 
-                    if not has_english_subtitle:
+                    if not has_subtitle:
                         if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                            console.print(f'[bold red]No English audio or subtitles found in BDINFO required for {tracker}.')
+                            console.print(f'[bold red]No required audio or subtitles found in BDINFO required for {tracker}.')
                             if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                 return True
                             else:
                                 return False
                         return False
                 return False
-        if not await has_english_stuff():
+        if not await has_proper_stuff():
             meta['skipping'] = {tracker}
             return
 
     elif not meta['is_disc'] == "BDMV":
-        async def has_english(media_info_text=None):
+        async def has_language(media_info_text=None):
             if media_info_text:
                 audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
                 subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                has_english_audio = False
-                for language in audio_section:
-                    language = language.lower().strip()
-                    if language in english_languages:
-                        has_english_audio = True
-                        return True
-
-                if not has_english_audio:
-                    has_english_sub = False
-                    for language in subtitle_section:
+                has_audio = False
+                if audio_section:
+                    for language in audio_section:
                         language = language.lower().strip()
-                        if language in english_languages:
-                            has_english_sub = True
+                        if tracker != "CBR" and language in english_languages:
+                            has_audio = True
                             return True
+                        elif tracker == "CBR" and language in portuguese_languages:
+                            has_audio = True
+                            return True
+                else:
+                    has_audio = False
 
-                    if not has_english_sub:
+                if not has_audio:
+                    has_sub = False
+                    if subtitle_section:
+                        for language in subtitle_section:
+                            language = language.lower().strip()
+                            if tracker != "CBR" and language in english_languages:
+                                has_sub = True
+                                return True
+                            elif tracker == "CBR" and language in portuguese_languages:
+                                has_sub = True
+                                return True
+
+                    if not has_sub:
                         if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                            console.print(f'[bold red]No English audio or subtitles found in MEDIAINFO required for {tracker}.')
+                            console.print(f'[bold red]No required audio or subtitles found in MEDIAINFO required for {tracker}.')
                             if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                 return True
                             else:
@@ -345,10 +363,10 @@ async def check_for_english(meta, tracker):
 
         try:
             media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-            with open(media_info_path, 'r', encoding='utf-8') as f:
-                media_info_text = f.read()
+            async with aiofiles.open(media_info_path, 'r', encoding='utf-8') as f:
+                media_info_text = await f.read()
 
-            if not await has_english(media_info_text=media_info_text):
+            if not await has_language(media_info_text=media_info_text):
                 meta['skipping'] = {tracker}
                 return
         except (FileNotFoundError, KeyError) as e:

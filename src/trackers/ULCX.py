@@ -9,7 +9,7 @@ import httpx
 import cli_ui
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.dupe_checking import check_for_english
+from src.dupe_checking import check_for_languages
 
 
 class ULCX():
@@ -222,7 +222,7 @@ class ULCX():
             return
 
         tracker = self.tracker
-        await check_for_english(meta, tracker)
+        await check_for_languages(meta, tracker)
 
         dupes = []
         console.print("[yellow]Searching for existing torrents on ULCX...")

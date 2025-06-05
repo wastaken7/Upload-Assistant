@@ -10,7 +10,7 @@ import httpx
 from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.dupe_checking import check_for_english
+from src.dupe_checking import check_for_languages
 from src.rehostimages import check_hosts
 
 
@@ -351,7 +351,7 @@ class OE():
             return
 
         tracker = self.tracker
-        await check_for_english(meta, tracker)
+        await check_for_languages(meta, tracker)
 
         dupes = []
         console.print("[yellow]Searching for existing torrents on OE...")
