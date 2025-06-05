@@ -326,8 +326,6 @@ class HUNO():
             elif type == "HDTV":  # HDTV
                 name = f"{title} ({year}) {season}{episode} {edition} ({resolution} HDTV {hybrid} {video_encode} {audio} {tag}) {repack}"
 
-        if hc:
-            name = re.sub(r'((\([0-9]{4}\)))', r'\1 Ensubbed', name)
         return ' '.join(name.split()).replace(": ", " - "), region_id, distributor_id
 
     async def get_cat_id(self, category_name):
