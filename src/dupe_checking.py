@@ -165,7 +165,7 @@ async def filter_dupes(dupes, meta, tracker_name):
                 return False
 
         if len(dupes) == 1 and meta.get('is_disc') != "BDMV":
-            if tracker_name in ["AITHER", "BHD", "HUNO", "OE", "ULCX", "RF"]:
+            if tracker_name in ["AITHER", "BHD", "HUNO", "OE", "ULCX"]:
                 if fileSize and "1080" in target_resolution and 'x264' in video_encode:
                     target_size = int(fileSize)
                     dupe_size = sized
@@ -177,6 +177,12 @@ async def filter_dupes(dupes, meta, tracker_name):
                         if size_difference >= 0.20:
                             await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
                             return True
+            if tracker_name == "RF":
+                if tag and tag.strip() and tag.strip() in normalized:
+                    return False
+                elif tag and tag.strip() and tag.strip() not in normalized:
+                    await log_exclusion(f"Tag '{tag}' not found in normalized name", each)
+                    return True
 
         if meta['debug']:
             console.log(f"[debug] Passed all checks: {each}")
