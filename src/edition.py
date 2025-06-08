@@ -251,6 +251,9 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
         guess = guessit(video)
         tag = guess.get('release_group', 'NOGROUP')
+        if isinstance(tag, list):
+            tag = " ".join(str(t) for t in tag)
+        repack = ""
         repack = ""
 
         if bdinfo is not None:
