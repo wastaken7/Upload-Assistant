@@ -269,7 +269,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
                 edition = ""
 
         if isinstance(edition, list):
-            edition = " ".join(edition)
+            edition = " ".join(str(e) for e in edition)
 
         if len(filelist) == 1:
             video = os.path.basename(video)
@@ -282,7 +282,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
     # Manual edition overrides everything
     if manual_edition:
         if isinstance(manual_edition, list):
-            manual_edition = " ".join(manual_edition)
+            manual_edition = " ".join(str(e) for e in manual_edition)
         edition = str(manual_edition)
 
     edition = edition.replace(",", " ")
