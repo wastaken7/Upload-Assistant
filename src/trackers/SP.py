@@ -81,7 +81,8 @@ class SP():
             'WEBDL': '4',
             'WEBRIP': '5',
             'HDTV': '6',
-            'ENCODE': '3'
+            'ENCODE': '3',
+            'DVDRIP': '3'
         }.get(type, '0')
         return type_id
 
