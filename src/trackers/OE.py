@@ -98,7 +98,6 @@ class OE():
             'resolution_id': resolution_id,
             'tmdb': meta['tmdb'],
             'imdb': meta['imdb'],
-            'tvdb': meta['tvdb_id'],
             'mal': meta['mal_id'],
             'igdb': 0,
             'anonymous': anon,
@@ -126,6 +125,7 @@ class OE():
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')
+            data['tvdb'] = meta['tvdb_id']
         headers = {
             'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         }
