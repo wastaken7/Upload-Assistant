@@ -57,7 +57,7 @@ class ASC(COMMON):
 
         description += self.signature
 
-            return description.strip()
+        return description.strip()
 
     async def _prepare_form_data(self, meta):
         try:
