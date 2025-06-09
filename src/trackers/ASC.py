@@ -404,13 +404,13 @@ class ASC(COMMON):
     async def _should_auto_approve(self, meta):
         uploader_enabled = self.config['TRACKERS'][self.tracker].get('uploader_status', False)
         if not uploader_enabled:
-            return False
+            return False, f"A aprovação automática está desativada para o uploader no tracker {self.tracker}."
 
         send_to_mod_queue = meta.get('modq', False) or meta.get('mq', False)
         if send_to_mod_queue:
             return False, "A flag --modq ou --mq foi usada, enviando para a fila de moderação."
-
-        return True
+        
+        return True, "Critérios de aprovação automática atendidos."
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
