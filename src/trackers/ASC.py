@@ -141,7 +141,7 @@ class ASC(COMMON):
                     "ja": "8", "pt": "5", "ru": "2"
                 }
                 original_lang_code = meta.get('original_language', '').lower()
-                data['idioma'] = idioma_map.get(original_lang_code, "6") #  '6' é 'Outros'
+                data['idioma'] = idioma_map.get(original_lang_code, "6")  # '6' é 'Outros'
 
             # Lógica para definir a qualidade
             if meta.get('type') == 'DISC':
@@ -168,13 +168,13 @@ class ASC(COMMON):
                             size = 0
 
                         if size > 66000000000:
-                            data['qualidade'] = "43" #  BD100
+                            data['qualidade'] = "43"  # BD100
                         elif size > 50000000000:
-                            data['qualidade'] = "42" #  BD66
+                            data['qualidade'] = "42"  # BD66
                         elif size > 25000000000:
-                            data['qualidade'] = "41" #  BD50
+                            data['qualidade'] = "41"  # BD50
                         else:
-                            data['qualidade'] = "40" #  BD25
+                            data['qualidade'] = "40"  # BD25
                     else:
                         # Se o usuário recusar, cancela o upload para este tracker
                         raise UploadException(f"Upload para o '{self.tracker}' cancelado pelo usuário devido à ausência do tipo de disco.", 'yellow')
@@ -208,11 +208,11 @@ class ASC(COMMON):
 
             is_original_pt = any(variant in meta.get('original_language', '').lower() for variant in pt_variants)
 
-            data['audio'] = "1"  #  Legendado
+            data['audio'] = "1"  # Legendado
             if has_pt and is_original_pt:
-                data['audio'] = "4"  #  Nacional
+                data['audio'] = "4"  # Nacional
             elif has_pt and other_langs_count > 0:
-                data['audio'] = "2"  #  Dual-Audio
+                data['audio'] = "2"  # Dual-Audio
 
             # Extensão
             if meta.get('is_disc') == "BDMV":
@@ -405,7 +405,7 @@ class ASC(COMMON):
             upload_url = f"{self.base_url}/enviar-anime.php"
         elif meta.get('category') == 'MOVIE':
             upload_url = f"{self.base_url}/enviar-filme.php"
-        else: #  Assume que é 'TV'
+        else:  # Assume que é 'TV'
             upload_url = f"{self.base_url}/enviar-series.php"
 
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
