@@ -267,8 +267,10 @@ class ASC(COMMON):
             codec_video = meta.get('video_codec')
             data['codecvideo'] = codec_video_map.get(codec_video, "16")
             if video_track and 'HDR' in video_track.get('HDR_Format_String', ''):
-                if codec_video == "HEVC": data['codecvideo'] = "28"
-                elif codec_video == "AVC": data['codecvideo'] = "32"
+                if codec_video == "HEVC":
+                    data['codecvideo'] = "28"
+                elif codec_video == "AVC":
+                    data['codecvideo'] = "32"
 
             # Screenshots e Trailer
             for i, img in enumerate(meta.get('image_list', [])[:4]):
@@ -279,7 +281,7 @@ class ASC(COMMON):
             return data
 
         except Exception as e:
-            console.print(f"[bold red]A preparação dos dados para o upload falhou. Isso geralmente ocorre devido a uma informação ausente ou inesperada no 'meta.json' deste torrent.[/bold red]")
+            console.print(f"[bold red]A preparação dos dados para o upload falhou. Isso geralmente ocorre devido a uma informação ausente ou inesperada no 'meta.json' deste torrent: {e}[/bold red]")
             raise
 
     async def _perform_search_and_parse(self, search_url, meta):
@@ -317,10 +319,14 @@ class ASC(COMMON):
                         badge_text = badge.text.strip()
                         badge_text_upper = badge_text.upper()
 
-                        if badge_text.isdigit() and len(badge_text) == 4: year = badge_text
-                        elif badge_text_upper in ['4K', '2160P', '1080P', '720P', 'BDRIP']: resolution = "2160p" if badge_text_upper == '4K' else badge_text
-                        elif any(term in badge_text_upper for term in video_codec_terms): video_codec = badge_text
-                        elif any(term in badge_text_upper for term in audio_codec_terms): audio_codec = badge_text
+                        if badge_text.isdigit() and len(badge_text) == 4:
+                            year = badge_text
+                        elif badge_text_upper in ['4K', '2160P', '1080P', '720P', 'BDRIP']:
+                            resolution = "2160p" if badge_text_upper == '4K' else badge_text
+                        elif any(term in badge_text_upper for term in video_codec_terms):
+                            video_codec = badge_text
+                        elif any(term in badge_text_upper for term in audio_codec_terms):
+                            audio_codec = badge_text
 
                     dupe_string = f"{name} {year} {resolution} {disk_type} {video_codec} {audio_codec}"
                     dupes.append(dupe_string)
