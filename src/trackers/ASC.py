@@ -5,7 +5,6 @@ import cli_ui
 from src.exceptions import UploadException
 from bs4 import BeautifulSoup
 from src.console import console
-from src.exceptions import *
 from .COMMON import COMMON
 from pymediainfo import MediaInfo
 
@@ -236,20 +235,34 @@ class ASC(COMMON):
 
             # Codecs
             cn = meta.get('clean_name', '').upper()
-            if "ATMOS" in cn: data['codecaudio'] = "43"
-            elif "DD+" in cn: data['codecaudio'] = "26"
-            elif "AAC" in cn: data['codecaudio'] = "10"
-            elif "AC-3" in cn or ("DD" in cn and "+" not in cn): data['codecaudio'] = "11"
-            elif "FLAC" in cn: data['codecaudio'] = "13"
-            elif "LPCM" in cn: data['codecaudio'] = "21"
-            elif "MPEG" in cn: data['codecaudio'] = "17"
-            elif "DTS:X" in cn: data['codecaudio'] = "25"
-            elif "DTS-HD MA" in cn: data['codecaudio'] = "24"
-            elif "DTS-HD" in cn: data['codecaudio'] = "23"
-            elif "DTS" in cn: data['codecaudio'] = "12"
-            elif "OPUS" in cn: data['codecaudio'] = "27"
-            elif "PCM" in cn: data['codecaudio'] = "28"
-            elif "TRUEHD" in cn: data['codecaudio'] = "29"
+            if "ATMOS" in cn:
+                data['codecaudio'] = "43"
+            elif "DD+" in cn:
+                data['codecaudio'] = "26"
+            elif "AAC" in cn:
+                data['codecaudio'] = "10"
+            elif "AC-3" in cn or ("DD" in cn and "+" not in cn):
+                data['codecaudio'] = "11"
+            elif "FLAC" in cn:
+                data['codecaudio'] = "13"
+            elif "LPCM" in cn:
+                data['codecaudio'] = "21"
+            elif "MPEG" in cn:
+                data['codecaudio'] = "17"
+            elif "DTS:X" in cn:
+                data['codecaudio'] = "25"
+            elif "DTS-HD MA" in cn:
+                data['codecaudio'] = "24"
+            elif "DTS-HD" in cn:
+                data['codecaudio'] = "23"
+            elif "DTS" in cn:
+                data['codecaudio'] = "12"
+            elif "OPUS" in cn:
+                data['codecaudio'] = "27"
+            elif "PCM" in cn:
+                data['codecaudio'] = "28"
+            elif "TRUEHD" in cn:
+                data['codecaudio'] = "29"
 
             codec_video = meta.get('video_codec')
             data['codecvideo'] = codec_video_map.get(codec_video, "16")
