@@ -264,9 +264,9 @@ class ASC(COMMON):
 
             return data
 
-            except Exception as e:
-                console.print(f"[bold red]A preparação dos dados para o upload falhou. Isso geralmente ocorre devido a uma informação ausente ou inesperada no 'meta.json' deste torrent.[/bold red]")
-                raise
+        except Exception as e:
+            console.print(f"[bold red]A preparação dos dados para o upload falhou. Isso geralmente ocorre devido a uma informação ausente ou inesperada no 'meta.json' deste torrent.[/bold red]")
+            raise
 
     async def _perform_search_and_parse(self, search_url, meta):
         dupes = []
