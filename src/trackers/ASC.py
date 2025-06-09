@@ -192,7 +192,7 @@ class ASC(COMMON):
             elif meta.get('mediainfo'):
                 mediainfo_tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
                 audio_tracks_raw = [{'language': t.get('Language')}
-                                        for t in mediainfo_tracks if t.get('@type') == 'Audio']
+                                    for t in mediainfo_tracks if t.get('@type') == 'Audio']
 
             pt_variants = ["pt", "portuguese", "português", "pt-br"]
 
