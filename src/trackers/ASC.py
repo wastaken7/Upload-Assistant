@@ -10,6 +10,8 @@ from .COMMON import COMMON
 from pymediainfo import MediaInfo
 
 class ASC(COMMON):
+
+
     def __init__(self, config):
         super().__init__(config)
         self.tracker = 'ASC'
