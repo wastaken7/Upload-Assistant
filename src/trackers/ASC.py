@@ -153,7 +153,7 @@ class ASC(COMMON):
                     data['qualidade'] = qualidade_map[disctype]
                 else:
                     # Se 'disctype' for nulo ou não reconhecido, pergunta ao usuário
-                    console.print(f"[bold yellow]Aviso: Não foi encontrado o tipo de disco.[/bold yellow]")
+                    console.print("[bold yellow]Aviso: Não foi encontrado o tipo de disco.[/bold yellow]")
                     use_size_fallback = cli_ui.ask_yes_no(
                         "Deseja definir o tipo de disco pelo tamanho do arquivo?",
                         default=True
@@ -449,7 +449,7 @@ class ASC(COMMON):
             response = self.session.post(upload_url, data=data, files=files, timeout=60)
 
             if "foi enviado com sucesso" in response.text:
-                console.print(f"[bold green]Upload para o ASC realizado com sucesso![/bold green]")
+                console.print("[bold green]Upload para o ASC realizado com sucesso![/bold green]")
 
                 try:
                     soup = BeautifulSoup(response.text, 'html.parser')
