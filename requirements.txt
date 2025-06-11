@@ -29,4 +29,3 @@ transmission_rpc
 psutil
 packaging
 tmdbsimple
-discord
