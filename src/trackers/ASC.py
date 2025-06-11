@@ -213,6 +213,8 @@ class ASC(COMMON):
                 data['audio'] = "4"  # Nacional
             elif has_pt and other_langs_count > 0:
                 data['audio'] = "2"  # Dual-Audio
+            elif has_pt and other_langs_count == 0:
+                data['audio'] = "3"  # Dublado
 
             # Extensão
             if meta.get('is_disc') == "BDMV":
