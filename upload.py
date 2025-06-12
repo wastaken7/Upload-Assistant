@@ -651,6 +651,7 @@ def check_python_version():
 
 
 async def main():
+    bot = None
     if use_discord and config['DISCORD'].get('discord_bot_token'):
         try:
             console.print("[cyan]Starting Discord bot initialization...")
