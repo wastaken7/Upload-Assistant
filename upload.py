@@ -640,6 +640,32 @@ def check_python_version():
 
 
 async def main():
+    bot = None
+    if use_discord and config['DISCORD'].get('discord_bot_token'):
+        try:
+            console.print("[cyan]Starting Discord bot initialization...")
+            intents = discord.Intents.default()
+            intents.message_content = True
+            bot = discord.Client(intents=intents)
+            token = config['DISCORD']['discord_bot_token']
+            await asyncio.wait_for(bot.login(token), timeout=10)
+            connect_task = asyncio.create_task(bot.connect())
+
+            try:
+                await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
+                console.print("[green]Bot is ready!")
+            except asyncio.TimeoutError:
+                console.print("[bold red]Bot failed to connect within timeout period.")
+                console.print("[yellow]Continuing without Discord integration...")
+                if 'connect_task' in locals():
+                    connect_task.cancel()
+        except discord.LoginFailure:
+            console.print("[bold red]Discord bot token is invalid. Please check your configuration.")
+        except discord.ClientException as e:
+            console.print(f"[bold red]Discord client exception: {e}")
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error during Discord bot initialization: {e}")
+
     try:
         await do_the_thing(base_dir)  # Ensure base_dir is correctly defined
     except asyncio.CancelledError:
