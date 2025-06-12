@@ -53,7 +53,10 @@ except Exception:
 from src.prep import Prep  # noqa E402
 client = Clients(config=config)
 parser = Args(config)
-use_discord = config['DISCORD'].get('use_discord', False)
+use_discord = False
+discord_config = config.get('discord')
+if discord_config:
+    use_discord = discord_config.get('use_discord', False)
 
 
 async def merge_meta(meta, saved_meta, path):
@@ -652,7 +655,7 @@ def check_python_version():
 
 async def main():
     bot = None
-    if use_discord and config['DISCORD'].get('discord_bot_token'):
+    if use_discord and 'DISCORD' in config and config['DISCORD'].get('discord_bot_token'):
         try:
             console.print("[cyan]Starting Discord bot initialization...")
             intents = discord.Intents.default()
