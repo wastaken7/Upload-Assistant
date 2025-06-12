@@ -686,7 +686,7 @@ async def main():
     except Exception as e:
         console.print(f"[bold red]Unexpected error: {e}[/bold red]")
     finally:
-        if 'bot' in locals():
+        if bot is not None:
             await bot.close()
         if 'connect_task' in locals():
             connect_task.cancel()
