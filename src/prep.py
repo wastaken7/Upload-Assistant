@@ -604,6 +604,9 @@ class Prep():
                     console.print(f"[bold red]{error_msg}[/bold red]")
                     raise RuntimeError(error_msg) from e
 
+        if meta.get('retrieved_aka', None) is not None:
+            meta['aka'] = meta['retrieved_aka']
+
         # if the quickie search and tmdb return didn't yield an IMDb ID, try again with prompts
         if meta.get('imdb_id') == 0:
             meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=meta.get('debug', False))
