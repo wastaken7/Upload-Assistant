@@ -388,6 +388,7 @@ def reset_terminal():
         if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
             try:
                 subprocess.run(["stty", "sane"], check=False)
+                subprocess.run(["stty", "erase", "^H"], check=False)  # explicitly restore backspace character
                 if hasattr(termios, 'tcflush'):
                     termios.tcflush(sys.stdin.fileno(), termios.TCIOFLUSH)
                 subprocess.run(["stty", "-ixon"], check=False)
