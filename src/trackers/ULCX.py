@@ -222,7 +222,11 @@ class ULCX():
             return
 
         tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        correct_language = await check_for_languages(meta, tracker)
+        if not correct_language:
+            console.print(f"[red]No valid language found for {tracker}. Skipping upload.[/red]")
+            meta['skipping'] = tracker
+            return
 
         dupes = []
         console.print("[yellow]Searching for existing torrents on ULCX...")

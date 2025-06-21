@@ -235,7 +235,11 @@ class CBR():
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
         tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        correct_language = await check_for_languages(meta, tracker)
+        if not correct_language:
+            console.print(f"[red]No valid language found for {tracker}. Skipping upload.[/red]")
+            meta['skipping'] = tracker
+            return
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],
