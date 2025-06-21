@@ -270,7 +270,7 @@ async def has_matching_hdr(file_hdr, target_hdr, meta, tracker=None):
             simplified.add("HDR")
         if "DV" in hdr_set or "DOVI" in hdr_set:
             simplified.add("DV")
-            if "framestor" in meta['tag'].lower():
+            if 'web' not in meta['type'].lower():
                 simplified.add("HDR")
             if tracker == "ANT":
                 simplified.add("HDR")
