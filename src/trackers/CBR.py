@@ -234,12 +234,10 @@ class CBR():
     async def search_existing(self, meta, disctype):
         dupes = []
         console.print(f"[yellow]Searching for existing torrents on {self.tracker}...")
+
         tracker = self.tracker
-        correct_language = await check_for_languages(meta, tracker)
-        if not correct_language:
-            console.print(f"[red]No valid language found for {tracker}. Skipping upload.[/red]")
-            meta['skipping'] = tracker
-            return
+        await check_for_languages(meta, tracker)
+
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId': meta['tmdb'],

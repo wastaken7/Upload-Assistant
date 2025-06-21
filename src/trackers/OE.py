@@ -353,11 +353,7 @@ class OE():
             return
 
         tracker = self.tracker
-        correct_language = await check_for_languages(meta, tracker)
-        if not correct_language:
-            console.print(f"[red]No valid language found for {tracker}. Skipping upload.[/red]")
-            meta['skipping'] = tracker
-            return
+        await check_for_languages(meta, tracker)
 
         dupes = []
         console.print("[yellow]Searching for existing torrents on OE...")
