@@ -56,12 +56,12 @@ parser = Args(config)
 
 # Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
 if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
-   try:
-       output = subprocess.check_output(['stty', '-a']).decode()
-       erase_key = re.search(r' erase = (\S+);', output).group(1)
-   except (IOError, OSError):
-       pass
-       
+    try:
+        output = subprocess.check_output(['stty', '-a']).decode()
+        erase_key = re.search(r' erase = (\S+);', output).group(1)
+    except (IOError, OSError):
+        pass
+
 use_discord = False
 discord_config = config.get('discord')
 if discord_config:
