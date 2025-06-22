@@ -83,6 +83,7 @@ class OTW():
             otw_name = otw_name.replace(meta["aka"], '')
         if meta['is_disc'] == "DVD":
             otw_name = otw_name.replace(source, f"{source} {resolution}")
+            otw_name = otw_name.replace(meta['audio'], f"{meta.get('video_codec', '')} {meta['audio']}", 1)
         if meta['category'] == "TV":
             years = []
 
