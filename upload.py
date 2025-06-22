@@ -53,6 +53,15 @@ except Exception:
 from src.prep import Prep  # noqa E402
 client = Clients(config=config)
 parser = Args(config)
+
+# Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
+if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+    try:
+        output = subprocess.check_output(['stty', '-a']).decode()
+        erase_key = re.search(r' erase = (\S+);', output).group(1)
+    except (IOError, OSError):
+        pass
+
 use_discord = False
 discord_config = config.get('discord')
 if discord_config:
@@ -388,7 +397,7 @@ def reset_terminal():
         if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
             try:
                 subprocess.run(["stty", "sane"], check=False)
-                subprocess.run(["stty", "erase", "^H"], check=False)  # explicitly restore backspace character
+                subprocess.run(["stty", "erase", erase_key], check=False)  # explicitly restore backspace character to original value
                 if hasattr(termios, 'tcflush'):
                     termios.tcflush(sys.stdin.fileno(), termios.TCIOFLUSH)
                 subprocess.run(["stty", "-ixon"], check=False)
