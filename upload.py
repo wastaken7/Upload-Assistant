@@ -591,7 +591,7 @@ async def do_the_thing(base_dir):
                 reset_terminal()
 
             bot = None
-            if use_discord and config['DISCORD'].get('discord_bot_token'):
+            if use_discord and config['DISCORD'].get('discord_bot_token') and not meta['debug']:
                 if (config.get('DISCORD', {}).get('only_unattended', False) and meta.get('unattended', False)) or not config.get('DISCORD', {}).get('only_unattended', False):
                     try:
                         console.print("[cyan]Starting Discord bot initialization...")
