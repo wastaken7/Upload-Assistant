@@ -43,7 +43,11 @@ class OTW():
         }.get(category_name, '0')
         return category_id
 
-    async def get_type_id(self, type):
+    async def get_type_id(self, type, meta):
+        if meta.get('is_disc') == "BDMV":
+            return '1'
+        elif meta.get('is_disc') and meta.get('is_disc') != "BDMV":
+            return '7'
         type_id = {
             'DISC': '1',
             'REMUX': '2',
@@ -106,7 +110,7 @@ class OTW():
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         modq = await self.get_flag(meta, 'modq')
-        type_id = await self.get_type_id(meta['type'])
+        type_id = await self.get_type_id(meta['type'], meta)
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
