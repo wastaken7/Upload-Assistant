@@ -1,3 +1,38 @@
+__version__ = "5.1.0"
+
+"""
+Changelog for version 5.1.0 (2025-06-22):
+
+## What's Changed
+* Updated get category function by @b-igu in https://github.com/Audionut/Upload-Assistant/pull/536
+* Set default value for FrameRate by @minicoz in https://github.com/Audionut/Upload-Assistant/pull/555
+* Update LCD.py by @a1Thiago in https://github.com/Audionut/Upload-Assistant/pull/562
+* DP - Fix: Subtitle language check ignores English by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/561
+* refactor id handling by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/548
+* make discord bot work by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/551
+* Added support for HD-Space by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/568
+* Added support for BrasilTracker by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/569
+* Added support for ASC by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/560
+* Properly restore  key to original value by @ppkhoa in https://github.com/Audionut/Upload-Assistant/pull/573
+* OTW - update naming for DVD and REMUX
+* Fixed an outlier is DVD source handling
+* Fixed the discord bot to only load when being used and skip when debug
+* Fixed existing image handling from PTP when not single files
+* Added feedback when trackers were being skipped because of language checks
+* Better dupe check handling for releases that only list DV when they're actually DV+HDR
+* Fixed manual tag handling when anime
+* Fixed only_id arg handling
+* Fixed an aka bug from the last release that could skip aka
+* Fixed double HC in HUNO name
+* Added language checking for CBR
+* Fixed only use tvdb if valid credentials
+
+## New Contributors
+* @minicoz made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/555
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.0.5.1...5.1.0
+"""
+
 __version__ = "5.0.5.1"
 
 """
