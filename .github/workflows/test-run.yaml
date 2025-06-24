@@ -172,22 +172,30 @@ jobs:
           
           # Read the first line of README.md
           FIRST_LINE=$(head -1 README.md)
+          echo "Current line: $FIRST_LINE"
           
-          # Extract existing badges using improved regex patterns
-          DOCKER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Create and publish a Docker image\][^\]]*\]\([^\)]*\)'  || echo "[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)")
+          # Extract existing badges using WORKING regex patterns
+          DOCKER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Create and publish a Docker image\][^]]*\]([^)]*)' || echo "[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)")
+          echo "Docker badge: $DOCKER_BADGE"
           
-          # Extract existing TAG badge (preserve it) - using improved pattern
-          TAG_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Test run ([^)]*[0-9]\+\.[0-9][^)]*)\][^\]]*\]\([^\)]*\)'  || echo "")
+          # Extract existing TAG badge (preserve it) - using WORKING pattern
+          TAG_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Test run ([^)]*[0-9][0-9]*\.[0-9][^)]*)\][^]]*\]([^)]*)' || echo "")
+          echo "Tag badge: $TAG_BADGE"
           
           # Create new MASTER badge
           MASTER_BADGE="[![Test run (Master Branch)](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=master&label=Test%20run%20(Master%20Branch%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3Amaster)"
+          echo "Master badge: $MASTER_BADGE"
           
           # Combine badges (keep existing TAG badge if present)
           if [ -n "$TAG_BADGE" ]; then
             NEW_FIRST_LINE="$DOCKER_BADGE $MASTER_BADGE $TAG_BADGE"
+            echo "Including TAG badge in output"
           else
             NEW_FIRST_LINE="$DOCKER_BADGE $MASTER_BADGE"
+            echo "No TAG badge found to preserve"
           fi
+          
+          echo "New line: $NEW_FIRST_LINE"
           
           # Update the first line
           echo "$NEW_FIRST_LINE" > README.md.new
@@ -211,22 +219,30 @@ jobs:
           
           # Read the first line of README.md
           FIRST_LINE=$(head -1 README.md)
+          echo "Current line: $FIRST_LINE"
           
-          # Extract existing badges using improved regex patterns
-          DOCKER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Create and publish a Docker image\][^\]]*\]\([^\)]*\)'  || echo "[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)")
+          # Extract existing badges using WORKING regex patterns
+          DOCKER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Create and publish a Docker image\][^]]*\]([^)]*)' || echo "[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)")
+          echo "Docker badge: $DOCKER_BADGE"
           
-          # Extract existing MASTER badge (preserve it) - using improved pattern
-          MASTER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Test run (Master Branch)\][^\]]*\]\([^\)]*\)'  || echo "")
+          # Extract existing MASTER badge (preserve it) - using WORKING pattern
+          MASTER_BADGE=$(echo "$FIRST_LINE" | grep -o '\[\!\[Test run (Master Branch)\][^]]*\]([^)]*)' || echo "")
+          echo "Master badge: $MASTER_BADGE"
           
           # Create new TAG badge
           TAG_BADGE="[![Test run (${TAG_NAME})](https://img.shields.io/github/actions/workflow/status/Audionut/Upload-Assistant/test-run.yaml?branch=${TAG_NAME}&label=Test%20run%20(${TAG_NAME}%20${DATE_STR// /%20}))](https://github.com/Audionut/Upload-Assistant/actions/workflows/test-run.yaml?query=branch%3A${TAG_NAME})"
+          echo "New Tag badge: $TAG_BADGE"
           
           # Combine badges (keep existing MASTER badge if present)
           if [ -n "$MASTER_BADGE" ]; then
             NEW_FIRST_LINE="$DOCKER_BADGE $MASTER_BADGE $TAG_BADGE"
+            echo "Including MASTER badge in output"
           else
             NEW_FIRST_LINE="$DOCKER_BADGE $TAG_BADGE"
+            echo "No MASTER badge found to preserve"
           fi
+          
+          echo "New line: $NEW_FIRST_LINE"
           
           # Update the first line
           echo "$NEW_FIRST_LINE" > README.md.new
