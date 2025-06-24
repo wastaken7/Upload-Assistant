@@ -86,6 +86,8 @@ class OTW():
             otw_name = otw_name.replace(source, f"{source} {resolution}")
         if meta['is_disc'] == "DVD" or type == "REMUX":
             otw_name = otw_name.replace(meta['audio'], f"{meta.get('video_codec', '')} {meta['audio']}", 1)
+        elif meta['is_disc'] == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            otw_name = otw_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
         if meta['category'] == "TV":
             years = []
 
