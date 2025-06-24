@@ -25,17 +25,25 @@ jobs:
 
       - name: Install Oxipng
         run: |
-          OXIPNG_LATEST_URL=$(curl -s "https://api.github.com/repos/shssoichiro/oxipng/releases/latest" | grep -oP '"browser_download_url": "\K(.*x86_64-unknown-linux-musl.tar.gz)(?=")')
-          if [ -z "$OXIPNG_LATEST_URL" ]; then
+          # Get the latest release info from the correct repository
+          RELEASE_INFO=$(curl -s "https://api.github.com/repos/oxipng/oxipng/releases/latest")
+          
+          # Extract the download URL using jq (more reliable than grep)
+          OXIPNG_LATEST_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("x86_64-unknown-linux-musl.tar.gz")) | .browser_download_url')
+          
+          if [ -z "$OXIPNG_LATEST_URL" ] || [ "$OXIPNG_LATEST_URL" = "null" ]; then
             echo "Failed to find latest Oxipng release URL for x86_64-unknown-linux-musl"
+            echo "Available assets:"
+            echo "$RELEASE_INFO" | jq -r '.assets[].name'
             exit 1
           fi
+          
           echo "Downloading Oxipng from $OXIPNG_LATEST_URL"
           curl -L -o oxipng.tar.gz "$OXIPNG_LATEST_URL"
           tar -xzf oxipng.tar.gz
-          # The extracted folder name might include the version, e.g., oxipng-vX.Y.Z-x86_64-unknown-linux-musl
-          # Find the binary within the extracted folder and move it
-          sudo mv oxipng-*/oxipng /usr/local/bin/
+          
+          # Find the oxipng binary and move it
+          find . -name "oxipng" -type f -executable | head -1 | xargs -I {} sudo mv {} /usr/local/bin/
           sudo chmod +x /usr/local/bin/oxipng
           oxipng --version # Verify installation
 
