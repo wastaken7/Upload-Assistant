@@ -9,6 +9,7 @@ import bencodepy
 import httpx
 import re
 import cli_ui
+import glob
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
@@ -72,6 +73,15 @@ class BHD():
         if os.path.exists(torrent_file):
             open_torrent = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb')
             files['file'] = open_torrent.read()
+        base_dir = meta['base_dir']
+        uuid = meta['uuid']
+        specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        nfo_files = glob.glob(specified_dir_path)
+        nfo_file = None
+        if nfo_files:
+            nfo_file = open(nfo_files[0], 'rb')
+        if nfo_file:
+            files['nfo_file'] = ("nfo_file.nfo", nfo_file, "text/plain")
 
         data = {
             'name': bhd_name,
