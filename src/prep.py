@@ -660,16 +660,26 @@ class Prep():
         if tvdb_api and tvdb_token and meta.get('original_language', "") == "en":
             if meta.get('tvdb_episode_data') and meta.get('tvdb_episode_data').get('series_name') != "" and meta.get('title') != meta.get('tvdb_episode_data').get('series_name'):
                 series_name = meta.get('tvdb_episode_data').get('series_name', '')
+                if meta['debug']:
+                    console.print(f"[yellow]tvdb series name: {series_name}")
+                year_match = re.search(r'\b(19|20)\d{2}\b', series_name)
+                if year_match:
+                    extracted_year = year_match.group(0)
+                    meta['search_year'] = extracted_year
+                    series_name = re.sub(r'\s*\b(19|20)\d{2}\b\s*', '', series_name).strip()
                 series_name = series_name.replace('(', '').replace(')', '').strip()
                 meta['title'] = series_name
-                if meta['debug']:
-                    console.print(f"[yellow]tvdb series name: {meta.get('tvdb_episode_data').get('series_name')}")
             elif meta.get('tvdb_series_name') and meta.get('tvdb_series_name') != "" and meta.get('title') != meta.get('tvdb_series_name'):
                 series_name = meta.get('tvdb_series_name')
+                if meta['debug']:
+                    console.print(f"[yellow]tvdb series name: {series_name}")
+                year_match = re.search(r'\b(19|20)\d{2}\b', series_name)
+                if year_match:
+                    extracted_year = year_match.group(0)
+                    meta['search_year'] = extracted_year
+                    series_name = re.sub(r'\s*\b(19|20)\d{2}\b\s*', '', series_name).strip()
                 series_name = series_name.replace('(', '').replace(')', '').strip()
                 meta['title'] = series_name
-                if meta['debug']:
-                    console.print(f"[yellow]tvdb series name: {meta.get('tvdb_series_name')}")
 
         # bluray.com data if config
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
