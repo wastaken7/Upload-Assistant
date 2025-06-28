@@ -157,7 +157,7 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 try:
                     ptp = PTP(config=config)
-                    groupID = await ptp.get_group_by_imdb(meta['imdb'])
+                    groupID = meta.get('ptp_groupID', None)
                     ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
                     try:
                         await ptp.upload(meta, ptpUrl, ptpData, disctype)

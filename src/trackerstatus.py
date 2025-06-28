@@ -84,6 +84,7 @@ async def process_all_trackers(meta):
                 elif tracker_name == "PTP":
                     ptp = PTP(config=config)
                     groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
+                    meta['ptp_groupID'] = groupID
                     dupes = await ptp.search_existing(groupID, local_meta, disctype)
 
                 if ('skipping' not in local_meta or local_meta['skipping'] is None) and tracker_name != "TL":
