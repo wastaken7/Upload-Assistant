@@ -185,6 +185,8 @@ async def process_all_trackers(meta):
             upload_status = 'Yes' if status['upload'] else 'No'
             console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
         console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
+        print()
+        console.print("[bold red]DEBUG MODE does not upload to sites")
 
     meta['tracker_status'] = tracker_status
     return successful_trackers
