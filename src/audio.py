@@ -155,7 +155,8 @@ async def get_audio_v2(mi, meta, bdinfo):
 
                         if isinstance(audio_language, str):
                             audio_language = audio_language.strip().lower()
-                            if audio_language and audio_language != meta.get('original_language').lower() and not audio_language.startswith("en"):
+                            orig_lang = meta.get('original_language', '').lower()
+                            if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en"):
                                 console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                                 time.sleep(5)
 
