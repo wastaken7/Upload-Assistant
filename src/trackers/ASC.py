@@ -3,7 +3,6 @@ import os
 import re
 import requests
 import cli_ui
-import unicodedata
 from datetime import datetime
 from src.exceptions import UploadException
 from bs4 import BeautifulSoup
