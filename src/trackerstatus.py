@@ -162,10 +162,10 @@ async def process_all_trackers(meta):
             elif status['skipped']:
                 skipped_trackers.append(tracker_name)
 
-        if passed_trackers:
-            console.print(f"[bold green]Trackers passed all checks: [bold yellow]{', '.join(passed_trackers)}")
         if dupe_trackers:
             console.print(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow]. [red]Aborting. If this is not a dupe, or you would like to upload anyways, pass --skip-dupe-check")
+        if passed_trackers:
+            console.print(f"[bold green]Trackers passed all checks: [bold yellow]{', '.join(passed_trackers)}")
     else:
         passed_trackers = []
         for tracker_name in meta['trackers']:
