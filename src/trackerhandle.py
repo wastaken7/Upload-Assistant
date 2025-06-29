@@ -38,24 +38,6 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
     tracker_setup = TRACKER_SETUP(config=config)
     enabled_trackers = tracker_setup.trackers_enabled(meta)
 
-    upload_yes_trackers = []
-    upload_no_trackers = []
-
-    for tracker in enabled_trackers:
-        tracker = tracker.replace(" ", "").upper().strip()
-        if tracker != "MANUAL":
-            tracker_status = meta.get('tracker_status', {})
-            upload_status = tracker_status.get(tracker, {}).get('upload', False)
-            if upload_status:
-                upload_yes_trackers.append(tracker)
-            else:
-                upload_no_trackers.append(tracker)
-
-    if upload_yes_trackers:
-        console.print(f"[green]Uploading to: {', '.join(upload_yes_trackers)}")
-    if upload_no_trackers:
-        console.print(f"[red]Not uploading to: {', '.join(upload_no_trackers)}")
-
     async def process_single_tracker(tracker):
         if meta['name'].endswith('DUPE?'):
             meta['name'] = meta['name'].replace(' DUPE?', '')
