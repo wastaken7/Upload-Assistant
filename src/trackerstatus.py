@@ -27,7 +27,6 @@ async def process_all_trackers(meta):
         local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
         local_tracker_status = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False}
         disctype = local_meta.get('disctype', None)
-        console.print(f"\n[bold yellow]Processing Tracker: {tracker_name}[/bold yellow]")
 
         if local_meta['name'].endswith('DUPE?'):
             local_meta['name'] = local_meta['name'].replace(' DUPE?', '')
