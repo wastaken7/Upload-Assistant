@@ -537,9 +537,6 @@ class ASC(COMMON):
             raise
 
     async def upload(self, meta, disctype):
-        if meta.get('anon'):
-            console.print(f"[yellow]Aviso: Você solicitou um upload anônimo, mas o tracker {self.tracker} não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
-
         await COMMON(config=self.config).edit_torrent(meta, self.tracker, self.source_flag)
 
         data = await self.prepare_form_data(meta)
