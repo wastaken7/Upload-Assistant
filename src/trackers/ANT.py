@@ -125,7 +125,7 @@ class ANT():
                         "error": f"Unexpected status code: {response.status_code}",
                         "response_content": response.text  # or use response.json() if JSON is expected
                     }
-                console.print(response_data)
+                meta['tracker_status'][self.tracker]['status_message'] = response_data
             else:
                 console.print("[cyan]Request Data:")
                 console.print(data)

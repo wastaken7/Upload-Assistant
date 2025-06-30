@@ -31,6 +31,7 @@ from src.add_comparison import add_comparison
 from src.get_name import get_name
 from src.get_desc import gen_desc
 from discordbot import send_discord_notification, send_upload_status_notification
+from cogs.redaction import clean_meta_for_export
 if os.name == "posix":
     import termios
 
@@ -99,15 +100,14 @@ async def print_progress(message, interval=10):
     """Prints a progress message every `interval` seconds until cancelled."""
     try:
         while True:
-            console.print(message)
             await asyncio.sleep(interval)
+            console.print(message)
     except asyncio.CancelledError:
         pass
 
 
 async def process_meta(meta, base_dir, bot=None):
     """Process the metadata for each queued path."""
-
     if use_discord and bot:
         await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False), meta=meta)
 
@@ -617,6 +617,7 @@ async def do_the_thing(base_dir):
                 console.print(f"[red]Exception: '{path}': {e}")
                 reset_terminal()
 
+            sanitize_meta = config['DEFAULT'].get('sanitize_meta', True)
             bot = None
             if use_discord and config['DISCORD'].get('discord_bot_token') and not meta['debug']:
                 if (config.get('DISCORD', {}).get('only_unattended', False) and meta.get('unattended', False)) or not config.get('DISCORD', {}).get('only_unattended', False):
@@ -631,7 +632,7 @@ async def do_the_thing(base_dir):
 
                         try:
                             await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
-                            console.print("[green]Bot is ready!")
+                            console.print("[green]Discord Bot is ready!")
                         except asyncio.TimeoutError:
                             console.print("[bold red]Bot failed to connect within timeout period.")
                             console.print("[yellow]Continuing without Discord integration...")
@@ -662,6 +663,8 @@ async def do_the_thing(base_dir):
                             await save_processed_file(log_file, path)
 
             else:
+                console.print()
+                console.print("[yellow]Processing uploads to trackers.....")
                 await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
                 if use_discord and bot:
                     await send_upload_status_notification(config, bot, meta)
@@ -675,6 +678,12 @@ async def do_the_thing(base_dir):
                         if log_file:
                             await save_processed_file(log_file, path)
                     await asyncio.sleep(0.1)
+                    if sanitize_meta:
+                        try:
+                            await asyncio.sleep(0.2)  # We can't race the status prints
+                            meta = await clean_meta_for_export(meta)
+                        except Exception as e:
+                            console.print(f"[red]Error cleaning meta for export: {e}")
                     await cleanup()
                     gc.collect()
                     reset_terminal()
@@ -691,8 +700,17 @@ async def do_the_thing(base_dir):
             if use_discord and bot:
                 await send_discord_notification(config, bot, f"Finsished uploading: {meta['path']}", debug=meta.get('debug', False), meta=meta)
 
+            if sanitize_meta:
+                try:
+                    await asyncio.sleep(0.3)  # We can't race the status prints
+                    meta = await clean_meta_for_export(meta)
+                except Exception as e:
+                    console.print(f"[red]Error cleaning meta for export: {e}")
+
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}")
+        if sanitize_meta:
+            meta = await clean_meta_for_export(meta)
         console.print(traceback.format_exc())
         reset_terminal()
 
