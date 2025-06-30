@@ -148,7 +148,7 @@ class BHD():
                     else:
                         console.print("[yellow]No valid details link found in status_message.")
 
-                meta['tracker_status'][self.tracker]['status_message'] = response.json()
+                meta['tracker_status'][self.tracker]['status_message'] = response
             except Exception as e:
                 console.print("It may have uploaded, go check")
                 console.print(f"Error: {e}")
