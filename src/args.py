@@ -166,7 +166,7 @@ class Args():
         parser.add_argument('-dm', '--delete-meta', action='store_true', required=False, dest='delete_meta', help="Delete only meta.json from tmp directory")
         parser.add_argument('-dtmp', '--delete-tmp', action='store_true', required=False, dest='delete_tmp', help="Delete tmp directory for the working file/folder")
         parser.add_argument('-cleanup', '--cleanup', action='store_true', required=False, help="Clean up tmp directory")
-        parser.add_argument('-fl', '--freeleech', nargs=1, required=False, help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values", default=0, dest="freeleech")
+        parser.add_argument('-fl', '--freeleech', nargs=1, required=False, help="Freeleech (Percentage optional). Any value 1-100 works, but site search is limited to certain values", default=100, dest="freeleech")
         parser.add_argument('--infohash', nargs=1, required=False, help="V1 Info Hash")
         args, before_args = parser.parse_known_args(input)
         args = vars(args)
