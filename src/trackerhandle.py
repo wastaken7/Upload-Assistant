@@ -71,8 +71,7 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     return
                 status = meta.get('tracker_status', {}).get(tracker_class.tracker, {})
                 if 'status_message' in status and "data error" not in str(status['status_message']):
-                    if not meta.get('race', False):
-                        await client.add_to_client(meta, tracker_class.tracker)
+                    await client.add_to_client(meta, tracker_class.tracker)
 
         elif tracker in other_api_trackers:
             tracker_status = meta.get('tracker_status', {})
@@ -88,10 +87,12 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                         return
                     if tracker == 'SN':
                         await asyncio.sleep(16)
-                    await client.add_to_client(meta, tracker_class.tracker)
                 except Exception:
                     console.print(traceback.format_exc())
                     return
+                status = meta.get('tracker_status', {}).get(tracker_class.tracker, {})
+                if 'status_message' in status and "data error" not in str(status['status_message']):
+                    await client.add_to_client(meta, tracker_class.tracker)
 
         elif tracker in http_trackers:
             tracker_status = meta.get('tracker_status', {})
@@ -105,10 +106,12 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         return
-                    await client.add_to_client(meta, tracker_class.tracker)
                 except Exception:
                     console.print(traceback.format_exc())
                     return
+                status = meta.get('tracker_status', {}).get(tracker_class.tracker, {})
+                if 'status_message' in status and "data error" not in str(status['status_message']):
+                    await client.add_to_client(meta, tracker_class.tracker)
 
         elif tracker == "MANUAL":
             if meta['unattended']:

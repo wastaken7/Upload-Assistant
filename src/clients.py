@@ -1716,7 +1716,8 @@ class Clients():
                         for tracker in best_match['tracker_urls']:
                             if tracker.get('id') and tracker.get('tracker_id'):
                                 meta[tracker['id']] = tracker['tracker_id']
-                                console.print(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
+                                if meta['debug']:
+                                    console.print(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
 
                     if not meta.get('base_torrent_created'):
                         default_torrent_client = self.config['DEFAULT']['default_torrent_client']
