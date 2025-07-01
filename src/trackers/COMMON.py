@@ -49,8 +49,6 @@ class COMMON():
             Torrent.copy(new_torrent).write(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent", overwrite=True)
 
     async def process_desc_language(self, meta, desc, tracker):
-        mal = meta.get('manual_audio_language', False)
-        msl = meta.get('manual_subtitle_language', False)
         if not meta['is_disc'] == "BDMV":
             def process_languages(tracks):
                 audio_languages = []
@@ -60,31 +58,29 @@ class COMMON():
                     if track.get('@type') == 'Audio':
                         language = track.get('Language')
                         if not language or language is None:
-                            if not mal or mal is None:
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                    audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
-                                    if audio_lang:
-                                        audio_languages.append(audio_lang)
-                                    else:
-                                        audio_languages = None
-                                        meta['tracker_status'][tracker]['skip_upload'] = True
+                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
+                                if audio_lang:
+                                    audio_languages.append(audio_lang)
                                 else:
+                                    audio_languages = None
                                     meta['tracker_status'][tracker]['skip_upload'] = True
+                            else:
+                                meta['tracker_status'][tracker]['skip_upload'] = True
                         else:
                             audio_languages = None
                     if track.get('@type') == 'Text':
                         language = track.get('Language')
                         if not language or language is None:
-                            if not msl or msl is None:
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                    subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
-                                    if subtitle_lang:
-                                        subtitle_languages.append(subtitle_lang)
-                                    else:
-                                        subtitle_languages = None
-                                        meta['tracker_status'][tracker]['skip_upload'] = True
+                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
+                                if subtitle_lang:
+                                    subtitle_languages.append(subtitle_lang)
                                 else:
+                                    subtitle_languages = None
                                     meta['tracker_status'][tracker]['skip_upload'] = True
+                            else:
+                                meta['tracker_status'][tracker]['skip_upload'] = True
                         else:
                             subtitle_languages = None
 
