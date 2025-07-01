@@ -108,7 +108,7 @@ class THR():
                             console.print(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
-                            console.print(f'[green]Successfully Uploaded at: {response.url}')
+                            meta['tracker_status'][self.tracker]['status_message'] = response.url
                             return True
                         else:
                             console.print(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")

@@ -26,6 +26,7 @@ class ITT():
         self.source_flag = 'ItaTorrents'
         self.upload_url = 'https://itatorrents.xyz/api/torrents/upload'
         self.search_url = 'https://itatorrents.xyz/api/torrents/filter'
+        self.torrent_url = 'https://itatorrents.xyz/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass
@@ -149,9 +150,10 @@ class ITT():
         if meta['debug'] is False:
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             try:
-                console.print(response.json())
+                meta['tracker_status'][self.tracker]['status_message'] = response.json()
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
+                meta['tracker_status'][self.tracker]['torrent_id'] = t_id
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://itatorrents.xyz/torrents/" + t_id)
             except Exception:
                 console.print("It may have uploaded, go check")

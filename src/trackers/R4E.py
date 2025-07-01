@@ -90,7 +90,7 @@ class R4E():
             response = requests.post(url=url, files=files, data=data, headers=headers)
             try:
 
-                console.print(response.json())
+                meta['tracker_status'][self.tracker]['status_message'] = response.json()
             except Exception:
                 console.print("It may have uploaded, go check")
                 return

@@ -188,6 +188,12 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     tracker_class = tracker_class_map[tracker](config=config)
                     torrent_url = tracker_class.torrent_url
                     console.print(f"[green]{torrent_url}{status['torrent_id']}[/green]")
+                else:
+                    for tracker, status in meta.get('tracker_status', {}).items():
+                        if 'status_message' in status:
+                            print(redact_private_info(status['status_message']))
+                        else:
+                            console.print(f"{tracker} gave no useful message.")
         except Exception as e:
-            console.print(f"[red]Error printing tracker links: {e}[/red]")
+            console.print(f"[red]Error printing {tracker} data: {e}[/red]")
             pass

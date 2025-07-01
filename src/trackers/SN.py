@@ -111,7 +111,7 @@ class SN():
 
             try:
                 if response.json().get('success'):
-                    console.print(response.json())
+                    meta['tracker_status'][self.tracker]['status_message'] = response.json()['link']
                     if 'link' in response.json():
                         await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.json()['link']))
                     else:
