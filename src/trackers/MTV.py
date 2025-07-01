@@ -162,11 +162,9 @@ class MTV():
                         await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)
                     else:
                         if "authkey.php" in response.url:
-                            console.print("[red]No DL link in response, It may have uploaded, check manually.")
+                            meta['tracker_status'][self.tracker]['status_message'] = "No DL link in response, It may have uploaded, check manually."
                         else:
-                            console.print("[red]Upload Failed. Either you are not logged in......")
-                            console.print("[red]You are hitting this site bug: https://www.morethantv.me/forum/thread/3338?")
-                            console.print("[red]Or you hit some other error with the torrent upload.")
+                            meta['tracker_status'][self.tracker]['status_message'] = "You are probably hitting this site bug: https://www.morethantv.me/forum/thread/3338?"
                 except Exception:
                     console.print("[red]It may have uploaded, check manually.")
                     print(traceback.print_exc())
