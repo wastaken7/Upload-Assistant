@@ -69,6 +69,11 @@ class ULCX():
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'], meta['type'])
         await common.unit3d_edit_desc(meta, self.tracker, self.signature, comparison=True)
+        should_skip = meta['tracker_status'][self.tracker].get('skip_upload', False)
+        if should_skip:
+            if meta['debug']:
+                console.print("[red]Skipping upload due to failed language checks.[/red]")
+            return
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         name, region_id, distributor_id = await self.edit_name(meta, region_id, distributor_id)
