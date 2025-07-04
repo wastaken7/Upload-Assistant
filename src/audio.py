@@ -133,43 +133,43 @@ async def get_audio_v2(mi, meta, bdinfo):
         if meta.get('dual_audio', False):
             dual = "Dual-Audio"
         else:
-            if not meta.get('original_language', '').startswith('en'):
-                eng, orig = False, False
-                try:
-                    for t in mi['media']['track']:
-                        if t.get('@type') != "Audio":
-                            continue
+            # if not meta.get('original_language', '').startswith('en'):
+            eng, orig = False, False
+            try:
+                for t in mi['media']['track']:
+                    if t.get('@type') != "Audio":
+                        continue
 
-                        audio_language = t.get('Language', '')
+                    audio_language = t.get('Language', '')
 
-                        if isinstance(audio_language, str):
-                            if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
-                                eng = True
+                    if isinstance(audio_language, str):
+                        if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
+                            eng = True
 
-                            if not audio_language.startswith("en") and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
-                                orig = True
+                        if audio_language and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
+                            orig = True
 
-                            variants = ['zh', 'cn', 'cmn', 'no', 'nb']
-                            if any(audio_language.startswith(var) for var in variants) and any(meta.get('original_language').startswith(var) for var in variants):
-                                orig = True
+                        variants = ['zh', 'cn', 'cmn', 'no', 'nb']
+                        if any(audio_language.startswith(var) for var in variants) and any(meta.get('original_language').startswith(var) for var in variants):
+                            orig = True
 
-                        if isinstance(audio_language, str):
-                            audio_language = audio_language.strip().lower()
-                            orig_lang = meta.get('original_language', '').lower()
-                            if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en"):
-                                console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
-                                time.sleep(5)
+                    if isinstance(audio_language, str):
+                        audio_language = audio_language.strip().lower()
+                        orig_lang = meta.get('original_language', '').lower()
+                        if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en"):
+                            console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
+                            time.sleep(5)
 
-                        if not audio_language:
-                            audio_language = "und"
+                    if not audio_language:
+                        audio_language = "und"
 
-                    if eng and orig:
-                        dual = "Dual-Audio"
-                    elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
-                        dual = "Dubbed"
-                except Exception:
-                    console.print(traceback.format_exc())
-                    pass
+                if eng and orig:
+                    dual = "Dual-Audio"
+                elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
+                    dual = "Dubbed"
+            except Exception:
+                console.print(traceback.format_exc())
+                pass
 
         for t in tracks:
             if t.get('@type') != "Audio":
