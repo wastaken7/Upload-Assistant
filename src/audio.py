@@ -135,7 +135,7 @@ async def get_audio_v2(mi, meta, bdinfo):
             dual = "Dual-Audio"
         else:
             # if not meta.get('original_language', '').startswith('en'):
-            eng, orig = False, False
+            eng, orig, non_en_non_commentary = False, False, False
             try:
                 for t in mi['media']['track']:
                     if t.get('@type') != "Audio":
