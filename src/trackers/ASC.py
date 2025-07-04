@@ -3,12 +3,12 @@ import os
 import re
 import requests
 import cli_ui
+from pymediainfo import MediaInfo
 from datetime import datetime
 from src.exceptions import UploadException
 from bs4 import BeautifulSoup
 from src.console import console
 from .COMMON import COMMON
-from pymediainfo import MediaInfo
 
 
 class ASC(COMMON):
@@ -18,6 +18,7 @@ class ASC(COMMON):
         self.source_flag = 'ASC'
         self.banned_groups = [""]
         self.base_url = "https://cliente.amigos-share.club"
+        self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
@@ -273,167 +274,221 @@ class ASC(COMMON):
         return codec_id
 
     async def get_auto_description(self, meta):
-        if not meta.get('imdb_id'):
-            return await self.fallback_description(meta)
-
         url_gerador_desc = f"{self.base_url}/search.php"
         payload = {
             'imdb': meta.get('imdb_info', {}).get('imdbID', ''),
-            'layout': '2'
+            'layout': self.layout
         }
 
         try:
-            cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-            if os.path.exists(cookie_file):
-                self.session.cookies.update(await self.parseCookieFile(cookie_file))
+            await self.load_cookies(meta)
 
             response = self.session.post(url_gerador_desc, data=payload, timeout=20)
             response.raise_for_status()
 
             json_data = response.json()
+            auto_description = await self.build_description(json_data, meta)
 
-            auto_description = self.build_description(json_data)
-
-            if not auto_description:
-                raise ValueError("Não foi possível construir a descrição automática.")
-
-            final_description = f"{auto_description}\n\n{self.signature}"
-            return final_description.strip()
+            return auto_description.strip()
 
         except Exception as e:
             console.print(f"[bold red]Ocorreu um erro no processo de descrição automática: {e}[/bold red]")
-            console.print("[yellow]Usando o método de descrição manual como fallback.[/yellow]")
-            return await self.fallback_description(meta)
 
-    def build_description(self, json_data):
-        asc_data = json_data.get('ASC')
-        if not asc_data:
-            return None
-
-        barrinhas = {key: value for key, value in asc_data.items() if key.startswith('BARRINHA_')}
-
-        titulo = asc_data.get('Title', 'Título não disponível')
-        poster_path = asc_data.get('poster_path', '')
-        sinopse = asc_data.get('overview', 'Sinopse não disponível.')
-
-        duracao = asc_data.get('Runtime', 'N/A')
-        produtora = asc_data.get('Production', 'N/A')
-        pais = asc_data.get('Country', 'N/A')
-        generos = asc_data.get('Genre', 'N/A')
-        data_lancamento_str = asc_data.get('Released', '')
-
-        try:
-            data_lancamento_formatada = datetime.strptime(data_lancamento_str, '%Y-%m-%d').strftime('%d/%m/%Y')
-        except (ValueError, TypeError):
-            data_lancamento_formatada = 'N/A'
-
-        elenco_lista = asc_data.get('cast', [])
-
-        imdb_id = asc_data.get('imdbID', '')
-        ratings_lista = asc_data.get('Ratings', [])
-        ratings = {rating.get('Source'): rating.get('Value') for rating in ratings_lista}
-
-        imdb_rating = ratings.get('Internet Movie Database', 'N/A')
-        rotten_rating = ratings.get('Rotten Tomatoes', 'N/A')
-        metacritic_rating = ratings.get('Metacritic', 'N/A')
-
-        description = "[center]\n"
-
-        if barrinhas.get('BARRINHA_APRESENTA'):
-            description += f"[img]{barrinhas['BARRINHA_APRESENTA']}[/img]\n"
-            description += f"[size=3]{titulo}[/size]\n\n"
-
-        if barrinhas.get('BARRINHA_CAPA') and poster_path:
-            description += f"[img]{barrinhas['BARRINHA_CAPA']}[/img]\n"
-            description += f"[img]{poster_path}[/img]\n\n"
-
-        if barrinhas.get('BARRINHA_SINOPSE') and sinopse:
-            description += f"[img]{barrinhas['BARRINHA_SINOPSE']}[/img]\n"
-            description += f"{sinopse}\n\n"
-
-        if barrinhas.get('BARRINHA_FICHA_TECNICA'):
-            description += f"[img]{barrinhas['BARRINHA_FICHA_TECNICA']}[/img]\n"
-            description += f"Tempo: {duracao}\n"
-            description += f"Produtora: {produtora}\n"
-            description += f"País de Origem: {pais}\n"
-            description += f"Gêneros: {generos}\n"
-            description += f"Data de Lançamento: {data_lancamento_formatada}\n\n"
-
-        if barrinhas.get('BARRINHA_ELENCO') and elenco_lista:
-            description += f"[img]{barrinhas['BARRINHA_ELENCO']}[/img]\n"
-            for ator in elenco_lista[:5]:
-                ator_id = ator.get('id')
-                profile_path = ator.get('profile_path')
-                nome = ator.get('name')
-                personagem = ator.get('character')
-
-                if all([ator_id, profile_path, nome, personagem]):
-                    tmdb_url = f"https://www.themoviedb.org/person/{ator_id}?language=pt-BR"
-                    foto_url = f"https://image.tmdb.org/t/p/w45{profile_path}"
-
-                    description += f"[url={tmdb_url}][img]{foto_url}[/img][/url]\n"
-                    description += f"[size=2][b]({nome}) como {personagem}[/b][/size]\n\n"
-
-        if barrinhas.get('BARRINHA_INFORMACOES'):
-            description += f"[img]{barrinhas['BARRINHA_INFORMACOES']}[/img]\n"
-            imdb_icon = "https://i.postimg.cc/Pr8Gv4RQ/IMDB.png"
-            rotten_icon = "https://i.postimg.cc/rppL76qC/rotten.png"
-            metacritic_icon = "https://i.postimg.cc/SKkH5pNg/Metacritic45x45.png"
-
-            if imdb_id and imdb_rating != 'N/A':
-                imdb_page_url = f"https://www.imdb.com/title/{imdb_id}"
-                description += f"[img]{imdb_icon}[/img]\n[url={imdb_page_url}][b]{imdb_rating}[/b][/url]\n"
-
-            if rotten_rating != 'N/A':
-                description += f"[img]{rotten_icon}[/img]\n[b]{rotten_rating}[/b]\n"
-
-            if metacritic_rating != 'N/A':
-                description += f"[img]{metacritic_icon}[/img]\n[b]{metacritic_rating}[/b]\n"
-
-        description += "[/center]"
-
-        return description
-
-    async def fallback_description(self, meta):
-        description = ""
-        mi_path = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
-        mi_clean_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-
+    async def build_description(self, json_data, meta):
+        fileinfo_dump = ""
         if meta.get('is_disc') != 'BDMV':
-            media_info_text = ""
-            if os.path.exists(mi_path):
-                try:
-                    media_info_text = MediaInfo.parse(meta['filelist'][0], output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_path}"})
-                except Exception as e:
-                    console.print(f"[bold red]Ocorreu um erro ao processar o template do MediaInfo: {e}[/bold red]")
-
-            if not media_info_text and os.path.exists(mi_clean_path):
-                with open(mi_clean_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
-
-            if media_info_text:
-                description += f"[left][font=consolas]\n{media_info_text}\n[/font][/left]\n\n"
+            video_file = meta['filelist'][0]
+            mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
+            if os.path.exists(mi_template):
+                media_info = MediaInfo.parse(video_file, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
+                fileinfo_dump = str(media_info).replace('\r', '')
+            else:
+                fileinfo_dump = None
         else:
             bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
             if os.path.exists(bd_summary_file):
                 with open(bd_summary_file, 'r', encoding='utf-8') as f:
-                    bd_summary = f.read()
-                description += f"[left][font=consolas]\n{bd_summary}\n[/font][/left]\n\n"
+                    fileinfo_dump = f.read()
 
-        description += self.signature
-        return description.strip()
+        asc_data = json_data.get('ASC')
+        if not asc_data:
+            console.print("[yellow]Alerta:[/yellow] O ASC não conseguiu gerar uma descrição com base no código IMDb.")
+            if fileinfo_dump:
+                console.print("[yellow]Alerta:[/yellow] Usando informações do arquivo como descrição.")
+                return f"\n[left][font=Courier New]{fileinfo_dump}[/font][/left]"
+            else:
+                return
+
+        def format_image(url):
+            return f"[img]{url}[/img]" if url else ""
+
+        def format_date(date_str):
+            if not date_str or date_str == 'N/A':
+                return 'N/A'
+            for fmt in ('%Y-%m-%d', '%d %b %Y'):
+                try:
+                    return datetime.strptime(date_str, fmt).strftime('%d/%m/%Y')
+                except (ValueError, TypeError):
+                    continue
+            return date_str
+
+        def append_section(parts, barrinha_key, content):
+            if content:
+                barrinha_url = barrinhas.get(barrinha_key)
+                if barrinha_url:
+                    parts.append(f"\n{format_image(barrinha_url)}")
+                parts.append(f"\n{content}\n")
+
+        def build_cast_section(cast_list):
+            if not cast_list:
+                return ""
+
+            cast_parts = []
+            for ator in cast_list[:10]:
+                profile_url = f"https://image.tmdb.org/t/p/w45{ator.get('profile_path')}" if ator.get('profile_path') else "https://i.imgur.com/eCCCtFA.png"
+                tmdb_url = f"https://www.themoviedb.org/person/{ator.get('id')}?language=pt-BR"
+                cast_parts.append(f"[url={tmdb_url}]{format_image(profile_url)}[/url]\n[size=2][b]({ator.get('name', '')}) como {ator.get('character', '')}[/b][/size]\n")
+            return "".join(cast_parts)
+
+        def build_ratings_section(ratings_list, imdb_id):
+            if not ratings_list:
+                return ""
+
+            ratings_map = {
+                "Internet Movie Database": "https://i.postimg.cc/Pr8Gv4RQ/IMDB.png",
+                "Rotten Tomatoes": "https://i.postimg.cc/rppL76qC/rotten.png",
+                "Metacritic": "https://i.postimg.cc/SKkH5pNg/Metacritic45x45.png"
+            }
+            ratings_parts = []
+            for rating in ratings_list:
+                source = rating.get('Source')
+                value = rating.get('Value', '').strip()
+                img_url = ratings_map.get(source)
+
+                if not img_url:
+                    continue
+
+                if source == "Internet Movie Database" and imdb_id:
+                    ratings_parts.append(f"[url=https://www.imdb.com/title/{imdb_id}]{format_image(img_url)}[/url] - [b]{value}[/b]")
+                else:
+                    ratings_parts.append(f"{format_image(img_url)} - [b]{value}[/b]")
+
+            return "\n".join(ratings_parts)
+
+        tmdb_tv_data = None
+        if meta.get('category', '').lower() == 'tv' and meta.get('tmdb') and self.config['DEFAULT'].get('tmdb_api'):
+            url = f"https://api.themoviedb.org/3/tv/{meta['tmdb']}?api_key={self.config['DEFAULT']['tmdb_api']}&language=pt-BR"
+            try:
+                response = requests.get(url)
+                if response.status_code == 200:
+                    tmdb_tv_data = response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"Ocorreu um erro ao fazer a requisição para o TMDB: {e}")
+
+        tipo_media = asc_data.get('Type', 'movie')
+        imdb_id = asc_data.get('imdbID', '')
+        barrinhas = {key: value for key, value in asc_data.items() if key.startswith('BARRINHA_')}
+
+        description_parts = ["[center]"]
+
+        # Custom top bars
+        for i in range(1, 4):
+            description_parts.append(format_image(barrinhas.get(f'BARRINHA_CUSTOM_T_{i}')))
+
+        # Common data
+        if tipo_media == 'movie':
+            description_parts.append(f"\n{format_image(barrinhas.get('BARRINHA_APRESENTA'))}\n")
+            description_parts.append(f"[size=3]{asc_data.get('Title', 'N/A')}[/size]\n")
+
+            append_section(description_parts, 'BARRINHA_CAPA', format_image(asc_data.get('poster_path')))
+            append_section(description_parts, 'BARRINHA_SINOPSE', asc_data.get('overview'))
+
+            # Technical Sheet
+            ficha_content = "\n".join([
+                f"Tempo: {asc_data.get('Runtime', 'N/A')}",
+                f"Produtora: {asc_data.get('Production', 'N/A')}",
+                f"País de Origem: {asc_data.get('Country', 'N/A')}",
+                f"Gêneros: {asc_data.get('Genre', 'N/A')}",
+                f"Data de Lançamento: {format_date(asc_data.get('Released', 'N/A'))}",
+                (f"Site: [url={asc_data.get('Website')}]Clique aqui[/url]" if asc_data.get('Website') != 'N/A' else "")
+            ])
+            append_section(description_parts, 'BARRINHA_FICHA_TECNICA', ficha_content)
+
+        elif tipo_media in ['series', 'episode']:
+            description_parts.append(f"\n{format_image(barrinhas.get('BARRINHA_APRESENTA'))}")
+            description_parts.append(f"\n{format_image(asc_data.get('poster_path'))}\n")
+
+            append_section(description_parts, 'BARRINHA_CAPA', format_image(asc_data.get('still_path')))
+            append_section(description_parts, 'BARRINHA_SINOPSE', asc_data.get('overview'))
+
+            # Technical Sheet (TV)
+            generos = asc_data.get('Genre', 'N/A')
+            if tmdb_tv_data and tmdb_tv_data.get('genres'):
+                generos = ', '.join([g['name'] for g in tmdb_tv_data.get('genres', [])])
+
+            ficha_content = "\n".join(filter(None, [
+                f"País de Origem: {asc_data.get('Country', 'N/A')}",
+                f"Gêneros: {generos}",
+                (f"Site: [url={asc_data.get('Website')}]Clique aqui[/url]" if asc_data.get('Website') != 'N/A' else None)
+            ]))
+            append_section(description_parts, 'BARRINHA_FICHA_TECNICA', ficha_content)
+
+            # Production Companies (TV)
+            if tmdb_tv_data and tmdb_tv_data.get('production_companies'):
+                prod_parts = ["[size=4][b]Produtoras[/b][/size]"]
+                for p in tmdb_tv_data['production_companies']:
+                    logo = format_image(f"https://image.tmdb.org/t/p/w45{p['logo_path']}") if p.get('logo_path') else ''
+                    prod_parts.append(f"{logo}[size=2] - [b]{p.get('name', '')}[/b][/size]" if logo else f"[size=2][b]{p.get('name', '')}[/b][/size]")
+                description_parts.append("\n" + "\n".join(prod_parts) + "\n")
+
+        # Cast
+        cast_content = build_cast_section(asc_data.get('cast'))
+        append_section(description_parts, 'BARRINHA_ELENCO', cast_content)
+
+        # Seasons
+        if tipo_media == 'series' and tmdb_tv_data and tmdb_tv_data.get('seasons'):
+            seasons_content = []
+            for temp in tmdb_tv_data['seasons']:
+                nome_temporada = temp.get('name', f"Temporada {temp.get('season_number')}").strip()
+                poster_temp = format_image(f"https://image.tmdb.org/t/p/w185{temp.get('poster_path')}") if temp.get('poster_path') else ''
+                overview_temp = f"\n\nSinopse:\n{temp.get('overview')}" if temp.get('overview') else ''
+
+                inner_content = "\n".join([
+                    f"Data: {format_date(temp.get('air_date'))}",
+                    f"Episódios: {temp.get('episode_count')}",
+                    poster_temp,
+                    overview_temp
+                ])
+                seasons_content.append(f"\n[spoiler={nome_temporada}]{inner_content}\n[/spoiler]")
+            append_section(description_parts, 'BARRINHA_EPISODIOS', "".join(seasons_content))
+
+        # Ratings
+        ratings_content = build_ratings_section(asc_data.get('Ratings'), imdb_id)
+        barrinha_criticas_key = 'BARRINHA_INFORMACOES' if tipo_media == 'movie' and 'BARRINHA_INFORMACOES' in barrinhas else 'BARRINHA_CRITICAS'
+        append_section(description_parts, barrinha_criticas_key, ratings_content)
+
+        # Custom bottom bars
+        for i in range(1, 4):
+            description_parts.append(format_image(barrinhas.get(f'BARRINHA_CUSTOM_B_{i}')))
+
+        # MediaInfo/BDinfo
+        if fileinfo_dump:
+            description_parts.append(f"\n[spoiler=Informações do Arquivo]\n[left][font=Courier New]{fileinfo_dump}[/font][/left][/spoiler]\n")
+
+        description_parts.append("[/center]")
+
+        return "".join(filter(None, description_parts))
 
     async def prepare_form_data(self, meta):
         try:
-            data = {'takeupload': 'yes', 'tresd': 2, 'layout': 2}
+            data = {'takeupload': 'yes', 'tresd': 2, 'layout': self.layout}
 
             asc_data = None
             if meta.get('imdb_id'):
                 url_gerador_desc = f"{self.base_url}/search.php"
-                payload = {'imdb': meta.get('imdb_info', {}).get('imdbID', ''), 'layout': '2'}
+                payload = {'imdb': meta.get('imdb_info', {}).get('imdbID', ''), 'layout': self.layout}
                 try:
-                    cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-                    self.session.cookies.update(await self.parseCookieFile(cookie_file))
+                    await self.load_cookies(meta)
                     response = self.session.post(url_gerador_desc, data=payload, timeout=20)
                     response.raise_for_status()
                     asc_data = response.json().get('ASC')
@@ -441,13 +496,35 @@ class ASC(COMMON):
                     asc_data = None
 
             # Description
-            description = None
-            if asc_data:
-                description = self.build_description({'ASC': asc_data})
-            if not description:
-                description = await self.fallback_description(meta)
+            tracker_description = await self.build_description({'ASC': asc_data}, meta)
 
-            data['descr'] = f"{description}\n\n{self.signature}".strip()
+            base_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+            asc_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+            external_desc_content = ""
+            if os.path.exists(base_desc):
+                with open(base_desc, 'r', encoding='utf-8') as f:
+                    external_desc_content = f.read().strip()
+                    desc = external_desc_content
+                    desc = desc.replace("[user]", "").replace("[/user]", "")
+                    desc = desc.replace("[align=left]", "").replace("[/align]", "")
+                    desc = desc.replace("[align=right]", "").replace("[/align]", "")
+                    desc = desc.replace("[alert]", "").replace("[/alert]", "")
+                    desc = desc.replace("[note]", "").replace("[/note]", "")
+                    desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+                    desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+                    desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+                    desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+
+            final_desc_parts = [
+                tracker_description,
+                desc,
+                self.signature
+            ]
+
+            data['descr'] = "\n\n".join(filter(None, final_desc_parts)).strip()
+
+            with open(asc_desc, 'w', encoding='utf-8') as f:
+                f.write(data['descr'])
 
             # Poster
             poster_path = asc_data.get('poster_path') if asc_data else None
@@ -538,6 +615,7 @@ class ASC(COMMON):
 
     async def upload(self, meta, disctype):
         await COMMON(config=self.config).edit_torrent(meta, self.tracker, self.source_flag)
+        await self.load_cookies(meta)
 
         data = await self.prepare_form_data(meta)
         if data is None:
@@ -554,8 +632,6 @@ class ASC(COMMON):
             return
 
         upload_url = self.get_upload_url(meta)
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-        self.session.cookies.update(await self.parseCookieFile(cookie_file))
 
         with open(torrent_path, 'rb') as torrent_file:
             files = {'torrent': (f"{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent", torrent_file, "application/x-bittorrent")}
@@ -578,9 +654,6 @@ class ASC(COMMON):
         try:
             soup = BeautifulSoup(response_text, 'html.parser')
             details_link_tag = soup.find('a', href=lambda href: href and "torrents-details.php?id=" in href)
-            if not details_link_tag:
-                console.print("[bold yellow]Aviso: Não foi possível encontrar o link do torrent na página de sucesso.[/bold yellow]")
-                return
 
             relative_url = details_link_tag['href']
             torrent_url = f"{self.base_url}/{relative_url}"
@@ -589,11 +662,9 @@ class ASC(COMMON):
 
             await COMMON(config=self.config).add_tracker_torrent(meta, self.tracker, self.source_flag, announce_url, torrent_url)
 
-            should_approve, reason = await self.get_approval(meta)
+            should_approve = await self.get_approval(meta)
             if should_approve:
                 await self.auto_approval(relative_url)
-            else:
-                console.print(f"[yellow]{reason}. A aprovação automática será ignorada.[/yellow]")
 
         except Exception as e:
             console.print(f"[bold red]Ocorreu um erro no pós-processamento do upload: {e}[/bold red]")
@@ -601,7 +672,6 @@ class ASC(COMMON):
     async def auto_approval(self, relative_url):
         try:
             torrent_id = relative_url.split('id=')[-1]
-            console.print(f"[cyan]Tentando realizar a aprovação automática para o torrent ID {torrent_id}...[/cyan]")
             approval_url = f"{self.base_url}/uploader_app.php?id={torrent_id}"
             approval_response = self.session.get(approval_url, timeout=30)
             approval_response.raise_for_status()
@@ -609,7 +679,7 @@ class ASC(COMMON):
             console.print(f"[bold red]Erro durante a tentativa de aprovação automática: {e}[/bold red]")
 
     def failed_upload(self, response, meta):
-        response_save_path = f"{meta['base_dir']}/tmp/asc_upload_fail_{meta['uuid']}.html"
+        response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
         with open(response_save_path, "w", encoding="utf-8") as f:
             f.write(response.text)
         console.print("[bold red]Falha no upload para o ASC. A resposta do servidor não indicou sucesso.[/bold red]")
@@ -621,8 +691,7 @@ class ASC(COMMON):
         console.print(f"[cyan]Buscando duplicados em:[/cyan] {search_url}")
 
         try:
-            cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-            self.session.cookies.update(await self.parseCookieFile(cookie_file))
+            await self.load_cookies(meta)
             response = self.session.get(search_url, timeout=30)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -715,13 +784,7 @@ class ASC(COMMON):
         return await self.get_dupes(search_url, meta)
 
     async def validate_credentials(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-        if not os.path.exists(cookie_file):
-            console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
-            return False
-
-        common = COMMON(config=self.config)
-        self.session.cookies.update(await common.parseCookieFile(cookie_file))
+        await self.load_cookies(meta)
 
         try:
             test_url = f"{self.base_url}/gerador.php"
@@ -738,12 +801,20 @@ class ASC(COMMON):
             return False
 
     async def get_approval(self, meta):
-        uploader_enabled = self.config['TRACKERS'][self.tracker].get('uploader_status', False)
-        if not uploader_enabled:
-            return False, f"A aprovação automática está desativada para o uploader no tracker {self.tracker}."
+        uploader = self.config['TRACKERS'][self.tracker].get('uploader_status', False)
+        if not uploader:
+            return False
 
-        send_to_mod_queue = meta.get('modq', False) or meta.get('mq', False)
-        if send_to_mod_queue:
-            return False, "A flag --modq ou --mq foi usada, enviando para a fila de moderação."
+        modq = meta.get('modq', False) or meta.get('mq', False)
+        if modq:
+            return False, "Enviando para a fila de moderação."
 
-        return True, "Critérios de aprovação automática atendidos."
+        return True
+
+    async def load_cookies(self, meta):
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
+        if os.path.exists(cookie_file):
+            self.session.cookies.update(await self.parseCookieFile(cookie_file))
+        else:
+            console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
+            return False
