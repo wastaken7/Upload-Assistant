@@ -226,6 +226,10 @@ class ULCX():
                 console.print('[bold red]Encodes must be at least 720p resolution for ULCX.')
             meta['skipping'] = "ULCX"
             return
+        if meta['bloated'] is True:
+            console.print("[bold red]Non-English dub not allowed at ULCX[/bold red]")
+            meta['skipping'] = "ULCX"
+            return []
 
         tracker = self.tracker
         await check_for_languages(meta, tracker)

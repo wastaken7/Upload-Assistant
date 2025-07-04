@@ -329,6 +329,10 @@ class BHD():
                 console.print("[bold red]Modified SD content not allowed at BHD[/bold red]")
             meta['skipping'] = "BHD"
             return []
+        if meta['bloated'] is True:
+            console.print("[bold red]Non-English dub not allowed at BHD[/bold red]")
+            meta['skipping'] = "BHD"
+            return []
 
         dupes = []
         category = meta['category']

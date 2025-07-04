@@ -130,6 +130,7 @@ async def get_audio_v2(mi, meta, bdinfo):
         else:
             chan = f"{channels}.0"
 
+        meta['bloated'] = False
         if meta.get('dual_audio', False):
             dual = "Dual-Audio"
         else:
@@ -157,11 +158,21 @@ async def get_audio_v2(mi, meta, bdinfo):
                         audio_language = audio_language.strip().lower()
                         orig_lang = meta.get('original_language', '').lower()
                         if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en"):
+                            non_en_non_commentary = True
                             console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                             time.sleep(5)
 
                     if not audio_language:
                         audio_language = "und"
+
+                if (
+                    meta.get('original_language', '').lower() == "en"
+                    and eng
+                    and non_en_non_commentary
+                ):
+                    console.print("[bold red]This release is English original, has English audio, but also has other non-English audio tracks (not commentary). This may be considered bloated.[/bold red]")
+                    meta['bloated'] = True
+                    time.sleep(5)
 
                 if eng and orig:
                     dual = "Dual-Audio"
