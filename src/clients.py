@@ -1564,7 +1564,8 @@ class Clients():
                     is_disc = meta.get('is_disc', "")
 
                     if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
-                        if torrent_name == meta['uuid'] and len(torrent.files) == len(meta.get('filelist', [])):
+                        file_name = os.path.basename(meta['filelist'][0])
+                        if (torrent_name == meta['uuid'] or torrent_name == file_name) and len(torrent.files) == 1:
                             is_match = True
                     else:
                         if torrent_name == meta['uuid']:
