@@ -106,6 +106,31 @@ async def print_progress(message, interval=10):
         pass
 
 
+def update_oeimg_to_onlyimage():
+    """Update all img_host_* values from 'oeimg' to 'onlyimage' in the config file."""
+    config_path = f"{base_dir}/data/config.py"
+    with open(config_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    new_content = re.sub(
+        r"(['\"]img_host_\d+['\"]\s*:\s*)['\"]oeimg['\"]",
+        r"\1'onlyimage'",
+        content
+    )
+    new_content = re.sub(
+        r"(['\"])(oeimg_api)(['\"]\s*:)",
+        r"\1onlyimage_api\3",
+        new_content
+    )
+
+    if new_content != content:
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        console.print("[green]Updated 'oeimg' to 'onlyimage' and 'oeimg_api' to 'onlyimage_api' in config.py[/green]")
+    else:
+        console.print("[yellow]No 'oeimg' or 'oeimg_api' found to update in config.py[/yellow]")
+
+
 async def process_meta(meta, base_dir, bot=None):
     """Process the metadata for each queued path."""
     if use_discord and bot:
@@ -113,6 +138,18 @@ async def process_meta(meta, base_dir, bot=None):
 
     if meta['imghost'] is None:
         meta['imghost'] = config['DEFAULT']['img_host_1']
+        try:
+            result = any(
+                config['DEFAULT'].get(key) == "oeimg"
+                for key in config['DEFAULT']
+                if key.startswith("img_host_")
+            )
+            if result:
+                console.print("[red]oeimg is now onlyimage, your config is being updated[/red]")
+                update_oeimg_to_onlyimage()
+        except Exception as e:
+            console.print(f"[red]Error checking image hosts: {e}[/red]")
+            return
 
     if not meta['unattended']:
         ua = config['DEFAULT'].get('auto_mode', False)
