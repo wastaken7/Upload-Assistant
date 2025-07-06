@@ -530,10 +530,10 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode != 0:
-                        each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False).replace('\r\n', '\n')
-                    else:
+                    if process.returncode == 0:
                         each['vob_mi'] = stdout.decode().replace('\r\n', '\n')
+                    else:
+                        each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for VOB: {str(e)}")
                     each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False).replace('\r\n', '\n')
@@ -547,10 +547,10 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode != 0:
-                        each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False).replace('\r\n', '\n')
-                    else:
+                    if process.returncode == 0:
                         each['ifo_mi'] = stdout.decode().replace('\r\n', '\n')
+                    else:
+                        each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for IFO: {str(e)}")
                     each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False).replace('\r\n', '\n')
@@ -564,10 +564,10 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode != 0:
-                        each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False).replace('\r\n', '\n')
-                    else:
+                    if process.returncode == 0:
                         each['vob_mi_full'] = stdout.decode().replace('\r\n', '\n')
+                    else:
+                        each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for full VOB: {str(e)}")
                     each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False).replace('\r\n', '\n')
@@ -581,10 +581,10 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode != 0:
-                        each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False).replace('\r\n', '\n')
-                    else:
+                    if process.returncode == 0:
                         each['ifo_mi_full'] = stdout.decode().replace('\r\n', '\n')
+                    else:
+                        each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for full IFO: {str(e)}")
                     each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False).replace('\r\n', '\n')
