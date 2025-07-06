@@ -56,7 +56,8 @@ async def is_scene(video, meta, imdb=None, lower=False):
                                     f.write(nfo_response.content)
                                     meta['nfo'] = True
                                     meta['auto_nfo'] = True
-                                console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                                if meta['debug']:
+                                    console.print(f"[green]NFO downloaded to {nfo_file_path}")
                             else:
                                 console.print("[yellow]NFO file not available for download.")
                         except Exception as e:

@@ -46,11 +46,6 @@ class PTER():
                 session.cookies.update(await common.parseCookieFile(cookiefile))
                 resp = session.get(url=url)
 
-                if meta['debug']:
-                    console.print('[cyan]Cookies:')
-                    console.print(session.cookies.get_dict())
-                    console.print("\n\n")
-                    console.print(resp.text)
                 if resp.text.find("""<a href="#" data-url="logout.php" id="logout-confirm">""") != -1:
                     return True
                 else:

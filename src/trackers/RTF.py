@@ -86,7 +86,7 @@ class RTF():
                 await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://retroflix.club/browse/t/" + str(t_id))
 
             except Exception:
-                console.print("It may have uploaded, go check")
+                meta['tracker_status'][self.tracker]['status_message'] = "data error - It may have uploaded, go check"
                 return
         else:
             console.print("[cyan]Request Data:")

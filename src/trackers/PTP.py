@@ -143,7 +143,7 @@ class PTP():
                 return None, None, None
 
             elif response.status_code in [400, 401, 403]:
-                console.print(f"[bold red]PTP: {response.text}")
+                console.print("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
 
             elif response.status_code == 503:
@@ -181,7 +181,7 @@ class PTP():
                         ptp_infohash = torrent.get('InfoHash', None)
                 return imdb_id, ptp_infohash, None
             elif int(response.status_code) in [400, 401, 403]:
-                console.print(response.text)
+                console.print("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
             elif int(response.status_code) == 503:
                 console.print("[bold yellow]PTP Unavailable (503)")

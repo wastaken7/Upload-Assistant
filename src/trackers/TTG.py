@@ -171,7 +171,6 @@ class TTG():
                     else:
                         console.print(data)
                         console.print("\n\n")
-                        console.print(up.text)
                         raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
         return
 
@@ -250,7 +249,6 @@ class TTG():
                 resp = session.get(url=url)
                 if meta['debug']:
                     console.print('[cyan]Cookies:')
-                    console.print(session.cookies.get_dict())
                     console.print(resp.url)
                 if resp.text.find("""<a href="/logout.php">Logout</a>""") != -1:
                     return True

@@ -491,11 +491,6 @@ class MTV():
                     # Add error handling for the request
                     try:
                         resp = session.get(url=url, timeout=10)
-                        if meta['debug']:
-                            console.log('[cyan]Validate Cookies:')
-                            console.log(session.cookies.get_dict())
-                            console.log(resp.url)
-
                         if resp.text.find("Logout") != -1:
                             return True
                         else:

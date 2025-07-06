@@ -262,8 +262,6 @@ class FL():
                     session.cookies.update(pickle.load(cf))
                 resp = session.get(url=url)
                 if meta['debug']:
-                    console.print('[cyan]Cookies:')
-                    console.print(session.cookies.get_dict())
                     console.print(resp.url)
                 if resp.text.find("Logout") != -1:
                     return True

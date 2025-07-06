@@ -257,8 +257,6 @@ class HDT():
                 session.cookies.update(await common.parseCookieFile(cookiefile))
                 res = session.get(url=url)
                 if meta['debug']:
-                    console.print('[cyan]Cookies:')
-                    console.print(session.cookies.get_dict())
                     console.print(res.url)
                 if res.text.find("Logout") != -1:
                     return True

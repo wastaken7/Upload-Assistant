@@ -214,9 +214,6 @@ class AR():
                 for name, value in cookie_dict.items():
                     self.session.cookie_jar.update_cookies({name: value})
 
-                if meta.get('debug', False):
-                    console.print("[yellow]Loaded cookies:", cookie_dict)
-
                 try:
                     async with self.session.get(f'{self.base_url}/torrents.php', timeout=10) as response:
                         if response.status == 200:
