@@ -327,3 +327,36 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
         mi = json.load(f)
 
     return mi
+
+
+def validate_mediainfo(base_dir, folder_id, debug):
+    mediainfo_path = f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt"
+    unique_id = None
+    in_general = False
+
+    if debug:
+        console.print(f"[cyan]Validating MediaInfo at: {mediainfo_path}")
+
+    try:
+        with open(mediainfo_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip() == "General":
+                    in_general = True
+                    continue
+                if in_general:
+                    if line.strip() == "":
+                        break
+                    if line.strip().startswith("Unique ID"):
+                        unique_id = line.split(":", 1)[1].strip()
+                        break
+    except FileNotFoundError:
+        console.print(f"[red]MediaInfo file not found: {mediainfo_path}[/red]")
+        return False
+
+    if debug:
+        if unique_id:
+            console.print(f"[green]Found Unique ID: {unique_id}[/green]")
+        else:
+            console.print("[yellow]Unique ID not found in General section.[/yellow]")
+
+    return bool(unique_id)

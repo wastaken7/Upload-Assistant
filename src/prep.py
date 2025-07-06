@@ -6,7 +6,7 @@ from src.tvmaze import search_tvmaze
 from src.imdb import get_imdb_info_api, search_imdb
 from src.tmdb import tmdb_other_meta, get_tmdb_imdb_from_mediainfo, get_tmdb_from_imdb, get_tmdb_id
 from src.region import get_region, get_distributor, get_service
-from src.exportmi import exportInfo, mi_resolution
+from src.exportmi import exportInfo, mi_resolution, validate_mediainfo
 from src.getseasonep import get_season_episode
 from src.get_tracker_data import get_tracker_data, ping_unit3d
 from src.bluray_com import get_bluray_releases
@@ -31,6 +31,7 @@ try:
     import ntpath
     from pathlib import Path
     import time
+    import sys
     from difflib import SequenceMatcher
 except ModuleNotFoundError:
     console.print(traceback.print_exc())
@@ -293,6 +294,11 @@ class Prep():
             filename = filename.split('AKA')[0]
         meta['filename'] = filename
         meta['bdinfo'] = bdinfo
+
+        valid_mi = validate_mediainfo(base_dir, folder_id, debug=meta['debug'])
+        if not valid_mi:
+            console.print("[red]MediaInfo validation failed. Please check the MediaInfo file (Unique ID).")
+            sys.exit(1)
 
         # Check if there's a language restriction
         if meta['has_languages'] is not None:
