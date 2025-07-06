@@ -181,16 +181,22 @@ class HDT():
                     torrentFile.close()
 
                     # Match url to verify successful upload
-                    search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text).group(1)
+                    try:
+                        search = re.search(r"download\.php\?id\=([a-z0-9]+)", up.text).group(1)
+                    except Exception as e:
+                        if meta['debug']:
+                            console.print(f"[red]Error occurred while searching for download link: {e}")
+                        search = None
                     if search:
                         id = search
                         # modding existing torrent for adding to client instead of downloading torrent from site.
                         meta['tracker_status'][self.tracker]['status_message'] = f"{self.base_url}/details.php?id=" + id
                         await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['HDT'].get('my_announce_url'), f"{self.base_url}/details.php?id=" + id)
                     else:
-                        console.print("[cyan]Request Data:")
-                        console.print("\n\n")
-                        console.print(f'[red]{up.text}')
+                        if meta['debug']:
+                            console.print("[cyan]Request Data:")
+                            console.print("\n\n")
+                            console.print(f'[red]{up.text}')
                         raise UploadException(f"Upload to HDT Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
         return
 
