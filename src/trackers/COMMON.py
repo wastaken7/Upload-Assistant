@@ -93,10 +93,10 @@ class COMMON():
                     audio_languages, subtitle_languages = process_languages(tracks)
                     if audio_languages or subtitle_languages:
                         if audio_languages:
-                            await desc.write(f"[code]Audio Language: {', '.join(audio_languages)}[/code]\n")
+                            desc.write(f"[code]Audio Language: {', '.join(audio_languages)}[/code]\n")
 
                         if subtitle_languages:
-                            await desc.write(f"[code]Subtitle Language: {', '.join(subtitle_languages)}[/code]\n")
+                            desc.write(f"[code]Subtitle Language: {', '.join(subtitle_languages)}[/code]\n")
                         return desc
                     else:
                         return desc
