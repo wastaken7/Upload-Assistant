@@ -147,7 +147,7 @@ async def get_audio_v2(mi, meta, bdinfo):
                         if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
                             eng = True
 
-                        if audio_language and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
+                        if audio_language and audio_language != "en" and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
                             orig = True
 
                         variants = ['zh', 'cn', 'cmn', 'no', 'nb']
@@ -174,9 +174,9 @@ async def get_audio_v2(mi, meta, bdinfo):
                     meta['bloated'] = True
                     time.sleep(5)
 
-                if eng and orig:
+                if eng and (orig or non_en_non_commentary):
                     dual = "Dual-Audio"
-                elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', None] and not meta.get('no_dub', False):
+                elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', 'en', None] and not meta.get('no_dub', False):
                     dual = "Dubbed"
             except Exception:
                 console.print(traceback.format_exc())
