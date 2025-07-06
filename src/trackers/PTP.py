@@ -404,7 +404,7 @@ class PTP():
         ptpType = None
         if imdb_info['type'] is not None:
             imdbType = imdb_info.get('type', 'movie').lower()
-            if imdbType in ("movie", "tv movie"):
+            if imdbType in ("movie", "tv movie", 'tvmovie'):
                 if int(imdb_info.get('runtime', '60')) >= 45 or int(imdb_info.get('runtime', '60')) == 0:
                     ptpType = "Feature Film"
                 else:
