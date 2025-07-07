@@ -6,7 +6,7 @@ import math
 import os
 import re
 import cli_ui
-import glob
+import fnmatch
 import time
 import subprocess
 import sys
@@ -105,25 +105,45 @@ class CustomTorrent(torf.Torrent):
             return
 
 
+def build_mkbrr_exclude_string(root_folder, filelist):
+    manual_patterns = ["*.nfo", "*.jpg", "*.png", '*.srt', '*.sub', '*.vtt', '*.ssa', '*.ass', "*.txt", "*.xml"]
+    keep_set = set(os.path.abspath(f) for f in filelist)
+
+    exclude_files = set()
+    for dirpath, _, filenames in os.walk(root_folder):
+        for fname in filenames:
+            full_path = os.path.abspath(os.path.join(dirpath, fname))
+            if full_path in keep_set:
+                continue
+            if any(fnmatch.fnmatch(fname, pat) for pat in manual_patterns):
+                continue
+            exclude_files.add(fname)
+
+    exclude_str = ",".join(sorted(exclude_files) + manual_patterns)
+    return exclude_str
+
+
 def create_torrent(meta, path, output_filename, tracker_url=None):
     if meta['isdir']:
         if meta['keep_folder']:
             cli_ui.info('--keep-folder was specified. Using complete folder for torrent creation.')
-            if meta.get('mkbrr', False):
-                cli_ui.info('mkbrr does not support folder torrents. Using CustomTorrent instead.')
-            path = path
+            if not meta.get('tv_pack', False):
+                folder_name = os.path.basename(str(path))
+                include = [
+                    f"{folder_name}/{os.path.basename(f)}"
+                    for f in meta['filelist']
+                ]
+                exclude = ["*", "*/**"]
         else:
-            os.chdir(path)
-            globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
-            no_sample_globs = [
-                os.path.abspath(f"{path}{os.sep}{file}") for file in globs
-                if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+            folder_name = os.path.basename(str(path))
+            include = [
+                f"{folder_name}/{os.path.basename(f)}"
+                for f in meta['filelist']
             ]
-            if len(no_sample_globs) == 1:
-                path = meta['filelist'][0]
-
-    exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
-    include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
+            exclude = ["*", "*/**"]
+    else:
+        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
+        include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
 
     if meta.get('tv_pack'):
         completeness = check_season_pack_completeness(meta)
@@ -173,6 +193,9 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                     console.print(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
                 except (ValueError, TypeError):
                     console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
+
+            exclude_str = build_mkbrr_exclude_string(str(path), meta['filelist'])
+            cmd.extend(["--exclude", exclude_str])
 
             cmd.extend(["-o", output_path])
             if meta['debug']:
