@@ -72,10 +72,11 @@ jobs:
         if: github.event_name == 'release'
         id: get_release_info
         run: |
-          # Correct way to store multi-line release notes in GITHUB_ENV
-          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo '${{ github.event.release.body }}' >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          cat << 'RELEASE_NOTES_EOF' >> $GITHUB_ENV
+          RELEASE_NOTES<<EOF
+          ${{ github.event.release.body }}
+          EOF
+          RELEASE_NOTES_EOF
 
       - name: Update version.py (only on release)
         if: github.event_name == 'release' && env.UPDATE_VERSION == 'true'
