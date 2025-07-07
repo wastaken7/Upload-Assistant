@@ -1,3 +1,47 @@
+__version__ = "5.1.2.3"
+
+"""
+Changelog for version 5.1.2.3 (2025-07-07):
+
+## What's Changed
+* region.py - add Pluto TV by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/583
+* Onlyimage by @edge20200 in https://github.com/Audionut/Upload-Assistant/pull/582
+* ASC - changes and fixes by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/581
+* Print cleaning and sanitation by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/580
+* HDS - description tweaks by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/585
+* (Update) ULCX banned groups by @AnabolicsAnonymous in https://github.com/Audionut/Upload-Assistant/pull/586
+* ASC - add custom layout config by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/584
+* Added support for DigitalCore by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/577
+* Fix upload to UTP by @IevgenSobko in https://github.com/Audionut/Upload-Assistant/pull/587
+* Fix torrent creation for foldered content to properly exclude bad files
+* Validate Unique ID in mediainfo
+* Cleaned up the UA presentation in console (see below)
+* Refactored the dual/dubbed/bloated audio handling to catch some edge cases
+* Fix linux dvd handling. maybe......
+* Updated auto torrent matching to catch more matches
+* Run an auto config updater for edge's image host change
+* Added a catch for incorrect tmdb id from BHD. Instead of allowing only an int for tmdb id, BHD changed to a string movie or tv/id arrangement, which means all manner of *plainly incorrect* ids can be returned from their API. 
+* Added language printing handling in descriptions using common.py, when language is not in mediainfo
+* Added non-en dub warning, and skips for BHD/ULCX
+* Changed -fl to be set at 100% by default
+* Better auto IMDb edition handling
+* Fixed an OE existing search bug that's been in the code since day dot
+* Other little tweaks
+
+## Notes
+Some large changes to the UA feedback during processing. Much more streamlined.
+Two new config options:
+* print_tracker_messages: False, - controls whether to print site api/html feedback on upload.
+* print_tracker_links: True, - controls whether to print direct uploaded torrent links where possible.
+
+Even in debug mode, the console should now be sanitized of private details. There may be some edge cases, please report.
+
+## New Contributors
+* @IevgenSobko made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/587
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.1...5.1.2
+"""
+
 __version__ = "5.1.1"
 
 """
