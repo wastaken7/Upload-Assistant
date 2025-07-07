@@ -74,7 +74,7 @@ jobs:
         run: |
           # Correct way to store multi-line release notes in GITHUB_ENV
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo "${{ github.event.release.body }}" >> $GITHUB_ENV
+          echo '${{ github.event.release.body }}' >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Update version.py (only on release)
