@@ -23,7 +23,7 @@ class LCD():
         self.tracker = 'LCD'
         self.source_flag = 'LOCADORA'
         self.search_url = 'https://locadora.cc/api/torrents/filter'
-        self.torrent_url = 'https://locadora.cc/api/torrents/'
+        self.torrent_url = 'https://locadora.cc/torrents/'
         self.upload_url = 'https://locadora.cc/api/torrents/upload'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]

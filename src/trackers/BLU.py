@@ -24,7 +24,7 @@ class BLU():
         self.tracker = 'BLU'
         self.source_flag = 'BLU'
         self.search_url = 'https://blutopia.cc/api/torrents/filter'
-        self.torrent_url = 'https://blutopia.cc/api/torrents/'
+        self.torrent_url = 'https://blutopia.cc/torrents/'
         self.upload_url = 'https://blutopia.cc/api/torrents/upload'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionuts Upload Assistant[/url][/center]"
         self.banned_groups = [

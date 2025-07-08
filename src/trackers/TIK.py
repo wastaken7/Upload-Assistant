@@ -30,7 +30,7 @@ class TIK():
         self.source_flag = 'TIK'
         self.search_url = 'https://cinematik.net/api/torrents/filter'
         self.upload_url = 'https://cinematik.net/api/torrents/upload'
-        self.torrent_url = 'https://cinematik.net/api/torrents/'
+        self.torrent_url = 'https://cinematik.net/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [""]
         pass

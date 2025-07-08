@@ -26,7 +26,7 @@ class SHRI():
         self.source_flag = 'Shareisland'
         self.search_url = 'https://shareisland.org/api/torrents/filter'
         self.upload_url = 'https://shareisland.org/api/torrents/upload'
-        self.torrent_url = 'https://shareisland.org/api/torrents/'
+        self.torrent_url = 'https://shareisland.org/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = []
         pass
