@@ -1,3 +1,14 @@
+__version__ = "5.1.3"
+
+"""
+Changelog for version 5.1.3 (2025-07-08):
+
+* Fixed en checking in audio
+* Fixed torrent links
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.2.4...5.1.3
+"""
+
 __version__ = "5.1.2.4"
 
 """
