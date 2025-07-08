@@ -1,3 +1,16 @@
+__version__ = "5.1.2.4"
+
+"""
+Changelog for version 5.1.2.4 (2025-07-08):
+
+## What's Changed
+* Update example-config.py by @backstab5983 in https://github.com/Audionut/Upload-Assistant/pull/589
+* Correct mediainfo validation
+
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.2.3...5.1.2.4
+"""
+
 __version__ = "5.1.2.3"
 
 """
