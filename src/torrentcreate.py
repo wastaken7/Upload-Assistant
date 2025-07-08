@@ -135,12 +135,17 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 ]
                 exclude = ["*", "*/**"]
         else:
-            folder_name = os.path.basename(str(path))
-            include = [
-                f"{folder_name}/{os.path.basename(f)}"
-                for f in meta['filelist']
-            ]
-            exclude = ["*", "*/**"]
+            if meta.get('is_disc', False):
+                path = path
+                include = []
+                exclude = []
+            else:
+                folder_name = os.path.basename(str(path))
+                include = [
+                    f"{folder_name}/{os.path.basename(f)}"
+                    for f in meta['filelist']
+                ]
+                exclude = ["*", "*/**"]
     else:
         exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
         include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
@@ -194,8 +199,9 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 except (ValueError, TypeError):
                     console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
-            exclude_str = build_mkbrr_exclude_string(str(path), meta['filelist'])
-            cmd.extend(["--exclude", exclude_str])
+            if not meta.get('is_disc', False):
+                exclude_str = build_mkbrr_exclude_string(str(path), meta['filelist'])
+                cmd.extend(["--exclude", exclude_str])
 
             cmd.extend(["-o", output_path])
             if meta['debug']:
