@@ -226,22 +226,14 @@ class Prep():
                             return primary_title, secondary_title, year
 
                 # if not AKA, catch titles that begin with a year
-                match = re.match(r"^(\d+)", basename)
-                if match:
-                    potential_title = match.group(1)
-                    # Check if this title could also be a year (1900-2099)
-                    could_be_year = re.match(r'^(19|20)\d{2}$', potential_title) is not None
-
-                    # Search for a different year elsewhere in the filename
-                    year_match = re.search(r'\b(19|20)\d{2}\b', basename)
-
-                    # Only accept the year_match if it's different from the potential_title
-                    if year_match and (not could_be_year or year_match.group(0) != potential_title):
-                        year = year_match.group(0)
-                    else:
-                        year = None
-
-                    return potential_title, None, year
+                year_start_match = re.match(r'^(19|20)\d{2}', basename)
+                if year_start_match:
+                    title = year_start_match.group(0)
+                    rest = basename[len(title):].lstrip('. _-')
+                    # Look for another year in the rest of the title
+                    year_match = re.search(r'\b(19|20)\d{2}\b', rest)
+                    year = year_match.group(0) if year_match else None
+                    return title, None, year
 
                 # If no pattern match works but there's still a year in the filename, extract it
                 year_match = re.search(r'\b(19|20)\d{2}\b', basename)
