@@ -329,7 +329,11 @@ async def exportInfo(video, isdir, folder_id, base_dir, export_text, is_dvd=Fals
     return mi
 
 
-def validate_mediainfo(base_dir, folder_id, debug):
+def validate_mediainfo(base_dir, folder_id, path, filelist, debug):
+    if not (path.lower().endswith('.mkv') or any(str(f).lower().endswith('.mkv') for f in filelist)):
+        if debug:
+            console.print(f"[yellow]Skipping {path} (not an .mkv file)[/yellow]")
+        return True
     mediainfo_path = f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt"
     unique_id = None
     in_general = False

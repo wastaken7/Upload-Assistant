@@ -295,8 +295,8 @@ class Prep():
         meta['filename'] = filename
         meta['bdinfo'] = bdinfo
 
-        if not meta['is_disc'] == "BDMV":
-            valid_mi = validate_mediainfo(base_dir, folder_id, debug=meta['debug'])
+        if not meta['is_disc']:
+            valid_mi = validate_mediainfo(base_dir, folder_id, path=meta['path'], filelist=meta['filelist'], debug=meta['debug'])
             if not valid_mi:
                 console.print("[red]MediaInfo validation failed. Please check the MediaInfo file (Unique ID).")
                 sys.exit(1)
