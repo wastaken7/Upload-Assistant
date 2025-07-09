@@ -27,6 +27,7 @@ class AITHER():
         self.search_url = 'https://aither.cc/api/torrents/filter'
         self.upload_url = 'https://aither.cc/api/torrents/upload'
         self.torrent_url = 'https://aither.cc/torrents/'
+        self.id_url = 'https://aither.cc/api/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = []
         pass

@@ -26,6 +26,7 @@ class LST():
         self.upload_url = 'https://lst.gg/api/torrents/upload'
         self.search_url = 'https://lst.gg/api/torrents/filter'
         self.torrent_url = 'https://lst.gg/torrents/'
+        self.id_url = 'https://lst.gg/api/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = []
         pass

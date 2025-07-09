@@ -499,7 +499,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
-                tracker_instance.torrent_url,
+                tracker_instance.id_url,
                 tracker_instance.search_url,
                 meta,
                 id=meta[tracker_key],
@@ -510,7 +510,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = await COMMON(config).unit3d_torrent_info(
                 tracker_name,
-                tracker_instance.torrent_url,
+                tracker_instance.id_url,
                 tracker_instance.search_url,
                 meta,
                 file_name=search_term,

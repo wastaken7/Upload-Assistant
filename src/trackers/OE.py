@@ -29,6 +29,7 @@ class OE():
         self.search_url = 'https://onlyencodes.cc/api/torrents/filter'
         self.upload_url = 'https://onlyencodes.cc/api/torrents/upload'
         self.torrent_url = 'https://onlyencodes.cc/torrents/'
+        self.id_url = 'https://onlyencodes.cc/api/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
         self.banned_groups = [
             '0neshot', '3LT0N', '4K4U', '4yEo', '$andra', '[Oj]', 'AFG', 'AkihitoSubs', 'AniHLS', 'Anime Time',
