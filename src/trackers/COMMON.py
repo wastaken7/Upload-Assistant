@@ -940,8 +940,7 @@ class COMMON():
                 console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
-            params['id'] = id
-            url = f"{search_url}"
+            url = f"{torrent_url}{id}"
             if meta.get('debug'):
                 console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
