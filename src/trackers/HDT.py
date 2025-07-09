@@ -229,13 +229,19 @@ class HDT():
                     'category[]': await self.get_category_id(meta),
                     'options': '3'
                 }
-
+            if meta['debug']:
+                console.print(f"[cyan]Searching for existing torrents on {search_url} with params: {params}")
             r = session.get(search_url, params=params)
             await asyncio.sleep(0.5)
             soup = BeautifulSoup(r.text, 'html.parser')
             find = soup.find_all('a', href=True)
+            if meta['debug']:
+                console.print(f"[cyan]Found {len(find)} links in the search results.")
+                console.print(f"[cyan]first 30 links: {[each['href'] for each in find[:30]]}")
             for each in find:
                 if each['href'].startswith('details.php?id='):
+                    if meta['debug']:
+                        console.print(f"[cyan]Found wanted links: {each['href']}")
                     dupes.append(each.text)
 
         return dupes
