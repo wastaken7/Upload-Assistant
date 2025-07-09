@@ -136,37 +136,60 @@ async def get_audio_v2(mi, meta, bdinfo):
         else:
             # if not meta.get('original_language', '').startswith('en'):
             eng, orig, non_en_non_commentary = False, False, False
+            orig_lang = meta.get('original_language', '').lower()
+            if meta['debug']:
+                console.print(f"DEBUG: Original Language: {orig_lang}")
             try:
-                for t in mi['media']['track']:
-                    if t.get('@type') != "Audio":
-                        continue
-
+                tracks = mi.get('media', {}).get('track', [])
+                has_commentary = False
+                has_coms = [t for t in tracks if "commentary" in (t.get('Title') or '').lower()]
+                if has_coms:
+                    has_commentary = True
+                if meta['debug']:
+                    console.print(f"DEBUG: Found {len(has_coms)} commentary tracks, has_commentary = {has_commentary}")
+                audio_tracks = [
+                    t for t in tracks
+                    if t.get('@type') == "Audio" and "commentary" not in (t.get('Title') or '').lower()
+                ]
+                audio_language = None
+                if meta['debug']:
+                    console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
+                for t in audio_tracks:
                     audio_language = t.get('Language', '')
+                    if meta['debug']:
+                        console.print(f"DEBUG: Audio Language = {audio_language}")
 
                     if isinstance(audio_language, str):
-                        if audio_language.startswith("en") and "commentary" not in (t.get('Title') or '').lower():
+                        if audio_language.startswith("en"):
+                            if meta['debug']:
+                                console.print(f"DEBUG: Found English audio track: {audio_language}")
                             eng = True
 
-                        if audio_language and "en" not in audio_language and audio_language.startswith(meta.get('original_language')) and "commentary" not in (t.get('Title') or '').lower():
+                        if audio_language and "en" not in audio_language and audio_language.startswith(orig_lang):
+                            if meta['debug']:
+                                console.print(f"DEBUG: Found original language audio track: {audio_language}")
                             orig = True
 
                         variants = ['zh', 'cn', 'cmn', 'no', 'nb']
-                        if any(audio_language.startswith(var) for var in variants) and any(meta.get('original_language').startswith(var) for var in variants):
+                        if any(audio_language.startswith(var) for var in variants) and any(orig_lang.startswith(var) for var in variants):
+                            if meta['debug']:
+                                console.print(f"DEBUG: Found original language audio track with variant: {audio_language}")
                             orig = True
 
                     if isinstance(audio_language, str):
                         audio_language = audio_language.strip().lower()
-                        orig_lang = meta.get('original_language', '').lower()
                         if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en"):
                             non_en_non_commentary = True
                             console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                             time.sleep(5)
 
                     if not audio_language:
+                        if meta['debug']:
+                            console.print("DEBUG: Audio language is None or empty, setting to 'und'")
                         audio_language = "und"
 
                 if (
-                    meta.get('original_language', '').lower() == "en"
+                    orig_lang == "en"
                     and eng
                     and non_en_non_commentary
                 ):
@@ -174,20 +197,13 @@ async def get_audio_v2(mi, meta, bdinfo):
                     meta['bloated'] = True
                     time.sleep(5)
 
-                if eng and (orig or non_en_non_commentary):
+                if eng and (orig or non_en_non_commentary) and len(audio_tracks) > 1:
                     dual = "Dual-Audio"
-                elif eng and not orig and meta.get('original_language') not in ['zxx', 'xx', 'en', None] and not meta.get('no_dub', False):
+                elif eng and not orig and orig_lang not in ['zxx', 'xx', 'en', None] and not meta.get('no_dub', False):
                     dual = "Dubbed"
             except Exception:
                 console.print(traceback.format_exc())
                 pass
-
-        for t in tracks:
-            if t.get('@type') != "Audio":
-                continue
-
-            if "commentary" in (t.get('Title') or '').lower():
-                has_commentary = True
 
     # Convert commercial name to naming conventions
     audio = {
