@@ -211,7 +211,7 @@ class HDT():
             cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDT.txt")
             session.cookies.update(await common.parseCookieFile(cookiefile))
 
-            search_url = f"{self.base_url}/torrents.php"
+            search_url = f"{self.base_url}/torrents.php?"
             csrfToken = await self.get_csrfToken(session, search_url)
             if int(meta['imdb_id']) != 0:
                 imdbID = f"tt{meta['imdb']}"
