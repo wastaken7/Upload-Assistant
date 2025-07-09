@@ -23,9 +23,12 @@ class ULCX():
         self.torrent_url = 'https://upload.cx/torrents/'
         self.id_url = 'https://upload.cx/api/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
-        self.banned_groups = ['Tigole', 'x0r', 'Judas', 'SPDVD', 'MeGusta', 'YIFY', 'SWTYBLZ', 'TAoE', 'TSP', 'TSPxL', 'LAMA', '4K4U',
-                              'ION10', 'Will1869', 'TGx', 'Sicario', 'QxR', 'Hi10', 'EMBER', 'FGT', 'AROMA', 'd3g', 'nikt0', 'Grym',
-                              'RARBG', 'iVy', 'FnP', 'EDGE2020', 'NuBz', 'NAHOM', 'Ralphy', 'Niblets', 'Vyndros', 'INFINITY', 'FRDS', 'VXT']
+        self.banned_groups = [
+            '4K4U', 'AROMA', 'd3g', ['EDGE2020', 'Encodes'], 'EMBER', 'FGT', 'FnP', 'FRDS', 'Grym', 'Hi10', 'INFINITY',
+            'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'NAHOM', 'Niblets', 'nikt0', ['NuBz', 'Encodes'], 'OFT', 'QxR',
+            ['Ralphy', 'Encodes'], 'RARBG', 'Sicario', 'SM737', 'SPDVD', 'SWTYBLZ', 'TAoE', 'TGx', 'Tigole', 'TSP',
+            'TSPxL', 'VXT', 'Vyndros', 'Will1869', 'x0r', 'YIFY'
+        ]
         pass
 
     async def get_cat_id(self, category_name):
