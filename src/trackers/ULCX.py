@@ -176,6 +176,8 @@ class ULCX():
         ulcx_name = ulcx_name.replace(f"{meta['title']}", imdb_name, 1)
         if not meta.get('category') == "TV":
             ulcx_name = ulcx_name.replace(f"{meta['year']}", imdb_year, 1)
+        if meta.get('mal_id', 0) != 0 and meta.get('aka', "") != "":
+            ulcx_name = ulcx_name.replace(f"{meta['aka']}", "", 1)
         if meta.get('is_disc') == "BDMV":
             if not region_id:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
