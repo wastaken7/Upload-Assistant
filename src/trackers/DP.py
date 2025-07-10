@@ -4,12 +4,12 @@ import asyncio
 import requests
 import platform
 import httpx
-import re
 import glob
 import os
 from src.trackers.COMMON import COMMON
 from src.console import console
 from data.config import config
+from src.dupe_checking import check_for_languages
 
 
 class DP():
@@ -60,10 +60,6 @@ class DP():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        name = await self.edit_name(meta)
-        if meta.get('dp_skipping', False):
-            console.print("[red]Skipping DP upload as language conditions were not met.")
-            return
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         modq = await self.get_flag(meta, 'modq')
         cat_id = await self.get_cat_id(meta['category'])
@@ -107,7 +103,7 @@ class DP():
         if nfo_file:
             files['nfo'] = ("nfo_file.nfo", nfo_file, "text/plain")
         data = {
-            'name': name,
+            'name': meta['name'],
             'description': desc,
             'mediainfo': mi_dump,
             'bdinfo': bd_dump,
@@ -166,76 +162,6 @@ class DP():
             console.print(data)
         open_torrent.close()
 
-    async def edit_name(self, meta):
-        dp_name = meta.get('name')
-        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
-        english_languages = ['english']
-        meta['dp_skipping'] = False
-
-        if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
-            has_english_audio = False
-            has_nordic_audio = False
-
-            if 'audio' in meta['bdinfo']:
-                for audio_track in meta['bdinfo']['audio']:
-                    if 'language' in audio_track:
-                        audio_lang = audio_track['language'].lower()
-                        if audio_lang in nordic_languages:
-                            has_nordic_audio = True
-                            break
-                        elif audio_lang in english_languages:
-                            has_english_audio = True
-
-            if not has_english_audio and not has_nordic_audio:
-                has_nordic_subtitle = False
-                if 'subtitles' in meta['bdinfo']:
-                    for subtitle in meta['bdinfo']['subtitles']:
-                        if subtitle.lower() in (nordic_languages + english_languages):
-                            has_nordic_subtitle = True
-                            break
-
-                    if not has_nordic_subtitle:
-                        meta['dp_skipping'] = True
-                        return dp_name
-
-        elif not meta['is_disc'] == "BDMV":
-            media_info_text = None
-            try:
-                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-                with open(media_info_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
-            except (FileNotFoundError, KeyError) as e:
-                print(f"Error processing MEDIAINFO.txt: {e}")
-
-            if media_info_text:
-                audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                subtitle_section = re.findall(r'Text[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-
-                has_nordic_audio = False
-                has_english_audio = False
-                for language in audio_section:
-                    language = language.lower().strip()
-                    if language in nordic_languages:
-                        has_nordic_audio = True
-                        break
-                    elif language in english_languages:
-                        has_english_audio = True
-                        break
-
-                if not has_english_audio and not has_nordic_audio:
-                    has_nordic_sub = False
-                    for language in subtitle_section:
-                        language = language.lower().strip()
-                        if language in (nordic_languages + english_languages):
-                            has_nordic_sub = True
-                            break
-
-                    if not has_nordic_sub:
-                        meta['dp_skipping'] = True
-                        return dp_name
-
-        return dp_name
-
     async def get_flag(self, meta, flag_name):
         config_flag = self.config['TRACKERS'][self.tracker].get(flag_name)
         if config_flag is not None:
@@ -244,6 +170,8 @@ class DP():
         return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta, disctype):
+        tracker = self.tracker
+        await check_for_languages(meta, tracker)
         dupes = []
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),

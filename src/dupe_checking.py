@@ -290,6 +290,7 @@ async def has_matching_hdr(file_hdr, target_hdr, meta, tracker=None):
 async def check_for_languages(meta, tracker):
     english_languages = ['english']
     portuguese_languages = ['portuguese', 'português']
+    nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish']
     if meta['is_disc'] == "BDMV" and 'bdinfo' in meta:
         async def has_proper_stuff():
             has_audio = False
@@ -303,6 +304,9 @@ async def check_for_languages(meta, tracker):
                         elif tracker == "CBR" and audio_lang in portuguese_languages:
                             has_audio = True
                             return True
+                        elif tracker == "DP" and audio_lang in (nordic_languages + english_languages):
+                            has_audio = True
+                            return True
 
             if not has_audio:
                 has_subtitle = False
@@ -312,6 +316,9 @@ async def check_for_languages(meta, tracker):
                             has_subtitle = True
                             return True
                         elif tracker == "CBR" and subtitle.lower() in portuguese_languages:
+                            has_subtitle = True
+                            return True
+                        elif tracker == "DP" and subtitle.lower() in (nordic_languages + english_languages):
                             has_subtitle = True
                             return True
 
@@ -344,6 +351,9 @@ async def check_for_languages(meta, tracker):
                         elif tracker == "CBR" and language in portuguese_languages:
                             has_audio = True
                             return True
+                        elif tracker == "DP" and language in (nordic_languages + english_languages):
+                            has_audio = True
+                            return True
                 else:
                     has_audio = False
 
@@ -356,6 +366,9 @@ async def check_for_languages(meta, tracker):
                                 has_sub = True
                                 return True
                             elif tracker == "CBR" and language in portuguese_languages:
+                                has_sub = True
+                                return True
+                            elif tracker == "DP" and language in (nordic_languages + english_languages):
                                 has_sub = True
                                 return True
 
