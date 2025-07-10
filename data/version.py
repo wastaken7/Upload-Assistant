@@ -1,3 +1,22 @@
+__version__ = "5.1.4"
+
+"""
+Changelog for version 5.1.4 (2025-07-10):
+
+## What's Changed
+* DP - remove image host requirements by @jschavey in https://github.com/Audionut/Upload-Assistant/pull/593
+* Fixed torf torrent creation when a single file from folder
+* Fixed some year matching regex that was regressing title searching
+* Fixed torrent id searching from support sites
+* Updated ULCX banned groups and naming standards
+* Updated BLU to use name as per IMDb
+
+## New Contributors
+* @jschavey made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/593
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.3.1...5.1.4
+"""
+
 __version__ = "5.1.3.1"
 
 """
