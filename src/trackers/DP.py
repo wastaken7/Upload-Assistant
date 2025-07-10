@@ -9,7 +9,6 @@ import glob
 import os
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.rehostimages import check_hosts
 from data.config import config
 
 
@@ -65,19 +64,6 @@ class DP():
         if meta.get('dp_skipping', False):
             console.print("[red]Skipping DP upload as language conditions were not met.")
             return
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "imagebam.com": "bam",
-            "onlyimage.org": "onlyimage",
-        }
-        approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam', 'onlyimage']
-        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
-        if 'DP_images_key' in meta:
-            image_list = meta['DP_images_key']
-        else:
-            image_list = meta['image_list']
         await common.edit_torrent(meta, self.tracker, self.source_flag)
         modq = await self.get_flag(meta, 'modq')
         cat_id = await self.get_cat_id(meta['category'])
@@ -94,7 +80,7 @@ class DP():
             logo_path = await get_logo(tmdb_id, category, debug, logo_languages=logo_languages, TMDB_API_KEY=TMDB_API_KEY, TMDB_BASE_URL=TMDB_BASE_URL)
             if logo_path:
                 meta['logo'] = logo_path
-        await common.unit3d_edit_desc(meta, self.tracker, self.signature, image_list=image_list)
+        await common.unit3d_edit_desc(meta, self.tracker, self.signature)
         region_id = await common.unit3d_region_ids(meta.get('region'))
         distributor_id = await common.unit3d_distributor_ids(meta.get('distributor'))
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
