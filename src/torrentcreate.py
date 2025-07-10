@@ -11,6 +11,7 @@ import time
 import subprocess
 import sys
 import platform
+import glob
 from src.console import console
 
 
@@ -139,6 +140,17 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 path = path
                 include = []
                 exclude = []
+            elif not meta.get('tv_pack', False):
+                os.chdir(path)
+                globs = glob.glob1(path, "*.mkv") + glob.glob1(path, "*.mp4") + glob.glob1(path, "*.ts")
+                no_sample_globs = [
+                    os.path.abspath(f"{path}{os.sep}{file}") for file in globs
+                    if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+                ]
+                if len(no_sample_globs) == 1:
+                    path = meta['filelist'][0]
+                exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
+                include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
             else:
                 folder_name = os.path.basename(str(path))
                 include = [
