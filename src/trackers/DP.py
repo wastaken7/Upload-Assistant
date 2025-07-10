@@ -70,8 +70,9 @@ class DP():
             "pixhost.to": "pixhost",
             "imgbox.com": "imgbox",
             "imagebam.com": "bam",
+            "onlyimage.org": "onlyimage",
         }
-        approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam']
+        approved_image_hosts = ['imgbox', 'imgbb', 'pixhost', 'bam', 'onlyimage']
         await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
         if 'DP_images_key' in meta:
             image_list = meta['DP_images_key']
