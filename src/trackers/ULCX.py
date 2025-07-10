@@ -171,10 +171,11 @@ class ULCX():
     async def edit_name(self, meta, region_id, distributor_id):
         common = COMMON(config=self.config)
         ulcx_name = meta['name']
-        if meta['category'] == 'TV' and meta.get('search_year', '') == '':
-            ulcx_name = ulcx_name.replace(f"{meta['title']} {meta['year']}", f"{meta['title']}", 1)
-        else:
-            ulcx_name = ulcx_name
+        imdb_name = meta.get('imdb_info', {}).get('title', "")
+        imdb_year = meta.get('imdb_info', {}).get('year', "")
+        ulcx_name = ulcx_name.replace(f"{meta['title']}", imdb_name, 1)
+        if not meta.get('category') == "TV":
+            ulcx_name = ulcx_name.replace(f"{meta['year']}", imdb_year, 1)
         if meta.get('is_disc') == "BDMV":
             if not region_id:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
