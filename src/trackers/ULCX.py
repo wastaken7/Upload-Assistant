@@ -172,10 +172,11 @@ class ULCX():
         common = COMMON(config=self.config)
         ulcx_name = meta['name']
         imdb_name = meta.get('imdb_info', {}).get('title', "")
-        imdb_year = meta.get('imdb_info', {}).get('year', "")
+        imdb_year = str(meta.get('imdb_info', {}).get('year', ""))
+        year = str(meta.get('year', ""))
         ulcx_name = ulcx_name.replace(f"{meta['title']}", imdb_name, 1)
         if not meta.get('category') == "TV":
-            ulcx_name = ulcx_name.replace(f"{meta['year']}", imdb_year, 1)
+            ulcx_name = ulcx_name.replace(f"{year}", imdb_year, 1)
         if meta.get('mal_id', 0) != 0 and meta.get('aka', "") != "":
             ulcx_name = ulcx_name.replace(f"{meta['aka']}", "", 1)
         if meta.get('is_disc') == "BDMV":

@@ -6,6 +6,7 @@ from src.console import console
 async def get_audio_v2(mi, meta, bdinfo):
     extra = dual = ""
     has_commentary = False
+    meta['bloated'] = False
 
     # Get formats
     if bdinfo is not None:  # Disks
@@ -130,7 +131,6 @@ async def get_audio_v2(mi, meta, bdinfo):
         else:
             chan = f"{channels}.0"
 
-        meta['bloated'] = False
         if meta.get('dual_audio', False):
             dual = "Dual-Audio"
         else:

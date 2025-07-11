@@ -144,10 +144,11 @@ class BLU():
         if meta['category'] == 'TV' and meta.get('episode_title', "") != "":
             blu_name = blu_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
         imdb_name = meta.get('imdb_info', {}).get('title', "")
-        imdb_year = meta.get('imdb_info', {}).get('year', "")
+        imdb_year = str(meta.get('imdb_info', {}).get('year', ""))
+        year = str(meta.get('year', ""))
         blu_name = blu_name.replace(f"{meta['title']}", imdb_name, 1)
         if not meta.get('category') == "TV":
-            blu_name = blu_name.replace(f"{meta['year']}", imdb_year, 1)
+            blu_name = blu_name.replace(f"{year}", imdb_year, 1)
         return blu_name
 
     async def get_flag(self, meta, flag_name):
