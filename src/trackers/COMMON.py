@@ -53,36 +53,44 @@ class COMMON():
             def process_languages(tracks):
                 audio_languages = []
                 subtitle_languages = []
-
-                for track in tracks:
-                    if track.get('@type') == 'Audio':
-                        language = track.get('Language')
-                        if not language or language is None:
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
-                                if audio_lang:
-                                    audio_languages.append(audio_lang)
+                if meta.get('audio_languages') is not None:
+                    audio_languages = meta['audio_languages']
+                if meta.get('subtitle_languages') is not None:
+                    subtitle_languages = meta['subtitle_languages']
+                if not audio_languages or not subtitle_languages:
+                    for track in tracks:
+                        if track.get('@type') == 'Audio':
+                            if not audio_languages or audio_languages is None:
+                                language = track.get('Language')
+                                if not language or language is None:
+                                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                        audio_lang = cli_ui.ask_string('No audio language present, you must enter one:')
+                                        if audio_lang:
+                                            audio_languages.append(audio_lang)
+                                            meta['audio_languages'] = audio_languages
+                                        else:
+                                            audio_languages = None
+                                            meta['tracker_status'][tracker]['skip_upload'] = True
+                                    else:
+                                        meta['tracker_status'][tracker]['skip_upload'] = True
                                 else:
                                     audio_languages = None
-                                    meta['tracker_status'][tracker]['skip_upload'] = True
-                            else:
-                                meta['tracker_status'][tracker]['skip_upload'] = True
-                        else:
-                            audio_languages = None
-                    if track.get('@type') == 'Text':
-                        language = track.get('Language')
-                        if not language or language is None:
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
-                                if subtitle_lang:
-                                    subtitle_languages.append(subtitle_lang)
+                        if track.get('@type') == 'Text':
+                            if not subtitle_languages or subtitle_languages is None:
+                                language = track.get('Language')
+                                if not language or language is None:
+                                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                                        subtitle_lang = cli_ui.ask_string('No subtitle language present, you must enter one:')
+                                        if subtitle_lang:
+                                            subtitle_languages.append(subtitle_lang)
+                                            meta['subtitle_languages'] = subtitle_languages
+                                        else:
+                                            subtitle_languages = None
+                                            meta['tracker_status'][tracker]['skip_upload'] = True
+                                    else:
+                                        meta['tracker_status'][tracker]['skip_upload'] = True
                                 else:
                                     subtitle_languages = None
-                                    meta['tracker_status'][tracker]['skip_upload'] = True
-                            else:
-                                meta['tracker_status'][tracker]['skip_upload'] = True
-                        else:
-                            subtitle_languages = None
 
                 return audio_languages, subtitle_languages
 
