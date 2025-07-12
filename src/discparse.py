@@ -479,7 +479,7 @@ class DiscParse():
                             )
                         stdout, stderr = await process.communicate()
 
-                        if process.returncode == 0:
+                        if process.returncode and process.returncode == 0:
                             vob_set_mi = stdout.decode()
                         else:
                             vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
@@ -530,7 +530,7 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
+                    if process.returncode and process.returncode == 0:
                         each['vob_mi'] = stdout.decode().replace('\r\n', '\n')
                     else:
                         each['vob_mi'] = MediaInfo.parse(os.path.basename(vob), output='STRING', full=False).replace('\r\n', '\n')
@@ -547,7 +547,7 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
+                    if process.returncode and process.returncode == 0:
                         each['ifo_mi'] = stdout.decode().replace('\r\n', '\n')
                     else:
                         each['ifo_mi'] = MediaInfo.parse(os.path.basename(ifo), output='STRING', full=False).replace('\r\n', '\n')
@@ -564,7 +564,7 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
+                    if process.returncode and process.returncode == 0:
                         each['vob_mi_full'] = stdout.decode().replace('\r\n', '\n')
                     else:
                         each['vob_mi_full'] = MediaInfo.parse(vob, output='STRING', full=False).replace('\r\n', '\n')
@@ -581,7 +581,7 @@ class DiscParse():
                         )
                     stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
+                    if process.returncode and process.returncode == 0:
                         each['ifo_mi_full'] = stdout.decode().replace('\r\n', '\n')
                     else:
                         each['ifo_mi_full'] = MediaInfo.parse(ifo, output='STRING', full=False).replace('\r\n', '\n')
