@@ -138,10 +138,11 @@ class ULCX():
                 data['internal'] = 1
         if meta.get('freeleech', 0) != 0:
             data['free'] = meta.get('freeleech', 0)
-        if region_id != 0:
-            data['region_id'] = region_id
-        if distributor_id != 0:
-            data['distributor_id'] = distributor_id
+        if meta['is_disc'] == "BDMV":
+            if region_id != 0:
+                data['region_id'] = region_id
+            if distributor_id != 0:
+                data['distributor_id'] = distributor_id
         if meta.get('category') == "TV":
             data['season_number'] = meta.get('season_int', '0')
             data['episode_number'] = meta.get('episode_int', '0')
