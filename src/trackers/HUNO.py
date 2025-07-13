@@ -400,13 +400,11 @@ class HUNO():
                     mediainfo_content = await f.read()
                 parsed_info = await parsed_mediainfo(mediainfo_content)
                 for video_track in parsed_info.get('video', []):
-                    console.print(f"[bold cyan]Checking video track: {video_track}")
                     encoding_settings = video_track.get('encoding_settings')
                     if not encoding_settings:
                         meta['tracker_status'][self.tracker]['skip_upload'] = True
                         meta['tracker_status'][self.tracker]['status_message'] = "No encoding settings found in MEDIAINFO for HUNO"
                         return []
-                    console.print(f"[bold cyan]Encoding settings: {encoding_settings}")
                     if encoding_settings:
                         crf_match = re.search(r'crf[ =:]+([\d.]+)', encoding_settings, re.IGNORECASE)
                         if crf_match:
@@ -417,7 +415,6 @@ class HUNO():
                                 return []
                         else:
                             bit_rate = video_track.get('bit_rate')
-                            console.print(f"[bold cyan]Bitrate: {bit_rate}")
                             if bit_rate and "Animation" not in meta.get('genre', ""):
                                 bit_rate_num = None
                                 # Match number and unit (e.g., 42.4 Mb/s, 42400 kb/s, etc.)
