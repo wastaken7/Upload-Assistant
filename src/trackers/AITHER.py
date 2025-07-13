@@ -183,8 +183,10 @@ class AITHER():
                 print(f"Error processing MEDIAINFO.txt: {e}")
 
         if name_type == "DVDRIP":
-            aither_name = aither_name.replace(f"{meta['source']}{meta['video_encode']}", f"{meta['source']}", 1)
-            aither_name = aither_name.replace(f"{meta['source']}", f"{resolution} {meta['source']}", 1)
+            source = "DVDRip"
+            aither_name = aither_name.replace(f"{meta['source']} ", "", 1)
+            aither_name = aither_name.replace(f"{meta['video_encode']}", "", 1)
+            aither_name = aither_name.replace(f"{source}", f"{resolution} {source}", 1)
             aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
 
         elif meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
