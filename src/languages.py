@@ -1,6 +1,7 @@
 import aiofiles
 import os
 import cli_ui
+import re
 from src.console import console
 
 
@@ -17,20 +18,22 @@ async def parsed_mediainfo(mediainfo_content):
 
     lines = mediainfo_content.strip().split('\n')
 
+    section_header_re = re.compile(r'^(General|Video|Audio|Text|Menu)(?:\s*#\d+)?$', re.IGNORECASE)
+
     for line in lines:
         line = line.strip()
-
         if not line:
             continue
 
-        if line in ['General', 'Video', 'Audio', 'Text', 'Menu']:
+        section_match = section_header_re.match(line)
+        if section_match:
             if current_section and current_track:
                 if current_section in ['video', 'audio', 'text']:
                     parsed_data[current_section].append(current_track)
-                else:
-                    parsed_data[current_section] = current_track
+                elif current_section == 'general':
+                    parsed_data['general'] = current_track
 
-            current_section = line.lower()
+            current_section = section_match.group(1).lower()
             current_track = {}
             continue
 
@@ -39,28 +42,23 @@ async def parsed_mediainfo(mediainfo_content):
             key = key.strip().lower()
             value = value.strip()
 
-            if key == 'language':
-                current_track['language'] = value
-            elif key == 'format':
-                current_track['format'] = value
-            elif key == 'duration':
-                current_track['duration'] = value
-            elif key == 'channels':
-                current_track['channels'] = value
-            elif key == 'bit rate':
-                current_track['bit_rate'] = value
-            elif key == 'channel(s)':
-                current_track['channels'] = value
-            elif key == 'commercial name':
-                current_track['commercial_name'] = value
-            elif key == 'title':
-                current_track['title'] = value
+            if current_section == 'video':
+                if key in ['format', 'duration', 'bit rate', 'encoding settings', 'title']:
+                    current_track[key.replace(' ', '_')] = value
+            elif current_section == 'audio':
+                if key in ['format', 'duration', 'bit rate', 'language', 'commercial name', 'channel', 'channel (s)', 'title']:
+                    current_track[key.replace(' ', '_')] = value
+            elif current_section == 'text':
+                if key in ['format', 'duration', 'bit rate', 'language', 'title']:
+                    current_track[key.replace(' ', '_')] = value
+            elif current_section == 'general':
+                current_track[key.replace(' ', '_')] = value
 
     if current_section and current_track:
         if current_section in ['video', 'audio', 'text']:
             parsed_data[current_section].append(current_track)
-        else:
-            parsed_data[current_section] = current_track
+        elif current_section == 'general':
+            parsed_data['general'] = current_track
 
     return parsed_data
 
