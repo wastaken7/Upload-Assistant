@@ -190,18 +190,20 @@ class ANT():
                                 console.print(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
 
                     except json.JSONDecodeError:
-                        console.print("[bold yellow]Response content is not valid JSON. Skipping this API call.")
+                        console.print("[bold yellow]ANT Response content is not valid JSON. Skipping this API call.")
                         meta['skipping'] = "ANT"
                 else:
-                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                    console.print(f"[bold red]ANT Failed to search torrents. HTTP Status: {response.status_code}")
                     meta['skipping'] = "ANT"
         except httpx.TimeoutException:
-            console.print("[bold red]Request timed out after 5 seconds")
+            console.print("[bold red]ANT Request timed out after 5 seconds")
+            meta['skipping'] = "ANT"
         except httpx.RequestError as e:
-            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+            console.print(f"[bold red]ANT Unable to search for existing torrents: {e}")
             meta['skipping'] = "ANT"
         except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
+            console.print(f"[bold red]ANT Unexpected error: {e}")
+            meta['skipping'] = "ANT"
             await asyncio.sleep(5)
 
         return dupes
