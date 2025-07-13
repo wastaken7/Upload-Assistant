@@ -165,43 +165,49 @@ class HUNO():
                     print("DEBUG: No languages found in BDMV audio tracks.")
 
             else:
-                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-                with open(media_info_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
-
-                # Extract all audio sections for DVD or other cases
-                audio_sections = re.findall(r'Audio\s+.*?(?=\n\n|Text|Menu|$)', media_info_text, re.DOTALL)
-                if audio_sections:
-                    if meta['is_disc'] == "DVD":
-                        # Aggregate all languages for DVDs
-                        languages = []
-                        for section in audio_sections:
-                            language_match = re.search(r'Language\s*:\s*(\w+.*)', section)
-                            if language_match:
-                                lang = language_match.group(1).strip()
-                                lang = re.sub(r'\(.+\)', '', lang)  # Remove parentheses and extra info
-                                if lang not in languages:
-                                    languages.append(lang)
-
-                        # Combine languages if multiple are found
-                        if len(languages) > 1:
-                            language = "Dual"
-                        elif languages:
-                            language = languages[0]
-                        else:
-                            print("DEBUG: No languages found in audio sections.")
+                if meta.get('audio_languages'):
+                    if len(meta['audio_languages']) > 1:
+                        language = "Dual"
                     else:
-                        # Use the first audio section for non-DVD cases
-                        first_audio_section = audio_sections[0]
-                        language_match = re.search(r'Language\s*:\s*(\w+.*)', first_audio_section)
-
-                        if language_match:
-                            language = language_match.group(1).strip()
-                            language = re.sub(r'\(.+\)', '', language)
-                        else:
-                            print("DEBUG: No Language match found in the first audio section.")
+                        language = meta['audio_languages'][0] if meta['audio_languages'] else "SKIPPED"
                 else:
-                    print("DEBUG: No Audio sections found in MEDIAINFO.txt.")
+                    media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+                    with open(media_info_path, 'r', encoding='utf-8') as f:
+                        media_info_text = f.read()
+
+                    # Extract all audio sections for DVD or other cases
+                    audio_sections = re.findall(r'Audio\s+.*?(?=\n\n|Text|Menu|$)', media_info_text, re.DOTALL)
+                    if audio_sections:
+                        if meta['is_disc'] == "DVD":
+                            # Aggregate all languages for DVDs
+                            languages = []
+                            for section in audio_sections:
+                                language_match = re.search(r'Language\s*:\s*(\w+.*)', section)
+                                if language_match:
+                                    lang = language_match.group(1).strip()
+                                    lang = re.sub(r'\(.+\)', '', lang)  # Remove parentheses and extra info
+                                    if lang not in languages:
+                                        languages.append(lang)
+
+                            # Combine languages if multiple are found
+                            if len(languages) > 1:
+                                language = "Dual"
+                            elif languages:
+                                language = languages[0]
+                            else:
+                                print("DEBUG: No languages found in audio sections.")
+                        else:
+                            # Use the first audio section for non-DVD cases
+                            first_audio_section = audio_sections[0]
+                            language_match = re.search(r'Language\s*:\s*(\w+.*)', first_audio_section)
+
+                            if language_match:
+                                language = language_match.group(1).strip()
+                                language = re.sub(r'\(.+\)', '', language)
+                            else:
+                                print("DEBUG: No Language match found in the first audio section.")
+                    else:
+                        print("DEBUG: No Audio sections found in MEDIAINFO.txt.")
 
         if language == "zxx":
             language = "NONE"
