@@ -161,6 +161,13 @@ class OE():
         name_type = meta.get('type', "")
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        imdb_name = meta.get('imdb_info', {}).get('title', "")
+        title = meta.get('title', "")
+        oe_name = oe_name.replace(f"{title}", imdb_name, 1)
+        year = str(meta.get('year', ""))
+        imdb_year = str(meta.get('imdb_info', {}).get('year', ""))
+        if not meta.get('category') == "TV":
+            oe_name = oe_name.replace(f"{year}", imdb_year, 1)
 
         if name_type == "DVDRIP":
             if meta.get('category') == "MOVIE":
