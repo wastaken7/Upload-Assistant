@@ -247,6 +247,10 @@ class AITHER():
             return resolution_mapping
 
     async def search_existing(self, meta, disctype):
+        if meta['valid_mi'] is False:
+            console.print("[bold red]No unique ID in mediainfo, skipping AITHER upload.")
+            meta['skipping'] = "AITHER"
+            return
         dupes = []
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
