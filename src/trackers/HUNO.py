@@ -402,16 +402,18 @@ class HUNO():
                 for video_track in parsed_info.get('video', []):
                     encoding_settings = video_track.get('encoding_settings')
                     if not encoding_settings:
-                        meta['tracker_status'][self.tracker]['skip_upload'] = True
-                        meta['tracker_status'][self.tracker]['status_message'] = "No encoding settings found in MEDIAINFO for HUNO"
+                        if not meta['unattended']:
+                            console.print("No encoding settings found in MEDIAINFO for HUNO")
+                        meta['skipping'] = "HUNO"
                         return []
                     if encoding_settings:
                         crf_match = re.search(r'crf[ =:]+([\d.]+)', encoding_settings, re.IGNORECASE)
                         if crf_match:
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
-                                meta['tracker_status'][self.tracker]['skip_upload'] = True
-                                meta['tracker_status'][self.tracker]['status_message'] = f"CRF value too high: {crf_value} for HUNO"
+                                if not meta['unattended']:
+                                    console.print(f"CRF value too high: {crf_value} for HUNO")
+                                meta['skipping'] = "HUNO"
                                 return []
                         else:
                             bit_rate = video_track.get('bit_rate')
@@ -429,8 +431,9 @@ class HUNO():
                                     else:
                                         bit_rate_num = int(value)
                                 if bit_rate_num is not None and bit_rate_num < 3000:
-                                    meta['tracker_status'][self.tracker]['skip_upload'] = True
-                                    meta['tracker_status'][self.tracker]['status_message'] = f"Video bitrate too low: {bit_rate_num} kbps for HUNO"
+                                    if not meta['unattended']:
+                                        console.print(f"Video bitrate too low: {bit_rate_num} kbps for HUNO")
+                                    meta['skipping'] = "HUNO"
                                     return []
 
         dupes = []
