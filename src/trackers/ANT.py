@@ -120,12 +120,17 @@ class ANT():
                 response = requests.post(url=self.upload_url, files=files, data=data, headers=headers)
                 if response.status_code in [200, 201]:
                     response_data = response.json()
+                elif response.status_code == 502:
+                    response_data = {
+                        "error": "Bad Gateway",
+                        "site seems down": "https://ant.trackerstatus.info/"
+                    }
                 else:
                     response_data = {
                         "error": f"Unexpected status code: {response.status_code}",
-                        "response_content": response.text  # or use response.json() if JSON is expected
+                        "response_content": response.text
                     }
-                meta['tracker_status'][self.tracker]['status_message'] = response_data
+                meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
             else:
                 console.print("[cyan]Request Data:")
                 console.print(data)
