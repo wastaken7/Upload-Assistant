@@ -7,9 +7,11 @@ import re
 import platform
 import cli_ui
 import httpx
+import aiofiles
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
+from src.languages import parsed_mediainfo
 
 
 class HUNO():
@@ -390,6 +392,50 @@ class HUNO():
                 console.print('[bold red]Only x265/HEVC encodes are allowed at HUNO')
             meta['skipping'] = "HUNO"
             return
+
+        if not meta['is_disc'] and meta['type'] in ['ENCODE', 'WEBRIP', 'DVDRIP', 'HDTV']:
+            mediainfo_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+            if os.path.exists(mediainfo_file):
+                async with aiofiles.open(mediainfo_file, 'r', encoding='utf-8') as f:
+                    mediainfo_content = await f.read()
+                parsed_info = await parsed_mediainfo(mediainfo_content)
+                for video_track in parsed_info.get('video', []):
+                    console.print(f"[bold cyan]Checking video track: {video_track}")
+                    encoding_settings = video_track.get('encoding_settings')
+                    if not encoding_settings:
+                        meta['tracker_status'][self.tracker]['skip_upload'] = True
+                        meta['tracker_status'][self.tracker]['status_message'] = "No encoding settings found in MEDIAINFO for HUNO"
+                        return []
+                    console.print(f"[bold cyan]Encoding settings: {encoding_settings}")
+                    if encoding_settings:
+                        crf_match = re.search(r'crf[ =:]+([\d.]+)', encoding_settings, re.IGNORECASE)
+                        if crf_match:
+                            crf_value = float(crf_match.group(1))
+                            if crf_value > 22:
+                                meta['tracker_status'][self.tracker]['skip_upload'] = True
+                                meta['tracker_status'][self.tracker]['status_message'] = f"CRF value too high: {crf_value} for HUNO"
+                                return []
+                        else:
+                            bit_rate = video_track.get('bit_rate')
+                            console.print(f"[bold cyan]Bitrate: {bit_rate}")
+                            if bit_rate:
+                                bit_rate_num = None
+                                # Match number and unit (e.g., 42.4 Mb/s, 42400 kb/s, etc.)
+                                match = re.search(r'([\d.]+)\s*([kM]?b/s)', bit_rate.replace(',', ''), re.IGNORECASE)
+                                if match:
+                                    value = float(match.group(1))
+                                    unit = match.group(2).lower()
+                                    if unit == 'mb/s':
+                                        bit_rate_num = int(value * 1000)
+                                    elif unit == 'kb/s':
+                                        bit_rate_num = int(value)
+                                    else:
+                                        bit_rate_num = int(value)
+                                if bit_rate_num is not None and bit_rate_num < 3000:
+                                    meta['tracker_status'][self.tracker]['skip_upload'] = True
+                                    meta['tracker_status'][self.tracker]['status_message'] = f"Video bitrate too low: {bit_rate_num} kbps for HUNO"
+                                    return []
+
         dupes = []
 
         params = {
