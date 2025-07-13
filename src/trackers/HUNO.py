@@ -418,7 +418,7 @@ class HUNO():
                         else:
                             bit_rate = video_track.get('bit_rate')
                             console.print(f"[bold cyan]Bitrate: {bit_rate}")
-                            if bit_rate:
+                            if bit_rate and "Animation" not in meta.get('genre', ""):
                                 bit_rate_num = None
                                 # Match number and unit (e.g., 42.4 Mb/s, 42400 kb/s, etc.)
                                 match = re.search(r'([\d.]+)\s*([kM]?b/s)', bit_rate.replace(',', ''), re.IGNORECASE)
