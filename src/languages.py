@@ -74,8 +74,10 @@ async def process_desc_language(meta, desc=None, tracker=None):
                 parsed_info = await parsed_mediainfo(mediainfo_content)
                 audio_languages = []
                 subtitle_languages = []
-                meta['write_audio_languages'] = False
-                meta['write_subtitle_languages'] = False
+                if 'write_audio_languages' not in meta:
+                    meta['write_audio_languages'] = False
+                if 'write_subtitle_languages' not in meta:
+                    meta['write_subtitle_languages'] = False
                 if meta.get('audio_languages'):
                     audio_languages = meta['audio_languages']
                 else:
