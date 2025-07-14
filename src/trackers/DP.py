@@ -9,7 +9,7 @@ import os
 from src.trackers.COMMON import COMMON
 from src.console import console
 from data.config import config
-from src.dupe_checking import check_for_languages
+from src.languages import process_desc_language
 
 
 class DP():
@@ -170,8 +170,15 @@ class DP():
         return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta, disctype):
-        tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+            await process_desc_language(meta, desc=None, tracker=self.tracker)
+        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish', 'english']
+        if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
+            if not meta['unattended']:
+                console.print('[bold red]DP requires at least one Nordic audio or subtitle track.')
+            meta['skipping'] = "DP"
+            return
+
         dupes = []
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),

@@ -8,7 +8,7 @@ import os
 import re
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.dupe_checking import check_for_languages
+from src.languages import process_desc_language
 
 
 class CBR():
@@ -233,10 +233,16 @@ class CBR():
         open_torrent.close()
 
     async def search_existing(self, meta, disctype):
-        dupes = []
+        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+            await process_desc_language(meta, desc=None, tracker=self.tracker)
+        portuguese_languages = ['portuguese', 'português']
+        if not any(lang in meta.get('audio_languages', []) for lang in portuguese_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in portuguese_languages):
+            if not meta['unattended']:
+                console.print('[bold red]CBR requires at least one Portuguese audio or subtitle track.')
+            meta['skipping'] = "CBR"
+            return
 
-        tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        dupes = []
 
         params = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),

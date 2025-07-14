@@ -204,8 +204,8 @@ async def process_meta(meta, base_dir, bot=None):
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
         confirm = await helper.get_confirmation(meta)
 
-    for tracker in trackers:
-        if tracker in ["HUNO", "OE", "AITHER"]:
+    for tracker in ["HUNO", "OE", "AITHER", "ULCX", "DP", "CBR"]:
+        if tracker in trackers:
             await process_desc_language(meta, desc=None, tracker=tracker)
     successful_trackers = await process_all_trackers(meta)
 

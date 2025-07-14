@@ -9,7 +9,7 @@ import httpx
 import cli_ui
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.dupe_checking import check_for_languages
+from src.languages import process_desc_language
 
 
 class ULCX():
@@ -240,8 +240,13 @@ class ULCX():
             meta['skipping'] = "ULCX"
             return []
 
-        tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+            await process_desc_language(meta, desc=None, tracker=self.tracker)
+        if 'english' not in meta.get('audio_languages', []) and 'english' not in meta.get('subtitle_languages', []):
+            if not meta['unattended']:
+                console.print('[bold red]ULCX requires at least one English audio or subtitle track.')
+            meta['skipping'] = "ULCX"
+            return
 
         dupes = []
         params = {
