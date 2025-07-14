@@ -105,6 +105,7 @@ class Args():
         parser.add_argument('--no-year', dest='no_year', action='store_true', required=False, help="Remove Year from title")
         parser.add_argument('--no-aka', dest='no_aka', action='store_true', required=False, help="Remove AKA from title")
         parser.add_argument('--no-dub', dest='no_dub', action='store_true', required=False, help="Remove Dubbed from title")
+        parser.add_argument('--no-dual', dest='no_dual', action='store_true', required=False, help="Remove Dual-Audio from title")
         parser.add_argument('--no-tag', dest='no_tag', action='store_true', required=False, help="Remove Group Tag from title")
         parser.add_argument('--no-edition', dest='no_edition', action='store_true', required=False, help="Remove Edition from title")
         parser.add_argument('--dual-audio', dest='dual_audio', action='store_true', required=False, help="Add Dual-Audio to the title")
