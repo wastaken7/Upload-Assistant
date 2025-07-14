@@ -9,7 +9,6 @@ import httpx
 from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
-from src.dupe_checking import check_for_languages
 from src.rehostimages import check_hosts
 from src.languages import process_desc_language
 
@@ -177,34 +176,12 @@ class OE():
                 oe_name = oe_name.replace(f"{meta['source']}", f"{resolution}", 1)
                 oe_name = oe_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
 
-        if not meta['is_disc'] == "BDMV":
-            def has_english_audio(media_info_text=None):
-                if media_info_text:
-                    audio_section = re.findall(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    for i, language in enumerate(audio_section):
-                        language = language.lower().strip()
-                        if language.lower().startswith('en'):  # Check if it's English
-                            return True
-                return False
-
-            def get_audio_lang(media_info_text=None):
-                if media_info_text:
-                    match = re.search(r'Audio[\s\S]+?Language\s+:\s+(\w+)', media_info_text)
-                    if match:
-                        return match.group(1).upper()
-                return ""
-
-            try:
-                media_info_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-                with open(media_info_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
-
-                if not has_english_audio(media_info_text=media_info_text):
-                    audio_lang = get_audio_lang(media_info_text=media_info_text)
-                    if audio_lang:
-                        oe_name = oe_name.replace(meta['resolution'], f"{audio_lang} {meta['resolution']}", 1)
-            except (FileNotFoundError, KeyError) as e:
-                print(f"Error processing MEDIAINFO.txt: {e}")
+        if not meta.get('audio_languages'):
+            await process_desc_language(meta, desc=None, tracker=self.tracker)
+        else:
+            audio_languages = meta['audio_languages'][0]
+            if audio_languages and audio_languages.lower() != "english":
+                oe_name = oe_name.replace(meta['resolution'], f"{audio_languages} {meta['resolution']}", 1)
 
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
@@ -320,8 +297,13 @@ class OE():
             meta['skipping'] = "OE"
             return
 
-        tracker = self.tracker
-        await check_for_languages(meta, tracker)
+        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+            await process_desc_language(meta, desc=None, tracker=self.tracker)
+        if 'english' not in meta.get('audio_languages', []) and 'english' not in meta.get('subtitle_languages', []):
+            if not meta['unattended']:
+                console.print('[bold red]OE requires at least one English audio or subtitle track.')
+            meta['skipping'] = "OE"
+            return
 
         dupes = []
         params = {
