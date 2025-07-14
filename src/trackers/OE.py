@@ -154,7 +154,6 @@ class OE():
 
     async def edit_name(self, meta):
         oe_name = meta.get('name')
-        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
         resolution = meta.get('resolution')
         video_encode = meta.get('video_encode')
         name_type = meta.get('type', "")

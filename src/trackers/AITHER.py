@@ -137,7 +137,6 @@ class AITHER():
 
     async def edit_name(self, meta):
         aither_name = meta['name']
-        media_info_tracks = meta.get('media_info_tracks', [])  # noqa #F841
         resolution = meta.get('resolution')
         video_codec = meta.get('video_codec')
         video_encode = meta.get('video_encode')
