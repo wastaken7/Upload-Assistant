@@ -32,7 +32,7 @@ from src.get_name import get_name
 from src.get_desc import gen_desc
 from discordbot import send_discord_notification, send_upload_status_notification
 from cogs.redaction import clean_meta_for_export
-from languages import process_desc_language
+from src.languages import process_desc_language
 if os.name == "posix":
     import termios
 
