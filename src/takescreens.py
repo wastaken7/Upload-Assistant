@@ -110,7 +110,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
     else:
         hdr_tonemap = False
 
-    ss_times = await valid_ss_time([], num_screens, length, frame_rate)
+    ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta.get('debug', False))
 
     if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
@@ -496,7 +496,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
     main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
     voblength, n = await _is_vob_good(0, 0, num_screens)
-    ss_times = await valid_ss_time([], num_screens, voblength, frame_rate)
+    ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta.get('debug', False))
     capture_tasks = []
     existing_images = 0
     existing_image_paths = []
@@ -904,7 +904,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         return
 
     if not ss_times:
-        ss_times = await valid_ss_time([], num_screens, length, frame_rate)
+        ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta.get('debug', False))
 
     if meta['debug']:
         console.print(f"[green]Final list of frames for screenshots: {ss_times}")
@@ -1358,7 +1358,7 @@ async def capture_screenshot(args):
         return f"Error: {str(e)}"
 
 
-async def valid_ss_time(ss_times, num_screens, length, frame_rate):
+async def valid_ss_time(ss_times, num_screens, length, frame_rate, debug):
     total_screens = num_screens + 1
     total_frames = int(length * frame_rate)
 
@@ -1368,14 +1368,18 @@ async def valid_ss_time(ss_times, num_screens, length, frame_rate):
     usable_frames = end_frame - start_frame
 
     if total_screens > 1:
-        frame_interval = usable_frames // (total_screens - 1)
+        frame_interval = usable_frames // (total_screens)
     else:
         frame_interval = usable_frames
 
     result_times = ss_times.copy()
+    if debug:
+        console.print(f"[purple]Screenshots information:[/purple]\n[slate_blue3]Total Frames: {total_frames}\nStart frame: {start_frame}\nEnd frame: {end_frame}\nUsable frames: {usable_frames}[/slate_blue3]\n[yellow]frame interval: {frame_interval}\n")
 
     for i in range(total_screens):
-        frame = start_frame + (i * frame_interval)
+        frame = random.randint(start_frame + (frame_interval * i), frame_interval*(i+1))
+        if debug:
+            console.print(f"[purple]Screenshot[/purple] [white]{i}[/white]\n[slate_blue3]Start:{start_frame + (frame_interval * i)} -- End: {frame_interval*(i+1)}\nChosen Frame: {frame}\n[/slate_blue3]")
         time = frame / frame_rate
         result_times.append(time)
 
