@@ -91,7 +91,8 @@ async def process_desc_language(meta, desc=None, tracker=None):
                         for audio_track in parsed_info.get('audio', []):
                             if 'language' not in audio_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                    audio_lang = cli_ui.ask_string('No audio language/s present, you must enter (comma-separated) languages:')
+                                    console.print("No audio language/s found, you must enter (comma-separated) languages")
+                                    audio_lang = cli_ui.ask_string('for all audio tracks, eg: English, Spanish:')
                                     if audio_lang:
                                         audio_languages.extend([lang.strip() for lang in audio_lang.split(',')])
                                         meta['audio_languages'] = audio_languages
@@ -113,7 +114,8 @@ async def process_desc_language(meta, desc=None, tracker=None):
                         for text_track in parsed_info.get('text', []):
                             if 'language' not in text_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                    subtitle_lang = cli_ui.ask_string('No subtitle language/s present, you must enter (comma-separated) languages:')
+                                    console.print("No subtitle language/s found, you must enter (comma-separated) languages")
+                                    subtitle_lang = cli_ui.ask_string('for all subtitle tracks, eg: English, Spanish:')
                                     if subtitle_lang:
                                         subtitle_languages.extend([lang.strip() for lang in subtitle_lang.split(',')])
                                         meta['subtitle_languages'] = subtitle_languages
