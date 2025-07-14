@@ -235,7 +235,7 @@ class CBR():
     async def search_existing(self, meta, disctype):
         if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
-        portuguese_languages = ['portuguese', 'português']
+        portuguese_languages = ['Portuguese', 'Português']
         if not any(lang in meta.get('audio_languages', []) for lang in portuguese_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in portuguese_languages):
             if not meta['unattended']:
                 console.print('[bold red]CBR requires at least one Portuguese audio or subtitle track.')

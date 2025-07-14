@@ -242,7 +242,7 @@ class ULCX():
 
         if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
-        if 'english' not in meta.get('audio_languages', []) and 'english' not in meta.get('subtitle_languages', []):
+        if 'English' not in meta.get('audio_languages', []) and 'English' not in meta.get('subtitle_languages', []):
             if not meta['unattended']:
                 console.print('[bold red]ULCX requires at least one English audio or subtitle track.')
             meta['skipping'] = "ULCX"

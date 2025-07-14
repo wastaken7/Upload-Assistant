@@ -172,7 +172,7 @@ class DP():
     async def search_existing(self, meta, disctype):
         if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
-        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish', 'english']
+        nordic_languages = ['Danish', 'Swedish', 'Norwegian', 'Icelandic', 'Finnish', 'English']
         if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
             if not meta['unattended']:
                 console.print('[bold red]DP requires at least one Nordic/English audio or subtitle track.')
