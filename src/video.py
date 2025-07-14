@@ -2,6 +2,7 @@ import os
 import json
 import re
 import glob
+import cli_ui
 from src.console import console
 from src.exportmi import mi_resolution
 
@@ -146,6 +147,12 @@ async def get_video(videoloc, mode):
         for file in globlist:
             if not file.lower().endswith('sample.mkv') or "!sample" in file.lower():
                 filelist.append(os.path.abspath(f"{videoloc}{os.sep}{file}"))
+                filelist = sorted(filelist)
+                for f in filelist:
+                    if "sample" in os.path.basename(f).lower():
+                        console.print("[bold red]Sample file detected in filelist!: ", f)
+                        if cli_ui.ask_yes_no("Do you want to remove it?", default="yes"):
+                            filelist.remove(f)
         try:
             video = sorted(filelist)[0]
         except IndexError:
