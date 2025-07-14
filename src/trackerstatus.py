@@ -71,7 +71,7 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['banned'] = False
 
-            if local_meta['tracker_status'][tracker_name]['skip_upload']:
+            if local_meta['tracker_status'][tracker_name].get('skip_upload'):
                 local_tracker_status['skipped'] = True
 
             if not local_tracker_status['banned'] and not local_tracker_status['skipped']:

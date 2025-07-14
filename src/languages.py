@@ -64,6 +64,14 @@ async def parsed_mediainfo(mediainfo_content):
 
 
 async def process_desc_language(meta, desc=None, tracker=None):
+    if 'tracker_status' not in meta:
+        meta['tracker_status'] = {}
+    if tracker not in meta['tracker_status']:
+        meta['tracker_status'][tracker] = {}
+    if 'unattended_audio_skip' not in meta:
+        meta['unattended_audio_skip'] = False
+    if 'unattended_subtitle_skip' not in meta:
+        meta['unattended_subtitle_skip'] = False
     if not meta['is_disc'] == "BDMV":
         try:
             mediainfo_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
@@ -87,7 +95,7 @@ async def process_desc_language(meta, desc=None, tracker=None):
                 else:
                     meta['subtitle_languages'] = []
                 if not audio_languages or not subtitle_languages:
-                    if not meta.get('unattended_audio_skip', False) or (not audio_languages or audio_languages is None):
+                    if not meta.get('unattended_audio_skip', False) and (not audio_languages or audio_languages is None):
                         for audio_track in parsed_info.get('audio', []):
                             if 'language' not in audio_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -110,7 +118,7 @@ async def process_desc_language(meta, desc=None, tracker=None):
                                 elif "title" not in audio_track:
                                     meta['audio_languages'].append(audio_track['language'])
 
-                    if not meta.get('unattended_subtitle_skip', False) or (not subtitle_languages or subtitle_languages is None):
+                    if (not meta.get('unattended_subtitle_skip', False) or not meta.get('unattended_audio_skip', False)) and (not subtitle_languages or subtitle_languages is None):
                         for text_track in parsed_info.get('text', []):
                             if 'language' not in text_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
