@@ -175,7 +175,7 @@ class DP():
         nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish', 'english']
         if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
             if not meta['unattended']:
-                console.print('[bold red]DP requires at least one Nordic audio or subtitle track.')
+                console.print('[bold red]DP requires at least one Nordic/English audio or subtitle track.')
             meta['skipping'] = "DP"
             return
 
