@@ -87,7 +87,7 @@ async def process_desc_language(meta, desc=None, tracker=None):
                 else:
                     meta['subtitle_languages'] = []
                 if not audio_languages or not subtitle_languages:
-                    if not audio_languages or audio_languages is None:
+                    if not meta.get('unattended_audio_skip', False) or (not audio_languages or audio_languages is None):
                         for audio_track in parsed_info.get('audio', []):
                             if 'language' not in audio_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -97,15 +97,19 @@ async def process_desc_language(meta, desc=None, tracker=None):
                                         meta['audio_languages'] = audio_languages
                                         meta['write_audio_languages'] = True
                                     else:
-                                        audio_languages = None
+                                        meta['audio_languages'] = None
+                                        meta['unattended_audio_skip'] = True
                                         meta['tracker_status'][tracker]['skip_upload'] = True
                                 else:
+                                    meta['unattended_audio_skip'] = True
                                     meta['tracker_status'][tracker]['skip_upload'] = True
                             else:
                                 if "title" in audio_track and "commentary" not in audio_track['title']:
                                     meta['audio_languages'].append(audio_track['language'])
+                                elif "title" not in audio_track:
+                                    meta['audio_languages'].append(audio_track['language'])
 
-                    if not subtitle_languages or subtitle_languages is None:
+                    if not meta.get('unattended_subtitle_skip', False) or (not subtitle_languages or subtitle_languages is None):
                         for text_track in parsed_info.get('text', []):
                             if 'language' not in text_track:
                                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
@@ -115,9 +119,11 @@ async def process_desc_language(meta, desc=None, tracker=None):
                                         meta['subtitle_languages'] = subtitle_languages
                                         meta['write_subtitle_languages'] = True
                                     else:
-                                        subtitle_languages = None
+                                        meta['subtitle_languages'] = None
+                                        meta['unattended_subtitle_skip'] = True
                                         meta['tracker_status'][tracker]['skip_upload'] = True
                                 else:
+                                    meta['unattended_subtitle_skip'] = True
                                     meta['tracker_status'][tracker]['skip_upload'] = True
                             else:
                                 meta['subtitle_languages'].append(text_track['language'])

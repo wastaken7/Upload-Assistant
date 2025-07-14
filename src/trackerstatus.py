@@ -71,6 +71,9 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['banned'] = False
 
+            if local_meta['tracker_status'][tracker_name]['skip_upload']:
+                local_tracker_status['skipped'] = True
+
             if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                 if tracker_name == "AITHER":
                     if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
@@ -78,7 +81,7 @@ async def process_all_trackers(meta):
                     else:
                         local_tracker_status['skipped'] = False
 
-                if tracker_name not in {"PTP", "TL"}:
+                if tracker_name not in {"PTP", "TL"} and not local_tracker_status['skipped']:
                     dupes = await tracker_class.search_existing(local_meta, disctype)
                 elif tracker_name == "PTP":
                     ptp = PTP(config=config)

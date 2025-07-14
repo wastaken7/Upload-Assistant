@@ -147,7 +147,8 @@ class HUNO():
         if dual:
             languages = "Dual"
         else:
-            await process_desc_language(meta, desc=None, tracker=self.tracker)
+            if not meta.get('audio_languages'):
+                await process_desc_language(meta, desc=None, tracker=self.tracker)
             if meta.get('audio_languages'):
                 languages = meta['audio_languages']
                 languages = set(languages)

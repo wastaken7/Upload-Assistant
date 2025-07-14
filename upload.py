@@ -32,6 +32,7 @@ from src.get_name import get_name
 from src.get_desc import gen_desc
 from discordbot import send_discord_notification, send_upload_status_notification
 from cogs.redaction import clean_meta_for_export
+from languages import process_desc_language
 if os.name == "posix":
     import termios
 
@@ -203,6 +204,9 @@ async def process_meta(meta, base_dir, bot=None):
         meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await get_name(meta)
         confirm = await helper.get_confirmation(meta)
 
+    for tracker in trackers:
+        if tracker in ["HUNO", "OE", "AITHER"]:
+            await process_desc_language(meta, desc=None, tracker=tracker)
     successful_trackers = await process_all_trackers(meta)
 
     if meta.get('trackers_pass') is not None:
