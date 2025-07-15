@@ -906,9 +906,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if not ss_times:
         ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta.get('debug', False))
 
-    if meta['debug']:
-        console.print(f"[green]Final list of frames for screenshots: {ss_times}")
-
     sanitized_filename = await sanitize_filename(filename)
 
     if tone_map and "HDR" in meta['hdr']:
@@ -1359,29 +1356,30 @@ async def capture_screenshot(args):
 
 
 async def valid_ss_time(ss_times, num_screens, length, frame_rate, debug):
-    total_screens = num_screens + 1
+    total_screens = num_screens
     total_frames = int(length * frame_rate)
 
     # Calculate usable portion (from 5% to 90% of video)
     start_frame = int(total_frames * 0.05)
     end_frame = int(total_frames * 0.9)
     usable_frames = end_frame - start_frame
+    chosen_frames = []
 
     if total_screens > 1:
-        frame_interval = usable_frames // (total_screens)
+        frame_interval = (usable_frames - start_frame) // (total_screens)
     else:
         frame_interval = usable_frames
 
     result_times = ss_times.copy()
-    if debug:
-        console.print(f"[purple]Screenshots information:[/purple]\n[slate_blue3]Total Frames: {total_frames}\nStart frame: {start_frame}\nEnd frame: {end_frame}\nUsable frames: {usable_frames}[/slate_blue3]\n[yellow]frame interval: {frame_interval}\n")
-
+        
     for i in range(total_screens):
-        frame = random.randint(start_frame + (frame_interval * i), frame_interval*(i+1))
-        if debug:
-            console.print(f"[purple]Screenshot[/purple] [white]{i}[/white]\n[slate_blue3]Start:{start_frame + (frame_interval * i)} -- End: {frame_interval*(i+1)}\nChosen Frame: {frame}\n[/slate_blue3]")
+        frame = random.randint(start_frame + (frame_interval * i) + 1, start_frame + frame_interval * (i+1))
+        chosen_frames.append(frame)
         time = frame / frame_rate
         result_times.append(time)
+    
+    if debug:
+        console.print(f"[purple]Screenshots information:[/purple] \n[slate_blue3]Screenshots: [gold3]{total_screens}[/gold3] \nTotal Frames: [gold3]{total_frames}[/gold3] \nStart frame: [gold3]{start_frame}[/gold3] \nEnd frame: [gold3]{end_frame}[/gold3] \nUsable frames: [gold3]{usable_frames}[/gold3][/slate_blue3] \n[yellow]frame interval: {frame_interval} \n[purple]Chosen Frames[/purple]\n[gold3]{chosen_frames}[/gold3]\n")
 
     result_times = sorted(result_times)
     return result_times
