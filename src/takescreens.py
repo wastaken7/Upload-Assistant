@@ -1371,13 +1371,13 @@ async def valid_ss_time(ss_times, num_screens, length, frame_rate, debug):
         frame_interval = usable_frames
 
     result_times = ss_times.copy()
-        
+
     for i in range(total_screens):
         frame = random.randint(start_frame + (frame_interval * i) + 1, start_frame + frame_interval * (i+1))
         chosen_frames.append(frame)
         time = frame / frame_rate
         result_times.append(time)
-    
+
     if debug:
         console.print(f"[purple]Screenshots information:[/purple] \n[slate_blue3]Screenshots: [gold3]{total_screens}[/gold3] \nTotal Frames: [gold3]{total_frames}[/gold3] \nStart frame: [gold3]{start_frame}[/gold3] \nEnd frame: [gold3]{end_frame}[/gold3] \nUsable frames: [gold3]{usable_frames}[/gold3][/slate_blue3] \n[yellow]frame interval: {frame_interval} \n[purple]Chosen Frames[/purple]\n[gold3]{chosen_frames}[/gold3]\n")
 
