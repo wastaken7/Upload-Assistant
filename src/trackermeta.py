@@ -494,7 +494,9 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                     if valid_images:
                         meta['image_list'] = valid_images
-                found_match = True
+                        found_match = True
+                    else:
+                        meta['image_list'] = []
         else:
             found_match = False
 
