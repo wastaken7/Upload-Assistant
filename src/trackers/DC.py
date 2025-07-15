@@ -4,6 +4,7 @@ import re
 import requests
 from src.exceptions import UploadException
 from src.console import console
+from src.rehostimages import check_hosts
 from .COMMON import COMMON
 
 
@@ -176,6 +177,13 @@ class DC(COMMON):
 
     async def upload(self, meta, disctype):
         await self.edit_torrent(meta, self.tracker, self.source_flag)
+        approved_image_hosts = ['imgbox', 'imgbb']
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+        }
+
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
 
         cat_id = await self.get_category_id(meta)
 
