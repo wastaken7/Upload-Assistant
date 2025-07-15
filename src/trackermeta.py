@@ -467,8 +467,10 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         if valid_images:
                             meta['image_list'] = valid_images
                             await handle_image_list(meta, tracker_name, valid_images)
-                    console.print(f"[green]{tracker_name} data retained.[/green]")
-                    found_match = True
+                            found_match = True
+                            console.print(f"[green]{tracker_name} data retained.[/green]")
+                        else:
+                            meta['image_list'] = []
                 else:
                     console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
                     meta[tracker_key] = None
