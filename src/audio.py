@@ -297,27 +297,3 @@ async def get_audio_v2(mi, meta, bdinfo):
     audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
     audio = ' '.join(audio.split())
     return audio, chan, has_commentary
-
-
-async def get_audio_languages(mi, meta):
-    tracks = mi.get('media', {}).get('track', [])
-
-    languages = []
-
-    for i, t in enumerate(tracks):
-        if t.get('@type') != "Audio":
-            continue
-
-        language = t.get('Language', '')
-        if meta['debug']:
-            console.print(f"DEBUG: Track {i} Language = {language} ({type(language)})")
-
-        if isinstance(language, str):  # Normal case
-            languages.append(language.lower())
-        elif isinstance(language, dict):  # Handle unexpected dict case
-            if 'value' in language:  # Check if a known key exists
-                extracted = language['value']
-                if isinstance(extracted, str):
-                    languages.append(extracted.lower())
-
-    return languages
