@@ -21,6 +21,11 @@ async def process_all_trackers(meta):
     tracker_setup = TRACKER_SETUP(config=config)
     helper = UploadHelper()
     meta_lock = asyncio.Lock()  # noqa F841
+    for tracker in meta['trackers']:
+        if 'tracker_status' not in meta:
+            meta['tracker_status'] = {}
+        if tracker not in meta['tracker_status']:
+            meta['tracker_status'][tracker] = {}
 
     async def process_single_tracker(tracker_name, shared_meta):
         nonlocal successful_trackers
