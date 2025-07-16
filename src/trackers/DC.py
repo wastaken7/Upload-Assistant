@@ -184,7 +184,7 @@ class DC(COMMON):
         url_host_mapping = {
             "ibb.co": "imgbb",
             "imgbox.com": "imgbox",
-            "beyondhd.co": "bhd", 
+            "beyondhd.co": "bhd",
             "imgur.com": "imgur",
             "postimg.cc": "postimg",
             "digitalcore.club": "digitalcore"
