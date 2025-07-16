@@ -4,7 +4,6 @@ import asyncio
 import requests
 import platform
 import httpx
-import os
 import re
 from src.trackers.COMMON import COMMON
 from src.console import console
@@ -67,47 +66,6 @@ class CBR():
         }.get(resolution, '10')
         return resolution_id
 
-    def get_audio(self, meta):
-        if meta.get('is_disc') == "BDMV":
-            return ''
-
-        audio_languages = set()
-
-        base_dir = meta.get('base_dir', '.')
-        uuid = meta.get('uuid', 'default_uuid')
-        media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
-
-        try:
-            if os.path.exists(media_info_path):
-                with open(media_info_path, 'r', encoding='utf-8') as f:
-                    media_info_text = f.read()
-
-                audio_sections = re.findall(
-                    r'Audio(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)',
-                    media_info_text,
-                    re.DOTALL | re.IGNORECASE
-                )
-
-                for section in audio_sections:
-                    language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
-                    if language_match:
-                        lang_raw = language_match.group(1).strip()
-                        lang_clean = re.sub(r'[/\\].*|\(.*?\)', '', lang_raw).strip()
-                        if lang_clean.lower() not in ["unknown", "und"]:
-                            audio_languages.add(lang_clean.lower())
-
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"ERRO: Falha ao processar MediaInfo para verificar os idiomas nas faixas de áudio, não sendo possível determinar se é ou não DUAL/MULTI: {e}")
-
-        if len(audio_languages) == 2:
-            return ' DUAL'
-        elif len(audio_languages) >= 3:
-            return ' MULTI'
-        else:
-            return ''
-
     async def edit_name(self, meta):
         name = meta['name'].replace('DD+ ', 'DDP').replace('DD ', 'DD').replace('AAC ', 'AAC').replace('FLAC ', 'FLAC')
 
@@ -132,8 +90,17 @@ class CBR():
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
-        audio_tag = self.get_audio(meta)
+        if meta.get('audio_languages'):
+            audio_languages = set(meta['audio_languages'])
+            if len(audio_languages) >= 3:
+                audio_tag = ' MULTI'
+            elif len(audio_languages) == 2:
+                audio_tag = ' DUAL'
+            else:
+                audio_tag = ''
         if audio_tag:
+            if meta.get('dual_audio', False):
+                cbr_name = cbr_name.replace(f"{meta.get('dual_audio', '')}", '')
             if '-' in cbr_name:
                 parts = cbr_name.rsplit('-', 1)
                 cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
