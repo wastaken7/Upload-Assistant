@@ -183,11 +183,6 @@ async def get_audio_v2(mi, meta, bdinfo):
                             console.print(f"[bold red]This release has a(n) {audio_language} audio track, and may be considered bloated")
                             time.sleep(5)
 
-                    if not audio_language:
-                        if meta['debug']:
-                            console.print("DEBUG: Audio language is None or empty, setting to 'und'")
-                        audio_language = "und"
-
                 if (
                     orig_lang == "en"
                     and eng
