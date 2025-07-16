@@ -21,7 +21,7 @@ class DP():
         self.search_url = 'https://darkpeers.org/api/torrents/filter'
         self.torrent_url = 'https://darkpeers.org/torrents/'
         self.signature = "\n[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
-        self.banned_groups = ["aXXo", "BONE", "BRrip", "CM8", "CrEwSaDe", "CTFOH", "dAV1nci", "DNL", "FaNGDiNG0", "GalaxyTV", "HD2DVD", "HDTime", "iHYTECH", "ION10", "iPlanet", "KiNGDOM", "LAMA", "MeGusta", "mHD", "mSD", "NaNi", "NhaNc3", "nHD", "nikt0", "nSD", "OFT", "PRODJi", "RARBG", "Rifftrax", "SANTi", "SasukeducK", "SEEDSTER", "ShAaNiG", "Sicario", "STUTTERSHIT", "TAoE", "TGALAXY", "TGx", "TORRENTGALAXY", "ToVaR", "TSP", "TSPxL", "ViSION", "VXT", "WAF", "WKS", "X0r", "YIFY", "YTS"]
+        self.banned_groups = ['aXXo', 'BONE', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'dAV1nci', 'DNL', 'FaNGDiNG0', 'GalaxyTV', 'HD2DVD', 'HDTime', 'iHYTECH', 'ION10', 'iPlanet', 'KiNGDOM', 'LAMA', 'MeGusta', 'mHD', 'mSD', 'NaNi', 'NhaNc3', 'nHD', 'nikt0', 'nSD', 'OFT', 'PRODJi', 'RARBG', 'Rifftrax', 'SANTi', 'SasukeducK', 'SEEDSTER', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'TAoE', 'TGALAXY', 'TGx', 'TORRENTGALAXY', 'ToVaR', 'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'X0r', 'YIFY', 'YTS']
         pass
 
     async def get_cat_id(self, category_name):
