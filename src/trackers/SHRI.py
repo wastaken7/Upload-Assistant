@@ -152,7 +152,7 @@ class SHRI():
             if audio_languages:
                 if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                     shareisland_name = shareisland_name.replace(str(meta['year']), f"{meta['year']} {audio_languages}", 1)
-                else:
+                elif not meta.get('is_disc') == "BDMV":
                     shareisland_name = shareisland_name.replace(meta['resolution'], f"{audio_languages} {meta['resolution']}", 1)
 
         if meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):

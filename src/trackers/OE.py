@@ -179,7 +179,7 @@ class OE():
             await process_desc_language(meta, desc=None, tracker=self.tracker)
         else:
             audio_languages = meta['audio_languages'][0]
-            if audio_languages and audio_languages.lower() != "english":
+            if audio_languages and audio_languages.lower() != "english" and not meta.get('is_disc') == "BDMV":
                 oe_name = oe_name.replace(meta['resolution'], f"{audio_languages} {meta['resolution']}", 1)
 
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
