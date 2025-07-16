@@ -306,6 +306,8 @@ class Prep():
                     if 'language' in audio_track and audio_track['language']:
                         audio_languages.append(audio_track['language'].lower())
                 any_of_languages = meta['has_languages'].lower().split(",")
+                if all(len(lang.strip()) == 2 for lang in any_of_languages):
+                    raise Exception(f"Warning: Languages should be full names, not ISO codes. Found: {any_of_languages}")
                 # We need to have user input languages and file must have audio tracks.
                 if len(any_of_languages) > 0 and len(audio_languages) > 0 and not set(any_of_languages).intersection(set(audio_languages)):
                     console.print(f"[red] None of the required languages ({meta['has_languages']}) is available on the file {audio_languages}")
