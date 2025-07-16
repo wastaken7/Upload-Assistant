@@ -49,7 +49,10 @@ class DC(COMMON):
             desc_parts.append(manual_desc)
 
         # Screenshots
-        images = meta.get('image_list', [])
+        if f'{self.tracker}_images_key' in meta:
+            images = meta[f'{self.tracker}_images_key']
+        else:
+            images = meta['image_list']
         if images:
             screenshots_block = "[center][b]Screenshots[/b]\n\n"
             for image in images:
