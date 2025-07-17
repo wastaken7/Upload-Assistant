@@ -17,7 +17,7 @@ import traceback
 from pymediainfo import MediaInfo
 from src.console import console
 from data.config import config
-from src.cleanup import cleanup
+from src.cleanup import cleanup, reset_terminal
 
 img_host = [
     config["DEFAULT"][key].lower()
@@ -110,7 +110,7 @@ async def disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, 
     else:
         hdr_tonemap = False
 
-    ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta.get('debug', False))
+    ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta, retake=force_screenshots)
 
     if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
@@ -496,7 +496,7 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
     main_set = meta['discs'][disc_num]['main_set'][1:] if len(meta['discs'][disc_num]['main_set']) > 1 else meta['discs'][disc_num]['main_set']
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
     voblength, n = await _is_vob_good(0, 0, num_screens)
-    ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta.get('debug', False))
+    ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
     capture_tasks = []
     existing_images = 0
     existing_image_paths = []
@@ -904,7 +904,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         return
 
     if not ss_times:
-        ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta.get('debug', False))
+        ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta, retake=force_screenshots)
 
     sanitized_filename = await sanitize_filename(filename)
 
@@ -973,18 +973,21 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         await kill_all_child_processes()
         console.print("[red]All tasks cancelled. Exiting.[/red]")
         gc.collect()
+        reset_terminal()
         sys.exit(1)
     except asyncio.CancelledError:
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
         gc.collect()
-        raise
+        reset_terminal()
+        sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error during screenshot capture: {e}[/red]")
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
         gc.collect()
-        return []
+        reset_terminal()
+        sys.exit(1)
     finally:
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
@@ -1017,6 +1020,15 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
             await kill_all_child_processes()
             console.print("[red]All tasks cancelled. Exiting.[/red]")
             gc.collect()
+            reset_terminal()
+            sys.exit(1)
+        except Exception as e:
+            console.print(f"[red]Error during image optimization: {e}[/red]")
+            await asyncio.sleep(0.1)
+            executor.shutdown(wait=True, cancel_futures=True)
+            await kill_all_child_processes()
+            gc.collect()
+            reset_terminal()
             sys.exit(1)
         finally:
             if meta['debug']:
@@ -1355,31 +1367,61 @@ async def capture_screenshot(args):
         return f"Error: {str(e)}"
 
 
-async def valid_ss_time(ss_times, num_screens, length, frame_rate, debug):
-    total_screens = num_screens
+async def valid_ss_time(ss_times, num_screens, length, frame_rate, meta, retake=False):
+    if not meta['is_disc']:
+        total_screens = num_screens + 1
+    else:
+        total_screens = num_screens
+    console.print(f"[cyan]Calculating valid screenshot times for {total_screens} screens[/cyan]")
     total_frames = int(length * frame_rate)
 
-    # Calculate usable portion (from 5% to 90% of video)
-    start_frame = int(total_frames * 0.05)
-    end_frame = int(total_frames * 0.9)
+    # Track retake calls and adjust start frame accordingly
+    retake_offset = 0
+    if retake and meta is not None:
+        if 'retake_call_count' not in meta:
+            meta['retake_call_count'] = 0
+
+        meta['retake_call_count'] += 1
+        retake_offset = meta['retake_call_count'] * 0.01
+
+        if meta['debug']:
+            console.print(f"[cyan]Retake call #{meta['retake_call_count']}, adding {retake_offset:.1%} offset[/cyan]")
+
+    # Calculate usable portion (from 1% to 90% of video)
+    if meta['category'] == "TV" and retake:
+        start_frame = int(total_frames * (0.1 + retake_offset))
+        end_frame = int(total_frames * 0.9)
+    elif meta['category'] == "Movie" and retake:
+        start_frame = int(total_frames * (0.05 + retake_offset))
+        end_frame = int(total_frames * 0.9)
+    else:
+        start_frame = int(total_frames * (0.05 + retake_offset))
+        end_frame = int(total_frames * 0.9)
+
+    # Ensure start_frame doesn't exceed reasonable bounds
+    max_start_frame = int(total_frames * 0.4)  # Don't start beyond 40%
+    start_frame = min(start_frame, max_start_frame)
+
     usable_frames = end_frame - start_frame
     chosen_frames = []
 
     if total_screens > 1:
-        frame_interval = (usable_frames - start_frame) // (total_screens)
+        frame_interval = usable_frames // total_screens
     else:
         frame_interval = usable_frames
 
     result_times = ss_times.copy()
 
     for i in range(total_screens):
-        frame = random.randint(start_frame + (frame_interval * i) + 1, start_frame + frame_interval * (i+1))
+        frame = start_frame + (i * frame_interval)
         chosen_frames.append(frame)
         time = frame / frame_rate
         result_times.append(time)
 
-    if debug:
-        console.print(f"[purple]Screenshots information:[/purple] \n[slate_blue3]Screenshots: [gold3]{total_screens}[/gold3] \nTotal Frames: [gold3]{total_frames}[/gold3] \nStart frame: [gold3]{start_frame}[/gold3] \nEnd frame: [gold3]{end_frame}[/gold3] \nUsable frames: [gold3]{usable_frames}[/gold3][/slate_blue3] \n[yellow]frame interval: {frame_interval} \n[purple]Chosen Frames[/purple]\n[gold3]{chosen_frames}[/gold3]\n")
+    if meta['debug']:
+        console.print(f"[purple]Screenshots information:[/purple] \n[slate_blue3]Screenshots: [gold3]{total_screens}[/gold3] \nTotal Frames: [gold3]{total_frames}[/gold3]")
+        console.print(f"[slate_blue3]Start frame: [gold3]{start_frame}[/gold3] \nEnd frame: [gold3]{end_frame}[/gold3] \nUsable frames: [gold3]{usable_frames}[/gold3][/slate_blue3]")
+        console.print(f"[yellow]frame interval: {frame_interval} \n[purple]Chosen Frames[/purple]\n[gold3]{chosen_frames}[/gold3]\n")
 
     result_times = sorted(result_times)
     return result_times
