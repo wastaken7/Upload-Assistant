@@ -21,6 +21,11 @@ async def process_all_trackers(meta):
     tracker_setup = TRACKER_SETUP(config=config)
     helper = UploadHelper()
     meta_lock = asyncio.Lock()  # noqa F841
+    for tracker in meta['trackers']:
+        if 'tracker_status' not in meta:
+            meta['tracker_status'] = {}
+        if tracker not in meta['tracker_status']:
+            meta['tracker_status'][tracker] = {}
 
     async def process_single_tracker(tracker_name, shared_meta):
         nonlocal successful_trackers
@@ -53,7 +58,6 @@ async def process_all_trackers(meta):
 
                         if imdb_id is None or imdb_id.strip() == "":
                             local_meta['imdb_id'] = 0
-                            local_tracker_status['skipped'] = True
                             break
 
                         imdb_id = imdb_id.strip().lower()
@@ -71,6 +75,9 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['banned'] = False
 
+            if local_meta['tracker_status'][tracker_name].get('skip_upload'):
+                local_tracker_status['skipped'] = True
+
             if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                 if tracker_name == "AITHER":
                     if await tracker_setup.get_torrent_claims(local_meta, tracker_name):
@@ -78,7 +85,7 @@ async def process_all_trackers(meta):
                     else:
                         local_tracker_status['skipped'] = False
 
-                if tracker_name not in {"PTP", "TL"}:
+                if tracker_name not in {"PTP", "TL"} and not local_tracker_status['skipped']:
                     dupes = await tracker_class.search_existing(local_meta, disctype)
                 elif tracker_name == "PTP":
                     ptp = PTP(config=config)
