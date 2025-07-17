@@ -903,9 +903,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
     if num_screens <= 0:
         return
 
-    if not ss_times:
-        ss_times = await valid_ss_time([], num_screens, length, frame_rate, meta, retake=force_screenshots)
-
     sanitized_filename = await sanitize_filename(filename)
 
     if tone_map and "HDR" in meta['hdr']:
@@ -926,11 +923,16 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         return existing_image_paths
 
+    num_capture = num_screens - existing_images_count
+
+    if not ss_times:
+        ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
+
     if frame_overlay:
         console.print("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [
             get_frame_info(path, ss_times[i], meta)
-            for i in range(num_screens)
+            for i in range(num_capture)
             if not os.path.exists(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
             or meta.get('retake', False)
         ]
@@ -944,7 +946,6 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         if meta['debug']:
             console.print(f"[cyan]Collected frame information for {len(frame_info_results)} frames")
 
-    num_capture = num_screens - existing_images_count
     num_tasks = num_capture
     num_workers = min(num_tasks, task_limit)
 
@@ -952,8 +953,9 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         console.print(f"Using {num_workers} worker(s) for {num_capture} image(s)")
 
     capture_tasks = []
-    for i in range(num_screens):
-        image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{i}.png")
+    for i in range(num_capture):
+        image_index = existing_images_count + i
+        image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{image_index}.png")
         if not os.path.exists(image_path) or meta.get('retake', False):
             capture_tasks.append(
                 capture_screenshot(  # Direct async function call
@@ -999,11 +1001,11 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
 
     optimized_results = []
     valid_images = [image for image in capture_results if os.path.exists(image)]
-    num_workers = min(task_limit, len(capture_results))
+    num_workers = min(task_limit, len(valid_images))
     if optimize_images:
         if meta['debug']:
             console.print("[yellow]Now optimizing images...[/yellow]")
-            console.print(f"Using {num_workers} worker(s) for {len(capture_results)} image(s)")
+            console.print(f"Using {num_workers} worker(s) for {len(valid_images)} image(s)")
 
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=num_workers)
         try:
@@ -1368,11 +1370,10 @@ async def capture_screenshot(args):
 
 
 async def valid_ss_time(ss_times, num_screens, length, frame_rate, meta, retake=False):
-    if not meta['is_disc']:
+    if meta['is_disc']:
         total_screens = num_screens + 1
     else:
         total_screens = num_screens
-    console.print(f"[cyan]Calculating valid screenshot times for {total_screens} screens[/cyan]")
     total_frames = int(length * frame_rate)
 
     # Track retake calls and adjust start frame accordingly
