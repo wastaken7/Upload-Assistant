@@ -207,3 +207,10 @@ async def process_desc_language(meta, desc=None, tracker=None):
 
     else:
         return desc if desc is not None else None
+
+
+async def has_english_language(languages):
+    """Check if any language in the list contains 'english'"""
+    if not languages:
+        return False
+    return any('english' in lang.lower() for lang in languages)

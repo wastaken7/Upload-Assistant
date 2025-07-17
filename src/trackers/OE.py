@@ -10,7 +10,7 @@ from src.bbcode import BBCODE
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rehostimages import check_hosts
-from src.languages import process_desc_language
+from src.languages import process_desc_language, has_english_language
 
 
 class OE():
@@ -298,7 +298,7 @@ class OE():
 
         if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
-        if 'English' not in meta.get('audio_languages', []) and 'English' not in meta.get('subtitle_languages', []):
+        if not await has_english_language(meta.get('audio_languages')) and not await has_english_language(meta.get('subtitle_languages')):
             if not meta['unattended']:
                 console.print('[bold red]OE requires at least one English audio or subtitle track.')
             meta['skipping'] = "OE"
