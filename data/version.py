@@ -1,3 +1,33 @@
+__version__ = "5.1.5"
+
+"""
+Changelog for version 5.1.5 (2025-07-18):
+
+## What's Changed
+* Fix LT edit name by @Hielito2 in https://github.com/Audionut/Upload-Assistant/pull/595
+* HUNO encode checks by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/600
+* Update ULCX Banned Release Groups by @backstab5983 in https://github.com/Audionut/Upload-Assistant/pull/601
+* Fix filenames in Description when uploading TV [ ] by @Hielito2 in https://github.com/Audionut/Upload-Assistant/pull/603
+* Handles None imdb_id string by @jacobcxdev in https://github.com/Audionut/Upload-Assistant/pull/606
+* Fix variable reuse by @moontime-goose in https://github.com/Audionut/Upload-Assistant/pull/607
+* Add image restriction to DigitalCore by @PythonCoderAS in https://github.com/Audionut/Upload-Assistant/pull/609
+* Dp banned groups by @OrbitMPGH in https://github.com/Audionut/Upload-Assistant/pull/611
+* centralized language handling by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/604
+* Add randomness to image taking function and cleanup by @Hielito2 in https://github.com/Audionut/Upload-Assistant/pull/608
+* ASC - remove dependency on tracker API by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/610
+* BT - remove dependency on tracker API by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/612
+* Add LDU support by @Audionut in https://github.com/Audionut/Upload-Assistant/pull/613
+* Other fixes here and there.
+
+## New Contributors
+* @jacobcxdev made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/606
+* @moontime-goose made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/607
+* @PythonCoderAS made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/609
+* @OrbitMPGH made their first contribution in https://github.com/Audionut/Upload-Assistant/pull/611
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.4.1...5.1.5
+"""
+
 __version__ = "5.1.4.1"
 
 """
