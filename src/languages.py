@@ -220,6 +220,8 @@ async def process_desc_language(meta, desc=None, tracker=None):
 
 async def has_english_language(languages):
     """Check if any language in the list contains 'english'"""
+    if isinstance(languages, str):
+        languages = [languages]
     if not languages:
         return False
     return any('english' in lang.lower() for lang in languages)
