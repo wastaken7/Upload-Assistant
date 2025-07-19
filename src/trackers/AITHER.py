@@ -145,7 +145,7 @@ class AITHER():
 
         if not meta.get('audio_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
-        else:
+        elif meta.get('audio_languages'):
             audio_languages = meta['audio_languages'][0].upper()
             if audio_languages and not await has_english_language(audio_languages):
                 if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
