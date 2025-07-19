@@ -251,7 +251,7 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
 
     if not edition:
         if video.lower().startswith('dc'):
-            video = video.replace('dc', '', 1)
+            video = video.lower().replace('dc', '', 1)
 
         guess = guessit(video)
         tag = guess.get('release_group', 'NOGROUP')
