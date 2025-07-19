@@ -53,7 +53,7 @@ from src.prep import Prep  # noqa E402
 client = Clients(config=config)
 parser = Args(config)
 use_discord = False
-discord_config = config.get('discord')
+discord_config = config.get('DISCORD')
 if discord_config:
     use_discord = discord_config.get('use_discord', False)
 
