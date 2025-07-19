@@ -240,13 +240,14 @@ class ULCX():
             meta['skipping'] = "ULCX"
             return []
 
-        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
-            await process_desc_language(meta, desc=None, tracker=self.tracker)
-        if not await has_english_language(meta.get('audio_languages')) and not await has_english_language(meta.get('subtitle_languages')):
-            if not meta['unattended']:
-                console.print('[bold red]ULCX requires at least one English audio or subtitle track.')
-            meta['skipping'] = "ULCX"
-            return
+        if not meta['is_disc'] == "BDMV":
+            if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+                await process_desc_language(meta, desc=None, tracker=self.tracker)
+            if not await has_english_language(meta.get('audio_languages')) and not await has_english_language(meta.get('subtitle_languages')):
+                if not meta['unattended']:
+                    console.print('[bold red]ULCX requires at least one English audio or subtitle track.')
+                meta['skipping'] = "ULCX"
+                return
 
         dupes = []
         params = {

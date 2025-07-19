@@ -177,14 +177,15 @@ class DP():
         return 1 if meta.get(flag_name, False) else 0
 
     async def search_existing(self, meta, disctype):
-        if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
-            await process_desc_language(meta, desc=None, tracker=self.tracker)
-        nordic_languages = ['Danish', 'Swedish', 'Norwegian', 'Icelandic', 'Finnish', 'English']
-        if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
-            if not meta['unattended']:
-                console.print('[bold red]DP requires at least one Nordic/English audio or subtitle track.')
-            meta['skipping'] = "DP"
-            return
+        if not meta['is_disc'] == "BDMV":
+            if not meta.get('audio_languages') or not meta.get('subtitle_languages'):
+                await process_desc_language(meta, desc=None, tracker=self.tracker)
+            nordic_languages = ['Danish', 'Swedish', 'Norwegian', 'Icelandic', 'Finnish', 'English']
+            if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
+                if not meta['unattended']:
+                    console.print('[bold red]DP requires at least one Nordic/English audio or subtitle track.')
+                meta['skipping'] = "DP"
+                return
 
         dupes = []
         params = {

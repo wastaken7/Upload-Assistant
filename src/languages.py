@@ -189,16 +189,19 @@ async def process_desc_language(meta, desc=None, tracker=None):
                         else:
                             bitrate_num = int(value)
 
-                    lang = track.get("language", "")
-                    if bitrate_num is not None and bitrate_num < 258:
-                        if lang and lang in audio_languages and len(lang) > 1 and not meta['bluray_audio_skip']:
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                                console.print(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
-                                if cli_ui.ask_yes_no(f"Remove '{lang}' from audio languages?", default=True):
-                                    audio_languages.discard(lang) if isinstance(audio_languages, set) else audio_languages.remove(lang)
-                            else:
+                lang = track.get("language", "")
+                if bitrate_num is not None and bitrate_num < 258:
+                    if lang and lang in audio_languages and len(lang) > 1 and not meta['bluray_audio_skip']:
+                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                            console.print(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
+                            if cli_ui.ask_yes_no(f"Remove '{lang}' from audio languages?", default=True):
                                 audio_languages.discard(lang) if isinstance(audio_languages, set) else audio_languages.remove(lang)
-                            meta['bluray_audio_skip'] = True
+                        else:
+                            audio_languages.discard(lang) if isinstance(audio_languages, set) else audio_languages.remove(lang)
+                        meta['bluray_audio_skip'] = True
+                else:
+                    audio_languages.discard(lang) if isinstance(audio_languages, set) else audio_languages.remove(lang)
+                    meta['bluray_audio_skip'] = True
 
             subtitle_tracks = bdinfo.get("subtitles", [])
             if subtitle_tracks and isinstance(subtitle_tracks[0], dict):
