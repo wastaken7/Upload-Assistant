@@ -97,7 +97,7 @@ async def process_all_trackers(meta):
                     console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
                     console.print("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
 
-                if ('skipping' not in local_meta or local_meta['skipping'] is None) and tracker_name != "TL":
+                if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped'] and tracker_name != "TL":
                     dupes = await filter_dupes(dupes, local_meta, tracker_name)
                     local_meta, is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
                     if is_dupe:
