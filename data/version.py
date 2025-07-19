@@ -1,3 +1,13 @@
+__version__ = "5.1.5.1"
+
+"""
+Changelog for version 5.1.5.1 (2025-07-19):
+
+- Language bases fixes.
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.5...5.1.5.1
+"""
+
 __version__ = "5.1.5"
 
 """
