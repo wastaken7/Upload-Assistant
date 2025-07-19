@@ -1,3 +1,18 @@
+__version__ = "5.1.5.2"
+
+"""
+Changelog for version 5.1.5.2 (2025-07-19):
+
+## What's Changed
+* Update README to include supported trackers list by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/619
+* Get correct discord config in upload.py by @ppkhoa in https://github.com/Audionut/Upload-Assistant/pull/621
+* DC - Remove file extensions from upload filename before torrent upload by @wastaken7 in https://github.com/Audionut/Upload-Assistant/pull/622
+* Fixed a DC edition check
+* Fixed a tracker status check
+
+**Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/5.1.5.1...5.1.5.2
+"""
+
 __version__ = "5.1.5.1"
 
 """
