@@ -83,6 +83,8 @@ async def process_desc_language(meta, desc=None, tracker=None):
         meta['unattended_subtitle_skip'] = False
     if 'no_subs' not in meta:
         meta['no_subs'] = False
+    if 'write_hc_languages' not in meta:
+        meta['write_hc_languages'] = False
     if not meta['is_disc'] == "BDMV":
         try:
             parsed_info = await parsed_mediainfo(meta)
