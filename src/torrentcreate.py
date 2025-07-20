@@ -162,7 +162,7 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
         exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
         include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
 
-    if meta.get('tv_pack'):
+    if meta['category'] == "TV" and meta.get('tv_pack'):
         completeness = check_season_pack_completeness(meta)
 
         if not completeness['complete']:
