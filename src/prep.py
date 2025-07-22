@@ -563,15 +563,15 @@ class Prep():
             meta = await all_ids(meta, tvdb_api, tvdb_token)
 
         # Check if IMDb, TMDb, and TVDb IDs are all present
-        elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0:
+        elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and int(meta['tmdb_id']) != 0 and not meta.get('quickie_search', False):
             meta = await imdb_tmdb_tvdb(meta, filename, tvdb_api, tvdb_token)
 
         # Check if both IMDb and TVDB IDs are present
-        elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0:
+        elif int(meta['imdb_id']) != 0 and int(meta['tvdb_id']) != 0 and not meta.get('quickie_search', False):
             meta = await imdb_tvdb(meta, filename, tvdb_api, tvdb_token)
 
         # Check if both IMDb and TMDb IDs are present
-        elif int(meta['imdb_id']) != 0 and int(meta['tmdb_id']) != 0:
+        elif int(meta['imdb_id']) != 0 and int(meta['tmdb_id']) != 0 and not meta.get('quickie_search', False):
             meta = await imdb_tmdb(meta, filename)
 
         # we have tmdb id one way or another, so lets get data if needed
