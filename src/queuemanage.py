@@ -31,12 +31,15 @@ async def gather_files_recursive(path, allowed_extensions=None):
     """
     Gather files and first-level subfolders.
     Each subfolder is treated as a single unit, without exploring deeper.
+    Skip folders that don't contain allowed extensions or disc structures (VIDEO_TS/BDMV).
     """
     queue = []
     if os.path.isdir(path):
         for entry in os.scandir(path):
             if entry.is_dir():
-                queue.append(entry.path)
+                # Check if this directory should be included
+                if await should_include_directory(entry.path, allowed_extensions):
+                    queue.append(entry.path)
             elif entry.is_file() and (allowed_extensions is None or entry.name.lower().endswith(tuple(allowed_extensions))):
                 queue.append(entry.path)
     elif os.path.isfile(path):
@@ -45,6 +48,37 @@ async def gather_files_recursive(path, allowed_extensions=None):
     else:
         console.print(f"[red]Invalid path: {path}")
     return queue
+
+
+async def should_include_directory(dir_path, allowed_extensions=None):
+    """
+    Check if a directory should be included in the queue.
+    Returns True if the directory contains:
+    - Files with allowed extensions, OR
+    - A subfolder named 'VIDEO_TS' or 'BDMV' (disc structures)
+    """
+    try:
+        # Check for disc structures first (VIDEO_TS or BDMV subfolders)
+        for entry in os.scandir(dir_path):
+            if entry.is_dir() and entry.name.upper() in ('VIDEO_TS', 'BDMV'):
+                return True
+
+        # Check for files with allowed extensions
+        if allowed_extensions:
+            for entry in os.scandir(dir_path):
+                if entry.is_file() and entry.name.lower().endswith(tuple(allowed_extensions)):
+                    return True
+        else:
+            # If no allowed_extensions specified, include any directory with files
+            for entry in os.scandir(dir_path):
+                if entry.is_file():
+                    return True
+
+        return False
+
+    except (OSError, PermissionError) as e:
+        console.print(f"[yellow]Warning: Could not scan directory {dir_path}: {e}")
+        return False
 
 
 async def resolve_queue_with_glob_or_split(path, paths, allowed_extensions=None):
