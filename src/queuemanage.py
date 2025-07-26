@@ -173,37 +173,104 @@ async def handle_queue(path, meta, paths, base_dir):
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
                 existing_queue = json.load(f)
+
+            if os.path.exists(path):
+                current_files = await gather_files_recursive(path, allowed_extensions=allowed_extensions)
+            else:
+                current_files = await resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
+
+            existing_set = set(existing_queue)
+            current_set = set(current_files)
+            new_files = current_set - existing_set
+            removed_files = existing_set - current_set
             log_file_proccess = await get_log_file(base_dir, meta['queue'])
             processed_files = await load_processed_files(log_file_proccess)
             queued = [file for file in existing_queue if file not in processed_files]
-            console.print(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
-            console.print(f"[cyan]The queue log contains {len(existing_queue)} total items and {len(queued)} unprocessed items..[/cyan]")
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
-                console.print("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
-                edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
 
-                if edit_choice == 'e':
-                    edited_content = click.edit(json.dumps(existing_queue, indent=4))
-                    if edited_content:
-                        try:
-                            queue = json.loads(edited_content.strip())
-                            console.print("[bold green]Successfully updated the queue from the editor.")
-                            with open(log_file, 'w') as f:
-                                json.dump(queue, f, indent=4)
-                        except json.JSONDecodeError as e:
-                            console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
-                            queue = existing_queue
+            console.print(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
+            console.print(f"[cyan]The queue log contains {len(existing_queue)} total items and {len(queued)} unprocessed items.[/cyan]")
+
+            if new_files or removed_files:
+                console.print("[bold yellow]Queue changes detected:[/bold yellow]")
+                if new_files:
+                    console.print(f"[green]New files found ({len(new_files)}):[/green]")
+                    for file in sorted(new_files):
+                        console.print(f"  + {file}")
+                if removed_files:
+                    console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
+                    for file in sorted(removed_files):
+                        console.print(f"  - {file}")
+
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    console.print("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
+                    edit_choice = input("Enter 'u' to update, 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
+
+                    if edit_choice == 'u':
+                        queue = current_files
+                        console.print(f"[bold green]Queue updated with current files ({len(queue)} items).")
+                        with open(log_file, 'w') as f:
+                            json.dump(queue, f, indent=4)
+                        console.print(f"[bold green]Queue log file updated: {log_file}[/bold green]")
+                    elif edit_choice == 'e':
+                        edited_content = click.edit(json.dumps(current_files, indent=4))
+                        if edited_content:
+                            try:
+                                queue = json.loads(edited_content.strip())
+                                console.print("[bold green]Successfully updated the queue from the editor.")
+                                with open(log_file, 'w') as f:
+                                    json.dump(queue, f, indent=4)
+                            except json.JSONDecodeError as e:
+                                console.print(f"[bold red]Failed to parse the edited content: {e}. Using the current files.")
+                                queue = current_files
+                        else:
+                            console.print("[bold red]No changes were made. Using the current files.")
+                            queue = current_files
+                    elif edit_choice == 'd':
+                        console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
+                        queue = current_files
+                        with open(log_file, 'w') as f:
+                            json.dump(queue, f, indent=4)
+                        console.print(f"[bold green]New queue log file created: {log_file}[/bold green]")
                     else:
-                        console.print("[bold red]No changes were made. Using the original queue.")
+                        console.print("[bold green]Keeping the existing queue as is.")
                         queue = existing_queue
-                elif edit_choice == 'd':
-                    console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
-                    queue = []
+                else:
+                    # In unattended mode, just use the existing queue
+                    queue = existing_queue
+                    console.print("[bold yellow]New or removed files detected, but unattended mode is active. Using existing queue.")
+            else:
+                # No changes detected
+                console.print("[green]No changes detected in the queue.[/green]")
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended-confirm', False)):
+                    console.print("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
+                    edit_choice = input("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ").strip().lower()
+
+                    if edit_choice == 'e':
+                        edited_content = click.edit(json.dumps(existing_queue, indent=4))
+                        if edited_content:
+                            try:
+                                queue = json.loads(edited_content.strip())
+                                console.print("[bold green]Successfully updated the queue from the editor.")
+                                with open(log_file, 'w') as f:
+                                    json.dump(queue, f, indent=4)
+                            except json.JSONDecodeError as e:
+                                console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
+                                queue = existing_queue
+                        else:
+                            console.print("[bold red]No changes were made. Using the original queue.")
+                            queue = existing_queue
+                    elif edit_choice == 'd':
+                        console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
+                        queue = current_files
+                        with open(log_file, 'w') as f:
+                            json.dump(queue, f, indent=4)
+                        console.print(f"[bold green]New queue log file created: {log_file}[/bold green]")
+                    else:
+                        console.print("[bold green]Keeping the existing queue as is.")
+                        queue = existing_queue
                 else:
                     console.print("[bold green]Keeping the existing queue as is.")
                     queue = existing_queue
-            else:
-                queue = existing_queue
         else:
             if os.path.exists(path):
                 queue = await gather_files_recursive(path, allowed_extensions=allowed_extensions)
