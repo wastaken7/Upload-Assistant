@@ -1235,6 +1235,7 @@ async def capture_screenshot(args):
             )
         else:
             ff = ffmpeg.input(path, ss=ss_time)
+        ff = ff['v']
         if w_sar != 1 or h_sar != 1:
             ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
 
