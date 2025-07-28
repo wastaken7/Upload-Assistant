@@ -90,7 +90,10 @@ class CBR():
         tag_lower = meta['tag'].lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
-        if not meta.get('no_dual', False):
+        if meta.get('no_dual', False):
+            if meta.get('dual_audio', False):
+                cbr_name = cbr_name.replace(f"{meta.get('dual_audio', '')}", '')
+        else:
             if meta.get('audio_languages') and not meta.get('is_disc') == "BDMV":
                 audio_languages = set(meta['audio_languages'])
                 if len(audio_languages) >= 3:
