@@ -597,7 +597,7 @@ async def do_the_thing(base_dir):
         if path.endswith('"'):
             path = path[:-1]
 
-        is_binary = await ensure_mkbrr_binary(base_dir, debug=meta['debug'], version="v1.8.1")
+        is_binary = await get_mkbrr_path(meta)
         if not meta['mkbrr']:
             meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
         if meta['mkbrr'] and not is_binary:
@@ -767,7 +767,7 @@ async def do_the_thing(base_dir):
 
 async def get_mkbrr_path(meta):
     try:
-        mkbrr_path = await ensure_mkbrr_binary(meta['base_dir'])
+        mkbrr_path = await ensure_mkbrr_binary(meta['base_dir'], debug=meta['debug'], version="v1.8.1")
         return mkbrr_path
     except Exception as e:
         console.print(f"[red]Error setting up mkbrr binary: {e}[/red]")
