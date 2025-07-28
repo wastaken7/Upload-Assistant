@@ -92,7 +92,7 @@ class CBR():
 
         if meta.get('no_dual', False):
             if meta.get('dual_audio', False):
-                cbr_name = cbr_name.replace(f"{meta.get('dual_audio', '')}", '')
+                cbr_name = cbr_name.replace("Dual-Audio ", '')
         else:
             if meta.get('audio_languages') and not meta.get('is_disc') == "BDMV":
                 audio_languages = set(meta['audio_languages'])
@@ -104,7 +104,7 @@ class CBR():
                     audio_tag = ''
             if audio_tag:
                 if meta.get('dual_audio', False):
-                    cbr_name = cbr_name.replace(f"{meta.get('dual_audio', '')}", '')
+                    cbr_name = cbr_name.replace("Dual-Audio ", '')
                 if '-' in cbr_name:
                     parts = cbr_name.rsplit('-', 1)
                     cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
