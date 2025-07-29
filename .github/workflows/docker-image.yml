@@ -77,12 +77,10 @@ jobs:
             ADD_LATEST=true
             TRIGGER_INFO="published release"
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ env.IS_TAG }}" == "true" ] && [ "${{ github.event.inputs.use_latest_tag }}" == "true" ]; then
-              # Add latest for manual dispatch from tag when requested
+            if [ "${{ env.IS_TAG }}" == "true" ]; then
+              # Always add latest for manual dispatch from tags
               ADD_LATEST=true
-              TRIGGER_INFO="manual dispatch from tag (with latest)"
-            elif [ "${{ env.IS_TAG }}" == "true" ]; then
-              TRIGGER_INFO="manual dispatch from tag (no latest)"
+              TRIGGER_INFO="manual dispatch from tag (auto-latest)"
             else
               TRIGGER_INFO="manual dispatch from branch (no latest)"
             fi
