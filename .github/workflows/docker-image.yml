@@ -49,6 +49,22 @@ jobs:
             echo "VERSION=${BRANCH_NAME}" >> $GITHUB_ENV
           fi
 
+      - name: Generate Docker tags
+        run: |
+          BASE_TAG="${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
+          
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # For releases: add both version tag and latest
+            TAGS="${BASE_TAG},${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
+            echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
+            echo "TAGGING_MODE=release (with latest)" >> $GITHUB_ENV
+          else
+            # For manual dispatch: only version tag (branch name)
+            TAGS="${BASE_TAG}"
+            echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
+            echo "TAGGING_MODE=manual dispatch (no latest)" >> $GITHUB_ENV
+          fi
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -57,7 +73,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -65,9 +81,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest
+          tags: ${{ env.DOCKER_TAGS }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -75,11 +89,15 @@ jobs:
       - name: Output build information
         run: |
           echo "✅ Docker images built and pushed successfully!"
-          echo "🐋 Images:"
-          echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
-          echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
+          echo "🐋 Images built:"
           if [ "${{ github.event_name }}" == "release" ]; then
+            echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
+            echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
             echo "📝 Triggered by release: ${{ github.event.release.tag_name }}"
+            echo "🏷️ Tagged as 'latest' because this is a published release"
           else
+            echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
             echo "📝 Triggered by manual workflow dispatch on branch: ${{ github.ref_name }}"
+            echo "🏷️ No 'latest' tag for manual builds"
           fi
+          echo "🔧 Tagging mode: ${{ env.TAGGING_MODE }}"
