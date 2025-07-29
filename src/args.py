@@ -412,4 +412,5 @@ class Args():
             category = 'MOVIE'
         else:
             id = id
+        id = int(id)
         return category, id
