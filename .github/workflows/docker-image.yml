@@ -5,6 +5,12 @@ on:
     types:
       - published
   workflow_dispatch:
+    inputs:
+      use_latest_tag:
+        description: 'Tag as latest (only applies when running from a tag)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -44,26 +50,54 @@ jobs:
           if [ "${{ github.event_name }}" == "release" ]; then
             RELEASE_VERSION="${{ github.event.release.tag_name }}"
             echo "VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+            echo "IS_TAG=true" >> $GITHUB_ENV
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            BRANCH_NAME="${{ github.ref_name }}"
-            echo "VERSION=${BRANCH_NAME}" >> $GITHUB_ENV
+            REF_NAME="${{ github.ref_name }}"
+            echo "VERSION=${REF_NAME}" >> $GITHUB_ENV
+            
+            # Check if we're running from a tag (version tag pattern)
+            if [[ "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+              echo "IS_TAG=true" >> $GITHUB_ENV
+              echo "📋 Running from tag: ${REF_NAME}"
+            else
+              echo "IS_TAG=false" >> $GITHUB_ENV
+              echo "📋 Running from branch: ${REF_NAME}"
+            fi
           fi
 
       - name: Generate Docker tags
         run: |
           BASE_TAG="${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
           
+          # Determine if we should add latest tag
+          ADD_LATEST=false
+          
           if [ "${{ github.event_name }}" == "release" ]; then
-            # For releases: add both version tag and latest
-            TAGS="${BASE_TAG},${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
-            echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
-            echo "TAGGING_MODE=release (with latest)" >> $GITHUB_ENV
-          else
-            # For manual dispatch: only version tag (branch name)
-            TAGS="${BASE_TAG}"
-            echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
-            echo "TAGGING_MODE=manual dispatch (no latest)" >> $GITHUB_ENV
+            # Always add latest for published releases
+            ADD_LATEST=true
+            TRIGGER_INFO="published release"
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ env.IS_TAG }}" == "true" ] && [ "${{ github.event.inputs.use_latest_tag }}" == "true" ]; then
+              # Add latest for manual dispatch from tag when requested
+              ADD_LATEST=true
+              TRIGGER_INFO="manual dispatch from tag (with latest)"
+            elif [ "${{ env.IS_TAG }}" == "true" ]; then
+              TRIGGER_INFO="manual dispatch from tag (no latest)"
+            else
+              TRIGGER_INFO="manual dispatch from branch (no latest)"
+            fi
           fi
+          
+          if [ "$ADD_LATEST" == "true" ]; then
+            TAGS="${BASE_TAG},${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
+            echo "WILL_TAG_LATEST=true" >> $GITHUB_ENV
+          else
+            TAGS="${BASE_TAG}"
+            echo "WILL_TAG_LATEST=false" >> $GITHUB_ENV
+          fi
+          
+          echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
+          echo "TRIGGER_INFO=${TRIGGER_INFO}" >> $GITHUB_ENV
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -73,7 +107,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ env.WILL_TAG_LATEST == 'true' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -90,14 +124,13 @@ jobs:
         run: |
           echo "✅ Docker images built and pushed successfully!"
           echo "🐋 Images built:"
-          if [ "${{ github.event_name }}" == "release" ]; then
-            echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
+          
+          if [ "${{ env.WILL_TAG_LATEST }}" == "true" ]; then
             echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
-            echo "📝 Triggered by release: ${{ github.event.release.tag_name }}"
-            echo "🏷️ Tagged as 'latest' because this is a published release"
-          else
-            echo "  - ${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
-            echo "📝 Triggered by manual workflow dispatch on branch: ${{ github.ref_name }}"
-            echo "🏷️ No 'latest' tag for manual builds"
           fi
-          echo "🔧 Tagging mode: ${{ env.TAGGING_MODE }}"
+          
+          echo "📝 Trigger: ${{ env.TRIGGER_INFO }}"
+          echo "🏷️ Version: ${{ env.VERSION }}"
+          echo "🏷️ Is tag: ${{ env.IS_TAG }}"
+          echo "🏷️ Tagged as latest: ${{ env.WILL_TAG_LATEST }}"
