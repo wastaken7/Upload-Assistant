@@ -5,12 +5,6 @@ on:
     types:
       - published
   workflow_dispatch:
-    inputs:
-      use_latest_tag:
-        description: 'Tag as latest (only applies when running from a tag)'
-        required: false
-        type: boolean
-        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -70,42 +64,31 @@ jobs:
           BASE_TAG="${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:${{ env.VERSION }}"
           
           # Determine if we should add latest tag
-          ADD_LATEST=false
-          
-          if [ "${{ github.event_name }}" == "release" ]; then
-            # Always add latest for published releases
-            ADD_LATEST=true
-            TRIGGER_INFO="published release"
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ env.IS_TAG }}" == "true" ]; then
-              # Always add latest for manual dispatch from tags
-              ADD_LATEST=true
-              TRIGGER_INFO="manual dispatch from tag (auto-latest)"
-            else
-              TRIGGER_INFO="manual dispatch from branch (no latest)"
-            fi
-          fi
-          
-          if [ "$ADD_LATEST" == "true" ]; then
+          if [ "${{ github.event_name }}" == "release" ] || [ "${{ env.IS_TAG }}" == "true" ]; then
+            # Add latest for published releases OR manual dispatch from tags
             TAGS="${BASE_TAG},${{ env.REGISTRY }}/${{ env.LOWER_CASE_REPO_NAME }}:latest"
             echo "WILL_TAG_LATEST=true" >> $GITHUB_ENV
+            
+            if [ "${{ github.event_name }}" == "release" ]; then
+              TRIGGER_INFO="published release"
+            else
+              TRIGGER_INFO="manual dispatch from tag (auto-latest)"
+            fi
           else
+            # No latest for manual dispatch from branches
             TAGS="${BASE_TAG}"
             echo "WILL_TAG_LATEST=false" >> $GITHUB_ENV
+            TRIGGER_INFO="manual dispatch from branch (no latest)"
           fi
           
           echo "DOCKER_TAGS=${TAGS}" >> $GITHUB_ENV
           echo "TRIGGER_INFO=${TRIGGER_INFO}" >> $GITHUB_ENV
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ env.WILL_TAG_LATEST == 'true' }}
+          
+          # Debug output
+          echo "🐛 DEBUG: BASE_TAG=${BASE_TAG}"
+          echo "🐛 DEBUG: TAGS=${TAGS}"
+          echo "🐛 DEBUG: IS_TAG=${{ env.IS_TAG }}"
+          echo "🐛 DEBUG: WILL_TAG_LATEST=${WILL_TAG_LATEST}"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
