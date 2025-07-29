@@ -29,11 +29,11 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Copy the download script
-COPY bin/download_mkbrr_docker.py bin/
-RUN chmod +x bin/download_mkbrr_docker.py
+COPY bin/download_mkbrr_for_docker.py bin/
+RUN chmod +x bin/download_mkbrr_for_docker.py
 
 # Download only the required mkbrr binary
-RUN python3 bin/download_mkbrr_docker.py
+RUN python3 bin/download_mkbrr_for_docker.py
 
 # Copy the rest of the application
 COPY . .
