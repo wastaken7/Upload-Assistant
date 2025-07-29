@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -219,7 +220,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.VERSION }}
-          name: "Release ${{ env.VERSION }}"
+          name: "${{ env.VERSION }}"
           body: ${{ env.CHANGELOG }}
           draft: false
           prerelease: false
@@ -233,3 +234,16 @@ jobs:
           echo "📝 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ env.VERSION }}"
           echo "📄 Version file updated and committed with tag: ${{ env.VERSION }}"
           echo "🏷️ Tag includes the version commit"
+
+      - name: Trigger Docker build
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker-image.yml',
+              ref: '${{ env.VERSION }}'
+            });
+            console.log('🐳 Triggered Docker workflow for tag: ${{ env.VERSION }}');
