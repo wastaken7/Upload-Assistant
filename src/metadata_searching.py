@@ -212,16 +212,17 @@ async def all_ids(meta, tvdb_api=None, tvdb_token=None):
             console.print(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}")
 
     elif meta.get('category') == 'TV' and meta.get('tv_pack', False):
-        # Process TVDb series data
-        tvdb_series_data = results[result_index]
-        result_index += 1
+        if tvdb_api and tvdb_token:
+            # Process TVDb series data
+            tvdb_series_data = results[result_index]
+            result_index += 1
 
-        if tvdb_series_data and not isinstance(tvdb_series_data, Exception):
-            meta['tvdb_series_name'] = tvdb_series_data
-            meta['we_checked_tvdb'] = True
+            if tvdb_series_data and not isinstance(tvdb_series_data, Exception):
+                meta['tvdb_series_name'] = tvdb_series_data
+                meta['we_checked_tvdb'] = True
 
-        elif isinstance(tvdb_series_data, Exception):
-            console.print(f"[yellow]TVDb series data retrieval failed: {tvdb_series_data}")
+            elif isinstance(tvdb_series_data, Exception):
+                console.print(f"[yellow]TVDb series data retrieval failed: {tvdb_series_data}")
     return meta
 
 
@@ -702,7 +703,7 @@ async def get_tvmaze_tvdb(meta, filename, tvdb_api=None, tvdb_token=None):
         meta['tvmaze_id'] = 0
 
     # Process TVDb results if we added that task
-    if len(results) > 1:
+    if len(results) > 1 and tvdb_api and tvdb_token:
         tvdb_result = results[1]
         if tvdb_result and not isinstance(tvdb_result, Exception):
             meta['tvdb_id'] = tvdb_result
