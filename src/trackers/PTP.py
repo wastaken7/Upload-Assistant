@@ -211,7 +211,7 @@ class PTP():
         desc = None
         imagelist = []
         bbcode = BBCODE()
-        desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc, meta)
+        desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
         if not meta.get('only_id'):
             console.print("[bold green]Successfully grabbed description from PTP")
