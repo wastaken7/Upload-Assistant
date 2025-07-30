@@ -1,4 +1,17 @@
-__version__ = "v5.2.0"
+__version__ = "v5.2.1"
+
+"""
+Release Notes for version v5.2.1 (2025-07-30):
+
+# ## What's Changed
+# 
+# * fix no_subs meta by @Audionut in 86f2bcf
+# * Robust id from mediainfo (#645) by @Audionut in 9c43584
+# * Other minor updates and improvements
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v5.2.0...v5.2.1
+"""
+
 
 """
 Release Notes for version v5.2.0 (2025-07-29):
