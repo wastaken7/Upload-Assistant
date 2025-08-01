@@ -328,7 +328,12 @@ async def process_meta(meta, base_dir, bot=None):
                             await cleanup()
                             gc.collect()
                             reset_terminal()
-                            raise Exception(f"Error during screenshot capture: {e}")
+                            try:
+                                raise Exception(f"Error during screenshot capture: {e}")
+                            except Exception as e2:
+                                if "workers" in str(e2):
+                                    console.print("[red]max workers issue, see https://github.com/Audionut/Upload-Assistant/wiki/ffmpeg---max-workers-issues[/red]")
+                                raise e2
 
                 except asyncio.CancelledError:
                     await cleanup_screenshot_temp_files(meta)
@@ -337,13 +342,13 @@ async def process_meta(meta, base_dir, bot=None):
                     gc.collect()
                     reset_terminal()
                     raise Exception("Error during screenshot capture")
-                except Exception as e:
+                except Exception:
                     await cleanup_screenshot_temp_files(meta)
                     await asyncio.sleep(0.1)
                     await cleanup()
                     gc.collect()
                     reset_terminal()
-                    raise Exception(f"Error during screenshot capture: {e}")
+                    raise Exception
                 finally:
                     await asyncio.sleep(0.1)
                     await cleanup()

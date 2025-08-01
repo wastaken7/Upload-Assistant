@@ -997,8 +997,7 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         gc.collect()
         reset_terminal()
         sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Error during screenshot capture: {e}[/red]")
+    except Exception:
         await asyncio.sleep(0.1)
         await kill_all_child_processes()
         gc.collect()
