@@ -549,7 +549,8 @@ async def dvd_screenshots(meta, disc_num, num_screens=None, retry_cap=None):
             input_files.append(input_file)
 
         if frame_overlay:
-            console.print("[yellow]Getting frame information for overlays...")
+            if meta['debug']:
+                console.print("[yellow]Getting frame information for overlays...")
             frame_info_tasks = [
                 get_frame_info(input_files[i], ss_times[i], meta)
                 for i in range(num_screens + 1)
@@ -943,7 +944,8 @@ async def screenshots(path, filename, folder_id, base_dir, meta, num_screens=Non
         ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
 
     if frame_overlay:
-        console.print("[yellow]Getting frame information for overlays...")
+        if meta['debug']:
+            console.print("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [
             get_frame_info(path, ss_times[i], meta)
             for i in range(num_capture)
