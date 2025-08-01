@@ -74,6 +74,8 @@ Better just to be on this fork and bug me about my bugs, rather than bugging som
       - On linux systems, get it from your favorite package manager
       - If you have issues with ffmpeg, such as `max workers` errors, and particuarly on seedboxes,
       - and cannot update binary, see https://github.com/Audionut/Upload-Assistant/pull/641
+      - Use the following on linux based systems to check existing ffmpeg
+      - `which ffmpeg` -v quiet -hide_banner -version | grep -q -- --enable-libzimg && echo "FFmpeg compiled with libzimg" || echo "FFmpeg not compiled with libzimg"
    - Get the source:
       - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git`
       - Fetch all of the release tags `git fetch --all --tags`
