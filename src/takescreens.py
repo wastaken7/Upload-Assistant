@@ -1368,7 +1368,10 @@ async def capture_screenshot(args):
             return (index, image_path)
         else:
             stderr_text = stderr.decode('utf-8', errors='replace')
-            console.print(f"[red]FFmpeg error capturing screenshot: {stderr_text}[/red]")
+            if "Error initializing complex filters" in stderr_text:
+                console.print("[red]FFmpeg complex filters error: see https://github.com/Audionut/Upload-Assistant/wiki/ffmpeg---max-workers-issues[/red]")
+            else:
+                console.print(f"[red]FFmpeg error capturing screenshot: {stderr_text}[/red]")
             return (index, None)
     except Exception as e:
         console.print(traceback.format_exc())
