@@ -604,6 +604,13 @@ class BT(COMMON):
         subtitles_info = await self.get_subtitles(meta)
         tmdb_data = await self.tmdb_data(meta)
 
+        desc_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        try:
+            with open(desc_file_path, 'r', newline='', encoding='utf-8') as desc_file:
+                especificas_content = desc_file.read()
+        except FileNotFoundError:
+            especificas_content = ""
+
         data = {
             'submit': 'true',
             'auth': self.auth_token,
@@ -628,7 +635,7 @@ class BT(COMMON):
             'bitrate': self.get_bitrate(meta),
             'screen[]': self.get_screens(meta),
             'desc': '',
-            'especificas': f"{open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', newline='', encoding='utf-8').read()}",
+            'especificas': especificas_content,
             'subtitles[]': subtitles_info.get('subtitles[]'),
         }
 
