@@ -374,6 +374,7 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
             if not meta['unattended']:
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
                 if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                    found_match = True
                     if meta.get('description') and meta.get('description') != "":
                         description = meta.get('description')
                         console.print("[bold green]Successfully grabbed description from BHD")
@@ -446,7 +447,6 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                         if valid_images:
                             meta['image_list'] = valid_images
                             await handle_image_list(meta, tracker_name, valid_images)
-                            found_match = True
                             console.print(f"[green]{tracker_name} data retained.[/green]")
                         else:
                             meta['image_list'] = []
@@ -471,11 +471,11 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                     found_match = False
             else:
                 console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.get('imdb_id')}, TMDb ID: {meta.get('tmdb_id')}[/green]")
+                found_match = True
                 if meta.get('image_list'):
                     valid_images = await check_images_concurrently(meta.get('image_list'), meta)
                     if valid_images:
                         meta['image_list'] = valid_images
-                        found_match = True
                     else:
                         meta['image_list'] = []
         else:
