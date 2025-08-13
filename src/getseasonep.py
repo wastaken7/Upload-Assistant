@@ -89,7 +89,7 @@ async def get_season_episode(video, meta):
             # if the mal id is set, then we've already run get_romaji in tmdb.py
             if meta.get('mal_id') == 0 and meta['category'] == "TV":
                 parsed = anitopy.parse(Path(video).name)
-                romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal_id', 0))
+                romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta['demographic'] = await get_romaji(parsed['anime_title'], meta.get('mal_id', 0), meta)
                 if mal_id:
                     meta['mal_id'] = mal_id
                 if meta.get('tmdb_id') == 0:
