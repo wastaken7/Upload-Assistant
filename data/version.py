@@ -1,4 +1,31 @@
-__version__ = "v5.3.2"
+__version__ = "v5.3.3"
+
+"""
+Release Notes for version v5.3.3 (2025-08-14):
+
+# 
+# ## RELEASE NOTES
+#  - New module added requiring update via requirements.txt. See README for instructions.
+# 
+# ---
+# 
+# ## What's Changed
+# 
+# * use all of result when specific is NoneType by @Audionut in 15faaad
+# * don't print guessit error in imdb by @Audionut in 3b21998
+# * add support for multiple announce links (#691) by @wastaken7 in 4a623d7
+# * Added support for PHD (#689) by @wastaken7 in 1170f46
+# * pass meta to romaji by @Audionut in 6594f2c
+# * DC - API update (#695) by @wastaken7 in 14380f2
+# * remove trackers found in client (#683) by @Audionut in 3207fd3
+# * Add service Chorki (#690) by @razinares in fa16ebf
+# * fix docker mediainfo install (#699) by @Audionut in aa84c07
+# * Option - send upload urls to discord (#694) by @Audionut in 29fbcf5
+# * Other minor updates and improvements
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v5.3.2...v5.3.3
+"""
+
 
 """
 Release Notes for version v5.3.2 (2025-08-11):
