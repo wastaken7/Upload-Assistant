@@ -764,6 +764,7 @@ class ASC(COMMON):
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
                     console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
+                    meta['tracker_status'][self.tracker]['skipped'] = True
                     meta['tracker_status'][self.tracker]['upload'] = False
 
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
