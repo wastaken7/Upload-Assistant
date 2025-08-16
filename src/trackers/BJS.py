@@ -29,6 +29,7 @@ class BJS(COMMON):
         self.banned_groups = [""]
         self.source_flag = "BJ"
         self.base_url = "https://bj-share.info"
+        self.torrent_url = "https://bj-share.info/torrents.php?torrentid="
         self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={
@@ -673,22 +674,19 @@ class BJS(COMMON):
     async def img_host(self, image_bytes: bytes, filename: str) -> Optional[str]:
         upload_url = f"{self.base_url}/ajax.php?action=screen_up"
         headers = {
-            'Referer': f"{self.base_url}/upload.php",
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
+            "Referer": f"{self.base_url}/upload.php",
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json",
         }
-        files = {'file': (filename, image_bytes, 'image/png')}
+        files = {"file": (filename, image_bytes, "image/png")}
 
         try:
-            response = await asyncio.to_thread(
-                self.session.post, upload_url, headers=headers, files=files, timeout=120
+            response = await self.session.post(
+                upload_url, headers=headers, files=files, timeout=120
             )
-            if response.ok:
-                data = response.json()
-                return data.get('url', '').replace('\\/', '/')
-            else:
-                print(f"Erro no upload de {filename}: Status {response.status_code}")
-                return None
+            response.raise_for_status()
+            data = response.json()
+            return data.get("url", "").replace("\\/", "/")
         except Exception as e:
             print(f"Exceção no upload de {filename}: {e}")
             return None
@@ -718,34 +716,43 @@ class BJS(COMMON):
                 return None
 
     async def get_screenshots(self, meta):
-        screenshot_dir = Path(meta['base_dir']) / 'tmp' / meta['uuid']
-        local_files = sorted(screenshot_dir.glob('*.png'))
-
+        screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
+        local_files = sorted(screenshot_dir.glob("*.png"))
         results = []
 
         # Use existing files
         if local_files:
             async def upload_local_file(path):
-                with open(path, 'rb') as f:
+                with open(path, "rb") as f:
                     image_bytes = f.read()
                 return await self.img_host(image_bytes, os.path.basename(path))
 
             paths = local_files[:6]
 
-            for coro in tqdm(asyncio.as_completed([upload_local_file(p) for p in paths]), total=len(paths), desc=f"Enviando {len(local_files)} screenshots para o host do {self.tracker}"):
+            for coro in tqdm(
+                asyncio.as_completed([upload_local_file(p) for p in paths]),
+                total=len(paths),
+                desc=f"Enviando {len(local_files)} screenshots para o host do {self.tracker}",
+            ):
                 result = await coro
                 if result:
                     results.append(result)
 
-        # If no files are found, get them from meta links
         else:
-            image_links = [img.get('raw_url') for img in meta.get('image_list', []) if img.get('raw_url')][:6]
+            image_links = [
+                img.get("raw_url")
+                for img in meta.get("image_list", [])
+                if img.get("raw_url")
+            ][:6]
+
             if len(image_links) < 2:
-                raise UploadException(f"[bold red]FALHA NO UPLOAD:[/bold red] É necessário pelo menos 2 screenshots para fazer upload para o {self.tracker}.")
+                raise UploadException(
+                    f"[bold red]FALHA NO UPLOAD:[/bold red] É necessário pelo menos 2 screenshots para fazer upload para o {self.tracker}."
+                )
 
             async def upload_remote_file(url):
                 try:
-                    response = await asyncio.to_thread(self.session.get, url, timeout=120)
+                    response = await self.session.get(url, timeout=120)
                     response.raise_for_status()
                     image_bytes = response.content
                     filename = os.path.basename(urlparse(url).path) or "screenshot.png"
@@ -754,15 +761,19 @@ class BJS(COMMON):
                     print(f"Falha ao processar screenshot da URL {url}: {e}")
                     return None
 
-            links = image_links
-
-            for coro in tqdm(asyncio.as_completed([upload_remote_file(url) for url in links]), total=len(links), desc=f"Enviando {len(image_links)} screenshots para o host do {self.tracker}"):
+            for coro in tqdm(
+                asyncio.as_completed([upload_remote_file(url) for url in image_links]),
+                total=len(image_links),
+                desc=f"Enviando {len(image_links)} screenshots para o host do {self.tracker}",
+            ):
                 result = await coro
                 if result:
                     results.append(result)
 
         if len(results) < 2:
-            raise UploadException(f"[bold red]FALHA NO UPLOAD:[/bold red] O host de imagem do {self.tracker} não retornou o número mínimo de screenshots.")
+            raise UploadException(
+                f"[bold red]FALHA NO UPLOAD:[/bold red] O host de imagem do {self.tracker} não retornou o número mínimo de screenshots."
+            )
 
         return results
 
@@ -1037,7 +1048,7 @@ class BJS(COMMON):
         status_message = ''
 
         if not meta.get('debug', False):
-            torrent_url = ''
+            torrent_id = ''
             upload_url = f"{self.base_url}/upload.php"
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
@@ -1045,25 +1056,34 @@ class BJS(COMMON):
                 files = {'file_input': (f"{self.tracker}.placeholder.torrent", torrent_file, "application/x-bittorrent")}
 
                 response = await self.session.post(upload_url, data=data, files=files, timeout=120)
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-                if response.status_code == 200 and 'Clique em baixar para entrar de' in response.text:
+                if 'Clique em baixar para entrar de' in response.text:
+                    page_element = soup.select_one('div#wrapper div#content p font')
 
-                    id_match = re.search(r'action=download&id=(\d+)', response.text)
-                    if id_match:
-                        torrent_id = id_match.group(1)
+                    # Find the torrent id
+                    match = re.search(r'action=download&id=(\d+)', response.text)
+                    if match:
+                        torrent_id = match.group(1)
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                        torrent_url = f"{self.base_url}/torrents.php?torrentid={torrent_id}"
-                        status_message = f"Enviado com sucesso. {torrent_url}"
 
                 else:
+                    page_element = soup.select_one("div.thin p[style*='color: red']")
+
                     response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
-                    console.print("[bold red]Falha no upload para o ASC. A resposta do servidor não indicou sucesso.[/bold red]")
-                    console.print(f"[yellow]A resposta foi salva em: {response_save_path}[/yellow]")
-                    raise UploadException("Falha no upload para o ASC: resposta inesperada do servidor.", 'red')
+                    console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
+                    meta['tracker_status'][self.tracker]['skipped'] = True
+                    meta['tracker_status'][self.tracker]['upload'] = False
 
-            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, torrent_url)
+                # Find the response text
+                page_message = ""
+                if page_element:
+                    page_message = page_element.get_text(strip=True)
+                    status_message = page_message
+
+            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
             console.print(data)
