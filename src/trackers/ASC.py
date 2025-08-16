@@ -20,6 +20,7 @@ class ASC(COMMON):
         self.source_flag = 'ASC'
         self.banned_groups = [""]
         self.base_url = "https://cliente.amigos-share.club"
+        self.torrent_url = "https://cliente.amigos-share.club/torrents-details.php?id="
         self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
         self.session = httpx.AsyncClient(headers={
@@ -27,7 +28,7 @@ class ASC(COMMON):
         }, timeout=60.0)
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via Audionut's Upload Assistant[/url][/center]"
 
-        self.anime_subtitle_map = {
+        self.language_map = {
             "bg": "15", "da": "12",
             "de": "3", "en": "1",
             "es": "6", "fi": "14",
@@ -39,7 +40,7 @@ class ASC(COMMON):
             "sv": "13", "th": "21",
             "tr": "25", "zh": "10",
         }
-        self.anime_audio_map = {
+        self.anime_language_map = {
             "de": "3", "en": "4",
             "es": "1", "ja": "8",
             "ko": "11", "pt": "5",
@@ -165,17 +166,17 @@ class ASC(COMMON):
             if meta['category'] == 'TV':
                 type_ = '118'
 
-            audio = self.anime_audio_map.get(meta.get('original_language', '').lower(), "6")
+            anime_language = self.anime_language_map.get(meta.get('original_language', '').lower(), "6")
 
             if self.get_audio(meta) in ('2', '3', '4'):
-                subtitle = "8"
+                lang = "8"
             else:
-                subtitle = self.anime_subtitle_map.get(meta.get('original_language', '').lower(), "11")
+                lang = self.language_map.get(meta.get('original_language', '').lower(), "11")
 
             return {
                 'type': type_,
-                'audio': audio,
-                'subtitle': subtitle
+                'idioma': anime_language,
+                'lang': lang
             }
 
     async def get_audio(self, meta):
@@ -698,6 +699,7 @@ class ASC(COMMON):
             'imdb': meta['imdb_info']['imdbID'],
             'altura': resolution['height'],
             'largura': resolution['width'],
+            'lang': self.language_map.get(meta.get('original_language', '').lower(), "11"),
             'layout': self.layout,
             'legenda': await self.get_subtitle(meta),
             'name': await self.get_title(meta),
@@ -709,9 +711,9 @@ class ASC(COMMON):
 
         if meta.get('anime'):
             anime_info = await self.get_languages(meta)
-            data = {
-                'idioma': anime_info['audio'],
-                'lang': anime_info['subtitle'],
+            data.update = {
+                'idioma': anime_info['idioma'],
+                'lang': anime_info['lang'],
                 'type': anime_info['type'],
             }
 
@@ -727,7 +729,7 @@ class ASC(COMMON):
         status_message = ''
 
         if not meta.get('debug', False):
-            torrent_url = ''
+            torrent_id = ''
             upload_url = self.get_upload_url(meta)
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
@@ -735,28 +737,36 @@ class ASC(COMMON):
                 files = {'torrent': (f"{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent", torrent_file, "application/x-bittorrent")}
 
                 response = await self.session.post(upload_url, data=data, files=files, timeout=60)
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-                if "foi enviado com sucesso" in response.text:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    details_link_tag = soup.find('a', href=lambda href: href and "torrents-details.php?id=" in href)
-                    torrent_id = details_link_tag['href']
-                    meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                    torrent_url = f"{self.base_url}/{torrent_id}"
-                    status_message = f"Enviado com sucesso. {torrent_url}"
+                # Find the response text
+                page_element = soup.select_one('div.card-body center b')
+                page_message = ""
+                if page_element:
+                    page_message = page_element.get_text(strip=True)
+                    status_message = page_message
 
-                    should_approve = await self.get_approval(meta)
-                    if should_approve:
-                        await self.auto_approval(torrent_id)
+                if "enviado com sucesso" in page_message:
+
+                    # Find the torrent id
+                    match = re.search(r"torrents-details\.php\?id=(\d+)", str(soup))
+                    if match:
+                        torrent_id = match.group(1) if match else None
+                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+
+                        # Approval
+                        should_approve = await self.get_approval(meta)
+                        if should_approve:
+                            await self.auto_approval(torrent_id)
 
                 else:
                     response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
-                    console.print(f"{self.tracker}: Possível falha no upload. Talvez o upload tenha sido bem-sucedido, por favor, verifique.")
-                    console.print(f"A resposta foi salva em: {response_save_path}")
-                    raise UploadException(f"Falha no upload para o {self.tracker}: resposta inesperada do servidor.")
+                    console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
+                    meta['tracker_status'][self.tracker]['upload'] = False
 
-            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, torrent_url)
+            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
             console.print(data)
