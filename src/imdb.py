@@ -253,7 +253,6 @@ async def get_imdb_info_api(imdbID, manual_language=None, debug=False):
     imdb_info['imdbID'] = imdbID
     imdb_info['title'] = await safe_get(title_data, ['titleText', 'text'])
     countries_list = await safe_get(title_data, ['countriesOfOrigin', 'countries'], [])
-    countries_list = await safe_get(title_data, ['countriesOfOrigin', 'countries'], [])
     if isinstance(countries_list, list) and countries_list:
         # First country for 'country'
         imdb_info['country'] = countries_list[0].get('text', '')
