@@ -2,10 +2,10 @@
 import asyncio
 import bencodepy
 import hashlib
+import httpx
 import os
 import platform
 import re
-import requests
 import uuid
 from .COMMON import COMMON
 from bs4 import BeautifulSoup
@@ -27,11 +27,11 @@ class PHD(COMMON):
         self.source_flag = "PrivateHD"
         self.banned_groups = [""]
         self.base_url = "https://privatehd.to"
+        self.torrent_url = "https://privatehd.to/torrent/"
         self.auth_token = None
-        self.session = requests.Session()
-        self.session.headers.update({
+        self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Audionut's Upload Assistant ({platform.system()} {platform.release()})"
-        })
+        }, timeout=60.0)
         self.signature = ""
 
     def rules(self, meta):
@@ -521,7 +521,7 @@ class PHD(COMMON):
 
         try:
             upload_page_url = f"{self.base_url}/upload"
-            response = self.session.get(upload_page_url, timeout=10, allow_redirects=True)
+            response = await self.session.get(upload_page_url, timeout=10)
 
             if 'login' in str(response.url):
                 console.print(f"[red]{self.tracker} validation failed. The cookie appears to be expired or invalid.[/red]")
@@ -571,7 +571,7 @@ class PHD(COMMON):
             visited_urls.add(page_url)
 
             try:
-                response = self.session.get(page_url, allow_redirects=False)
+                response = await self.session.get(page_url)
                 response.raise_for_status()
 
                 soup = BeautifulSoup(response.text, 'html.parser')
@@ -588,7 +588,7 @@ class PHD(COMMON):
                     # if no rel="next", we are at the last page
                     page_url = None
 
-            except requests.RequestException as e:
+            except httpx.RequestError as e:
                 console.log(f"{self.tracker}: Failed to search for duplicates. {e.request.url}: {e}")
                 return dupes
 
@@ -615,14 +615,17 @@ class PHD(COMMON):
         }
 
         try:
-            response = self.session.get(ajax_url, headers=headers, timeout=20)
+            response = await self.session.get(ajax_url, headers=headers, timeout=20)
             response.raise_for_status()
 
             data = response.json()
             if data.get('data'):
                 self.media_code = str(data['data'][0]['id'])
             else:
-                console.print(f"No code found for {meta['imdb_info']['imdbID']} in {ajax_url}")
+                # maybe create a function to add the media to the database in the future
+                console.print(f"This media ({meta['imdb_info']['imdbID']}) is not registered in {self.tracker}, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}")
+                meta['skipping'] = f"{self.tracker}"
+                return
 
         except Exception as e:
             console.print(f"[red]Error trying to fetch media code for tracker {self.tracker}: {e}[/red]")
@@ -694,18 +697,16 @@ class PHD(COMMON):
         files = {'qqfile': (filename, image_bytes, 'image/png')}
 
         try:
-            response = await asyncio.to_thread(
-                self.session.post, upload_url, headers=headers, data=data, files=files, timeout=120
-            )
+            response = await self.session.post(upload_url, headers=headers, data=data, files=files, timeout=120)
 
-            if response.ok:
+            if response.is_success:
                 json_data = response.json()
                 if json_data.get('success'):
                     image_id = json_data.get('imageId')
                     return str(image_id)
                 else:
                     error_message = json_data.get('error', 'Unknown image host error.')
-                    print(f"Erro no upload de {filename}: {error_message}")
+                    print(f"Error uploading {filename}: {error_message}")
                     return None
             else:
                 print(f"Error uploading {filename}: Status {response.status_code} - {response.text}")
@@ -719,20 +720,21 @@ class PHD(COMMON):
         local_files = sorted(screenshot_dir.glob('*.png'))
         results = []
 
-        # Rule: [...] However, you may include only 3 screenshots for single TV show episodes.
         limit = 3 if meta.get('tv_pack', '') == 0 else None
 
         if local_files:
             async def upload_local_file(path):
                 with open(path, 'rb') as f:
                     image_bytes = f.read()
-                return await self.img_host(meta, image_bytes, os.path.basename(path))
+                return await self.img_host(meta, image_bytes, path.name)
 
             paths = local_files[:limit] if limit else local_files
+            tasks = [upload_local_file(p) for p in paths]
+
             for coro in tqdm(
-                asyncio.as_completed([upload_local_file(p) for p in paths]),
+                asyncio.as_completed(tasks),
                 total=len(paths),
-                desc=f"Uploading {len(paths)} screenshots to {self.tracker} host"
+                desc=f"Uploading screenshots to {self.tracker}"
             ):
                 result = await coro
                 if result:
@@ -745,7 +747,7 @@ class PHD(COMMON):
 
             async def upload_remote_file(url):
                 try:
-                    response = await asyncio.to_thread(self.session.get, url, timeout=120)
+                    response = await self.session.get(url, timeout=120)
                     response.raise_for_status()
                     image_bytes = response.content
                     filename = os.path.basename(urlparse(url).path) or "screenshot.png"
@@ -755,10 +757,12 @@ class PHD(COMMON):
                     return None
 
             links = image_links[:limit] if limit else image_links
+            tasks = [upload_remote_file(url) for url in links]
+
             for coro in tqdm(
-                asyncio.as_completed([upload_remote_file(url) for url in links]),
+                asyncio.as_completed(tasks),
                 total=len(links),
-                desc=f"Uploading {len(links)} screenshots to {self.tracker} host"
+                desc=f"Uploading screenshots to {self.tracker}"
             ):
                 result = await coro
                 if result:
@@ -769,27 +773,142 @@ class PHD(COMMON):
 
         return results
 
-    async def upload(self, meta, disctype):
-        lang_info = await self.get_lang(meta)
+    async def get_requests(self, meta):
+        if self.config['DEFAULT'].get('check_requests', False) is False:
+            return False
+
+        else:
+            try:
+                category = meta.get('category').lower()
+
+                if category == 'tv':
+                    query = meta['title'] + f" {meta.get('season', '')}{meta.get('episode', '')}"
+                else:
+                    query = meta['title']
+
+                # Debug
+                if meta.get('debug', False):
+                    console.print("DEBUG: Please input the query for searching requests:")
+                    query = input().lower()
+                    console.print("DEBUG: Please input the category for searching requests (tv or movie):")
+                    category = input().lower()
+
+                search_url = f"{self.base_url}/requests?type={category}&search={query}&condition=new"
+
+                response = await self.session.get(search_url)
+                response.raise_for_status()
+                response_results_text = response.text
+
+                soup = BeautifulSoup(response_results_text, "html.parser")
+
+                request_rows = soup.select(".table-responsive table tbody tr")
+
+                results = []
+                for row in request_rows:
+                    link_element = row.select_one("a.torrent-filename")
+
+                    if not link_element:
+                        continue
+
+                    name = link_element.text.strip()
+                    link = link_element.get("href")
+
+                    all_tds = row.find_all("td")
+
+                    reward = all_tds[5].text.strip() if len(all_tds) > 5 else 'N/A'
+
+                    results.append({
+                        "Name": name,
+                        "Link": link,
+                        "Reward": reward
+                    })
+
+                if results:
+                    message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
+                    for r in results:
+                        message += f"[bold green]Name:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
+                    console.print(message)
+
+                return results
+
+            except Exception as e:
+                console.print(f"[bold red]An error occurred while fetching requests for {self.tracker}: {e}[/bold red]")
+                import traceback
+                console.print(traceback.format_exc())
+                return []
+
+    async def create_task_id(self, meta):
         await self.validate_credentials(meta)
-        if not await self.get_media_code(meta):
-            # maybe create a function to add the media to the database in the future
-            raise UploadException(f"This media ({meta['imdb_info']['imdbID']}) is not registered in {self.tracker}, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}")
+        await self.get_media_code(meta)
 
-        final_message = ""
-
-        # Uploading to the tracker works in 2 separate steps
-        # Step 1:
-        data1 = {
+        data = {
             '_token': self.auth_token,
             'type_id': await self.get_cat_id(meta['category']),
             'movie_id': self.media_code,
             'media_info': await self.get_file_info(meta),
         }
 
-        # After sending the first set of data we are redirected to a second page where we fill in the remaining data
-        # Step 2:
-        data2 = {
+        if not meta.get('debug', False):
+            try:
+                await self.edit_torrent(meta, self.tracker, self.source_flag)
+                upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
+                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+
+                with open(torrent_path, 'rb') as torrent_file:
+                    files = {'torrent_file': (os.path.basename(torrent_path), torrent_file, 'application/x-bittorrent')}
+                    torrent_data = bencodepy.decode(torrent_file.read())
+                    info = bencodepy.encode(torrent_data[b'info'])
+                    info_hash = hashlib.sha1(info).hexdigest()
+
+                    task_response = await self.session.post(upload_url_step1, data=data, files=files, timeout=120)
+
+                    if task_response.status_code == 302 and 'Location' in task_response.headers:
+                        await asyncio.sleep(5)
+                        redirect_url = task_response.headers['Location']
+
+                        match = re.search(r'/(\d+)$', redirect_url)
+                        if not match:
+                            console.print(f"Could not extract 'task_id' from redirect URL:{redirect_url}")
+                            meta['skipping'] = f"{self.tracker}"
+                            return
+
+                        task_id = match.group(1)
+
+                        return {
+                            'task_id': task_id,
+                            'info_hash': info_hash,
+                            'redirect_url': redirect_url,
+                        }
+
+                    else:
+                        failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html"
+                        with open(failure_path, "w", encoding="utf-8") as f:
+                            f.write(task_response.text)
+                        status_message = f"""[red]Step 1 of upload failed to {self.tracker}. Status: {task_response.status_code}, URL: {task_response.url}[/red].
+                                            [yellow]The HTML response was saved to '{failure_path}' for analysis.[/yellow]"""
+
+            except Exception as e:
+                status_message = f"[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]"
+                meta['skipping'] = f"{self.tracker}"
+                return
+
+        else:
+            console.print(data)
+            status_message = 'Debug mode enabled, not uploading.'
+
+        meta['tracker_status'][self.tracker]['status_message'] = status_message
+
+    async def upload(self, meta, disctype):
+        await self.validate_credentials(meta)
+        task_info = await self.create_task_id(meta)
+        lang_info = await self.get_lang(meta) or {}
+        requests = await self.get_requests(meta)
+
+        status_message = ""
+
+        data = {
             '_token': self.auth_token,
             'torrent_id': '',
             'type_id': await self.get_cat_id(meta['category']),
@@ -808,7 +927,7 @@ class PHD(COMMON):
 
         # TV
         if meta.get('category') == 'TV':
-            data2.update({
+            data.update({
                 'tv_collection': '1' if meta.get('tv_pack') == 0 else '2',
                 'tv_season': meta.get('season_int', ''),
                 'tv_episode': meta.get('episode_int', ''),
@@ -816,85 +935,73 @@ class PHD(COMMON):
 
         anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
         if anon:
-            data2.update({
+            data.update({
                 'anon_upload': '1'
             })
 
         if not meta.get('debug', False):
             try:
-                await COMMON(config=self.config).edit_torrent(meta, self.tracker, self.source_flag)
-                upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
-                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+                self.upload_url_step2 = task_info.get('redirect_url')
 
-                with open(torrent_path, 'rb') as torrent_file:
-                    files = {'torrent_file': (os.path.basename(torrent_path), torrent_file, 'application/x-bittorrent')}
-                    response1 = self.session.post(upload_url_step1, data=data1, files=files, timeout=120, allow_redirects=False)
+                # task_id and screenshot cannot be called until Step 1 is completed
+                data.update({
+                    'info_hash': task_info.get('info_hash'),
+                    'task_id': task_info.get('task_id'),
+                    'screenshots[]': await self.get_screenshots(meta),
+                })
 
-                if response1.status_code == 302 and 'Location' in response1.headers:
-                    await asyncio.sleep(5)
-                    redirect_url = response1.headers['Location']
+                response = await self.session.post(self.upload_url_step2, data=data, timeout=120)
 
-                    match = re.search(r'/(\d+)$', redirect_url)
-                    if not match:
-                        raise UploadException(f"Could not extract 'task_id' from redirect URL:{redirect_url}")
+                if response.status_code == 302:
+                    torrent_url = response.headers['Location']
 
-                    task_id = match.group(1)
+                    torrent_id = ''
+                    match = re.search(r"/torrent/(\d+)", torrent_url)
+                    if match:
+                        torrent_id = match.group(1)
+                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
-                    # At this point Step 1 is completed
+                    # Even if you are uploading, you still need to download the .torrent from the website
+                    # because it needs to be registered as a download before you can start seeding
+                    download_url = torrent_url.replace("/torrent/", "/download/torrent/")
+                    register_download = await self.session.get(download_url)
+                    if register_download.status_code != 200:
+                        status_message = (
+                            f"Unable to register your upload in your download history.\n"
+                            f"Please visit the following URL and manually download the torrent file before starting to seed:\n"
+                            f"{torrent_url}\n"
+                            f"(Error code: {register_download.status_code})"
+                        )
 
-                    with open(torrent_path, "rb") as f:
-                        torrent_data = bencodepy.decode(f.read())
-                        info = bencodepy.encode(torrent_data[b'info'])
-                        new_info_hash = hashlib.sha1(info).hexdigest()
+                    announce_url = self.config['TRACKERS'][self.tracker].get('announce_url')
+                    await self.add_tracker_torrent(meta, self.tracker, self.source_flag, announce_url, self.torrent_url + torrent_id)
+                    status_message = 'Torrent uploaded successfully.'
 
-                    self.upload_url_step2 = redirect_url
+                    if requests:
+                        status_message += ' Your upload may fulfill existing requests, check prior console logs.'
 
-                    # The hash, task_id, and screenshot cannot be called until Step 1 is completed
-                    data2.update({
-                        'info_hash': new_info_hash,
-                        'task_id': task_id,
-                        'screenshots[]': await self.get_screenshots(meta),
-                    })
-                    response2 = self.session.post(self.upload_url_step2, data=data2, timeout=120)
-
-                    if response2.status_code in [200, 302]:
-                        torrent_url = response2.url
-
-                        # Even if you are uploading, you still need to download the .torrent from the website because it needs to be registered as a download before you can start seeding
-                        download_url = torrent_url.replace("/torrent/", "/download/torrent/")
-                        register_download = self.session.get(download_url)
-                        if register_download.status_code != 200:
-                            print(f"Unable to register your upload in your download history, please go to the URL and download the torrent file before you can start seeding: {torrent_url}"
-                                  f"Error: {register_download.status_code}")
-
-                        announce_url = self.config['TRACKERS'][self.tracker].get('announce_url')
-                        await COMMON(config=self.config).add_tracker_torrent(meta, self.tracker, self.source_flag, announce_url, torrent_url)
-                        final_message = torrent_url  # show torrent link in terminal at end of upload
-                    else:
-                        failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html"
-                        with open(failure_path, "w", encoding="utf-8") as f:
-                            f.write(response2.text)
-                        final_message = f"""[red]Step 2 of upload failed to {self.tracker}. Status: {response2.status_code}, URL: {response2.url}[/red].
-                                            [yellow]The HTML response was saved to '{failure_path}' for analysis.[/yellow]"""
                 else:
-                    failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html"
+                    failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html"
                     with open(failure_path, "w", encoding="utf-8") as f:
-                        f.write(response1.text)
-                    final_message = f"""[red]Step 1 of upload failed to {self.tracker}. Status: {response1.status_code}, URL: {response1.url}[/red].
-                                        [yellow]The HTML response was saved to '{failure_path}' for analysis.[/yellow]"""
+                        f.write(response.text)
 
-            except requests.exceptions.RequestException as e:
-                final_message = f"[red]Connection error while uploading to {self.tracker}: {e}[/red]"
-            except UploadException as e:
-                final_message = f"[red]Upload error: {e}[/red]"
+                    status_message = (
+                        f"Step 2 of upload to {self.tracker} failed.\n"
+                        f"Status code: {response.status_code}\n"
+                        f"URL: {response.url}\n"
+                        f"The HTML response has been saved to '{failure_path}' for analysis."
+                    )
+
             except Exception as e:
-                final_message = f"[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]"
+                status_message = f"[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]"
+                meta['skipping'] = f"{self.tracker}"
+                return
 
         else:
-            console.print(data1)
-            console.print(data2)
-            final_message = 'Debug mode enabled, not uploading.'
-        meta['tracker_status'][self.tracker]['status_message'] = final_message
+            console.print(data)
+            status_message = 'Debug mode enabled, not uploading.'
+
+        meta['tracker_status'][self.tracker]['status_message'] = status_message
 
     def language_map(self):
         self.all_lang_map = {

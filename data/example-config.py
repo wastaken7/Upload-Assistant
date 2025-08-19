@@ -157,6 +157,10 @@ config = {
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
 
+        # Set to True if you want to check whether your upload fulfills corresponding requests. This may slightly slow down the upload process.
+        # Only works on: FF, PHD
+        "check_requests": False,
+
         # Set False to skip getting images from tracker descriptions
         "keep_images": True,
 
