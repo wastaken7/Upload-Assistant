@@ -42,6 +42,11 @@ class RF():
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         rf_name = await self.edit_name(meta)
+        tvdb = meta.get('tvdb_id', 0)
+        if meta['category'] == "TV":
+            tvdb = meta.get('tvdb_id', 0)
+        else:
+            tvdb = 0
         if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
             anon = 0
         else:
@@ -75,7 +80,7 @@ class RF():
             'resolution_id': resolution_id,
             'tmdb': meta['tmdb'],
             'imdb': meta['imdb'],
-            'tvdb': meta['tvdb_id'],
+            'tvdb': tvdb,
             'mal': meta['mal_id'],
             'igdb': 0,
             'anonymous': anon,
@@ -109,6 +114,7 @@ class RF():
             response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
             if 'two-factor' in response.json():
                 console.print("[bold red]Two-factor authentication required for upload at RF. Please enable on site and retry.")
+                return
             try:
                 meta['tracker_status'][self.tracker]['status_message'] = response.json()
                 # adding torrent link to comment of torrent file
