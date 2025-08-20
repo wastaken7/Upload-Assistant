@@ -127,6 +127,8 @@ class BBCODE:
             desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
 
         description = desc.strip()
+        if self.is_only_bbcode(description):
+            return "", imagelist
         return description, imagelist
 
     def clean_bhd_description(self, description, meta):
@@ -200,6 +202,9 @@ class BBCODE:
         else:
             description = ""
 
+        if self.is_only_bbcode(description):
+            return "", imagelist
+
         return description, imagelist
 
     def clean_ptp_description(self, desc, is_disc):
@@ -251,7 +256,7 @@ class BBCODE:
         comps.extend(hides)
         nocomp = desc
 
-        # Exclude URLs from exculed array fom `nocomp`
+        # Exclude URLs from excluded array fom `nocomp`
         for url in excluded_urls:
             nocomp = nocomp.replace(url, '')
 
@@ -401,7 +406,8 @@ class BBCODE:
         desc = desc.strip('\n')
 
         if desc.replace('\n', '').strip() == '':
-            console.print("[yellow]Description is empty after cleaning.")
+            return "", imagelist
+        if self.is_only_bbcode(desc):
             return "", imagelist
 
         return desc, imagelist
@@ -510,7 +516,17 @@ class BBCODE:
 
         if desc.replace('\n', '') == '':
             return "", imagelist
+        if self.is_only_bbcode(desc):
+            return "", imagelist
         return desc, imagelist
+
+    def is_only_bbcode(self, desc):
+        # Remove all BBCode tags
+        text = re.sub(r"\[/?[a-zA-Z0-9]+(?:=[^\]]*)?\]", "", desc)
+        # Remove whitespace and newlines
+        text = text.strip()
+        # If nothing left, it's only BBCode
+        return not text
 
     def convert_pre_to_code(self, desc):
         desc = desc.replace('[pre]', '[code]')

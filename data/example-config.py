@@ -78,7 +78,11 @@ config = {
         # Tonemap HDR - DV+HDR screenshots
         "tone_map": True,
 
-        # Tonemap screenshots with the following settings
+        # Set true to skip ffmpeg check, useful if you know your ffmpeg is compatible with libplacebo
+        # Else, when tonemapping is enabled (and used), UA will run a quick check before to decide
+        "ffmpeg_is_good": False,
+
+        # Tonemap screenshots with the following settings (doesn't apply when using libplacebo)
         # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
         "algorithm": "mobius",
         "desat": "10.0",
