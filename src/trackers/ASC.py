@@ -603,7 +603,12 @@ class ASC(COMMON):
         return str(date_str)
 
     def media_info(self, meta):
-        if meta.get('is_disc') != 'BDMV':
+        if meta.get('is_disc') == 'BDMV':
+            summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
+            if os.path.exists(summary_path):
+                with open(summary_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+        if not meta.get('is_disc'):
             video_file = meta['filelist'][0]
             template_path = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
             if os.path.exists(template_path):
@@ -614,11 +619,7 @@ class ASC(COMMON):
                     mediainfo_options={"inform": f"file://{template_path}"}
                 )
                 return str(mi_output).replace('\r', '')
-        else:
-            summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if os.path.exists(summary_path):
-                with open(summary_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+
         return None
 
     async def fetch_layout_data(self, meta):
@@ -723,8 +724,77 @@ class ASC(COMMON):
 
         return data
 
+    async def get_requests(self, meta):
+        if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
+            return False
+        else:
+            try:
+                category = meta['category']
+                if meta.get('anime'):
+                    if category == 'TV':
+                        category = 118
+                    if category == 'MOVIE':
+                        category = 116
+                else:
+                    if category == 'TV':
+                        category = 120
+                    if category == 'MOVIE':
+                        category = 119
+
+                query = meta['title']
+
+                search_url = f"{self.base_url}/pedidos.php?search={query}&category={category}"
+
+                response = await self.session.get(search_url)
+                response.raise_for_status()
+                response_results_text = response.text
+
+                soup = BeautifulSoup(response_results_text, "html.parser")
+
+                request_rows = soup.select(".table-responsive table tr")
+
+                results = []
+                for row in request_rows:
+                    all_tds = row.find_all("td")
+                    if not all_tds or len(all_tds) < 6:
+                        continue
+
+                    info_cell = all_tds[1]
+                    link_element = info_cell.select_one('a[href*="pedidos.php?action=ver"]')
+                    if not link_element:
+                        continue
+
+                    name = link_element.text.strip()
+                    link = link_element.get("href")
+
+                    reward_td = all_tds[4]
+                    reward = reward_td.text.strip()
+
+                    results.append({
+                        "Name": name,
+                        "Reward": reward,
+                        "Link": link,
+                    })
+
+                if results:
+                    message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+                    for r in results:
+                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                    console.print(message)
+
+                return results
+
+            except Exception as e:
+                console.print(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+                import traceback
+                console.print(traceback.format_exc())
+                return []
+
     async def upload(self, meta, disctype):
         data = await self.gather_data(meta)
+        requests = await self.get_requests(meta)
         await self.edit_torrent(meta, self.tracker, self.source_flag)
         status_message = ''
 
@@ -737,22 +807,18 @@ class ASC(COMMON):
                 files = {'torrent': (f"{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent", torrent_file, "application/x-bittorrent")}
 
                 response = await self.session.post(upload_url, data=data, files=files, timeout=60)
-                soup = BeautifulSoup(response.text, 'html.parser')
 
-                # Find the response text
-                page_element = soup.select_one('div.card-body center b')
-                page_message = ""
-                if page_element:
-                    page_message = page_element.get_text(strip=True)
-                    status_message = page_message
-
-                if "enviado com sucesso" in page_message:
+                if "torrents-details.php?id=" in response.text:
+                    status_message = 'Enviado com sucesso.'
 
                     # Find the torrent id
-                    match = re.search(r"torrents-details\.php\?id=(\d+)", str(soup))
+                    match = re.search(r"torrents-details\.php\?id=(\d+)", response.text)
                     if match:
                         torrent_id = match.group(1) if match else None
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+
+                    if requests:
+                        status_message += ' Seu upload pode atender a pedidos existentes, verifique os logs anteriores do console.'
 
                         # Approval
                         should_approve = await self.get_approval(meta)
@@ -760,12 +826,13 @@ class ASC(COMMON):
                             await self.auto_approval(torrent_id)
 
                 else:
+                    status_message = 'O upload pode ter falhado, verifique. '
                     response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
                     console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
-                    meta['tracker_status'][self.tracker]['skipped'] = True
-                    meta['tracker_status'][self.tracker]['upload'] = False
+                    meta['skipping'] = f"{self.tracker}"
+                    return
 
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
