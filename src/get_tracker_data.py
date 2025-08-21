@@ -177,11 +177,12 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
                 if tracker_to_process == "BTN":
                     btn_id = meta.get('btn')
                     btn_api = config['DEFAULT'].get('btn_api')
-                    await get_btn_torrents(btn_api, btn_id, meta)
-                    if meta.get('imdb_id') != 0:
-                        found_match = True
-                        meta['matched_tracker'] = "BTN"
-                    await save_tracker_timestamp("BTN", base_dir=base_dir)
+                    if btn_api and len(btn_api) > 25:
+                        await get_btn_torrents(btn_api, btn_id, meta)
+                        if meta.get('imdb_id') != 0:
+                            found_match = True
+                            meta['matched_tracker'] = "BTN"
+                        await save_tracker_timestamp("BTN", base_dir=base_dir)
                 elif tracker_to_process == "ANT":
                     imdb_tmdb_list = await tracker_class_map['ANT'](config=config).get_data_from_files(meta)
                     console.print(f"[green]ANT tracker data found: {imdb_tmdb_list}[/green]")
