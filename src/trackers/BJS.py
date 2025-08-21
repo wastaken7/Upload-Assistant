@@ -325,15 +325,20 @@ class BJS(COMMON):
     async def build_description(self, meta):
         description = []
 
-        # The site does not auto-generate BDInfo like it does with MediaInfo, so it must be provided manually
-        bd_info = ""
-        if meta.get('is_disc') == 'BDMV':
-            bd_summary = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if os.path.exists(bd_summary):
-                with open(bd_summary, 'r', encoding='utf-8') as f:
-                    bd_info = f.read()
-                    if bd_info:
-                        description.append(f"[quote]{bd_info}[/quote]")
+        disc_map = {
+            "BDMV": ("BD_SUMMARY_00.txt", "BDInfo"),
+            "DVD": ("MEDIAINFO_CLEANPATH.txt", "MediaInfo"),
+        }
+
+        disc_type = meta.get("is_disc")
+        if disc_type in disc_map:
+            filename, title = disc_map[disc_type]
+            path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{filename}"
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if content.strip():
+                        description.append(f"[hide={title}][pre]{content}[/pre][/hide]")
 
         base_desc = ""
         base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
@@ -345,14 +350,14 @@ class BJS(COMMON):
 
         custom_description_header = self.config['DEFAULT'].get('custom_description_header', '')
         if custom_description_header:
-            description.append(custom_description_header + "\n")
+            description.append(custom_description_header)
 
-        if self.signature:
-            description.append(self.signature)
+        description.append(self.signature)
 
         final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         with open(final_desc_path, 'w', encoding='utf-8') as descfile:
-            final_description = "\n".join(filter(None, description))
+            all_parts = "\n\n".join(filter(None, description))
+            final_description = re.sub(r'\n{3,}', '\n\n', all_parts)
             descfile.write(final_description)
 
         return final_description
@@ -844,7 +849,7 @@ class BJS(COMMON):
             found_tags.add('Remux')
         if meta.get('extras'):
             found_tags.add('Com extras')
-        if meta.get('has_commentary') or meta.get('manual_commentary'):
+        if meta.get('has_commentary', False) or meta.get('manual_commentary', False):
             found_tags.add('Com comentários')
 
         if meta['is_disc'] != "BDMV":
