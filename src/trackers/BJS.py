@@ -926,6 +926,77 @@ class BJS(COMMON):
                 else:
                     return "N/A"
 
+    async def get_requests(self, meta):
+        if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
+            return False
+        else:
+            try:
+                cat = meta['category']
+                if cat == 'TV':
+                    cat = 2
+                if cat == 'MOVIE':
+                    cat = 1
+                if meta.get('anime'):
+                    cat = 14
+
+                query = meta['title']
+
+                search_url = f"{self.base_url}/requests.php?submit=true&search={query}&showall=on&filter_cat[{cat}]=1"
+
+                response = await self.session.get(search_url)
+                response.raise_for_status()
+                response_results_text = response.text
+
+                soup = BeautifulSoup(response_results_text, "html.parser")
+
+                request_rows = soup.select("#torrent_table tr.torrent")
+
+                results = []
+                for row in request_rows:
+                    all_tds = row.find_all("td")
+                    if not all_tds or len(all_tds) < 5:
+                        continue
+
+                    info_cell = all_tds[1]
+
+                    link_element = info_cell.select_one('a[href*="requests.php?action=view"]')
+                    quality_element = info_cell.select_one('b')
+
+                    if not link_element or not quality_element:
+                        continue
+
+                    name = link_element.text.strip()
+                    quality = quality_element.text.strip()
+                    link = link_element.get("href")
+
+                    reward_td = all_tds[3]
+                    reward_parts = [td.text.replace('\xa0', ' ').strip() for td in reward_td.select('tr > td:first-child')]
+                    reward = " / ".join(reward_parts)
+
+                    results.append({
+                        "Name": name,
+                        "Quality": quality,
+                        "Reward": reward,
+                        "Link": link,
+                    })
+
+                if results:
+                    message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+                    for r in results:
+                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
+                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                    console.print(message)
+
+                return results
+
+            except Exception as e:
+                console.print(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+                import traceback
+                console.print(traceback.format_exc())
+                return []
+
     async def gather_data(self, meta, disctype):
         await self.validate_credentials(meta)
         tmdb_data = await self.ptbr_tmdb_data(meta)
@@ -1044,6 +1115,7 @@ class BJS(COMMON):
 
     async def upload(self, meta, disctype):
         data = await self.gather_data(meta, disctype)
+        requests = await self.get_requests(meta)
         await self.edit_torrent(meta, self.tracker, self.source_flag)
         status_message = ''
 
@@ -1058,30 +1130,32 @@ class BJS(COMMON):
                 response = await self.session.post(upload_url, data=data, files=files, timeout=120)
                 soup = BeautifulSoup(response.text, 'html.parser')
 
-                if 'Clique em baixar para entrar de' in response.text:
-                    page_element = soup.select_one('div#wrapper div#content p font')
+                if 'action=download&id=' in response.text:
+                    status_message = 'Enviado com sucesso.'
 
                     # Find the torrent id
-                    match = re.search(r'action=download&id=(\d+)', response.text)
+                    match = re.search(r'torrentid=(\d+)', response.text)
                     if match:
                         torrent_id = match.group(1)
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
+                    if requests:
+                        status_message += ' Seu upload pode atender a pedidos existentes, verifique os logs anteriores do console.'
+
                 else:
+                    status_message = 'O upload pode ter falhado, verifique. '
+                    page_message = ""
                     page_element = soup.select_one("div.thin p[style*='color: red']")
+                    if page_element:
+                        page_message = page_element.get_text(strip=True)
+                        status_message += page_message
 
                     response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
                     console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
-                    meta['tracker_status'][self.tracker]['skipped'] = True
-                    meta['tracker_status'][self.tracker]['upload'] = False
-
-                # Find the response text
-                page_message = ""
-                if page_element:
-                    page_message = page_element.get_text(strip=True)
-                    status_message = page_message
+                    meta['skipping'] = f"{self.tracker}"
+                    return
 
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
