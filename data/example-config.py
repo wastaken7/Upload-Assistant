@@ -400,6 +400,16 @@ config = {
             # Send uploads to DP modq for staff approval
             "modq": False,
         },
+        "FF": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "username": "",
+            "password": "",
+            # You can find your announce URL by downloading any torrent from FunFile, adding it to your client, and then copying the URL from the 'Trackers' tab.
+            "announce_url": "https://tracker.funfile.org:2711/<PASSKEY>/announce",
+            # Set to True if you want to check whether your upload fulfills corresponding requests. This may slightly slow down the upload process.
+            "check_requests": False,
+        },
         "FL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
