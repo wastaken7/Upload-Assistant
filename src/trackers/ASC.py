@@ -46,14 +46,16 @@ class ASC(COMMON):
             "ru": "2", "zh": "9",
         }
 
-    async def validate_credentials(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/ASC.txt")
-        if os.path.exists(cookie_file):
-            self.session.cookies.update(await self.parseCookieFile(cookie_file))
-        else:
+    async def load_cookies(self, meta):
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+        if not os.path.exists(cookie_file):
             console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
             return False
 
+        self.session.cookies = await self.parseCookieFile(cookie_file)
+
+    async def validate_credentials(self, meta):
+        await self.load_cookies(meta)
         try:
             test_url = f"{self.base_url}/gerador.php"
             response = await self.session.get(test_url, timeout=30.0)
@@ -626,7 +628,6 @@ class ASC(COMMON):
 
         async def _fetch(payload):
             try:
-                await self.validate_credentials(meta)
                 response = await self.session.post(url, data=payload, timeout=20)
                 response.raise_for_status()
                 return response.json().get('ASC')
@@ -798,6 +799,7 @@ class ASC(COMMON):
         return data
 
     async def upload(self, meta, disctype):
+        await self.load_cookies(meta)
         data = await self.gather_data(meta)
         requests = await self.get_requests(meta)
         await self.edit_torrent(meta, self.tracker, self.source_flag)
