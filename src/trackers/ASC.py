@@ -184,15 +184,17 @@ class ASC(COMMON):
             }
 
     async def get_audio(self, meta):
-        subtitled = '1'
+        subtitles = '1'
         dual_audio = '2'
         dubbed = '3'
         national = '4'
+        original = '7'
 
-        audio_languages = set(meta.get('audio_languages', []))
+        portuguese_languages = {'portuguese', 'português', 'pt'}
 
-        portuguese_languages = ['Portuguese', 'Português', 'pt']
+        has_pt_subs = (await self.get_subtitle(meta)) == 'Embutida'
 
+        audio_languages = {lang.lower() for lang in meta.get('audio_languages', [])}
         has_pt_audio = any(lang in portuguese_languages for lang in audio_languages)
 
         original_lang = meta.get('original_language', '').lower()
@@ -201,22 +203,23 @@ class ASC(COMMON):
         if has_pt_audio:
             if is_original_pt:
                 return national
-            elif len(audio_languages) > 1:
+            elif len(audio_languages - portuguese_languages) > 0:
                 return dual_audio
             else:
                 return dubbed
-
-        return subtitled
+        elif has_pt_subs:
+            return subtitles
+        else:
+            return original
 
     async def get_subtitle(self, meta):
-        found_language_strings = meta.get('subtitle_languages', [])
+        portuguese_languages = {'portuguese', 'português', 'pt'}
 
-        subtitle_type = "0"
+        found_languages = {lang.lower() for lang in meta.get('subtitle_languages', [])}
 
-        if 'Portuguese' in found_language_strings:
-            subtitle_type = "1"
-
-        return subtitle_type
+        if any(lang in portuguese_languages for lang in found_languages):
+            return "Embutida"
+        return "S_legenda"
 
     async def get_resolution(self, meta):
         if meta.get('is_disc') == 'BDMV':
@@ -781,6 +784,12 @@ class ASC(COMMON):
                 'lang': anime_info['lang'],
                 'type': anime_info['type'],
             }
+
+        # Internal
+        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
+            data.update({
+                'internal': 'yes',
+            })
 
         # Screenshots
         for i, img in enumerate(meta.get('image_list', [])[:4]):
