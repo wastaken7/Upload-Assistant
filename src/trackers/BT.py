@@ -8,10 +8,8 @@ import re
 import unicodedata
 from .COMMON import COMMON
 from bs4 import BeautifulSoup
-from http.cookiejar import MozillaCookieJar
 from langcodes.tag_parser import LanguageTagError
 from src.console import console
-from src.exceptions import UploadException
 from src.languages import process_desc_language
 
 
@@ -92,29 +90,16 @@ class BT(COMMON):
                 for alias in aliases_tuple:
                     self.ultimate_lang_map[alias.lower()] = correct_id
 
-    async def validate_credentials(self, meta):
+    async def load_cookies(self, meta):
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
             return False
 
-        try:
-            jar = MozillaCookieJar()
-            loop = asyncio.get_running_loop()
+        self.session.cookies = await self.parseCookieFile(cookie_file)
 
-            await loop.run_in_executor(
-                None,
-                lambda: jar.load(cookie_file, ignore_discard=True, ignore_expires=True)
-            )
-            self.session.cookies = jar
-
-        except FileNotFoundError:
-            console.print(f"[bold red]Arquivo de cookie não encontrado ao tentar carregar: {cookie_file}[/bold red]")
-            return False
-        except Exception as e:
-            console.print(f"[bold red]Erro ao carregar o arquivo de cookie. Formato inválido? Erro: {e}[/bold red]")
-            return False
-
+    async def validate_credentials(self, meta):
+        await self.load_cookies(meta)
         try:
             upload_page_url = f"{self.base_url}/upload.php"
             response = await self.session.get(upload_page_url, timeout=30.0)
@@ -675,8 +660,9 @@ class BT(COMMON):
         return data
 
     async def upload(self, meta, disctype):
-        data = await self.gather_data(meta, disctype)
+        await self.load_cookies(meta)
         await self.edit_torrent(meta, self.tracker, self.source_flag)
+        data = await self.gather_data(meta, disctype)
         status_message = ''
 
         if not meta.get('debug', False):
