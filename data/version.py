@@ -1,4 +1,16 @@
-__version__ = "v5.3.5"
+__version__ = "v5.3.6"
+
+"""
+Release Notes for version v5.3.6 (2025-08-22):
+
+# ## What's Changed
+# 
+# * fix docker mkbrr version by @Audionut in 69a1384
+# * Other minor updates and improvements
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v5.3.5...v5.3.6
+"""
+
 
 """
 Release Notes for version v5.3.5 (2025-08-22):
