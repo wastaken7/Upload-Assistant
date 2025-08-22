@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from pymediainfo import MediaInfo
 from src.console import console
-from src.exceptions import UploadException
 from src.languages import process_desc_language
 
 
@@ -112,7 +111,7 @@ class ASC(COMMON):
         endpoint = f"tv/{meta['tmdb']}/season/{season}/episode/{episode}"
         return await self.fetch_tmdb_data(endpoint)
 
-    def get_container(self, meta):
+    async def get_container(self, meta):
         if meta['is_disc'] == "BDMV":
             return "5"
         elif meta['is_disc'] == "DVD":
@@ -129,35 +128,40 @@ class ASC(COMMON):
             return None
         return None
 
-    def get_type(self, meta):
-        qualidade_map_disc = {"BD25": "40", "BD50": "41", "BD66": "42", "BD100": "43"}
-        qualidade_map_files = {"ENCODE": "9", "REMUX": "39", "WEBDL": "23", "WEBRIP": "38", "BDRIP": "8", "DVDRIP": "3"}
-        qualidade_map_dvd = {"DVD5": "45", "DVD9": "46"}
+    async def get_type(self, meta):
+        bd_disc_map = {"BD25": "40", "BD50": "41", "BD66": "42", "BD100": "43"}
+        standard_map = {"ENCODE": "9", "REMUX": "39", "WEBDL": "23", "WEBRIP": "38", "BDRIP": "8", "DVDRIP": "3"}
+        dvd_map = {"DVD5": "45", "DVD9": "46"}
 
         if meta['type'] == 'DISC':
+            if meta['is_disc'] == 'HDDVD':
+                return 15
+
             if meta['is_disc'] == 'DVD':
                 dvd_size = meta['dvd_size']
-                type_id = qualidade_map_dvd[dvd_size]
+                type_id = dvd_map[dvd_size]
                 if type_id:
                     return type_id
 
             disctype = meta['disctype']
-            if disctype in qualidade_map_disc:
-                return qualidade_map_disc[disctype]
+            if disctype in bd_disc_map:
+                return bd_disc_map[disctype]
 
-            bdinfo_size_gib = meta.get('bdinfo', {}).get('size')
-            if bdinfo_size_gib:
-                size_bytes = bdinfo_size_gib * 1_073_741_824
-                if size_bytes > 66_000_000_000:
-                    return "43"  # BD100
-                elif size_bytes > 50_000_000_000:
-                    return "42"  # BD66
-                elif size_bytes > 25_000_000_000:
-                    return "41"  # BD50
-                else:
-                    return "40"  # BD25
+            try:
+                size_in_gb = meta['bdinfo']['size']
+            except (KeyError, IndexError, TypeError):
+                size_in_gb = 0
+
+            if size_in_gb > 66:
+                return "43"  # BD100
+            elif size_in_gb > 50:
+                return "42"  # BD66
+            elif size_in_gb > 25:
+                return "41"  # BD50
+            else:
+                return "40"  # BD25
         else:
-            return qualidade_map_files.get(meta['type'], "0")
+            return standard_map.get(meta['type'], "0")
 
     async def get_languages(self, meta):
         if meta.get('anime'):
@@ -205,24 +209,16 @@ class ASC(COMMON):
         return subtitled
 
     async def get_subtitle(self, meta):
-        # Stops uploading when an external subtitle is detected
-        video_path = meta.get('path')
-        directory = video_path if os.path.isdir(video_path) else os.path.dirname(video_path)
-        subtitle_extensions = ('.srt', '.sub', '.ass', '.ssa', '.idx', '.smi', '.psb')
-
-        if any(f.lower().endswith(subtitle_extensions) for f in os.listdir(directory)):
-            raise UploadException("[bold red]ERRO: Esta ferramenta não suporta o upload de legendas em arquivos separados.[/bold red]")
-
         found_language_strings = meta.get('subtitle_languages', [])
 
-        subtitle_type = 0
+        subtitle_type = "0"
 
         if 'Portuguese' in found_language_strings:
-            subtitle_type = 1
+            subtitle_type = "1"
 
         return subtitle_type
 
-    def get_resolution(self, meta):
+    async def get_resolution(self, meta):
         if meta.get('is_disc') == 'BDMV':
             resolution_str = meta.get('resolution', '')
             try:
@@ -244,7 +240,7 @@ class ASC(COMMON):
             'height': height
         }
 
-    def get_video_codec(self, meta):
+    async def get_video_codec(self, meta):
         codec_video_map = {
             "MPEG-4": "31", "AV1": "29", "AVC": "30", "DivX": "9",
             "H264": "17", "H265": "18", "HEVC": "27", "M4V": "20",
@@ -277,7 +273,7 @@ class ASC(COMMON):
 
         return codec_id
 
-    def get_audio_codec(self, meta):
+    async def get_audio_codec(self, meta):
         audio_type = (meta['audio'] or '').upper()
 
         codec_map = {
@@ -327,7 +323,7 @@ class ASC(COMMON):
         season_tmdb = await self.season_tmdb_data(meta)
         episode_tmdb = await self.episode_tmdb_data(meta)
         user_layout = await self.fetch_layout_data(meta)
-        fileinfo_dump = self.media_info(meta)
+        fileinfo_dump = await self.media_info(meta)
 
         if not user_layout:
             return "[center]Erro: Não foi possível carregar o layout da descrição.[/center]"
@@ -335,25 +331,25 @@ class ASC(COMMON):
         layout_image = {k: v for k, v in user_layout.items() if k.startswith('BARRINHA_')}
         description_parts = ["[center]"]
 
-        def append_section(key: str, content: str):
+        async def append_section(key: str, content: str):
             if content and (img := layout_image.get(key)):
-                description_parts.append(f"\n{self.format_image(img)}")
+                description_parts.append(f"\n{await self.format_image(img)}")
                 description_parts.append(f"\n{content}\n")
 
         # Title
         for i in range(1, 4):
-            description_parts.append(self.format_image(layout_image.get(f'BARRINHA_CUSTOM_T_{i}')))
-        description_parts.append(f"\n{self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n")
+            description_parts.append(await self.format_image(layout_image.get(f'BARRINHA_CUSTOM_T_{i}')))
+        description_parts.append(f"\n{await self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n")
         description_parts.append(f"\n[size=3]{await self.get_title(meta)}[/size]\n")
 
         # Poster
         poster_path = (season_tmdb or {}).get('poster_path') or (main_tmdb or {}).get('poster_path') or meta.get('tmdb_poster')
         poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
-        append_section('BARRINHA_CAPA', self.format_image(poster))
+        await append_section('BARRINHA_CAPA', await self.format_image(poster))
 
         # Overview
         overview = (season_tmdb or {}).get('overview') or (main_tmdb or {}).get('overview')
-        append_section('BARRINHA_SINOPSE', overview)
+        await append_section('BARRINHA_SINOPSE', overview)
 
         # Episode
         if meta['category'] == 'TV' and episode_tmdb:
@@ -364,7 +360,7 @@ class ASC(COMMON):
             if episode_name and episode_overview and still_path:
                 still_url = f"https://image.tmdb.org/t/p/w300{still_path}"
                 description_parts.append(f"\n[size=4][b]Episódio:[/b] {episode_name}[/size]\n")
-                description_parts.append(f"\n{self.format_image(still_url)}\n\n{episode_overview}\n")
+                description_parts.append(f"\n{await self.format_image(still_url)}\n\n{episode_overview}\n")
 
         # Technical Sheet
         if main_tmdb:
@@ -380,17 +376,17 @@ class ASC(COMMON):
                 f"Duração: {formatted_runtime}" if formatted_runtime else None,
                 f"País de Origem: {', '.join(c['name'] for c in main_tmdb.get('production_countries', []))}" if main_tmdb.get('production_countries') else None,
                 f"Gêneros: {', '.join(g['name'] for g in main_tmdb.get('genres', []))}" if main_tmdb.get('genres') else None,
-                f"Data de Lançamento: {self.format_date(release_date)}" if release_date else None,
+                f"Data de Lançamento: {await self.format_date(release_date)}" if release_date else None,
                 f"Site: [url={main_tmdb.get('homepage')}]Clique aqui[/url]" if main_tmdb.get('homepage') else None
             ]
-            append_section('BARRINHA_FICHA_TECNICA', "\n".join(filter(None, sheet_items)))
+            await append_section('BARRINHA_FICHA_TECNICA', "\n".join(filter(None, sheet_items)))
 
         # Production Companies
         if main_tmdb and main_tmdb.get('production_companies'):
             prod_parts = ["[size=4][b]Produtoras[/b][/size]"]
             for p in main_tmdb.get('production_companies', []):
                 logo_path = p.get('logo_path')
-                logo = self.format_image(f"https://image.tmdb.org/t/p/w45{logo_path}") if logo_path else ''
+                logo = await self.format_image(f"https://image.tmdb.org/t/p/w45{logo_path}") if logo_path else ''
 
                 prod_parts.append(f"{logo}[size=2] - [b]{p.get('name', '')}[/b][/size]" if logo else f"[size=2][b]{p.get('name', '')}[/b][/size]")
             description_parts.append("\n" + "\n".join(prod_parts) + "\n")
@@ -402,20 +398,20 @@ class ASC(COMMON):
             cast_data = ((season_tmdb or {}).get('credits') or {}).get('cast', [])
         else:
             cast_data = ((episode_tmdb or {}).get('credits') or {}).get('cast', [])
-        append_section('BARRINHA_ELENCO', self.build_cast_bbcode(cast_data))
+        await append_section('BARRINHA_ELENCO', await self.build_cast_bbcode(cast_data))
 
         # Seasons
         if meta['category'] == 'TV' and main_tmdb and main_tmdb.get('seasons'):
             seasons_content = []
             for seasons in main_tmdb.get('seasons', []):
                 season_name = seasons.get('name', f"Temporada {seasons.get('season_number')}").strip()
-                poster_temp = self.format_image(f"https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}") if seasons.get('poster_path') else ''
+                poster_temp = await self.format_image(f"https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}") if seasons.get('poster_path') else ''
                 overview_temp = f"\n\nSinopse:\n{seasons.get('overview')}" if seasons.get('overview') else ''
 
                 inner_content_parts = []
                 air_date = seasons.get('air_date')
                 if air_date:
-                    inner_content_parts.append(f"Data: {self.format_date(air_date)}")
+                    inner_content_parts.append(f"Data: {await self.format_date(air_date)}")
 
                 episode_count = seasons.get('episode_count')
                 if episode_count is not None:
@@ -426,7 +422,7 @@ class ASC(COMMON):
 
                 inner_content = "\n".join(inner_content_parts)
                 seasons_content.append(f"\n[spoiler={season_name}]{inner_content}[/spoiler]\n")
-            append_section('BARRINHA_EPISODIOS', "".join(seasons_content))
+            await append_section('BARRINHA_EPISODIOS', "".join(seasons_content))
 
         # Ratings
         ratings_list = user_layout.get('Ratings', [])
@@ -438,7 +434,7 @@ class ASC(COMMON):
                 ratings_list.append({'Source': 'TMDb', 'Value': f'{tmdb_rating:.1f}/10'})
 
         criticas_key = 'BARRINHA_INFORMACOES' if meta['category'] == 'MOVIE' and 'BARRINHA_INFORMACOES' in layout_image else 'BARRINHA_CRITICAS'
-        append_section(criticas_key, self.build_ratings_bbcode(meta, ratings_list))
+        await append_section(criticas_key, await self.build_ratings_bbcode(meta, ratings_list))
 
         # MediaInfo/BDinfo
         if fileinfo_dump:
@@ -446,7 +442,7 @@ class ASC(COMMON):
 
         # Custom Bar
         for i in range(1, 4):
-            description_parts.append(self.format_image(layout_image.get(f'BARRINHA_CUSTOM_B_{i}')))
+            description_parts.append(await self.format_image(layout_image.get(f'BARRINHA_CUSTOM_B_{i}')))
         description_parts.append("[/center]")
 
         # External description
@@ -581,7 +577,7 @@ class ASC(COMMON):
                 continue
         return found_items
 
-    def get_upload_url(self, meta):
+    async def get_upload_url(self, meta):
         if meta.get('anime'):
             return f"{self.base_url}/enviar-anime.php"
         elif meta['category'] == 'MOVIE':
@@ -589,10 +585,10 @@ class ASC(COMMON):
         else:
             return f"{self.base_url}/enviar-series.php"
 
-    def format_image(self, url):
+    async def format_image(self, url):
         return f"[img]{url}[/img]" if url else ""
 
-    def format_date(self, date_str):
+    async def format_date(self, date_str):
         if not date_str or date_str == 'N/A':
             return 'N/A'
         for fmt in ('%Y-%m-%d', '%d %b %Y'):
@@ -602,7 +598,7 @@ class ASC(COMMON):
                 continue
         return str(date_str)
 
-    def media_info(self, meta):
+    async def media_info(self, meta):
         if meta.get('is_disc') == 'BDMV':
             summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
             if os.path.exists(summary_path):
@@ -643,7 +639,7 @@ class ASC(COMMON):
         fallback_payload = {'imdb': 'tt0013442', 'layout': self.layout}
         return await _fetch(fallback_payload)
 
-    def build_ratings_bbcode(self, meta, ratings_list):
+    async def build_ratings_bbcode(self, meta, ratings_list):
         if not ratings_list:
             return ""
 
@@ -669,7 +665,7 @@ class ASC(COMMON):
                 parts.append(f"{img_tag}\n[b]{value}[/b]\n")
         return "\n".join(parts)
 
-    def build_cast_bbcode(self, cast_list):
+    async def build_cast_bbcode(self, cast_list):
         if not cast_list:
             return ""
 
@@ -678,51 +674,10 @@ class ASC(COMMON):
             profile_path = person.get('profile_path')
             profile_url = f"https://image.tmdb.org/t/p/w45{profile_path}" if profile_path else "https://i.imgur.com/eCCCtFA.png"
             tmdb_url = f"https://www.themoviedb.org/person/{person.get('id')}?language=pt-BR"
-            img_tag = self.format_image(profile_url)
+            img_tag = await self.format_image(profile_url)
             character_info = f"({person.get('name', '')}) como {person.get('character', '')}"
             parts.append(f"[url={tmdb_url}]{img_tag}[/url]\n[size=2][b]{character_info}[/b][/size]\n")
         return "".join(parts)
-
-    async def gather_data(self, meta):
-        await process_desc_language(meta, desc=None, tracker=self.tracker)
-        main_tmdb = await self.main_tmdb_data(meta)
-        resolution = self.get_resolution(meta)
-
-        data = {
-            'ano': str(meta['year']),
-            'audio': await self.get_audio(meta),
-            'capa': f"https://image.tmdb.org/t/p/w500{main_tmdb.get('poster_path') or meta.get('tmdb_poster')}",
-            'codecaudio': self.get_audio_codec(meta),
-            'codecvideo': self.get_video_codec(meta),
-            'descr': await self.build_description(meta),
-            'extencao': self.get_container(meta),
-            'genre': await self.get_tags(meta),
-            'imdb': meta['imdb_info']['imdbID'],
-            'altura': resolution['height'],
-            'largura': resolution['width'],
-            'lang': self.language_map.get(meta.get('original_language', '').lower(), "11"),
-            'layout': self.layout,
-            'legenda': await self.get_subtitle(meta),
-            'name': await self.get_title(meta),
-            'qualidade': self.get_type(meta),
-            'takeupload': 'yes',
-            'tresd': '1' if meta.get('3d') else '2',
-            'tube': await self.get_trailer(meta),
-        }
-
-        if meta.get('anime'):
-            anime_info = await self.get_languages(meta)
-            data.update = {
-                'idioma': anime_info['idioma'],
-                'lang': anime_info['lang'],
-                'type': anime_info['type'],
-            }
-
-        # Screenshots
-        for i, img in enumerate(meta.get('image_list', [])[:4]):
-            data[f'screens{i+1}'] = img.get('raw_url')
-
-        return data
 
     async def get_requests(self, meta):
         if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
@@ -792,6 +747,47 @@ class ASC(COMMON):
                 console.print(traceback.format_exc())
                 return []
 
+    async def gather_data(self, meta):
+        await process_desc_language(meta, desc=None, tracker=self.tracker)
+        main_tmdb = await self.main_tmdb_data(meta)
+        resolution = await self.get_resolution(meta)
+
+        data = {
+            'ano': str(meta['year']),
+            'audio': await self.get_audio(meta),
+            'capa': f"https://image.tmdb.org/t/p/w500{main_tmdb.get('poster_path') or meta.get('tmdb_poster')}",
+            'codecaudio': await self.get_audio_codec(meta),
+            'codecvideo': await self.get_video_codec(meta),
+            'descr': await self.build_description(meta),
+            'extencao': await self.get_container(meta),
+            'genre': await self.get_tags(meta),
+            'imdb': meta['imdb_info']['imdbID'],
+            'altura': resolution['height'],
+            'largura': resolution['width'],
+            'lang': self.language_map.get(meta.get('original_language', '').lower(), "11"),
+            'layout': self.layout,
+            'legenda': await self.get_subtitle(meta),
+            'name': await self.get_title(meta),
+            'qualidade': await self.get_type(meta),
+            'takeupload': 'yes',
+            'tresd': '1' if meta.get('3d') else '2',
+            'tube': await self.get_trailer(meta),
+        }
+
+        if meta.get('anime'):
+            anime_info = await self.get_languages(meta)
+            data.update = {
+                'idioma': anime_info['idioma'],
+                'lang': anime_info['lang'],
+                'type': anime_info['type'],
+            }
+
+        # Screenshots
+        for i, img in enumerate(meta.get('image_list', [])[:4]):
+            data[f'screens{i+1}'] = img.get('raw_url')
+
+        return data
+
     async def upload(self, meta, disctype):
         data = await self.gather_data(meta)
         requests = await self.get_requests(meta)
@@ -800,7 +796,7 @@ class ASC(COMMON):
 
         if not meta.get('debug', False):
             torrent_id = ''
-            upload_url = self.get_upload_url(meta)
+            upload_url = await self.get_upload_url(meta)
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
             with open(torrent_path, 'rb') as torrent_file:
@@ -820,17 +816,17 @@ class ASC(COMMON):
                     if requests:
                         status_message += ' Seu upload pode atender a pedidos existentes, verifique os logs anteriores do console.'
 
-                        # Approval
-                        should_approve = await self.get_approval(meta)
-                        if should_approve:
-                            await self.auto_approval(torrent_id)
+                    # Approval
+                    should_approve = await self.get_approval(meta)
+                    if should_approve:
+                        await self.auto_approval(torrent_id)
 
                 else:
                     status_message = 'O upload pode ter falhado, verifique. '
                     response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, "w", encoding="utf-8") as f:
                         f.write(response.text)
-                    console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
+                    print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
                     meta['skipping'] = f"{self.tracker}"
                     return
 
@@ -842,9 +838,8 @@ class ASC(COMMON):
 
         meta['tracker_status'][self.tracker]['status_message'] = status_message
 
-    async def auto_approval(self, relative_url):
+    async def auto_approval(self, torrent_id):
         try:
-            torrent_id = relative_url.split('id=')[-1]
             approval_url = f"{self.base_url}/uploader_app.php?id={torrent_id}"
             approval_response = await self.session.get(approval_url, timeout=30)
             approval_response.raise_for_status()
@@ -852,12 +847,11 @@ class ASC(COMMON):
             console.print(f"[bold red]Erro durante a tentativa de aprovação automática: {e}[/bold red]")
 
     async def get_approval(self, meta):
-        uploader = self.config['TRACKERS'][self.tracker].get('uploader_status', False)
-        if not uploader:
+        if not self.config['TRACKERS'][self.tracker].get('uploader_status', False):
             return False
 
-        modq = meta.get('modq', False) or meta.get('mq', False)
-        if modq:
-            return False, "Enviando para a fila de moderação."
+        if meta.get('modq', False):
+            print("Enviando para a fila de moderação.")
+            return False
 
         return True
