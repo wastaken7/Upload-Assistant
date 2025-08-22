@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import aiofiles
 import asyncio
 import httpx
 import langcodes
@@ -11,7 +10,6 @@ import unicodedata
 from .COMMON import COMMON
 from bs4 import BeautifulSoup
 from datetime import datetime
-from http.cookiejar import MozillaCookieJar
 from langcodes.tag_parser import LanguageTagError
 from pathlib import Path
 from src.console import console
@@ -38,29 +36,16 @@ class BJS(COMMON):
         self.cover = ''
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via Audionut's Upload Assistant[/url][/center]"
 
-    async def validate_credentials(self, meta):
+    async def load_cookies(self, meta):
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
             return False
 
-        try:
-            jar = MozillaCookieJar()
-            loop = asyncio.get_running_loop()
+        self.session.cookies = await self.parseCookieFile(cookie_file)
 
-            await loop.run_in_executor(
-                None,
-                lambda: jar.load(cookie_file, ignore_discard=True, ignore_expires=True)
-            )
-            self.session.cookies = jar
-
-        except FileNotFoundError:
-            console.print(f"[bold red]Arquivo de cookie não encontrado ao tentar carregar: {cookie_file}[/bold red]")
-            return False
-        except Exception as e:
-            console.print(f"[bold red]Erro ao carregar o arquivo de cookie. Formato inválido? Erro: {e}[/bold red]")
-            return False
-
+    async def validate_credentials(self, meta):
+        await self.load_cookies(meta)
         try:
             upload_page_url = f"{self.base_url}/upload.php"
             response = await self.session.get(upload_page_url, timeout=30.0)
@@ -77,8 +62,8 @@ class BJS(COMMON):
                 console.print("[yellow]A estrutura do site pode ter mudado ou o login falhou silenciosamente.[/yellow]")
 
                 failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
-                    await f.write(response.text)
+                with open(failure_path, "w", encoding="utf-8") as f:
+                    f.write(response.text)
                 console.print(f"[yellow]A resposta do servidor foi salva em {failure_path} para análise.[/yellow]")
                 return False
 
