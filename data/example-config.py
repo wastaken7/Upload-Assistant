@@ -324,6 +324,7 @@ config = {
             # for ASC to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/ASC.txt
             "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY",
+            "check_requests": False,
         },
         "BHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
