@@ -24,7 +24,6 @@ class DC(COMMON):
             f'https://tracker.digitalcore.club/announce/{self.passkey}',
             f'https://trackerprxy.digitalcore.club/announce/{self.passkey}'
         ]
-        self.auth_cookies = None
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Audionut's Upload Assistant ({platform.system()} {platform.release()})",
             "X-API-KEY": self.api_key
@@ -32,6 +31,8 @@ class DC(COMMON):
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
 
     async def mediainfo(self, meta):
+        mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
+
         if meta.get('is_disc') == 'BDMV':
             path = meta["discs"][0]["playlists"][0]["path"]
             await exportInfo(
@@ -44,7 +45,6 @@ class DC(COMMON):
                 debug=meta.get('debug', False)
             )
 
-            mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             with open(mi_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
@@ -56,7 +56,6 @@ class DC(COMMON):
             mediainfo = "".join(lines)
 
         else:
-            mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             with open(mi_path, 'r', encoding='utf-8') as f:
                 mediainfo = f.read()
 
@@ -66,7 +65,7 @@ class DC(COMMON):
         base_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
         dc_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
 
-        desc_parts = []
+        description_parts = []
 
         # BDInfo
         tech_info = ""
@@ -77,12 +76,12 @@ class DC(COMMON):
                     tech_info = f.read()
 
         if tech_info:
-            desc_parts.append(f"{tech_info}")
+            description_parts.append(f"{tech_info}")
 
         if os.path.exists(base_desc):
             with open(base_desc, 'r', encoding='utf-8') as f:
                 manual_desc = f.read()
-            desc_parts.append(manual_desc)
+            description_parts.append(manual_desc)
 
         # Screenshots
         if f'{self.tracker}_images_key' in meta:
@@ -96,12 +95,16 @@ class DC(COMMON):
                 web_url = image['web_url']
                 screenshots_block += f"[url={web_url}][img]{img_url}[/img][/url]"
             screenshots_block += "\n[/center]"
-            desc_parts.append(screenshots_block)
+            description_parts.append(screenshots_block)
+
+        custom_description_header = self.config['DEFAULT'].get('custom_description_header', '')
+        if custom_description_header:
+            description_parts.append(custom_description_header)
 
         if self.signature:
-            desc_parts.append(self.signature)
+            description_parts.append(self.signature)
 
-        final_description = "\n\n".join(filter(None, desc_parts))
+        final_description = "\n\n".join(filter(None, description_parts))
         from src.bbcode import BBCODE
         bbcode = BBCODE()
         desc = final_description
@@ -183,11 +186,6 @@ class DC(COMMON):
             return False
 
     async def search_existing(self, meta, results):
-        if not self.auth_cookies:
-            if not await self.login():
-                console.print(f"[bold red]Search failed on {self.tracker} because login failed.[/bold red]")
-                return []
-
         imdb_id = meta.get('imdb_info', {}).get('imdbID')
         if not imdb_id:
             console.print(f"[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
