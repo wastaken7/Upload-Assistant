@@ -82,11 +82,21 @@ class ASC(COMMON):
         tmdb_api = self.config['DEFAULT']['tmdb_api']
         base_url = "https://api.themoviedb.org/3/"
 
-        url = f"{base_url}{endpoint}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos,content_ratings"
+        url = f"{base_url}{endpoint}"
+
+        params = {
+            "api_key": tmdb_api,
+            "language": "pt-BR",
+            "append_to_response": "credits,videos,content_ratings"
+        }
+
+        headers = {
+            "Accept": "application/json"
+        }
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url)
+                response = await client.get(url, params=params, headers=headers)
                 if response.status_code == 200:
                     return response.json()
                 else:
@@ -356,8 +366,14 @@ class ASC(COMMON):
 
     async def build_description(self, meta):
         main_tmdb = await self.main_tmdb_data(meta)
-        season_tmdb = await self.season_tmdb_data(meta)
-        episode_tmdb = await self.episode_tmdb_data(meta)
+
+        season_tmdb = {}
+        episode_tmdb = {}
+        if meta['category'] == 'TV':
+            season_tmdb = await self.season_tmdb_data(meta)
+            if not meta.get('tv_pack', False):
+                episode_tmdb = await self.episode_tmdb_data(meta)
+
         user_layout = await self.fetch_layout_data(meta)
         fileinfo_dump = await self.media_info(meta)
 
