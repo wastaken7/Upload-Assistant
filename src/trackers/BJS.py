@@ -88,17 +88,26 @@ class BJS(COMMON):
         tmdb_api = self.config['DEFAULT']['tmdb_api']
 
         base_url = "https://api.themoviedb.org/3"
-        url = f"{base_url}/{meta['category'].lower()}/{meta['tmdb']}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos,content_ratings"
+        url = f"{base_url}/{meta['category'].lower()}/{meta['tmdb']}"
+
+        params = {
+            "api_key": tmdb_api,
+            "language": "pt-BR",
+            "append_to_response": "credits,videos,content_ratings"
+        }
+
+        headers = {
+            "Accept": "application/json"
+        }
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url)
+                response = await client.get(url, params=params, headers=headers)
                 if response.status_code == 200:
-                    if 'tmdb_localized_data' not in meta:
-                        meta['tmdb_localized_data'] = {}
-                    meta['tmdb_localized_data']['brazil']['main'] = response.json()
+                    data = response.json()
+                    meta.setdefault('tmdb_localized_data', {}).setdefault('brazil', {})['main'] = data
 
-                    return response.json()
+                    return data
                 else:
                     return None
         except httpx.RequestError:
@@ -726,7 +735,7 @@ class BJS(COMMON):
             for coro in tqdm(
                 asyncio.as_completed([upload_local_file(p) for p in paths]),
                 total=len(paths),
-                desc=f"Enviando {len(local_files)} screenshots para o host do {self.tracker}",
+                desc=f"Uploading screenshots to {self.tracker}",
             ):
                 result = await coro
                 if result:
@@ -758,7 +767,7 @@ class BJS(COMMON):
             for coro in tqdm(
                 asyncio.as_completed([upload_remote_file(url) for url in image_links]),
                 total=len(image_links),
-                desc=f"Enviando {len(image_links)} screenshots para o host do {self.tracker}",
+                desc=f"Uploading screenshots to {self.tracker}",
             ):
                 result = await coro
                 if result:
