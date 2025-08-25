@@ -81,6 +81,10 @@ class BJS(COMMON):
             return False
 
     async def ptbr_tmdb_data(self, meta):
+        brazil_data_in_meta = meta.get('tmdb_localized_data', {}).get('brazil', {}).get('main', {})
+        if brazil_data_in_meta:
+            return brazil_data_in_meta
+
         tmdb_api = self.config['DEFAULT']['tmdb_api']
         tmdb_data = None
 
@@ -91,6 +95,10 @@ class BJS(COMMON):
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url)
                 if response.status_code == 200:
+                    if 'tmdb_localized_data' not in meta:
+                        meta['tmdb_localized_data'] = {}
+                    meta['tmdb_localized_data']['brazil']['main'] = response.json()
+
                     return response.json()
                 else:
                     return None
