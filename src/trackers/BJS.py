@@ -86,7 +86,6 @@ class BJS(COMMON):
             return brazil_data_in_meta
 
         tmdb_api = self.config['DEFAULT']['tmdb_api']
-        tmdb_data = None
 
         base_url = "https://api.themoviedb.org/3"
         url = f"{base_url}/{meta['category'].lower()}/{meta['tmdb']}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos,content_ratings"
@@ -103,9 +102,6 @@ class BJS(COMMON):
                 else:
                     return None
         except httpx.RequestError:
-            return None
-
-        if not tmdb_data:
             return None
 
     def get_container(self, meta):
