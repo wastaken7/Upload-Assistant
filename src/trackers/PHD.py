@@ -23,20 +23,20 @@ from urllib.parse import urlparse
 class PHD(COMMON):
     def __init__(self, config):
         super().__init__(config)
-        self.tracker = "PHD"
-        self.source_flag = "PrivateHD"
-        self.banned_groups = [""]
-        self.base_url = "https://privatehd.to"
-        self.torrent_url = "https://privatehd.to/torrent/"
+        self.tracker = 'PHD'
+        self.source_flag = 'PrivateHD'
+        self.banned_groups = ['']
+        self.base_url = 'https://privatehd.to'
+        self.torrent_url = 'https://privatehd.to/torrent/'
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Audionut's Upload Assistant ({platform.system()} {platform.release()})"
         }, timeout=60.0)
-        self.signature = ""
+        self.signature = ''
 
     def rules(self, meta):
         meta['phd_rule'] = ''
-        warning = f"{self.tracker} RULE WARNING: "
+        warning = f'{self.tracker} RULE WARNING: '
         rule = ''
 
         is_bd_disc = False
@@ -59,11 +59,11 @@ class PHD(COMMON):
         if source:
             source = source.strip().lower()
 
-        # This also checks the rule "FANRES content is not allowed"
+        # This also checks the rule 'FANRES content is not allowed'
         if meta['category'] not in ('MOVIE', 'TV'):
             meta['phd_rule'] = (
-                warning + "The only allowed content to be uploaded are Movies and TV Shows.\n"
-                "Anything else, like games, music, software and porn is not allowed!"
+                warning + 'The only allowed content to be uploaded are Movies and TV Shows.\n'
+                'Anything else, like games, music, software and porn is not allowed!'
             )
             return False
 
@@ -75,76 +75,76 @@ class PHD(COMMON):
         current_year = datetime.now().year
         is_older_than_50_years = (current_year - year) >= 50
         if is_older_than_50_years:
-            meta['phd_rule'] = warning + "Upload movies/series 50+ years old to our sister site CinemaZ.to instead."
+            meta['phd_rule'] = warning + 'Upload movies/series 50+ years old to our sister site CinemaZ.to instead.'
             return False
 
         # https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
 
         africa = [
-            "AO", "BF", "BI", "BJ", "BW", "CD", "CF", "CG", "CI", "CM", "CV", "DJ", "DZ", "EG", "EH",
-            "ER", "ET", "GA", "GH", "GM", "GN", "GQ", "GW", "IO", "KE", "KM", "LR", "LS", "LY", "MA",
-            "MG", "ML", "MR", "MU", "MW", "MZ", "NA", "NE", "NG", "RE", "RW", "SC", "SD", "SH", "SL",
-            "SN", "SO", "SS", "ST", "SZ", "TD", "TF", "TG", "TN", "TZ", "UG", "YT", "ZA", "ZM", "ZW"
+            'AO', 'BF', 'BI', 'BJ', 'BW', 'CD', 'CF', 'CG', 'CI', 'CM', 'CV', 'DJ', 'DZ', 'EG', 'EH',
+            'ER', 'ET', 'GA', 'GH', 'GM', 'GN', 'GQ', 'GW', 'IO', 'KE', 'KM', 'LR', 'LS', 'LY', 'MA',
+            'MG', 'ML', 'MR', 'MU', 'MW', 'MZ', 'NA', 'NE', 'NG', 'RE', 'RW', 'SC', 'SD', 'SH', 'SL',
+            'SN', 'SO', 'SS', 'ST', 'SZ', 'TD', 'TF', 'TG', 'TN', 'TZ', 'UG', 'YT', 'ZA', 'ZM', 'ZW'
         ]
 
         america = [
-            "AG", "AI", "AR", "AW", "BB", "BL", "BM", "BO", "BQ", "BR", "BS", "BV", "BZ", "CA", "CL",
-            "CO", "CR", "CU", "CW", "DM", "DO", "EC", "FK", "GD", "GF", "GL", "GP", "GS", "GT", "GY",
-            "HN", "HT", "JM", "KN", "KY", "LC", "MF", "MQ", "MS", "MX", "NI", "PA", "PE", "PM", "PR",
-            "PY", "SR", "SV", "SX", "TC", "TT", "US", "UY", "VC", "VE", "VG", "VI"
+            'AG', 'AI', 'AR', 'AW', 'BB', 'BL', 'BM', 'BO', 'BQ', 'BR', 'BS', 'BV', 'BZ', 'CA', 'CL',
+            'CO', 'CR', 'CU', 'CW', 'DM', 'DO', 'EC', 'FK', 'GD', 'GF', 'GL', 'GP', 'GS', 'GT', 'GY',
+            'HN', 'HT', 'JM', 'KN', 'KY', 'LC', 'MF', 'MQ', 'MS', 'MX', 'NI', 'PA', 'PE', 'PM', 'PR',
+            'PY', 'SR', 'SV', 'SX', 'TC', 'TT', 'US', 'UY', 'VC', 'VE', 'VG', 'VI'
         ]
 
         asia = [
-            "AE", "AF", "AM", "AZ", "BD", "BH", "BN", "BT", "CN", "CY", "GE", "HK", "ID", "IL", "IN",
-            "IQ", "IR", "JO", "JP", "KG", "KH", "KP", "KR", "KW", "KZ", "LA", "LB", "LK", "MM", "MN",
-            "MO", "MV", "MY", "NP", "OM", "PH", "PK", "PS", "QA", "SA", "SG", "SY", "TH", "TJ", "TL",
-            "TM", "TR", "TW", "UZ", "VN", "YE"
+            'AE', 'AF', 'AM', 'AZ', 'BD', 'BH', 'BN', 'BT', 'CN', 'CY', 'GE', 'HK', 'ID', 'IL', 'IN',
+            'IQ', 'IR', 'JO', 'JP', 'KG', 'KH', 'KP', 'KR', 'KW', 'KZ', 'LA', 'LB', 'LK', 'MM', 'MN',
+            'MO', 'MV', 'MY', 'NP', 'OM', 'PH', 'PK', 'PS', 'QA', 'SA', 'SG', 'SY', 'TH', 'TJ', 'TL',
+            'TM', 'TR', 'TW', 'UZ', 'VN', 'YE'
         ]
 
         europe = [
-            "AD", "AL", "AT", "AX", "BA", "BE", "BG", "BY", "CH", "CZ", "DE", "DK", "EE", "ES", "FI",
-            "FO", "FR", "GB", "GG", "GI", "GR", "HR", "HU", "IE", "IM", "IS", "IT", "JE", "LI", "LT",
-            "LU", "LV", "MC", "MD", "ME", "MK", "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE",
-            "SI", "SJ", "SK", "SM", "UA", "VA"
+            'AD', 'AL', 'AT', 'AX', 'BA', 'BE', 'BG', 'BY', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI',
+            'FO', 'FR', 'GB', 'GG', 'GI', 'GR', 'HR', 'HU', 'IE', 'IM', 'IS', 'IT', 'JE', 'LI', 'LT',
+            'LU', 'LV', 'MC', 'MD', 'ME', 'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'RU', 'SE',
+            'SI', 'SJ', 'SK', 'SM', 'UA', 'VA'
         ]
 
         oceania = [
-            "AS", "AU", "CC", "CK", "CX", "FJ", "FM", "GU", "HM", "KI", "MH", "MP", "NC", "NF", "NR",
-            "NU", "NZ", "PF", "PG", "PN", "PW", "SB", "TK", "TO", "TV", "UM", "VU", "WF", "WS"
+            'AS', 'AU', 'CC', 'CK', 'CX', 'FJ', 'FM', 'GU', 'HM', 'KI', 'MH', 'MP', 'NC', 'NF', 'NR',
+            'NU', 'NZ', 'PF', 'PG', 'PN', 'PW', 'SB', 'TK', 'TO', 'TV', 'UM', 'VU', 'WF', 'WS'
         ]
 
         phd_allowed_countries = [
-            "AG", "AI", "AU", "BB", "BM", "BS", "BZ", "CA", "CW", "DM", "GB", "GD", "IE",
-            "JM", "KN", "KY", "LC", "MS", "NZ", "PR", "TC", "TT", "US", "VC", "VG", "VI",
+            'AG', 'AI', 'AU', 'BB', 'BM', 'BS', 'BZ', 'CA', 'CW', 'DM', 'GB', 'GD', 'IE',
+            'JM', 'KN', 'KY', 'LC', 'MS', 'NZ', 'PR', 'TC', 'TT', 'US', 'VC', 'VG', 'VI',
         ]
 
         all_countries = africa + america + europe + oceania
         cinemaz_countries = list(set(all_countries) - set(phd_allowed_countries))
 
-        origin_countries_codes = meta.get("origin_country", [])
+        origin_countries_codes = meta.get('origin_country', [])
 
         if any(code in phd_allowed_countries for code in origin_countries_codes):
             return True
 
         # CinemaZ
         elif any(code in cinemaz_countries for code in origin_countries_codes):
-            meta['phd_rule'] = warning + "Upload European (EXCLUDING United Kingdom and Ireland), South American and African content to our sister site CinemaZ.to instead."
+            meta['phd_rule'] = warning + 'Upload European (EXCLUDING United Kingdom and Ireland), South American and African content to our sister site CinemaZ.to instead.'
             return False
 
         # AvistaZ
         elif any(code in asia for code in origin_countries_codes):
-            origin_country_str = ", ".join(origin_countries_codes)
+            origin_country_str = ', '.join(origin_countries_codes)
             meta['phd_rule'] = (
-                warning + "DO NOT upload content originating from countries shown in this map (https://imgur.com/nIB9PM1).\n"
-                "In case of doubt, message the staff first. Upload Asian content to our sister site Avistaz.to instead.\n"
+                warning + 'DO NOT upload content originating from countries shown in this map (https://imgur.com/nIB9PM1).\n'
+                'In case of doubt, message the staff first. Upload Asian content to our sister site Avistaz.to instead.\n'
                 f'Origin country for your upload: {origin_country_str}'
             )
             return False
 
         elif not any(code in phd_allowed_countries for code in origin_countries_codes):
             meta['phd_rule'] = (
-                warning + "Only upload content to PrivateHD from all major English speaking countries.\n"
-                "Including United States, Canada, UK, Ireland, Australia, and New Zealand."
+                warning + 'Only upload content to PrivateHD from all major English speaking countries.\n'
+                'Including United States, Canada, UK, Ireland, Australia, and New Zealand.'
             )
             return False
 
@@ -153,27 +153,27 @@ class PHD(COMMON):
         if tag:
             tag = tag.strip().lower()
             if tag in ('rarbg', 'fgt', 'grym', 'tbs'):
-                meta['phd_rule'] = warning + "Do not upload RARBG, FGT, Grym or TBS. Existing uploads by these groups can be trumped at any time."
+                meta['phd_rule'] = warning + 'Do not upload RARBG, FGT, Grym or TBS. Existing uploads by these groups can be trumped at any time.'
                 return False
 
             if tag == 'evo' and source != 'web':
-                meta['phd_rule'] = warning + "Do not upload non-web EVO releases. Existing uploads by this group can be trumped at any time."
+                meta['phd_rule'] = warning + 'Do not upload non-web EVO releases. Existing uploads by this group can be trumped at any time.'
                 return False
 
         if meta.get('sd', '') == 1:
-            meta['phd_rule'] = warning + "SD (Standard Definition) content is forbidden."
+            meta['phd_rule'] = warning + 'SD (Standard Definition) content is forbidden.'
             return False
 
         if not is_bd_disc:
             ext = os.path.splitext(meta['filelist'][0])[1].lower()
-            allowed_extensions = {'.mkv': "MKV", '.mp4': "MP4"}
+            allowed_extensions = {'.mkv': 'MKV', '.mp4': 'MP4'}
             container = allowed_extensions.get(ext)
             if container is None:
-                meta['phd_rule'] = warning + "Allowed containers: MKV, MP4."
+                meta['phd_rule'] = warning + 'Allowed containers: MKV, MP4.'
                 return False
 
         # Video codec
-        """
+        '''
         Video Codecs:
             Allowed:
                 1 - BluRay (Untouched + REMUX): MPEG-2, VC-1, H.264, H.265
@@ -183,58 +183,58 @@ class PHD(COMMON):
                 5 - x265 encodes must be 10-bit
                 6 - H.264/x264 only allowed for 1080p and below.
                 7 - Not Allowed: Any codec not mentioned above is not allowed.
-        """
+        '''
         # 1
         if type == 'remux':
             if video_codec not in ('mpeg-2', 'vc-1', 'h.264', 'h.265', 'avc'):
-                meta['phd_rule'] = warning + "Allowed Video Codecs for BluRay (Untouched + REMUX): MPEG-2, VC-1, H.264, H.265"
+                meta['phd_rule'] = warning + 'Allowed Video Codecs for BluRay (Untouched + REMUX): MPEG-2, VC-1, H.264, H.265'
                 return False
 
         # 2
         if type == 'encode' and source == 'bluray':
             if video_encode not in ('h.264', 'h.265', 'x264', 'x265'):
-                meta['phd_rule'] = warning + "Allowed Video Codecs for BluRay (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)"
+                meta['phd_rule'] = warning + 'Allowed Video Codecs for BluRay (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)'
                 return False
 
         # 3
         if type in ('webdl', 'web-dl') and source == 'web':
             if video_encode not in ('h.264', 'h.265', 'vp9'):
-                meta['phd_rule'] = warning + "Allowed Video Codecs for WEB (Untouched): H.264, H.265, VP9"
+                meta['phd_rule'] = warning + 'Allowed Video Codecs for WEB (Untouched): H.264, H.265, VP9'
                 return False
 
         # 4
         if type == 'encode' and source == 'web':
             if video_encode not in ('h.264', 'h.265', 'x264', 'x265'):
-                meta['phd_rule'] = warning + "Allowed Video Codecs for WEB (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)"
+                meta['phd_rule'] = warning + 'Allowed Video Codecs for WEB (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)'
                 return False
 
         # 5
         if type == 'encode':
             if video_encode == 'x265':
                 if meta.get('bit_depth', '') != '10':
-                    meta['phd_rule'] = warning + "Allowed Video Codecs for x265 encodes must be 10-bit"
+                    meta['phd_rule'] = warning + 'Allowed Video Codecs for x265 encodes must be 10-bit'
                     return False
 
         # 6
         resolution = int(meta.get('resolution').lower().replace('p', '').replace('i', ''))
         if resolution > 1080:
             if video_encode in ('h.264', 'x264'):
-                meta['phd_rule'] = warning + "H.264/x264 only allowed for 1080p and below."
+                meta['phd_rule'] = warning + 'H.264/x264 only allowed for 1080p and below.'
                 return False
 
         # 7
         if video_codec not in ('avc', 'mpeg-2', 'vc-1', 'avc', 'h.264', 'vp9', 'h.265', 'x264', 'x265', 'hevc'):
-            meta['phd_rule'] = warning + f"Video codec not allowed in your upload: {video_codec}."
+            meta['phd_rule'] = warning + f'Video codec not allowed in your upload: {video_codec}.'
             return False
 
         # Audio codec
-        """
+        '''
         Audio Codecs:
             1 - Allowed: AC3 (Dolby Digital), Dolby TrueHD, DTS, DTS-HD (MA), FLAC, AAC, all other Dolby codecs.
             2 - Exceptions: Any uncompressed audio codec that comes on a BluRay disc like; PCM, LPCM, etc.
             3 - TrueHD/Atmos audio must have a compatibility track due to poor compatibility with most players.
             4 - Not Allowed: Any codec not mentioned above is not allowed.
-        """
+        '''
         if is_bd_disc:
             pass
         else:
@@ -279,9 +279,9 @@ class PHD(COMMON):
 
                     if has_truehd_atmos and not has_ac3_compat_track:
                         meta['phd_rule'] = (
-                            warning + f"A TrueHD Atmos track was detected in the original language ({original_language}), "
-                            f"but no AC-3 (Dolby Digital) compatibility track was found for that same language.\n"
-                            "Rule: TrueHD/Atmos audio must have a compatibility track due to poor compatibility with most players."
+                            warning + f'A TrueHD Atmos track was detected in the original language ({original_language}), '
+                            f'but no AC-3 (Dolby Digital) compatibility track was found for that same language.\n'
+                            'Rule: TrueHD/Atmos audio must have a compatibility track due to poor compatibility with most players.'
                         )
                         return False
 
@@ -304,22 +304,22 @@ class PHD(COMMON):
             if invalid_codecs:
                 unique_invalid_codecs = sorted(list(set(invalid_codecs)))
                 meta['phd_rule'] = (
-                    warning + f"Unallowed audio codec(s) detected: {', '.join(unique_invalid_codecs)}\n"
-                    f"Allowed codecs: AC3 (Dolby Digital), Dolby TrueHD, DTS, DTS-HD (MA), FLAC, AAC, all other Dolby codecs.\n"
-                    f"Dolby Exceptions: Any uncompressed audio codec that comes on a BluRay disc like; PCM, LPCM, etc."
+                    warning + f'Unallowed audio codec(s) detected: {', '.join(unique_invalid_codecs)}\n'
+                    f'Allowed codecs: AC3 (Dolby Digital), Dolby TrueHD, DTS, DTS-HD (MA), FLAC, AAC, all other Dolby codecs.\n'
+                    f'Dolby Exceptions: Any uncompressed audio codec that comes on a BluRay disc like; PCM, LPCM, etc.'
                 )
                 return False
 
         def ask_yes_no(prompt_text):
             while True:
-                answer = input(f"{prompt_text} (y/n): ").lower()
+                answer = input(f'{prompt_text} (y/n): ').lower()
                 if answer in ['y', 'n']:
                     return answer
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
         # Quality check
-        """
+        '''
         Minimum quality:
             Only upload proper encodes. Any encodes where the size and/or the bitrate imply a bad quality of the encode will be deleted. Indication of a proper encode:
                 Or a minimum x265 video bitrate  of:
@@ -330,7 +330,7 @@ class PHD(COMMON):
                 Depending on the content, for example an animation movie or series, a lower bitrate (x264) can be allowed.
             Video must at least be 720p
             The above bitrates are subject to staff discretion and uploads may be nuked even if they fulfill the above criteria.
-        """
+        '''
         BITRATE_RULES = {
             ('x265', 'web', 720): 1500000,
             ('x265', 'web', 1080): 2500000,
@@ -366,17 +366,17 @@ class PHD(COMMON):
 
                     if bitrate < min_bitrate:
                         quality_rule_text = (
-                            "Only upload proper encodes.\n"
-                            "Any encodes where the size and/or the bitrate imply a bad quality will be deleted."
+                            'Only upload proper encodes.\n'
+                            'Any encodes where the size and/or the bitrate imply a bad quality will be deleted.'
                         )
                         rule = (
-                            f"Your upload was rejected due to low quality.\n"
-                            f"Minimum bitrate for {resolution}p {source.upper()} {video_encode.upper()} is {min_bitrate / 1000} Kbps."
+                            f'Your upload was rejected due to low quality.\n'
+                            f'Minimum bitrate for {resolution}p {source.upper()} {video_encode.upper()} is {min_bitrate / 1000} Kbps.'
                         )
                         meta['phd_rule'] = (warning + quality_rule_text + rule)
 
         if resolution < 720:
-            rule = "Video must be at least 720p."
+            rule = 'Video must be at least 720p.'
             meta['phd_rule'] = (warning + rule)
 
         # Hybrid
@@ -389,56 +389,56 @@ class PHD(COMMON):
 
                 if is_hybrid_confirm == 'y':
                     hybrid_rule_text = (
-                        "Hybrid Remuxes and Encodes are subject to the following condition:\n\n"
-                        "Hybrid user releases are permitted, but are treated similarly to regular "
-                        "user releases and must be approved by staff before you upload them "
-                        "(please see the torrent approvals forum for details)."
+                        'Hybrid Remuxes and Encodes are subject to the following condition:\n\n'
+                        'Hybrid user releases are permitted, but are treated similarly to regular '
+                        'user releases and must be approved by staff before you upload them '
+                        '(please see the torrent approvals forum for details).'
                     )
 
-                    print("\n" + "-"*60)
-                    print("Important Rule for Hybrid Releases")
-                    print("-" * 60)
+                    print('\n' + '-'*60)
+                    print('Important Rule for Hybrid Releases')
+                    print('-' * 60)
                     print(warning + hybrid_rule_text)
-                    print("-" * 60 + "\n")
+                    print('-' * 60 + '\n')
 
                     continue_upload = ask_yes_no(
-                        "Have you already received staff approval for this upload?"
-                        "Do you wish to continue?"
+                        'Have you already received staff approval for this upload?'
+                        'Do you wish to continue?'
                     )
 
                     if continue_upload == 'n':
-                        error_message = "Upload aborted by user. Hybrid releases require prior staff approval."
-                        print(f"{error_message}")
+                        error_message = 'Upload aborted by user. Hybrid releases require prior staff approval.'
+                        print(f'{error_message}')
                         meta['phd_rule'] = error_message
 
                 else:
                     error_message = "Upload aborted. The term 'Hybrid' in the release name is reserved for approved hybrid releases. Please correct the name if it is not a hybrid."
-                    print(f"{error_message}")
+                    print(f'{error_message}')
                     meta['phd_rule'] = error_message
 
         # Log
         if type == 'remux':
             remux_log = ask_yes_no(
-                warning + "Remuxes must have a demux/eac3to log under spoilers in description.\n"
-                "Do you have these logs and will you add them to the description after upload?"
+                warning + 'Remuxes must have a demux/eac3to log under spoilers in description.\n'
+                'Do you have these logs and will you add them to the description after upload?'
             )
             if remux_log == 'y':
                 pass
             else:
-                meta['phd_rule'] = (warning + "Remuxes must have a demux/eac3to log under spoilers in description.")
+                meta['phd_rule'] = (warning + 'Remuxes must have a demux/eac3to log under spoilers in description.')
                 return False
 
         # Bloated
         if meta.get('bloated', False):
             ask_bloated = ask_yes_no(
-                warning + "Audio dubs are never preferred and can always be trumped by original audio only rip (Exception for BD50/BD25).\n"
-                "Do NOT upload a multi audio release when there is already a original audio only release on site.\n"
-                "Do you want to upload anyway?"
+                warning + 'Audio dubs are never preferred and can always be trumped by original audio only rip (Exception for BD50/BD25).\n'
+                'Do NOT upload a multi audio release when there is already a original audio only release on site.\n'
+                'Do you want to upload anyway?'
             )
             if ask_bloated == 'y':
                 pass
             else:
-                meta['phd_rule'] = "Canceled by user. Reason: Bloated"
+                meta['phd_rule'] = 'Canceled by user. Reason: Bloated'
                 return False
 
         return True
@@ -459,12 +459,12 @@ class PHD(COMMON):
         upload_name = re.sub(r'\s{2,}', ' ', upload_name).strip()
 
         tag_lower = meta['tag'].lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        invalid_tags = ['nogrp', 'nogroup', 'unknown', '-unk-']
 
-        if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+        if meta['tag'] == '' or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
-                upload_name = re.sub(f"-{invalid_tag}", "", upload_name, flags=re.IGNORECASE)
-            upload_name = f"{upload_name}-NOGROUP"
+                upload_name = re.sub(f'-{invalid_tag}', '', upload_name, flags=re.IGNORECASE)
+            upload_name = f'{upload_name}-NOGROUP'
 
         return upload_name
 
@@ -472,7 +472,7 @@ class PHD(COMMON):
         resolution = ''
         if not meta.get('is_disc') == 'BDMV':
             video_mi = meta['mediainfo']['media']['track'][1]
-            resolution = f"{video_mi['Width']}x{video_mi['Height']}"
+            resolution = f'{video_mi['Width']}x{video_mi['Height']}'
 
         return resolution
 
@@ -506,9 +506,9 @@ class PHD(COMMON):
         return keyword_map.get(source_type.lower())
 
     async def validate_credentials(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/{self.tracker}.txt')
         if not os.path.exists(cookie_file):
-            console.print(f"[red]Cookie file for {self.tracker} not found: {cookie_file}[/red]")
+            console.print(f'[red]Cookie file for {self.tracker} not found: {cookie_file}[/red]')
             return False
 
         try:
@@ -516,15 +516,15 @@ class PHD(COMMON):
             jar.load(ignore_discard=True, ignore_expires=True)
             self.session.cookies = jar
         except Exception as e:
-            console.print(f"[red]Error loading cookie file. Please check if the format is correct. Error:{e}[/red]")
+            console.print(f'[red]Error loading cookie file. Please check if the format is correct. Error:{e}[/red]')
             return False
 
         try:
-            upload_page_url = f"{self.base_url}/upload"
+            upload_page_url = f'{self.base_url}/upload'
             response = await self.session.get(upload_page_url, timeout=10)
 
             if 'login' in str(response.url):
-                console.print(f"[red]{self.tracker} validation failed. The cookie appears to be expired or invalid.[/red]")
+                console.print(f'[red]{self.tracker} validation failed. The cookie appears to be expired or invalid.[/red]')
                 return False
 
             auth_match = re.search(r'name="_token" content="([^"]+)"', response.text)
@@ -534,21 +534,21 @@ class PHD(COMMON):
                 return True
             else:
                 console.print(f"[red]{self.tracker} validation failed. Could not find 'auth' token on upload page.[/red]")
-                console.print("[yellow]This can happen if the site structure has changed or if the login failed silently..[/yellow]")
-                with open(f"{self.tracker}_auth_failure_{meta['uuid']}.html", "w", encoding="utf-8") as f:
+                console.print('[yellow]This can happen if the site structure has changed or if the login failed silently..[/yellow]')
+                with open(f'{self.tracker}_auth_failure_{meta['uuid']}.html', 'w', encoding='utf-8') as f:
                     f.write(response.text)
                 console.print(f"[yellow]The server response was saved to '{self.tracker}_auth_failure_{meta['uuid']}.html' for analysis.[/yellow]")
                 return False
 
         except Exception as e:
-            console.print(f"[red]Error validating credentials for {self.tracker}: {e}[/red]")
+            console.print(f'[red]Error validating credentials for {self.tracker}: {e}[/red]')
             return False
 
     async def search_existing(self, meta, disctype):
         upload_ok = self.rules(meta)
         if not upload_ok:
-            console.print(f"[red]{meta['phd_rule']}[/red]")
-            meta['skipping'] = "PHD"
+            console.print(f'[red]{meta['phd_rule']}[/red]')
+            meta['skipping'] = 'PHD'
             return
         await self.validate_credentials(meta)
         await self.get_media_code(meta)
@@ -560,7 +560,7 @@ class PHD(COMMON):
         else:
             resolution = 'all'
 
-        page_url = f"{self.base_url}/movies/torrents/{self.media_code}?quality={resolution}"
+        page_url = f'{self.base_url}/movies/torrents/{self.media_code}?quality={resolution}'
 
         dupes = []
 
@@ -589,7 +589,7 @@ class PHD(COMMON):
                     page_url = None
 
             except httpx.RequestError as e:
-                console.log(f"{self.tracker}: Failed to search for duplicates. {e.request.url}: {e}")
+                console.log(f'{self.tracker}: Failed to search for duplicates. {e.request.url}: {e}')
                 return dupes
 
         return dupes
@@ -604,14 +604,14 @@ class PHD(COMMON):
         }
         category_path = category_map.get(meta['category'])
         if not category_path:
-            console.print(f"[red]Invalid category: {meta['category']}[/red]")
+            console.print(f'[red]Invalid category: {meta['category']}[/red]')
             return False
 
-        ajax_url = f"https://privatehd.to/ajax/movies/{category_path}?term={meta['imdb_info']['imdbID']}"
+        ajax_url = f'https://privatehd.to/ajax/movies/{category_path}?term={meta['imdb_info']['imdbID']}'
 
         headers = {
-            "Referer": f"https://privatehd.to/upload/{'movie' if category_path == '1' else 'tv'}",
-            "X-Requested-With": "XMLHttpRequest"
+            'Referer': f'https://privatehd.to/upload/{'movie' if category_path == '1' else 'tv'}',
+            'X-Requested-With': 'XMLHttpRequest'
         }
 
         try:
@@ -623,12 +623,12 @@ class PHD(COMMON):
                 self.media_code = str(data['data'][0]['id'])
             else:
                 # maybe create a function to add the media to the database in the future
-                console.print(f"This media ({meta['imdb_info']['imdbID']}) is not registered in {self.tracker}, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}")
-                meta['skipping'] = f"{self.tracker}"
+                console.print(f'This media ({meta['imdb_info']['imdbID']}) is not registered in {self.tracker}, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}')
+                meta['skipping'] = f'{self.tracker}'
                 return
 
         except Exception as e:
-            console.print(f"[red]Error trying to fetch media code for tracker {self.tracker}: {e}[/red]")
+            console.print(f'[red]Error trying to fetch media code for tracker {self.tracker}: {e}[/red]')
 
         return bool(self.media_code)
 
@@ -640,11 +640,11 @@ class PHD(COMMON):
         return category_id
 
     async def get_file_info(self, meta):
-        info_file_path = ""
+        info_file_path = ''
         if meta.get('is_disc') == 'BDMV':
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt"
+            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt'
         else:
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
+            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt'
 
         if os.path.exists(info_file_path):
             with open(info_file_path, 'r', encoding='utf-8') as f:
@@ -677,7 +677,7 @@ class PHD(COMMON):
         }
 
     async def img_host(self, meta, image_bytes: bytes, filename: str) -> Optional[str]:
-        upload_url = f"{self.base_url}/ajax/image/upload"
+        upload_url = f'{self.base_url}/ajax/image/upload'
 
         headers = {
             'Referer': self.upload_url_step2,
@@ -706,13 +706,13 @@ class PHD(COMMON):
                     return str(image_id)
                 else:
                     error_message = json_data.get('error', 'Unknown image host error.')
-                    print(f"Error uploading {filename}: {error_message}")
+                    print(f'Error uploading {filename}: {error_message}')
                     return None
             else:
-                print(f"Error uploading {filename}: Status {response.status_code} - {response.text}")
+                print(f'Error uploading {filename}: Status {response.status_code} - {response.text}')
                 return None
         except Exception as e:
-            print(f"Exception when uploading {filename}: {e}")
+            print(f'Exception when uploading {filename}: {e}')
             return None
 
     async def get_screenshots(self, meta):
@@ -734,7 +734,7 @@ class PHD(COMMON):
             for coro in tqdm(
                 asyncio.as_completed(tasks),
                 total=len(paths),
-                desc=f"Uploading screenshots to {self.tracker}"
+                desc=f'Uploading screenshots to {self.tracker}'
             ):
                 result = await coro
                 if result:
@@ -743,17 +743,17 @@ class PHD(COMMON):
         else:
             image_links = [img.get('raw_url') for img in meta.get('image_list', []) if img.get('raw_url')]
             if len(image_links) < 3:
-                raise UploadException(f"UPLOAD FAILED: At least 3 screenshots are required for {self.tracker}.")
+                raise UploadException(f'UPLOAD FAILED: At least 3 screenshots are required for {self.tracker}.')
 
             async def upload_remote_file(url):
                 try:
                     response = await self.session.get(url, timeout=120)
                     response.raise_for_status()
                     image_bytes = response.content
-                    filename = os.path.basename(urlparse(url).path) or "screenshot.png"
+                    filename = os.path.basename(urlparse(url).path) or 'screenshot.png'
                     return await self.img_host(meta, image_bytes, filename)
                 except Exception as e:
-                    print(f"Failed to process screenshot from URL {url}: {e}")
+                    print(f'Failed to process screenshot from URL {url}: {e}')
                     return None
 
             links = image_links[:limit] if limit else image_links
@@ -762,14 +762,14 @@ class PHD(COMMON):
             for coro in tqdm(
                 asyncio.as_completed(tasks),
                 total=len(links),
-                desc=f"Uploading screenshots to {self.tracker}"
+                desc=f'Uploading screenshots to {self.tracker}'
             ):
                 result = await coro
                 if result:
                     results.append(result)
 
         if len(results) < 3:
-            raise UploadException("UPLOAD FAILED: The image host did not return the minimum number of screenshots.")
+            raise UploadException('UPLOAD FAILED: The image host did not return the minimum number of screenshots.')
 
         return results
 
@@ -782,59 +782,59 @@ class PHD(COMMON):
                 category = meta.get('category').lower()
 
                 if category == 'tv':
-                    query = meta['title'] + f" {meta.get('season', '')}{meta.get('episode', '')}"
+                    query = meta['title'] + f' {meta.get('season', '')}{meta.get('episode', '')}'
                 else:
                     query = meta['title']
 
                 # Debug
                 if meta.get('debug', False):
-                    console.print("DEBUG: Please input the query for searching requests:")
+                    console.print('DEBUG: Please input the query for searching requests:')
                     query = input().lower()
-                    console.print("DEBUG: Please input the category for searching requests (tv or movie):")
+                    console.print('DEBUG: Please input the category for searching requests (tv or movie):')
                     category = input().lower()
 
-                search_url = f"{self.base_url}/requests?type={category}&search={query}&condition=new"
+                search_url = f'{self.base_url}/requests?type={category}&search={query}&condition=new'
 
                 response = await self.session.get(search_url)
                 response.raise_for_status()
                 response_results_text = response.text
 
-                soup = BeautifulSoup(response_results_text, "html.parser")
+                soup = BeautifulSoup(response_results_text, 'html.parser')
 
-                request_rows = soup.select(".table-responsive table tbody tr")
+                request_rows = soup.select('.table-responsive table tbody tr')
 
                 results = []
                 for row in request_rows:
-                    link_element = row.select_one("a.torrent-filename")
+                    link_element = row.select_one('a.torrent-filename')
 
                     if not link_element:
                         continue
 
                     name = link_element.text.strip()
-                    link = link_element.get("href")
+                    link = link_element.get('href')
 
-                    all_tds = row.find_all("td")
+                    all_tds = row.find_all('td')
 
                     reward = all_tds[5].text.strip() if len(all_tds) > 5 else 'N/A'
 
                     results.append({
-                        "Name": name,
-                        "Link": link,
-                        "Reward": reward
+                        'Name': name,
+                        'Link': link,
+                        'Reward': reward
                     })
 
                 if results:
-                    message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
+                    message = f'\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n'
                     for r in results:
-                        message += f"[bold green]Name:[/bold green] {r['Name']}\n"
-                        message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
-                        message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
+                        message += f'[bold green]Name:[/bold green] {r['Name']}\n'
+                        message += f'[bold green]Reward:[/bold green] {r['Reward']}\n'
+                        message += f'[bold green]Link:[/bold green] {r['Link']}\n\n'
                     console.print(message)
 
                 return results
 
             except Exception as e:
-                console.print(f"[bold red]An error occurred while fetching requests for {self.tracker}: {e}[/bold red]")
+                console.print(f'[bold red]An error occurred while fetching requests for {self.tracker}: {e}[/bold red]')
                 import traceback
                 console.print(traceback.format_exc())
                 return []
@@ -853,8 +853,8 @@ class PHD(COMMON):
         if not meta.get('debug', False):
             try:
                 await self.edit_torrent(meta, self.tracker, self.source_flag)
-                upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
-                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+                upload_url_step1 = f'{self.base_url}/upload/{meta['category'].lower()}'
+                torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
 
                 with open(torrent_path, 'rb') as torrent_file:
                     files = {'torrent_file': (os.path.basename(torrent_path), torrent_file, 'application/x-bittorrent')}
@@ -871,7 +871,7 @@ class PHD(COMMON):
                         match = re.search(r'/(\d+)$', redirect_url)
                         if not match:
                             console.print(f"Could not extract 'task_id' from redirect URL:{redirect_url}")
-                            meta['skipping'] = f"{self.tracker}"
+                            meta['skipping'] = f'{self.tracker}'
                             return
 
                         task_id = match.group(1)
@@ -883,15 +883,15 @@ class PHD(COMMON):
                         }
 
                     else:
-                        failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html"
-                        with open(failure_path, "w", encoding="utf-8") as f:
+                        failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html'
+                        with open(failure_path, 'w', encoding='utf-8') as f:
                             f.write(task_response.text)
-                        status_message = f"""[red]Step 1 of upload failed to {self.tracker}. Status: {task_response.status_code}, URL: {task_response.url}[/red].
-                                            [yellow]The HTML response was saved to '{failure_path}' for analysis.[/yellow]"""
+                        status_message = f'''[red]Step 1 of upload failed to {self.tracker}. Status: {task_response.status_code}, URL: {task_response.url}[/red].
+                                            [yellow]The HTML response was saved to '{failure_path}' for analysis.[/yellow]'''
 
             except Exception as e:
-                status_message = f"[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]"
-                meta['skipping'] = f"{self.tracker}"
+                status_message = f'[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]'
+                meta['skipping'] = f'{self.tracker}'
                 return
 
         else:
@@ -906,7 +906,7 @@ class PHD(COMMON):
         lang_info = await self.get_lang(meta) or {}
         requests = await self.get_requests(meta)
 
-        status_message = ""
+        status_message = ''
 
         data = {
             '_token': self.auth_token,
@@ -956,21 +956,21 @@ class PHD(COMMON):
                     torrent_url = response.headers['Location']
 
                     torrent_id = ''
-                    match = re.search(r"/torrent/(\d+)", torrent_url)
+                    match = re.search(r'/torrent/(\d+)', torrent_url)
                     if match:
                         torrent_id = match.group(1)
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
                     # Even if you are uploading, you still need to download the .torrent from the website
                     # because it needs to be registered as a download before you can start seeding
-                    download_url = torrent_url.replace("/torrent/", "/download/torrent/")
+                    download_url = torrent_url.replace('/torrent/', '/download/torrent/')
                     register_download = await self.session.get(download_url)
                     if register_download.status_code != 200:
                         status_message = (
-                            f"Unable to register your upload in your download history.\n"
-                            f"Please visit the following URL and manually download the torrent file before starting to seed:\n"
-                            f"{torrent_url}\n"
-                            f"(Error code: {register_download.status_code})"
+                            f'Unable to register your upload in your download history.\n'
+                            f'Please visit the following URL and manually download the torrent file before starting to seed:\n'
+                            f'{torrent_url}\n'
+                            f'(Error code: {register_download.status_code})'
                         )
 
                     announce_url = self.config['TRACKERS'][self.tracker].get('announce_url')
@@ -981,20 +981,20 @@ class PHD(COMMON):
                         status_message += ' Your upload may fulfill existing requests, check prior console logs.'
 
                 else:
-                    failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html"
-                    with open(failure_path, "w", encoding="utf-8") as f:
+                    failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html'
+                    with open(failure_path, 'w', encoding='utf-8') as f:
                         f.write(response.text)
 
                     status_message = (
-                        f"Step 2 of upload to {self.tracker} failed.\n"
-                        f"Status code: {response.status_code}\n"
-                        f"URL: {response.url}\n"
+                        f'Step 2 of upload to {self.tracker} failed.\n'
+                        f'Status code: {response.status_code}\n'
+                        f'URL: {response.url}\n'
                         f"The HTML response has been saved to '{failure_path}' for analysis."
                     )
 
             except Exception as e:
-                status_message = f"[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]"
-                meta['skipping'] = f"{self.tracker}"
+                status_message = f'[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]'
+                meta['skipping'] = f'{self.tracker}'
                 return
 
         else:
@@ -1005,195 +1005,195 @@ class PHD(COMMON):
 
     def language_map(self):
         self.all_lang_map = {
-            ("Abkhazian", "abk", "ab"): '1',
-            ("Afar", "aar", "aa"): '2',
-            ("Afrikaans", "afr", "af"): '3',
-            ("Akan", "aka", "ak"): '4',
-            ("Albanian", "sqi", "sq"): '5',
-            ("Amharic", "amh", "am"): '6',
-            ("Arabic", "ara", "ar"): '7',
-            ("Aragonese", "arg", "an"): '8',
-            ("Armenian", "hye", "hy"): '9',
-            ("Assamese", "asm", "as"): '10',
-            ("Avaric", "ava", "av"): '11',
-            ("Avestan", "ave", "ae"): '12',
-            ("Aymara", "aym", "ay"): '13',
-            ("Azerbaijani", "aze", "az"): '14',
-            ("Bambara", "bam", "bm"): '15',
-            ("Bashkir", "bak", "ba"): '16',
-            ("Basque", "eus", "eu"): '17',
-            ("Belarusian", "bel", "be"): '18',
-            ("Bengali", "ben", "bn"): '19',
-            ("Bihari languages", "bih", "bh"): '20',
-            ("Bislama", "bis", "bi"): '21',
-            ("Bokmål, Norwegian", "nob", "nb"): '22',
-            ("Bosnian", "bos", "bs"): '23',
-            ("Brazilian Portuguese", "por", "pt"): '187',
-            ("Breton", "bre", "br"): '24',
-            ("Bulgarian", "bul", "bg"): '25',
-            ("Burmese", "mya", "my"): '26',
-            ("Cantonese", "yue", "zh"): '27',
-            ("Catalan", "cat", "ca"): '28',
-            ("Central Khmer", "khm", "km"): '29',
-            ("Chamorro", "cha", "ch"): '30',
-            ("Chechen", "che", "ce"): '31',
-            ("Chichewa", "nya", "ny"): '32',
-            ("Chinese", "zho", "zh"): '33',
-            ("Church Slavic", "chu", "cu"): '34',
-            ("Chuvash", "chv", "cv"): '35',
-            ("Cornish", "cor", "kw"): '36',
-            ("Corsican", "cos", "co"): '37',
-            ("Cree", "cre", "cr"): '38',
-            ("Croatian", "hrv", "hr"): '39',
-            ("Czech", "ces", "cs"): '40',
-            ("Danish", "dan", "da"): '41',
-            ("Dhivehi", "div", "dv"): '42',
-            ("Dutch", "nld", "nl"): '43',
-            ("Dzongkha", "dzo", "dz"): '44',
-            ("English", "eng", "en"): '45',
-            ("Esperanto", "epo", "eo"): '46',
-            ("Estonian", "est", "et"): '47',
-            ("Ewe", "ewe", "ee"): '48',
-            ("Faroese", "fao", "fo"): '49',
-            ("Fijian", "fij", "fj"): '50',
-            ("Filipino", "fil", "fil"): '189',
-            ("Finnish", "fin", "fi"): '51',
-            ("French", "fra", "fr"): '52',
-            ("Fulah", "ful", "ff"): '53',
-            ("Gaelic", "gla", "gd"): '54',
-            ("Galician", "glg", "gl"): '55',
-            ("Ganda", "lug", "lg"): '56',
-            ("Georgian", "kat", "ka"): '57',
-            ("German", "deu", "de"): '58',
-            ("Greek", "ell", "el"): '59',
-            ("Guarani", "grn", "gn"): '60',
-            ("Gujarati", "guj", "gu"): '61',
-            ("Haitian", "hat", "ht"): '62',
-            ("Hausa", "hau", "ha"): '63',
-            ("Hebrew", "heb", "he"): '64',
-            ("Herero", "her", "hz"): '65',
-            ("Hindi", "hin", "hi"): '66',
-            ("Hiri Motu", "hmo", "ho"): '67',
-            ("Hungarian", "hun", "hu"): '68',
-            ("Icelandic", "isl", "is"): '69',
-            ("Ido", "ido", "io"): '70',
-            ("Igbo", "ibo", "ig"): '71',
-            ("Indonesian", "ind", "id"): '72',
-            ("Interlingua", "ina", "ia"): '73',
-            ("Interlingue", "ile", "ie"): '74',
-            ("Inuktitut", "iku", "iu"): '75',
-            ("Inupiaq", "ipk", "ik"): '76',
-            ("Irish", "gle", "ga"): '77',
-            ("Italian", "ita", "it"): '78',
-            ("Japanese", "jpn", "ja"): '79',
-            ("Javanese", "jav", "jv"): '80',
-            ("Kalaallisut", "kal", "kl"): '81',
-            ("Kannada", "kan", "kn"): '82',
-            ("Kanuri", "kau", "kr"): '83',
-            ("Kashmiri", "kas", "ks"): '84',
-            ("Kazakh", "kaz", "kk"): '85',
-            ("Kikuyu", "kik", "ki"): '86',
-            ("Kinyarwanda", "kin", "rw"): '87',
-            ("Kirghiz", "kir", "ky"): '88',
-            ("Komi", "kom", "kv"): '89',
-            ("Kongo", "kon", "kg"): '90',
-            ("Korean", "kor", "ko"): '91',
-            ("Kuanyama", "kua", "kj"): '92',
-            ("Kurdish", "kur", "ku"): '93',
-            ("Lao", "lao", "lo"): '94',
-            ("Latin", "lat", "la"): '95',
-            ("Latvian", "lav", "lv"): '96',
-            ("Limburgan", "lim", "li"): '97',
-            ("Lingala", "lin", "ln"): '98',
-            ("Lithuanian", "lit", "lt"): '99',
-            ("Luba-Katanga", "lub", "lu"): '100',
-            ("Luxembourgish", "ltz", "lb"): '101',
-            ("Macedonian", "mkd", "mk"): '102',
-            ("Malagasy", "mlg", "mg"): '103',
-            ("Malay", "msa", "ms"): '104',
-            ("Malayalam", "mal", "ml"): '105',
-            ("Maltese", "mlt", "mt"): '106',
-            ("Mandarin", "cmn", "zh"): '107',
-            ("Manx", "glv", "gv"): '108',
-            ("Maori", "mri", "mi"): '109',
-            ("Marathi", "mar", "mr"): '110',
-            ("Marshallese", "mah", "mh"): '111',
-            ("Mongolian", "mon", "mn"): '112',
-            ("Mooré", "mos", "mos"): '188',
-            ("Nauru", "nau", "na"): '113',
-            ("Navajo", "nav", "nv"): '114',
-            ("Ndebele, North", "nde", "nd"): '115',
-            ("Ndebele, South", "nbl", "nr"): '116',
-            ("Ndonga", "ndo", "ng"): '117',
-            ("Nepali", "nep", "ne"): '118',
-            ("Northern Sami", "sme", "se"): '119',
-            ("Norwegian", "nor", "no"): '120',
-            ("Norwegian Nynorsk", "nno", "nn"): '121',
-            ("Occitan (post 1500)", "oci", "oc"): '122',
-            ("Ojibwa", "oji", "oj"): '123',
-            ("Oriya", "ori", "or"): '124',
-            ("Oromo", "orm", "om"): '125',
-            ("Ossetian", "oss", "os"): '126',
-            ("Pali", "pli", "pi"): '127',
-            ("Panjabi", "pan", "pa"): '128',
-            ("Persian", "fas", "fa"): '129',
-            ("Polish", "pol", "pl"): '130',
-            ("Portuguese", "por", "pt"): '131',
-            ("Pushto", "pus", "ps"): '132',
-            ("Quechua", "que", "qu"): '133',
-            ("Romanian", "ron", "ro"): '134',
-            ("Romansh", "roh", "rm"): '135',
-            ("Rundi", "run", "rn"): '136',
-            ("Russian", "rus", "ru"): '137',
-            ("Samoan", "smo", "sm"): '138',
-            ("Sango", "sag", "sg"): '139',
-            ("Sanskrit", "san", "sa"): '140',
-            ("Sardinian", "srd", "sc"): '141',
-            ("Serbian", "srp", "sr"): '142',
-            ("Shona", "sna", "sn"): '143',
-            ("Sichuan Yi", "iii", "ii"): '144',
-            ("Sindhi", "snd", "sd"): '145',
-            ("Sinhala", "sin", "si"): '146',
-            ("Slovak", "slk", "sk"): '147',
-            ("Slovenian", "slv", "sl"): '148',
-            ("Somali", "som", "so"): '149',
-            ("Sotho, Southern", "sot", "st"): '150',
-            ("Spanish", "spa", "es"): '151',
-            ("Sundanese", "sun", "su"): '152',
-            ("Swahili", "swa", "sw"): '153',
-            ("Swati", "ssw", "ss"): '154',
-            ("Swedish", "swe", "sv"): '155',
-            ("Tagalog", "tgl", "tl"): '156',
-            ("Tahitian", "tah", "ty"): '157',
-            ("Tajik", "tgk", "tg"): '158',
-            ("Tamil", "tam", "ta"): '159',
-            ("Tatar", "tat", "tt"): '160',
-            ("Telugu", "tel", "te"): '161',
-            ("Thai", "tha", "th"): '162',
-            ("Tibetan", "bod", "bo"): '163',
-            ("Tigrinya", "tir", "ti"): '164',
-            ("Tongan", "ton", "to"): '165',
-            ("Tsonga", "tso", "ts"): '166',
-            ("Tswana", "tsn", "tn"): '167',
-            ("Turkish", "tur", "tr"): '168',
-            ("Turkmen", "tuk", "tk"): '169',
-            ("Twi", "twi", "tw"): '170',
-            ("Uighur", "uig", "ug"): '171',
-            ("Ukrainian", "ukr", "uk"): '172',
-            ("Urdu", "urd", "ur"): '173',
-            ("Uzbek", "uzb", "uz"): '174',
-            ("Venda", "ven", "ve"): '175',
-            ("Vietnamese", "vie", "vi"): '176',
-            ("Volapük", "vol", "vo"): '177',
-            ("Walloon", "wln", "wa"): '178',
-            ("Welsh", "cym", "cy"): '179',
-            ("Western Frisian", "fry", "fy"): '180',
-            ("Wolof", "wol", "wo"): '181',
-            ("Xhosa", "xho", "xh"): '182',
-            ("Yiddish", "yid", "yi"): '183',
-            ("Yoruba", "yor", "yo"): '184',
-            ("Zhuang", "zha", "za"): '185',
-            ("Zulu", "zul", "zu"): '186',
+            ('Abkhazian', 'abk', 'ab'): '1',
+            ('Afar', 'aar', 'aa'): '2',
+            ('Afrikaans', 'afr', 'af'): '3',
+            ('Akan', 'aka', 'ak'): '4',
+            ('Albanian', 'sqi', 'sq'): '5',
+            ('Amharic', 'amh', 'am'): '6',
+            ('Arabic', 'ara', 'ar'): '7',
+            ('Aragonese', 'arg', 'an'): '8',
+            ('Armenian', 'hye', 'hy'): '9',
+            ('Assamese', 'asm', 'as'): '10',
+            ('Avaric', 'ava', 'av'): '11',
+            ('Avestan', 'ave', 'ae'): '12',
+            ('Aymara', 'aym', 'ay'): '13',
+            ('Azerbaijani', 'aze', 'az'): '14',
+            ('Bambara', 'bam', 'bm'): '15',
+            ('Bashkir', 'bak', 'ba'): '16',
+            ('Basque', 'eus', 'eu'): '17',
+            ('Belarusian', 'bel', 'be'): '18',
+            ('Bengali', 'ben', 'bn'): '19',
+            ('Bihari languages', 'bih', 'bh'): '20',
+            ('Bislama', 'bis', 'bi'): '21',
+            ('Bokmål, Norwegian', 'nob', 'nb'): '22',
+            ('Bosnian', 'bos', 'bs'): '23',
+            ('Brazilian Portuguese', 'por', 'pt'): '187',
+            ('Breton', 'bre', 'br'): '24',
+            ('Bulgarian', 'bul', 'bg'): '25',
+            ('Burmese', 'mya', 'my'): '26',
+            ('Cantonese', 'yue', 'zh'): '27',
+            ('Catalan', 'cat', 'ca'): '28',
+            ('Central Khmer', 'khm', 'km'): '29',
+            ('Chamorro', 'cha', 'ch'): '30',
+            ('Chechen', 'che', 'ce'): '31',
+            ('Chichewa', 'nya', 'ny'): '32',
+            ('Chinese', 'zho', 'zh'): '33',
+            ('Church Slavic', 'chu', 'cu'): '34',
+            ('Chuvash', 'chv', 'cv'): '35',
+            ('Cornish', 'cor', 'kw'): '36',
+            ('Corsican', 'cos', 'co'): '37',
+            ('Cree', 'cre', 'cr'): '38',
+            ('Croatian', 'hrv', 'hr'): '39',
+            ('Czech', 'ces', 'cs'): '40',
+            ('Danish', 'dan', 'da'): '41',
+            ('Dhivehi', 'div', 'dv'): '42',
+            ('Dutch', 'nld', 'nl'): '43',
+            ('Dzongkha', 'dzo', 'dz'): '44',
+            ('English', 'eng', 'en'): '45',
+            ('Esperanto', 'epo', 'eo'): '46',
+            ('Estonian', 'est', 'et'): '47',
+            ('Ewe', 'ewe', 'ee'): '48',
+            ('Faroese', 'fao', 'fo'): '49',
+            ('Fijian', 'fij', 'fj'): '50',
+            ('Filipino', 'fil', 'fil'): '189',
+            ('Finnish', 'fin', 'fi'): '51',
+            ('French', 'fra', 'fr'): '52',
+            ('Fulah', 'ful', 'ff'): '53',
+            ('Gaelic', 'gla', 'gd'): '54',
+            ('Galician', 'glg', 'gl'): '55',
+            ('Ganda', 'lug', 'lg'): '56',
+            ('Georgian', 'kat', 'ka'): '57',
+            ('German', 'deu', 'de'): '58',
+            ('Greek', 'ell', 'el'): '59',
+            ('Guarani', 'grn', 'gn'): '60',
+            ('Gujarati', 'guj', 'gu'): '61',
+            ('Haitian', 'hat', 'ht'): '62',
+            ('Hausa', 'hau', 'ha'): '63',
+            ('Hebrew', 'heb', 'he'): '64',
+            ('Herero', 'her', 'hz'): '65',
+            ('Hindi', 'hin', 'hi'): '66',
+            ('Hiri Motu', 'hmo', 'ho'): '67',
+            ('Hungarian', 'hun', 'hu'): '68',
+            ('Icelandic', 'isl', 'is'): '69',
+            ('Ido', 'ido', 'io'): '70',
+            ('Igbo', 'ibo', 'ig'): '71',
+            ('Indonesian', 'ind', 'id'): '72',
+            ('Interlingua', 'ina', 'ia'): '73',
+            ('Interlingue', 'ile', 'ie'): '74',
+            ('Inuktitut', 'iku', 'iu'): '75',
+            ('Inupiaq', 'ipk', 'ik'): '76',
+            ('Irish', 'gle', 'ga'): '77',
+            ('Italian', 'ita', 'it'): '78',
+            ('Japanese', 'jpn', 'ja'): '79',
+            ('Javanese', 'jav', 'jv'): '80',
+            ('Kalaallisut', 'kal', 'kl'): '81',
+            ('Kannada', 'kan', 'kn'): '82',
+            ('Kanuri', 'kau', 'kr'): '83',
+            ('Kashmiri', 'kas', 'ks'): '84',
+            ('Kazakh', 'kaz', 'kk'): '85',
+            ('Kikuyu', 'kik', 'ki'): '86',
+            ('Kinyarwanda', 'kin', 'rw'): '87',
+            ('Kirghiz', 'kir', 'ky'): '88',
+            ('Komi', 'kom', 'kv'): '89',
+            ('Kongo', 'kon', 'kg'): '90',
+            ('Korean', 'kor', 'ko'): '91',
+            ('Kuanyama', 'kua', 'kj'): '92',
+            ('Kurdish', 'kur', 'ku'): '93',
+            ('Lao', 'lao', 'lo'): '94',
+            ('Latin', 'lat', 'la'): '95',
+            ('Latvian', 'lav', 'lv'): '96',
+            ('Limburgan', 'lim', 'li'): '97',
+            ('Lingala', 'lin', 'ln'): '98',
+            ('Lithuanian', 'lit', 'lt'): '99',
+            ('Luba-Katanga', 'lub', 'lu'): '100',
+            ('Luxembourgish', 'ltz', 'lb'): '101',
+            ('Macedonian', 'mkd', 'mk'): '102',
+            ('Malagasy', 'mlg', 'mg'): '103',
+            ('Malay', 'msa', 'ms'): '104',
+            ('Malayalam', 'mal', 'ml'): '105',
+            ('Maltese', 'mlt', 'mt'): '106',
+            ('Mandarin', 'cmn', 'zh'): '107',
+            ('Manx', 'glv', 'gv'): '108',
+            ('Maori', 'mri', 'mi'): '109',
+            ('Marathi', 'mar', 'mr'): '110',
+            ('Marshallese', 'mah', 'mh'): '111',
+            ('Mongolian', 'mon', 'mn'): '112',
+            ('Mooré', 'mos', 'mos'): '188',
+            ('Nauru', 'nau', 'na'): '113',
+            ('Navajo', 'nav', 'nv'): '114',
+            ('Ndebele, North', 'nde', 'nd'): '115',
+            ('Ndebele, South', 'nbl', 'nr'): '116',
+            ('Ndonga', 'ndo', 'ng'): '117',
+            ('Nepali', 'nep', 'ne'): '118',
+            ('Northern Sami', 'sme', 'se'): '119',
+            ('Norwegian', 'nor', 'no'): '120',
+            ('Norwegian Nynorsk', 'nno', 'nn'): '121',
+            ('Occitan (post 1500)', 'oci', 'oc'): '122',
+            ('Ojibwa', 'oji', 'oj'): '123',
+            ('Oriya', 'ori', 'or'): '124',
+            ('Oromo', 'orm', 'om'): '125',
+            ('Ossetian', 'oss', 'os'): '126',
+            ('Pali', 'pli', 'pi'): '127',
+            ('Panjabi', 'pan', 'pa'): '128',
+            ('Persian', 'fas', 'fa'): '129',
+            ('Polish', 'pol', 'pl'): '130',
+            ('Portuguese', 'por', 'pt'): '131',
+            ('Pushto', 'pus', 'ps'): '132',
+            ('Quechua', 'que', 'qu'): '133',
+            ('Romanian', 'ron', 'ro'): '134',
+            ('Romansh', 'roh', 'rm'): '135',
+            ('Rundi', 'run', 'rn'): '136',
+            ('Russian', 'rus', 'ru'): '137',
+            ('Samoan', 'smo', 'sm'): '138',
+            ('Sango', 'sag', 'sg'): '139',
+            ('Sanskrit', 'san', 'sa'): '140',
+            ('Sardinian', 'srd', 'sc'): '141',
+            ('Serbian', 'srp', 'sr'): '142',
+            ('Shona', 'sna', 'sn'): '143',
+            ('Sichuan Yi', 'iii', 'ii'): '144',
+            ('Sindhi', 'snd', 'sd'): '145',
+            ('Sinhala', 'sin', 'si'): '146',
+            ('Slovak', 'slk', 'sk'): '147',
+            ('Slovenian', 'slv', 'sl'): '148',
+            ('Somali', 'som', 'so'): '149',
+            ('Sotho, Southern', 'sot', 'st'): '150',
+            ('Spanish', 'spa', 'es'): '151',
+            ('Sundanese', 'sun', 'su'): '152',
+            ('Swahili', 'swa', 'sw'): '153',
+            ('Swati', 'ssw', 'ss'): '154',
+            ('Swedish', 'swe', 'sv'): '155',
+            ('Tagalog', 'tgl', 'tl'): '156',
+            ('Tahitian', 'tah', 'ty'): '157',
+            ('Tajik', 'tgk', 'tg'): '158',
+            ('Tamil', 'tam', 'ta'): '159',
+            ('Tatar', 'tat', 'tt'): '160',
+            ('Telugu', 'tel', 'te'): '161',
+            ('Thai', 'tha', 'th'): '162',
+            ('Tibetan', 'bod', 'bo'): '163',
+            ('Tigrinya', 'tir', 'ti'): '164',
+            ('Tongan', 'ton', 'to'): '165',
+            ('Tsonga', 'tso', 'ts'): '166',
+            ('Tswana', 'tsn', 'tn'): '167',
+            ('Turkish', 'tur', 'tr'): '168',
+            ('Turkmen', 'tuk', 'tk'): '169',
+            ('Twi', 'twi', 'tw'): '170',
+            ('Uighur', 'uig', 'ug'): '171',
+            ('Ukrainian', 'ukr', 'uk'): '172',
+            ('Urdu', 'urd', 'ur'): '173',
+            ('Uzbek', 'uzb', 'uz'): '174',
+            ('Venda', 'ven', 've'): '175',
+            ('Vietnamese', 'vie', 'vi'): '176',
+            ('Volapük', 'vol', 'vo'): '177',
+            ('Walloon', 'wln', 'wa'): '178',
+            ('Welsh', 'cym', 'cy'): '179',
+            ('Western Frisian', 'fry', 'fy'): '180',
+            ('Wolof', 'wol', 'wo'): '181',
+            ('Xhosa', 'xho', 'xh'): '182',
+            ('Yiddish', 'yid', 'yi'): '183',
+            ('Yoruba', 'yor', 'yo'): '184',
+            ('Zhuang', 'zha', 'za'): '185',
+            ('Zulu', 'zul', 'zu'): '186',
         }
         self.lang_map = {}
         for key_tuple, lang_id in self.all_lang_map.items():
