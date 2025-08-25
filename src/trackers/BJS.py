@@ -23,11 +23,11 @@ from urllib.parse import urlparse
 class BJS(COMMON):
     def __init__(self, config):
         super().__init__(config)
-        self.tracker = "BJS"
-        self.banned_groups = [""]
-        self.source_flag = "BJ"
-        self.base_url = "https://bj-share.info"
-        self.torrent_url = "https://bj-share.info/torrents.php?torrentid="
+        self.tracker = 'BJS'
+        self.banned_groups = ['']
+        self.source_flag = 'BJ'
+        self.base_url = 'https://bj-share.info'
+        self.torrent_url = 'https://bj-share.info/torrents.php?torrentid='
         self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={
@@ -37,9 +37,9 @@ class BJS(COMMON):
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via Audionut's Upload Assistant[/url][/center]"
 
     async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/{self.tracker}.txt')
         if not os.path.exists(cookie_file):
-            console.print(f"[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]")
+            console.print(f'[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]')
             return False
 
         self.session.cookies = await self.parseCookieFile(cookie_file)
@@ -47,37 +47,37 @@ class BJS(COMMON):
     async def validate_credentials(self, meta):
         await self.load_cookies(meta)
         try:
-            upload_page_url = f"{self.base_url}/upload.php"
+            upload_page_url = f'{self.base_url}/upload.php'
             response = await self.session.get(upload_page_url, timeout=30.0)
             response.raise_for_status()
 
             if 'login.php' in str(response.url):
-                console.print(f"[bold red]Falha na validação do {self.tracker}. O cookie parece estar expirado (redirecionado para login).[/bold red]")
+                console.print(f'[bold red]Falha na validação do {self.tracker}. O cookie parece estar expirado (redirecionado para login).[/bold red]')
                 return False
 
             auth_match = re.search(r'name="auth" value="([^"]+)"', response.text)
 
             if not auth_match:
-                console.print(f"[bold red]Falha na validação do {self.tracker}. Token 'auth' não encontrado.[/bold red]")
-                console.print("[yellow]A estrutura do site pode ter mudado ou o login falhou silenciosamente.[/yellow]")
+                console.print(f'[bold red]Falha na validação do {self.tracker}. Token Auth não encontrado.[/bold red]')
+                console.print('[yellow]A estrutura do site pode ter mudado ou o login falhou silenciosamente.[/yellow]')
 
-                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                with open(failure_path, "w", encoding="utf-8") as f:
+                failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                with open(failure_path, 'w', encoding='utf-8') as f:
                     f.write(response.text)
-                console.print(f"[yellow]A resposta do servidor foi salva em {failure_path} para análise.[/yellow]")
+                console.print(f'[yellow]A resposta do servidor foi salva em {failure_path} para análise.[/yellow]')
                 return False
 
             self.auth_token = auth_match.group(1)
             return True
 
         except httpx.TimeoutException:
-            console.print(f"[bold red]Erro no {self.tracker}: Timeout ao tentar validar credenciais.[/bold red]")
+            console.print(f'[bold red]Erro no {self.tracker}: Timeout ao tentar validar credenciais.[/bold red]')
             return False
         except httpx.HTTPStatusError as e:
-            console.print(f"[bold red]Erro HTTP ao validar credenciais do {self.tracker}: Status {e.response.status_code}.[/bold red]")
+            console.print(f'[bold red]Erro HTTP ao validar credenciais do {self.tracker}: Status {e.response.status_code}.[/bold red]')
             return False
         except httpx.RequestError as e:
-            console.print(f"[bold red]Erro de rede ao validar credenciais do {self.tracker}: {e.__class__.__name__}.[/bold red]")
+            console.print(f'[bold red]Erro de rede ao validar credenciais do {self.tracker}: {e.__class__.__name__}.[/bold red]')
             return False
 
     async def ptbr_tmdb_data(self, meta):
@@ -87,17 +87,17 @@ class BJS(COMMON):
 
         tmdb_api = self.config['DEFAULT']['tmdb_api']
 
-        base_url = "https://api.themoviedb.org/3"
-        url = f"{base_url}/{meta['category'].lower()}/{meta['tmdb']}"
+        base_url = 'https://api.themoviedb.org/3'
+        url = f'{base_url}/{meta['category'].lower()}/{meta['tmdb']}'
 
         params = {
-            "api_key": tmdb_api,
-            "language": "pt-BR",
-            "append_to_response": "credits,videos,content_ratings"
+            'api_key': tmdb_api,
+            'language': 'pt-BR',
+            'append_to_response': 'credits,videos,content_ratings'
         }
 
         headers = {
-            "Accept": "application/json"
+            'Accept': 'application/json'
         }
 
         try:
@@ -115,14 +115,14 @@ class BJS(COMMON):
 
     def get_container(self, meta):
         container = None
-        if meta["is_disc"] == "BDMV":
-            container = "M2TS"
-        elif meta['is_disc'] == "DVD":
-            container = "VOB"
+        if meta['is_disc'] == 'BDMV':
+            container = 'M2TS'
+        elif meta['is_disc'] == 'DVD':
+            container = 'VOB'
         else:
             ext = os.path.splitext(meta['filelist'][0])[1]
             containermap = {
-                '.mkv': "MKV",
+                '.mkv': 'MKV',
                 '.mp4': 'MP4'
             }
             container = containermap.get(ext, 'Outro')
@@ -141,29 +141,29 @@ class BJS(COMMON):
 
     async def get_languages(self, meta):
         possible_languages = {
-            "Alemão", "Árabe", "Argelino", "Búlgaro", "Cantonês", "Chinês",
-            "Coreano", "Croata", "Dinamarquês", "Egípcio", "Espanhol", "Estoniano",
-            "Filipino", "Finlandês", "Francês", "Grego", "Hebraico", "Hindi",
-            "Holandês", "Húngaro", "Indonésio", "Inglês", "Islandês", "Italiano",
-            "Japonês", "Macedônio", "Malaio", "Marati", "Nigeriano", "Norueguês",
-            "Persa", "Polaco", "Polonês", "Português", "Português (pt)", "Romeno",
-            "Russo", "Sueco", "Tailandês", "Tamil", "Tcheco", "Telugo", "Turco",
-            "Ucraniano", "Urdu", "Vietnamita", "Zulu", "Outro"
+            'Alemão', 'Árabe', 'Argelino', 'Búlgaro', 'Cantonês', 'Chinês',
+            'Coreano', 'Croata', 'Dinamarquês', 'Egípcio', 'Espanhol', 'Estoniano',
+            'Filipino', 'Finlandês', 'Francês', 'Grego', 'Hebraico', 'Hindi',
+            'Holandês', 'Húngaro', 'Indonésio', 'Inglês', 'Islandês', 'Italiano',
+            'Japonês', 'Macedônio', 'Malaio', 'Marati', 'Nigeriano', 'Norueguês',
+            'Persa', 'Polaco', 'Polonês', 'Português', 'Português (pt)', 'Romeno',
+            'Russo', 'Sueco', 'Tailandês', 'Tamil', 'Tcheco', 'Telugo', 'Turco',
+            'Ucraniano', 'Urdu', 'Vietnamita', 'Zulu', 'Outro'
         }
         tmdb_data = await self.ptbr_tmdb_data(meta)
-        lang_code = tmdb_data.get("original_language")
-        origin_countries = tmdb_data.get("origin_country", [])
+        lang_code = tmdb_data.get('original_language')
+        origin_countries = tmdb_data.get('origin_country', [])
 
         if not lang_code:
-            return "Outro"
+            return 'Outro'
 
         language_name = None
 
         if lang_code == 'pt':
             if 'PT' in origin_countries:
-                language_name = "Português (pt)"
+                language_name = 'Português (pt)'
             else:
-                language_name = "Português"
+                language_name = 'Português'
         else:
             try:
                 language_name = langcodes.Language.make(lang_code).display_name('pt').capitalize()
@@ -173,7 +173,7 @@ class BJS(COMMON):
         if language_name in possible_languages:
             return language_name
         else:
-            return "Outro"
+            return 'Outro'
 
     async def get_audio(self, meta):
         await process_desc_language(meta, desc=None, tracker=self.tracker)
@@ -189,13 +189,13 @@ class BJS(COMMON):
 
         if has_pt_audio:
             if is_original_pt:
-                return "Nacional"
+                return 'Nacional'
             elif len(audio_languages) > 1:
-                return "Dual Áudio"
+                return 'Dual Áudio'
             else:
-                return "Dublado"
+                return 'Dublado'
 
-        return "Legendado"
+        return 'Legendado'
 
     async def get_subtitle(self, meta):
         # Stops uploading when an external subtitle is detected
@@ -204,7 +204,7 @@ class BJS(COMMON):
         subtitle_extensions = ('.srt', '.sub', '.ass', '.ssa', '.idx', '.smi', '.psb')
 
         if any(f.lower().endswith(subtitle_extensions) for f in os.listdir(directory)):
-            raise UploadException("[bold red]ERRO: Esta ferramenta não suporta o upload de legendas em arquivos separados.[/bold red]")
+            raise UploadException('[bold red]ERRO: Esta ferramenta não suporta o upload de legendas em arquivos separados.[/bold red]')
 
         await process_desc_language(meta, desc=None, tracker=self.tracker)
         found_language_strings = meta.get('subtitle_languages', [])
@@ -264,43 +264,43 @@ class BJS(COMMON):
         video_encode = meta.get('video_encode', '').lower()
         video_codec = meta.get('video_codec', '')
 
-        search_text = f"{video_encode} {video_codec.lower()}"
+        search_text = f'{video_encode} {video_codec.lower()}'
 
         for key, value in CODEC_MAP.items():
             if key in search_text:
                 return value
 
-        return video_codec if video_codec else "Outro"
+        return video_codec if video_codec else 'Outro'
 
     def get_audio_codec(self, meta):
         priority_order = [
-            "DTS-X", "E-AC-3 JOC", "TrueHD", "DTS-HD", "LPCM", "PCM", "FLAC",
-            "DTS-ES", "DTS", "E-AC-3", "AC3", "AAC", "Opus", "Vorbis", "MP3", "MP2"
+            'DTS-X', 'E-AC-3 JOC', 'TrueHD', 'DTS-HD', 'LPCM', 'PCM', 'FLAC',
+            'DTS-ES', 'DTS', 'E-AC-3', 'AC3', 'AAC', 'Opus', 'Vorbis', 'MP3', 'MP2'
         ]
 
         codec_map = {
-            "DTS-X": ["DTS:X", "DTS-X"],
-            "E-AC-3 JOC": ["E-AC-3 JOC", "DD+ JOC"],
-            "TrueHD": ["TRUEHD"],
-            "DTS-HD": ["DTS-HD", "DTSHD"],
-            "LPCM": ["LPCM"],
-            "PCM": ["PCM"],
-            "FLAC": ["FLAC"],
-            "DTS-ES": ["DTS-ES"],
-            "DTS": ["DTS"],
-            "E-AC-3": ["E-AC-3", "DD+"],
-            "AC3": ["AC3", "DD"],
-            "AAC": ["AAC"],
-            "Opus": ["OPUS"],
-            "Vorbis": ["VORBIS"],
-            "MP2": ["MP2"],
-            "MP3": ["MP3"]
+            'DTS-X': ['DTS:X', 'DTS-X'],
+            'E-AC-3 JOC': ['E-AC-3 JOC', 'DD+ JOC'],
+            'TrueHD': ['TRUEHD'],
+            'DTS-HD': ['DTS-HD', 'DTSHD'],
+            'LPCM': ['LPCM'],
+            'PCM': ['PCM'],
+            'FLAC': ['FLAC'],
+            'DTS-ES': ['DTS-ES'],
+            'DTS': ['DTS'],
+            'E-AC-3': ['E-AC-3', 'DD+'],
+            'AC3': ['AC3', 'DD'],
+            'AAC': ['AAC'],
+            'Opus': ['OPUS'],
+            'Vorbis': ['VORBIS'],
+            'MP2': ['MP2'],
+            'MP3': ['MP3']
         }
 
         audio_description = meta.get('audio')
 
         if not audio_description or not isinstance(audio_description, str):
-            return "Outro"
+            return 'Outro'
 
         audio_upper = audio_description.upper()
 
@@ -311,7 +311,7 @@ class BJS(COMMON):
                 if term.upper() in audio_upper:
                     return codec_name
 
-        return "Outro"
+        return 'Outro'
 
     async def get_title(self, meta):
         tmdb_data = await self.ptbr_tmdb_data(meta)
@@ -324,22 +324,22 @@ class BJS(COMMON):
         description = []
 
         disc_map = {
-            "BDMV": ("BD_SUMMARY_00.txt", "BDInfo"),
-            "DVD": ("MEDIAINFO_CLEANPATH.txt", "MediaInfo"),
+            'BDMV': ('BD_SUMMARY_00.txt', 'BDInfo'),
+            'DVD': ('MEDIAINFO_CLEANPATH.txt', 'MediaInfo'),
         }
 
-        disc_type = meta.get("is_disc")
+        disc_type = meta.get('is_disc')
         if disc_type in disc_map:
             filename, title = disc_map[disc_type]
-            path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{filename}"
+            path = f'{meta['base_dir']}/tmp/{meta['uuid']}/{filename}'
             if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
                     if content.strip():
-                        description.append(f"[hide={title}][pre]{content}[/pre][/hide]")
+                        description.append(f'[hide={title}][pre]{content}[/pre][/hide]')
 
-        base_desc = ""
-        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+        base_desc = ''
+        base_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt'
         if os.path.exists(base_desc_path):
             with open(base_desc_path, 'r', encoding='utf-8') as f:
                 base_desc = f.read()
@@ -352,9 +352,9 @@ class BJS(COMMON):
 
         description.append(self.signature)
 
-        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        final_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt'
         with open(final_desc_path, 'w', encoding='utf-8') as descfile:
-            all_parts = "\n\n".join(filter(None, description))
+            all_parts = '\n\n'.join(filter(None, description))
             final_description = re.sub(r'\n{3,}', '\n\n', all_parts)
             descfile.write(final_description)
 
@@ -365,7 +365,7 @@ class BJS(COMMON):
         video_results = tmdb_data.get('videos', {}).get('results', [])
         youtube_code = video_results[-1].get('key', '') if video_results else ''
         if youtube_code:
-            youtube = f"http://www.youtube.com/watch?v={youtube_code}"
+            youtube = f'http://www.youtube.com/watch?v={youtube_code}'
         else:
             youtube = meta.get('youtube') or ''
 
@@ -389,7 +389,7 @@ class BJS(COMMON):
                 if br_rating == 'L':
                     br_rating = 'Livre'
                 else:
-                    br_rating = f"{br_rating} anos"
+                    br_rating = f'{br_rating} anos'
                 break
 
             # Use US rating as fallback
@@ -400,7 +400,7 @@ class BJS(COMMON):
 
     async def get_tags(self, meta):
         tmdb_data = await self.ptbr_tmdb_data(meta)
-        tags = ""
+        tags = ''
 
         if tmdb_data and isinstance(tmdb_data.get('genres'), list):
             genre_names = [
@@ -419,7 +419,7 @@ class BJS(COMMON):
                 )
 
         if not tags:
-            tags = await asyncio.to_thread(input, f"Digite os gêneros (no formato do {self.tracker}): ")
+            tags = await asyncio.to_thread(input, f'Digite os gêneros (no formato do {self.tracker}): ')
 
         return tags
 
@@ -440,13 +440,13 @@ class BJS(COMMON):
                 if episode_match:
                     upload_episode_num = episode_match
 
-        search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
+        search_url = f'{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}'
 
         found_items = []
         try:
             response = await self.session.get(search_url)
             if response.status_code in [301, 302, 307] and 'Location' in response.headers:
-                redirect_url = f"{self.base_url}/{response.headers['Location']}"
+                redirect_url = f'{self.base_url}/{response.headers['Location']}'
                 response = await self.session.get(redirect_url)
             response.raise_for_status()
 
@@ -456,7 +456,7 @@ class BJS(COMMON):
             episode_found_on_page = False
             if meta['category'] == 'TV' and not is_tv_pack and upload_season_num and upload_episode_num:
                 temp_season_on_page = None
-                upload_episode_str = f"E{upload_episode_num}"
+                upload_episode_str = f'E{upload_episode_num}'
                 for r in torrent_details_table.find_all('tr'):
                     if 'season_header' in r.get('class', []):
                         s_match = re.search(r'Temporada (\d+)', r.get_text(strip=True))
@@ -464,7 +464,7 @@ class BJS(COMMON):
                             temp_season_on_page = s_match.group(1)
                         continue
                     if temp_season_on_page == upload_season_num and r.get('id', '').startswith('torrent'):
-                        link = r.find('a', onclick=re.compile(r"loadIfNeeded\("))
+                        link = r.find('a', onclick=re.compile(r'loadIfNeeded\('))
                         if link and re.search(r'\b' + re.escape(upload_episode_str) + r'\b', link.get_text(strip=True)):
                             episode_found_on_page = True
                             break
@@ -504,11 +504,11 @@ class BJS(COMMON):
                     continue
 
                 torrent_row = row
-                id_link = torrent_row.find('a', onclick=re.compile(r"loadIfNeeded\("))
+                id_link = torrent_row.find('a', onclick=re.compile(r'loadIfNeeded\('))
                 if not id_link:
                     continue
 
-                description_text = " ".join(id_link.get_text(strip=True).split())
+                description_text = ' '.join(id_link.get_text(strip=True).split())
 
                 should_make_ajax_call = False
 
@@ -551,14 +551,14 @@ class BJS(COMMON):
 
                     torrent_id = id_match.group(1)
                     group_id = id_match.group(2)
-                    ajax_url = f"{self.base_url}/ajax.php?action=torrent_content&torrentid={torrent_id}&groupid={group_id}"
+                    ajax_url = f'{self.base_url}/ajax.php?action=torrent_content&torrentid={torrent_id}&groupid={group_id}'
 
                     try:
                         ajax_response = await self.session.get(ajax_url)
                         ajax_response.raise_for_status()
                         ajax_soup = BeautifulSoup(ajax_response.text, 'html.parser')
                     except Exception as e:
-                        console.print(f"[yellow]Não foi possível buscar a lista de arquivos para o torrent {torrent_id}: {e}[/yellow]")
+                        console.print(f'[yellow]Não foi possível buscar a lista de arquivos para o torrent {torrent_id}: {e}[/yellow]')
                         continue
 
                     item_name = None
@@ -585,7 +585,7 @@ class BJS(COMMON):
                         found_items.append(item_name)
 
         except Exception as e:
-            console.print(f"[bold red]Ocorreu um erro inesperado ao processar a busca: {e}[/bold red]")
+            console.print(f'[bold red]Ocorreu um erro inesperado ao processar a busca: {e}[/bold red]')
             import traceback
             traceback.print_exc()
             return []
@@ -595,25 +595,25 @@ class BJS(COMMON):
     def get_edition(self, meta):
         edition_str = meta.get('edition', '').lower()
         if not edition_str:
-            return ""
+            return ''
 
         edition_map = {
             "director's cut": "Director's Cut",
-            "extended": "Extended Edition",
-            "imax": "IMAX",
-            "open matte": "Open Matte",
-            "noir": "Noir Edition",
-            "theatrical": "Theatrical Cut",
-            "uncut": "Uncut",
-            "unrated": "Unrated",
-            "uncensored": "Uncensored",
+            'extended': 'Extended Edition',
+            'imax': 'IMAX',
+            'open matte': 'Open Matte',
+            'noir': 'Noir Edition',
+            'theatrical': 'Theatrical Cut',
+            'uncut': 'Uncut',
+            'unrated': 'Unrated',
+            'uncensored': 'Uncensored',
         }
 
         for keyword, label in edition_map.items():
             if keyword in edition_str:
                 return label
 
-        return ""
+        return ''
 
     def get_bitrate(self, meta):
         if meta.get('type') == 'DISC':
@@ -621,7 +621,7 @@ class BJS(COMMON):
 
             if is_disc_type == 'BDMV':
                 disctype = meta.get('disctype')
-                if disctype in ["BD100", "BD66", "BD50", "BD25"]:
+                if disctype in ['BD100', 'BD66', 'BD50', 'BD25']:
                     return disctype
 
                 try:
@@ -630,24 +630,24 @@ class BJS(COMMON):
                     size_in_gb = 0
 
                 if size_in_gb > 66:
-                    return "BD100"
+                    return 'BD100'
                 elif size_in_gb > 50:
-                    return "BD66"
+                    return 'BD66'
                 elif size_in_gb > 25:
-                    return "BD50"
+                    return 'BD50'
                 else:
-                    return "BD25"
+                    return 'BD25'
 
             elif is_disc_type == 'DVD':
                 dvd_size = meta.get('dvd_size')
-                if dvd_size in ["DVD9", "DVD5"]:
+                if dvd_size in ['DVD9', 'DVD5']:
                     return dvd_size
-                return "DVD9"
+                return 'DVD9'
 
         source_type = meta.get('type')
 
         if not source_type or not isinstance(source_type, str):
-            return "Outro"
+            return 'Outro'
 
         keyword_map = {
             'webdl': 'WEB-DL',
@@ -672,16 +672,16 @@ class BJS(COMMON):
             'tvrip': 'TVRip',
         }
 
-        return keyword_map.get(source_type.lower(), "Outro")
+        return keyword_map.get(source_type.lower(), 'Outro')
 
     async def img_host(self, image_bytes: bytes, filename: str) -> Optional[str]:
-        upload_url = f"{self.base_url}/ajax.php?action=screen_up"
+        upload_url = f'{self.base_url}/ajax.php?action=screen_up'
         headers = {
-            "Referer": f"{self.base_url}/upload.php",
-            "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json",
+            'Referer': f'{self.base_url}/upload.php',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
         }
-        files = {"file": (filename, image_bytes, "image/png")}
+        files = {'file': (filename, image_bytes, 'image/png')}
 
         try:
             response = await self.session.post(
@@ -689,9 +689,9 @@ class BJS(COMMON):
             )
             response.raise_for_status()
             data = response.json()
-            return data.get("url", "").replace("\\/", "/")
+            return data.get('url', '').replace('\\/', '/')
         except Exception as e:
-            print(f"Exceção no upload de {filename}: {e}")
+            print(f'Exceção no upload de {filename}: {e}')
             return None
 
     async def get_cover(self, meta, disctype):
@@ -703,10 +703,10 @@ class BJS(COMMON):
             tmdb_data = await self.ptbr_tmdb_data(meta)
             cover_path = tmdb_data.get('poster_path') or meta.get('tmdb_poster')
             if not cover_path:
-                print("Nenhum poster_path encontrado nos dados do TMDB.")
+                print('Nenhum poster_path encontrado nos dados do TMDB.')
                 return None
 
-            cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
+            cover_tmdb_url = f'https://image.tmdb.org/t/p/w500{cover_path}'
             try:
                 response = await self.session.get(cover_tmdb_url, timeout=120)
                 response.raise_for_status()
@@ -715,18 +715,18 @@ class BJS(COMMON):
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                print(f"Falha ao processar pôster da URL {cover_tmdb_url}: {e}")
+                print(f'Falha ao processar pôster da URL {cover_tmdb_url}: {e}')
                 return None
 
     async def get_screenshots(self, meta):
-        screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
-        local_files = sorted(screenshot_dir.glob("*.png"))
+        screenshot_dir = Path(meta['base_dir']) / 'tmp' / meta['uuid']
+        local_files = sorted(screenshot_dir.glob('*.png'))
         results = []
 
         # Use existing files
         if local_files:
             async def upload_local_file(path):
-                with open(path, "rb") as f:
+                with open(path, 'rb') as f:
                     image_bytes = f.read()
                 return await self.img_host(image_bytes, os.path.basename(path))
 
@@ -735,7 +735,7 @@ class BJS(COMMON):
             for coro in tqdm(
                 asyncio.as_completed([upload_local_file(p) for p in paths]),
                 total=len(paths),
-                desc=f"Uploading screenshots to {self.tracker}",
+                desc=f'Uploading screenshots to {self.tracker}',
             ):
                 result = await coro
                 if result:
@@ -743,14 +743,14 @@ class BJS(COMMON):
 
         else:
             image_links = [
-                img.get("raw_url")
-                for img in meta.get("image_list", [])
-                if img.get("raw_url")
+                img.get('raw_url')
+                for img in meta.get('image_list', [])
+                if img.get('raw_url')
             ][:6]
 
             if len(image_links) < 2:
                 raise UploadException(
-                    f"[bold red]FALHA NO UPLOAD:[/bold red] É necessário pelo menos 2 screenshots para fazer upload para o {self.tracker}."
+                    f'[bold red]FALHA NO UPLOAD:[/bold red] É necessário pelo menos 2 screenshots para fazer upload para o {self.tracker}.'
                 )
 
             async def upload_remote_file(url):
@@ -758,16 +758,16 @@ class BJS(COMMON):
                     response = await self.session.get(url, timeout=120)
                     response.raise_for_status()
                     image_bytes = response.content
-                    filename = os.path.basename(urlparse(url).path) or "screenshot.png"
+                    filename = os.path.basename(urlparse(url).path) or 'screenshot.png'
                     return await self.img_host(image_bytes, filename)
                 except Exception as e:
-                    print(f"Falha ao processar screenshot da URL {url}: {e}")
+                    print(f'Falha ao processar screenshot da URL {url}: {e}')
                     return None
 
             for coro in tqdm(
                 asyncio.as_completed([upload_remote_file(url) for url in image_links]),
                 total=len(image_links),
-                desc=f"Uploading screenshots to {self.tracker}",
+                desc=f'Uploading screenshots to {self.tracker}',
             ):
                 result = await coro
                 if result:
@@ -775,7 +775,7 @@ class BJS(COMMON):
 
         if len(results) < 2:
             raise UploadException(
-                f"[bold red]FALHA NO UPLOAD:[/bold red] O host de imagem do {self.tracker} não retornou o número mínimo de screenshots."
+                f'[bold red]FALHA NO UPLOAD:[/bold red] O host de imagem do {self.tracker} não retornou o número mínimo de screenshots.'
             )
 
         return results
@@ -798,16 +798,16 @@ class BJS(COMMON):
         raw_date_string = tmdb_data.get('first_air_date') or tmdb_data.get('release_date')
 
         if not raw_date_string:
-            return ""
+            return ''
 
         try:
-            date_object = datetime.strptime(raw_date_string, "%Y-%m-%d")
-            formatted_date = date_object.strftime("%d %b %Y")
+            date_object = datetime.strptime(raw_date_string, '%Y-%m-%d')
+            formatted_date = date_object.strftime('%d %b %Y')
 
             return formatted_date
 
         except ValueError:
-            return ""
+            return ''
 
     def find_remaster_tags(self, meta):
         found_tags = set()
@@ -850,9 +850,9 @@ class BJS(COMMON):
         if meta.get('has_commentary', False) or meta.get('manual_commentary', False):
             found_tags.add('Com comentários')
 
-        if meta['is_disc'] != "BDMV":
+        if meta['is_disc'] != 'BDMV':
             for track in meta['mediainfo']['media']['track']:
-                if track['@type'] == "Video":
+                if track['@type'] == 'Video':
                     dar_str = track.get('DisplayAspectRatio', '')
                     if dar_str:
                         try:
@@ -892,7 +892,7 @@ class BJS(COMMON):
             if tag in available_tags:
                 ordered_tags.append(tag)
 
-        return " / ".join(ordered_tags)
+        return ' / '.join(ordered_tags)
 
     def get_credits(self, meta, role):
         role_map = {
@@ -914,20 +914,20 @@ class BJS(COMMON):
 
             unique_names = list(dict.fromkeys(names))[:5]
             if unique_names:
-                return ", ".join(unique_names)
+                return ', '.join(unique_names)
 
             else:
                 if not self.cover:  # Only ask for input if there's no info in the site already
                     role_display_name = prompt_name_map.get(role, role.capitalize())
-                    prompt_message = (f"{role_display_name} não encontrado(s).\nPor favor, insira manualmente (separados por vírgula): ")
+                    prompt_message = (f'{role_display_name} não encontrado(s).\nPor favor, insira manualmente (separados por vírgula): ')
                     user_input = input(prompt_message)
 
                     if user_input.strip():
                         return user_input.strip()
                     else:
-                        raise UploadException(f"Dados obrigatórios não fornecidos: {role_display_name}")
+                        raise UploadException(f'Dados obrigatórios não fornecidos: {role_display_name}')
                 else:
-                    return "N/A"
+                    return 'N/A'
 
     async def get_requests(self, meta):
         if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
@@ -944,19 +944,19 @@ class BJS(COMMON):
 
                 query = meta['title']
 
-                search_url = f"{self.base_url}/requests.php?submit=true&search={query}&showall=on&filter_cat[{cat}]=1"
+                search_url = f'{self.base_url}/requests.php?submit=true&search={query}&showall=on&filter_cat[{cat}]=1'
 
                 response = await self.session.get(search_url)
                 response.raise_for_status()
                 response_results_text = response.text
 
-                soup = BeautifulSoup(response_results_text, "html.parser")
+                soup = BeautifulSoup(response_results_text, 'html.parser')
 
-                request_rows = soup.select("#torrent_table tr.torrent")
+                request_rows = soup.select('#torrent_table tr.torrent')
 
                 results = []
                 for row in request_rows:
-                    all_tds = row.find_all("td")
+                    all_tds = row.find_all('td')
                     if not all_tds or len(all_tds) < 5:
                         continue
 
@@ -970,32 +970,32 @@ class BJS(COMMON):
 
                     name = link_element.text.strip()
                     quality = quality_element.text.strip()
-                    link = link_element.get("href")
+                    link = link_element.get('href')
 
                     reward_td = all_tds[3]
                     reward_parts = [td.text.replace('\xa0', ' ').strip() for td in reward_td.select('tr > td:first-child')]
-                    reward = " / ".join(reward_parts)
+                    reward = ' / '.join(reward_parts)
 
                     results.append({
-                        "Name": name,
-                        "Quality": quality,
-                        "Reward": reward,
-                        "Link": link,
+                        'Name': name,
+                        'Quality': quality,
+                        'Reward': reward,
+                        'Link': link,
                     })
 
                 if results:
-                    message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+                    message = f'\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n'
                     for r in results:
-                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
-                        message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
-                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
-                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                        message += f'[bold green]Nome:[/bold green] {r['Name']}\n'
+                        message += f'[bold green]Qualidade:[/bold green] {r['Quality']}\n'
+                        message += f'[bold green]Recompensa:[/bold green] {r['Reward']}\n'
+                        message += f'[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n'
                     console.print(message)
 
                 return results
 
             except Exception as e:
-                console.print(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+                console.print(f'[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]')
                 import traceback
                 console.print(traceback.format_exc())
                 return []
@@ -1025,7 +1025,7 @@ class BJS(COMMON):
             'remaster_title': self.build_remaster_title(meta),
             'resolucaoh': self.get_resolution(meta).get('height'),
             'resolucaow': self.get_resolution(meta).get('width'),
-            'sinopse': tmdb_data.get('overview') or await asyncio.to_thread(input, "Digite a sinopse: "),
+            'sinopse': tmdb_data.get('overview') or await asyncio.to_thread(input, 'Digite a sinopse: '),
             'submit': 'true',
             'tags': await self.get_tags(meta),
             'tipolegenda': await self.get_subtitle(meta),
@@ -1033,7 +1033,7 @@ class BJS(COMMON):
             'titulobrasileiro': await self.get_title(meta),
             'traileryoutube': await self.get_trailer(meta),
             'type': self.get_type(meta),
-            'year': f"{meta['year']}-{meta['imdb_info']['end_year']}" if meta.get('imdb_info').get('end_year') else meta['year'],
+            'year': f'{meta['year']}-{meta['imdb_info']['end_year']}' if meta.get('imdb_info').get('end_year') else meta['year'],
             })
 
         # These fields are common in movies and TV shows, even if it's anime
@@ -1071,11 +1071,11 @@ class BJS(COMMON):
                     if (country := pycountry.countries.get(alpha_2=code))
                 ]
                 data.update({
-                    'network': ", ".join([p.get('name', '') for p in tmdb_data.get("networks", [])]) or "",  # Optional
-                    'numtemporadas': tmdb_data.get("number_of_seasons", ''),  # Optional
+                    'network': ', '.join([p.get('name', '') for p in tmdb_data.get('networks', [])]) or '',  # Optional
+                    'numtemporadas': tmdb_data.get('number_of_seasons', ''),  # Optional
                     'datalancamento': self.get_release_date(tmdb_data),
-                    'pais': ", ".join(country_list),  # Optional
-                    'diretorserie': ", ".join(set(meta.get('tmdb_directors', []) or meta.get('imdb_info', {}).get('directors', [])[:5])),  # Optional
+                    'pais': ', '.join(country_list),  # Optional
+                    'diretorserie': ', '.join(set(meta.get('tmdb_directors', []) or meta.get('imdb_info', {}).get('directors', [])[:5])),  # Optional
                     'avaliacao': await self.get_rating(meta),  # Optional
                 })
 
@@ -1124,11 +1124,11 @@ class BJS(COMMON):
 
         if not meta.get('debug', False):
             torrent_id = ''
-            upload_url = f"{self.base_url}/upload.php"
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+            upload_url = f'{self.base_url}/upload.php'
+            torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
 
             with open(torrent_path, 'rb') as torrent_file:
-                files = {'file_input': (f"{self.tracker}.placeholder.torrent", torrent_file, "application/x-bittorrent")}
+                files = {'file_input': (f'{self.tracker}.placeholder.torrent', torrent_file, 'application/x-bittorrent')}
 
                 response = await self.session.post(upload_url, data=data, files=files, timeout=120)
                 soup = BeautifulSoup(response.text, 'html.parser')
@@ -1147,17 +1147,17 @@ class BJS(COMMON):
 
                 else:
                     status_message = 'O upload pode ter falhado, verifique. '
-                    page_message = ""
+                    page_message = ''
                     page_element = soup.select_one("div.thin p[style*='color: red']")
                     if page_element:
                         page_message = page_element.get_text(strip=True)
                         status_message += page_message
 
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, "w", encoding="utf-8") as f:
+                    response_save_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                    with open(response_save_path, 'w', encoding='utf-8') as f:
                         f.write(response.text)
-                    console.print(f"Falha no upload, a resposta HTML foi salva em: {response_save_path}")
-                    meta['skipping'] = f"{self.tracker}"
+                    console.print(f'Falha no upload, a resposta HTML foi salva em: {response_save_path}')
+                    meta['skipping'] = f'{self.tracker}'
                     return
 
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
