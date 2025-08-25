@@ -80,38 +80,69 @@ class ASC(COMMON):
 
     async def fetch_tmdb_data(self, endpoint):
         tmdb_api = self.config['DEFAULT']['tmdb_api']
+        base_url = "https://api.themoviedb.org/3/"
 
-        url = f"https://api.themoviedb.org/3/{endpoint}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos"
+        url = f"{base_url}{endpoint}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos,content_ratings"
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url)
                 if response.status_code == 200:
                     return response.json()
                 else:
+                    print(f"Error fetching {url}: Status {response.status_code}")
                     return None
-        except httpx.RequestError:
+        except httpx.RequestError as e:
+            print(f"Request failed for {url}: {e}")
             return None
 
     async def main_tmdb_data(self, meta):
+        brazil_data_in_meta = meta.get('tmdb_localized_data', {}).get('brazil', {}).get('main')
+        if brazil_data_in_meta:
+            return brazil_data_in_meta
+
         endpoint = f"{meta['category'].lower()}/{meta['tmdb']}"
-        return await self.fetch_tmdb_data(endpoint)
+        data = await self.fetch_tmdb_data(endpoint)
+
+        if data:
+            meta.setdefault('tmdb_localized_data', {}).setdefault('brazil', {})['main'] = data
+
+        return data
 
     async def season_tmdb_data(self, meta):
+        brazil_data_in_meta = meta.get('tmdb_localized_data', {}).get('brazil', {}).get('season')
+        if brazil_data_in_meta:
+            return brazil_data_in_meta
+
         season = meta.get('season_int')
         if not season:
             return None
 
         endpoint = f"tv/{meta['tmdb']}/season/{season}"
-        return await self.fetch_tmdb_data(endpoint)
+        data = await self.fetch_tmdb_data(endpoint)
+
+        if data:
+            meta.setdefault('tmdb_localized_data', {}).setdefault('brazil', {})['season'] = data
+
+        return data
 
     async def episode_tmdb_data(self, meta):
-        season = meta.get('season_int', '')
-        episode = meta.get('episode_int', '')
-        if not episode:
+        brazil_data_in_meta = meta.get('tmdb_localized_data', {}).get('brazil', {}).get('episode')
+        if brazil_data_in_meta:
+            return brazil_data_in_meta
+
+        season = meta.get('season_int')
+        episode = meta.get('episode_int')
+        if not all([season, episode]):
             return None
 
         endpoint = f"tv/{meta['tmdb']}/season/{season}/episode/{episode}"
-        return await self.fetch_tmdb_data(endpoint)
+        data = await self.fetch_tmdb_data(endpoint)
+
+        if data:
+            meta.setdefault('tmdb_localized_data', {}).setdefault('brazil', {})['episode'] = data
+
+        return data
 
     async def get_container(self, meta):
         if meta['is_disc'] == "BDMV":
