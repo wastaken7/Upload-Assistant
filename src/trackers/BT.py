@@ -141,13 +141,23 @@ class BT(COMMON):
             return False
 
     async def tmdb_data(self, meta):
+        brazil_data_in_meta = meta.get('tmdb_localized_data', {}).get('brazil', {}).get('main', {})
+        if brazil_data_in_meta:
+            return brazil_data_in_meta
+
         tmdb_api = self.config['DEFAULT']['tmdb_api']
 
-        url = f"https://api.themoviedb.org/3/{meta['category'].lower()}/{meta['tmdb']}?api_key={tmdb_api}&language=pt-BR&append_to_response=videos"
+        base_url = "https://api.themoviedb.org/3"
+        url = f"{base_url}/{meta['category'].lower()}/{meta['tmdb']}?api_key={tmdb_api}&language=pt-BR&append_to_response=credits,videos,content_ratings"
+
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url)
                 if response.status_code == 200:
+                    if 'tmdb_localized_data' not in meta:
+                        meta['tmdb_localized_data'] = {}
+                    meta['tmdb_localized_data']['brazil']['main'] = response.json()
+
                     return response.json()
                 else:
                     return None
