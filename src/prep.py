@@ -388,7 +388,7 @@ class Prep():
                 meta['skip_trackers'] = True
 
         # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
-        if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.get('skip_trackers', False):
+        if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.get('skip_trackers', False) and not meta.get('edit', False):
             await client.get_pathed_torrents(meta['path'], meta)
 
         # Ensure all manual IDs have proper default values
