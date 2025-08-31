@@ -74,6 +74,7 @@ class Clients():
             return None
 
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
+        client_name = client.get('torrent_client', '').lower()
         torrent_storage_dir = client.get('torrent_storage_dir')
         torrent_client = client.get('torrent_client', '').lower()
         mtv_config = self.config['TRACKERS'].get('MTV')
@@ -93,6 +94,9 @@ class Clients():
                 if torrent_storage_dir:
                     torrent_path = os.path.join(torrent_storage_dir, f"{hash_value}.torrent")
                 else:
+                    if client_name != 'qbit':
+                        return None
+
                     # Fetch from qBittorrent since we don't have torrent_storage_dir
                     console.print(f"[yellow]Fetching .torrent file from qBittorrent for hash: {hash_value}")
 
