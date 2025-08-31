@@ -79,7 +79,7 @@ class Prep():
         base_dir = meta['base_dir']
         meta['saved_description'] = False
         client = Clients(config=config)
-        meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False)
+        meta['skip_auto_torrent'] = config['DEFAULT'].get('skip_auto_torrent', False) if not meta.get('skip_auto_torrent', False) else False
         hash_ids = ['infohash', 'torrent_hash', 'skip_auto_torrent']
         tracker_ids = ['aither', 'ulcx', 'lst', 'blu', 'oe', 'btn', 'bhd', 'huno', 'hdb', 'rf', 'otw', 'yus', 'dp', 'sp', 'ptp']
         use_sonarr = config['DEFAULT'].get('use_sonarr', False)
