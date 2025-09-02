@@ -94,7 +94,7 @@ class BT():
                     self.ultimate_lang_map[alias.lower()] = correct_id
 
     async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/{self.tracker}.txt')
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             console.print(f'[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]')
             return False
@@ -124,7 +124,7 @@ class BT():
                 console.print(f'[bold red]Falha na validação do {self.tracker}. Token auth não encontrado.[/bold red]')
                 console.print('[yellow]A estrutura do site pode ter mudado ou o login falhou silenciosamente.[/yellow]')
 
-                failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                 with open(failure_path, 'w', encoding='utf-8') as f:
                     f.write(response.text)
                 console.print(f'[yellow]A resposta do servidor foi salva em {failure_path} para análise.[/yellow]')
@@ -354,7 +354,7 @@ class BT():
         description = []
 
         base_desc = ''
-        base_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt'
+        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
         if os.path.exists(base_desc_path):
             with open(base_desc_path, 'r', encoding='utf-8') as f:
                 base_desc = f.read()
@@ -368,7 +368,7 @@ class BT():
         if self.signature:
             description.append(self.signature)
 
-        final_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt'
+        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         with open(final_desc_path, 'w', encoding='utf-8') as descfile:
             final_description = '\n'.join(filter(None, description))
             descfile.write(final_description)
@@ -486,9 +486,9 @@ class BT():
     async def media_info(self, meta):
         info_file_path = ''
         if meta.get('is_disc') == 'BDMV':
-            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt'
+            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt"
         else:
-            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt'
+            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             try:
@@ -677,7 +677,7 @@ class BT():
         if not meta.get('debug', False):
             torrent_id = ''
             upload_url = f'{self.base_url}/upload.php'
-            torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
             with open(torrent_path, 'rb') as torrent_file:
                 files = {'file_input': (f'{self.tracker}.placeholder.torrent', torrent_file, 'application/x-bittorrent')}
@@ -689,7 +689,7 @@ class BT():
 
                 else:
                     status_message = 'O upload pode ter falhado, verifique. '
-                    response_save_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, 'w', encoding='utf-8') as f:
                         f.write(response.text)
                     console.print(f'Falha no upload, a resposta HTML foi salva em: {response_save_path}')

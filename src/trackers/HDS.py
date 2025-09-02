@@ -28,7 +28,7 @@ class HDS():
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
 
     async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/HDS.txt')
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDS.txt")
         if not os.path.exists(cookie_file):
             console.print(f'[bold red]Cookie file for {self.tracker} not found: {cookie_file}[/bold red]')
             return False
@@ -56,35 +56,35 @@ class HDS():
             return False
 
     async def generate_description(self, meta):
-        base_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt'
-        final_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt'
+        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
 
         description_parts = []
 
         # MediaInfo/BDInfo
         tech_info = ''
         if meta.get('is_disc') == 'BDMV':
-            bd_summary_file = f'{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt'
+            bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
             if os.path.exists(bd_summary_file):
                 with open(bd_summary_file, 'r', encoding='utf-8') as f:
                     tech_info = f.read()
 
         if not meta.get('is_disc'):
             video_file = meta['filelist'][0]
-            mi_template = os.path.abspath(f'{meta['base_dir']}/data/templates/MEDIAINFO.txt')
+            mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
             if os.path.exists(mi_template):
                 try:
                     media_info = MediaInfo.parse(video_file, output='STRING', full=False, mediainfo_options={'inform': f'file://{mi_template}'})
                     tech_info = str(media_info)
                 except Exception:
                     console.print('[bold red]Could not find the MediaInfo template[/bold red]')
-                    mi_file_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt'
+                    mi_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
                     if os.path.exists(mi_file_path):
                         with open(mi_file_path, 'r', encoding='utf-8') as f:
                             tech_info = f.read()
             else:
                 console.print('[bold yellow]Using normal MediaInfo for the description.[/bold yellow]')
-                mi_file_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt'
+                mi_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
                 if os.path.exists(mi_file_path):
                     with open(mi_file_path, 'r', encoding='utf-8') as f:
                         tech_info = f.read()
@@ -328,8 +328,8 @@ class HDS():
 
         if not meta.get('debug', False):
             torrent_id = ''
-            torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
-            upload_url = f'{self.base_url}/index.php?'
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+            upload_url = f"{self.base_url}/index.php?"
             params = {
                 'page': 'upload'
             }
@@ -359,12 +359,12 @@ class HDS():
                 else:
                     status_message = 'The upload appears to have failed. It may have uploaded, go check.'
 
-                    response_save_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, 'w', encoding='utf-8') as f:
                         f.write(response.text)
                     console.print(f'Upload failed, HTML response was saved to: {response_save_path}')
 
-                    meta['skipping'] = f'{self.tracker}'
+                    meta['skipping'] = f"{self.tracker}"
                     return
 
             await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)

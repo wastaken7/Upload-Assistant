@@ -507,7 +507,7 @@ class PHD():
         return keyword_map.get(source_type.lower())
 
     async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/{self.tracker}.txt')
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             console.print(f'[{self.tracker}] Cookie file for {self.tracker} not found: {cookie_file}')
             return False
@@ -531,7 +531,7 @@ class PHD():
                 console.print(f"{self.tracker} Validation failed. Could not find 'auth' token on upload page.")
                 console.print('This can happen if the site HTML has changed or if the login failed silently..')
 
-                failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                 with open(failure_path, 'w', encoding='utf-8') as f:
                     f.write(response.text)
                 console.print(f'The server response was saved to {failure_path} for analysis.')
@@ -722,9 +722,9 @@ class PHD():
     async def get_file_info(self, meta):
         info_file_path = ''
         if meta.get('is_disc') == 'BDMV':
-            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt'
+            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt"
         else:
-            info_file_path = f'{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt'
+            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             with open(info_file_path, 'r', encoding='utf-8') as f:
@@ -965,8 +965,8 @@ class PHD():
         if not meta.get('debug', False):
             try:
                 await self.common.edit_torrent(meta, self.tracker, self.source_flag)
-                upload_url_step1 = f'{self.base_url}/upload/{meta['category'].lower()}'
-                torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
+                upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
+                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
                 with open(torrent_path, 'rb') as torrent_file:
                     files = {'torrent_file': (os.path.basename(torrent_path), torrent_file, 'application/x-bittorrent')}
@@ -994,7 +994,7 @@ class PHD():
                         }
 
                     else:
-                        failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html'
+                        failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html"
                         with open(failure_path, 'w', encoding='utf-8') as f:
                             f.write(task_response.text)
                         status_message = f'''[red]Step 1 of upload failed to {self.tracker}. Status: {task_response.status_code}, URL: {task_response.url}[/red].
@@ -1097,7 +1097,7 @@ class PHD():
                     status_message += ' Your upload may fulfill existing requests, check prior console logs.'
 
             else:
-                failure_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html'
+                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html"
                 with open(failure_path, 'w', encoding='utf-8') as f:
                     f.write(response.text)
 

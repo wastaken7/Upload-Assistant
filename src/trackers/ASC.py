@@ -49,7 +49,7 @@ class ASC(COMMON):
         }
 
     async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f'{meta['base_dir']}/data/cookies/{self.tracker}.txt')
+        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             console.print(f'[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]')
             return False
@@ -463,7 +463,7 @@ class ASC(COMMON):
 
         # External description
         desc = ''
-        base_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt'
+        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
         if os.path.exists(base_desc_path):
             with open(base_desc_path, 'r', encoding='utf-8') as f:
                 desc = f.read().strip()
@@ -485,7 +485,7 @@ class ASC(COMMON):
         if self.signature:
             description_parts.append(self.signature)
 
-        final_desc_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt'
+        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         with open(final_desc_path, 'w', encoding='utf-8') as descfile:
             final_description = '\n'.join(filter(None, description_parts))
             descfile.write(final_description)
@@ -616,13 +616,13 @@ class ASC(COMMON):
 
     async def media_info(self, meta):
         if meta.get('is_disc') == 'BDMV':
-            summary_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt'
+            summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
             if os.path.exists(summary_path):
                 with open(summary_path, 'r', encoding='utf-8') as f:
                     return f.read()
         if not meta.get('is_disc'):
             video_file = meta['filelist'][0]
-            template_path = os.path.abspath(f'{meta['base_dir']}/data/templates/MEDIAINFO.txt')
+            template_path = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
             if os.path.exists(template_path):
                 mi_output = MediaInfo.parse(
                     video_file,
@@ -820,10 +820,10 @@ class ASC(COMMON):
         if not meta.get('debug', False):
             torrent_id = ''
             upload_url = await self.get_upload_url(meta)
-            torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
             with open(torrent_path, 'rb') as torrent_file:
-                files = {'torrent': (f'{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent', torrent_file, 'application/x-bittorrent')}
+                files = {'torrent': (f"{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent", torrent_file, 'application/x-bittorrent')}
 
                 response = await self.session.post(upload_url, data=data, files=files, timeout=60)
 
@@ -846,7 +846,7 @@ class ASC(COMMON):
 
                 else:
                     status_message = 'O upload pode ter falhado, verifique. '
-                    response_save_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html'
+                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
                     with open(response_save_path, 'w', encoding='utf-8') as f:
                         f.write(response.text)
                     print(f'Falha no upload, a resposta HTML foi salva em: {response_save_path}')

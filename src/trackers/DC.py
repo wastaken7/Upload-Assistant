@@ -29,7 +29,7 @@ class DC(COMMON):
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/center]"
 
     async def mediainfo(self, meta):
-        mi_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt'
+        mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
 
         if meta.get('is_disc') == 'BDMV':
             path = meta['discs'][0]['playlists'][0]['path']
@@ -60,15 +60,15 @@ class DC(COMMON):
         return mediainfo
 
     async def generate_description(self, meta):
-        base_desc = f'{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt'
-        dc_desc = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt'
+        base_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+        dc_desc = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
 
         description_parts = []
 
         # BDInfo
         tech_info = ''
         if meta.get('is_disc') == 'BDMV':
-            bd_summary_file = f'{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt'
+            bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
             if os.path.exists(bd_summary_file):
                 with open(bd_summary_file, 'r', encoding='utf-8') as f:
                     tech_info = f.read()
@@ -289,7 +289,7 @@ class DC(COMMON):
 
         if not meta.get('debug', False):
             upload_url = f'{self.api_base_url}/torrents/upload'
-            torrent_path = f'{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent'
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
             with open(torrent_path, 'rb') as torrent_file:
                 files = {'file': (title, torrent_file, 'application/x-bittorrent')}
