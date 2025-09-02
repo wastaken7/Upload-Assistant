@@ -262,10 +262,10 @@ class HDS():
                     })
 
                 if results:
-                    message = f'\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n'
+                    message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
                     for r in results:
-                        message += f'[bold green]Name:[/bold green] {r['Name']}\n'
-                        message += f'[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n'
+                        message += f"[bold green]Name:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
                     console.print(message)
 
                 return results

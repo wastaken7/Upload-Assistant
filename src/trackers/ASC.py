@@ -355,8 +355,8 @@ class ASC(COMMON):
         # Title
         for i in range(1, 4):
             description_parts.append(await self.format_image(layout_image.get(f'BARRINHA_CUSTOM_T_{i}')))
-        description_parts.append(f'\n{await self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n')
-        description_parts.append(f'\n[size=3]{await self.get_title(meta)}[/size]\n')
+        description_parts.append(f"\n{await self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n")
+        description_parts.append(f"\n[size=3]{await self.get_title(meta)}[/size]\n")
 
         # Poster
         poster_path = (season_tmdb or {}).get('poster_path') or (main_tmdb or {}).get('poster_path') or meta.get('tmdb_poster')
@@ -422,7 +422,7 @@ class ASC(COMMON):
             for seasons in main_tmdb.get('seasons', []):
                 season_name = seasons.get('name', f'Temporada {seasons.get('season_number')}').strip()
                 poster_temp = await self.format_image(f'https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}') if seasons.get('poster_path') else ''
-                overview_temp = f'\n\nSinopse:\n{seasons.get('overview')}' if seasons.get('overview') else ''
+                overview_temp = f"\n\nSinopse:\n{seasons.get('overview')}" if seasons.get('overview') else ''
 
                 inner_content_parts = []
                 air_date = seasons.get('air_date')
