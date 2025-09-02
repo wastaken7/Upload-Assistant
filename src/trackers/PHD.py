@@ -473,7 +473,7 @@ class PHD():
         resolution = ''
         if not meta.get('is_disc') == 'BDMV':
             video_mi = meta['mediainfo']['media']['track'][1]
-            resolution = f'{video_mi['Width']}x{video_mi['Height']}'
+            resolution = f"{video_mi['Width']}x{video_mi['Height']}"
 
         return resolution
 
@@ -552,13 +552,13 @@ class PHD():
 
     async def search_existing(self, meta, disctype):
         if not await self.rules(meta):
-            console.print(f'[red]{meta['phd_rule']}[/red]')
-            meta['skipping'] = f'{self.tracker}'
+            console.print(f"[red]{meta['phd_rule']}[/red]")
+            meta['skipping'] = f"{self.tracker}"
             return
 
         if not await self.get_media_code(meta):
             console.print((f"[{self.tracker}] This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}"))
-            meta['skipping'] = f'{self.tracker}'
+            meta['skipping'] = f"{self.tracker}"
             return
 
         if meta.get('resolution') == '2160p':
@@ -694,10 +694,10 @@ class PHD():
             if tvdb_id:
                 data['tvdb_id'] = str(tvdb_id)
 
-        url = f'{self.base_url}/add/{meta['category'].lower()}'
+        url = f"{self.base_url}/add/{meta['category'].lower()}"
 
         headers = {
-            'Referer': f'{self.base_url}/upload',
+            'Referer': f"{self.base_url}/upload",
         }
 
         try:
@@ -897,9 +897,9 @@ class PHD():
                 if results:
                     message = f'\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n'
                     for r in results:
-                        message += f'[bold green]Name:[/bold green] {r['Name']}\n'
-                        message += f'[bold green]Reward:[/bold green] {r['Reward']}\n'
-                        message += f'[bold green]Link:[/bold green] {r['Link']}\n\n'
+                        message += f"[bold green]Name:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
                     console.print(message)
 
                 return results

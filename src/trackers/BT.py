@@ -301,9 +301,9 @@ class BT():
 
         for key, value in codec_map.items():
             if key in codec_lower:
-                return f'{value} HDR' if value == 'x265' and is_hdr else value
+                return f"{value} HDR" if value == "x265" and is_hdr else value
 
-        return codec_final if codec_final else 'Outro'
+        return codec_final if codec_final else "Outro"
 
     async def get_audio_codec(self, meta):
         priority_order = [
@@ -419,7 +419,7 @@ class BT():
     async def search_existing(self, meta, disctype):
         is_tv_pack = bool(meta.get('tv_pack'))
 
-        search_url = f'{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}'
+        search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
 
         found_items = []
         try:
@@ -605,11 +605,11 @@ class BT():
             'bitrate': await self.get_bitrate(meta),
             'desc': '',
             'diretor': await self.get_credits(meta),
-            'duracao': f'{str(meta.get('runtime', ''))} min',
+            'duracao': f"{str(meta.get('runtime', ''))} min",
             'especificas': await self.build_description(meta),
             'format': await self.get_container(meta),
             'idioma_ori': await self.get_languages(meta) or meta.get('original_language', ''),
-            'image': f'https://image.tmdb.org/t/p/w500{tmdb_data.get('poster_path') or meta.get('tmdb_poster', '')}',
+            'image': f"https://image.tmdb.org/t/p/w500{tmdb_data.get('poster_path') or meta.get('tmdb_poster', '')}",
             'legenda': subtitles_info.get('legenda', 'Nao'),
             'mediainfo': await self.media_info(meta),
             'resolucao_1': resolution.get('width'),
@@ -642,7 +642,7 @@ class BT():
         if meta['category'] == 'TV' or meta.get('anime'):
             data.update({
                 'episodio': meta.get('episode', ''),
-                'ntorrent': f'{meta.get('season', '')}{meta.get('episode', '')}',
+                'ntorrent': f"<{meta.get('season', '')}{meta.get('episode', '')}>",
                 'temporada_e': meta.get('season', '') if not tv_pack else '',
                 'temporada': meta.get('season', '') if tv_pack else '',
                 'tipo': 'ep_individual' if not tv_pack else 'completa',

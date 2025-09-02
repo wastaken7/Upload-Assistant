@@ -318,16 +318,16 @@ class ASC(COMMON):
         if meta['category'] == 'TV':
             tv_title_ptbr = tmdb_ptbr_data['name']
             if tv_title_ptbr and tv_title_ptbr.lower() != name.lower():
-                base_name = f'{tv_title_ptbr} ({name})'
+                base_name = f"{tv_title_ptbr} ({name})"
 
-            return f'{base_name} - {meta.get('season', '')}{meta.get('episode', '')}'
+            return f"{base_name} - {meta.get('season', '')}{meta.get('episode', '')}"
 
         else:
             movie_title_ptbr = tmdb_ptbr_data['title']
             if movie_title_ptbr and movie_title_ptbr.lower() != name.lower():
-                base_name = f'{movie_title_ptbr} ({name})'
+                base_name = f"{movie_title_ptbr} ({name})"
 
-            return f'{base_name}'
+            return f"{base_name}"
 
     async def build_description(self, meta):
         main_tmdb = await self.main_tmdb_data(meta)
@@ -384,7 +384,7 @@ class ASC(COMMON):
             formatted_runtime = None
             if runtime:
                 h, m = divmod(runtime, 60)
-                formatted_runtime = f'{h} hora{'s' if h > 1 else ''} e {m:02d} minutos' if h > 0 else f'{m:02d} minutos'
+                formatted_runtime = f"{h} hora{'s' if h > 1 else ''} e {m:02d} minutos" if h > 0 else f"{m:02d} minutos"
 
             release_date = (episode_tmdb or {}).get('air_date') or (season_tmdb or {}).get('air_date') if meta['category'] != 'MOVIE' else main_tmdb.get('release_date')
 
@@ -404,7 +404,7 @@ class ASC(COMMON):
                 logo_path = p.get('logo_path')
                 logo = await self.format_image(f'https://image.tmdb.org/t/p/w45{logo_path}') if logo_path else ''
 
-                prod_parts.append(f'{logo}[size=2] - [b]{p.get('name', '')}[/b][/size]' if logo else f'[size=2][b]{p.get('name', '')}[/b][/size]')
+                prod_parts.append(f"{logo}[size=2] - [b]{p.get('name', '')}[/b][/size]" if logo else f"[size=2][b]{p.get('name', '')}[/b][/size]")
             description_parts.append('\n' + '\n'.join(prod_parts) + '\n')
 
         # Cast
@@ -527,10 +527,10 @@ class ASC(COMMON):
             search_url = f'{self.base_url}/torrents-search.php?search={search_query}'
 
         if meta['category'] == 'MOVIE':
-            search_url = f'{self.base_url}/busca-filmes.php?search=&imdb={meta['imdb_info']['imdbID']}'
+            search_url = f"{self.base_url}/busca-filmes.php?search=&imdb={meta['imdb_info']['imdbID']}"
 
         if meta['category'] == 'TV':
-            search_url = f'{self.base_url}/busca-series.php?search={meta.get('season', '')}{meta.get('episode', '')}&imdb={meta['imdb_info']['imdbID']}'
+            search_url = f"{self.base_url}/busca-series.php?search={meta.get('season', '')}{meta.get('episode', '')}&imdb={meta['imdb_info']['imdbID']}"
 
         try:
             response = await self.session.get(search_url, timeout=30)
@@ -673,12 +673,12 @@ class ASC(COMMON):
                 continue
 
             if source == 'Internet Movie Database':
-                parts.append(f'\n[url=https://www.imdb.com/title/{meta['imdb_info']['imdbID']}]{img_tag}[/url]\n[b]{value}[/b]\n')
+                parts.append(f"\n[url=https://www.imdb.com/title/{meta['imdb_info']['imdbID']}]{img_tag}[/url]\n[b]{value}[/b]\n")
             elif source == 'TMDb':
-                parts.append(f'[url=https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}]{img_tag}[/url]\n[b]{value}[/b]\n')
+                parts.append(f"[url=https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}]{img_tag}[/url]\n[b]{value}[/b]\n")
             else:
-                parts.append(f'{img_tag}\n[b]{value}[/b]\n')
-        return '\n'.join(parts)
+                parts.append(f"{img_tag}\n[b]{value}[/b]\n")
+        return "\n".join(parts)
 
     async def build_cast_bbcode(self, cast_list):
         if not cast_list:
@@ -749,9 +749,9 @@ class ASC(COMMON):
                 if results:
                     message = f'\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n'
                     for r in results:
-                        message += f'[bold green]Nome:[/bold green] {r['Name']}\n'
-                        message += f'[bold green]Recompensa:[/bold green] {r['Reward']}\n'
-                        message += f'[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n'
+                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
                     console.print(message)
 
                 return results

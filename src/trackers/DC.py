@@ -304,8 +304,8 @@ class DC(COMMON):
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
                 else:
-                    console.print(f'{status_message.get('message', 'Unknown API error.')}')
-                    meta['skipping'] = f'{self.tracker}'
+                    console.print(f"{status_message.get('message', 'Unknown API error.')}")
+                    meta['skipping'] = f"{self.tracker}"
                     return
 
         else:

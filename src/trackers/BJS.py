@@ -591,11 +591,11 @@ class BJS(COMMON):
         return found_items
 
     async def _fetch_search_page(self, meta):
-        search_url = f'{self.base_url}/torrents.php?searchstr={meta["imdb_info"]["imdbID"]}'
+        search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
 
         response = await self.session.get(search_url)
         if response.status_code in [301, 302, 307] and 'Location' in response.headers:
-            redirect_url = f'{self.base_url}/{response.headers["Location"]}'
+            redirect_url = f"{self.base_url}/{response.headers['Location']}"
             response = await self.session.get(redirect_url)
         response.raise_for_status()
 
@@ -1054,10 +1054,10 @@ class BJS(COMMON):
                 if results:
                     message = f'\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n'
                     for r in results:
-                        message += f'[bold green]Nome:[/bold green] {r['Name']}\n'
-                        message += f'[bold green]Qualidade:[/bold green] {r['Quality']}\n'
-                        message += f'[bold green]Recompensa:[/bold green] {r['Reward']}\n'
-                        message += f'[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n'
+                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                        message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
+                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
                     console.print(message)
 
                 return results
@@ -1102,7 +1102,7 @@ class BJS(COMMON):
             'titulobrasileiro': await self.get_title(meta),
             'traileryoutube': await self.get_trailer(meta),
             'type': self.get_type(meta),
-            'year': f'{meta['year']}-{meta['imdb_info']['end_year']}' if meta.get('imdb_info').get('end_year') else meta['year'],
+            'year': f"{meta['year']}-{meta['imdb_info']['end_year']}" if meta.get('imdb_info').get('end_year') else meta['year'],
             })
 
         # These fields are common in movies and TV shows, even if it's anime
