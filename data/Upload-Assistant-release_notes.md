@@ -10,5 +10,5 @@ v5.4.0
 ## WHAT'S NEW
  - UA can now search for related requests for the uploaded content, allowing you to quickly and easily see which requests can be filled by your upload.
  - Request checking via config option (see example-config) or new arg (see --help)
- - Only ASC and ULCX supported currently
+ - Only ASC, BJS and ULCX supported currently
  - Added a new arg to skip auto torrent searching
