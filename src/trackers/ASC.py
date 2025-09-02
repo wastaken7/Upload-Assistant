@@ -390,10 +390,10 @@ class ASC(COMMON):
 
             sheet_items = [
                 f'Duração: {formatted_runtime}' if formatted_runtime else None,
-                f'País de Origem: {', '.join(c['name'] for c in main_tmdb.get('production_countries', []))}' if main_tmdb.get('production_countries') else None,
-                f'Gêneros: {', '.join(g['name'] for g in main_tmdb.get('genres', []))}' if main_tmdb.get('genres') else None,
+                f"País de Origem: {', '.join(c['name'] for c in main_tmdb.get('production_countries', []))}" if main_tmdb.get('production_countries') else None,
+                f"Gêneros: {', '.join(g['name'] for g in main_tmdb.get('genres', []))}" if main_tmdb.get('genres') else None,
                 f'Data de Lançamento: {await self.format_date(release_date)}' if release_date else None,
-                f'Site: [url={main_tmdb.get('homepage')}]Clique aqui[/url]' if main_tmdb.get('homepage') else None
+                f"Site: [url={main_tmdb.get('homepage')}]Clique aqui[/url]" if main_tmdb.get('homepage') else None
             ]
             await append_section('BARRINHA_FICHA_TECNICA', '\n'.join(filter(None, sheet_items)))
 
@@ -420,8 +420,8 @@ class ASC(COMMON):
         if meta['category'] == 'TV' and main_tmdb and main_tmdb.get('seasons'):
             seasons_content = []
             for seasons in main_tmdb.get('seasons', []):
-                season_name = seasons.get('name', f'Temporada {seasons.get('season_number')}').strip()
-                poster_temp = await self.format_image(f'https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}') if seasons.get('poster_path') else ''
+                season_name = seasons.get('name', f"Temporada {seasons.get('season_number')}").strip()
+                poster_temp = await self.format_image(f"https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}") if seasons.get('poster_path') else ''
                 overview_temp = f"\n\nSinopse:\n{seasons.get('overview')}" if seasons.get('overview') else ''
 
                 inner_content_parts = []
@@ -688,9 +688,9 @@ class ASC(COMMON):
         for person in cast_list[:10]:
             profile_path = person.get('profile_path')
             profile_url = f'https://image.tmdb.org/t/p/w45{profile_path}' if profile_path else 'https://i.imgur.com/eCCCtFA.png'
-            tmdb_url = f'https://www.themoviedb.org/person/{person.get('id')}?language=pt-BR'
+            tmdb_url = f"https://www.themoviedb.org/person/{person.get('id')}?language=pt-BR"
             img_tag = await self.format_image(profile_url)
-            character_info = f'({person.get('name', '')}) como {person.get('character', '')}'
+            character_info = f"({person.get('name', '')}) como {person.get('character', '')}"
             parts.append(f'[url={tmdb_url}]{img_tag}[/url]\n[size=2][b]{character_info}[/b][/size]\n')
         return ''.join(parts)
 
@@ -771,7 +771,7 @@ class ASC(COMMON):
         data = {
             'ano': str(meta['year']),
             'audio': await self.get_audio(meta),
-            'capa': f'https://image.tmdb.org/t/p/w500{main_tmdb.get('poster_path') or meta.get('tmdb_poster')}',
+            'capa': f"https://image.tmdb.org/t/p/w500{main_tmdb.get('poster_path') or meta.get('tmdb_poster')}",
             'codecaudio': await self.get_audio_codec(meta),
             'codecvideo': await self.get_video_codec(meta),
             'descr': await self.build_description(meta),
