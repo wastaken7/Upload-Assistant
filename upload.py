@@ -645,6 +645,7 @@ async def do_the_thing(base_dir):
     meta['current_version'] = await update_notification(base_dir)
 
     cleanup_only = any(arg in ('--cleanup', '-cleanup') for arg in sys.argv) and len(sys.argv) <= 2
+    sanitize_meta = config['DEFAULT'].get('sanitize_meta', True)
 
     try:
         # If cleanup is the only operation, use a dummy path to satisfy the parser
@@ -732,7 +733,6 @@ async def do_the_thing(base_dir):
                 console.print(f"[red]Exception: '{path}': {e}")
                 reset_terminal()
 
-            sanitize_meta = config['DEFAULT'].get('sanitize_meta', True)
             if use_discord and config['DISCORD'].get('discord_bot_token') and not meta['debug']:
                 if (config.get('DISCORD', {}).get('only_unattended', False) and meta.get('unattended', False)) or not config.get('DISCORD', {}).get('only_unattended', False):
                     try:
