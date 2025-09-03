@@ -219,6 +219,7 @@ async def process_meta(meta, base_dir, bot=None):
             await get_tracker_data(meta['video'], meta, search_term, search_file_folder, meta['category'], only_id=meta['only_id'])
 
     editargs_tracking = ()
+    previous_trackers = meta.get('trackers', [])
     confirm = await helper.get_confirmation(meta)
     while confirm is False:
         editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
@@ -227,6 +228,8 @@ async def process_meta(meta, base_dir, bot=None):
         editargs_tracking = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
         meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')) + editargs_tracking, meta)
+        if not meta.get('trackers'):
+            meta['trackers'] = previous_trackers
         if isinstance(meta.get('trackers'), str):
             if "," in meta['trackers']:
                 meta['trackers'] = [t.strip().upper() for t in meta['trackers'].split(',')]
