@@ -128,7 +128,7 @@ class HUNO():
                 # adding torrent link to comment of torrent file
                 t_id = response.json()['data'].split(".")[1].split("/")[3]
                 meta['tracker_status'][self.tracker]['torrent_id'] = t_id
-                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://hawke.uno/torrents/" + t_id)
+                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), "https://hawke.uno/torrents/" + t_id, headers=headers, params=params, downurl=response.json()['data'])
             except Exception:
                 console.print("Error getting torrent ID from response.")
                 return

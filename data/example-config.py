@@ -470,7 +470,6 @@ config = {
             "link_dir_name": "",
             "useAPI": False,
             "api_key": "",
-            "announce_url": "https://hawke.uno/announce/customannounceurl",
             "anon": False,
         },
         "ITT": {
