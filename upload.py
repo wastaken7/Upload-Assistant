@@ -674,7 +674,12 @@ async def do_the_thing(base_dir):
 
         is_binary = await get_mkbrr_path(meta, base_dir)
         if not meta['mkbrr']:
-            meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
+            try:
+                meta['mkbrr'] = int(config['DEFAULT'].get('mkbrr', False))
+            except ValueError:
+                if meta['debug']:
+                    console.print("[yellow]Invalid mkbrr config value, defaulting to False[/yellow]")
+                meta['mkbrr'] = False
         if meta['mkbrr'] and not is_binary:
             console.print("[bold red]mkbrr binary is not available. Please ensure it is installed correctly.[/bold red]")
             console.print("[bold red]Reverting to Torf[/bold red]")
