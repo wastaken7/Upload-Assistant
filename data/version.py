@@ -1,4 +1,32 @@
-__version__ = "v5.4.1"
+__version__ = "v5.4.2"
+
+"""
+Release Notes for version v5.4.2 (2025-09-03):
+
+# ## What's Changed
+# 
+# * enhance(PHD): add search requests option, tags and other changes (#749) by @wastaken7 in 1c970ce
+# * enhance(BT): use tmdb cache file and other changes (#750) by @wastaken7 in a793060
+# * enhance(HDS): add search requests option and other changes (#751) by @wastaken7 in b0f88e3
+# * python does python things by @Audionut in 057d2be
+# * FNP - fix banned groups (#753) by @flower in 54c5c32
+# * more python quoting fixes by @Audionut in d8a6779
+# * MOAR quotes by @Audionut in 7a62585
+# * chore: fix incompatible f-strings with python 3.9  (#754) by @wastaken7 in 9a8f190
+# * fix(HUNO) - add multi audio, UHD BluRay naming (#756) by @wastaken7 in 5b41f4d
+# * fix default tracker list through edit process by @Audionut in 354e9c1
+# * move sanatize meta definition by @Audionut in 9d2991b
+# * catch mkbrr config error by @Audionut in 34e05f9
+# * Added HDT (HD-Torrents) to client.py to allow tracker removal (#760) by @FortKnox1337 in 6c5bbc5
+# * fix(PHD): add BD resolution, basic description, remove aka from title (#761) by @wastaken7 in 8459a45
+# * fix(DC): Resize images in description generation (#762) by @wastaken7 in 41d7173
+# * add(client.py): skip more trackers (#763) by @wastaken7 in 61dfd4a
+# * HUNO - unit3d torrent download by @Audionut in 637a145
+# * Other minor updates and improvements
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v5.4.1...v5.4.2
+"""
+
 
 """
 Release Notes for version v5.4.1 (2025-09-02):
