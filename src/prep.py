@@ -966,9 +966,9 @@ class Prep():
 
         path_patterns = [
             r'(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]',
-            r'(?i)[\\/](?:season\s*\d+|s\d+|complete)[\\/]',
+            r'(?i)[\\/](?:season\s*\d+|s\d+)[\\/]',
             r'(?i)[\\/](?:s\d{1,2}e\d{1,2}|s\d{1,2}|season\s*\d+)',
-            r'(?i)(?:complete series|tv pack|season\s*\d+\s*complete)'
+            r'(?i)(?:tv pack|season\s*\d+)'
         ]
 
         filename_patterns = [
@@ -976,8 +976,7 @@ class Prep():
             r'(?i)s\d{1,2}',
             r'(?i)\d{1,2}x\d{2}',
             r'(?i)(?:season|series)\s*\d+',
-            r'(?i)e\d{2,3}\s*\-',
-            r'(?i)(?:complete|full)\s*(?:season|series)'
+            r'(?i)e\d{2,3}\s*\-'
         ]
 
         path = meta.get('path', '')
