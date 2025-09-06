@@ -332,7 +332,7 @@ async def process_meta(meta, base_dir, bot=None):
                                     console.print("[cyan]Loaded previously saved image sizes")
 
                             if 'tonemapped' in image_data and not meta.get('tonemapped'):
-                                meta['tonemapped'] = True
+                                meta['tonemapped'] = image_data['tonemapped']
                                 if meta.get('debug'):
                                     console.print("[cyan]Loaded previously saved tonemapped status[/cyan]")
                     except Exception as e:
