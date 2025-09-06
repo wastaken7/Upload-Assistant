@@ -63,11 +63,21 @@ class TL():
         self.session.cookies.update(await common.parseCookieFile(self.cookies_file))
 
         try:
-            response = await self.session.get(self.http_upload_url, timeout=10)
-            if response.status_code == 200 and 'torrents/upload' in str(response.url):
-                if meta['debug']:
-                    console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
-                return True
+            if force:
+                response = await self.session.get('https://www.torrentleech.org/torrents/browse/index', timeout=10)
+                if response.status_code == 301 and 'torrents/browse' in str(response.url):
+                    if meta['debug']:
+                        console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                    return True
+            elif not force:
+                response = await self.session.get(self.http_upload_url, timeout=10)
+                if response.status_code == 200 and 'torrents/upload' in str(response.url):
+                    if meta['debug']:
+                        console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                    return True
+            else:
+                console.print(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
+                return False
 
         except httpx.RequestError as e:
             console.print(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
@@ -202,7 +212,8 @@ class TL():
         return name
 
     async def search_existing(self, meta, disctype):
-        if not await self.login(meta, force=True):
+        login = await self.login(meta, force=True)
+        if not login:
             meta['skipping'] = "TL"
             if meta['debug']:
                 console.print(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
@@ -299,7 +310,8 @@ class TL():
                 console.print(data)
 
     async def upload_http(self, meta, cat_id):
-        if not await self.login(meta):
+        login = await self.login(meta)
+        if not login:
             meta['tracker_status'][self.tracker]['status_message'] = "data error: Login with cookies failed."
             return
 
