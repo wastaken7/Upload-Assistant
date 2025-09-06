@@ -40,7 +40,7 @@ class TL():
         self.signature = """<center><a href="https://github.com/Audionut/Upload-Assistant">Created by Audionut's Upload Assistant</a></center>"""
         self.banned_groups = [""]
         self.session = httpx.AsyncClient(timeout=60.0)
-        self.api_upload = self.config['TRACKERS'][self.tracker].get('api_upload')
+        self.api_upload = self.config['TRACKERS'][self.tracker].get('api_upload', False)
         self.passkey = self.config['TRACKERS'][self.tracker]['passkey']
         self.announce_url_1 = f'https://tracker.torrentleech.org/a/{self.passkey}/announce'
         self.announce_url_2 = f'https://tracker.tleechreload.org/a/{self.passkey}/announce'
@@ -48,8 +48,8 @@ class TL():
             'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})'
         })
 
-    async def login(self, meta):
-        if self.api_upload:
+    async def login(self, meta, force=False):
+        if self.api_upload and not force:
             return True
 
         self.cookies_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/TL.txt")
@@ -200,7 +200,7 @@ class TL():
         return name
 
     async def search_existing(self, meta, disctype):
-        await self.login(meta)
+        await self.login(meta, force=True)
         cat_id = await self.get_cat_id(self, meta)
 
         dupes = []
@@ -284,6 +284,7 @@ class TL():
                     meta['tracker_status'][self.tracker]['status_message'] = "data error: " + response.text
 
                 if response.text.isnumeric():
+                    meta['tracker_status'][self.tracker]['status_message'] = f"{self.torrent_url}{response.text}"
                     meta['tracker_status'][self.tracker]['torrent_id'] = response.text
                     await self.api_torrent_download(meta, self.passkey, response.text)
 
