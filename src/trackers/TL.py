@@ -300,7 +300,7 @@ class TL():
 
     async def upload_http(self, meta, cat_id):
         if not await self.login(meta):
-            meta['skipping'][self.tracker]['status_message'] = "data error: Login with cookies failed."
+            meta['tracker_status'][self.tracker]['status_message'] = "data error: Login with cookies failed."
             return
 
         await self.generate_description(meta)
