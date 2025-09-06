@@ -65,6 +65,8 @@ class TL():
         try:
             response = await self.session.get(self.http_upload_url, timeout=10)
             if response.status_code == 200 and 'torrents/upload' in str(response.url):
+                if meta['debug']:
+                    console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                 return True
 
         except httpx.RequestError as e:
@@ -200,7 +202,11 @@ class TL():
         return name
 
     async def search_existing(self, meta, disctype):
-        await self.login(meta, force=True)
+        if not await self.login(meta, force=True):
+            meta['skipping'] = "TL"
+            if meta['debug']:
+                console.print(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
+            return
         cat_id = await self.get_cat_id(self, meta)
 
         dupes = []
@@ -294,7 +300,7 @@ class TL():
 
     async def upload_http(self, meta, cat_id):
         if not await self.login(meta):
-            meta['tracker_status'][self.tracker]['status_message'] = "Login with cookies failed."
+            meta['skipping'][self.tracker]['status_message'] = "data error: Login with cookies failed."
             return
 
         await self.generate_description(meta)
