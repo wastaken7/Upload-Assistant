@@ -205,10 +205,6 @@ class TL():
 
         dupes = []
 
-        if self.api_upload:
-            console.print(f"[bold yellow]Cannot search for duplicates on {self.tracker} when using API upload.[/bold yellow]")
-            return dupes
-
         search_name = meta["title"]
         resolution = meta["resolution"]
         year = meta['year']
@@ -374,7 +370,7 @@ class TL():
                 console.print(data)
 
     async def api_torrent_download(self, meta, passkey, torrent_id):
-        torrent_url = f"{self.http_upload_url}/apidownload"
+        torrent_url = f"{self.http_upload_url}apidownload"
         data = {
             'announcekey': passkey,
             'torrentID': torrent_id
@@ -390,8 +386,7 @@ class TL():
             with open(torrent_path, 'wb') as f:
                 f.write(response.content)
 
-            if meta['debug']:
-                console.print(f"[green]Downloaded torrent: {torrent_filename}[/green]")
+            console.print(f"[green]Downloaded torrent: {torrent_filename}[/green]")
 
         except Exception as e:
             console.print(f"[bold red]Error downloading torrent from {self.tracker}: {e}[/bold red]")
