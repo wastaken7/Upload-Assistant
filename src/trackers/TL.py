@@ -36,6 +36,7 @@ class TL():
         self.base_url = 'https://www.torrentleech.org'
         self.http_upload_url = f'{self.base_url}/torrents/upload/'
         self.api_upload_url = f'{self.base_url}/torrents/upload/apiupload'
+        self.torrent_url = f'{self.base_url}/torrent/'
         self.signature = """<center><a href="https://github.com/Audionut/Upload-Assistant">Created by Audionut's Upload Assistant</a></center>"""
         self.banned_groups = [""]
         self.session = httpx.AsyncClient(timeout=60.0)
@@ -284,14 +285,11 @@ class TL():
                     data=data
                 )
                 if not response.text.isnumeric():
-                    meta['tracker_status'][self.tracker]['status_message'] = response.text
+                    meta['tracker_status'][self.tracker]['status_message'] = "data error: " + response.text
 
-                announce_list = [
-                    self.announce_url_1,
-                    self.announce_url_2
-                ]
-                common = COMMON(config=self.config)
-                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, announce_list, comment='')
+                if response.text.isnumeric():
+                    meta['tracker_status'][self.tracker]['torrent_id'] = response.text
+                    await self.api_torrent_download(meta, self.passkey, response.text)
 
             else:
                 console.print("[cyan]Request Data:")
@@ -351,6 +349,7 @@ class TL():
                         torrent_id = response.headers['location'].replace('/successfulupload?torrentID=', '')
                         torrent_url = f"{self.base_url}/torrent/{torrent_id}"
                         meta['tracker_status'][self.tracker]['status_message'] = torrent_url
+                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
                         announce_list = [
                             self.announce_url_1,
@@ -373,3 +372,26 @@ class TL():
                     meta['tracker_status'][self.tracker]['status_message'] = str(e)
             else:
                 console.print(data)
+
+    async def api_torrent_download(self, meta, passkey, torrent_id):
+        torrent_url = f"{self.http_upload_url}/apidownload"
+        data = {
+            'announcekey': passkey,
+            'torrentID': torrent_id
+        }
+
+        try:
+            response = await self.session.post(torrent_url, data=data)
+            response.raise_for_status()
+
+            torrent_filename = f"[{self.tracker}].torrent"
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}"
+
+            with open(torrent_path, 'wb') as f:
+                f.write(response.content)
+
+            if meta['debug']:
+                console.print(f"[green]Downloaded torrent: {torrent_filename}[/green]")
+
+        except Exception as e:
+            console.print(f"[bold red]Error downloading torrent from {self.tracker}: {e}[/bold red]")
