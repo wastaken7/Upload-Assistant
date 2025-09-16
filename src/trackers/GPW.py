@@ -190,10 +190,18 @@ class GPW():
         base_desc = ''
         base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
         if os.path.exists(base_desc_path):
-            with open(base_desc_path, 'r', encoding='utf-8') as f:
-                base_desc = f.read()
-                if base_desc:
-                    description.append(base_desc)
+            with open(base_desc_path, 'r', encoding='utf-8') as file:
+                base_desc = file.read()
+
+            console.print('\n[green]Found existing description:[/green]\n')
+            print(base_desc)
+            user_input = input('Do you want to use this description? (y/n): ')
+
+            if user_input.lower() == 'y':
+                description.append(base_desc)
+                console.print('Using existing description.')
+            else:
+                console.print('Ignoring existing description.')
 
         # Screenshots
         # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
@@ -206,9 +214,7 @@ class GPW():
         if images:
             screenshots_block = '[center]\n'
             for i, image in enumerate(images, start=1):
-                img_url = image['img_url']
-                web_url = image['web_url']
-                screenshots_block += f'[url={web_url}][img=350]{img_url}[/img][/url] '
+                screenshots_block += f"[img=350]{image['raw_url']}[/img] "
                 if i % 2 == 0:
                     screenshots_block += '\n'
             screenshots_block += '\n[/center]'
@@ -290,7 +296,7 @@ class GPW():
         if not cookies:
             search_url = f'{self.base_url}/api.php?api_key={self.api_key}&action=torrent&imdbID={imdb}'
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.get(search_url)
                     response.raise_for_status()
                     data = response.json()
@@ -321,7 +327,7 @@ class GPW():
             found_items = []
 
             try:
-                async with httpx.AsyncClient(cookies=cookies, timeout=10.0, headers={'User-Agent': 'your-custom-user-agent'}) as client:
+                async with httpx.AsyncClient(cookies=cookies, timeout=30, headers={'User-Agent': "Audionut's Upload Assistant"}) as client:
                     response = await client.get(search_url)
                     response.raise_for_status()
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -337,6 +343,9 @@ class GPW():
                             file_name = title_link['data-tooltip']
                             found_items.append(file_name)
 
+                    if found_items:
+                        await self.get_slots(meta, client, group_id)
+
                 return found_items
             except httpx.HTTPError as e:
                 print(f'An HTTP error occurred: {e}')
@@ -344,6 +353,56 @@ class GPW():
             except Exception as e:
                 print(f'An unexpected error occurred while processing the search: {e}')
                 return []
+
+    async def get_slots(self, meta, client, group_id):
+        url = f'{self.base_url}/torrents.php?id={group_id}'
+
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            print(f'Error on request: {e.response.status_code} - {e.response.reason_phrase}')
+            return
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        empty_slot_rows = soup.find_all('tr', class_='TableTorrent-rowEmptySlotNote')
+
+        for row in empty_slot_rows:
+            edition_id = row.get('edition-id')
+            resolution = ''
+
+            if edition_id == '1':
+                resolution = 'SD'
+            elif edition_id == '3':
+                resolution = '2160p'
+
+            if not resolution:
+                slot_type_tag = row.find('td', class_='TableTorrent-cellEmptySlotNote').find('i')
+                if slot_type_tag:
+                    resolution = slot_type_tag.get_text(strip=True).replace('empty slots:', '').strip()
+
+            slot_names = []
+
+            i_tags = row.find_all('i')
+            for tag in i_tags:
+                text = tag.get_text(strip=True)
+                if 'empty slots:' not in text:
+                    slot_names.append(text)
+
+            span_tags = row.find_all('span', class_='tooltipstered')
+            for tag in span_tags:
+                slot_names.append(tag.find('i').get_text(strip=True))
+
+            final_slots_list = sorted(list(set(slot_names)))
+            formatted_slots = [f'- {slot}' for slot in final_slots_list]
+            final_slots = '\n'.join(formatted_slots)
+
+            if final_slots:
+                final_slots = final_slots.replace('Slot', '').replace('Empty slots:', '').strip()
+                if resolution == meta.get('resolution'):
+                    console.print(f'\n[green]Available Slots for[/green] {resolution}:')
+                    console.print(f'{final_slots}\n')
 
     async def get_media_info(self, meta):
         info_file_path = ''
@@ -490,7 +549,7 @@ class GPW():
         search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.get('imdb_info', {}).get('imdbID')}"
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.get(search_url)
                 response.raise_for_status()
 
@@ -720,7 +779,7 @@ class GPW():
             with open(torrent_path, 'rb') as torrent_file:
                 files = {'file_input': (f'{self.tracker}.placeholder.torrent', torrent_file, 'application/x-bittorrent')}
 
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.post(url=upload_url, files=files, data=data)
                     data = response.json()
 
