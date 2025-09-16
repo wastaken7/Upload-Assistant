@@ -195,6 +195,13 @@ async def process_meta(meta, base_dir, bot=None):
         else:
             trackers = [t.strip().upper() for t in trackers]
         meta['trackers'] = trackers
+
+        if meta.get('trackers_remove', False):
+            remove_list = [t.strip().upper() for t in meta['trackers_remove'].split(',')]
+            for tracker in remove_list:
+                if tracker in meta['trackers']:
+                    meta['trackers'].remove(tracker)
+
         if meta['debug']:
             console.print(f"Trackers list before editing: {meta['trackers']}")
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as f:
