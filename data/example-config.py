@@ -333,8 +333,9 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/AZ.txt
             "announce_url": "https://tracker.avistaz.to/<PASSKEY>/announce",
             "anon": False,
-            # Set false to use imgbox links if available
-            "img_rehost": True,
+            # If True, the script performs a basic rules compliance check (e.g., codecs, region).
+            # This does not cover all tracker rules. Set to False to disable.
+            "check_for_rules": True,
         },
         "BHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -397,8 +398,9 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/CZ.txt
             "announce_url": "https://tracker.cinemaz.to/<PASSKEY>/announce",
             "anon": False,
-            # Set false to use imgbox links if available
-            "img_rehost": True,
+            # If True, the script performs a basic rules compliance check (e.g., codecs, region).
+            # This does not cover all tracker rules. Set to False to disable.
+            "check_for_rules": True,
         },
         "DC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -582,8 +584,9 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/PHD.txt
             "announce_url": "https://tracker.privatehd.to/<PASSKEY>/announce",
             "anon": False,
-            # Set false to use imgbox links if available
-            "img_rehost": True,
+            # If True, the script performs a basic rules compliance check (e.g., codecs, region).
+            # This does not cover all tracker rules. Set to False to disable.
+            "check_for_rules": True,
         },
         "PT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
