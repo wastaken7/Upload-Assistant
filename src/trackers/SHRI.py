@@ -167,6 +167,9 @@ class SHRI():
             except (FileNotFoundError, KeyError):
                 pass
 
+        if meta.get('dual_audio'):
+            shareisland_name = shareisland_name.replace(f"{meta.get('dual_audio')} ", "", 1)
+
         if audio_lang_str:
             if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 shareisland_name = shareisland_name.replace(str(meta['year']), f"{meta['year']} {audio_lang_str}", 1)
