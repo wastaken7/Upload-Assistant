@@ -4,7 +4,6 @@ import aiofiles
 import click
 import os
 import re
-import sys
 import urllib.request
 from src.console import console
 from src.trackers.COMMON import COMMON
@@ -23,6 +22,7 @@ class TIK(UNIT3D):
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'
         self.search_url = f'{self.base_url}/api/torrents/filter'
+        self.requests_url = f'{self.base_url}/api/requests/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
         pass
@@ -142,8 +142,8 @@ class TIK(UNIT3D):
 
         if not disctype:
             console.print("[red]You must specify a --disctype")
-            # exit since we can't proceed without disctype
-            sys.exit(1)
+            # Raise an exception since we can't proceed without disctype
+            raise ValueError("disctype is required for TIK tracker but was not provided")
 
         disctype_value = disctype[0] if isinstance(disctype, list) else disctype
         type_id = type_id_map.get(disctype_value, '1')  # '1' is the default fallback
