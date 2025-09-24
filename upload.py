@@ -864,6 +864,7 @@ async def do_the_thing(base_dir):
 
             find_requests = config['DEFAULT'].get('search_requests', False) if meta.get('search_requests') is None else meta.get('search_requests')
             if find_requests:
+                console.print("[green]Searching for requests on supported trackers.....")
                 tracker_setup = TRACKER_SETUP(config=config)
                 await tracker_setup.tracker_request(meta, meta['trackers'])
 
