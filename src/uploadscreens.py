@@ -53,7 +53,7 @@ async def upload_image_task(args):
             try:
                 payload = {
                     'format': 'json',
-                    'api_key': config['DEFAULT']['ptpimg_api']
+                    'api_key': config['DEFAULT']['ptpimg_api'].strip()
                 }
             except KeyError:
                 return {'status': 'failed', 'reason': 'Missing ptpimg API key in config'}
@@ -63,6 +63,9 @@ async def upload_image_task(args):
                     async with aiofiles.open(image, 'rb') as file:
                         files = {'file-upload[0]': (os.path.basename(image), await file.read())}
                         headers = {'referer': 'https://ptpimg.me/index.php'}
+                        if meta.get('debug'):
+                            console.print(f"[cyan][ptpimg] Headers: {headers}[/cyan]")
+                            console.print(f"[cyan][ptpimg] Files: {list(files.keys())}[/cyan]")
 
                     try:
                         response = await client.post(
@@ -72,25 +75,37 @@ async def upload_image_task(args):
                             files=files,
                             timeout=timeout
                         )
+                        if meta.get('debug'):
+                            console.print(f"[cyan][ptpimg] Response status: {response.status_code}[/cyan]")
+                            console.print(f"[cyan][ptpimg] Response text: {response.text[:500]}[/cyan]")
+
                         response.raise_for_status()
                         response_data = response.json()
+                        if meta.get('debug'):
+                            console.print(f"[cyan][ptpimg] Response JSON: {response_data}[/cyan]")
 
                         if not response_data or not isinstance(response_data, list) or 'code' not in response_data[0]:
                             return {'status': 'failed', 'reason': "Invalid JSON response from ptpimg"}
 
                         code = response_data[0]['code']
                         ext = response_data[0]['ext']
+                        if meta.get('debug'):
+                            console.print(f"[cyan][ptpimg] Image code: {code}, extension: {ext}[/cyan]")
                         img_url = f"https://ptpimg.me/{code}.{ext}"
                         raw_url = img_url
                         web_url = img_url
 
                     except httpx.TimeoutException:
+                        console.print("[red][ptpimg] Request timed out.")
                         return {'status': 'failed', 'reason': 'Request timed out'}
                     except ValueError as e:
+                        console.print(f"[red][ptpimg] ValueError: {str(e)}")
                         return {'status': 'failed', 'reason': f"Request failed: {str(e)}"}
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as e:
+                        console.print(f"[red][ptpimg] JSONDecodeError: {str(e)}")
                         return {'status': 'failed', 'reason': 'Invalid JSON response from ptpimg'}
             except Exception as e:
+                console.print(f"[red][ptpimg] Exception: {str(e)}")
                 return {'status': 'failed', 'reason': f"Error during ptpimg upload: {str(e)}"}
 
         elif img_host == "imgbb":
@@ -593,6 +608,7 @@ async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_i
         if meta['debug']:
             console.print(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
             console.print(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
+            console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta['image_list']={len(meta['image_list'])}, cutoff={meta.get('cutoff', 1)}[/blue]")
         if (len(successfully_uploaded) + len(meta['image_list'])) < meta.get('cutoff', 1) and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
             img_host_num += 1
             if f'img_host_{img_host_num}' in config['DEFAULT']:
