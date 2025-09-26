@@ -56,7 +56,23 @@ class UNIT3D:
                 if response.status_code == 200:
                     data = response.json()
                     for each in data['data']:
-                        result = [each][0]['attributes']['name']
+                        attributes = each.get('attributes', {})
+                        if not meta['is_disc']:
+                            result = {
+                                'name': attributes['name'],
+                                'size': attributes['size'],
+                                'files': [file['name'] for file in attributes.get('files', []) if isinstance(file, dict) and 'name' in file],
+                                'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
+                                'trumpable': attributes.get('trumpable', False),
+                                'link': attributes.get('details_link', None)
+                            }
+                        else:
+                            result = {
+                                'name': attributes['name'],
+                                'size': attributes['size'],
+                                'trumpable': attributes.get('trumpable', False),
+                                'link': attributes.get('details_link', None)
+                            }
                         dupes.append(result)
                 else:
                     console.print(f'[bold red]Failed to search torrents. HTTP Status: {response.status_code}')
