@@ -33,8 +33,8 @@ class LST(UNIT3D):
 
     async def get_additional_data(self, meta):
         data = {
-            'modq': await self.get_flag(meta, 'modq'),
-            'draft': await self.get_flag(meta, 'draft'),
+            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+            'draft_queue_opt_in': await self.get_flag(meta, 'draft'),
         }
 
         return data
