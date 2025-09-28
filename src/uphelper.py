@@ -41,13 +41,9 @@ class UploadHelper:
                         meta['we_asked'] = False
                 else:
                     if meta.get('filename_match', False) and meta.get('file_count_match', False):
-                        if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not meta.get('ask_dupe', False):
-                            console.print(f'[bold red]Exact filename matches found! - {meta["filename_match"]}[/bold red]')
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
-                            meta['we_asked'] = True
-                        else:
-                            upload = False
-                            meta['we_asked'] = False
+                        console.print(f'[bold red]Exact filename matches found! - {meta["filename_match"]}[/bold red]')
+                        upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                        meta['we_asked'] = True
                     else:
                         console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
                         console.print()
