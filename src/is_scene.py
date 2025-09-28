@@ -1,8 +1,9 @@
 import os
 import re
-import urllib.parse
 import requests
+import urllib.parse
 from bs4 import BeautifulSoup
+from data.config import config
 from src.console import console
 
 
@@ -133,10 +134,11 @@ async def is_scene(video, meta, imdb=None, lower=False):
             console.print(f"[yellow]SRRDB search failed: {e}")
             return None
 
-    if not scene:
+    check_predb = config['DEFAULT'].get('check_predb', False)
+    if not scene and check_predb and not meta.get('emby_debug', False):
         if meta['debug']:
             console.print("[yellow]SRRDB: No scene match found, checking predb")
-        #  scene = await predb_check(meta, video)
+        scene = await predb_check(meta, video)
 
     return video, scene, imdb
 
