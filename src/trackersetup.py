@@ -1,3 +1,15 @@
+import asyncio
+import cli_ui
+import httpx
+import json
+import os
+import re
+import sys
+
+from datetime import datetime, timedelta
+from src.cleanup import cleanup, reset_terminal
+from src.console import console
+
 from src.trackers.ACM import ACM
 from src.trackers.AITHER import AITHER
 from src.trackers.AL import AL
@@ -59,14 +71,6 @@ from src.trackers.ULCX import ULCX
 from src.trackers.UTP import UTP
 from src.trackers.YOINK import YOINK
 from src.trackers.YUS import YUS
-from src.console import console
-import httpx
-import os
-import json
-import cli_ui
-from datetime import datetime, timedelta
-import asyncio
-import re
 
 
 class TRACKER_SETUP:
@@ -272,8 +276,14 @@ class TRACKER_SETUP:
 
         if result:
             if not meta['unattended'] or meta.get('unattended_confirm', False):
-                if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
-                    return False
+                try:
+                    if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                        return False
+                except EOFError:
+                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                    await cleanup()
+                    reset_terminal()
+                    sys.exit(1)
                 return True
 
             return True
