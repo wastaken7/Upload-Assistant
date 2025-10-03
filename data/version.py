@@ -1,4 +1,4 @@
-__version__ = "v6.0.0"
+__version__ = "6.0.0"
 
 """
 Changelog for version v6.0.0 (2025-10-03):
