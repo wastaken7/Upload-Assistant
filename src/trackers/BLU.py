@@ -55,6 +55,8 @@ class BLU(UNIT3D):
                         pass
                     else:
                         return False
+                else:
+                    return False
 
         return should_continue
 
