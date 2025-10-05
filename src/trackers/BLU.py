@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import cli_ui
+
 from difflib import SequenceMatcher
+
+from src.console import console
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -26,10 +30,33 @@ class BLU(UNIT3D):
             'PlaySD', 'playXD', 'PRODJi', 'RAPiDCOWS', 'RARBG', 'RDN', 'REsuRRecTioN', 'RetroPeeps',
             'RMTeam', 'SANTi', 'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'Telly', 'TM', 'TRiToN',
             'UPiNSMOKE', 'URANiME', 'WAF', 'x0r', 'xRed', 'XS', 'YIFY', 'ZKBL', 'ZmN', 'ZMNT',
-            ['CMRG', 'Raw Content Only'], ['EVO', 'Raw Content Only'], ['TERMiNAL', 'Raw Content Only'],
-            ['ViSION', 'Note the capitalization and characters used'],
         ]
         pass
+
+    async def get_additional_checks(self, meta):
+        should_continue = True
+        if meta['type'] in ['ENCODE', 'REMUX']:
+            if 'HDR' in meta.get('hdr', '') and 'DV' in meta.get('hdr', ''):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print('[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]')
+                    console.print('[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        return False
+                    if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
+                        meta['tracker_status'][self.tracker]['other'] = True
+
+        if meta['type'] not in ['WEBDL'] and not meta['is_disc']:
+            if meta.get('tag', "") and any(x in meta['tag'] for x in ['CMRG', 'EVO', 'TERMINAL', 'ViSION']):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        return False
+
+        return should_continue
 
     async def get_name(self, meta):
         blu_name = meta['name']
@@ -50,6 +77,9 @@ class BLU(UNIT3D):
         if not meta.get('category') == "TV" and imdb_year and imdb_year != "" and year and year != "" and imdb_year != year:
             blu_name = blu_name.replace(f"{year}", imdb_year, 1)
 
+        if meta['tracker_status'][self.tracker].get('other', False):
+            blu_name = blu_name.replace(f"{meta['resolution']}", f"{meta['resolution']} DVP5/DVP8", 1)
+
         return {'name': blu_name}
 
     async def get_additional_data(self, meta):
@@ -59,7 +89,7 @@ class BLU(UNIT3D):
 
         return data
 
-    async def get_category_id(self, meta, mapping_only=False, reverse=False, category=None):
+    async def get_category_id(self, meta, category=None, reverse=False, mapping_only=False):
         edition = meta.get('edition', '')
         category_name = meta['category']
         category_id = {
@@ -67,8 +97,18 @@ class BLU(UNIT3D):
             'TV': '2',
             'FANRES': '3'
         }
+
+        is_fanres = False
+
         if category_name == 'MOVIE' and 'FANRES' in edition:
-            category_id = '3'
+            is_fanres = True
+
+        if meta['tracker_status'][self.tracker].get('other', False):
+            is_fanres = True
+
+        if is_fanres:
+            return {'category_id': '3'}
+
         if mapping_only:
             return category_id
         elif reverse:
