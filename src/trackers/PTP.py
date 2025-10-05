@@ -315,7 +315,7 @@ class PTP():
                 console.print(f"[green]Title: [yellow]{response.get('Name')}[/yellow] ([yellow]{response.get('Year')}[/yellow])")
                 return groupID
         except Exception:
-            console.print("[red]An error has occured trying to find a group ID")
+            console.print("[red]An error has occurred trying to find a group ID")
             console.print("[red]Please check that the site is online and your ApiUser/ApiKey values are correct")
             return None
 
@@ -1387,7 +1387,7 @@ class PTP():
                 if meta.get('mode', 'discord') == 'cli':
                     console.print('[yellow]Unable to match any tags')
                     console.print("Valid tags can be found on the PTP upload form")
-                    new_data["tags"] = console.input("Please enter at least one tag. Comma seperated (action, animation, short):")
+                    new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
             if meta["imdb_info"].get("directors", None) is not None:
                 data["artist[]"] = tuple(meta['imdb_info'].get('directors'))
