@@ -4,10 +4,11 @@ import httpx
 import os
 import platform
 import re
-from src.trackers.COMMON import COMMON
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from src.console import console
+from src.cookies import CookieValidator
+from src.trackers.COMMON import COMMON
 
 
 class HDS:
@@ -25,33 +26,14 @@ class HDS:
         }, timeout=30)
         self.signature = "[center][url=https://github.com/Audionut/Upload-Assistant]Created by Upload Assistant[/url][/center]"
 
-    async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/HDS.txt")
-        if not os.path.exists(cookie_file):
-            console.print(f'[bold red]Cookie file for {self.tracker} not found: {cookie_file}[/bold red]')
-            return False
-
-        self.session.cookies = await self.common.parseCookieFile(cookie_file)
-
     async def validate_credentials(self, meta):
-        await self.load_cookies(meta)
-        try:
-            test_url = f'{self.base_url}/index.php?'
-
-            params = {
-                'page': 'upload'
-            }
-
-            response = await self.session.get(test_url, params=params)
-
-            if response.status_code == 200 and 'index.php?page=upload' in str(response.url):
-                return True
-            else:
-                console.print(f'[bold red]Failed to validate {self.tracker} credentials. The cookie may be expired.[/bold red]')
-                return False
-        except Exception as e:
-            console.print(f'[bold red]Error validating {self.tracker} credentials: {e}[/bold red]')
-            return False
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        return await CookieValidator().cookie_validation(
+            meta=meta,
+            tracker=self.tracker,
+            test_url=f'{self.base_url}/index.php?page=upload',
+            error_text='Recover password',
+        )
 
     async def generate_description(self, meta):
         base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
@@ -139,12 +121,6 @@ class HDS:
         return desc
 
     async def search_existing(self, meta, disctype):
-        images = meta.get('image_list', [])
-        if not images or len(images) < 3:
-            console.print(f'{self.tracker}: At least 3 screenshots are required to upload.')
-            meta['skipping'] = f'{self.tracker}'
-            return
-
         dupes = []
         imdb_id = meta.get('imdb', '')
         if imdb_id == '0':
@@ -313,7 +289,8 @@ class HDS:
             }
         return {}
 
-    async def fetch_data(self, meta):
+    async def get_data(self, meta):
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
             'category': await self.get_category_id(meta),
             'filename': meta['name'],
@@ -343,9 +320,8 @@ class HDS:
         return data
 
     async def upload(self, meta, disctype):
-        await self.load_cookies(meta)
         await self.common.edit_torrent(meta, self.tracker, self.source_flag)
-        data = await self.fetch_data(meta)
+        data = await self.get_data(meta)
         requests = await self.get_requests(meta)
         status_message = ''
 
@@ -390,6 +366,13 @@ class HDS:
             await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
+            console.print("Headers:")
+            console.print(self.session.headers)
+            console.print()
+            console.print("Cookies:")
+            console.print(self.session.cookies)
+            console.print()
+            console.print("Form data:")
             console.print(data)
             status_message = 'Debug mode enabled, not uploading'
 

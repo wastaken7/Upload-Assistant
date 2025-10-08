@@ -3,18 +3,20 @@ import httpx
 import os
 import platform
 import re
-from pymediainfo import MediaInfo
 from .COMMON import COMMON
 from bs4 import BeautifulSoup
+from pymediainfo import MediaInfo
 from src.console import console
+from src.cookies import CookieValidator
 from src.languages import process_desc_language
 
 
-class PTS(COMMON):
+class PTS:
     def __init__(self, config):
-        super().__init__(config)
+        self.config = config
         self.tracker = "PTS"
-        self.banned_groups = [""]
+        self.common = COMMON(config)
+        self.banned_groups = []
         self.source_flag = "[www.ptskit.org] PTSKIT"
         self.base_url = "https://www.ptskit.org"
         self.torrent_url = "https://www.ptskit.org/details.php?id="
@@ -25,26 +27,14 @@ class PTS(COMMON):
         }, timeout=60.0)
         self.signature = "[center]Created by Upload Assistant[/center]"
 
-    async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
-        if not os.path.exists(cookie_file):
-            console.print(f"[bold red]Cookie file for {self.tracker} not found: {cookie_file}[/bold red]")
-            return False
-
-        self.session.cookies = await self.parseCookieFile(cookie_file)
-
     async def validate_credentials(self, meta):
-        await self.load_cookies(meta)
-
-        upload_page_url = f"{self.base_url}/upload.php"
-        response = await self.session.get(upload_page_url, timeout=30.0)
-        response.raise_for_status()
-
-        if 'login.php' in str(response.url):
-            console.print(f"[bold red]{self.tracker} validation failed. Cookie appears to be expired (redirected to login).[/bold red]")
-            return False
-
-        return True
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        return await CookieValidator().cookie_validation(
+            meta=meta,
+            tracker=self.tracker,
+            test_url=f'{self.base_url}/upload.php',
+            success_text='forums.php',
+        )
 
     async def get_type(self, meta):
         if meta.get('anime'):
@@ -192,7 +182,8 @@ class PTS(COMMON):
 
         return found_items
 
-    async def gather_data(self, meta, disctype):
+    async def get_data(self, meta, disctype):
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
             'name': meta['name'],
             'url': f"https://www.imdb.com/title/{meta.get('imdb_info', {}).get('imdbID', '')}",
@@ -203,9 +194,8 @@ class PTS(COMMON):
         return data
 
     async def upload(self, meta, disctype):
-        await self.load_cookies(meta)
-        await self.edit_torrent(meta, self.tracker, self.source_flag)
-        data = await self.gather_data(meta, disctype)
+        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
+        data = await self.get_data(meta, disctype)
         status_message = ''
 
         if not meta.get('debug', False):
@@ -235,9 +225,16 @@ class PTS(COMMON):
                     meta['skipping'] = f"{self.tracker}"
                     return
 
-            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
+            await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
+            console.print("Headers:")
+            console.print(self.session.headers)
+            console.print()
+            console.print("Cookies:")
+            console.print(self.session.cookies)
+            console.print()
+            console.print("Form data:")
             console.print(data)
             status_message = 'Debug mode enabled, not uploading.'
 
