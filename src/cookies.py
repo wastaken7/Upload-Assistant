@@ -17,13 +17,15 @@ class CookieValidator:
         try:
             cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except http.cookiejar.LoadError as e:
-            console.print(f'{tracker}: Failed to load the cookie file: {e}')
-            console.print(f'{tracker}: Please ensure the cookie file is in the correct format (Netscape).')
+            console.print(f"{tracker}: Failed to load the cookie file: {e}")
+            console.print(
+                f"{tracker}: Please ensure the cookie file is in the correct format (Netscape)."
+            )
             return False
         except FileNotFoundError:
             console.print(
-                f'{tracker}: [red]Cookie file not found.[/red]\n'
-                f'{tracker}: You must first log in through your usual browser and export the cookies to: [yellow]{cookie_file}[/yellow]\n'
+                f"{tracker}: [red]Cookie file not found.[/red]\n"
+                f"{tracker}: You must first log in through your usual browser and export the cookies to: [yellow]{cookie_file}[/yellow]\n"
                 f'{tracker}: Cookies can be exported using browser extensions like "cookies.txt" (Firefox) or "Get cookies.txt LOCALLY" (Chrome).'
             )
             return False
@@ -33,15 +35,26 @@ class CookieValidator:
     async def save_session_cookies(self, tracker, cookie_jar):
         """Save updated cookies."""
         if not cookie_jar:
-            console.print(f'{tracker}: Cookie jar not initialized, cannot save cookies.')
+            console.print(
+                f"{tracker}: Cookie jar not initialized, cannot save cookies."
+            )
             return
 
         try:
             cookie_jar.save(ignore_discard=True, ignore_expires=True)
         except Exception as e:
-            console.print(f'{tracker}: Failed to update the cookie file: {e}')
+            console.print(f"{tracker}: Failed to update the cookie file: {e}")
 
-    async def cookie_validation(self, meta, tracker, test_url='', status_code='', error_text='', success_text='', token_pattern=''):
+    async def cookie_validation(
+        self,
+        meta,
+        tracker,
+        test_url="",
+        status_code="",
+        error_text="",
+        success_text="",
+        token_pattern="",
+    ):
         """
         Validate login cookies for a tracker by checking specific indicators on a test page.
         Return False to skip the upload if credentials are invalid.
@@ -51,11 +64,13 @@ class CookieValidator:
             return False
 
         headers = {
-            'User-Agent': f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
+            "User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
         }
 
         try:
-            async with httpx.AsyncClient(headers=headers, timeout=20.0, cookies=cookie_jar) as session:
+            async with httpx.AsyncClient(
+                headers=headers, timeout=20.0, cookies=cookie_jar
+            ) as session:
                 response = await session.get(test_url)
                 text = response.text
 
@@ -77,7 +92,7 @@ class CookieValidator:
                     return False
 
                 # Find the auth token if it is needed
-                token = ''
+                token = ""
                 if token_pattern:
                     match = re.search(token_pattern, text)
                     if not match:
@@ -90,26 +105,28 @@ class CookieValidator:
                 return token or True
 
         except httpx.HTTPStatusError as e:
-            console.print(f'{tracker}: HTTP error: {e}')
+            console.print(f"{tracker}: HTTP error: {e}")
         except httpx.RequestError as e:
-            console.print(f'{tracker}: Request error: {e}')
+            console.print(f"{tracker}: Request error: {e}")
         except Exception as e:
-            console.print(f'{tracker}: Unexpected error: {e}')
+            console.print(f"{tracker}: Unexpected error: {e}")
 
         return False
 
     async def handle_validation_failure(self, meta, tracker, text):
         console.print(
-            f'{tracker}: Validation failed. The cookie appears to be expired or invalid.'
+            f"{tracker}: Validation failed. The cookie appears to be expired or invalid."
         )
-        failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]Failed_Login.html"
+        failure_path = (
+            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]Failed_Login.html"
+        )
         os.makedirs(os.path.dirname(failure_path), exist_ok=True)
-        async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
+        async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
             await f.write(text)
         console.print(
-            f'The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n'
-            '[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n'
-            'You can open this file in a web browser to see what went wrong.\n'
+            f"The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
+            "[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
+            "You can open this file in a web browser to see what went wrong.\n"
         )
 
         return
@@ -119,7 +136,7 @@ class CookieValidator:
         if not auth_match:
             console.print(
                 f"{tracker}: The required token could not be found in the page's HTML.\n"
-                f'{tracker}: This can happen if the site HTML has changed or if the login failed silently.'
+                f"{tracker}: This can happen if the site HTML has changed or if the login failed silently."
             )
             return False
         else:

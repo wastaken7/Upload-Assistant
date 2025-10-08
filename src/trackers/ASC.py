@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from pymediainfo import MediaInfo
 from src.console import console
+from src.cookies import CookieValidator
 from src.languages import process_desc_language
 from src.tmdb import get_tmdb_localized_data
 
@@ -48,37 +49,14 @@ class ASC(COMMON):
             'ru': '2', 'zh': '9',
         }
 
-    async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
-        if not os.path.exists(cookie_file):
-            console.print(f'[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]')
-            return False
-
-        self.session.cookies = await self.parseCookieFile(cookie_file)
-
     async def validate_credentials(self, meta):
-        await self.load_cookies(meta)
-        try:
-            test_url = f'{self.base_url}/gerador.php'
-            response = await self.session.get(test_url, timeout=30.0)
-
-            response.raise_for_status()
-
-            if 'gerador.php' in str(response.url):
-                return True
-            else:
-                console.print(f'[bold red]Falha na validação do {self.tracker}. Cookie provavelmente expirado (redirecionado para a página de login).[/bold red]')
-                return False
-
-        except httpx.TimeoutException:
-            console.print(f'[bold red]Erro no {self.tracker}: Timeout (30s) ao tentar validar credenciais.[/bold red]')
-            return False
-        except httpx.HTTPStatusError as e:
-            console.print(f'[bold red]Erro HTTP ao validar credenciais do {self.tracker}: Status {e.response.status_code}. O site pode estar offline.[/bold red]')
-            return False
-        except httpx.RequestError as e:
-            console.print(f'[bold red]Erro de rede ao validar credenciais do {self.tracker}: {e.__class__.__name__}. Verifique sua conexão.[/bold red]')
-            return False
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        return await CookieValidator().cookie_validation(
+            meta=meta,
+            tracker=self.tracker,
+            test_url=f'{self.base_url}/gerador.php',
+            error_text='Esqueceu sua senha',
+        )
 
     def load_localized_data(self, meta):
         localized_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"
@@ -850,7 +828,7 @@ class ASC(COMMON):
         return data
 
     async def upload(self, meta, disctype):
-        await self.load_cookies(meta)
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = await self.fetch_data(meta)
         requests = await self.get_requests(meta)
         await self.edit_torrent(meta, self.tracker, self.source_flag)
@@ -895,7 +873,8 @@ class ASC(COMMON):
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
-            console.print(data)
+            console.print(f'Session:\n{self.session}\n')
+            console.print(f'Data:\n{data}\n')
             status_message = 'Debug mode enabled, not uploading.'
 
         meta['tracker_status'][self.tracker]['status_message'] = status_message
