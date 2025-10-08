@@ -76,14 +76,15 @@ class CookieValidator:
                 # if meta.get('debug', False):
                 #    console.print(text)
 
-                # Check for key indicators of failed login
-                # For example, “Forgot your password” <- this indicates that you are on the login page
-                if error_text and error_text in text:
+                # Check for key indicators of successful login
+                # This is the most precise method if you can find a unique string that only appears when logged in
+                if success_text and success_text not in text:
                     await self.handle_validation_failure(meta, tracker, text)
                     return False
 
-                # Check for key indicators of successful login
-                if success_text and success_text not in text:
+                # Check for key indicators of failed login
+                # For example, “Forgot your password” <- this indicates that you are on the login page
+                if error_text and error_text in text:
                     await self.handle_validation_failure(meta, tracker, text)
                     return False
 
