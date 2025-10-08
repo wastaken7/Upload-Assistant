@@ -107,8 +107,20 @@ class CookieValidator:
                 await self.save_session_cookies(tracker, cookie_jar)
                 return token or True
 
+        except httpx.ConnectTimeout:
+            console.print(f"{tracker}: Connection timed out")
+        except httpx.ReadTimeout:
+            console.print(f"{tracker}: Read timed out")
+        except httpx.ConnectError:
+            console.print(f"{tracker}: Failed to connect to the server")
+        except httpx.ProxyError:
+            console.print(f"{tracker}: Proxy connection failed")
+        except httpx.DecodingError:
+            console.print(f"{tracker}: Response decoding failed")
+        except httpx.TooManyRedirects:
+            console.print(f"{tracker}: Too many redirects")
         except httpx.HTTPStatusError as e:
-            console.print(f"{tracker}: HTTP error: {e}")
+            console.print(f"{tracker}: HTTP error {e.response.status_code}: {e}")
         except httpx.RequestError as e:
             console.print(f"{tracker}: Request error: {e}")
         except Exception as e:
