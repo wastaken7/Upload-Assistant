@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import glob
 import httpx
 import os
 import platform
@@ -7,14 +6,12 @@ import re
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from src.console import console
-from src.cookies import CookieValidator
-from src.trackers.COMMON import COMMON
+from src.cookies import CookieValidator, CookieUploader
 
 
 class HDS:
     def __init__(self, config):
         self.config = config
-        self.common = COMMON(config)
         self.tracker = 'HDS'
         self.source_flag = 'HD-Space'
         self.banned_groups = ['']
@@ -273,22 +270,6 @@ class HDS:
                 print(f'An error occurred while fetching requests: {e}')
                 return []
 
-    async def get_nfo(self, meta):
-        nfo_dir = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
-        nfo_files = glob.glob(os.path.join(nfo_dir, '*.nfo'))
-
-        if nfo_files:
-            nfo_path = nfo_files[0]
-
-            return {
-                'nfo': (
-                    os.path.basename(nfo_path),
-                    open(nfo_path, 'rb'),
-                    'application/octet-stream'
-                )
-            }
-        return {}
-
     async def get_data(self, meta):
         self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
@@ -320,60 +301,25 @@ class HDS:
         return data
 
     async def upload(self, meta, disctype):
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
         data = await self.get_data(meta)
-        requests = await self.get_requests(meta)
-        status_message = ''
 
-        if not meta.get('debug', False):
-            torrent_id = ''
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-            upload_url = f"{self.base_url}/index.php?"
-            params = {
-                'page': 'upload'
-            }
+        upload = await CookieUploader(self.config).handle_upload(
+            meta,
+            self.tracker,
+            self.source_flag,
+            self.announce,
+            self.torrent_url,
+            data,
+            file_name='torrent',
+            upload_cookies=self.session.cookies,
+            upload_url="https://hd-space.org/index.php?page=upload",
+            id_pattern=r'download\.php\?id=([^&]+)',
+            success_text="download.php?id=",
+        )
 
-            with open(torrent_path, 'rb') as torrent_file:
-                files = {
-                    'torrent': (f'[{self.tracker}].torrent', torrent_file, 'application/x-bittorrent'),
-                }
-                nfo = await self.get_nfo(meta)
-                if nfo:
-                    files['nfo'] = nfo['nfo']
+        if upload:
+            requests = await self.get_requests(meta)
+            if requests:
+                meta["tracker_status"][self.tracker]["status_message"] += '\nYour upload may fulfill existing requests, check prior console logs.'
 
-                response = await self.session.post(upload_url, data=data, params=params, files=files)
-
-                if 'download.php?id=' in response.text:
-                    status_message = 'Torrent uploaded successfully.'
-
-                    # Find the torrent id
-                    match = re.search(r'download\.php\?id=([^&]+)', response.text)
-                    if match:
-                        torrent_id = match.group(1)
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                    if requests:
-                        status_message += ' Your upload may fulfill existing requests, check prior console logs.'
-
-                else:
-                    status_message = 'data error - The upload appears to have failed. It may have uploaded, go check.'
-
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-                    console.print(f'Upload failed, HTML response was saved to: {response_save_path}')
-
-            await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
-
-        else:
-            console.print("Headers:")
-            console.print(self.session.headers)
-            console.print()
-            console.print("Cookies:")
-            console.print(self.session.cookies)
-            console.print()
-            console.print("Form data:")
-            console.print(data)
-            status_message = 'Debug mode enabled, not uploading'
-
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        return
