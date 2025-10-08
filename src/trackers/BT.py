@@ -10,6 +10,7 @@ import unicodedata
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from src.console import console
+from src.cookies import CookieValidator
 from src.languages import process_desc_language
 from src.tmdb import get_tmdb_localized_data
 from src.trackers.COMMON import COMMON
@@ -93,48 +94,15 @@ class BT():
                 for alias in aliases_tuple:
                     self.ultimate_lang_map[alias.lower()] = correct_id
 
-    async def load_cookies(self, meta):
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
-        if not os.path.exists(cookie_file):
-            console.print(f'[bold red]Arquivo de cookie para o {self.tracker} não encontrado: {cookie_file}[/bold red]')
-            return False
-
-        self.session.cookies = await self.common.parseCookieFile(cookie_file)
-
     async def validate_credentials(self, meta):
-        await self.load_cookies(meta)
-        try:
-            upload_page_url = f'{self.base_url}/upload.php'
-            response = await self.session.get(upload_page_url, timeout=30.0)
-            response.raise_for_status()
-
-            if 'login.php' in str(response.url):
-                console.print(f'[bold red]Falha na validação do {self.tracker}. O cookie parece estar expirado (redirecionado para login).[/bold red]')
-                return False
-
-            auth_match = re.search(r'name="auth" value="([^"]+)"', response.text)
-
-            if not auth_match:
-                console.print(f'[bold red]Falha na validação do {self.tracker}. Token auth não encontrado.[/bold red]')
-                console.print('[yellow]A estrutura do site pode ter mudado ou o login falhou silenciosamente.[/yellow]')
-
-                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                with open(failure_path, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                console.print(f'[yellow]A resposta do servidor foi salva em {failure_path} para análise.[/yellow]')
-                return False
-
-            return str(auth_match.group(1))
-
-        except httpx.TimeoutException:
-            console.print(f'[bold red]Erro no {self.tracker}: Timeout ao tentar validar credenciais.[/bold red]')
-            return False
-        except httpx.HTTPStatusError as e:
-            console.print(f'[bold red]Erro HTTP ao validar credenciais do {self.tracker}: Status {e.response.status_code}.[/bold red]')
-            return False
-        except httpx.RequestError as e:
-            console.print(f'[bold red]Erro de rede ao validar credenciais do {self.tracker}: {e.__class__.__name__}.[/bold red]')
-            return False
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        return await CookieValidator().cookie_validation(
+            meta=meta,
+            tracker=self.tracker,
+            test_url=f'{self.base_url}/upload.php',
+            error_text='login.php',
+            token_pattern=r'name="auth" value="([^"]+)"'
+        )
 
     def load_localized_data(self, meta):
         localized_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"
@@ -571,7 +539,7 @@ class BT():
             return 'N/A'
 
     async def get_data(self, meta, disctype):
-        await self.load_cookies(meta)
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         self.load_localized_data(meta)
         tmdb_data = await self.ptbr_tmdb_data(meta)
         has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
@@ -680,6 +648,13 @@ class BT():
             await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
+            console.print("Headers:")
+            console.print(self.session.headers)
+            console.print()
+            console.print("Cookies:")
+            console.print(self.session.cookies)
+            console.print()
+            console.print("Form data:")
             console.print(data)
             status_message = 'Debug mode enabled, not uploading.'
 

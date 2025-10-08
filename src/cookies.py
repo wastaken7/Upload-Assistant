@@ -73,6 +73,8 @@ class CookieValidator:
             ) as session:
                 response = await session.get(test_url)
                 text = response.text
+                # if meta.get('debug', False):
+                #    console.print(text)
 
                 # Check for key indicators of failed login
                 # For example, “Forgot your password” <- this indicates that you are on the login page
@@ -115,7 +117,8 @@ class CookieValidator:
 
     async def handle_validation_failure(self, meta, tracker, text):
         console.print(
-            f"{tracker}: Validation failed. The cookie appears to be expired or invalid."
+            f"{tracker}: Validation failed. The cookie appears to be expired or invalid.\n"
+            f"{tracker}: Please log in through your usual browser and export the cookies again."
         )
         failure_path = (
             f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]Failed_Login.html"

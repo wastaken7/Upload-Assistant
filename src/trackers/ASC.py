@@ -873,8 +873,14 @@ class ASC(COMMON):
             await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
 
         else:
-            console.print(f'Session:\n{self.session}\n')
-            console.print(f'Data:\n{data}\n')
+            console.print("Headers:")
+            console.print(self.session.headers)
+            console.print()
+            console.print("Cookies:")
+            console.print(self.session.cookies)
+            console.print()
+            console.print("Form data:")
+            console.print(data)
             status_message = 'Debug mode enabled, not uploading.'
 
         meta['tracker_status'][self.tracker]['status_message'] = status_message
