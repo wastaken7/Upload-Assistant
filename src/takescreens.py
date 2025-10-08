@@ -1333,8 +1333,10 @@ async def capture_screenshot(args):
             if use_libplacebo:
                 warm_up = config['DEFAULT'].get('ffmpeg_warmup', False)
                 if warm_up:
+                    meta['_libplacebo_warmed'] = False
+                else:
                     meta['_libplacebo_warmed'] = True
-                elif "_libplacebo_warmed" not in meta:
+                if "_libplacebo_warmed" not in meta:
                     meta['_libplacebo_warmed'] = False
                 if hdr_tonemap and meta.get('libplacebo') and not meta.get('_libplacebo_warmed'):
                     await libplacebo_warmup(path, meta, loglevel)
