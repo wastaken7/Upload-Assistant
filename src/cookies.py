@@ -163,6 +163,7 @@ class CookieValidator:
 class CookieUploader:
     def __init__(self, config):
         self.config = config
+        self.common = COMMON(config)
         pass
 
     async def handle_upload(
@@ -181,6 +182,20 @@ class CookieUploader:
         error_text="",
         success_text="",
     ):
+        """
+        Upload a torrent to a tracker using cookies for authentication.
+        Return True if the upload is successful, False otherwise.
+
+        1. Create the [tracker].torrent file and set the source flag.
+        2. Load the torrent file into memory.
+        3. Post the torrent file and form data to the provided upload URL using the provided cookies.
+        4. Check the response for success indicators.
+        5. Handle success or failure accordingly.
+
+        A successful upload will create a torrent entry with the announce URL and torrent ID (if applicable).
+        A failed upload will save the response HTML for analysis and also create a torrent entry with the announce URL,
+        as the upload may have partially succeeded.
+        """
         values = [success_status_code, error_text, success_text]
         count = sum(bool(v) for v in values)
 
@@ -192,12 +207,11 @@ class CookieUploader:
             meta["tracker_status"][tracker]["status_message"] = error
             return False
 
-        await COMMON(config=self.config).edit_torrent(meta, tracker, source_flag)
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        with open(torrent_path, 'rb') as torrent_file:
-            files = {
-                file_name: (f'[{tracker}].torrent', torrent_file, 'application/x-bittorrent'),
-            }
+        status_message = ""
+
+        await self.common.edit_torrent(meta, tracker, source_flag)
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        files = await self.load_torrent_file(torrent_path, file_name, tracker)
 
         headers = {
             "User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
@@ -209,20 +223,38 @@ class CookieUploader:
             ) as session:
 
                 if not meta.get("debug", False):
+                    success = False
                     response = await session.post(upload_url, data=data, files=files)
 
                     if success_text and success_text in response.text:
-                        return await self.handle_successful_upload(meta, tracker, response, id_pattern, source_flag, announce, torrent_url)
+                        success = True
 
-                    elif success_status_code and int(response.status_code) == int(success_status_code):
-                        return await self.handle_successful_upload(meta, tracker, response, id_pattern, source_flag, announce, torrent_url)
+                    elif success_status_code and int(response.status_code) == int(
+                        success_status_code
+                    ):
+                        success = True
 
                     elif error_text and error_text not in response.text:
-                        return await self.handle_successful_upload(meta, tracker, response, id_pattern, source_flag, announce, torrent_url)
+                        success = True
 
+                    if success:
+                        return await self.handle_successful_upload(
+                            meta,
+                            tracker,
+                            response,
+                            id_pattern,
+                            source_flag,
+                            announce,
+                            torrent_url,
+                        )
                     else:
-                        return await self.handle_failed_upload(
-                            meta, tracker, success_status_code, success_text, error_text, response
+                        await self.handle_failed_upload(
+                            meta,
+                            tracker,
+                            success_status_code,
+                            success_text,
+                            error_text,
+                            response,
                         )
 
                 else:
@@ -234,67 +266,76 @@ class CookieUploader:
                     console.print()
                     console.print("Form data:")
                     console.print(data)
-                    meta["tracker_status"][tracker]["status_message"] = "Debug mode enabled, not uploading"
+                    status_message = "Debug mode enabled, not uploading"
 
         except httpx.ConnectTimeout:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Connection timed out"
-            return False
+            status_message = f"{tracker}: Connection timed out"
         except httpx.ReadTimeout:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Read timed out"
-            return False
+            status_message += f"{tracker}: Read timed out"
         except httpx.ConnectError:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Failed to connect to the server"
-            return False
+            status_message += f"{tracker}: Failed to connect to the server"
         except httpx.ProxyError:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Proxy connection failed"
-            return False
+            status_message += f"{tracker}: Proxy connection failed"
         except httpx.DecodingError:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Response decoding failed"
-            return False
+            status_message += f"{tracker}: Response decoding failed"
         except httpx.TooManyRedirects:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Too many redirects"
-            return False
+            status_message += f"{tracker}: Too many redirects"
         except httpx.HTTPStatusError as e:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: HTTP error {e.response.status_code}: {e}"
-            return False
+            status_message += f"{tracker}: HTTP error {e.response.status_code}: {e}"
         except httpx.RequestError as e:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Request error: {e}"
-            return False
+            status_message += f"{tracker}: Request error: {e}"
         except Exception as e:
-            meta["tracker_status"][tracker]["status_message"] = f"{tracker}: Unexpected error: {e}"
-            return False
+            status_message += f"{tracker}: Unexpected error: {e}"
 
+        await self.common.add_tracker_torrent(
+            meta, tracker, source_flag, announce, torrent_url
+        )
+        meta["tracker_status"][tracker]["status_message"] = status_message
         return False
 
-    async def handle_successful_upload(self, meta, tracker, response, id_pattern, source_flag, announce, torrent_url):
-        torrent_id = ''
+    async def load_torrent_file(self, path, file_name, tracker):
+        async with aiofiles.open(path, "rb") as f:
+            file_bytes = await f.read()
+
+        return {
+            file_name: (f"[{tracker}].torrent", file_bytes, "application/x-bittorrent")
+        }
+
+    async def handle_successful_upload(
+        self, meta, tracker, response, id_pattern, source_flag, announce, torrent_url
+    ):
+        torrent_id = ""
         if id_pattern:
             match = re.search(id_pattern, response.text)
             if match:
                 torrent_id = match.group(1)
                 meta["tracker_status"][tracker]["torrent_id"] = torrent_id
 
-        meta["tracker_status"][tracker]["status_message"] = "Torrent uploaded successfully."
-        await COMMON(config=self.config).add_tracker_torrent(meta, tracker, source_flag, announce, torrent_url + torrent_id)
+        meta["tracker_status"][tracker][
+            "status_message"
+        ] = "Torrent uploaded successfully."
+        await self.common.add_tracker_torrent(
+            meta, tracker, source_flag, announce, torrent_url + torrent_id
+        )
 
         return True
 
     async def handle_failed_upload(
         self, meta, tracker, status_code, success_text, error_text, response
     ):
-        message = "data error: The upload appears to have failed. It may have uploaded, go check."
+        message = ["data error: The upload appears to have failed. It may have uploaded, go check."]
         if success_text:
-            message += (
-                f"\nCould not find the success text '{success_text}' in the response."
+            message.append(
+                f"Could not find the success text '{success_text}' in the response."
             )
         elif error_text in response.text:
-            message += f"\nFound the error text '{error_text}' in the response."
+            message.append(f"Found the error text '{error_text}' in the response.")
         elif status_code and response.status_code != int(status_code):
-            message += (
-                f"\nExpected status code '{status_code}', got '{response.status_code}'."
+            message.append(
+                f"Expected status code '{status_code}', got '{response.status_code}'."
             )
         else:
-            message += "\nUnknown upload error."
+            message.append("Unknown upload error.")
 
         failure_path = (
             f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]Failed_Upload.html"
@@ -303,11 +344,11 @@ class CookieUploader:
         async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
             await f.write(response.text)
 
-        message += (
-            f"\nThe web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
+        message.append(
+            f"The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
             "[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
             "You can open this file in a web browser to see what went wrong.\n"
         )
 
-        meta["tracker_status"][tracker]["status_message"] = message
+        meta["tracker_status"][tracker]["status_message"] = "\n".join(message)
         return False

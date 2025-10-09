@@ -320,6 +320,6 @@ class HDS:
         if upload:
             requests = await self.get_requests(meta)
             if requests:
-                meta["tracker_status"][self.tracker]["status_message"] += '\nYour upload may fulfill existing requests, check prior console logs.'
+                meta["tracker_status"][self.tracker]["status_message"] = 'Torrent uploaded successfully. Your upload may fulfill existing requests, check prior console logs.'
 
         return
