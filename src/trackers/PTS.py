@@ -183,7 +183,6 @@ class PTS:
         return found_items
 
     async def get_data(self, meta, disctype):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
             'name': meta['name'],
             'url': f"https://www.imdb.com/title/{meta.get('imdb_info', {}).get('imdbID', '')}",

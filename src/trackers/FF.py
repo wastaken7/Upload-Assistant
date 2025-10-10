@@ -545,7 +545,6 @@ class FF(COMMON):
         return {}
 
     async def get_data(self, meta):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         languages = await self.languages(meta)
         self.file_information(meta)
 

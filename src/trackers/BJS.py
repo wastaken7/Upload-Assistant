@@ -1154,7 +1154,6 @@ class BJS(COMMON):
         return False
 
     async def upload(self, meta, disctype):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta, disctype)
 
         issue = await self.check_data(meta, data)

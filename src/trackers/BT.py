@@ -538,7 +538,6 @@ class BT():
             return 'N/A'
 
     async def get_data(self, meta):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         self.load_localized_data(meta)
         tmdb_data = await self.ptbr_tmdb_data(meta)
         has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
