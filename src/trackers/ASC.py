@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from pymediainfo import MediaInfo
 from src.console import console
-from src.cookies import CookieValidator
+from src.cookies import CookieValidator, CookieUploader
 from src.languages import process_desc_language
 from src.tmdb import get_tmdb_localized_data
 
@@ -23,7 +23,6 @@ class ASC(COMMON):
         self.banned_groups = ['']
         self.base_url = 'https://cliente.amigos-share.club'
         self.torrent_url = 'https://cliente.amigos-share.club/torrents-details.php?id='
-        self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
@@ -778,7 +777,7 @@ class ASC(COMMON):
                 console.print(traceback.format_exc())
                 return []
 
-    async def fetch_data(self, meta):
+    async def get_data(self, meta):
         self.load_localized_data(meta)
         if not meta.get('language_checked', False):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
@@ -829,61 +828,33 @@ class ASC(COMMON):
 
     async def upload(self, meta, disctype):
         self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
-        data = await self.fetch_data(meta)
-        requests = await self.get_requests(meta)
-        await self.edit_torrent(meta, self.tracker, self.source_flag)
-        status_message = ''
+        data = await self.get_data(meta)
+        upload_url = await self.get_upload_url(meta)
 
-        if not meta.get('debug', False):
-            torrent_id = ''
-            upload_url = await self.get_upload_url(meta)
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        upload = await CookieUploader(self.config).handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name='torrent',
+            upload_cookies=self.session.cookies,
+            upload_url=upload_url,
+            id_pattern=r'torrents-details\.php\?id=(\d+)',
+            success_text="torrents-details.php?id=",
+        )
 
-            with open(torrent_path, 'rb') as torrent_file:
-                files = {'torrent': (f"{self.tracker}.{meta.get('infohash', '')}.placeholder.torrent", torrent_file, 'application/x-bittorrent')}
+        if upload:
+            requests = await self.get_requests(meta)
+            if requests:
+                meta["tracker_status"][self.tracker]["status_message"] = 'Torrent uploaded successfully. Your upload may fulfill existing requests, check prior console logs.'
 
-                response = await self.session.post(upload_url, data=data, files=files, timeout=60)
+            # Approval
+            should_approve = await self.get_approval(meta)
+            if should_approve:
+                await self.auto_approval(meta['tracker_status'][self.tracker]['torrent_id'])
 
-                if 'torrents-details.php?id=' in response.text:
-                    status_message = 'Enviado com sucesso.'
-
-                    # Find the torrent id
-                    match = re.search(r'torrents-details\.php\?id=(\d+)', response.text)
-                    if match:
-                        torrent_id = match.group(1) if match else None
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                    if requests:
-                        status_message += ' Seu upload pode atender a pedidos existentes, verifique os logs anteriores do console.'
-
-                    # Approval
-                    should_approve = await self.get_approval(meta)
-                    if should_approve:
-                        await self.auto_approval(torrent_id)
-
-                else:
-                    status_message = 'O upload pode ter falhado, verifique. '
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-                    print(f'Falha no upload, a resposta HTML foi salva em: {response_save_path}')
-                    meta['skipping'] = f'{self.tracker}'
-                    return
-
-            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
-
-        else:
-            console.print("Headers:")
-            console.print(self.session.headers)
-            console.print()
-            console.print("Cookies:")
-            console.print(self.session.cookies)
-            console.print()
-            console.print("Form data:")
-            console.print(data)
-            status_message = 'Debug mode enabled, not uploading.'
-
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        return
 
     async def auto_approval(self, torrent_id):
         try:

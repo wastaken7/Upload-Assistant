@@ -34,7 +34,7 @@ class CookieValidator:
         return cookie_jar
 
     async def save_session_cookies(self, tracker, cookie_jar):
-        """Save updated cookies."""
+        """Save updated cookies after a successful validation."""
         if not cookie_jar:
             console.print(
                 f"{tracker}: Cookie jar not initialized, cannot save cookies."
@@ -171,26 +171,30 @@ class CookieUploader:
         meta,
         tracker,
         source_flag,
-        announce,
         torrent_url,
         data,
-        file_name,
+        torrent_field_name,
         upload_cookies,
         upload_url,
+        default_announce="",
+        torrent_name="",
         id_pattern="",
         success_status_code="",
         error_text="",
         success_text="",
+        additional_files={},
     ):
         """
         Upload a torrent to a tracker using cookies for authentication.
         Return True if the upload is successful, False otherwise.
 
-        1. Create the [tracker].torrent file and set the source flag.
-        2. Load the torrent file into memory.
-        3. Post the torrent file and form data to the provided upload URL using the provided cookies.
-        4. Check the response for success indicators.
-        5. Handle success or failure accordingly.
+        1.  Create the [tracker].torrent file and set the source flag.
+            Uses default_announce if provided as some trackers require it.
+
+        2.  Load the torrent file into memory.
+        3.  Post the torrent file and form data to the provided upload URL using the provided cookies.
+        4.  Check the response for success indicators.
+        5.  Handle success or failure accordingly.
 
         A successful upload will create a torrent entry with the announce URL and torrent ID (if applicable).
         A failed upload will save the response HTML for analysis and also create a torrent entry with the announce URL,
@@ -209,9 +213,17 @@ class CookieUploader:
 
         status_message = ""
 
-        await self.common.edit_torrent(meta, tracker, source_flag)
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
-        files = await self.load_torrent_file(torrent_path, file_name, tracker)
+        files = await self.load_torrent_file(
+            self,
+            meta,
+            tracker,
+            torrent_field_name,
+            torrent_name,
+            source_flag,
+            default_announce,
+        )
+        if additional_files:
+            files.update(additional_files)
 
         headers = {
             "User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
@@ -225,14 +237,20 @@ class CookieUploader:
                 if not meta.get("debug", False):
                     success = False
                     response = await session.post(upload_url, data=data, files=files)
+                    announce = self.config["TRACKERS"][tracker]["announce_url"]
 
                     if success_text and success_text in response.text:
                         success = True
 
-                    elif success_status_code and int(response.status_code) == int(
-                        success_status_code
-                    ):
-                        success = True
+                    elif success_status_code:
+                        valid_codes = {
+                            int(code.strip())
+                            for code in str(success_status_code).split(",")
+                            if code.strip().isdigit()
+                        }
+
+                        if int(response.status_code) in valid_codes:
+                            success = True
 
                     elif error_text and error_text not in response.text:
                         success = True
@@ -293,12 +311,27 @@ class CookieUploader:
         meta["tracker_status"][tracker]["status_message"] = status_message
         return False
 
-    async def load_torrent_file(self, path, file_name, tracker):
-        async with aiofiles.open(path, "rb") as f:
+    async def load_torrent_file(
+        self, meta, tracker, torrent_field_name, torrent_name, source_flag, default_announce
+    ):
+        """Load the torrent file into memory."""
+        await self.common.edit_torrent(meta, tracker, source_flag, default_announce)
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        async with aiofiles.open(torrent_path, "rb") as f:
             file_bytes = await f.read()
 
+        name = (
+            torrent_name
+            if torrent_name
+            else f"{tracker}.{meta.get('infohash', '')}.placeholder"
+        )
+
         return {
-            file_name: (f"[{tracker}].torrent", file_bytes, "application/x-bittorrent")
+            torrent_field_name: (
+                f"{name}.torrent",
+                file_bytes,
+                "application/x-bittorrent",
+            )
         }
 
     async def handle_successful_upload(
@@ -323,7 +356,9 @@ class CookieUploader:
     async def handle_failed_upload(
         self, meta, tracker, status_code, success_text, error_text, response
     ):
-        message = ["data error: The upload appears to have failed. It may have uploaded, go check."]
+        message = [
+            "data error: The upload appears to have failed. It may have uploaded, go check."
+        ]
         if success_text:
             message.append(
                 f"Could not find the success text '{success_text}' in the response."

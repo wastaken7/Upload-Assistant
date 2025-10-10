@@ -17,7 +17,6 @@ class HDS:
         self.banned_groups = ['']
         self.base_url = 'https://hd-space.org'
         self.torrent_url = 'https://hd-space.org/index.php?page=torrent-details&id='
-        self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
         }, timeout=30)
@@ -271,7 +270,6 @@ class HDS:
                 return []
 
     async def get_data(self, meta):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
             'category': await self.get_category_id(meta),
             'filename': meta['name'],
@@ -301,16 +299,16 @@ class HDS:
         return data
 
     async def upload(self, meta, disctype):
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta)
 
         upload = await CookieUploader(self.config).handle_upload(
-            meta,
-            self.tracker,
-            self.source_flag,
-            self.announce,
-            self.torrent_url,
-            data,
-            file_name='torrent',
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name='torrent',
             upload_cookies=self.session.cookies,
             upload_url="https://hd-space.org/index.php?page=upload",
             id_pattern=r'download\.php\?id=([^&]+)',

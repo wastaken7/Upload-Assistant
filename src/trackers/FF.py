@@ -11,7 +11,7 @@ from .COMMON import COMMON
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from src.console import console
-from src.cookies import CookieValidator
+from src.cookies import CookieValidator, CookieUploader
 from src.languages import process_desc_language
 
 
@@ -23,7 +23,6 @@ class FF(COMMON):
         self.source_flag = "FunFile"
         self.base_url = "https://www.funfile.org"
         self.torrent_url = "https://www.funfile.org/details.php?id="
-        self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
@@ -545,7 +544,7 @@ class FF(COMMON):
             }
         return {}
 
-    async def fetch_data(self, meta, disctype):
+    async def get_data(self, meta):
         self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         languages = await self.languages(meta)
         self.file_information(meta)
@@ -593,61 +592,35 @@ class FF(COMMON):
         return data
 
     async def upload(self, meta, disctype):
-        await self.edit_torrent(meta, self.tracker, self.source_flag)
-        data = await self.fetch_data(meta, disctype)
-        requests = await self.get_requests(meta)
-        status_message = ''
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        data = await self.get_data(meta)
+        torrent_name = self.edit_name(meta)
+        files = {}
+        files['poster'] = await self.get_poster(meta)
+        nfo = self.get_nfo(meta)
+        if nfo:
+            files['nfo'] = nfo['nfo']
 
-        if not meta.get('debug', False):
-            torrent_id = ''
-            upload_url = f"{self.base_url}/takeupload.php"
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        upload = await CookieUploader(self.config).handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name='file',
+            torrent_name=torrent_name,
+            upload_cookies=self.session.cookies,
+            upload_url=f"{self.base_url}/takeupload.php",
+            id_pattern=r'details\.php\?id=(\d+)',
+            success_status_code=302,
+            additional_files=files
+        )
 
-            with open(torrent_path, 'rb') as torrent_file:
-                files = {
-                    'file': (f"{self.edit_name(meta)}.torrent", torrent_file, "application/x-bittorrent"),
-                }
-                files['poster'] = await self.get_poster(meta)
-                nfo = self.get_nfo(meta)
-                if nfo:
-                    files['nfo'] = nfo['nfo']
+        if upload:
+            requests = await self.get_requests(meta)
+            if requests:
+                meta["tracker_status"][self.tracker]["status_message"] = (
+                    'Torrent uploaded successfully. Your upload may fulfill existing requests, check prior console logs.'
+                )
 
-                response = await self.session.post(upload_url, data=data, files=files, timeout=30)
-
-                if response.status_code == 302:
-                    status_message = 'Torrent uploaded successfully.'
-                    # Find the torrent id
-                    match = re.search(r'details\.php\?id=(\d+)', response.text)
-                    if match:
-                        torrent_id = match.group(1)
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                    if requests:
-                        status_message += ' Your upload may fulfill existing requests, check prior console logs.'
-
-                else:
-                    status_message = 'The upload appears to have failed. It may have uploaded, go check.'
-
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, "w", encoding="utf-8") as f:
-                        f.write(response.text)
-                    console.print(f"Upload failed, HTML response was saved to: {response_save_path}")
-
-                    meta['skipping'] = f"{self.tracker}"
-                    return
-
-            await asyncio.sleep(5)  # the tracker takes a while to register the hash
-            await self.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
-
-        else:
-            console.print("Headers:")
-            console.print(self.session.headers)
-            console.print()
-            console.print("Cookies:")
-            console.print(self.session.cookies)
-            console.print()
-            console.print("Form data:")
-            console.print(data)
-            status_message = 'Debug mode enabled, not uploading'
-
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        return

@@ -10,7 +10,7 @@ import unicodedata
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from src.console import console
-from src.cookies import CookieValidator
+from src.cookies import CookieValidator, CookieUploader
 from src.languages import process_desc_language
 from src.tmdb import get_tmdb_localized_data
 from src.trackers.COMMON import COMMON
@@ -25,7 +25,6 @@ class BT():
         self.source_flag = 'BT'
         self.base_url = 'https://brasiltracker.org'
         self.torrent_url = f'{self.base_url}/torrents.php?id='
-        self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
@@ -538,7 +537,7 @@ class BT():
         else:
             return 'N/A'
 
-    async def get_data(self, meta, disctype):
+    async def get_data(self, meta):
         self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         self.load_localized_data(meta)
         tmdb_data = await self.ptbr_tmdb_data(meta)
@@ -616,46 +615,20 @@ class BT():
         return data
 
     async def upload(self, meta, disctype):
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
-        data = await self.get_data(meta, disctype)
-        status_message = ''
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
+        data = await self.get_data(meta)
 
-        if not meta.get('debug', False):
-            torrent_id = ''
-            upload_url = f'{self.base_url}/upload.php'
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        await CookieUploader(self.config).handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name='file_input',
+            upload_cookies=self.session.cookies,
+            upload_url=f"{self.base_url}/upload.php",
+            id_pattern=r'groupid=(\d+)',
+            success_status_code="200, 302, 303",
+        )
 
-            with open(torrent_path, 'rb') as torrent_file:
-                files = {'file_input': (f'{self.tracker}.placeholder.torrent', torrent_file, 'application/x-bittorrent')}
-
-                response = await self.session.post(upload_url, data=data, files=files, timeout=120)
-
-                if response.status_code in (200, 302, 303):
-                    status_message = 'Enviado com sucesso.'
-
-                    match = re.search(r'id=(\d+)', response.headers['Location'])
-                    if match:
-                        torrent_id = match.group(1)
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                else:
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-                    status_message = f'data error - O upload pode ter falhado, a resposta HTML foi salva em: {response_save_path}'
-                    return
-
-            await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
-
-        else:
-            console.print("Headers:")
-            console.print(self.session.headers)
-            console.print()
-            console.print("Cookies:")
-            console.print(self.session.cookies)
-            console.print()
-            console.print("Form data:")
-            console.print(data)
-            status_message = 'Debug mode enabled, not uploading.'
-
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        return

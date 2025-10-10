@@ -6,7 +6,7 @@ import re
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from src.console import console
-from src.cookies import CookieValidator
+from src.cookies import CookieValidator, CookieUploader
 from src.trackers.COMMON import COMMON
 from urllib.parse import urlparse
 
@@ -291,7 +291,6 @@ class HDT:
         return results
 
     async def get_data(self, meta):
-        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = {
             'filename': await self.edit_name(meta),
             'category': await self.get_category_id(meta),
@@ -332,48 +331,21 @@ class HDT:
         return data
 
     async def upload(self, meta, disctype):
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag, announce_url='https://hdts-announce.ru/announce.php')
+        self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta)
-        status_message = ''
 
-        if not meta.get('debug', False):
-            torrent_id = ''
-            upload_url = f"{self.base_url}/upload.php"
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        await CookieUploader(self.config).handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name='torrent',
+            upload_cookies=self.session.cookies,
+            upload_url=f"{self.base_url}/upload.php",
+            id_pattern=r'download\.php\?id=([^&]+)',
+            success_text="Upload successful!",
+            default_announce='https://hdts-announce.ru/announce.php'
+        )
 
-            with open(torrent_path, 'rb') as torrent_file:
-                files = {'torrent': ('torrent.torrent', torrent_file, 'application/x-bittorrent')}
-
-                response = await self.session.post(url=upload_url, data=data, files=files)
-
-                if 'Upload successful!' in response.text:
-                    status_message = "Torrent uploaded successfully."
-
-                    # Find the torrent id
-                    match = re.search(r'download\.php\?id=([^&]+)', response.text)
-                    if match:
-                        torrent_id = match.group(1)
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                else:
-                    status_message = 'data error - The upload appears to have failed. It may have uploaded, go check.'
-
-                    response_save_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload.html"
-                    with open(response_save_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-                    console.print(f'Upload failed, HTML response was saved to: {response_save_path}')
-
-            await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_url, self.torrent_url + torrent_id)
-
-        else:
-            console.print("Headers:")
-            console.print(self.session.headers)
-            console.print()
-            console.print("Cookies:")
-            console.print(self.session.cookies)
-            console.print()
-            console.print("Form data:")
-            console.print(data)
-            status_message = 'Debug mode enabled, not uploading.'
-
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        return
