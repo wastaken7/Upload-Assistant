@@ -25,7 +25,6 @@ class PTS:
         self.session = httpx.AsyncClient(headers={
             'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
         }, timeout=60.0)
-        self.signature = "[center]Created by Upload Assistant[/center]"
 
     async def validate_credentials(self, meta):
         self.session.cookies = await CookieValidator().load_session_cookies(meta, self.tracker)
@@ -106,8 +105,7 @@ class PTS:
         if custom_description_header:
             description_parts.append(custom_description_header)
 
-        if self.signature:
-            description_parts.append(self.signature)
+        description_parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]")
 
         final_description = "\n\n".join(filter(None, description_parts))
         from src.bbcode import BBCODE
@@ -185,7 +183,7 @@ class PTS:
     async def get_data(self, meta, disctype):
         data = {
             'name': meta['name'],
-            'url': f"https://www.imdb.com/title/{meta.get('imdb_info', {}).get('imdbID', '')}",
+            'url': str(meta.get('imdb_info', {}).get('imdb_url', '')),
             'descr': await self.generate_description(meta),
             'type': await self.get_type(meta),
         }
