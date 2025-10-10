@@ -3,7 +3,6 @@ import httpx
 import os
 import platform
 import re
-from .COMMON import COMMON
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from src.console import console
@@ -15,7 +14,6 @@ class PTS:
     def __init__(self, config):
         self.config = config
         self.tracker = "PTS"
-        self.common = COMMON(config)
         self.banned_groups = []
         self.source_flag = "[www.ptskit.org] PTSKIT"
         self.base_url = "https://www.ptskit.org"

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import aiofiles
 import httpx
-import os
 import platform
 import re
 from bs4 import BeautifulSoup
@@ -9,14 +8,12 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookies import CookieValidator, CookieUploader
 from src.get_desc import DescriptionBuilder
-from src.trackers.COMMON import COMMON
 from urllib.parse import urlparse
 
 
 class HDT:
     def __init__(self, config):
         self.config = config
-        self.common = COMMON(config)
         self.tracker = 'HDT'
         self.source_flag = 'hd-torrents.org'
 

@@ -7,7 +7,6 @@ import os
 import platform
 import re
 import unicodedata
-from .COMMON import COMMON
 from bs4 import BeautifulSoup
 from src.bbcode import BBCODE
 from src.console import console
@@ -19,7 +18,6 @@ from src.languages import process_desc_language
 class FF:
     def __init__(self, config):
         self.config = config
-        self.common = COMMON(config)
         self.tracker = "FF"
         self.banned_groups = []
         self.source_flag = "FunFile"
