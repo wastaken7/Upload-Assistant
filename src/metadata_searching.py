@@ -800,13 +800,13 @@ async def get_tv_data(meta, base_dir, tvdb_api=None, tvdb_token=None):
             if tvmaze_episode_data:
                 meta['tvmaze_episode_data'] = tvmaze_episode_data
         if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None and (not meta.get('we_asked_tvmaze', False) and meta.get('episode_overview', None)):
-            if meta.get('auto_episode_title') is None and tvmaze_episode_data.get('name') is not None:
-                if 'episode' in tvmaze_episode_data.get("name").lower():
+            if meta.get('auto_episode_title') is None and meta['tvmaze_episode_data'].get('name') is not None:
+                if 'episode' in meta['tvmaze_episode_data'].get("name").lower():
                     meta['auto_episode_title'] = None
                 else:
-                    meta['auto_episode_title'] = tvmaze_episode_data['name']
-            if meta.get('overview_meta') is None and tvmaze_episode_data.get('overview') is not None:
-                meta['overview_meta'] = tvmaze_episode_data.get('overview', None)
+                    meta['auto_episode_title'] = meta['tvmaze_episode_data']['name']
+            if meta.get('overview_meta') is None and meta['tvmaze_episode_data'].get('overview') is not None:
+                meta['overview_meta'] = meta['tvmaze_episode_data'].get('overview', None)
 
         # fallback to tmdb data if no other data is not available
         if (meta.get('auto_episode_title') is None or meta.get('overview_meta') is None) and meta.get('episode_overview', None):
