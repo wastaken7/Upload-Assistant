@@ -796,6 +796,7 @@ async def get_tv_data(meta, base_dir, tvdb_api=None, tvdb_token=None):
 
         # fallback to tvmaze data if tvdb data is available
         if 'tvmaze_episode_data' not in meta or meta['tvmaze_episode_data'] is None:
+            meta['tvmaze_episode_data'] = {}
             tvmaze_episode_data = await get_tvmaze_episode_data(meta.get('tvmaze_id'), meta.get('season_int'), meta.get('episode_int'))
             if tvmaze_episode_data:
                 meta['tvmaze_episode_data'] = tvmaze_episode_data
