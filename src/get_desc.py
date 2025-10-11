@@ -10,6 +10,18 @@ from pymediainfo import MediaInfo
 
 
 async def gen_desc(meta):
+    if meta.get('category') == 'BOOK':
+        with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
+            title = meta.get('title', '')
+            author = meta.get('author', '')
+            year = meta.get('year', '')
+            summary = meta.get('summary', '')
+            description.write(f"Title: {title}\n")
+            description.write(f"Author: {author}\n")
+            description.write(f"Year: {year}\n\n")
+            description.write(f"Summary:\n{summary}\n")
+        return meta
+
     def clean_text(text):
         return text.replace('\r\n', '\n').strip()
 

@@ -35,7 +35,7 @@ async def get_name(meta):
     title = meta.get('title', "")
     alt_title = meta.get('aka', "")
     year = meta.get('year', "")
-    if int(meta.get('manual_year')) > 0:
+    if int(meta.get('manual_year', 0)) > 0:
         year = meta.get('manual_year')
     resolution = meta.get('resolution', "")
     if resolution == "OTHER":
@@ -126,6 +126,12 @@ async def get_name(meta):
         elif type == "DVDRIP":
             name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
             potential_missing = []
+    elif meta['category'] == "BOOK":
+        author = meta.get('author', "")
+        title = meta.get('title', "")
+        year = meta.get('year', "")
+        name = f"{title} - {author} [{year}]"
+        potential_missing = []
     elif meta['category'] == "TV":  # TV SPECIFIC
         if type == "DISC":  # Disk
             if meta['is_disc'] == 'BDMV':
@@ -170,7 +176,8 @@ async def get_name(meta):
 
         exit()
     name_notag = name
-    name = name_notag + tag
+    if tag:
+        name = name_notag + tag
     clean_name = await clean_filename(name)
     return name_notag, name, clean_name, potential_missing
 

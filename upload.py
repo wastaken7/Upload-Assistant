@@ -401,7 +401,9 @@ async def process_meta(meta, base_dir, bot=None):
 
                 # Take Screenshots
                 try:
-                    if meta['is_disc'] == "BDMV":
+                    if meta.get('category') == 'BOOK':
+                        pass
+                    elif meta['is_disc'] == "BDMV":
                         use_vs = meta.get('vapoursynth', False)
                         try:
                             await disc_screenshots(

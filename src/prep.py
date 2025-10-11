@@ -16,6 +16,7 @@ try:
     from data.config import config
     from src.apply_overrides import get_source_override
     from src.audio import get_audio_v2
+    from src.book import get_book_info, book_meta, get_google_book_info
     from src.bluray_com import get_bluray_releases
     from src.cleanup import cleanup, reset_terminal
     from src.clients import Clients
@@ -456,6 +457,18 @@ class Prep():
             meta['category'] = await self.get_cat(video, meta)
         else:
             meta['category'] = meta['category'].upper()
+
+        if meta['category'] == 'BOOK':
+            ol_data = await get_book_info(meta)
+            gl_data = await get_google_book_info(meta)
+            meta.update({
+                'ol_data': ol_data,
+                'gl_data': gl_data
+            })
+            meta['type'] = 'EBOOK'
+            meta['screens'] = 0
+            await book_meta(meta)
+            return meta
 
         ids = None
         if not meta.get('skip_trackers', False):
@@ -982,6 +995,10 @@ class Prep():
     async def get_cat(self, video, meta):
         if meta.get('manual_category'):
             return meta.get('manual_category').upper()
+
+        book_extensions = ['.epub', '.mobi', '.pdf']
+        if any(meta.get('path', '').lower().endswith(ext) for ext in book_extensions):
+            return "BOOK"
 
         path_patterns = [
             r'(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]',
