@@ -480,7 +480,17 @@ class BBCODE:
                 desc = desc.replace(f"SPOILER_PLACEHOLDER-{i} ", spoiler)
 
         # Check for and clean up empty [center] tags
-        desc = re.sub(r'\[center\]\s*\[\/center\]', '', desc)
+        centers = re.findall(r"\[center[\s\S]*?\[\/center\]", desc)
+        if centers:
+            for center in centers:
+                # If [center] contains only whitespace or empty tags, remove the entire tag
+                cleaned_center = re.sub(r'\[center\]\s*\[\/center\]', '', center)
+                cleaned_center = re.sub(r'\[center\]\s+', '[center]', cleaned_center)
+                cleaned_center = re.sub(r'\s*\[\/center\]', '[/center]', cleaned_center)
+                if cleaned_center == '[center][/center]':
+                    desc = desc.replace(center, '')
+                else:
+                    desc = desc.replace(center, cleaned_center.strip())
 
         # Remove bot signatures
         bot_signature_regex = r"""
