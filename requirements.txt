@@ -20,7 +20,7 @@ Pillow
 psutil
 pycountry
 pyimgbox
-pymediainfo
+pymediainfo==7.0.1
 pyotp
 pyoxipng
 pyparsebluray
