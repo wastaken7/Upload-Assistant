@@ -16,7 +16,7 @@ try:
     from data.config import config
     from src.apply_overrides import get_source_override
     from src.audio import get_audio_v2
-    from src.book import get_book_info, book_meta, get_google_book_info
+    from src.book import book_meta
     from src.bluray_com import get_bluray_releases
     from src.cleanup import cleanup, reset_terminal
     from src.clients import Clients
@@ -459,12 +459,6 @@ class Prep():
             meta['category'] = meta['category'].upper()
 
         if meta['category'] == 'BOOK':
-            ol_data = await get_book_info(meta)
-            gl_data = await get_google_book_info(meta)
-            meta.update({
-                'ol_data': ol_data,
-                'gl_data': gl_data
-            })
             meta['type'] = 'EBOOK'
             meta['screens'] = 0
             await book_meta(meta)
