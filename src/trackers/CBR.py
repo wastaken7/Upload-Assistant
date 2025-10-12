@@ -34,8 +34,12 @@ class CBR(UNIT3D):
             'TV': '2',
             'ANIMES': '4'
         }.get(meta['category'], '0')
-        if meta['anime'] is True and category_id == '2':
+        if meta.get('anime') and category_id == '2':
             category_id = '4'
+        elif meta['type'] in ['CBR', 'CBZ']:
+            category_id = '10'
+        elif meta['type'] in ['AZW3', 'MOBI', 'PDF', 'EPUB']:
+            category_id = '11'
         return {'category_id': category_id}
 
     async def get_type_id(self, meta):
@@ -46,7 +50,13 @@ class CBR(UNIT3D):
             'DVDRIP': '3',
             'WEBDL': '4',
             'WEBRIP': '5',
-            'HDTV': '6'
+            'HDTV': '6',
+            'AZW3': '13',
+            'CBR': '14',
+            'CBZ': '15',
+            'MOBI': '16',
+            'PDF': '17',
+            'EPUB': '18',
         }.get(meta['type'], '0')
         return {'type_id': type_id}
 
@@ -130,8 +140,9 @@ class CBR(UNIT3D):
         if not meta.get('language_checked', False):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
         portuguese_languages = ['Portuguese', 'Português']
-        if not any(lang in meta.get('audio_languages', []) for lang in portuguese_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in portuguese_languages):
-            console.print('[bold red]CBR requires at least one Portuguese audio or subtitle track.')
-            should_continue = False
+        if meta.get('audio_languages') and meta.get('subtitle_languages'):
+            if not any(lang in meta.get('audio_languages', []) for lang in portuguese_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in portuguese_languages):
+                console.print('[bold red]CBR requires at least one Portuguese audio or subtitle track.')
+                should_continue = False
 
         return should_continue

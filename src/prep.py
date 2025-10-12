@@ -459,7 +459,6 @@ class Prep():
             meta['category'] = meta['category'].upper()
 
         if meta['category'] == 'BOOK':
-            meta['type'] = 'EBOOK'
             meta['screens'] = 0
             await book_meta(meta)
             return meta

@@ -175,6 +175,8 @@ async def parsed_mediainfo(meta):
 
 
 async def process_desc_language(meta, desc=None, tracker=None):
+    if meta['category'] not in ['TV', 'MOVIE']:
+        return None
     if 'language_checked' not in meta:
         meta['language_checked'] = False
     if 'tracker_status' not in meta:

@@ -40,12 +40,20 @@ class UNIT3D:
         dupes = []
         params = {
             'api_token': self.api_key,
-            'tmdbId': meta['tmdb'],
             'categories[]': (await self.get_category_id(meta))['category_id'],
             'types[]': (await self.get_type_id(meta))['type_id'],
-            'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
             'name': ''
         }
+        if meta['category'] == 'TV' or meta['category'] == 'MOVIE':
+            params.update({
+                'tmdbId': meta['tmdb'],
+                'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
+            })
+        elif meta['category'] == 'BOOK':
+            params.update({
+                'name': meta['title'],
+            })
+
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}"
         if meta.get('edition', '') != '':
