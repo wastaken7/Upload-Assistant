@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-from bs4 import BeautifulSoup
-from pathlib import Path
-from PIL import Image
-from src.console import console
-from src.tags import get_tag
 import aiofiles
 import httpx
 import io
@@ -11,33 +6,32 @@ import json
 import os
 import re
 import shutil
+from bs4 import BeautifulSoup
+from pathlib import Path
+from PIL import Image
+from src.console import console
+from src.tags import get_tag
 
 
-async def book_meta(meta):
-    open_library_data = await get_openlibrary_info(meta)
-    google_books_data = await get_google_info(meta)
-    isbnsearch_data = await get_isbnsearch_info(meta)
-    meta['ol_data'] = open_library_data
-    meta['gl_data'] = google_books_data
-    meta['isbnsearch_data'] = isbnsearch_data
-
-    ol_data = open_library_data
-    gl_data = google_books_data
+async def reading_media_meta(meta):
+    meta['ol_data'] = ol_data = await get_openlibrary_info(meta)
+    meta['gl_data'] = gl_data = await get_google_info(meta)
+    meta['isbns_data'] = isbns_data = await get_isbnsearch_info(meta)
 
     # Authors
-    meta_author(meta, ol_data, gl_data)
+    meta_author(meta, ol_data, gl_data, isbns_data)
 
     # Year
-    meta_year(meta, ol_data)
+    meta_year(meta, ol_data, gl_data, isbns_data)
 
     # Title
-    meta_title(meta, ol_data, gl_data)
+    meta_title(meta, ol_data, gl_data, isbns_data)
 
     # Genres
     meta_genres(meta, ol_data, gl_data)
 
     # Cover Image
-    await meta_cover(meta, ol_data, gl_data)
+    await meta_cover(meta, ol_data, gl_data, isbns_data)
 
     # Type
     meta_type(meta)
@@ -177,7 +171,7 @@ async def get_openlibrary_info(meta):
 async def get_google_info(meta):
     isbn = meta.get('isbn')
     if not isbn:
-        return {"error": "ISBN not provided in metadata."}
+        return {}
 
     # Define cache file path
     cache_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
@@ -271,7 +265,7 @@ def meta_type(meta):
     meta['type'] = file.split('.')[-1]
 
 
-def meta_author(meta, ol_data, gl_data):
+def meta_author(meta, ol_data, gl_data, isbns_data):
     authors = []
     if ol_data and 'authors' in ol_data:
         for author_entry in ol_data['authors']:
@@ -287,16 +281,16 @@ def meta_author(meta, ol_data, gl_data):
         meta['author'] = ", ".join(unique_authors)
 
 
-def meta_year(meta, ol_data):
+def meta_year(meta, ol_data, gl_data, isbns_data):
     meta['year'] = ''
-    publish_date = ol_data.get('publish_date', '')
+    publish_date = ol_data.get('publish_date', '') or gl_data.get('publishedDate', '')
     if publish_date:
         year_match = re.search(r'\d{4}', publish_date)
         if year_match:
             meta['year'] = year_match.group(0)
 
 
-def meta_title(meta, ol_data, gl_data):
+def meta_title(meta, ol_data, gl_data, isbns_data):
     meta['title'] = ''
     if not meta.get('title') and ol_data and 'title' in ol_data:
         meta['title'] = ol_data['title']
@@ -320,7 +314,7 @@ def meta_genres(meta, ol_data, gl_data):
         meta['genres'] = ", ".join(unique_genres)
 
 
-async def meta_cover(meta, ol_data, gl_data):
+async def meta_cover(meta, ol_data, gl_data, isbns_data):
     # Check if a cover file already exists in the tmp directory
     tmp_dir = Path(meta['base_dir']) / "tmp" / meta['uuid']
     if tmp_dir.exists():
@@ -338,11 +332,13 @@ async def meta_cover(meta, ol_data, gl_data):
 
     # Google Books
     if gl_data and 'imageLinks' in gl_data and 'thumbnail' in gl_data['imageLinks']:
-        potential_urls.append(gl_data['imageLinks']['thumbnail'])
+        g_cover = gl_data['imageLinks']['thumbnail']
+        g_cover_large = g_cover.replace('zoom=1', 'zoom=10')
+        potential_urls.append(g_cover_large)
 
     # ISBNsearch
-    if meta.get('isbnsearch_data') and 'cover_url' in meta['isbnsearch_data']:
-        potential_urls.append(meta['isbnsearch_data']['cover_url'])
+    if isbns_data.get('cover_url'):
+        potential_urls.append(isbns_data['cover_url'])
 
     successful_url = None
 

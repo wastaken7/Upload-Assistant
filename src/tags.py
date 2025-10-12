@@ -66,7 +66,7 @@ async def get_tag(video, meta):
         tag = ""
 
     # Remove generic "no group" tags
-    if tag and tag[1:].lower() in ["hd.ma.5.1", "untouched"]:
+    if tag and tag[1:].lower() in ["hd.ma.5.1", "untouched", "ebook"]:
         tag = ""
 
     return tag

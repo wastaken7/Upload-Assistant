@@ -16,7 +16,7 @@ try:
     from data.config import config
     from src.apply_overrides import get_source_override
     from src.audio import get_audio_v2
-    from src.book import book_meta
+    from src.book import reading_media_meta
     from src.bluray_com import get_bluray_releases
     from src.cleanup import cleanup, reset_terminal
     from src.clients import Clients
@@ -460,7 +460,7 @@ class Prep():
 
         if meta['category'] == 'READING':
             meta['screens'] = 0
-            await book_meta(meta)
+            await reading_media_meta(meta)
             return meta
 
         ids = None
