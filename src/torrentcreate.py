@@ -163,8 +163,12 @@ def create_torrent(meta, path, output_filename, tracker_url=None):
                 ]
                 exclude = ["*", "*/**"]
     else:
-        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
-        include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
+        if meta.get('category') == 'READING':
+            include = ['*.epub', '*.mobi', '*.pdf', '*.azw3', '*.azw3', '*.mobi', '*.cbr', '*.cbz']
+            exclude = []
+        else:
+            exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else ""
+            include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else ""
 
     if meta['category'] == "TV" and meta.get('tv_pack'):
         completeness = check_season_pack_completeness(meta)

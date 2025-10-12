@@ -87,7 +87,7 @@ class CBR(UNIT3D):
 
         # Remove the AKA title, unless it is Brazilian
         if meta.get('original_language') != 'pt':
-            name = name.replace(meta["aka"], '')
+            name = name.replace(meta.get('aka', ''), '')
 
         # If it is Brazilian, use only the AKA title, deleting the foreign title
         if meta.get('original_language') == 'pt' and meta.get('aka'):

@@ -30,7 +30,7 @@ from src.get_tracker_data import get_tracker_data
 from src.languages import process_desc_language
 from src.nfo_link import nfo_link
 from src.queuemanage import handle_queue
-from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots, pdf_screenshots
 from src.torrentcreate import create_torrent, create_random_torrents, create_base_from_existing_torrent
 from src.trackerhandle import process_trackers
 from src.trackerstatus import process_all_trackers
@@ -402,7 +402,10 @@ async def process_meta(meta, base_dir, bot=None):
                 # Take Screenshots
                 try:
                     if meta.get('category') == 'READING':
-                        pass
+                        if meta['path'].lower().endswith('.pdf'):
+                            await pdf_screenshots(meta)
+                        else:
+                            pass
                     elif meta['is_disc'] == "BDMV":
                         use_vs = meta.get('vapoursynth', False)
                         try:
@@ -555,7 +558,7 @@ async def process_meta(meta, base_dir, bot=None):
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         if not os.path.exists(torrent_path):
             reuse_torrent = None
-            if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
+            if meta.get('rehash', False) is False and not meta.get('base_torrent_created') and not meta.get('we_checked_them_all'):
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])

@@ -18,6 +18,45 @@ from pymediainfo import MediaInfo
 from src.console import console
 from data.config import config
 from src.cleanup import cleanup, reset_terminal
+from pdf2image import convert_from_path
+
+
+async def pdf_screenshots(meta, num_screens=None, force_screenshots=False):
+    if meta['debug']:
+        start_time = time.time()
+    if 'image_list' not in meta:
+        meta['image_list'] = []
+
+    if num_screens is None:
+        num_screens = meta['screens']
+
+    if num_screens == 0:
+        num_screens = 6
+
+    pdf_path = meta['path']
+    if not pdf_path.lower().endswith('.pdf'):
+        console.print(f"[red]File is not a PDF: {pdf_path}")
+        return
+
+    sanitized_filename = await sanitize_filename(os.path.basename(pdf_path))
+    output_folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+    os.makedirs(output_folder, exist_ok=True)
+
+    try:
+        images = convert_from_path(pdf_path, first_page=1, last_page=num_screens)
+        for i, image in enumerate(images):
+            image_path = os.path.join(output_folder, f"{sanitized_filename}-{i}.png")
+            image.save(image_path, 'PNG')
+            if meta['debug']:
+                console.print(f"[green]Saved screenshot: {image_path}")
+    except Exception as e:
+        console.print(f"[red]Error creating PDF screenshots: {e}")
+        console.print("[red]Please ensure poppler is installed and in your PATH.")
+
+    if meta['debug']:
+        finish_time = time.time()
+        console.print(f"PDF screenshots processed in {finish_time - start_time:.4f} seconds")
+
 
 task_limit = int(config['DEFAULT'].get('process_limit', 1))
 threads = str(config['DEFAULT'].get('threads', '1'))
