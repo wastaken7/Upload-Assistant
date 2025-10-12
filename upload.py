@@ -401,7 +401,7 @@ async def process_meta(meta, base_dir, bot=None):
 
                 # Take Screenshots
                 try:
-                    if meta.get('category') == 'BOOK':
+                    if meta.get('category') == 'READING':
                         pass
                     elif meta['is_disc'] == "BDMV":
                         use_vs = meta.get('vapoursynth', False)

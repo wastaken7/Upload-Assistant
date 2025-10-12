@@ -126,7 +126,9 @@ async def get_name(meta):
         elif type == "DVDRIP":
             name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
             potential_missing = []
-    elif meta['category'] == "BOOK":
+    elif meta['category'] == "READING":
+        # This can be improved in the future
+        # https://scenerules.org/html/2022_EBOOK.html
         author = meta.get('author', "")
         title = meta.get('title', "")
         year = meta.get('year', "")

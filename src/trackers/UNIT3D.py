@@ -49,7 +49,7 @@ class UNIT3D:
                 'tmdbId': meta['tmdb'],
                 'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
             })
-        elif meta['category'] == 'BOOK':
+        elif meta['category'] == 'READING':
             params.update({
                 'name': meta['title'],
             })

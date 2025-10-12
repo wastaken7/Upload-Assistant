@@ -458,7 +458,7 @@ class Prep():
         else:
             meta['category'] = meta['category'].upper()
 
-        if meta['category'] == 'BOOK':
+        if meta['category'] == 'READING':
             meta['screens'] = 0
             await book_meta(meta)
             return meta
@@ -989,9 +989,9 @@ class Prep():
         if meta.get('manual_category'):
             return meta.get('manual_category').upper()
 
-        book_extensions = ['.epub', '.mobi', '.pdf']
+        book_extensions = ['.epub', '.mobi', '.pdf', '.azw3', '.azw3', '.mobi', '.cbr', '.cbz']
         if any(meta.get('path', '').lower().endswith(ext) for ext in book_extensions):
-            return "BOOK"
+            return "READING"
 
         path_patterns = [
             r'(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]',

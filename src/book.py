@@ -311,7 +311,7 @@ def meta_genres(meta, ol_data, gl_data):
     genres = []
     if gl_data and 'categories' in gl_data:
         genres.extend(gl_data['categories'])
-    if ol_data and 'subjects' in ol_data:
+    elif ol_data and 'subjects' in ol_data:
         ol_subjects = [subject['name'] for subject in ol_data['subjects'] if 'name' in subject]
         genres.extend(ol_subjects)
 

@@ -10,7 +10,7 @@ from pymediainfo import MediaInfo
 
 
 async def gen_desc(meta):
-    if meta.get('category') == 'BOOK':
+    if meta.get('category') == 'READING':
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'w', newline="", encoding='utf8') as description:
             title = meta.get('title', '')
             author = meta.get('author', '')
