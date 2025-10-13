@@ -85,12 +85,14 @@ class IM:
         dupes = []
 
         if meta['category'] == "MOVIE":
+            search_type = 't_genre'
             search_query = meta.get('imdb_info', {}).get('imdbID', '')
 
         elif meta['category'] == "TV":
+            search_type = 't_name'
             search_query = meta.get('title') + f" {meta.get('season', '')}{meta.get('episode', '')}"
 
-        search_url = f'{self.base_url}/browse.php?do=search&keywords={search_query}&search_type=t_name'
+        search_url = f'{self.base_url}/browse.php?do=search&keywords={search_query}&search_type={search_type}'
 
         try:
             response = await self.session.get(search_url)
