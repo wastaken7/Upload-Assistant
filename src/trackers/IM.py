@@ -285,6 +285,7 @@ class IM:
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
+            hash_is_id=True,
             torrent_field_name='torrentfile',
             torrent_name=f"{meta.get('clean_name', 'placeholder')}",
             upload_cookies=self.session.cookies,
