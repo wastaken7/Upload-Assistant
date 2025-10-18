@@ -904,18 +904,19 @@ async def do_the_thing(base_dir):
             await process_meta(meta, base_dir, bot=bot)
 
             if 'we_are_uploading' not in meta or not meta.get('we_are_uploading', False):
-                if not meta.get('emby', False) and not meta.get('site_check', False):
-                    console.print("we are not uploading.......")
-                if 'queue' in meta and meta.get('queue') is not None:
-                    processed_files_count += 1
+                if not meta.get('site_check', False):
                     if not meta.get('emby', False):
-                        skipped_files_count += 1
-                        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.")
-                    else:
-                        console.print(f"[cyan]Processed {processed_files_count}/{total_files}.")
-                    if not meta['debug'] or "debug" in os.path.basename(log_file):
-                        if log_file:
-                            await save_processed_file(log_file, path)
+                        console.print("we are not uploading.......")
+                    if 'queue' in meta and meta.get('queue') is not None:
+                        processed_files_count += 1
+                        if not meta.get('emby', False):
+                            skipped_files_count += 1
+                            console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.")
+                        else:
+                            console.print(f"[cyan]Processed {processed_files_count}/{total_files}.")
+                        if not meta['debug'] or "debug" in os.path.basename(log_file):
+                            if log_file:
+                                await save_processed_file(log_file, path)
 
             else:
                 console.print()
@@ -990,6 +991,15 @@ async def do_the_thing(base_dir):
                 else:
                     trackers = meta['trackers']
                 await tracker_setup.tracker_request(meta, trackers)
+
+            if meta.get('site_check', False):
+                if 'queue' in meta and meta.get('queue') is not None:
+                    processed_files_count += 1
+                    skipped_files_count += 1
+                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                    if not meta['debug'] or "debug" in os.path.basename(log_file):
+                        if log_file:
+                            await save_processed_file(log_file, path)
 
             if sanitize_meta and not meta.get('emby', False):
                 try:
