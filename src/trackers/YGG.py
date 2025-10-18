@@ -2,6 +2,7 @@ import aiofiles
 import bbcode
 import httpx
 import platform
+import re
 from bs4 import BeautifulSoup
 from src.bbcode import BBCODE
 from src.console import console
@@ -191,6 +192,38 @@ class YGG:
         description = description.strip()
         description = ua_bbcode.remove_extra_lines(description)
 
+        # [url][img=000]...[/img][/url]
+        description = re.sub(
+            r"\[url=(?P<href>[^\]]+)\]\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]\[/url\]",
+            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="\g<width>"></a>',
+            description,
+            flags=re.IGNORECASE
+        )
+
+        # [url][img]...[/img][/url]
+        description = re.sub(
+            r"\[url=(?P<href>[^\]]+)\]\[img\](?P<src>[^\[]+)\[/img\]\[/url\]",
+            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="220"></a>',
+            description,
+            flags=re.IGNORECASE
+        )
+
+        # [img=200]...[/img] (no [url])
+        description = re.sub(
+            r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]",
+            r'<img src="\g<src>" width="\g<width>">',
+            description,
+            flags=re.IGNORECASE
+        )
+
+        bbcode_tags_pattern = r'\[/?(size|align|left|center|right|img|table|tr|td|spoiler|url)[^\]]*\]'
+        description, _ = re.subn(
+            bbcode_tags_pattern,
+            '',
+            description,
+            flags=re.IGNORECASE
+        )
+
         description = bbcode.render_html(description)
 
         async with aiofiles.open(
@@ -203,7 +236,7 @@ class YGG:
     async def get_nfo(self, meta):
         nfo_content = ""
         if meta.get("is_disc") == "BDMV":
-            nfo_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
+            nfo_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/Disc1_00001_FULL.txt"
         else:
             nfo_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
         async with aiofiles.open(nfo_path, "r", encoding="utf-8") as f:
