@@ -1,5 +1,8 @@
 from src.console import console
 import aiofiles
+import httpx
+import platform
+from urllib.parse import urlparse
 from src.get_desc import DescriptionBuilder
 
 
@@ -8,12 +11,74 @@ class YGG:
         self.config = config
         self.tracker = 'YGG'
         self.source_flag = 'YGG'
-        self.tracker_url = 'https://www.yggtorrent.top'
-        self.upload_url = f'{self.tracker}/user/upload_torrent_action'
-        self.search_url = f'{self.tracker}/engine/search?'
-        self.torrent_url = f'{self.tracker}/torrent/'
+
+        url_from_config = self.config['TRACKERS'][self.tracker].get('url')
+        parsed_url = urlparse(url_from_config)
+        self.config_url = parsed_url.netloc
+        self.base_url = f'https://{self.config_url}'
+
+        self.upload_url = f'{self.base_url}/user/upload_torrent_action'
+        self.search_url = f'{self.base_url}/engine/search?'
+        self.torrent_url = f'{self.base_url}/torrent/'
+        self.announce_url = self.config['TRACKERS'][self.tracker]['announce_url']
         self.banned_groups = []
+        self.session = httpx.AsyncClient(headers={
+            'User-Agent': f'Upload Assistant ({platform.system()} {platform.release()})'
+        }, timeout=60.0)
         pass
+
+    async def validate_credentials(self, meta):
+        console.print("[yellow]YGG is not yet supported for validating credentials.")
+        return False
+
+    async def login(self, meta):
+        auth_url = f'{self.base_url}/auth/process_login'
+        user = self.config['TRACKERS'][self.tracker].get('username')
+        password = self.config['TRACKERS'][self.tracker].get('password')
+        data = {'id': user, 'pass': password}
+        try:
+            response = await self.session.post(auth_url, data=data)
+            response.raise_for_status()
+
+            if 'Déconnexion' in response.text:
+                console.print(f'{self.tracker}: Successfully logged in.')
+                return True
+            else:
+                console.print(f'{self.tracker}: Login failed. Check your username and password.')
+                return False
+        except httpx.TimeoutException:
+            console.print(f'{self.tracker}: Error in {self.tracker}: Timeout while trying to log in.')
+            return False
+        except httpx.HTTPStatusError as e:
+            console.print(f'{self.tracker}: HTTP error during login for {self.tracker}: Status {e.response.status_code}.')
+            return False
+        except httpx.RequestError as e:
+            console.print(f'{self.tracker}: Network error during login for {self.tracker}: {e.__class__.__name__}.')
+            return False
+        except Exception as e:
+            console.print(f'{self.tracker}: Unexpected error during login: {e}')
+
+        return False
+
+    async def search_existing(self, meta, disctype):
+        console.print("[yellow]YGG is not yet supported for searching existing torrents.")
+        return []
+
+    async def get_additional_checks(self, meta):
+        if await self.get_category_id(meta) == 0:
+            console.print(f'[bold red]{self.tracker}: Category not supported. Skipping upload...[/bold red]')
+            meta['skipping'] = f'{self.tracker}'
+            return False
+        if await self.get_type_id(meta) == 0:
+            console.print(f'[bold red]{self.tracker}: Type not supported. Skipping upload...[/bold red]')
+            meta['skipping'] = f'{self.tracker}'
+            return False
+        if await self.get_quality(meta) == 0:
+            console.print(f'[bold red]{self.tracker}: Quality not supported. Skipping upload...[/bold red]')
+            meta['skipping'] = f'{self.tracker}'
+            return False
+
+        return True
 
     async def get_category_id(self, meta):
         return 2145
@@ -27,16 +92,18 @@ class YGG:
         tv_series = 2184
 
         if meta['category'] == 'MOVIE':
-            if meta['anime']:
+            if meta.get('anime', False):
                 return animation
             return movie
         elif meta['category'] == 'TV':
-            if meta['anime']:
+            if meta.get('anime', False):
                 return animation_series
             return tv_series
-        if any(keyword in meta['keywords'] for keyword in ['documentary', 'biography']):
+
+        meta_keywords_list = [k.strip() for k in meta.get('keywords', "").split(',')]
+        if any(keyword in meta_keywords_list for keyword in ['documentary', 'biography']):
             return documentary
-        if any(keyword in meta['keywords'] for keyword in ['tv show', 'talk show', 'game show']):
+        if any(keyword in meta_keywords_list for keyword in ['tv show', 'talk show', 'game show']):
             return tv_show
 
         return 0
@@ -176,17 +243,96 @@ class YGG:
 
         return results
 
+    async def get_quality(self, meta):
+        bdrip_brrip = 1        # BDrip/BRrip [Rip SD (non-HD) from Bluray or HDrip]
+        bluray_4k = 2          # Bluray 4K [Full or Remux]
+        bluray_full = 3        # Bluray [Full]
+        bluray_remux = 4       # Bluray [Remux]
+        dvd_r5 = 5             # DVD-R 5 [DVD < 4.37GB]
+        dvd_r9 = 6             # DVD-R 9 [DVD > 4.37GB]
+        dvdrip = 7             # DVDrip [Ripped from DVD-R]
+        hdrip_1080 = 8         # HDrip 1080 [Rip HD from Bluray]
+        hdrip_4k = 9           # HDrip 4k [Rip HD 4k from 4k source]
+        hdrip_720 = 10         # HDrip 720 [Rip HD from Bluray]
+        tvrip = 11             # TVrip [Rip SD (non-HD) from HD/SD TV source]
+        tvrip_hd_1080 = 12     # TVripHD 1080 [Rip HD from Source TV HD]
+        tvrip_hd_4k = 13       # TvripHD 4k [Rip HD 4k from Source TV 4k]
+        tvrip_hd_720 = 14      # TVripHD 720 [Rip HD from Source TV HD]
+        vcd_svcd_vhsrip = 15   # VCD/SVCD/VHSrip
+        web_dl = 16            # Web-Dl
+        web_dl_1080 = 17       # Web-Dl 1080
+        web_dl_4k = 18         # Web-Dl 4K
+        web_dl_720 = 19        # Web-Dl 720
+        webrip = 20            # WEBrip
+        webrip_1080 = 21       # WEBrip 1080
+        webrip_4k = 22         # WEBrip 4K
+        webrip_720 = 23        # WEBrip 720
+
+        source_type = meta.get('type', '').lower()
+        resolution = meta.get('resolution', '').lower()
+        is_disc = meta.get('is_disc')
+
+        if is_disc == 'BDMV':
+            if resolution == '2160p':
+                return bluray_4k
+            return bluray_full
+        elif is_disc == 'DVD':
+            if meta.get('dvd_size') == 'DVD5':
+                return dvd_r5
+            return dvd_r9
+
+        if source_type == 'remux':
+            if resolution == '2160p':
+                return bluray_4k
+            return bluray_remux
+
+        if source_type in ('bdrip', 'brrip', 'encode'):
+            if resolution == '1080p':
+                return hdrip_1080
+            if resolution == '720p':
+                return hdrip_720
+            if resolution == '2160p':
+                return hdrip_4k
+            return bdrip_brrip
+
+        if source_type == 'dvdrip':
+            return dvdrip
+
+        if source_type in ('hdtv', 'pdtv', 'sdtv', 'tvrip'):
+            if resolution == '2160p':
+                return tvrip_hd_4k
+            if resolution == '1080p':
+                return tvrip_hd_1080
+            if resolution == '720p':
+                return tvrip_hd_720
+            return tvrip
+
+        if source_type in ('web-dl', 'webdl'):
+            if resolution == '2160p':
+                return web_dl_4k
+            if resolution == '1080p':
+                return web_dl_1080
+            if resolution == '720p':
+                return web_dl_720
+            return web_dl
+
+        if source_type == 'webrip':
+            if resolution == '2160p':
+                return webrip_4k
+            if resolution == '1080p':
+                return webrip_1080
+            if resolution == '720p':
+                return webrip_720
+            return webrip
+
+        if source_type in ('vhsrip', 'vcd', 'svcd'):
+            return vcd_svcd_vhsrip
+
+        return 0
+
     async def get_data(self, meta):
         return meta['data']
 
     async def upload(self, meta):
         console.print("[yellow]YGG is not yet supported for uploads.")
-        return False
-
-    async def search_existing(self, meta, disctype):
-        console.print("[yellow]YGG is not yet supported for searching existing torrents.")
-        return []
-
-    async def validate_credentials(self, meta):
-        console.print("[yellow]YGG is not yet supported for validating credentials.")
         return False

@@ -69,6 +69,7 @@ from src.trackers.TVC import TVC
 from src.trackers.UHD import UHD
 from src.trackers.ULCX import ULCX
 from src.trackers.UTP import UTP
+from src.trackers.YGG import YGG
 from src.trackers.YOINK import YOINK
 from src.trackers.YUS import YUS
 from src.trackers.EMUW import EMUW
@@ -789,7 +790,7 @@ tracker_class_map = {
     'CZ': CZ, 'DC': DC, 'DP': DP, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
-    'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'UHD': UHD, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
+    'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'UHD': UHD, 'ULCX': ULCX, 'UTP': UTP, 'YGG': YGG, 'YOINK': YOINK, 'YUS': YUS
 }
 
 api_trackers = {
@@ -802,5 +803,5 @@ other_api_trackers = {
 }
 
 http_trackers = {
-    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG'
+    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG', 'YGG'
 }
