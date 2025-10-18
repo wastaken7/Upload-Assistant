@@ -355,6 +355,9 @@ async def process_meta(meta, base_dir, bot=None):
         common = COMMON(config)
         if meta.get('site_check', False):
             for tracker in meta['trackers']:
+                upload_status = meta['tracker_status'].get(tracker, {}).get('upload', False)
+                if tracker not in meta['tracker_status'] or not upload_status:
+                    continue
                 log_path = f"{base_dir}/tmp/{tracker}_search_results.json"
                 if not await common.path_exists(log_path):
                     await common.makedirs(os.path.dirname(log_path))
