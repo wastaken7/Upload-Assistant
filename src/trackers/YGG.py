@@ -1,13 +1,12 @@
 import aiofiles
-import bbcode
 import httpx
+import json
+import os
+from src.tmdb import get_tmdb_localized_data
 import platform
-import re
 from bs4 import BeautifulSoup
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieValidator, CookieAuthUploader
-from src.get_desc import DescriptionBuilder
 from src.languages import process_desc_language
 
 
@@ -142,96 +141,40 @@ class YGG:
     async def get_name(self, meta):
         return meta["uuid"]
 
+    async def load_localized_data(self, meta):
+        localized_data_file = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/tmdb_localized_data.json'
+        main_french_data = {}
+        data = {}
+
+        if os.path.isfile(localized_data_file):
+            try:
+                async with aiofiles.open(localized_data_file, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    data = json.loads(content)
+            except json.JSONDecodeError:
+                print(f'Warning: Could not decode JSON from {localized_data_file}')
+                data = {}
+            except Exception as e:
+                print(f'Error reading file {localized_data_file}: {e}')
+                data = {}
+
+        main_french_data = data.get('fr-FR', {}).get('main')
+
+        if not main_french_data:
+            main_french_data = await get_tmdb_localized_data(
+                meta,
+                data_type='main',
+                language='fr-FR',
+                append_to_response='credits,videos,content_ratings'
+            )
+
+        self.main_tmdb_data = main_french_data or {}
+
+        return
+
     async def get_description(self, meta):
-        builder = DescriptionBuilder(self.config)
-        desc_parts = []
 
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header(self.tracker))
-
-        # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta, self.tracker)
-        if episode_overview:
-            desc_parts.append(f"[center]{title}[/center]")
-            desc_parts.append(f"[center]{episode_overview}[/center]")
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Screenshot Header
-        desc_parts.append(await builder.screenshot_header(self.tracker))
-
-        # Screenshots
-        images = meta["image_list"]
-        if images:
-            screenshots_block = "[center]\n"
-            for i, image in enumerate(images, start=1):
-                img_url = image["img_url"]
-                web_url = image["web_url"]
-                screenshots_block += f"[url={web_url}][img]{img_url}[/img][/url] "
-                # limits to 2 screens per line, as the description box is small
-                if i % 2 == 0:
-                    screenshots_block += "\n"
-            screenshots_block += "\n[/center]"
-            desc_parts.append(screenshots_block)
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta, self.tracker))
-
-        # Signature
-        desc_parts.append(
-            f"[center][url=https://github.com/Audionut/Upload-Assistant]{meta['ua_signature']}[/url][/center]"
-        )
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
-
-        ua_bbcode = BBCODE()
-        description = ua_bbcode.remove_img_resize(description)
-        description = ua_bbcode.convert_named_spoiler_to_normal_spoiler(description)
-        description = ua_bbcode.convert_comparison_to_centered(description, 1000)
-        description = description.strip()
-        description = ua_bbcode.remove_extra_lines(description)
-
-        # [url][img=000]...[/img][/url]
-        description = re.sub(
-            r"\[url=(?P<href>[^\]]+)\]\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]\[/url\]",
-            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="\g<width>"></a>',
-            description,
-            flags=re.IGNORECASE
-        )
-
-        # [url][img]...[/img][/url]
-        description = re.sub(
-            r"\[url=(?P<href>[^\]]+)\]\[img\](?P<src>[^\[]+)\[/img\]\[/url\]",
-            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="220"></a>',
-            description,
-            flags=re.IGNORECASE
-        )
-
-        # [img=200]...[/img] (no [url])
-        description = re.sub(
-            r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]",
-            r'<img src="\g<src>" width="\g<width>">',
-            description,
-            flags=re.IGNORECASE
-        )
-
-        bbcode_tags_pattern = r'\[/?(size|align|left|center|right|img|table|tr|td|spoiler|url)[^\]]*\]'
-        description, _ = re.subn(
-            bbcode_tags_pattern,
-            '',
-            description,
-            flags=re.IGNORECASE
-        )
-
-        description = bbcode.render_html(description)
-
-        async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8"
-        ) as description_file:
-            await description_file.write(description)
-
-        return description
+        return
 
     async def get_nfo(self, meta):
         nfo_content = ""
@@ -494,6 +437,7 @@ class YGG:
         return list(genre_ids)
 
     async def get_data(self, meta):
+        await self.load_localized_data(meta)
         data = {
             "parent_category": await self.get_category_id(meta),
             "category": await self.get_type_id(meta),
