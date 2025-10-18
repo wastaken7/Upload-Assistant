@@ -102,6 +102,7 @@ class Prep():
         meta['we_asked_tvmaze'] = False
         meta['audio_languages'] = None
         meta['subtitle_languages'] = None
+        meta['aither_trumpable'] = None
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid', None) is None:

@@ -356,8 +356,14 @@ async def process_meta(meta, base_dir, bot=None):
         if meta.get('site_check', False):
             for tracker in meta['trackers']:
                 upload_status = meta['tracker_status'].get(tracker, {}).get('upload', False)
-                if tracker not in meta['tracker_status'] or not upload_status:
+                if not upload_status:
+                    if tracker == "AITHER" and meta.get('aither_trumpable') and len(meta.get('aither_trumpable', [])) > 0:
+                        pass
+                    else:
+                        continue
+                if tracker not in meta['tracker_status']:
                     continue
+
                 log_path = f"{base_dir}/tmp/{tracker}_search_results.json"
                 if not await common.path_exists(log_path):
                     await common.makedirs(os.path.dirname(log_path))
@@ -383,6 +389,8 @@ async def process_meta(meta, base_dir, bot=None):
                         'mal_id': meta.get('mal_id', 0),
                         'tvmaze_id': meta.get('tvmaze_id', 0),
                     }
+                    if tracker == "AITHER":
+                        search_entry['trumpable'] = meta.get('aither_trumpable', '')
                     search_data.append(search_entry)
 
                     async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
