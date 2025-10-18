@@ -1,6 +1,7 @@
 import aiofiles
 import httpx
 import json
+import langcodes
 import os
 from src.tmdb import get_tmdb_localized_data
 import platform
@@ -193,14 +194,14 @@ class YGG:
 
         # YGG Banner: Information
         desc.append(
-            f"[img]https://i.imgur.com/oiqE1Xi.png[/img]"
+            "[img]https://i.imgur.com/oiqE1Xi.png[/img]"
         )
 
         # Origin Country
         origin_country = fr_data.get("origin_country", [])
         if origin_country:
             desc.append(f"[b]Origine :[/b] : {', '.join(origin_country)}"
-            )
+                        )
 
         # Release Date
         release_date = fr_data.get("release_date", "") or fr_data.get("first_air_date", "")
@@ -254,30 +255,16 @@ class YGG:
             f"[img]{rating_img}[/img] {rating}"
         )
 
-        # YGG Banner: Synopsis
-        desc.append(
-            f"[img]https://i.imgur.com/oiqE1Xi.png[/img]"
+        # TMDB link
+        category_lower = meta.get("category", "").lower()
+        tmdb_link = (
+            f"https://www.themoviedb.org/{category_lower}/{meta.get('tmdb_id')}"
         )
-
-        # Overview
-        overview = fr_data.get("overview")
-        if overview:
+        if tmdb_link:
             desc.append(
-                f"\n[center][size=150][color=#aa0000][b]Synopsis[/b][/color][/size]\n{overview}[/center]"
+                f"[img]https://zupimages.net/up/21/03/mxao.png[/img] "
+                f"[url={tmdb_link}]Fiche du film[/url]"
             )
-
-        # Cast
-        credits = fr_data.get("credits", {})
-        cast = credits.get("cast", [])
-        if cast:
-            desc.append(
-                f"\n[center][size=150][color=#aa0000][b]Casting[/b][/color][/size]\n"
-            )
-            for person in cast[:5]:  # Limit to 5 cast members
-                desc.append(
-                    f"{person['name']} ({person['character']})"
-                )
-            desc.append("[/center]")
 
         # Trailer
         videos = fr_data.get("videos", {})
@@ -286,9 +273,203 @@ class YGG:
             trailer_key = youtube_videos[0].get("key")
             if trailer_key:
                 desc.append(
-                    f"\n[center][size = 150][color =  # aa0000][b]Bande
+                    f"[img]https://www.zupimages.net/up/21/02/ogot.png[/img] "
+                    f"[url=https://www.youtube.com/watch?v={trailer_key}]Bande annonce[/url]"
+                )
 
-        return
+        # YGG Banner: Overview
+        desc.append(
+            "[img]https://i.imgur.com/HS8PPgH.png[/img]"
+        )
+
+        # Overview
+        overview = fr_data.get("overview")
+        if overview:
+            desc.append(
+                f"{overview}"
+            )
+
+        # Cast photos from TMDB
+        cast_data = ((self.main_tmdb_data or {}).get('credits') or {}).get('cast', [])
+        if cast_data:
+            for person in cast_data[:5]:
+                profile_path = person.get('profile_path')
+                desc.append(
+                    f"[img]https://image.tmdb.org/t/p/w138_and_h175_face/{profile_path}[/img] "
+                )
+
+        # YGG Banner: Technical information
+        desc.append(
+            "[img]https://i.imgur.com/fKYpxI3.png[/img]"
+        )
+
+        # Technical information
+        # Quality
+        quality = await self._desc_quality(meta)
+        desc.append(
+            f"[b]Qualité :[/b] {quality}"
+        )
+
+        # Format
+        format_ = meta.get("container", "").upper()
+        desc.append(
+            f"[b]Format :[/b] {format_}"
+        )
+
+        # Video Codec
+        video_codec = meta.get("video_codec", "").upper()
+        desc.append(
+            f"[b]Codec Vidéo :{video_codec}"
+        )
+
+        # Video bit rate
+        bitrate = self._desc_bitrate(meta)
+        if bitrate:
+            desc.append(
+                f"[b]Débit Vidéo :[/b] {bitrate} kbps"
+            )
+
+        # Audio Languages
+        await self._desc_audio_languages(meta, desc)
+
+        description = "\n".join(desc)
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
+            await description_file.write(description)
+
+        return description
+
+    async def _desc_audio_languages(self, meta, desc):
+        processed_tracks = set()
+        if "discs" in meta:
+            for disc in meta.get("discs", []):
+                if disc.get("type") == "BDMV" and disc.get("bdinfo"):
+                    audio_tracks = disc.get("bdinfo", {}).get("audio", [])
+                    for track in audio_tracks:
+                        lang = track.get("language")
+                        channels = track.get("channels")
+                        codec = track.get("codec")
+                        bitrate = track.get("bitrate")
+
+                        track_tuple = (lang, channels, codec, bitrate)
+                        if lang:
+                            processed_tracks.add(track_tuple)
+
+        elif "mediainfo" in meta:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            for track in tracks:
+                if track.get("@type") == "Audio":
+                    lang = track.get("Language")
+                    channels = track.get("Channels")
+                    codec = track.get("Format")
+                    bitrate = track.get("BitRate")
+
+                    track_tuple = (lang, channels, codec, bitrate)
+                    if lang:
+                        processed_tracks.add(track_tuple)
+
+        for lang_name, channels_raw, codec_raw, bitrate_raw in sorted(list(processed_tracks)):
+
+            flag_url = ""
+            display_name = ""
+
+            try:
+                lang_obj = langcodes.find(lang_name)
+
+                # Get the base language object (e.g., 'pt' from 'pt-PT')
+                base_lang_obj = langcodes.find(lang_obj.language)
+                display_name = base_lang_obj.display_name('pt').capitalize()
+
+                # First, check if the language tag already has a territory
+                territory_code = lang_obj.territory
+
+                if not territory_code:
+                    # If not, maximize to find the most likely territory
+                    # e.g., 'en' -> 'en-US' (territory 'US')
+                    # e.g., 'pt' -> 'pt-BR' (territory 'BR')
+                    maximized_lang = lang_obj.maximize()
+                    territory_code = maximized_lang.territory
+
+                if territory_code:
+                    country_code = str(territory_code).lower()
+                    flag_url = f"https://flagcdn.com/20x15/{country_code}.png"
+                else:
+                    # Warning if no territory could be found
+                    print(f"Warning: Could not find a likely country for '{lang_name}'.")
+
+            except Exception as e:
+                print(f"Error processing language '{lang_name}': {e}")
+                display_name = lang_name.capitalize()
+
+            if display_name == 'Und':
+                display_name = 'Undetermined'
+
+            line_parts = []
+            if flag_url:
+                line_parts.append(f"[img]{flag_url}[/img]")
+
+            line_parts.append(display_name)
+
+            if channels_raw:
+                line_parts.append(channels_raw)
+
+            codec_bitrate_parts = []
+            if codec_raw:
+                codec_bitrate_parts.append(codec_raw)
+            if bitrate_raw:
+                codec_bitrate_parts.append(f"à {bitrate_raw}")
+
+            if codec_bitrate_parts:
+                line_parts.append(f"| {' '.join(codec_bitrate_parts)}")
+
+            desc.append(" ".join(line_parts))
+
+    def _desc_bitrate(self, meta):
+        bitrate = ''
+        if meta.get('is_disc') == "BDMV":
+            disc = meta["discs"][0]
+            video_info = disc.get("bdinfo", {}).get("video", [])
+            first_video = video_info[0] if video_info else {}
+            bitrate = first_video.get("bitrate", "").replace("kbps", "").strip()
+        else:
+            track_list = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            general_info = next((t for t in track_list if t.get("@type") == "General"), {})
+            bitrate_bps = general_info.get("OverallBitRate")
+            if bitrate_bps:
+                try:
+                    bitrate = int(bitrate_bps) // 1000
+                except ValueError:
+                    pass
+        return bitrate
+
+    async def _desc_quality(self, meta):
+        quality_names = {
+            1: "BDrip/BRrip",
+            2: "Bluray 4K",
+            3: "Bluray [Full]",
+            4: "Bluray [Remux]",
+            5: "DVD-R 5",
+            6: "DVD-R 9",
+            7: "DVDrip",
+            8: "HDrip 1080",
+            9: "HDrip 4k",
+            10: "HDrip 720",
+            11: "TVrip",
+            12: "TVripHD 1080",
+            13: "TVripHD 4k",
+            14: "TVripHD 720",
+            15: "VCD/SVCD/VHSrip",
+            16: "Web-Dl",
+            17: "Web-Dl 1080",
+            18: "Web-Dl 4K",
+            19: "Web-Dl 720",
+            20: "WEBrip",
+            21: "WEBrip 1080",
+            22: "WEBrip 4K",
+            23: "WEBrip 720"
+        }
+        quality_id = await self.get_quality(meta)
+        quality_name = quality_names.get(quality_id, "Unknown")
+        return quality_name
 
     async def get_nfo(self, meta):
         nfo_content = ""
@@ -585,40 +766,39 @@ class YGG:
 
         return
 
-
     def _desc_ratings(self, rating):
-        r_0= "https://zupimages.net/up/21/02/8ysk.png"
-        r_0_5= "https://zupimages.net/up/21/02/3sol.png"
-        r_1= "https://zupimages.net/up/21/02/40xt.png"
-        r_1_5= "https://zupimages.net/up/21/02/oeyu.png"
-        r_2= "https://zupimages.net/up/21/02/7d9t.png"
-        r_2_5= "https://zupimages.net/up/21/02/og43.png"
-        r_3= "https://zupimages.net/up/21/02/fi3f.png"
-        r_3_5= "https://zupimages.net/up/21/02/g8lz.png"
-        r_4= "https://zupimages.net/up/21/02/xro7.png"
-        r_4_5= "https://zupimages.net/up/21/02/x4pr.png"
-        r_5= "https://zupimages.net/up/21/02/zxn3.png"
+        r_0 = "https://zupimages.net/up/21/02/8ysk.png"
+        r_0_5 = "https://zupimages.net/up/21/02/3sol.png"
+        r_1 = "https://zupimages.net/up/21/02/40xt.png"
+        r_1_5 = "https://zupimages.net/up/21/02/oeyu.png"
+        r_2 = "https://zupimages.net/up/21/02/7d9t.png"
+        r_2_5 = "https://zupimages.net/up/21/02/og43.png"
+        r_3 = "https://zupimages.net/up/21/02/fi3f.png"
+        r_3_5 = "https://zupimages.net/up/21/02/g8lz.png"
+        r_4 = "https://zupimages.net/up/21/02/xro7.png"
+        r_4_5 = "https://zupimages.net/up/21/02/x4pr.png"
+        r_5 = "https://zupimages.net/up/21/02/zxn3.png"
         if rating == 0.0:
-            image= r_0
+            image = r_0
         elif rating <= 0.5:
-            image= r_0_5
+            image = r_0_5
         elif rating <= 1.0:
-            image= r_1
+            image = r_1
         elif rating <= 1.5:
-            image= r_1_5
+            image = r_1_5
         elif rating <= 2.0:
-            image= r_2
+            image = r_2
         elif rating <= 2.5:
-            image= r_2_5
+            image = r_2_5
         elif rating <= 3.0:
-            image= r_3
+            image = r_3
         elif rating <= 3.5:
-            image= r_3_5
+            image = r_3_5
         elif rating <= 4.0:
-            image= r_4
+            image = r_4
         elif rating <= 4.5:
-            image= r_4_5
+            image = r_4_5
         else:
-            image= r_5
+            image = r_5
 
         return image
