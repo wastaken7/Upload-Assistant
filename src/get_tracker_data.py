@@ -136,7 +136,6 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
             # since that tracker was found in client, and remove it from meta['trackers']
             for tracker in list(specific_tracker):
                 if tracker in meta_trackers and meta.get('site_check', False):
-                    console.print(f"[yellow]Found {tracker} in your trackers list, removing from specific_tracker[/yellow]")
                     specific_tracker.remove(tracker)
                     meta_trackers.remove(tracker)
 
