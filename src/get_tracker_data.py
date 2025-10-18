@@ -130,7 +130,7 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
             if isinstance(meta_trackers, str):
                 meta_trackers = [t.strip().upper() for t in meta_trackers.split(',')]
             elif isinstance(meta_trackers, list):
-                meta_trackers = [t.upper() if isinstance(t, str) else t for t in meta_trackers]
+                meta_trackers = [t.upper() if isinstance(t, str) else str(t).upper() for t in meta_trackers]
 
             # for just searching, remove any specific trackers already in meta['trackers']
             # since that tracker was found in client, and remove it from meta['trackers']
@@ -139,7 +139,11 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
                     specific_tracker.remove(tracker)
                     meta_trackers.remove(tracker)
 
-            meta['trackers'] = meta_trackers
+            # Update meta['trackers'] preserving list format
+            if meta_trackers:
+                meta['trackers'] = meta_trackers
+            else:
+                meta['trackers'] = []
 
             async def process_tracker(tracker_name, meta, only_id):
                 nonlocal found_match
