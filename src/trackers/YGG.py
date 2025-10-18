@@ -173,6 +173,120 @@ class YGG:
         return
 
     async def get_description(self, meta):
+        """
+        Description must be the YGG standard format.
+        """
+        fr_data = self.main_tmdb_data
+        desc = []
+
+        # Title
+        title = fr_data.get("title", "") or fr_data.get("name", "")
+        desc.append(
+            f'[center][size=200][color=#aa0000][b]{title}[/b][/color][/size]'
+        )
+
+        # Poster
+        poster_url = fr_data.get("poster_path")
+        desc.append(
+            f"[img]https://image.tmdb.org/t/p/w500{poster_url}[/img]"
+        )
+
+        # YGG Banner: Information
+        desc.append(
+            f"[img]https://i.imgur.com/oiqE1Xi.png[/img]"
+        )
+
+        # Origin Country
+        origin_country = fr_data.get("origin_country", [])
+        if origin_country:
+            desc.append(f"[b]Origine :[/b] : {', '.join(origin_country)}"
+            )
+
+        # Release Date
+        release_date = fr_data.get("release_date", "") or fr_data.get("first_air_date", "")
+        if release_date:
+            desc.append(
+                f"[b]Sortie :[/b] {release_date}"
+            )
+
+        # Original Title
+        original_title = fr_data.get("original_title", "") or fr_data.get("original_name", "")
+        if original_title:
+            desc.append(
+                f"[b]Titre original :[/b] {original_title}"
+            )
+
+        # Runtime
+        runtime = fr_data.get("runtime", "") or meta.get("runtime", "")
+        if runtime:
+            hours = runtime // 60
+            minutes = runtime % 60
+            desc.append(
+                f"Durée: {hours}h et {minutes}min"
+            )
+
+        # Directors
+        directors = meta.get("tmdb_directors", [])
+        if directors:
+            desc.append(
+                f"[b]Réalisateur :[/b] {', '.join(directors)}"
+            )
+
+        # Actors
+        actors = meta.get('tmdb_cast', [])
+        if actors:
+            desc.append(
+                f"[b]Acteurs :[/b]\n"
+                f"{', '.join(actors)}"
+            )
+
+        # Genres
+        genres = [g["name"] for g in fr_data.get("genres", [])]
+        if genres:
+            desc.append(
+                f"Genre: {', '.join(genres)}"
+            )
+
+        # Rating
+        rating = fr_data.get("vote_average", 0.0)
+        rating_img = self._desc_ratings(rating)
+        desc.append(
+            f"[img]{rating_img}[/img] {rating}"
+        )
+
+        # YGG Banner: Synopsis
+        desc.append(
+            f"[img]https://i.imgur.com/oiqE1Xi.png[/img]"
+        )
+
+        # Overview
+        overview = fr_data.get("overview")
+        if overview:
+            desc.append(
+                f"\n[center][size=150][color=#aa0000][b]Synopsis[/b][/color][/size]\n{overview}[/center]"
+            )
+
+        # Cast
+        credits = fr_data.get("credits", {})
+        cast = credits.get("cast", [])
+        if cast:
+            desc.append(
+                f"\n[center][size=150][color=#aa0000][b]Casting[/b][/color][/size]\n"
+            )
+            for person in cast[:5]:  # Limit to 5 cast members
+                desc.append(
+                    f"{person['name']} ({person['character']})"
+                )
+            desc.append("[/center]")
+
+        # Trailer
+        videos = fr_data.get("videos", {})
+        youtube_videos = [v for v in videos.get("results", []) if v.get("site") == "YouTube"]
+        if youtube_videos:
+            trailer_key = youtube_videos[0].get("key")
+            if trailer_key:
+                desc.append(
+                    f"\n[center][size = 150][color =  # aa0000][b]Bande
 
         return
 
@@ -470,3 +584,41 @@ class YGG:
         )
 
         return
+
+
+    def _desc_ratings(self, rating):
+        r_0= "https://zupimages.net/up/21/02/8ysk.png"
+        r_0_5= "https://zupimages.net/up/21/02/3sol.png"
+        r_1= "https://zupimages.net/up/21/02/40xt.png"
+        r_1_5= "https://zupimages.net/up/21/02/oeyu.png"
+        r_2= "https://zupimages.net/up/21/02/7d9t.png"
+        r_2_5= "https://zupimages.net/up/21/02/og43.png"
+        r_3= "https://zupimages.net/up/21/02/fi3f.png"
+        r_3_5= "https://zupimages.net/up/21/02/g8lz.png"
+        r_4= "https://zupimages.net/up/21/02/xro7.png"
+        r_4_5= "https://zupimages.net/up/21/02/x4pr.png"
+        r_5= "https://zupimages.net/up/21/02/zxn3.png"
+        if rating == 0.0:
+            image= r_0
+        elif rating <= 0.5:
+            image= r_0_5
+        elif rating <= 1.0:
+            image= r_1
+        elif rating <= 1.5:
+            image= r_1_5
+        elif rating <= 2.0:
+            image= r_2
+        elif rating <= 2.5:
+            image= r_2_5
+        elif rating <= 3.0:
+            image= r_3
+        elif rating <= 3.5:
+            image= r_3_5
+        elif rating <= 4.0:
+            image= r_4
+        elif rating <= 4.5:
+            image= r_4_5
+        else:
+            image= r_5
+
+        return image
