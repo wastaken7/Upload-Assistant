@@ -188,21 +188,6 @@ async def process_meta(meta, base_dir, bot=None):
     helper = UploadHelper()
 
     if not meta.get('emby', False):
-        if meta.get('trackers'):
-            trackers = meta['trackers']
-        else:
-            default_trackers = config['TRACKERS'].get('default_trackers', '')
-            trackers = [tracker.strip() for tracker in default_trackers.split(',')]
-
-        if isinstance(trackers, str):
-            if "," in trackers:
-                trackers = [t.strip().upper() for t in trackers.split(',')]
-            else:
-                trackers = [trackers.strip().upper()]  # Make it a list with one element
-        else:
-            trackers = [t.strip().upper() for t in trackers]
-        meta['trackers'] = trackers
-
         if meta.get('trackers_remove', False):
             remove_list = [t.strip().upper() for t in meta['trackers_remove'].split(',')]
             for tracker in remove_list:
@@ -1000,7 +985,11 @@ async def do_the_thing(base_dir):
             if find_requests and meta['trackers'] not in ([], None) and not (meta.get('site_check', False) and 'is_disc' not in meta):
                 console.print("[green]Searching for requests on supported trackers.....")
                 tracker_setup = TRACKER_SETUP(config=config)
-                await tracker_setup.tracker_request(meta, meta['trackers'])
+                if meta.get('site_check', False):
+                    trackers = meta['requested_trackers']
+                else:
+                    trackers = meta['trackers']
+                await tracker_setup.tracker_request(meta, trackers)
 
             if sanitize_meta and not meta.get('emby', False):
                 try:
