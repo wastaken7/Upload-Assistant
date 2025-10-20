@@ -39,6 +39,7 @@ from src.trackers.HDS import HDS
 from src.trackers.HDT import HDT
 from src.trackers.HHD import HHD
 from src.trackers.HUNO import HUNO
+from src.trackers.IPT import IPT
 from src.trackers.ITT import ITT
 from src.trackers.LCD import LCD
 from src.trackers.LDU import LDU
@@ -897,8 +898,8 @@ class TRACKER_SETUP:
 
 tracker_class_map = {
     'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'CBR': CBR,
-    'CZ': CZ, 'DC': DC, 'DP': DP, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
-    'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
+    'CZ': CZ, 'DC': DC, 'DP': DP, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO,
+    'IPT': IPT, 'ITT': ITT, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TVC': TVC, 'TTG': TTG, 'UHD': UHD, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
@@ -913,5 +914,5 @@ other_api_trackers = {
 }
 
 http_trackers = {
-    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG'
+    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'IPT', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG'
 }
