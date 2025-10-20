@@ -72,18 +72,18 @@ class BLU(UNIT3D):
         year = str(meta.get('year', ""))
         aka = meta.get('aka', "")
         webdv = meta.get('webdv', "")
-        if imdb_name and imdb_name != "":
+        if imdb_name and imdb_name.strip():
             if aka:
                 blu_name = blu_name.replace(f"{aka} ", "", 1)
             blu_name = blu_name.replace(f"{meta['title']}", imdb_name, 1)
 
-            if imdb_aka and imdb_aka != "" and imdb_aka != imdb_name and not meta.get('no_aka', False):
+            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.get('no_aka', False):
                 blu_name = blu_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
 
-        if not meta.get('category') == "TV" and imdb_year and imdb_year != "" and year and year != "" and imdb_year != year:
+        if not meta.get('category') == "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
             blu_name = blu_name.replace(f"{year}", imdb_year, 1)
 
-        if webdv and webdv != "":
+        if webdv and webdv.strip():
             blu_name = blu_name.replace(f"{webdv} ", "", 1)
 
         if meta['tracker_status'][self.tracker].get('other', False):
