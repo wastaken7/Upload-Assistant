@@ -71,6 +71,7 @@ class BLU(UNIT3D):
         imdb_aka = meta.get('imdb_info', {}).get('aka', "")
         year = str(meta.get('year', ""))
         aka = meta.get('aka', "")
+        webdv = meta.get('webdv', "")
         if imdb_name and imdb_name != "":
             if aka:
                 blu_name = blu_name.replace(f"{aka} ", "", 1)
@@ -81,6 +82,9 @@ class BLU(UNIT3D):
 
         if not meta.get('category') == "TV" and imdb_year and imdb_year != "" and year and year != "" and imdb_year != year:
             blu_name = blu_name.replace(f"{year}", imdb_year, 1)
+
+        if webdv and webdv != "":
+            blu_name = blu_name.replace(f"{webdv} ", "", 1)
 
         if meta['tracker_status'][self.tracker].get('other', False):
             blu_name = blu_name.replace(f"{meta['resolution']}", f"{meta['resolution']} DVP5/DVP8", 1)
