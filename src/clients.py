@@ -2464,6 +2464,7 @@ async def match_tracker_url(tracker_urls, meta):
         'hdt': ["https://hdts-announce.ru"],
         'hhd': ["https://homiehelpdesk.net"],
         'huno': ["https://hawke.uno"],
+        'ipt': ["https://ssl.empirehost.me"],
         'lcd': ["locadora.cc"],
         'ldu': ["theldu.to"],
         'lst': ["https://lst.gg"],

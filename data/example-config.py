@@ -542,6 +542,15 @@ config = {
             "api_key": "",
             "anon": False,
         },
+        "IPT": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # For IPT to work, you need to export cookies from the site using:
+            # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # Cookies must be in Netscape format and saved in: data/cookies/IPT.txt
+            "announce_url": "https://ssl.empirehost.me/<PASS_KEY/PID>/announce",
+            "anon": False,
+        },
         "ITT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",

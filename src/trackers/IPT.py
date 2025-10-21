@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 import aiofiles
-import glob
+import bencodepy
 import httpx
 import os
-import platform
 import re
-from src.cookie_auth import CookieValidator, CookieAuthUploader
 from bs4 import BeautifulSoup
 from src.bbcode import BBCODE
 from src.console import console
+from src.cookie_auth import CookieValidator, CookieAuthUploader
 from src.get_desc import DescriptionBuilder
-from src.trackers.COMMON import COMMON
 
 
 class IPT:
@@ -20,13 +18,24 @@ class IPT:
         self.cookie_auth_uploader = CookieAuthUploader(config)
         self.tracker = 'IPT'
         self.source_flag = 'IPTorrents'
-        self.banned_groups = ['']
         self.base_url = 'https://iptorrents.com'
         self.torrent_url = 'https://iptorrents.com/torrent.php?id='
         self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
+            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0"
         }, timeout=30)
+        self.banned_groups = [
+            "1337x", "3DM", "3dtorrents", "ali213", "AreaFiles", "BD25", "BlackBox", "BLuBits",
+            "bluhd.org", "BTN", "BTNet", "Catalyst RG", "CBUT", "CHDBits", "CHDTV.Net", "CINEMANIA",
+            "CorePack", "CorePacks", "CPG", "DADDY", "Digital Desi Releasers", "DDR", "DLLHits", "DLBR",
+            "DRIG", "DVDSEED", "EncodeKing", "FGT", "filelist.ro", "flashtorrents", "Ganool", "HD4FUN",
+            "HDAccess", "HDChina", "HDGeek", "HDME", "HDRoad", "HDStar", "HDTime", "HDTurk", "HDWing",
+            "h33t", "HorribleSubs", "hqsource.org", "IWStream", "Kingdom-KVCD", "MeGaHeRTZ", "MkvCage",
+            "MVGroup.org", "MYEGY", "nosTEAM", "os4world", "OntohinBD", "Pimp4003", "Projekt-Revolution",
+            "ps3gameroom", "PTP", "RARBG/RBG", "RLS", "RLSM", "Shaanig", "SHOWSCEN", "SiRiUs sHaRe",
+            "SFS-RG", "SFS", "SilverTorrents", "SpaceHD", "The Wolfs Den", "TPTB", "TTG", "UNKNOWN",
+            "X360ISO", "YIFY", "zombiRG"
+        ]
 
     async def validate_credentials(self, meta):
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -115,52 +124,40 @@ class IPT:
 
     async def search_existing(self, meta, disctype):
         dupes = []
-        imdb_id = meta.get('imdb', '')
-        if imdb_id == '0':
-            console.print(f'IMDb ID not found, cannot search for duplicates on {self.tracker}.')
-            return dupes
 
-        search_url = f'{self.base_url}/index.php?'
-
-        params = {
-            'page': 'torrents',
-            'search': imdb_id,
-            'active': '0',
-            'options': '2'
-        }
+        search_url = f"{self.base_url}/t?72=&q={meta['title']}"
 
         try:
-            response = await self.session.get(search_url, params=params)
+            response = await self.session.get(search_url, follow_redirects=True)
             response.raise_for_status()
+
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            all_tables = soup.find_all('table', class_='lista')
+            torrent_table = soup.find('table', id='torrents')
 
-            torrent_rows = []
+            if torrent_table:
+                rows = torrent_table.find('tbody').find_all('tr')
 
-            for table in all_tables:
-                recommend_header = table.find('td', class_='block', string='Our Team Recommend')
-                if recommend_header:
-                    continue
+                for row in rows:
+                    cells = row.find_all('td')
 
-                rows_in_table = table.select('tr:has(td.lista)')
-                torrent_rows.extend(rows_in_table)
+                    if len(cells) > 5:
+                        name_cell = cells[1]
+                        link_tag = name_cell.find('a', class_='hv')
 
-            for row in torrent_rows:
-                name_tag = row.select_one('td:nth-child(2) > a[href*="page=torrent-details&id="]')
-                name = name_tag.get_text(strip=True) if name_tag else 'Unknown Name'
+                        if link_tag:
+                            name = link_tag.get_text(strip=True)
+                            torrent_path = link_tag.get('href')
+                            torrent_link = f"{self.base_url}{torrent_path}"
 
-                link_tag = name_tag
-                torrent_link = None
-                if link_tag and 'href' in link_tag.attrs:
-                    torrent_link = f'{self.base_url}/{link_tag["href"]}'
+                            size = cells[5].get_text(strip=True)
 
-                duplicate_entry = {
-                    'name': name,
-                    'size': None,
-                    'link': torrent_link
-                }
-                dupes.append(duplicate_entry)
+                            duplicate_entry = {
+                                'name': name,
+                                'size': size,
+                                'link': torrent_link
+                            }
+                            dupes.append(duplicate_entry)
 
         except Exception as e:
             console.print(f'[bold red]Error searching for duplicates on {self.tracker}: {e}[/bold red]')
@@ -185,7 +182,6 @@ class IPT:
         tv_bd = 23
         documentaries = 26
         sports = 55
-        tv_sd_x264 = 79
         tv_dvd_rip = 25
         tv_non_english = 82
         tv_packs_non_english = 83
@@ -200,9 +196,7 @@ class IPT:
         movie_non_english = 38
         movie_bd_r = 89
         movie_bd_rip = 90
-        movie_packs = 68
         movie_dvd_r = 6
-        movie_mp4 = 62
         movie_3d = 87
         movie_kids = 54
         movie_480p = 77
@@ -247,6 +241,14 @@ class IPT:
                 if meta.get('original_language') and meta.get('original_language') != 'en':
                     return tv_packs_non_english
                 return tv_packs
+            else:
+                if meta.get('original_language') and meta.get('original_language') != 'en':
+                    return tv_non_english
+            if is_disc:
+                if is_disc == 'BDMV':
+                    return tv_bd
+                if is_disc == 'DVD':
+                    return tv_dvd_r
             if meta.get('video_codec', '').lower() == 'x265':
                 return tv_x265
             if type_ in ('WEBDL', 'WEBRIP'):
@@ -266,18 +268,88 @@ class IPT:
             'type': await self.get_category_id(meta),
         }
 
+        if await self.get_is_freeleech(meta):
+            data['freeleech'] = 'on'
+
         # Anon
         anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
         if anon:
             data.update({
-                'anonymous': 'true'
-            })
-        else:
-            data.update({
-                'anonymous': 'false'
+                'anonymous': 'on'
             })
 
         return data
+
+    async def get_name(self, meta):
+        if meta.get('scene_name', ''):
+            name = meta.get('scene_name')
+        else:
+            name = meta.get('clean_name')
+
+        replacements = {
+            '3DAccess': '3DA',
+            'AreaFiles': 'AF',
+            'BeyondHD': 'BHD',
+            'Blackcat': 'Blackcat',
+            'Blu-Bits': 'BluHD',
+            'Bluebird': 'BB',
+            'BlueEvolution': 'BluEvo',
+            'Chdbits': 'CHD',
+            'CtrlHD': 'CtrlHD',
+            'HDAccess': 'HDA',
+            'HDChina': 'HDC',
+            'HDClub': 'HDCL',
+            'HDGeek': 'HDG',
+            'HDRoad': 'HDR',
+            'HDStar': 'HDS',
+            'HDWing': 'HDW',
+            'ExtraTorrent': 'ETRG',
+            'IWStream': 'IWS',
+            'Kingdom-KVCD': 'KVCD',
+            'MVGroup': 'MVG',
+            'Projekt-Revolution': 'Projekt',
+            'PublicHD': 'PHD',
+            'SpaceHD': 'SHD',
+            'ThumperDC': 'TDC',
+            'TrollHD': 'TrollHD',
+            'TheWolfsDen': 'TWD',
+        }
+
+        for key, value in replacements.items():
+            if key in name:
+                name = name.replace(key, value)
+
+        name = name.replace("'", "").replace('"', "")
+
+        if meta.get('is_scene', False):
+            if '[NO RAR]' not in name.upper():
+                name += ' [NO RAR]'
+
+        name = re.sub(r"\s{2,}", " ", name)
+
+        return name
+
+    async def get_is_freeleech(self, meta):
+        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+        if not os.path.exists(torrent_path):
+            return False
+
+        try:
+            async with aiofiles.open(torrent_path, 'rb') as f:
+                torrent_data = await f.read()
+            metainfo = bencodepy.decode(torrent_data)
+            info = metainfo.get(b'info', {})
+            total_size = 0
+            if b'files' in info:
+                for file_info in info[b'files']:
+                    total_size += file_info.get(b'length', 0)
+            else:
+                total_size = info.get(b'length', 0)
+            size_gb = total_size / (1024 ** 3)
+            return size_gb >= 8
+        except Exception as e:
+            console.print(f"[bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
+            return False
 
     async def upload(self, meta, disctype):
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -290,8 +362,9 @@ class IPT:
             torrent_url=self.torrent_url,
             data=data,
             torrent_field_name='file',
+            torrent_name=await self.get_name(meta),
             upload_cookies=self.session.cookies,
-            upload_url="https://iptorrents.com/takeupload.php",
+            upload_url=f"{self.base_url}/takeupload.php",
             hash_is_id=True,
             success_text="download.php?id=",
         )
