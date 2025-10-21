@@ -88,7 +88,7 @@ class IPT:
         if images:
             screenshots_block = ''
             for image in images:
-                screenshots_block += f"[url={image['web_url']}][img]{image['img_url']}[/img][/url]"
+                screenshots_block += f"[url={image['web_url']}][img]{image['img_url']}[/img][/url] "
             desc_parts.append('[center]\n' + screenshots_block + '[/center]')
 
         # Tonemapped Header
@@ -366,7 +366,7 @@ class IPT:
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/takeupload.php",
             hash_is_id=True,
-            success_text="download.php?id=",
+            error_text="Upload failed!",
         )
 
         return
