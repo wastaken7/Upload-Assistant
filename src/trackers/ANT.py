@@ -99,7 +99,7 @@ class ANT:
             # ID of "Scene?" checkbox on upload form is actually "censored"
             data['censored'] = 1
 
-        genres = f"{meta.get('keywords', '')} {meta.get('genres', '')}"
+        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
         if any(x in genres.lower() for x in ['xxx', 'erotic', 'porn', 'adult', 'orgy']):
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                 console.print('[bold red]Adult content detected[/bold red]')
