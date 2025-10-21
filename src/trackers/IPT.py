@@ -124,15 +124,15 @@ class IPT:
 
     async def search_existing(self, meta, disctype):
         dupes = []
-
+        cat_id = 72 if meta['category'] == 'MOVIE' else 73 if meta['category'] == 'TV' else 0
+        if not cat_id:
+            return dupes
         search_url = f"{self.base_url}/t?72=&q={meta['title']}"
 
         try:
             response = await self.session.get(search_url, follow_redirects=True)
             response.raise_for_status()
-
             soup = BeautifulSoup(response.text, 'html.parser')
-
             torrent_table = soup.find('table', id='torrents')
 
             if torrent_table:
@@ -149,7 +149,6 @@ class IPT:
                             name = link_tag.get_text(strip=True)
                             torrent_path = link_tag.get('href')
                             torrent_link = f"{self.base_url}{torrent_path}"
-
                             size = cells[5].get_text(strip=True)
 
                             duplicate_entry = {
