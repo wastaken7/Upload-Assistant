@@ -119,7 +119,7 @@ class ANT:
             data.update({'flagchangereason': "BDMV Uploaded with Upload Assistant"})
 
         headers = {
-            'User-Agent': f'Upload Assistant/2.3 ({platform.system()} {platform.release()})'
+            'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
         }
 
         try:
