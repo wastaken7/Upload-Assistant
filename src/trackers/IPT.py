@@ -260,25 +260,6 @@ class IPT:
                 return tv_xvid
             return tv_x264
 
-    async def get_data(self, meta):
-        data = {
-            'name': meta['name'],
-            'descr': await self.generate_description(meta),
-            'type': await self.get_category_id(meta),
-        }
-
-        if await self.get_is_freeleech(meta):
-            data['freeleech'] = 'on'
-
-        # Anon
-        anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
-        if anon:
-            data.update({
-                'anonymous': 'on'
-            })
-
-        return data
-
     async def get_name(self, meta):
         if meta.get('scene_name', ''):
             name = meta.get('scene_name')
@@ -349,6 +330,26 @@ class IPT:
         except Exception as e:
             console.print(f"[bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
             return False
+
+    async def get_data(self, meta):
+        data = {
+            'name': meta['name'],
+            'descr': await self.generate_description(meta),
+            'type': await self.get_category_id(meta),
+            'imdb_id': str(meta.get('imdb_info', {}).get('imdbID', '')),
+        }
+
+        if await self.get_is_freeleech(meta):
+            data['freeleech'] = 'on'
+
+        # Anon
+        anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
+        if anon:
+            data.update({
+                'anonymous': 'on'
+            })
+
+        return data
 
     async def upload(self, meta, disctype):
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
