@@ -12,7 +12,7 @@ class RF(UNIT3D):
         self.common = COMMON(config)
         self.tracker = 'RF'
         self.source_flag = 'ReelFliX'
-        self.base_url = 'https://reelflix.xyz'
+        self.base_url = 'https://reelflix.cc'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'
         self.search_url = f'{self.base_url}/api/torrents/filter'
