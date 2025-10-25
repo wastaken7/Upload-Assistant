@@ -123,6 +123,7 @@ class IPT:
         return description
 
     async def search_existing(self, meta, disctype):
+        self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         dupes = []
         cat_id = 72 if meta['category'] == 'MOVIE' else 73 if meta['category'] == 'TV' else 0
         if not cat_id:
