@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import cli_ui
+import re
 from src.trackers.COMMON import COMMON
 from src.console import console
 from src.trackers.UNIT3D import UNIT3D
@@ -26,29 +27,45 @@ class OTW(UNIT3D):
             'LAMA', 'Leffe', 'LOAD', 'mHD', 'NhaNc3', 'nHD', 'NOIVTC', 'nSD', 'PiRaTeS',
             'PRODJi', 'RAPiDCOWS', 'RARBG', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi',
             'SicFoI', 'SPASM', 'STUTTERSHIT', 'Telly', 'TM', 'UPiNSMOKE', 'WAF', 'xRed',
-            'XS', 'YELLO', 'YIFY', 'YTS', 'ZKBL', 'ZmN', '4f8c4100292', 'Azkars', 'Sync0rdi',
-            ['EVO', 'Raw Content Only'], ['TERMiNAL', 'Raw Content Only'],
-            ['ViSION', 'Note the capitalization and characters used'], ['CMRG', 'Raw Content Only']
+            'XS', 'YELLO', 'YIFY', 'YTS', 'ZKBL', 'ZmN', '4f8c4100292', 'Azkars', 'Sync0rdi'
         ]
         pass
 
     async def get_additional_checks(self, meta):
         should_continue = True
 
-        if not any(genre in meta['genres'] for genre in ['Animation', 'Family']):
+        if not any(genre in meta['combined_genres'] for genre in ['Animation', 'Family']):
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                 console.print('[bold red]Genre does not match Animation or Family for OTW.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    should_continue = False
+                    return False
             else:
-                should_continue = False
-        disallowed_keywords = {'XXX', 'Erotic', 'Porn', 'Hentai', 'Adult Animation', 'Orgy', 'softcore'}
-        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
-            if not meta['unattended']:
+                return False
+
+        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                 console.print('[bold red]Adult animation not allowed at OTW.')
-            should_continue = False
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    return False
+            else:
+                return False
+
+        if meta['type'] not in ['WEBDL'] and not meta['is_disc']:
+            if meta.get('tag', "") and any(x in meta['tag'] for x in ['CMRG', 'EVO', 'TERMiNAL', 'ViSION']):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content at OTW[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        return False
+                else:
+                    return False
 
         return should_continue
 
@@ -85,34 +102,35 @@ class OTW(UNIT3D):
         resolution = meta['resolution']
         aka = meta.get('aka', '')
         type = meta['type']
+        video_codec = meta.get('video_codec', '')
         if aka:
-            otw_name = otw_name.replace(meta["aka"], '')
-        if meta['is_disc'] == "DVD":
-            otw_name = otw_name.replace(source, f"{source} {resolution}")
-        if meta['is_disc'] == "DVD" or type == "REMUX":
-            otw_name = otw_name.replace(meta['audio'], f"{meta.get('video_codec', '')} {meta['audio']}", 1)
-        elif meta['is_disc'] == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            otw_name = otw_name.replace(f"{aka} ", '')
+        if meta['is_disc'] == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
             otw_name = otw_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
+            otw_name = otw_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
         if meta['category'] == "TV":
             years = []
 
             tmdb_year = meta.get('year')
             if tmdb_year and str(tmdb_year).isdigit():
-                years.append(int(tmdb_year))
+                year = str(tmdb_year)
+            else:
+                if tmdb_year and str(tmdb_year).isdigit():
+                    years.append(int(tmdb_year))
 
-            imdb_year = meta.get('imdb_info', {}).get('year')
-            if imdb_year and str(imdb_year).isdigit():
-                years.append(int(imdb_year))
+                imdb_year = meta.get('imdb_info', {}).get('year')
+                if imdb_year and str(imdb_year).isdigit():
+                    years.append(int(imdb_year))
 
-            series_year = meta.get('tvdb_episode_data', {}).get('series_year')
-            if series_year and str(series_year).isdigit():
-                years.append(int(series_year))
-            # Use the oldest year if any found, else empty string
-            year = str(min(years)) if years else ""
+                series_year = meta.get('tvdb_episode_data', {}).get('series_year')
+                if series_year and str(series_year).isdigit():
+                    years.append(int(series_year))
+                # Use the oldest year if any found, else empty string
+                year = str(min(years)) if years else ""
             if not meta.get('no_year', False) and not meta.get('search_year', ''):
                 otw_name = otw_name.replace(meta['title'], f"{meta['title']} {year}", 1)
 
-        return {'name': meta['name']}
+        return {'name': otw_name}
 
     async def get_additional_data(self, meta):
         data = {

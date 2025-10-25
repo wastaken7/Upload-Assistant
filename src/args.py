@@ -81,6 +81,7 @@ class Args():
         parser.add_argument('path', nargs='+', help="Path to file/directory (in single/double quotes is best)")
         parser.add_argument('--queue', nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
         parser.add_argument('-lq', '--limit-queue', dest='limit_queue', nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
+        parser.add_argument('-sc', '--site-check', dest='site_check', action='store_true', required=False, help="Just search sites for suitable uploads and create log file, no uploading", default=False)
         parser.add_argument('--unit3d', action='store_true', required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
         parser.add_argument('-s', '--screens', nargs=1, required=False, help="Number of screenshots", default=int(self.config['DEFAULT']['screens']))
         parser.add_argument('-comps', '--comparison', nargs='+', required=False, help="Use comparison images from a folder (input folder path). See: https://github.com/Audionut/Upload-Assistant/pull/487", default=None)
@@ -373,33 +374,53 @@ class Args():
                         meta[key] = value2
                 else:
                     meta[key] = value
-            elif key in ("manual_edition"):
+            if key in ("manual_edition"):
                 if isinstance(value, list) and len(value) == 1:
                     meta[key] = value[0]
                 else:
                     meta[key] = value
-            elif key in ("manual_dvds"):
+            if key in ("manual_dvds"):
                 meta[key] = value
-            elif key in ("freeleech"):
+            if key in ("freeleech"):
                 meta[key] = 100
-            elif key in ("tag") and value == []:
+            if key in ("tag") and value == []:
                 meta[key] = ""
-            elif key in ["manual_episode_title"] and value == []:
+            if key in ["manual_episode_title"] and value == []:
                 meta[key] = ""
-            elif key in ["manual_episode_title"]:
+            if key in ["manual_episode_title"]:
                 meta[key] = value
-            elif key in ["tvmaze_manual"]:
+            if key in ["tvmaze_manual"]:
                 meta[key] = value
-            elif key == 'trackers':
+            if key == 'trackers':
                 if value:
-                    tracker_value = value
+                    # Extract from list if it's a single-item list (from nargs=1)
+                    if isinstance(value, list) and len(value) == 1:
+                        tracker_value = value[0]
+                    else:
+                        tracker_value = value
+
                     if isinstance(tracker_value, str):
                         tracker_value = tracker_value.strip('"\'')
 
-                    if isinstance(tracker_value, str) and ',' in tracker_value:
-                        meta[key] = [t.strip().upper() for t in tracker_value.split(',')]
+                        # Split by comma if present
+                        if ',' in tracker_value:
+                            meta[key] = [t.strip().upper() for t in tracker_value.split(',')]
+                        else:
+                            meta[key] = [tracker_value.strip().upper()]
+                    elif isinstance(tracker_value, list):
+                        # Handle list of strings
+                        expanded = []
+                        for t in tracker_value:
+                            if isinstance(t, str):
+                                if ',' in t:
+                                    expanded.extend([x.strip().upper() for x in t.split(',')])
+                                else:
+                                    expanded.append(t.strip().upper())
+                            else:
+                                expanded.append(str(t).upper())
+                        meta[key] = expanded
                     else:
-                        meta[key] = [tracker_value.strip().upper()] if isinstance(tracker_value, str) else [tracker_value.upper()]
+                        meta[key] = [str(tracker_value).upper()]
                 else:
                     meta[key] = []
             else:

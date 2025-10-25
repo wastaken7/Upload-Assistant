@@ -23,18 +23,18 @@ class OE(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = [
-            '0neshot', '3LT0N', '4K4U', '4yEo', '$andra', '[Oj]', 'AFG', 'AkihitoSubs', 'AniHLS', 'Anime Time',
+            '0neshot', '3LT0N', '4K4U', '4yEo', '$andra', '[Oj]', 'AFG', 'AkihitoSubs', 'Alcaide_Kira', 'AniHLS', 'Anime Time',
             'AnimeRG', 'AniURL', 'AOC', 'AR', 'AROMA', 'ASW', 'aXXo', 'BakedFish', 'BiTOR', 'BRrip', 'bonkai',
             'Cleo', 'CM8', 'C4K', 'CrEwSaDe', 'core', 'd3g', 'DDR', 'DE3PM', 'DeadFish', 'DeeJayAhmed', 'DNL', 'ELiTE',
             'EMBER', 'eSc', 'EVO', 'EZTV', 'FaNGDiNG0', 'FGT', 'fenix', 'FUM', 'FRDS', 'FROZEN', 'GalaxyTV',
             'GalaxyRG', 'GalaxyRG265', 'GERMini', 'Grym', 'GrymLegacy', 'HAiKU', 'HD2DVD', 'HDTime', 'Hi10',
-            'HiQVE', 'ION10', 'iPlanet', 'JacobSwaggedUp', 'JIVE', 'Judas', 'KiNGDOM', 'LAMA', 'Leffe', 'LiGaS',
+            'HiQVE', 'ION10', 'iPlanet', 'iVy', 'JacobSwaggedUp', 'JIVE', 'Judas', 'KiNGDOM', 'LAMA', 'Leffe', 'LiGaS',
             'LOAD', 'LycanHD', 'MeGusta', 'MezRips', 'mHD', 'Mr.Deadpool', 'mSD', 'NemDiggers', 'neoHEVC', 'NeXus',
             'nHD', 'nikt0', 'nSD', 'NhaNc3', 'NOIVTC', 'pahe.in', 'PlaySD', 'playXD', 'PRODJi', 'ProRes',
             'project-gxs', 'PSA', 'QaS', 'Ranger', 'RAPiDCOWS', 'RARBG', 'Raze', 'RCDiVX', 'RDN', 'Reaktor',
-            'REsuRRecTioN', 'RMTeam', 'ROBOTS', 'rubix', 'SANTi', 'SHUTTERSHIT', 'SpaceFish', 'SPASM', 'SSA',
-            'TBS', 'Telly', 'Tenrai-Sensei', 'TERMiNAL', 'TGx', 'TM', 'topaz', 'TSP', 'TSPxL', 'URANiME', 'UTR',
-            'VipapkSudios', 'ViSION', 'WAF', 'Wardevil', 'x0r', 'xRed', 'XS', 'YakuboEncodes', 'YIFY', 'YTS',
+            'REsuRRecTioN', 'RMTeam', 'ROBOTS', 'rubix', 'SANTi', 'SHUTTERSHIT', 'SM737', 'SpaceFish', 'SPASM', 'SSA',
+            'TBS', 'Telly', 'Tenrai-Sensei', 'TERMiNAL', 'TGx', 'TM', 'topaz', 'ToVaR', 'TSP', 'TSPxL', 'UnKn0wn', 'URANiME', 'UTR',
+            'VipapkSudios', 'ViSION', 'WAF', 'Wardevil', 'x0r', 'xRed', 'XS', 'YakuboEncodes', 'YAWNTiC', 'YAWNiX', 'YIFY', 'YTS',
             'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT'
         ]
         pass
@@ -42,8 +42,9 @@ class OE(UNIT3D):
     async def get_additional_checks(self, meta):
         should_continue = True
 
-        disallowed_keywords = {'XXX', 'softcore', 'concert'}
-        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])):
+        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta['unattended']:
                 console.print('[bold red]Erotic not allowed at OE.')
             should_continue = False
@@ -131,24 +132,33 @@ class OE(UNIT3D):
         resolution = meta.get('resolution')
         video_encode = meta.get('video_encode')
         name_type = meta.get('type', "")
-        tag_lower = meta['tag'].lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        source = meta.get('source', "")
+        audio = meta.get('audio', "")
+        video_codec = meta.get('video_codec', "")
+
         imdb_name = meta.get('imdb_info', {}).get('title', "")
-        title = meta.get('title', "")
-        oe_name = oe_name.replace(f"{title}", imdb_name, 1)
-        year = str(meta.get('year', ""))
         imdb_year = str(meta.get('imdb_info', {}).get('year', ""))
-        scale = "DS4K" if "DS4K" in meta['uuid'].upper() else "RM4K" if "RM4K" in meta['uuid'].upper() else ""
-        if not meta.get('category') == "TV":
+        imdb_aka = meta.get('imdb_info', {}).get('aka', "")
+        year = str(meta.get('year', ""))
+        aka = meta.get('aka', "")
+        if imdb_name and imdb_name.strip():
+            if aka:
+                oe_name = oe_name.replace(f"{aka} ", "", 1)
+            oe_name = oe_name.replace(f"{meta['title']}", imdb_name, 1)
+
+            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.get('no_aka', False):
+                oe_name = oe_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
+
+        if not meta.get('category') == "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
             oe_name = oe_name.replace(f"{year}", imdb_year, 1)
 
         if name_type == "DVDRIP":
             if meta.get('category') == "MOVIE":
-                oe_name = oe_name.replace(f"{meta['source']}{meta['video_encode']}", f"{resolution}", 1)
-                oe_name = oe_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+                oe_name = oe_name.replace(f"{source}{video_encode}", f"{resolution}", 1)
+                oe_name = oe_name.replace((audio), f"{audio}{video_encode}", 1)
             else:
-                oe_name = oe_name.replace(f"{meta['source']}", f"{resolution}", 1)
-                oe_name = oe_name.replace(f"{meta['video_codec']}", f"{meta['audio']} {meta['video_codec']}", 1)
+                oe_name = oe_name.replace(f"{source}", f"{resolution}", 1)
+                oe_name = oe_name.replace(f"{video_codec}", f"{audio} {video_codec}", 1)
 
         if not meta.get('audio_languages'):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
@@ -156,11 +166,14 @@ class OE(UNIT3D):
             audio_languages = meta['audio_languages']
             if audio_languages and not await has_english_language(audio_languages) and not meta.get('is_disc') == "BDMV":
                 foreign_lang = meta['audio_languages'][0].upper()
-                oe_name = oe_name.replace(meta['resolution'], f"{foreign_lang} {meta['resolution']}", 1)
+                oe_name = oe_name.replace(f"{resolution}", f"{foreign_lang} {resolution}", 1)
 
+        scale = "DS4K" if "DS4K" in meta['uuid'].upper() else "RM4K" if "RM4K" in meta['uuid'].upper() else ""
         if name_type in ["ENCODE", "WEBDL", "WEBRIP"] and scale != "":
             oe_name = oe_name.replace(f"{resolution}", f"{scale}", 1)
 
+        tag_lower = meta['tag'].lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
                 oe_name = re.sub(f"-{invalid_tag}", "", oe_name, flags=re.IGNORECASE)

@@ -28,7 +28,7 @@ class BHD():
         self.upload_url = 'https://beyond-hd.me/api/upload/'
         self.torrent_url = 'https://beyond-hd.me/details/'
         self.requests_url = f"https://beyond-hd.me/api/requests/{self.config['TRACKERS']['BHD']['api_key'].strip()}"
-        self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD', 'Telly', 'AOC', 'WKS', 'SasukeducK']
+        self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD', 'Telly', 'AOC', 'WKS', 'SasukeducK', 'CRUCiBLE', 'iFT']
         pass
 
     async def upload(self, meta, disctype):
@@ -243,11 +243,6 @@ class BHD():
                             await desc.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n")
                             await desc.write("\n")
             await desc.write(base.replace("[img]", "[img width=300]"))
-            try:
-                # If screensPerRow is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
-                screensPerRow = int(self.config['DEFAULT'].get('screens_per_row', 2))
-            except Exception:
-                screensPerRow = 2
             if meta.get('comparison') and meta.get('comparison_groups'):
                 await desc.write("[center]")
                 comparison_groups = meta.get('comparison_groups', {})
@@ -295,9 +290,6 @@ class BHD():
                     img_url = images[each]['img_url']
                     if (each == len(images) - 1):
                         await desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]")
-                    elif (each + 1) % screensPerRow == 0:
-                        await desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]\n")
-                        await desc.write("\n")
                     elif (each + 1) % 2 == 0:
                         await desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url]\n")
                         await desc.write("\n")
@@ -334,6 +326,33 @@ class BHD():
             console.print("[bold red]Non-English dub not allowed at BHD[/bold red]")
             meta['skipping'] = "BHD"
             return []
+
+        if meta['type'] not in ['WEBDL']:
+            if meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content at BHD[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        meta['skipping'] = "BHD"
+                        return []
+                else:
+                    meta['skipping'] = "BHD"
+                    return []
+
+        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
+            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))):
+                console.print('[bold red]Porn/xxx is not allowed at BHD.')
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    meta['skipping'] = "BHD"
+                    return []
+            else:
+                meta['skipping'] = "BHD"
+                return []
 
         dupes = []
         category = meta['category']

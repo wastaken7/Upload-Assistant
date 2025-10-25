@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # import discord
+import aiofiles
 import cli_ui
+import re
 
 from src.console import console
 from src.languages import process_desc_language, has_english_language
@@ -78,6 +80,27 @@ class ULCX(UNIT3D):
 
         return data
 
+    async def get_description(self, meta):
+        signature = f"\n[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
+        await self.common.unit3d_edit_desc(meta, self.tracker, signature, comparison=True)
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8') as f:
+            desc = await f.read()
+
+        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
+            pattern = r'(\[center\](?:\s*\[url=[^\]]+\]\[img(?:=[0-9]+)?\][^\]]+\[/img\]\[/url\]\s*)+\[/center\])'
+
+            def wrap_in_spoiler(match):
+                center_block = match.group(1)
+                return f'[center][spoiler=Screenshots]{center_block}[/spoiler][/center]'
+
+            desc = re.sub(pattern, wrap_in_spoiler, desc, flags=re.DOTALL)
+            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as f:
+                await f.write(desc)
+
+        return {'description': desc}
+
     async def get_name(self, meta):
         ulcx_name = meta['name']
         imdb_name = meta.get('imdb_info', {}).get('title', "")
@@ -85,19 +108,19 @@ class ULCX(UNIT3D):
         imdb_aka = meta.get('imdb_info', {}).get('aka', "")
         year = str(meta.get('year', ""))
         aka = meta.get('aka', "")
-        if imdb_name and imdb_name != "":
+        if imdb_name and imdb_name.strip():
             if aka:
                 ulcx_name = ulcx_name.replace(f"{aka} ", "", 1)
             ulcx_name = ulcx_name.replace(f"{meta['title']}", imdb_name, 1)
             if meta.get('mal_id', 0) != 0:
                 ulcx_name = ulcx_name
-            elif imdb_aka and imdb_aka != "" and imdb_aka != imdb_name and not meta.get('no_aka', False):
+            elif imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.get('no_aka', False):
                 ulcx_name = ulcx_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
         elif meta.get('mal_id', 0) != 0 and aka:
             ulcx_name = ulcx_name.replace(f"{aka} ", "", 1)
         if "Hybrid" in ulcx_name:
             ulcx_name = ulcx_name.replace("Hybrid ", "", 1)
-        if not meta.get('category') == "TV" and imdb_year and imdb_year != "" and year and year != "" and imdb_year != year:
+        if not meta.get('category') == "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
             ulcx_name = ulcx_name.replace(f"{year}", imdb_year, 1)
 
         return {'name': ulcx_name}

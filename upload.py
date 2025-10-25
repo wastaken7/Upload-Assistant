@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import aiofiles
 import asyncio
 import cli_ui
 import discord
@@ -125,6 +126,44 @@ def update_oeimg_to_onlyimage():
         console.print("[yellow]No 'oeimg' or 'oeimg_api' found to update in config.py[/yellow]")
 
 
+async def validate_tracker_logins(meta, trackers=None):
+    if 'tracker_status' not in meta:
+        meta['tracker_status'] = {}
+
+    # Filter trackers that are in both the list and tracker_class_map
+    valid_trackers = [tracker for tracker in trackers if tracker in tracker_class_map and tracker in http_trackers]
+    if "RTF" in trackers:
+        valid_trackers.append("RTF")
+
+    if valid_trackers:
+
+        async def validate_single_tracker(tracker_name):
+            """Validate credentials for a single tracker."""
+            try:
+                if tracker_name not in meta['tracker_status']:
+                    meta['tracker_status'][tracker_name] = {}
+
+                tracker_class = tracker_class_map[tracker_name](config=config)
+                if meta['debug']:
+                    console.print(f"[cyan]Validating {tracker_name} credentials...[/cyan]")
+                if tracker_name == "RTF":
+                    login = await tracker_class.api_test(meta)
+                else:
+                    login = await tracker_class.validate_credentials(meta)
+
+                if not login:
+                    meta['tracker_status'][tracker_name]['skipped'] = True
+
+                return tracker_name, login
+            except Exception as e:
+                console.print(f"[red]Error validating {tracker_name}: {e}[/red]")
+                meta['tracker_status'][tracker_name]['skipped'] = True
+                return tracker_name, False
+
+        # Run all tracker validations concurrently
+        await asyncio.gather(*[validate_single_tracker(tracker) for tracker in valid_trackers])
+
+
 async def process_meta(meta, base_dir, bot=None):
     """Process the metadata for each queued path."""
     if use_discord and bot:
@@ -150,7 +189,6 @@ async def process_meta(meta, base_dir, bot=None):
         if str(ua).lower() == "true":
             meta['unattended'] = True
             console.print("[yellow]Running in Auto Mode")
-    meta['base_dir'] = base_dir
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     try:
         results = await asyncio.gather(
@@ -187,21 +225,6 @@ async def process_meta(meta, base_dir, bot=None):
     helper = UploadHelper()
 
     if not meta.get('emby', False):
-        if meta.get('trackers'):
-            trackers = meta['trackers']
-        else:
-            default_trackers = config['TRACKERS'].get('default_trackers', '')
-            trackers = [tracker.strip() for tracker in default_trackers.split(',')]
-
-        if isinstance(trackers, str):
-            if "," in trackers:
-                trackers = [t.strip().upper() for t in trackers.split(',')]
-            else:
-                trackers = [trackers.strip().upper()]  # Make it a list with one element
-        else:
-            trackers = [t.strip().upper() for t in trackers]
-        meta['trackers'] = trackers
-
         if meta.get('trackers_remove', False):
             remove_list = [t.strip().upper() for t in meta['trackers_remove'].split(',')]
             for tracker in remove_list:
@@ -319,7 +342,7 @@ async def process_meta(meta, base_dir, bot=None):
         trackers = meta['trackers']
 
         audio_prompted = False
-        for tracker in ["AITHER", "ASC", "BJS", "BT", "CBR", "DP", "FF", "GPW", "HUNO", "LDU", "OE", "PTS", "SAM", "SHRI", "SPD", "ULCX"]:
+        for tracker in ["AITHER", "ASC", "BJS", "BT", "CBR", "DP", "FF", "GPW", "HUNO", "LDU", "LT", "OE", "PTS", "SAM", "SHRI", "SPD", "ULCX"]:
             if tracker in trackers:
                 if not audio_prompted:
                     await process_desc_language(meta, desc=None, tracker=tracker)
@@ -339,6 +362,12 @@ async def process_meta(meta, base_dir, bot=None):
             json.dump(meta, f, indent=4)
         await asyncio.sleep(0.2)
 
+        try:
+            await validate_tracker_logins(meta, trackers)
+            await asyncio.sleep(0.2)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
+
         successful_trackers = await process_all_trackers(meta)
 
         if meta.get('trackers_pass') is not None:
@@ -351,6 +380,52 @@ async def process_meta(meta, base_dir, bot=None):
 
     else:
         meta['we_are_uploading'] = True
+        common = COMMON(config)
+        if meta.get('site_check', False):
+            for tracker in meta['trackers']:
+                upload_status = meta['tracker_status'].get(tracker, {}).get('upload', False)
+                if not upload_status:
+                    if tracker == "AITHER" and meta.get('aither_trumpable') and len(meta.get('aither_trumpable', [])) > 0:
+                        pass
+                    else:
+                        continue
+                if tracker not in meta['tracker_status']:
+                    continue
+
+                log_path = f"{base_dir}/tmp/{tracker}_search_results.json"
+                if not await common.path_exists(log_path):
+                    await common.makedirs(os.path.dirname(log_path))
+
+                search_data = []
+                if os.path.exists(log_path):
+                    try:
+                        async with aiofiles.open(log_path, 'r', encoding='utf-8') as f:
+                            content = await f.read()
+                            search_data = json.loads(content) if content.strip() else []
+                    except Exception:
+                        search_data = []
+
+                existing_uuids = {entry.get('uuid') for entry in search_data if isinstance(entry, dict)}
+
+                if meta['uuid'] not in existing_uuids:
+                    search_entry = {
+                        'uuid': meta['uuid'],
+                        'path': meta.get('path', ''),
+                        'imdb_id': meta.get('imdb_id', 0),
+                        'tmdb_id': meta.get('tmdb_id', 0),
+                        'tvdb_id': meta.get('tvdb_id', 0),
+                        'mal_id': meta.get('mal_id', 0),
+                        'tvmaze_id': meta.get('tvmaze_id', 0),
+                    }
+                    if tracker == "AITHER":
+                        search_entry['trumpable'] = meta.get('aither_trumpable', '')
+                    search_data.append(search_entry)
+
+                    async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
+                        await f.write(json.dumps(search_data, indent=4))
+            meta['we_are_uploading'] = False
+            return
+
         filename = meta.get('title', None)
         bdmv_filename = meta.get('filename', None)
         bdinfo = meta.get('bdinfo', None)
@@ -370,7 +445,6 @@ async def process_meta(meta, base_dir, bot=None):
             upload_status = meta['tracker_status'].get(tracker, {}).get('upload', False)
             if tracker in trackers and upload_status is True:
                 if not bdmv_mi_created:
-                    common = COMMON(config)
                     await common.get_bdmv_mediainfo(meta)
                     bdmv_mi_created = True
 
@@ -743,6 +817,7 @@ async def do_the_thing(base_dir):
     if meta.get('current_version', ''):
         signature += f" {meta['current_version']}"
     meta['ua_signature'] = signature
+    meta['base_dir'] = base_dir
 
     cleanup_only = any(arg in ('--cleanup', '-cleanup') for arg in sys.argv) and len(sys.argv) <= 2
     sanitize_meta = config['DEFAULT'].get('sanitize_meta', True)
@@ -791,6 +866,7 @@ async def do_the_thing(base_dir):
         processed_files_count = 0
         skipped_files_count = 0
         base_meta = {k: v for k, v in meta.items()}
+
         for path in queue:
             total_files = len(queue)
             try:
@@ -873,18 +949,19 @@ async def do_the_thing(base_dir):
             await process_meta(meta, base_dir, bot=bot)
 
             if 'we_are_uploading' not in meta or not meta.get('we_are_uploading', False):
-                if not meta.get('emby', False):
-                    console.print("we are not uploading.......")
-                if 'queue' in meta and meta.get('queue') is not None:
-                    processed_files_count += 1
+                if not meta.get('site_check', False):
                     if not meta.get('emby', False):
-                        skipped_files_count += 1
-                        console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.")
-                    else:
-                        console.print(f"[cyan]Processed {processed_files_count}/{total_files}.")
-                    if not meta['debug'] or "debug" in os.path.basename(log_file):
-                        if log_file:
-                            await save_processed_file(log_file, path)
+                        console.print("we are not uploading.......")
+                    if 'queue' in meta and meta.get('queue') is not None:
+                        processed_files_count += 1
+                        if not meta.get('emby', False):
+                            skipped_files_count += 1
+                            console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.")
+                        else:
+                            console.print(f"[cyan]Processed {processed_files_count}/{total_files}.")
+                        if not meta['debug'] or "debug" in os.path.basename(log_file):
+                            if log_file:
+                                await save_processed_file(log_file, path)
 
             else:
                 console.print()
@@ -951,10 +1028,23 @@ async def do_the_thing(base_dir):
                     await send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get('debug', False), meta=meta)
 
             find_requests = config['DEFAULT'].get('search_requests', False) if meta.get('search_requests') is None else meta.get('search_requests')
-            if find_requests:
+            if find_requests and meta['trackers'] not in ([], None) and not (meta.get('site_check', False) and 'is_disc' not in meta):
                 console.print("[green]Searching for requests on supported trackers.....")
                 tracker_setup = TRACKER_SETUP(config=config)
-                await tracker_setup.tracker_request(meta, meta['trackers'])
+                if meta.get('site_check', False):
+                    trackers = meta['requested_trackers']
+                else:
+                    trackers = meta['trackers']
+                await tracker_setup.tracker_request(meta, trackers)
+
+            if meta.get('site_check', False):
+                if 'queue' in meta and meta.get('queue') is not None:
+                    processed_files_count += 1
+                    skipped_files_count += 1
+                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files.")
+                    if not meta['debug'] or "debug" in os.path.basename(log_file):
+                        if log_file:
+                            await save_processed_file(log_file, path)
 
             if sanitize_meta and not meta.get('emby', False):
                 try:

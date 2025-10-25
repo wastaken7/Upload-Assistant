@@ -20,6 +20,7 @@ class DP(UNIT3D):
         self.base_url = 'https://darkpeers.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'
+        self.requests_url = f'{self.base_url}/api/requests/filter'
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = [
@@ -41,23 +42,20 @@ class DP(UNIT3D):
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta['skipping'] = {self.tracker}
                     return False
             else:
-                meta['skipping'] = {self.tracker}
                 return False
+
         if not meta.get('language_checked', False):
             await process_desc_language(meta, desc=None, tracker=self.tracker)
         nordic_languages = ['Danish', 'Swedish', 'Norwegian', 'Icelandic', 'Finnish', 'English']
         if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
             console.print(f'[bold red]{self.tracker} requires at least one Nordic/English audio or subtitle track.')
-            meta['skipping'] = {self.tracker}
             return False
 
         if meta['type'] == "ENCODE" and meta.get('tag', "") and 'fgt' in meta['tag'].lower():
             if not meta['unattended']:
                 console.print(f"[bold red]{self.tracker} does not allow FGT encodes, skipping upload.")
-            meta['skipping'] = {self.tracker}
             return False
 
         return should_continue

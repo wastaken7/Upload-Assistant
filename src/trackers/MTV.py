@@ -36,9 +36,14 @@ class MTV():
         self.forum_link = 'https://www.morethantv.me/wiki.php?action=article&id=73'
         self.search_url = 'https://www.morethantv.me/api/torznab'
         self.banned_groups = [
-            'aXXo', 'BRrip', 'CM8', 'CrEwSaDe', 'DNL', 'FaNGDiNG0', 'FRDS', 'HD2DVD', 'HDTime', 'iPlanet',
-            'KiNGDOM', 'Leffe', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'PRODJi', 'RDN', 'SANTi',
-            'STUTTERSHIT', 'TERMiNAL', 'ViSION', 'WAF', 'x0r', 'YIFY', ['EVO', 'WEB-DL Only']
+            '3LTON', '[Oj]', 'aXXo', 'BDP', 'BRrip', 'CM8', 'CrEwSaDe', 'CMCT',
+            'DeadFish', 'DNL', 'ELiTE', 'AFG', 'ZMNT',
+            'FaNGDiNG0', 'FRDS', 'FUM', 'h65', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet', 'JIVE',
+            'KiNGDOM', 'LAMA', 'Leffe', 'LOAD', 'mHD', 'mRS', 'mSD', 'NhaNc3', 'nHD', 'nikt0', 'nSD',
+            'PandaRG', 'PRODJi', 'QxR', 'RARBG', 'RDN', 'SANTi', 'STUTTERSHIT',
+            'TERMiNAL',  # TERMiNAL: low bitrate UHD
+            'TM', 'ViSiON',  # ViSiON: Xvid releases -- re-encoded
+            'WAF', 'x0r', 'XS', 'YIFY', 'ZKBL', 'ZmN'
         ]
         pass
 
@@ -474,26 +479,8 @@ class MTV():
                 return vcookie
             else:
                 return False
-        vapi = await self.validate_api()
-        if vapi is not True:
-            console.print('[red]Failed to validate API. Please confirm that the site is up and your API key is valid.')
-        return True
 
-    async def validate_api(self):
-        url = self.search_url
-        params = {
-            'apikey': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
-        }
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.get(url=url, params=params)
-                if not response.is_success:
-                    if "unauthorized api key" in response.text.lower():
-                        console.print("[red]Invalid API Key")
-                    return False
-                return True
-        except Exception:
-            return False
+        return True
 
     async def validate_cookies(self, meta, cookiefile):
         url = "https://www.morethantv.me/index.php"
@@ -508,7 +495,7 @@ class MTV():
                     try:
                         resp = await client.get(url=url)
                         if meta['debug']:
-                            console.print('[cyan]Validating Cookies:')
+                            console.print('[cyan]Validating MTV Cookies:')
 
                         if "Logout" in resp.text:
                             return True
@@ -632,6 +619,58 @@ class MTV():
         return False
 
     async def search_existing(self, meta, disctype):
+        if meta.get('bloated', False):
+            console.print(f'[bold red]Bloated releases are not allowed at {self.tracker}[/bold red]')
+            meta['skipping'] = "MTV"
+            return []
+        if meta['type'] not in ['WEBDL']:
+            if meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content at {self.tracker}[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        meta['skipping'] = "MTV"
+                        return []
+                else:
+                    meta['skipping'] = "MTV"
+                    return []
+
+        allowed_anime = ['Thighs', 'sam', 'Vanilla', 'OZR', 'Netaro', 'Datte13', 'UDF', 'Baws', 'ARC', 'Dae', 'MTBB',
+                         'Okay-Subs', 'hchcsen', 'Noyr', 'TTGA', 'GJM', 'Kaleido-Subs', 'GJM-Kaleido', 'LostYears',
+                         'Reza', 'Aergia', 'Drag', 'Crow', 'Arid', 'JySzE', 'iKaos', 'Spirale', 'CsS', 'FLE', 'WSE',
+                         'Legion', 'AC', 'UQW', 'Commie', 'Chihiro']
+        if meta['resolution'] not in ['2160p'] and meta['video_codec'] in ['HEVC']:
+            if meta['anime'] and meta.get('tag', "") and not any(x in meta['tag'] for x in allowed_anime):
+                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    console.print(f'[bold red]Only 4K HEVC anime releases from {meta["tag"]} are allowed at {self.tracker}[/bold red]')
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        meta['skipping'] = "MTV"
+                        return []
+            else:
+                console.print(f'[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]')
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    meta['skipping'] = "MTV"
+                    return []
+
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn'}
+        disallowed_genres = {'Adult', 'Erotica'}
+        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])) or any(genre.lower() in disallowed_genres for genre in map(str.lower, meta.get('combined_genres', []))):
+            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))):
+                console.print(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    meta['skipping'] = "MTV"
+                    return []
+            else:
+                meta['skipping'] = "MTV"
+                return []
+
         dupes = []
 
         # Build request parameters

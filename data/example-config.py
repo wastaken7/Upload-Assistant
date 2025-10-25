@@ -153,6 +153,9 @@ config = {
         # Which client are you using.
         "default_torrent_client": "qbittorrent",
 
+        # Use this client for injection (aka actually adding the torrent for uploading)
+        "inject_torrent_client": "",
+
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
 
@@ -286,7 +289,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, AL, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IM, ITT, LCD, LDU, LST, LT, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TTG, TVC, UHD, ULCX, UTP, YOINK, YUS
+        # Available tracker: ACM, AITHER, AL, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IM, ITT, LCD, LDU, LST, LT, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TTG, TVC, UHD, ULCX, UTP, YOINK, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -434,6 +437,14 @@ config = {
             "anon": False,
             # Send uploads to DP modq for staff approval
             "modq": False,
+        },
+        "EMUW": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "api_key": "",
+            "anon": False,
+            # Use Spanish title instead of English title, if available
+            "use_spanish_title": False,
         },
         "FF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -781,6 +792,8 @@ config = {
         "TVC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # 2 is listed as max images in rules. Please do not change unless you have permission
+            "image_count": 2,
             "api_key": "",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
             "anon": False,
@@ -871,6 +884,19 @@ config = {
 
             # Set to False to skip verify certificate for HTTPS connections; for instance, if the connection is using a self-signed certificate.
             # "VERIFY_WEBUI_CERTIFICATE": True,
+        },
+        "qbittorrent_searching": {
+            # an example of using a qBitTorrent client just for searching, when using another client for injection
+            "torrent_client": "qbit",
+            # qui reverse proxy url, see https://github.com/autobrr/qui#reverse-proxy-for-external-applications
+            # If using the qui reverse proxy, no other auth type needs to be set
+            "qui_proxy_url": "",
+            # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
+            "enable_search": True,
+            "qbit_url": "http://127.0.0.1",
+            "qbit_port": "8080",
+            "qbit_user": "",
+            "qbit_pass": "",
         },
         "rtorrent": {
             "torrent_client": "rtorrent",
