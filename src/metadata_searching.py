@@ -538,10 +538,10 @@ async def get_tv_data(meta):
             meta['auto_episode_title'] = meta['tvdb_episode_name']
         if meta['tvdb_overview']:
             meta['overview_meta'] = meta['tvdb_overview']
-        if meta['tvdb_season'] is not None and meta['tvdb_season'] != meta.get('season_int', None):
+        if meta['tvdb_season'] is not None and meta['tvdb_season'] != meta.get('season_int', None) and not meta.get('season', None) and not meta.get('no_season', False) and not meta.get('manual_date', None):
             meta['season_int'] = int(meta['tvdb_season'])
             meta['season'] = f"S{meta['tvdb_season']:02d}"
-        if meta['tvdb_episode'] is not None and meta['tvdb_episode'] != meta.get('episode_int', None):
+        if meta['tvdb_episode'] is not None and meta['tvdb_episode'] != meta.get('episode_int', None) and not meta.get('episode', None) and not meta.get('manual_date', None):
             meta['episode_int'] = int(meta['tvdb_episode'])
             meta['episode'] = f"E{meta['tvdb_episode']:02d}"
 
