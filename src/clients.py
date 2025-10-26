@@ -2123,15 +2123,16 @@ class Clients():
                     has_working_tracker = False
 
                     if is_match:
+                        url = torrent.tracker if torrent.tracker else []
                         try:
                             if proxy_url:
-                                async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/trackers",
+                                async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties",
                                                            params={'hash': torrent.hash}) as response:
                                     if response.status == 200:
-                                        torrent_trackers = await response.json()
+                                        torrent_properties = await response.json()
                                     else:
                                         if meta['debug']:
-                                            console.print(f"[yellow]Failed to get trackers for torrent {torrent.name} via proxy: {response.status}")
+                                            console.print(f"[yellow]Failed to get properties for torrent {torrent.name} via proxy: {response.status}")
                                         continue
                             else:
                                 torrent_trackers = await self.retry_qbt_operation(
@@ -2147,39 +2148,43 @@ class Clients():
                                 console.print(f"[yellow]Error getting trackers for torrent {torrent.name}: {e}")
                             continue
 
-                        try:
-                            display_trackers = []
+                        if torrent_properties:
+                            torrent.comment = torrent_properties.get('comment', '')
+                            has_working_tracker = True
+                        else:
+                            try:
+                                display_trackers = []
 
-                            # Filter out DHT, PEX, LSD "trackers"
-                            for tracker in torrent_trackers:
-                                if tracker.get('url', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
-                                    continue
-                                display_trackers.append(tracker)
+                                # Filter out DHT, PEX, LSD "trackers"
+                                for tracker in torrent_trackers:
+                                    if tracker.get('url', []).startswith(('** [DHT]', '** [PeX]', '** [LSD]')):
+                                        continue
+                                    display_trackers.append(tracker)
 
-                                for tracker in display_trackers:
-                                    url = tracker.get('url', 'Unknown URL')
-                                    status_code = tracker.get('status', 0)
-                                    status_text = {
-                                        0: "Disabled",
-                                        1: "Not contacted",
-                                        2: "Working",
-                                        3: "Updating",
-                                        4: "Error"
-                                    }.get(status_code, f"Unknown ({status_code})")
+                                    for tracker in display_trackers:
+                                        url = tracker.get('url', 'Unknown URL')
+                                        status_code = tracker.get('status', 0)
+                                        status_text = {
+                                            0: "Disabled",
+                                            1: "Not contacted",
+                                            2: "Working",
+                                            3: "Updating",
+                                            4: "Error"
+                                        }.get(status_code, f"Unknown ({status_code})")
 
-                                    if status_code == 2:
-                                        has_working_tracker = True
-                                        if meta['debug']:
-                                            console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
+                                        if status_code == 2:
+                                            has_working_tracker = True
+                                            if meta['debug']:
+                                                console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
 
-                                    elif meta['debug']:
-                                        msg = tracker.get('msg', '')
-                                        console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
+                                        elif meta['debug']:
+                                            msg = tracker.get('msg', '')
+                                            console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
 
-                        except qbittorrentapi.APIError as e:
-                            if meta['debug']:
-                                console.print(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
-                            continue
+                            except qbittorrentapi.APIError as e:
+                                if meta['debug']:
+                                    console.print(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
+                                continue
 
                         if 'torrent_comments' not in meta:
                             meta['torrent_comments'] = []
