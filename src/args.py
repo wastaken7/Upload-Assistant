@@ -380,9 +380,19 @@ class Args():
                 else:
                     meta[key] = value
             if key in ("manual_dvds"):
-                meta[key] = value
+                if isinstance(value, list) and len(value) == 1:
+                    meta[key] = value[0]
+                elif value not in (None, [], ""):
+                    meta[key] = value
+                else:
+                    meta[key] = ""
             if key in ("freeleech"):
-                meta[key] = 100
+                if isinstance(value, list) and len(value) == 1:
+                    meta[key] = int(value[0])
+                elif value not in (None, [], 0):
+                    meta[key] = int(value)
+                else:
+                    meta[key] = 0
             if key in ("tag") and value == []:
                 meta[key] = ""
             if key in ["manual_episode_title"] and value == []:
@@ -390,7 +400,10 @@ class Args():
             if key in ["manual_episode_title"]:
                 meta[key] = value
             if key in ["tvmaze_manual"]:
-                meta[key] = value
+                if isinstance(value, list) and len(value) == 1:
+                    meta[key] = value[0]
+                elif value not in (None, []):
+                    meta[key] = value
             if key == 'trackers':
                 if value:
                     # Extract from list if it's a single-item list (from nargs=1)
@@ -423,8 +436,6 @@ class Args():
                         meta[key] = [str(tracker_value).upper()]
                 else:
                     meta[key] = []
-            else:
-                meta[key] = meta.get(key, None)
             # if key == 'help' and value == True:
                 # parser.print_help()
         return meta, parser, before_args
