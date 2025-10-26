@@ -89,6 +89,9 @@ config = {
         # Some systems are slow to compile libtorrent shaders, which will cause the first screenshot to fail
         "ffmpeg_warmup": False,
 
+        # Set ffmpeg compression level for screenshots (0-9)
+        "ffmpeg_compression": "6",
+
         # Tonemap screenshots with the following settings (doesn't apply when using libplacebo)
         # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
         "algorithm": "mobius",
@@ -146,9 +149,6 @@ config = {
 
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         "screenshot_header": "",
-
-        # Enable lossless PNG Compression (True/False)
-        "optimize_images": True,
 
         # Which client are you using.
         "default_torrent_client": "qbittorrent",
