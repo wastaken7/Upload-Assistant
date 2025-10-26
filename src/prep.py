@@ -272,56 +272,69 @@ class Prep():
 
             video, meta['scene'], meta['imdb_id'] = await is_scene(videopath, meta, meta.get('imdb_id', 0))
 
-            title, secondary_title, extracted_year = await extract_title_and_year(meta, video)
-            if meta['debug']:
-                console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
-            if secondary_title:
-                meta['secondary_title'] = secondary_title
-            if extracted_year and not meta.get('year'):
-                meta['year'] = extracted_year
+            try:
+                title, secondary_title, extracted_year = await extract_title_and_year(meta, video)
+                if meta['debug']:
+                    console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
+                if secondary_title:
+                    meta['secondary_title'] = secondary_title
+                if extracted_year and not meta.get('year'):
+                    meta['year'] = extracted_year
 
-            if meta.get('isdir', False):
-                guess_name = os.path.basename(meta['path']).replace("_", "").replace("-", "") if meta['path'] else ""
-            else:
-                guess_name = ntpath.basename(video).replace('-', ' ')
-
-            if title:
-                filename = title
-                meta['regex_title'] = title
-                meta['regex_secondary_title'] = secondary_title
-                meta['regex_year'] = extracted_year
-            else:
-                try:
-                    filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
-                except Exception:
-                    try:
-                        guess_name = ntpath.basename(video).replace('-', ' ')
-                        filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
-                    except Exception as e:
-                        return Exception(f"[red]Error extracting title from video name: {e}[/red]")
-
-            untouched_filename = os.path.basename(video)
-
-            if not meta.get('emby', False):
-                # rely only on guessit for search_year for tv matching
-                try:
-                    meta['search_year'] = guessit(video)['year']
-                except Exception:
-                    meta['search_year'] = ""
-
-                if not meta.get('edit', False):
-                    mi = await exportInfo(videopath, meta['isdir'], meta['uuid'], base_dir, export_text=True)
-                    meta['mediainfo'] = mi
+                if meta.get('isdir', False):
+                    guess_name = os.path.basename(meta['path']).replace("_", "").replace("-", "") if meta['path'] else ""
                 else:
-                    mi = meta['mediainfo']
+                    guess_name = ntpath.basename(video).replace('-', ' ')
+            except Exception as e:
+                console.print(f"[red]Error extracting title and year: {e}[/red]")
+                raise Exception(f"Error extracting title and year: {e}")
 
-                if meta.get('resolution', None) is None:
-                    meta['resolution'], meta['hfr'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
+            try:
+                if title:
+                    filename = title
+                    meta['regex_title'] = title
+                    meta['regex_secondary_title'] = secondary_title
+                    meta['regex_year'] = extracted_year
+                else:
+                    try:
+                        filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
+                    except Exception:
+                        try:
+                            guess_name = ntpath.basename(video).replace('-', ' ')
+                            filename = guessit(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes": ["country", "language"]})["title"])
+                        except Exception as e:
+                            console.print(f"[red]Error extracting title from video name: {e}[/red]")
+                            raise Exception(f"Error extracting title from video name: {e}")
 
-                meta['sd'] = await is_sd(meta['resolution'])
-            else:
-                meta['resolution'] = "1080p"
-                meta['search_year'] = ""
+                untouched_filename = os.path.basename(video)
+            except Exception as e:
+                console.print(f"[red]Error processing filename: {e}[/red]")
+                raise Exception(f"Error processing filename: {e}")
+
+            try:
+                if not meta.get('emby', False):
+                    # rely only on guessit for search_year for tv matching
+                    try:
+                        meta['search_year'] = guessit(video)['year']
+                    except Exception:
+                        meta['search_year'] = ""
+
+                    if not meta.get('edit', False):
+                        mi = await exportInfo(videopath, meta['isdir'], meta['uuid'], base_dir, export_text=True)
+                        meta['mediainfo'] = mi
+                    else:
+                        mi = meta['mediainfo']
+
+                    if meta.get('resolution', None) is None:
+                        meta['resolution'], meta['hfr'] = await get_resolution(guessit(video), meta['uuid'], base_dir)
+
+                    meta['sd'] = await is_sd(meta['resolution'])
+                else:
+                    meta['resolution'] = "1080p"
+                    meta['search_year'] = ""
+            except Exception as e:
+                console.print(f"[red]Error processing Mediainfo: {e}[/red]")
+                raise Exception(f"Error processing Mediainfo: {e}")
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
@@ -353,7 +366,8 @@ class Prep():
                                 console.print(f"[yellow]Removed temporary metadata file: {file_path}[/yellow]")
                     except Exception as e:
                         console.print(f"[red]Error cleaning up temporary metadata files: {e}[/red]", highlight=False)
-                return Exception("Conformance errors found in mediainfo")
+                console.print("[red]Not uploading due to conformance errors.[/red]")
+                raise Exception("Conformance errors found in mediainfo")
 
         meta['valid_mi'] = True
         if not meta['is_disc'] and not meta.get('emby', False):
@@ -379,8 +393,8 @@ class Prep():
                     console.print(f"[red] None of the required languages ({meta['has_languages']}) is available on the file {audio_languages}")
                     raise Exception("No matching languages")
             except Exception as e:
-                console.print(f"[red]{e}")
-                return Exception("Language check failed")
+                console.print(f"[red]{e}[/red]")
+                raise Exception("Language check failed")
 
         if not meta.get('emby', False):
             if 'description' not in meta or meta.get('description') is None:
