@@ -128,6 +128,7 @@ class Clients():
         # Determine piece size preferences
         mtv_config = self.config['TRACKERS'].get('MTV')
         piece_limit = self.config['DEFAULT'].get('prefer_max_16_torrent', False)
+        mtv_torrent = False
         if isinstance(mtv_config, dict):
             mtv_torrent = mtv_config.get('prefer_mtv_torrent', False)
             prefer_small_pieces = mtv_torrent
@@ -1883,6 +1884,7 @@ class Clients():
         try:
             mtv_config = self.config['TRACKERS'].get('MTV')
             piece_limit = self.config['DEFAULT'].get('prefer_max_16_torrent', False)
+            mtv_torrent = False
             if isinstance(mtv_config, dict):
                 mtv_torrent = mtv_config.get('prefer_mtv_torrent', False)
                 # MTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
