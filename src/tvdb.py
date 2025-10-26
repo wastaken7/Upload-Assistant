@@ -79,19 +79,85 @@ class tvdb_data:
 
     async def get_tvdb_episodes(self, series_id, debug=False):
         try:
-            # Get all episodes for the series
-            episodes = tvdb.get_series_episodes(
-                series_id,
-                season_type="default",
-                lang="eng"
-            )
+            # Get all episodes for the series with pagination
+            all_episodes = []
+            page = 0
+            max_pages = 10  # Safety limit to prevent infinite loops
+
+            while page < max_pages:
+                if debug and page > 0:
+                    console.print(f"[cyan]Fetching TVDB episodes page {page + 1}[/cyan]")
+
+                try:
+                    episodes_response = tvdb.get_series_episodes(
+                        series_id,
+                        season_type="default",
+                        page=page,
+                        lang="eng"
+                    )
+
+                    # Handle both dict response and direct episodes list
+                    if isinstance(episodes_response, dict):
+                        current_episodes = episodes_response.get('episodes', [])
+                    else:
+                        # Fallback for direct list response
+                        current_episodes = episodes_response if isinstance(episodes_response, list) else []
+
+                    if not current_episodes:
+                        if debug:
+                            console.print(f"[yellow]No episodes found on page {page + 1}, stopping pagination[/yellow]")
+                        break
+
+                    all_episodes.extend(current_episodes)
+
+                    if debug:
+                        console.print(f"[cyan]Retrieved {len(current_episodes)} episodes from page {page + 1} (total: {len(all_episodes)})[/cyan]")
+
+                    # If we got fewer than 500 results, we've reached the end
+                    if len(current_episodes) < 500:
+                        if debug:
+                            console.print(f"[cyan]Page {page + 1} returned {len(current_episodes)} episodes (< 500), pagination complete[/cyan]")
+                        break
+
+                    page += 1
+                    await asyncio.sleep(0.1)  # Rate limiting
+
+                except Exception as page_error:
+                    if debug:
+                        console.print(f"[yellow]Error fetching page {page + 1}: {page_error}[/yellow]")
+                    # If first page fails, re-raise; otherwise, stop pagination
+                    if page == 0:
+                        raise page_error
+                    else:
+                        break
+
+            if debug:
+                console.print(f"[green]Total episodes retrieved: {len(all_episodes)} across {page + 1} page(s)[/green]")
+
+            # Create the response structure
+            episodes_data = {
+                'episodes': all_episodes,
+                'aliases': []  # Will be populated if available from first response
+            }
+
+            # Try to get aliases from series info (may need separate call)
+            try:
+                if all_episodes:
+                    # Get series details for aliases
+                    series_info = tvdb.get_series_extended(series_id)
+                    if 'aliases' in series_info:
+                        episodes_data['aliases'] = series_info['aliases']
+            except Exception as alias_error:
+                if debug:
+                    console.print(f"[yellow]Could not retrieve series aliases: {alias_error}[/yellow]")
+
             # Extract specific English alias only if it contains a year (e.g., "Cats eye (2025)")
             specific_alias = None
-            if 'aliases' in episodes:
+            if 'aliases' in episodes_data and episodes_data['aliases']:
                 # Pattern to match a 4-digit year in parentheses
                 year_pattern = re.compile(r'\((\d{4})\)')
                 eng_aliases = [
-                    alias['name'] for alias in episodes['aliases']
+                    alias['name'] for alias in episodes_data['aliases']
                     if alias.get('language') == 'eng' and year_pattern.search(alias['name'])
                 ]
                 if eng_aliases:
@@ -99,7 +165,8 @@ class tvdb_data:
                     specific_alias = eng_aliases[-1]
                     if debug:
                         console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
-            return episodes, specific_alias
+
+            return episodes_data, specific_alias
 
         except Exception as e:
             console.print(f"[red]Error getting episodes: {e}[/red]")
