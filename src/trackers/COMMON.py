@@ -174,6 +174,8 @@ class COMMON():
             screensPerRow = int(self.config['DEFAULT'].get('screens_per_row', 2))
         except Exception:
             screensPerRow = 2
+        if tracker == "HUNO" and signature != "":
+            signature = signature.replace("[size=4]", "[size=8]")
         try:
             # If custom signature set and isn't empty, use that instead of the signature parameter
             custom_signature = self.config['TRACKERS'][tracker].get('custom_signature', signature)
