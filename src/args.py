@@ -436,6 +436,8 @@ class Args():
                         meta[key] = [str(tracker_value).upper()]
                 else:
                     meta[key] = []
+            else:
+                meta[key] = meta.get(key, None)
             # if key == 'help' and value == True:
                 # parser.print_help()
         return meta, parser, before_args
