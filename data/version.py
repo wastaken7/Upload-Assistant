@@ -1,4 +1,15 @@
-__version__ = "v6.2.0"
+__version__ = "v6.2.1"
+
+"""
+Release Notes for version v6.2.1 (2025-10-26):
+
+# ## What's Changed
+# 
+# * fix: prevent error with missing config by @Audionut in 1398458
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v6.2.0...v6.2.1
+"""
+
 
 """
 Release Notes for version v6.2.0 (2025-10-26):
