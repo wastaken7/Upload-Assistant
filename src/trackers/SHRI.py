@@ -411,14 +411,15 @@ class SHRI(UNIT3D):
         1. DV profile (05/07/08) + no encoding -> WEB-DL (overrides source field)
         2. CRF in settings -> WEBRIP/ENCODE
         3. Service fingerprints -> WEB-DL (CR/Netflix patterns)
-        4. BluRay empty metadata -> ENCODE (GPU stripped)
-        5. Encoding tools (source-aware) -> WEBRIP/ENCODE
+        4. BluRay encoding detection -> ENCODE (settings, library, or GPU stripped metadata)
+        5. Encoding tools (source-aware) -> WEBRIP/ENCODE (Handbrake/Staxrip/etc in general track)
         6. No encoding + WEB -> WEB-DL
-        7. No encoding + disc -> REMUX
+        7. Service override -> WEB-DL (handles misdetected sources)
+        8. No encoding + disc -> REMUX
         """
 
         def has_encoding_tools(general_track, tools):
-            """Check if general track contains specified encoding tools"""
+            """Check if general track contains specified encoding tools."""
             encoded_app = str(general_track.get("Encoded_Application", "")).lower()
             extra = general_track.get("extra", {})
             writing_frontend = str(extra.get("Writing_frontend", "")).lower()
@@ -448,23 +449,27 @@ class SHRI(UNIT3D):
             encoding_settings = str(raw_settings).lower() if has_settings else ""
             encoded_library = str(raw_library).lower() if has_library else ""
 
-            # Priority 1: DV profiles 5/7/8 indicate streaming (overrides source field)
+            # ===== Priority 1: DV streaming profiles =====
+            # DV profiles 5/7/8 indicate streaming sources (overrides source field)
             hdr_profile = video_track.get("HDR_Format_Profile", "")
             has_streaming_dv = any(
                 prof in hdr_profile for prof in ["dvhe.05", "dvhe.07", "dvhe.08"]
             )
 
             if has_streaming_dv and not encoding_settings:
+                # Ensure not re-encoded by user tools
                 if not has_encoding_tools(
                     general_track, ["handbrake", "staxrip", "megatagger"]
                 ):
                     return "WEBDL"
 
-            # Priority 2: CRF indicates user re-encode
+            # ===== Priority 2: CRF detection =====
+            # CRF (Constant Rate Factor) indicates user re-encode
             if "crf=" in encoding_settings:
                 return "WEBRIP" if any("WEB" in s for s in source) else "ENCODE"
 
-            # Priority 3: Service fingerprints
+            # ===== Priority 3: Service fingerprints =====
+            # Crunchyroll detection
             if service == "CR":
                 if "core 142" in encoded_library:
                     return "WEBDL"
@@ -475,21 +480,24 @@ class SHRI(UNIT3D):
                 if encoding_settings and "bitrate=" in encoding_settings:
                     return "WEBDL"
 
-            # Netflix fingerprint
+            # Netflix fingerprint detection
             format_profile = video_track.get("Format_Profile", "")
             if "Main@L4.0" in format_profile and "rc=2pass" in encoding_settings:
                 if "core 118" in encoded_library or "core 148" in encoded_library:
                     return "WEBDL"
 
-            # Priority 4: BluRay empty metadata indicates GPU encode
+            # ===== Priority 4: BluRay encoding detection =====
             if any(s in ("BLURAY", "BLU-RAY") for s in source):
-                bit_depth = video_track.get("BitDepth")
-                chroma = video_track.get("ChromaSubsampling")
-                if isinstance(bit_depth, dict) and isinstance(chroma, dict):
+                # GPU encode detection: empty BitDepth/Chroma metadata (dict type)
+                if isinstance(video_track.get("BitDepth"), dict):
+                    return "ENCODE"
+                # Any encoding settings or library info = encode (not remux)
+                # Catches x264/x265 in Encoded_Library or settings in Encoded_Library_Settings
+                if has_settings or has_library:
                     return "ENCODE"
 
-            # Priority 5: Encoding tools (source-aware)
-            # BluRay: x264/x265 indicates re-encode
+            # ===== Priority 5: Encoding tools (source-aware) =====
+            # Check general track for encoding tools (Handbrake, Staxrip, etc)
             if any(s in ("BLURAY", "BLU-RAY") for s in source):
                 if has_encoding_tools(
                     general_track,
@@ -497,24 +505,37 @@ class SHRI(UNIT3D):
                 ):
                     return "ENCODE"
 
-            # WEB: only explicit user tools indicate re-encode
+            # WEB sources: only explicit user tools indicate re-encode
             if any("WEB" in s for s in source):
                 if has_encoding_tools(
                     general_track, ["handbrake", "staxrip", "megatagger"]
                 ):
                     return "WEBRIP"
 
-            # Priority 6: No encoding + WEB = WEB-DL
+            # ===== Priority 6: No encoding + WEB = WEB-DL =====
             if any("WEB" in s for s in source):
                 return "WEBDL"
 
-            # Priority 7: No encoding + disc = REMUX
+            # ===== Priority 7: Service override =====
+            # If streaming service is set but source wasn't detected as Web,
+            # override to WEB-DL (handles upstream get_source.py misdetection)
+            if service and service not in ("", "NONE"):
+                return "WEBDL"
+
+            # ===== Priority 8: No encoding + disc = REMUX =====
             if any(s in ("BLURAY", "BLU-RAY", "HDDVD") for s in source):
                 return "REMUX"
 
+            # DVD REMUX detection
+            if any(s in ("NTSC", "PAL", "NTSC DVD", "PAL DVD", "DVD") for s in source):
+                if not has_settings and not has_library:
+                    return "REMUX"
+
         except (IndexError, KeyError):
+            # Fallback on mediainfo parsing errors
             pass
 
+        # Final fallback: use meta type or default to ENCODE
         return meta.get("type", "ENCODE")
 
     def _get_effective_type(self, meta):

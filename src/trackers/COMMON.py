@@ -172,8 +172,15 @@ class COMMON():
         try:
             # If screensPerRow is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
             screensPerRow = int(self.config['DEFAULT'].get('screens_per_row', 2))
+            if tracker == "HUNO":
+                width = int(self.config['DEFAULT'].get('thumbnail_size', '350'))
+                # Adjust screensPerRow to keep total width below 1100
+                while screensPerRow * width > 1100 and screensPerRow > 1:
+                    screensPerRow -= 1
         except Exception:
             screensPerRow = 2
+        if tracker == "HUNO" and signature != "":
+            signature = signature.replace("[size=4]", "[size=8]")
         try:
             # If custom signature set and isn't empty, use that instead of the signature parameter
             custom_signature = self.config['TRACKERS'][tracker].get('custom_signature', signature)
