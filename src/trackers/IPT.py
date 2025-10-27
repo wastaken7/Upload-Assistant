@@ -337,7 +337,6 @@ class IPT:
             'name': meta['name'],
             'descr': await self.generate_description(meta),
             'type': await self.get_category_id(meta),
-            'imdb_id': str(meta.get('imdb_info', {}).get('imdbID', '')),
         }
 
         if await self.get_is_freeleech(meta):
@@ -356,7 +355,7 @@ class IPT:
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta)
 
-        await self.cookie_auth_uploader.handle_upload(
+        upload = await self.cookie_auth_uploader.handle_upload(
             meta=meta,
             tracker=self.tracker,
             source_flag=self.source_flag,
@@ -366,8 +365,29 @@ class IPT:
             torrent_name=await self.get_name(meta),
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/takeupload.php",
-            hash_is_id=True,
             error_text="Upload failed!",
+            id_pattern=r'download\.php/(\d+)/'
         )
 
+        if upload and self.config['TRACKERS'][self.tracker]['force_data']:
+            await self.edit_post_upload(meta)
+
         return
+
+    async def edit_post_upload(self, meta):
+        torrent_id = meta["tracker_status"][self.tracker]["torrent_id"]
+        data = {
+            'name': meta['name'],
+            'descr': await self.generate_description(meta),
+            'type': await self.get_category_id(meta),
+            'imdb_id': str(meta.get('imdb_info', {}).get('imdbID', '')),
+            'id': torrent_id,
+        }
+
+        edit_url = f"https://iptorrents.com/t/{torrent_id}/edit"
+
+        response = await self.session.post(edit_url, data=data)
+        if response.status_code == 302:
+            console.print(f"[bold green]{self.tracker}: Successfully edited torrent {torrent_id}[/bold green]")
+        else:
+            console.print(f"[bold red]{self.tracker}: Failed to edit torrent {torrent_id}. Status code: {response.status_code}[/bold red]")

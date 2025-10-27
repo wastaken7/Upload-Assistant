@@ -546,6 +546,11 @@ config = {
             # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # Cookies must be in Netscape format and saved in: data/cookies/IPT.txt
             "announce_url": "https://ssl.empirehost.me/<PASS_KEY/PID>/announce",
+            # By default, IPT removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
+            # It also does not have the option to set the IMDb during upload.
+            # Set this to True to edit the torrent after the upload to force the correct naming and IMDb.
+            "force_data": False,
+        },
         "IS": {
             # for IS to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/IS.txt
