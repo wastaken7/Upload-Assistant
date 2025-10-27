@@ -1,4 +1,18 @@
-__version__ = "v6.2.2"
+__version__ = "v6.2.3"
+
+"""
+Release Notes for version v6.2.3 (2025-10-27):
+
+# ## What's Changed
+# 
+# * set torrent_properties by @Audionut in 96d41b8
+# * discparse.py - Use BDInfo on PATH if available (Linux) (#952) by @noobiangodd in bd52996
+# * tvdb improvements by @Audionut in 5891db5
+# * BT: add internal upload support (#953) by @wastaken7 in daeadbe
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v6.2.2...v6.2.3
+"""
+
 
 """
 Release Notes for version v6.2.2 (2025-10-26):
