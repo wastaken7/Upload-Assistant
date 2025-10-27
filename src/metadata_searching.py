@@ -523,7 +523,7 @@ async def get_tv_data(meta):
             if tvdb_name:
                 meta['tvdb_series_name'] = tvdb_name
 
-        if meta.get('tvdb_series_name'):
+        if meta.get('tvdb_series_name', None):
             year = meta['tvdb_series_name']
             year_match = re.search(r'\b(19\d\d|20[0-3]\d)\b', year)
             if year_match:
@@ -531,17 +531,17 @@ async def get_tv_data(meta):
             else:
                 meta['search_year'] = ""
 
-        if meta.get('tvdb_episode_data', None):
+        if meta.get('tvdb_episode_data', None) and meta.get('tvdb_id', 0):
             meta['tvdb_season_name'], meta['tvdb_episode_name'], meta['tvdb_overview'], meta['tvdb_season'], meta['tvdb_episode'], meta['tvdb_episode_year'], meta['tvdb_episode_id'] = await tvdb_handler.get_specific_episode_data(meta['tvdb_episode_data'], meta.get('season_int', None), meta.get('episode_int', None), debug=meta.get('debug', False))
 
-        if meta['tvdb_episode_name']:
+        if meta.get('tvdb_episode_name', None):
             meta['auto_episode_title'] = meta['tvdb_episode_name']
-        if meta['tvdb_overview']:
+        if meta.get('tvdb_overview', None):
             meta['overview_meta'] = meta['tvdb_overview']
-        if meta['tvdb_season'] is not None and meta['tvdb_season'] != meta.get('season_int', None):
+        if meta.get('tvdb_season', None) is not None and meta['tvdb_season'] != meta.get('season_int', None) and not meta.get('season', None) and not meta.get('no_season', False) and not meta.get('manual_date', None):
             meta['season_int'] = int(meta['tvdb_season'])
             meta['season'] = f"S{meta['tvdb_season']:02d}"
-        if meta['tvdb_episode'] is not None and meta['tvdb_episode'] != meta.get('episode_int', None):
+        if meta.get('tvdb_episode', None) is not None and meta['tvdb_episode'] != meta.get('episode_int', None) and not meta.get('episode', None) and not meta.get('manual_date', None):
             meta['episode_int'] = int(meta['tvdb_episode'])
             meta['episode'] = f"E{meta['tvdb_episode']:02d}"
 
@@ -592,7 +592,7 @@ async def get_tv_data(meta):
                 meta['tvdb_episode_data'] = tvdb_episode_data
             if tvdb_name:
                 meta['tvdb_series_name'] = tvdb_name
-        if meta.get('tvdb_series_name'):
+        if meta.get('tvdb_series_name', None):
             year = meta['tvdb_series_name']
             year_match = re.search(r'\b(19\d\d|20[0-3]\d)\b', year)
             if year_match:
@@ -600,10 +600,10 @@ async def get_tv_data(meta):
             else:
                 meta['search_year'] = ""
 
-        if meta.get('tvdb_episode_data', None):
+        if meta.get('tvdb_episode_data', None) and meta.get('tvdb_id', 0):
             meta['tvdb_season_name'], meta['tvdb_episode_name'], meta['tvdb_overview'], meta['tvdb_season'], meta['tvdb_episode'], meta['tvdb_episode_year'], meta['tvdb_episode_id'] = await tvdb_handler.get_specific_episode_data(meta['tvdb_episode_data'], meta.get('season_int', None), meta.get('episode_int', None), debug=meta.get('debug', False))
 
-        if meta.get('tvdb_episode_id'):
+        if meta.get('tvdb_episode_id', None):
             meta['tvdb_imdb_id'] = await tvdb_handler.get_imdb_id_from_tvdb_episode_id(meta['tvdb_episode_id'], debug=meta.get('debug', False))
 
     return meta

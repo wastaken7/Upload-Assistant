@@ -1,4 +1,17 @@
-__version__ = "v6.2.1"
+__version__ = "v6.2.2"
+
+"""
+Release Notes for version v6.2.2 (2025-10-26):
+
+# ## What's Changed
+# 
+# * fix tvdb pagination by @Audionut in 1c4f9b6
+# * S/E overrides by @Audionut in 84787af
+# * tvdb safe settings by @Audionut in d4de654
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v6.2.1...v6.2.2
+"""
+
 
 """
 Release Notes for version v6.2.1 (2025-10-26):
