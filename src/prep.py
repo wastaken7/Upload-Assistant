@@ -794,8 +794,10 @@ class Prep():
             meta = await get_season_episode(video, meta)
 
         if meta['category'] == "TV":
+            both_ids_searched = False
             if meta.get('tvmaze_id', 0) == 0 and meta.get('tvdb_id', 0) == 0:
-                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False))
+                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tmdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False))
+                both_ids_searched = True
                 if tvmaze:
                     meta['tvmaze_id'] = tvmaze
                     if meta['debug']:
@@ -808,7 +810,7 @@ class Prep():
                     meta['tvdb_search_results'] = tvdb_data
                     if meta['debug']:
                         console.print("[blue]Found TVDB search results from search.[/blue]")
-            if meta.get('tvmaze_id', 0) == 0:
+            if meta.get('tvmaze_id', 0) == 0 and not both_ids_searched:
                 if meta['debug']:
                     console.print("[yellow]No TVMAZE ID found, attempting to fetch...[/yellow]")
                 meta['tvmaze_id'] = await search_tvmaze(

@@ -172,6 +172,79 @@ class tvdb_data:
             console.print(f"[red]Error getting episodes: {e}[/red]")
             return None, None
 
+    async def get_tvdb_by_external_id(self, imdb, tmdb, debug=False):
+        # Try IMDB first if available
+        if imdb:
+            try:
+                if isinstance(imdb, str) and imdb.startswith('tt'):
+                    imdb_formatted = imdb
+                elif isinstance(imdb, str) and imdb.isdigit():
+                    imdb_formatted = f"tt{int(imdb):07d}"
+                elif isinstance(imdb, int):
+                    imdb_formatted = f"tt{imdb:07d}"
+                else:
+                    imdb_formatted = str(imdb)
+
+                if debug:
+                    console.print(f"[cyan]Trying TVDB lookup with IMDB ID: {imdb_formatted}[/cyan]")
+
+                results = tvdb.search_by_remote_id(imdb_formatted)
+                await asyncio.sleep(0.1)
+
+                if results and len(results) > 0:
+                    if debug:
+                        console.print(f"[blue]results: {results}[/blue]")
+
+                    # Look for series results only (ignore movies)
+                    for result in results:
+                        if 'series' in result:
+                            series_id = result['series']['id']
+                            if debug:
+                                console.print(f"[blue]TVDB series ID from IMDB: {series_id}[/blue]")
+                            return series_id
+
+                    if debug:
+                        console.print("[yellow]IMDB search returned results but no series found[/yellow]")
+                else:
+                    if debug:
+                        console.print("[yellow]No TVDB series found for IMDB ID[/yellow]")
+            except Exception as e:
+                if debug:
+                    console.print(f"[red]Error getting TVDB by IMDB ID: {e}[/red]")
+
+        if tmdb:
+            try:
+                tmdb_str = str(tmdb)
+
+                if debug:
+                    console.print(f"[cyan]Trying TVDB lookup with TMDB ID: {tmdb_str}[/cyan]")
+
+                results = tvdb.search_by_remote_id(tmdb_str)
+                await asyncio.sleep(0.1)
+
+                if results and len(results) > 0:
+                    if debug:
+                        console.print(f"[blue]results: {results}[/blue]")
+
+                    for result in results:
+                        if 'series' in result:
+                            series_id = result['series']['id']
+                            if debug:
+                                console.print(f"[blue]TVDB series ID from TMDB: {series_id}[/blue]")
+                            return series_id
+
+                    if debug:
+                        console.print("[yellow]TMDB search returned results but no series found[/yellow]")
+                else:
+                    if debug:
+                        console.print("[yellow]No TVDB series found for TMDB ID[/yellow]")
+            except Exception as e:
+                if debug:
+                    console.print(f"[red]Error getting TVDB by TMDB ID: {e}[/red]")
+
+        console.print("[yellow]No TVDB series found for any available external ID[/yellow]")
+        return None
+
     async def get_imdb_id_from_tvdb_episode_id(self, episode_id, debug=False):
         try:
             episode_data = tvdb.get_episode_extended(episode_id)
