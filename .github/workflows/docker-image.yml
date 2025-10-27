@@ -35,6 +35,40 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.pr_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Fetch PR if building for PR
+        if: inputs.pr_number
+        run: |
+          echo "Building for PR #${{ inputs.pr_number }}"
+          echo "PR SHA: ${{ inputs.pr_sha }}"
+          echo "PR Ref: ${{ inputs.pr_ref }}"
+          
+          # Try to fetch the PR head directly (works for both forks and same-repo PRs)
+          if git fetch origin pull/${{ inputs.pr_number }}/head:pr-${{ inputs.pr_number }}; then
+            echo "✅ Successfully fetched PR via pull/${{ inputs.pr_number }}/head"
+            git checkout pr-${{ inputs.pr_number }}
+          else
+            echo "⚠️ Failed to fetch via pull/ ref, trying to checkout SHA directly"
+            # Fallback: try to checkout the SHA if it exists
+            if git checkout ${{ inputs.pr_sha }}; then
+              echo "✅ Successfully checked out SHA ${{ inputs.pr_sha }}"
+            else
+              echo "❌ Failed to checkout PR. Using current ref."
+              exit 1
+            fi
+          fi
+          
+          # Verify we're on the right commit
+          CURRENT_SHA=$(git rev-parse HEAD)
+          echo "Current SHA: $CURRENT_SHA"
+          echo "Expected SHA: ${{ inputs.pr_sha }}"
+          
+          if [ "$CURRENT_SHA" = "${{ inputs.pr_sha }}" ]; then
+            echo "✅ Successfully checked out correct commit"
+          else
+            echo "⚠️ Warning: Current SHA doesn't match expected SHA"
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

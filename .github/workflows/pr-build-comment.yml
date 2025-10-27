@@ -13,6 +13,7 @@ jobs:
       pr-number: ${{ steps.pr-info.outputs.pr-number }}
       pr-ref: ${{ steps.pr-info.outputs.pr-ref }}
       pr-sha: ${{ steps.pr-info.outputs.pr-sha }}
+      pr-repo: ${{ steps.pr-info.outputs.pr-repo }}
     
     steps:
       - name: Check comment and permissions
@@ -36,10 +37,12 @@ jobs:
             core.setOutput('pr-number', context.issue.number);
             core.setOutput('pr-ref', pr.data.head.ref);
             core.setOutput('pr-sha', pr.data.head.sha);
+            core.setOutput('pr-repo', pr.data.head.repo.full_name);
             
             console.log(`PR #${context.issue.number}: ${pr.data.title}`);
             console.log(`Branch: ${pr.data.head.ref}`);
             console.log(`SHA: ${pr.data.head.sha}`);
+            console.log(`Repo: ${pr.data.head.repo.full_name}`);
 
       - name: React to comment
         uses: actions/github-script@v7
@@ -63,11 +66,35 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Check if PR is from a fork
+            const prRepo = '${{ needs.check-comment.outputs.pr-repo }}';
+            const baseRepo = context.repo.owner + '/' + context.repo.repo;
+            const isFromFork = prRepo !== baseRepo;
+            
+            let ref;
+            if (isFromFork) {
+              // For forks, we can't dispatch to the fork's branch, so we'll trigger on main/master
+              // but pass the PR info so the workflow can checkout the right commit
+              console.log(`PR is from fork (${prRepo}), dispatching on default branch`);
+              
+              // Get the default branch
+              const repo = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              ref = repo.data.default_branch;
+              console.log(`Using default branch: ${ref}`);
+            } else {
+              // For same-repo PRs, use the actual branch
+              ref = '${{ needs.check-comment.outputs.pr-ref }}';
+              console.log(`PR is from same repo, using branch: ${ref}`);
+            }
+            
             const response = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'docker-image.yml',
-              ref: 'refs/pull/${{ needs.check-comment.outputs.pr-number }}/head',
+              ref: ref,
               inputs: {
                 pr_number: '${{ needs.check-comment.outputs.pr-number }}',
                 pr_ref: '${{ needs.check-comment.outputs.pr-ref }}',
@@ -75,7 +102,7 @@ jobs:
               }
             });
             
-            console.log(`Triggered workflow dispatch for PR #${{ needs.check-comment.outputs.pr-number }}`);
+            console.log(`Triggered workflow dispatch for PR #${{ needs.check-comment.outputs.pr-number }} on ref: ${ref}`);
 
       - name: Comment on PR
         uses: actions/github-script@v7
