@@ -2123,6 +2123,7 @@ class Clients():
                         continue
 
                     has_working_tracker = False
+                    torrent_properties = []
 
                     if is_match:
                         url = torrent.tracker if torrent.tracker else []
