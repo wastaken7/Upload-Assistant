@@ -454,9 +454,12 @@ async def imdb_tmdb(meta, filename):
     return meta
 
 
-async def get_tvmaze_tvdb(filename, search_year, imdb, manual_date=None, tvmaze_manual=None, year='', debug=False):
+async def get_tvmaze_tvdb(filename, search_year, imdb, tmdb, manual_date=None, tvmaze_manual=None, year='', debug=False):
+    tvdb_data = None
+    tvmaze = 0
+    tvdb = 0
     if debug:
-        console.print("[yellow]Both TVMaze and TVDb IDs are present[/yellow]")
+        console.print("[yellow]Finding both TVMaze and TVDb IDs[/yellow]")
     # Core metadata tasks that run in parallel
     tasks = [
         search_tvmaze(
@@ -464,13 +467,17 @@ async def get_tvmaze_tvdb(filename, search_year, imdb, manual_date=None, tvmaze_
             manual_date=manual_date,
             tvmaze_manual=tvmaze_manual,
             debug=debug,
-            return_full_tuple=False
+            return_full_tuple=True
         )
     ]
-
-    tasks.append(
-        tvdb_handler.search_tvdb_series(filename=filename, year=year, debug=debug)
-    )
+    if (imdb and imdb != 0) or (tmdb and tmdb != 0):
+        tasks.append(
+            tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, debug=debug)
+        )
+    else:
+        tasks.append(
+            tvdb_handler.search_tvdb_series(filename=filename, year=year, debug=debug)
+        )
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -478,8 +485,7 @@ async def get_tvmaze_tvdb(filename, search_year, imdb, manual_date=None, tvmaze_
     tvmaze_result = results[0]
     if isinstance(tvmaze_result, tuple) and len(tvmaze_result) == 3:
         # Handle tuple return: (tvmaze_id, imdbID, tvdbID)
-        tvmaze_id = tvmaze_result
-        tvmaze = tvmaze_id if isinstance(tvmaze_id, int) else 0
+        tvmaze = tvmaze_result[0] if isinstance(tvmaze_result[0], int) else 0
 
     elif isinstance(tvmaze_result, int):
         tvmaze = tvmaze_result
@@ -491,7 +497,9 @@ async def get_tvmaze_tvdb(filename, search_year, imdb, manual_date=None, tvmaze_
         tvmaze = 0
 
     # Process TVDb results if we added that task
-    if len(results) > 1:
+    if (imdb and imdb != 0) or (tmdb and tmdb != 0):
+        tvdb = results[1]
+    elif len(results) > 1:
         tvdb_result = results[1]
         if tvdb_result and not isinstance(tvdb_result, Exception):
             # Handle tuple return: (series_results, series_id)
@@ -507,6 +515,11 @@ async def get_tvmaze_tvdb(filename, search_year, imdb, manual_date=None, tvmaze_
                 console.print(f"[yellow]Unexpected TVDb result format: {tvdb_result}[/yellow]")
         elif isinstance(tvdb_result, Exception):
             console.print(f"[yellow]TVDb series data retrieval failed: {tvdb_result}[/yellow]")
+
+    if not tvdb and tvmaze and isinstance(tvmaze_result, tuple) and len(tvmaze_result) == 3:
+        tvdb = tvmaze_result[2] if isinstance(tvmaze_result[2], int) else 0
+    if debug:
+        console.print(f"[blue]TVMaze ID: {tvmaze} | TVDb ID: {tvdb}[/blue]")
 
     return tvmaze, tvdb, tvdb_data
 

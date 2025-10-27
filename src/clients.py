@@ -154,7 +154,8 @@ class Clients():
             if not clients_to_search:
                 if default_torrent_client and default_torrent_client != 'none':
                     clients_to_search = [default_torrent_client]
-                    console.print(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_torrent_client}[/cyan]")
+                    if meta['debug']:
+                        console.print(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_torrent_client}[/cyan]")
                 else:
                     console.print("[yellow]No clients configured for searching...[/yellow]")
                     return None
