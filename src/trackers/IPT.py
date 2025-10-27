@@ -387,7 +387,5 @@ class IPT:
         edit_url = f"https://iptorrents.com/t/{torrent_id}/edit"
 
         response = await self.session.post(edit_url, data=data)
-        if response.status_code == 302:
-            console.print(f"[bold green]{self.tracker}: Successfully edited torrent {torrent_id}[/bold green]")
-        else:
-            console.print(f"[bold red]{self.tracker}: Failed to edit torrent {torrent_id}. Status code: {response.status_code}[/bold red]")
+        if not response.status_code == 302:
+            meta["tracker_status"][self.tracker]["status_message"] += " Failed to edit torrent."
