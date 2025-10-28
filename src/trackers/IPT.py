@@ -20,7 +20,6 @@ class IPT:
         self.source_flag = 'IPTorrents'
         self.base_url = 'https://iptorrents.com'
         self.torrent_url = 'https://iptorrents.com/torrent.php?id='
-        self.announce = self.config['TRACKERS'][self.tracker]['announce_url']
         self.session = httpx.AsyncClient(headers={
             'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0"
         }, timeout=30)
@@ -302,7 +301,7 @@ class IPT:
 
         name = name.replace("'", "").replace('"', "")
 
-        if meta.get('is_scene', False):
+        if meta.get('scene', False):
             if '[NO RAR]' not in name.upper():
                 name += ' [NO RAR]'
 
