@@ -631,7 +631,8 @@ async def get_tvdb_tvmaze_episode_data(meta):
 
     # Add TVMaze episode data task
     if meta.get('tvmaze_id'):
-        console.print("[yellow]Fetching TVMaze episode data...[/yellow]")
+        if meta['debug']:
+            console.print("[yellow]Fetching TVMaze episode data...[/yellow]")
         tasks.append(
             get_tvmaze_episode_data(
                 meta.get('tvmaze_id'),
@@ -643,7 +644,8 @@ async def get_tvdb_tvmaze_episode_data(meta):
 
     # Add TVDb episode data task
     if meta.get('tvdb_id'):
-        console.print("[yellow]Fetching TVDb episode data...[/yellow]")
+        if meta['debug']:
+            console.print("[yellow]Fetching TVDb episode data...[/yellow]")
         tasks.append(
             tvdb_handler.get_tvdb_episodes(
                 meta['tvdb_id'],
