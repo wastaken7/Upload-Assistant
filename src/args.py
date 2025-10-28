@@ -393,12 +393,8 @@ class Args():
                     meta[key] = int(value)
                 else:
                     meta[key] = 0
-            if key in ("tag") and value == []:
-                meta[key] = ""
             if key in ["manual_episode_title"] and value == []:
                 meta[key] = ""
-            if key in ["manual_episode_title"]:
-                meta[key] = value
             if key in ["tvmaze_manual"]:
                 if isinstance(value, list) and len(value) == 1:
                     meta[key] = value[0]
