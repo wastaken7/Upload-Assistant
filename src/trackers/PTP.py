@@ -1411,7 +1411,7 @@ class PTP():
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
-            console.print("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
+            console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
             tracker_url = config['TRACKERS']['PTP'].get('announce_url', "https://fake.tracker").strip()
             meta['max_piece_size'] = '16'
             torrent_create = f"[{self.tracker}]"
@@ -1438,6 +1438,7 @@ class PTP():
                 console.log(redact_private_info(debug_data))
                 meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             else:
+                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]PTP_upload_failure.html"
                 with requests.Session() as session:
                     cookiefile = f"{meta['base_dir']}/data/cookies/PTP.pickle"
                     with open(cookiefile, 'rb') as cf:
@@ -1453,14 +1454,16 @@ class PTP():
                     if match is not None:
                         errorMessage = match.group(1)
 
-                    raise UploadException(f"Upload to PTP failed: {errorMessage} ({response.status_code}). (We are still on the upload page.)")  # noqa F405
+                    with open(failure_path, 'w', encoding='utf-8') as f:
+                        f.write(responsetext)
+                    meta['tracker_status'][self.tracker]['status_message'] = f"data error: see {failure_path} | {errorMessage}"
 
                 # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
                 match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", response.url)
                 if match is None:
-                    console.print(url)
-                    console.print(redact_private_info(data))
-                    raise UploadException(f"Upload to PTP failed: result URL {response.url} ({response.status_code}) is not the expected one.")  # noqa F405
+                    with open(failure_path, 'w', encoding='utf-8') as f:
+                        f.write(responsetext)
+                    meta['tracker_status'][self.tracker]['status_message'] = f"data error: see {failure_path}"
 
                 # having UA add the torrent link as a comment.
                 if match:

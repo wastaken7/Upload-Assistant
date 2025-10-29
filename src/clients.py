@@ -1330,6 +1330,26 @@ class Clients():
             except Exception as e:
                 console.print(f"[yellow]Error adding tracker tag: {e}")
 
+        if tracker in client.get("super_seed_trackers", []):
+            try:
+                if meta['debug']:
+                    console.print(f"{tracker}: Setting super-seed mode.")
+                if proxy_url:
+                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/setSuperSeeding",
+                                                data={'hashes': torrent.infohash, "value": "true"}) as response:
+                        if response.status != 200:
+                            console.print(f"{tracker}: Failed to set super-seed via proxy: {response.status}")
+                else:
+                    await self.retry_qbt_operation(
+                        lambda: asyncio.to_thread(qbt_client.torrents_set_super_seeding, torrent_hashes=torrent.infohash),
+                        "Set super-seed mode",
+                        initial_timeout=10.0
+                    )
+            except asyncio.TimeoutError:
+                console.print(f"{tracker}: Super-seed request timed out")
+            except Exception as e:
+                console.print(f"{tracker}: Super-seed error: {e}")
+
         if client.get('qbit_tag'):
             try:
                 if proxy_url:
@@ -2690,6 +2710,7 @@ async def async_link_directory(src, dst, use_hardlink=True, debug=False):
 
 async def match_tracker_url(tracker_urls, meta):
     tracker_url_patterns = {
+        'acm': ["https://eiga.moi"],
         'aither': ["https://aither.cc"],
         'ant': ["tracker.anthelion.me"],
         'ar': ["tracker.alpharatio"],
@@ -2707,27 +2728,37 @@ async def match_tracker_url(tracker_urls, meta):
         'ff': ["tracker.funfile.org"],
         'fl': ["reactor.filelist"],
         'fnp': ["https://fearnopeer.com"],
+        'gpw': ["https://tracker.greatposterwall.com"],
         'hdb': ["https://hdbits.org"],
         'hds': ["hd-space.pw"],
         'hdt': ["https://hdts-announce.ru"],
         'hhd': ["https://homiehelpdesk.net"],
         'huno': ["https://hawke.uno"],
         'ipt': ["https://ssl.empirehost.me"],
+        'is': ["https://immortalseed.me"],
+        'itt': ["https://itatorrents.xyz"],
         'lcd': ["locadora.cc"],
         'ldu': ["theldu.to"],
         'lst': ["https://lst.gg"],
+        'lt': ["https://lat-team.com"],
         'mtv': ["tracker.morethantv"],
         'nbl': ["tracker.nebulance"],
         'oe': ["https://onlyencodes.cc"],
         'otw': ["https://oldtoons.world"],
         'phd': ["tracker.privatehd"],
+        'pt': ["https://portugas.org"],
         'ptp': ["passthepopcorn.me"],
+        'pts': ["https://tracker.ptskit.com"],
+        'ras': ["https://rastastugan.org"],
         'rf': ["https://reelflix.xyz", "https://reelflix.cc"],
         'rtf': ["peer.retroflix"],
+        'sam': ["https://samaritano.cc"],
         'sp': ["https://seedpool.org"],
         'spd': ["ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org"],
+        'stc': ["https://skipthecommercials.xyz"],
         'thr': ["torrenthr"],
         'tl': ["tracker.tleechreload", "tracker.torrentleech"],
+        'tvc': ["https://tvchaosuk.com"],
         'ulcx': ["https://upload.cx"],
         'yoink': ["yoinked.org"],
         'yus': ["https://yu-scene.net"],

@@ -809,12 +809,6 @@ config = {
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
             "anon": False,
         },
-        "UHD": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            "api_key": "",
-            "anon": False,
-        },
         "ULCX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -867,6 +861,11 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # List of trackers to activate "super-seed" (or "initial seeding") mode when adding the torrent.
+            # https://www.bittorrent.org/beps/bep_0016.html
+            # Super-seed mode is NOT recommended for general use.
+            # Super-seed mode is only recommended for initial seeding servers where bandwidth management is paramount.
+            "super_seed_trackers": [""],
             # Use the UA tracker acronym as a tag in qBitTorrent
             "use_tracker_as_tag": False,
             "qbit_tag": "",
