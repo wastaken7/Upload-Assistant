@@ -63,9 +63,6 @@ async def upload_image_task(args):
                     async with aiofiles.open(image, 'rb') as file:
                         files = {'file-upload[0]': (os.path.basename(image), await file.read())}
                         headers = {'referer': 'https://ptpimg.me/index.php'}
-                        if meta.get('debug'):
-                            console.print(f"[cyan][ptpimg] Headers: {headers}[/cyan]")
-                            console.print(f"[cyan][ptpimg] Files: {list(files.keys())}[/cyan]")
 
                     try:
                         response = await client.post(
@@ -75,22 +72,15 @@ async def upload_image_task(args):
                             files=files,
                             timeout=timeout
                         )
-                        if meta.get('debug'):
-                            console.print(f"[cyan][ptpimg] Response status: {response.status_code}[/cyan]")
-                            console.print(f"[cyan][ptpimg] Response text: {response.text[:500]}[/cyan]")
 
                         response.raise_for_status()
                         response_data = response.json()
-                        if meta.get('debug'):
-                            console.print(f"[cyan][ptpimg] Response JSON: {response_data}[/cyan]")
 
                         if not response_data or not isinstance(response_data, list) or 'code' not in response_data[0]:
                             return {'status': 'failed', 'reason': "Invalid JSON response from ptpimg"}
 
                         code = response_data[0]['code']
                         ext = response_data[0]['ext']
-                        if meta.get('debug'):
-                            console.print(f"[cyan][ptpimg] Image code: {code}, extension: {ext}[/cyan]")
                         img_url = f"https://ptpimg.me/{code}.{ext}"
                         raw_url = img_url
                         web_url = img_url
@@ -447,15 +437,39 @@ async def upload_image_task(args):
 thread_pool = ThreadPoolExecutor(max_workers=10)
 
 
-async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3):
+async def upload_screens(meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=False, max_retries=3, allowed_hosts=None):
     if 'image_list' not in meta:
         meta['image_list'] = []
     if meta['debug']:
         upload_start_time = time.time()
 
     os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
+
     initial_img_host = config['DEFAULT'][f'img_host_{img_host_num}']
     img_host = meta['imghost']
+
+    # Check if current host is allowed, if not find an approved one
+    if allowed_hosts is not None and img_host not in allowed_hosts:
+        console.print(f"[yellow]Current image host '{img_host}' is not in allowed hosts: {allowed_hosts}[/yellow]")
+
+        # Find the first approved host from config
+        approved_host = None
+        for i in range(1, 10):  # Check img_host_1 through img_host_9
+            host_key = f'img_host_{i}'
+            if host_key in config['DEFAULT']:
+                host = config['DEFAULT'][host_key]
+                if host in allowed_hosts:
+                    approved_host = host
+                    img_host_num = i
+                    console.print(f"[green]Switching to approved image host: {approved_host}[/green]")
+                    break
+
+        if approved_host:
+            img_host = approved_host
+        else:
+            console.print(f"[red]No approved image hosts found in config. Available: {allowed_hosts}[/red]")
+            return meta['image_list'], len(meta['image_list'])
+
     if meta['debug']:
         console.print(f"[blue]Using image host: {img_host} (configured: {initial_img_host})[/blue]")
     using_custom_img_list = isinstance(custom_img_list, list) and bool(custom_img_list)
