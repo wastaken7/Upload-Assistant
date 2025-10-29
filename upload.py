@@ -978,16 +978,6 @@ async def do_the_thing(base_dir):
                     if not meta['debug'] or "debug" in os.path.basename(log_file):
                         if log_file:
                             await save_processed_file(log_file, path)
-                    await asyncio.sleep(0.1)
-                    if sanitize_meta:
-                        try:
-                            await asyncio.sleep(0.2)  # We can't race the status prints
-                            meta = await clean_meta_for_export(meta)
-                        except Exception as e:
-                            console.print(f"[red]Error cleaning meta for export: {e}")
-                    await cleanup()
-                    gc.collect()
-                    reset_terminal()
 
             if meta['debug']:
                 finish_time = time.time()
@@ -1046,13 +1036,6 @@ async def do_the_thing(base_dir):
                         if log_file:
                             await save_processed_file(log_file, path)
 
-            if sanitize_meta and not meta.get('emby', False):
-                try:
-                    await asyncio.sleep(0.3)  # We can't race the status prints
-                    meta = await clean_meta_for_export(meta)
-                except Exception as e:
-                    console.print(f"[red]Error cleaning meta for export: {e}")
-
             if meta.get('delete_tmp', False) and os.path.exists(tmp_path) and meta.get('emby', False):
                 try:
                     shutil.rmtree(tmp_path)
@@ -1063,7 +1046,26 @@ async def do_the_thing(base_dir):
 
             if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
                 if (processed_files_count - skipped_files_count) >= int(meta['limit_queue']):
+                    if sanitize_meta and not meta.get('emby', False):
+                        try:
+                            await asyncio.sleep(0.2)  # We can't race the status prints
+                            meta = await clean_meta_for_export(meta)
+                        except Exception as e:
+                            console.print(f"[red]Error cleaning meta for export: {e}")
+                    await cleanup()
+                    gc.collect()
+                    reset_terminal()
                     break
+
+            if sanitize_meta and not meta.get('emby', False):
+                try:
+                    await asyncio.sleep(0.2)
+                    meta = await clean_meta_for_export(meta)
+                except Exception as e:
+                    console.print(f"[red]Error cleaning meta for export: {e}")
+            await cleanup()
+            gc.collect()
+            reset_terminal()
 
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}")
