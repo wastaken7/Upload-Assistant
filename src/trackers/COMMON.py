@@ -128,7 +128,7 @@ class COMMON():
             info_hash = hashlib.sha1(info).hexdigest()
         return info_hash
 
-    async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header="", image_list=None):
+    async def unit3d_edit_desc(self, meta, tracker, signature, comparison=False, desc_header="", image_list=None, approved_image_hosts=None):
         if image_list is not None:
             images = image_list
             multi_screens = 0
@@ -145,9 +145,56 @@ class COMMON():
             try:
                 async with aiofiles.open(pack_images_file, 'r', encoding='utf-8') as f:
                     pack_images_data = json.loads(await f.read())
-                    if meta['debug']:
-                        console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                        console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} previously uploaded images")
+
+                    # Filter out keys with non-approved image hosts
+                    keys_to_remove = []
+                    for key_name, key_data in pack_images_data.get('keys', {}).items():
+                        images_to_keep = []
+                        for img in key_data.get('images', []):
+                            raw_url = img.get('raw_url', '')
+                            # Extract hostname from URL (e.g., ptpimg.me -> ptpimg)
+                            try:
+                                import urllib.parse
+                                parsed_url = urllib.parse.urlparse(raw_url)
+                                hostname = parsed_url.netloc
+                                # Get the main domain name (first part before the dot)
+                                host_key = hostname.split('.')[0] if hostname else ''
+
+                                if host_key in approved_image_hosts:
+                                    images_to_keep.append(img)
+                                elif meta['debug']:
+                                    console.print(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
+                            except Exception:
+                                # If URL parsing fails, skip this image
+                                if meta['debug']:
+                                    console.print(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                continue
+
+                        if images_to_keep:
+                            # Update the key with only approved images
+                            pack_images_data['keys'][key_name]['images'] = images_to_keep
+                            pack_images_data['keys'][key_name]['count'] = len(images_to_keep)
+                        else:
+                            # Mark key for removal if no approved images
+                            keys_to_remove.append(key_name)
+
+                    # Remove keys with no approved images
+                    for key_name in keys_to_remove:
+                        del pack_images_data['keys'][key_name]
+                        if meta['debug']:
+                            console.print(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
+
+                    # Recalculate total count
+                    pack_images_data['total_count'] = sum(key_data['count'] for key_data in pack_images_data.get('keys', {}).values())
+
+                    if pack_images_data.get('total_count', 0) < 3:
+                        pack_images_data = {}  # Invalidate if less than 3 images total
+                        if meta['debug']:
+                            console.print("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
+                    else:
+                        if meta['debug']:
+                            console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                            console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
 
@@ -366,7 +413,7 @@ class COMMON():
                                         print(f"Error during BDMV screenshot capture: {e}")
                                     new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
                                     if uploaded_images and not meta.get('skip_imghost_upload', False):
                                         await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
@@ -502,7 +549,7 @@ class COMMON():
                                         new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
 
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
                                     if uploaded_images and not meta.get('skip_imghost_upload', False):
                                         await self.save_image_links(meta, new_images_key, uploaded_images)
                                     # Append each uploaded image's data to `meta[new_images_key]`
@@ -627,7 +674,7 @@ class COMMON():
 
                             # Upload generated screenshots
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]})
+                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
                                 if uploaded_images and not meta.get('skip_imghost_upload', False):
                                     await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:

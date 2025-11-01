@@ -824,13 +824,6 @@ class ASC:
                 'type': anime_info['type'],
             })
 
-        # Internal
-        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
-            if meta['tag'] != '' and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
-                data.update({
-                    'internal': 'yes',
-                })
-
         # Screenshots
         for i, img in enumerate(meta.get('image_list', [])[:4]):
             data[f'screens{i+1}'] = img.get('raw_url')
@@ -856,27 +849,59 @@ class ASC:
         )
 
         # Approval
-        if not meta.get('debug', False):
-            should_approve = await self.get_approval(meta)
-            if should_approve:
-                await self.auto_approval(meta['tracker_status'][self.tracker]['torrent_id'])
+        should_approve = await self.get_approval(meta)
+        if should_approve:
+            await self.auto_approval(meta)
+
+        # Internal
+        if self.config['TRACKERS'][self.tracker].get('internal', False) is True:
+            if meta['tag'] != '' and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])):
+                await self.set_internal_flag(meta)
 
         return
 
-    async def auto_approval(self, torrent_id):
-        try:
-            approval_url = f'{self.base_url}/uploader_app.php?id={torrent_id}'
-            approval_response = await self.session.get(approval_url, timeout=30)
-            approval_response.raise_for_status()
-        except Exception as e:
-            console.print(f'[bold red]Erro durante a tentativa de aprovação automática: {e}[/bold red]')
+    async def auto_approval(self, meta):
+        if meta.get('debug', False):
+            console.print(
+                f'{self.tracker}: Debug mode, skipping automatic approval.'
+            )
+        else:
+            torrent_id = meta['tracker_status'][self.tracker]['torrent_id']
+            try:
+                approval_url = f'{self.base_url}/uploader_app.php?id={torrent_id}'
+                approval_response = await self.session.get(approval_url, timeout=30)
+                approval_response.raise_for_status()
+            except Exception as e:
+                console.print(f'{self.tracker}: [bold red]Error during automatic approval attempt: {e}[/bold red]')
 
     async def get_approval(self, meta):
         if not self.config['TRACKERS'][self.tracker].get('uploader_status', False):
             return False
 
         if meta.get('modq', False):
-            print('Enviando para a fila de moderação.')
+            console.print(f'{self.tracker}: Sending to the moderation queue.')
             return False
 
         return True
+
+    async def set_internal_flag(self, meta):
+        if meta.get('debug', False):
+            console.print(
+                f'{self.tracker}: [bold yellow]Debug mode, skipping setting internal flag.[/bold yellow]'
+            )
+        else:
+            data = {
+                'id': meta['tracker_status'][self.tracker]['torrent_id'],
+                'internal': 'yes'
+            }
+
+            try:
+                response = await self.session.post(
+                    f"{self.base_url}/torrents-edit.php?action=doedit",
+                    data=data
+                )
+                response.raise_for_status()
+
+            except Exception as e:
+                console.print(f'{self.tracker}: [bold red]Error setting internal flag: {e}[/bold red]')
+                return

@@ -420,17 +420,18 @@ class BBCODE:
 
         # Remove links to site
         site_netloc = urllib.parse.urlparse(site).netloc
-        site_regex = rf"(\[url[\=\]]https?:\/\/{site_netloc}/[^\]]+])([^\[]+)(\[\/url\])?"
+        site_domain = site_netloc.split('.')[0]
+        site_regex = rf"(\[url[\=\]]https?:\/\/{site_domain}\.[^\/\]]+/[^\]]+])([^\[]+)(\[\/url\])?"
         site_url_tags = re.findall(site_regex, desc)
         if site_url_tags:
             for site_url_tag in site_url_tags:
                 site_url_tag = ''.join(site_url_tag)
-                url_tag_regex = rf"(\[url[\=\]]https?:\/\/{site_netloc}[^\]]+])"
+                url_tag_regex = rf"(\[url[\=\]]https?:\/\/{site_domain}\.[^\/\]]+[^\]]+])"
                 url_tag_removed = re.sub(url_tag_regex, "", site_url_tag)
                 url_tag_removed = url_tag_removed.replace("[/url]", "")
                 desc = desc.replace(site_url_tag, url_tag_removed)
 
-        desc = desc.replace(site_netloc, site_netloc.split('.')[0])
+        desc = desc.replace(site_netloc, site_domain)
 
         # Temporarily hide spoiler tags
         spoilers = re.findall(r"\[spoiler[\s\S]*?\[\/spoiler\]", desc)
