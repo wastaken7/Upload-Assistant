@@ -82,7 +82,7 @@ class tvdb_data:
             # Get all episodes for the series with pagination
             all_episodes = []
             page = 0
-            max_pages = 10  # Safety limit to prevent infinite loops
+            max_pages = 20  # Safety limit to prevent infinite loops
 
             while page < max_pages:
                 if debug and page > 0:
@@ -281,11 +281,11 @@ class tvdb_data:
             episodes = data
         else:
             console.print("[red]No episode data available or invalid format[/red]")
-            return None, None, None, None, None, None
+            return None, None, None, None, None, None, None
 
         if not episodes:
             console.print("[red]No episodes found in data[/red]")
-            return None, None, None, None, None, None
+            return None, None, None, None, None, None, None
 
         # Convert season and episode to int for comparison
         try:
@@ -293,11 +293,11 @@ class tvdb_data:
             episode_int = int(episode) if episode is not None and episode != 0 else None
         except (ValueError, TypeError) as e:
             console.print(f"[red]Invalid season or episode format: season={season}, episode={episode}, error={e}[/red]")
-            return None, None, None, None, None, None
+            return None, None, None, None, None, None, None
 
         if season_int is None:
             console.print(f"[red]Season is None after conversion: season_int={season_int}[/red]")
-            return None, None, None, None, None, None
+            return None, None, None, None, None, None, None
 
         if debug:
             console.print(f"[blue]Total episodes retrieved from TVDB: {len(episodes)}[/blue]")
@@ -353,4 +353,4 @@ class tvdb_data:
                 )
 
         console.print(f"[red]Could not find episode for S{season_int:02d}E{episode_int:02d} or absolute #{episode_int}[/red]")
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
