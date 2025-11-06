@@ -170,6 +170,7 @@ class THR():
             for track in mi['media']['track']:
                 if track['@type'] == "Text":
                     language = track.get('Language')
+                    language = language.split('-')[0] if language else language
                     if language in ['hr', 'en', 'bs', 'sr', 'sl']:
                         if language not in sub_langs:
                             sub_langs.append(language)
@@ -214,6 +215,10 @@ class THR():
                 desc.write(f"IMDb: {str(meta.get('imdb_info', {}).get('imdb_url', ''))}\n")
             if meta['tvdb_id'] != 0:
                 desc.write(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series\n")
+            if meta['tvmaze_id'] != 0:
+                desc.write(f"TVMaze: https://www.tvmaze.com/shows/{meta['tvmaze_id']}\n")
+            if meta['mal_id'] != 0:
+                desc.write(f"MAL: https://myanimelist.net/anime/{meta['mal_id']}\n")
             desc.write("[/quote]")
             desc.write(base)
             # REHOST IMAGES
@@ -259,7 +264,7 @@ class THR():
                 with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt") as bd_file:
                     desc.write(f"[nfo]{bd_file.read()}[/nfo]")
                     bd_file.close()
-            else:
+            elif self.config['TRACKERS']['THR'].get('pronfo_api_key'):
                 # ProNFO
                 pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['THR'].get('pronfo_api_key', '')}"
                 data = {
@@ -287,7 +292,7 @@ class THR():
             #         full_mi = mi_file.read()
             #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
             #         mi_file.close()
-            desc.write("\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]Created by L4G's Upload Assistant[/url][/size][/align]")
+            desc.write(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta['ua_signature']}[/url][/size][/align]")
             desc.close()
         return pronfo
 
