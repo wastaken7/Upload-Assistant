@@ -721,7 +721,7 @@ class Prep():
 
         # Get IMDb ID if not set
         if meta.get('imdb_id') == 0:
-            meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=meta.get('debug', False))
+            meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), untouched_filename=untouched_filename, duration=duration, unattended=unattended)
 
         # user might have skipped tmdb earlier, lets double check
         if meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
