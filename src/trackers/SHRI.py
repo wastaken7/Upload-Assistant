@@ -9,6 +9,7 @@ import pycountry
 import random
 import re
 import requests
+from babel import Locale
 from src.audio import get_audio_v2
 from src.languages import process_desc_language
 from src.trackers.COMMON import COMMON
@@ -43,6 +44,29 @@ class SHRI(UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = []
+
+    def _get_language_code(self, track_or_string):
+        """Extract and normalize language to ISO alpha-2 code"""
+        if isinstance(track_or_string, dict):
+            lang = track_or_string.get("Language", "")
+            if isinstance(lang, dict):
+                lang = lang.get("String", "")
+        else:
+            lang = track_or_string
+        if not lang:
+            return ""
+        lang_str = str(lang).lower()
+        if len(lang_str) == 2:
+            return lang_str
+        try:
+            lang_obj = (
+                pycountry.languages.get(name=lang_str.title())
+                or pycountry.languages.get(alpha_2=lang_str)
+                or pycountry.languages.get(alpha_3=lang_str)
+            )
+            return lang_obj.alpha_2.lower() if lang_obj else lang_str
+        except (AttributeError, KeyError, LookupError):
+            return lang_str
 
     async def get_additional_data(self, meta):
         """Get additional tracker-specific upload data"""
@@ -582,8 +606,7 @@ class SHRI(UNIT3D):
         tracks = meta["mediainfo"].get("media", {}).get("track", [])
         return any(
             track.get("@type") == "Audio"
-            and isinstance(track.get("Language"), str)
-            and track.get("Language").lower() in {"it", "it-it"}
+            and self._get_language_code(track) in {"it", "it-it"}
             and "commentary" not in str(track.get("Title", "")).lower()
             for track in tracks[2:]
         )
@@ -596,8 +619,7 @@ class SHRI(UNIT3D):
         tracks = meta["mediainfo"].get("media", {}).get("track", [])
         return any(
             track.get("@type") == "Text"
-            and isinstance(track.get("Language"), str)
-            and track.get("Language").lower() in {"it", "it-it"}
+            and self._get_language_code(track) in {"it", "it-it"}
             for track in tracks
         )
 
@@ -617,6 +639,22 @@ class SHRI(UNIT3D):
             return lang.name.upper()
 
         return iso_code
+
+    def _get_italian_language_name(self, iso_code):
+        """Convert ISO language code to Italian language name using Babel"""
+        if not iso_code:
+            return ""
+
+        try:
+            locale = Locale.parse(iso_code.lower())
+            italian_name = locale.get_display_name("it")
+            return (
+                italian_name.title()
+                if italian_name
+                else self._get_language_name(iso_code).title()
+            )
+        except (ValueError, AttributeError, KeyError):
+            return self._get_language_name(iso_code).title()
 
     async def _get_best_italian_audio_format(self, meta):
         """Filter Italian tracks, select best, format via get_audio_v2"""
@@ -662,8 +700,7 @@ class SHRI(UNIT3D):
             italian = [
                 t for t in tracks[1:]
                 if t.get("@type") == "Audio"
-                and isinstance(t.get("Language"), str)
-                and t.get("Language", "").lower() in ITALIAN_LANGS
+                and self._get_language_code(t) in ITALIAN_LANGS
                 and "commentary" not in str(t.get("Title", "")).lower()
             ]
             if not italian:
@@ -673,7 +710,7 @@ class SHRI(UNIT3D):
 
         return clean(audio_str)
 
-    async def get_description(self, meta):
+    async def get_description(self, meta, is_test=False):
         """Generate Italian BBCode description for ShareIsland"""
         title = meta.get("title", "Unknown")
         italian_title = self._get_italian_title(meta.get("imdb_info", {}))
@@ -691,7 +728,9 @@ class SHRI(UNIT3D):
         if isinstance(source, list):
             source = source[0] if source else ""
         if source:
-            info_parts.append(source.replace("Blu-ray", "BluRay"))
+            info_parts.append(
+                source.replace("Blu-ray", "BluRay").replace("Web", "WEB-DL")
+            )
 
         video_codec = meta.get("video_codec", "")
         if "HEVC" in video_codec or "H.265" in video_codec:
@@ -710,7 +749,7 @@ class SHRI(UNIT3D):
 
         if meta.get("audio_languages"):
             langs = [
-                self._get_language_name(lang.upper())
+                self._get_italian_language_name(self._get_language_code(lang))
                 for lang in meta["audio_languages"]
             ]
             langs = [lang for lang in langs if lang]
@@ -740,12 +779,12 @@ class SHRI(UNIT3D):
                 "[code]\n", f"[code]\n{custom_description_header}\n\n"
             )
 
-        # Save description file
-        desc_file = (
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-        )
-        async with aiofiles.open(desc_file, "w", encoding="utf-8") as f:
-            await f.write(bbcode)
+        if not is_test:
+            desc_file = (
+                f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+            )
+            async with aiofiles.open(desc_file, "w", encoding="utf-8") as f:
+                await f.write(bbcode)
 
         return {"description": bbcode}
 
@@ -795,14 +834,22 @@ class SHRI(UNIT3D):
                     if img_resp.status_code == 200:
                         img_data = img_resp.json()
                         logos = img_data.get("logos", [])
-                        # Prefer Italian, fallback to English
-                        for lang in ["it", "en"]:
-                            for logo in logos:
-                                if logo.get("iso_639_1") == lang:
-                                    logo_url = f"https://image.tmdb.org/t/p/w300{logo['file_path']}"
-                                    break
-                            if logo_url:
+                        # Priority: Italian > English > any other > first available
+                        logo_url = ""
+                        fallback_logo = None
+                        for logo in logos:
+                            lang = logo.get("iso_639_1")
+                            path = logo.get("file_path")
+                            if lang == "it":
+                                logo_url = f"https://image.tmdb.org/t/p/w300{path}"
                                 break
+                            elif lang == "en" and not logo_url:
+                                logo_url = f"https://image.tmdb.org/t/p/w300{path}"
+                            elif not fallback_logo:
+                                fallback_logo = path
+                        # Use fallback if no Italian/English found
+                        if not logo_url and fallback_logo:
+                            logo_url = f"https://image.tmdb.org/t/p/w300{fallback_logo}"
         except Exception as e:
             print(f"[DEBUG] TMDb fetch error: {e}")
 
@@ -880,7 +927,7 @@ class SHRI(UNIT3D):
 
             # Prefer Italian audio, fallback to first track
             ita_audio = next(
-                (t for t in audio_tracks if t.get("Language", "").lower() == "it"), None
+                (t for t in audio_tracks if self._get_language_code(t) == "it"), None
             )
             if not ita_audio and audio_tracks:
                 ita_audio = audio_tracks[0]
@@ -944,19 +991,23 @@ class SHRI(UNIT3D):
                 if ita_audio
                 else "0 kb/s"
             )
-            lang = (
-                "Italiano"
-                if ita_audio and ita_audio.get("Language", "").lower() == "it"
-                else "Inglese"
-            )
+            if ita_audio:
+                audio_lang_code = self._get_language_code(ita_audio)
+                lang = (
+                    self._get_italian_language_name(audio_lang_code)
+                    if audio_lang_code
+                    else "Inglese"
+                )
+            else:
+                lang = "Inglese"
 
             # Subtitle languages
             if text_tracks:
                 sub_langs = set()
                 for t in text_tracks:
-                    lang_code = t.get("Language", "")
+                    lang_code = self._get_language_code(t)
                     if lang_code:
-                        lang_name = self._get_language_name(lang_code.upper())
+                        lang_name = self._get_italian_language_name(lang_code)
                         if lang_name:
                             sub_langs.add(lang_name.title())
                 subs = ", ".join(sorted(sub_langs)) if sub_langs else "Assenti"
@@ -993,7 +1044,15 @@ class SHRI(UNIT3D):
         self, title, info_line, logo_url, summary, screens, synthetic_mi, category, meta
     ):
         """Build ShareIsland BBCode template"""
-        category_header = "--- SERIE TV ---" if category == "TV" else "--- FILM ---"
+        if category == "TV":
+            is_pack = meta.get("tv_pack", 0) == 1
+            category_header = (
+                "--- SERIE TV (STAGIONE) ---"
+                if is_pack
+                else "--- SERIE TV (EPISODIO) ---"
+            )
+        else:
+            category_header = "--- FILM ---"
         release_group = meta.get("tag", "").lstrip("-").strip()
 
         if release_group.lower() == "island":
