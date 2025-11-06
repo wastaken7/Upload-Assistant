@@ -52,18 +52,10 @@ class IPT:
         # Custom Header
         desc_parts.append(await builder.get_custom_header(self.tracker))
 
-        # Logo
-        logo_resize_url = meta.get('tmdb_logo', '')
-        if logo_resize_url:
-            desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
-
         # TV
         title, episode_image, episode_overview = await builder.get_tv_info(meta, self.tracker, resize=True)
         if episode_overview:
             desc_parts.append(f'[center]{title}[/center]')
-
-            if episode_image:
-                desc_parts.append(f"[center][img]{episode_image}[/img][/center]")
 
             desc_parts.append(f'[center]{episode_overview}[/center]')
 
