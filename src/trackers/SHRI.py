@@ -9,6 +9,7 @@ import pycountry
 import random
 import re
 import requests
+from babel import Locale
 from src.audio import get_audio_v2
 from src.languages import process_desc_language
 from src.trackers.COMMON import COMMON
@@ -43,6 +44,29 @@ class SHRI(UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = []
+
+    def _get_language_code(self, track_or_string):
+        """Extract and normalize language to ISO alpha-2 code"""
+        if isinstance(track_or_string, dict):
+            lang = track_or_string.get("Language", "")
+            if isinstance(lang, dict):
+                lang = lang.get("String", "")
+        else:
+            lang = track_or_string
+        if not lang:
+            return ""
+        lang_str = str(lang).lower()
+        if len(lang_str) == 2:
+            return lang_str
+        try:
+            lang_obj = (
+                pycountry.languages.get(name=lang_str.title())
+                or pycountry.languages.get(alpha_2=lang_str)
+                or pycountry.languages.get(alpha_3=lang_str)
+            )
+            return lang_obj.alpha_2.lower() if lang_obj else lang_str
+        except (AttributeError, KeyError, LookupError):
+            return lang_str
 
     async def get_additional_data(self, meta):
         """Get additional tracker-specific upload data"""
@@ -135,7 +159,7 @@ class SHRI(UNIT3D):
 
             audio_lang_str = " - ".join(result)
 
-        effective_type = self._get_effective_type(meta)
+        effective_type = self.get_effective_type(meta)
 
         if effective_type != "DISC":
             source = source.replace("Blu-ray", "BluRay")
@@ -228,7 +252,7 @@ class SHRI(UNIT3D):
         return {"name": name}
 
     def _extract_clean_release_group(self, meta, current_name):
-        """Extract release group if not already in the calculated name"""
+        """Extract release group - only accepts VU/UNTOUCHED markers from filename"""
         tag = meta.get("tag", "").strip().lstrip("-")
         if tag and " " not in tag and not self.INVALID_TAG_PATTERN.search(tag):
             return tag
@@ -259,25 +283,11 @@ class SHRI(UNIT3D):
             not potential_tag
             or len(potential_tag) > 30
             or not potential_tag.replace("_", "").isalnum()
-            or self.INVALID_TAG_PATTERN.search(potential_tag)
         ):
             return "NoGroup"
 
-        # Special case: UNTOUCHED/VU at end is valid tag, don't reject
-        if self.MARKER_PATTERN.search(potential_tag):
-            return potential_tag
-
-        # Check against calculated name
-        name_normalized = (
-            current_name.lower()
-            .replace("-", "")
-            .replace(".", "")
-            .replace(" ", "")
-            .replace("_", "")
-        )
-        tag_normalized = potential_tag.lower().replace("_", "")
-
-        if tag_normalized in name_normalized:
+        # ONLY accept if it's a VU/UNTOUCHED marker
+        if not self.MARKER_PATTERN.search(potential_tag):
             return "NoGroup"
 
         return potential_tag
@@ -304,7 +314,7 @@ class SHRI(UNIT3D):
         elif type is not None:
             return {"type_id": type_mapping.get(type, "0")}
         else:
-            effective_type = self._get_effective_type(meta)
+            effective_type = self.get_effective_type(meta)
             type_id = type_mapping.get(effective_type, "0")
             return {"type_id": type_id}
 
@@ -389,23 +399,36 @@ class SHRI(UNIT3D):
 
     def _detect_type_from_technical_analysis(self, meta):
         """Unified type detection: filename markers + MediaInfo analysis"""
+        # Priority 1: Explicit REMUX markers (filename check FIRST)
+        if self._has_remux_marker(meta):
+            return "REMUX"
+        # Priority 2: Base type from upstream
         base_type = meta.get("type", "ENCODE")
         if base_type in ("DISC", "DVDRIP", "BRRIP"):
             return base_type
-        # Priority 1: Explicit REMUX markers
-        if self._has_remux_marker(meta):
-            return "REMUX"
-        # Priority 2: Technical analysis
+        # Priority 3: Technical mediainfo analysis
         return self._analyze_encode_type(meta)
 
     def _has_remux_marker(self, meta):
-        """Check filename for REMUX indicators"""
         name_no_ext = os.path.splitext(self.get_basename(meta))[0].lower()
         if "remux" in name_no_ext:
             return True
-        match = self.MARKER_PATTERN.search(name_no_ext)
-        if match and not name_no_ext.endswith(f"-{match.group(0).lower()}"):
+        if self.MARKER_PATTERN.search(name_no_ext):
             return True
+
+        # Check for MakeMKV + no encoding
+        mi = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+        if mi:
+            general = mi[0]
+            encoded_app = str(general.get("Encoded_Application", "")).lower()
+            encoded_lib = str(general.get("Encoded_Library", "")).lower()
+
+            if "makemkv" in encoded_app or "makemkv" in encoded_lib:
+                video = next((t for t in mi if t.get("@type") == "Video"), {})
+                settings = video.get("Encoded_Library_Settings")
+                if not settings or isinstance(settings, dict):
+                    return True
+
         return False
 
     def _analyze_encode_type(self, meta):
@@ -543,7 +566,7 @@ class SHRI(UNIT3D):
         # Final fallback: use meta type or default to ENCODE
         return meta.get("type", "ENCODE")
 
-    def _get_effective_type(self, meta):
+    def get_effective_type(self, meta):
         """
         Determine effective type with priority hierarchy:
         1. Cinema News (CAM/HDCAM/TC/HDTC/TS/HDTS/MD/LD keywords)
@@ -555,8 +578,6 @@ class SHRI(UNIT3D):
             return "CINEMA_NEWS"
 
         detected_type = self._detect_type_from_technical_analysis(meta)
-        cli_ui.info(f"UA Detected type: {meta.get('type')}")
-        cli_ui.info(f"{self.tracker} Detected type: {detected_type}")
         return detected_type
 
     def _get_italian_title(self, imdb_info):
@@ -582,8 +603,7 @@ class SHRI(UNIT3D):
         tracks = meta["mediainfo"].get("media", {}).get("track", [])
         return any(
             track.get("@type") == "Audio"
-            and isinstance(track.get("Language"), str)
-            and track.get("Language").lower() in {"it", "it-it"}
+            and self._get_language_code(track) in {"it", "it-it"}
             and "commentary" not in str(track.get("Title", "")).lower()
             for track in tracks[2:]
         )
@@ -596,8 +616,7 @@ class SHRI(UNIT3D):
         tracks = meta["mediainfo"].get("media", {}).get("track", [])
         return any(
             track.get("@type") == "Text"
-            and isinstance(track.get("Language"), str)
-            and track.get("Language").lower() in {"it", "it-it"}
+            and self._get_language_code(track) in {"it", "it-it"}
             for track in tracks
         )
 
@@ -617,6 +636,22 @@ class SHRI(UNIT3D):
             return lang.name.upper()
 
         return iso_code
+
+    def _get_italian_language_name(self, iso_code):
+        """Convert ISO language code to Italian language name using Babel"""
+        if not iso_code:
+            return ""
+
+        try:
+            locale = Locale.parse(iso_code.lower())
+            italian_name = locale.get_display_name("it")
+            return (
+                italian_name.title()
+                if italian_name
+                else self._get_language_name(iso_code).title()
+            )
+        except (ValueError, AttributeError, KeyError):
+            return self._get_language_name(iso_code).title()
 
     async def _get_best_italian_audio_format(self, meta):
         """Filter Italian tracks, select best, format via get_audio_v2"""
@@ -662,8 +697,7 @@ class SHRI(UNIT3D):
             italian = [
                 t for t in tracks[1:]
                 if t.get("@type") == "Audio"
-                and isinstance(t.get("Language"), str)
-                and t.get("Language", "").lower() in ITALIAN_LANGS
+                and self._get_language_code(t) in ITALIAN_LANGS
                 and "commentary" not in str(t.get("Title", "")).lower()
             ]
             if not italian:
@@ -673,7 +707,7 @@ class SHRI(UNIT3D):
 
         return clean(audio_str)
 
-    async def get_description(self, meta):
+    async def get_description(self, meta, is_test=False):
         """Generate Italian BBCode description for ShareIsland"""
         title = meta.get("title", "Unknown")
         italian_title = self._get_italian_title(meta.get("imdb_info", {}))
@@ -691,7 +725,9 @@ class SHRI(UNIT3D):
         if isinstance(source, list):
             source = source[0] if source else ""
         if source:
-            info_parts.append(source.replace("Blu-ray", "BluRay"))
+            info_parts.append(
+                source.replace("Blu-ray", "BluRay").replace("Web", "WEB-DL")
+            )
 
         video_codec = meta.get("video_codec", "")
         if "HEVC" in video_codec or "H.265" in video_codec:
@@ -710,7 +746,7 @@ class SHRI(UNIT3D):
 
         if meta.get("audio_languages"):
             langs = [
-                self._get_language_name(lang.upper())
+                self._get_italian_language_name(self._get_language_code(lang))
                 for lang in meta["audio_languages"]
             ]
             langs = [lang for lang in langs if lang]
@@ -740,12 +776,12 @@ class SHRI(UNIT3D):
                 "[code]\n", f"[code]\n{custom_description_header}\n\n"
             )
 
-        # Save description file
-        desc_file = (
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-        )
-        async with aiofiles.open(desc_file, "w", encoding="utf-8") as f:
-            await f.write(bbcode)
+        if not is_test:
+            desc_file = (
+                f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+            )
+            async with aiofiles.open(desc_file, "w", encoding="utf-8") as f:
+                await f.write(bbcode)
 
         return {"description": bbcode}
 
@@ -795,14 +831,22 @@ class SHRI(UNIT3D):
                     if img_resp.status_code == 200:
                         img_data = img_resp.json()
                         logos = img_data.get("logos", [])
-                        # Prefer Italian, fallback to English
-                        for lang in ["it", "en"]:
-                            for logo in logos:
-                                if logo.get("iso_639_1") == lang:
-                                    logo_url = f"https://image.tmdb.org/t/p/w300{logo['file_path']}"
-                                    break
-                            if logo_url:
+                        # Priority: Italian > English > any other > first available
+                        logo_url = ""
+                        fallback_logo = None
+                        for logo in logos:
+                            lang = logo.get("iso_639_1")
+                            path = logo.get("file_path")
+                            if lang == "it":
+                                logo_url = f"https://image.tmdb.org/t/p/w300{path}"
                                 break
+                            elif lang == "en" and not logo_url:
+                                logo_url = f"https://image.tmdb.org/t/p/w300{path}"
+                            elif not fallback_logo:
+                                fallback_logo = path
+                        # Use fallback if no Italian/English found
+                        if not logo_url and fallback_logo:
+                            logo_url = f"https://image.tmdb.org/t/p/w300{fallback_logo}"
         except Exception as e:
             print(f"[DEBUG] TMDb fetch error: {e}")
 
@@ -880,7 +924,7 @@ class SHRI(UNIT3D):
 
             # Prefer Italian audio, fallback to first track
             ita_audio = next(
-                (t for t in audio_tracks if t.get("Language", "").lower() == "it"), None
+                (t for t in audio_tracks if self._get_language_code(t) == "it"), None
             )
             if not ita_audio and audio_tracks:
                 ita_audio = audio_tracks[0]
@@ -901,7 +945,17 @@ class SHRI(UNIT3D):
 
             # Video info
             vid_format = video.get("Format", "N/A")
-            codec = "x265" if "HEVC" in vid_format else "x264"
+            vid_format_upper = vid_format.upper()
+            if "HEVC" in vid_format_upper:
+                codec = "x265"
+            elif "AVC" in vid_format_upper or "H.264" in vid_format_upper:
+                codec = "x264"
+            elif "MPEG VIDEO" in vid_format_upper or "MPEG-2" in vid_format_upper:
+                codec = "MPEG-2"
+            elif "VC-1" in vid_format_upper or "VC1" in vid_format_upper:
+                codec = "VC-1"
+            else:
+                codec = vid_format  # Fallback to format name
             depth = f"{video.get('BitDepth', 10)} bits"
             vid_br = f"{safe_int(video.get('BitRate', 0)) / 1000000:.1f} Mb/s"
             res = meta.get("resolution", "N/A")
@@ -944,19 +998,23 @@ class SHRI(UNIT3D):
                 if ita_audio
                 else "0 kb/s"
             )
-            lang = (
-                "Italiano"
-                if ita_audio and ita_audio.get("Language", "").lower() == "it"
-                else "Inglese"
-            )
+            if ita_audio:
+                audio_lang_code = self._get_language_code(ita_audio)
+                lang = (
+                    self._get_italian_language_name(audio_lang_code)
+                    if audio_lang_code
+                    else "Inglese"
+                )
+            else:
+                lang = "Inglese"
 
             # Subtitle languages
             if text_tracks:
                 sub_langs = set()
                 for t in text_tracks:
-                    lang_code = t.get("Language", "")
+                    lang_code = self._get_language_code(t)
                     if lang_code:
-                        lang_name = self._get_language_name(lang_code.upper())
+                        lang_name = self._get_italian_language_name(lang_code)
                         if lang_name:
                             sub_langs.add(lang_name.title())
                 subs = ", ".join(sorted(sub_langs)) if sub_langs else "Assenti"
@@ -993,7 +1051,15 @@ class SHRI(UNIT3D):
         self, title, info_line, logo_url, summary, screens, synthetic_mi, category, meta
     ):
         """Build ShareIsland BBCode template"""
-        category_header = "--- SERIE TV ---" if category == "TV" else "--- FILM ---"
+        if category == "TV":
+            is_pack = meta.get("tv_pack", 0) == 1
+            category_header = (
+                "--- SERIE TV (STAGIONE) ---"
+                if is_pack
+                else "--- SERIE TV (EPISODIO) ---"
+            )
+        else:
+            category_header = "--- FILM ---"
         release_group = meta.get("tag", "").lstrip("-").strip()
 
         if release_group.lower() == "island":
