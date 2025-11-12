@@ -223,7 +223,7 @@ class AZTrackerBase:
                     return
 
         if meta['type'] not in ['WEBDL'] and self.tracker == "PHD":
-            if meta.get('tag', "") and any(x in meta['tag'] for x in ['FGT', 'EVO']):
+            if meta.get('tag', "") in ['FGT', 'EVO']:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                     console.print(f'[bold red]Group {meta["tag"]} is only allowed for web-dl[/bold red]')
                     choice = await self.common.async_input('Do you want to upload anyway? [y/N]: ')
