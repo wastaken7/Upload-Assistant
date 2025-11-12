@@ -1067,7 +1067,8 @@ class Prep():
             r'(?i)s\d{1,2}',
             r'(?i)\d{1,2}x\d{2}',
             r'(?i)(?:season|series)\s*\d+',
-            r'(?i)e\d{2,3}\s*\-'
+            r'(?i)e\d{2,3}\s*\-',
+            r'(?i)\d{4}\.\d{1,2}\.\d{1,2}'
         ]
 
         path = meta.get('path', '')
