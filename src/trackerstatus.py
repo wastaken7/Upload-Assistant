@@ -143,7 +143,7 @@ async def process_all_trackers(meta):
 
                 we_already_asked = local_meta.get('we_asked', False)
 
-            if not local_meta['debug']:
+            if local_meta['debug']:
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
                     if not local_meta.get('unattended', False):
                         console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
@@ -166,13 +166,28 @@ async def process_all_trackers(meta):
                             elif isinstance(tracker_rename, str):
                                 display_name = tracker_rename
 
+                        meta['tracker_renames'][tracker_name] = ""
                         if display_name is not None and display_name != "" and display_name != meta['name']:
+                            meta['tracker_renames'][tracker_name] = display_name
                             console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
                         try:
-                            edit_choice = "y" if local_meta['unattended'] else input("Enter 'y' to upload, or press enter to skip uploading:")
+                            edit_choice = "y" if local_meta['unattended'] else input("Enter 'y' to upload, 'e' to edit and upload, or press Enter to skip:")
                             if edit_choice.lower() == 'y':
                                 local_tracker_status['upload'] = True
                                 successful_trackers += 1
+                            elif edit_choice.lower() == 'e':
+                                console.print(f"[bold yellow]Editing name for {tracker_name}[/bold yellow]")
+                                current_name = meta['tracker_renames'].get(tracker_name) or meta.get('name', '')
+                                new_name = cli_ui.ask_string("Enter new name:", default=current_name)
+                                if new_name and new_name != current_name:
+                                    meta['tracker_renames'][tracker_name] = new_name
+                                    console.print(f"[bold green]Name for {tracker_name} updated to: {new_name}[/bold green]")
+                                    local_tracker_status['upload'] = True
+                                    successful_trackers += 1
+                                else:
+                                    console.print("[bold yellow]No changes made.[/bold yellow]")
+                                    local_tracker_status['upload'] = True
+                                    successful_trackers += 1
                             else:
                                 local_tracker_status['upload'] = False
                         except EOFError:

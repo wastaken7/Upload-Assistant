@@ -96,6 +96,8 @@ class Prep():
         meta['audio_languages'] = None
         meta['subtitle_languages'] = None
         meta['aither_trumpable'] = None
+        for tracker in meta['trackers']:
+            meta['tracker_renames'][tracker] = ""
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid', None) is None:
