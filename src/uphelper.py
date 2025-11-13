@@ -7,6 +7,7 @@ from data.config import config
 from src.cleanup import cleanup, reset_terminal
 from src.console import console
 from src.trackersetup import tracker_class_map
+from src.trackers.COMMON import upload_prompt
 
 
 class UploadHelper:
@@ -60,7 +61,7 @@ class UploadHelper:
                     console.print("[yellow]Please check the trumpable entries above to see if you want to upload, and report the trumpable torrent if you upload.[/yellow]")
                     if meta.get('dupe', False) is False:
                         try:
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                            upload = await upload_prompt(meta, tracker_name=tracker_name, dupe=True)
                             meta['we_asked'] = True
                         except EOFError:
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -74,7 +75,7 @@ class UploadHelper:
                     if meta.get('filename_match', False) and meta.get('file_count_match', False):
                         console.print(f'[bold red]Exact filename matches found! - {meta["filename_match"]}[/bold red]')
                         try:
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                            upload = await upload_prompt(meta, tracker_name=tracker_name, dupe=True)
                             meta['we_asked'] = True
                         except EOFError:
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -87,7 +88,7 @@ class UploadHelper:
                         console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
                         if meta.get('dupe', False) is False:
                             try:
-                                upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                                upload = await upload_prompt(meta, tracker_name=tracker_name, dupe=True)
                                 meta['we_asked'] = True
                             except EOFError:
                                 console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")

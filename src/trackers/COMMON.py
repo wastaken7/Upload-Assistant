@@ -1521,3 +1521,34 @@ class COMMON():
                 mediainfo = ''.join(lines) if remove else lines
 
         return mediainfo
+
+
+async def upload_prompt(meta, tracker_name, dupe=False, local_meta=None):
+    upload_prompt = "[bold green]'y'[/bold green] to upload / "
+    if meta["tracker_renames"].get(tracker_name, ""):
+        upload_prompt += "[bold yellow]'e'[/bold yellow] to edit name / "
+    upload_prompt += "[bold red]'Enter'[/bold red] to skip:"
+    if dupe:
+        console.print(f"Upload to {tracker_name} anyway? {upload_prompt}")
+        edit_choice = input()
+    else:
+        if local_meta["unattended"]:
+            edit_choice = "y"
+        else:
+            console.print(upload_prompt)
+            edit_choice = input()
+
+    if edit_choice.lower() == "y":
+        return True
+    elif edit_choice.lower() == "e":
+        current_name = meta["tracker_renames"].get(tracker_name) or meta.get("name", "")
+        console.print(f"Current name: {current_name}")
+        new_name = input("Enter new name: ")
+        if new_name and new_name != current_name:
+            meta["tracker_renames"][tracker_name] = new_name
+            return True
+        else:
+            console.print("[bold yellow]No changes made.[/bold yellow]")
+            return True
+    else:
+        return False
