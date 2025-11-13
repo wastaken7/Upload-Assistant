@@ -5,7 +5,6 @@ import cli_ui
 import re
 from data.config import config
 from src.console import console
-from src.languages import process_desc_language
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -46,11 +45,10 @@ class DP(UNIT3D):
             else:
                 return False
 
-        if not meta.get('language_checked', False):
-            await process_desc_language(meta, desc=None, tracker=self.tracker)
         nordic_languages = ['Danish', 'Swedish', 'Norwegian', 'Icelandic', 'Finnish', 'English']
-        if not any(lang in meta.get('audio_languages', []) for lang in nordic_languages) and not any(lang in meta.get('subtitle_languages', []) for lang in nordic_languages):
-            console.print(f'[bold red]{self.tracker} requires at least one Nordic/English audio or subtitle track.')
+        if not await self.common.check_language_requirements(
+            meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True
+        ):
             return False
 
         if meta['type'] == "ENCODE" and meta.get('tag', "") in ['FGT']:
