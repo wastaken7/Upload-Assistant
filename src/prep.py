@@ -753,7 +753,7 @@ class Prep():
         if meta.get('imdb_info', None) is None and int(meta['imdb_id']) != 0:
             imdb_info = await get_imdb_info_api(meta['imdb_id'], manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
             meta['imdb_info'] = imdb_info
-            meta['tv_year'] = imdb_info.get('tv_year', None)
+
         check_valid_data = meta.get('imdb_info', {}).get('title', "")
         if check_valid_data:
             try:
@@ -855,7 +855,6 @@ class Prep():
                                     meta['imdb_id'] = int(series_imdb)
                                     imdb_info = await get_imdb_info_api(meta['imdb_id'], manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
                                     meta['imdb_info'] = imdb_info
-                                    meta['tv_year'] = imdb_info.get('year', None)
                                     check_valid_data = meta.get('imdb_info', {}).get('title', "")
                                     if check_valid_data:
                                         title = meta.get('title', "").strip()
