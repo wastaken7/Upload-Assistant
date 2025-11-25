@@ -1,3 +1,4 @@
+# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
 import aiohttp
 import cli_ui
 import json
@@ -149,7 +150,10 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
                     valid_trackers.append(tracker)
 
             specific_tracker = valid_trackers
-        console.print(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
+
+        if meta['debug']:
+            console.print(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
+
         if specific_tracker:
             if meta.get('is_disc', False) and "ANT" in specific_tracker:
                 specific_tracker.remove("ANT")
