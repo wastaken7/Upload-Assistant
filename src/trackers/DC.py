@@ -183,20 +183,13 @@ class DC:
         Scene uploads should also have "[UNRAR]" in the name, as the UA only uploads unzipped files, which are considered "altered".
         https://digitalcore.club/forum/17/topic/1051/uploading-for-beginners
         """
-        rename = meta.get("tracker_renames", {}).get(self.tracker)
-        if rename:
-            return rename
-
-        if meta.get("scene", False):
-            if meta.get("scene_name", ""):
-                dc_name = meta.get("scene_name")
-            else:
-                dc_name = meta["uuid"]
-                base, ext = os.path.splitext(dc_name)
-                if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
-                    dc_name = f"{base} [UNRAR]"
+        if meta.get("scene_name", ""):
+            dc_name = f"{meta.get('scene_name')} [UNRAR]"
         else:
-            dc_name = meta['uuid']
+            dc_name = meta["uuid"]
+            base, ext = os.path.splitext(dc_name)
+            if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
+                dc_name = base
 
         return dc_name
 
