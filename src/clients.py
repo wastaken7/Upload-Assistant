@@ -95,36 +95,59 @@ class Clients():
             torrent = Torrent.read(torrent_path)
         else:
             return
-        if meta.get('client', None) is None:
-            if self.config['DEFAULT'].get('inject_torrent_client', "") != "":
-                default_torrent_client = self.config['DEFAULT']['inject_torrent_client']
-            else:
-                default_torrent_client = self.config['DEFAULT']['default_torrent_client']
+
+        inject_clients = []
+        if meta.get('client') and meta.get('client') != 'none':
+            inject_clients = [meta['client']]
+        elif meta.get('client') == 'none':
+            return
         else:
-            default_torrent_client = meta['client']
-        if meta.get('client', None) == 'none':
-            return
-        if default_torrent_client == "none":
-            return
-        client = self.config['TORRENT_CLIENTS'][default_torrent_client]
-        torrent_client = client['torrent_client']
+            inject_clients_config = self.config['DEFAULT'].get('injecting_client_list')
+            if isinstance(inject_clients_config, str) and inject_clients_config:
+                inject_clients = [inject_clients_config]
+            elif isinstance(inject_clients_config, list) and inject_clients_config:
+                inject_clients = inject_clients_config
 
-        local_path, remote_path = await self.remote_path_map(meta)
+            if not inject_clients:
+                default_client = self.config['DEFAULT'].get('default_torrent_client')
+                if default_client and default_client != 'none':
+                    inject_clients = [default_client]
 
-        if meta['debug']:
-            console.print(f"[bold green]Adding to {torrent_client}")
-        if torrent_client.lower() == "rtorrent":
-            self.rtorrent(meta['path'], torrent_path, torrent, meta, local_path, remote_path, client, tracker)
-        elif torrent_client == "qbit":
-            await self.qbittorrent(meta['path'], torrent, local_path, remote_path, client, meta['is_disc'], meta['filelist'], meta, tracker)
-        elif torrent_client.lower() == "deluge":
-            if meta['type'] == "DISC":
-                path = os.path.dirname(meta['path'])  # noqa F841
-            self.deluge(meta['path'], torrent_path, torrent, local_path, remote_path, client, meta)
-        elif torrent_client.lower() == "transmission":
-            self.transmission(meta['path'], torrent, local_path, remote_path, client, meta)
-        elif torrent_client.lower() == "watch":
-            shutil.copy(torrent_path, client['watch_folder'])
+        if not inject_clients:
+            return
+
+        for client_name in inject_clients:
+            if client_name == "none" or not client_name:
+                continue
+
+            if client_name not in self.config['TORRENT_CLIENTS']:
+                console.print(f"[bold red]Torrent client '{client_name}' not found in config.")
+                continue
+
+            client = self.config['TORRENT_CLIENTS'][client_name]
+            torrent_client = client['torrent_client']
+
+            # Must pass client_name to remote_path_map
+            local_path, remote_path = await self.remote_path_map(meta, client_name)
+
+            if meta['debug']:
+                console.print(f"[bold green]Adding to {client_name} ({torrent_client})")
+
+            try:
+                if torrent_client.lower() == "rtorrent":
+                    self.rtorrent(meta['path'], torrent_path, torrent, meta, local_path, remote_path, client, tracker)
+                elif torrent_client == "qbit":
+                    await self.qbittorrent(meta['path'], torrent, local_path, remote_path, client, meta['is_disc'], meta['filelist'], meta, tracker)
+                elif torrent_client.lower() == "deluge":
+                    if meta['type'] == "DISC":
+                        path = os.path.dirname(meta['path'])  # noqa F841
+                    self.deluge(meta['path'], torrent_path, torrent, local_path, remote_path, client, meta)
+                elif torrent_client.lower() == "transmission":
+                    self.transmission(meta['path'], torrent, local_path, remote_path, client, meta)
+                elif torrent_client.lower() == "watch":
+                    shutil.copy(torrent_path, client['watch_folder'])
+            except Exception as e:
+                console.print(f"[bold red]Failed to add torrent to {client_name}: {e}")
         return
 
     async def find_existing_torrent(self, meta):
@@ -1527,13 +1550,23 @@ class Clients():
 
         return metainfo
 
-    async def remote_path_map(self, meta):
-        if meta.get('client', None) is None:
-            torrent_client = self.config['DEFAULT']['default_torrent_client']
+    async def remote_path_map(self, meta, torrent_client_name=None):
+        if torrent_client_name:
+            torrent_client = torrent_client_name
+        elif meta.get('client', None) is not None:
+            torrent_client = meta.get('client')
         else:
-            torrent_client = meta['client']
-        local_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('local_path', ['/LocalPath'])
-        remote_paths = self.config['TORRENT_CLIENTS'][torrent_client].get('remote_path', ['/RemotePath'])
+            torrent_client = self.config['DEFAULT']['default_torrent_client']
+
+        if not torrent_client or torrent_client == 'none' or torrent_client not in self.config['TORRENT_CLIENTS']:
+            torrent_client = self.config['DEFAULT']['default_torrent_client']
+            if not torrent_client or torrent_client == 'none' or torrent_client not in self.config['TORRENT_CLIENTS']:
+                # Fallback to avoid crashing if no valid client is found
+                return os.path.normpath('/LocalPath'), os.path.normpath('/RemotePath')
+
+        client_config = self.config['TORRENT_CLIENTS'][torrent_client]
+        local_paths = client_config.get('local_path', ['/LocalPath'])
+        remote_paths = client_config.get('remote_path', ['/RemotePath'])
 
         if not isinstance(local_paths, list):
             local_paths = [local_paths]
