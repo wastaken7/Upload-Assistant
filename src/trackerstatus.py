@@ -17,6 +17,7 @@ from src.torrentcreate import create_base_from_existing_torrent
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
 from src.uphelper import UploadHelper
+from src.trackers.COMMON import upload_prompt
 
 
 async def process_all_trackers(meta):
@@ -112,7 +113,7 @@ async def process_all_trackers(meta):
                 if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped']:
                     dupes = await filter_dupes(dupes, local_meta, tracker_name)
                     meta['we_asked'] = False
-                    is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
+                    is_dupe = await helper.dupe_check(dupes, meta, local_meta, tracker_name)
                     if is_dupe:
                         local_tracker_status['dupe'] = True
 
@@ -167,15 +168,24 @@ async def process_all_trackers(meta):
                             elif isinstance(tracker_rename, str):
                                 display_name = tracker_rename
 
+                        if display_name:
+                            if 'tracker_renames' not in meta:
+                                meta['tracker_renames'] = {}
+                            meta['tracker_renames'][tracker_name] = display_name
+
                         if display_name is not None and display_name != "" and display_name != meta['name']:
                             console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
                         try:
-                            edit_choice = "y" if local_meta['unattended'] else input("Enter 'y' to upload, or press enter to skip uploading:")
-                            if edit_choice.lower() == 'y':
+                            if local_meta['unattended']:
                                 local_tracker_status['upload'] = True
                                 successful_trackers += 1
                             else:
-                                local_tracker_status['upload'] = False
+                                manual_upload_confirmation = await upload_prompt(meta=meta, tracker_name=tracker_name)
+                                if manual_upload_confirmation:
+                                    local_tracker_status['upload'] = True
+                                    successful_trackers += 1
+                                else:
+                                    local_tracker_status['upload'] = False
                         except EOFError:
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup()
