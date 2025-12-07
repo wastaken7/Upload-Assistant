@@ -102,8 +102,7 @@ class Clients():
         elif meta.get('client') == 'none':
             return
         else:
-            # New logic for inject_torrent_client as a list or string
-            inject_clients_config = self.config['DEFAULT'].get('inject_torrent_client')
+            inject_clients_config = self.config['DEFAULT'].get('injecting_client_list')
             if isinstance(inject_clients_config, str) and inject_clients_config:
                 inject_clients = [inject_clients_config]
             elif isinstance(inject_clients_config, list) and inject_clients_config:
@@ -1558,7 +1557,7 @@ class Clients():
             torrent_client = meta.get('client')
         else:
             torrent_client = self.config['DEFAULT']['default_torrent_client']
-        
+
         if not torrent_client or torrent_client == 'none' or torrent_client not in self.config['TORRENT_CLIENTS']:
             torrent_client = self.config['DEFAULT']['default_torrent_client']
             if not torrent_client or torrent_client == 'none' or torrent_client not in self.config['TORRENT_CLIENTS']:
