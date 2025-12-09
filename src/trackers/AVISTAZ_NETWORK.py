@@ -631,6 +631,7 @@ class AZTrackerBase:
             return ''
 
         description = description.replace('[URL=', '').replace('[url=', '')
+        description = description.replace('[*] ', '• ').replace('[*]', '• ')
 
         processed_desc, amount = re.subn(
             r'\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]',
