@@ -2167,7 +2167,7 @@ class Clients():
                     if qui_filters.get('excludeStatus'):
                         # Join multiple excludeStatus filters with comma (qBittorrent style)
                         filter_value = ','.join(qui_filters['excludeStatus'])
-                        query_parts.append(f"status={urllib.parse.quote(filter_value)}")
+                        query_parts.append(f"filter={urllib.parse.quote(filter_value)}")
 
                     if qui_filters.get('categories'):
                         # Join multiple categories with comma
