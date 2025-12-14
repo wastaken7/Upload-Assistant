@@ -183,6 +183,11 @@ async def filter_dupes(dupes, meta, tracker_name):
         if tracker_name == "AITHER" and entry.get('trumpable', False):
             meta['trumpable'] = entry.get('link', None)
 
+        if tracker_name == "BHD":
+            if ('2160p' in target_resolution and '2160p' in each) and ('framestor' in each.lower() or 'framestor' in meta['uuid'].lower()):
+                await log_exclusion("FraMeSToR release somewhere, could be HDR type or not, who knows....", each)
+                return False
+
         if has_is_disc and each.lower().endswith(".m2ts"):
             return False
 
