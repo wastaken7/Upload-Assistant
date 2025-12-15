@@ -228,18 +228,12 @@ class DiscParse():
 
                             if bdinfo_executable:
                                 proc = await asyncio.create_subprocess_exec(
-                                    *bdinfo_executable,
-                                    stdout=asyncio.subprocess.PIPE,
-                                    stderr=asyncio.subprocess.PIPE
+                                    *bdinfo_executable
                                 )
-                                stdout, stderr = await proc.communicate()
+                                await proc.wait()
 
                                 if proc.returncode != 0:
                                     console.print(f"[bold red]BDInfo failed with return code {proc.returncode}[/bold red]")
-                                    if stderr:
-                                        console.print(f"[red]BDInfo stderr: {stderr.decode().strip()}[/red]")
-                                    if stdout:
-                                        console.print(f"[yellow]BDInfo stdout: {stdout.decode().strip()}[/yellow]")
                                     continue
 
                                 # Rename the output to playlist_report_path
