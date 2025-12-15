@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import aiofiles
 import aiofiles.os
 import asyncio
@@ -1285,7 +1285,7 @@ class PTP():
                     resp = loginresponse.json()
                     if resp['Result'] == "TfaRequired":
                         data['TfaType'] = "normal"
-                        data['TfaCode'] = cli_ui.ask_string("2FA Required: Please enter 2FA code")
+                        data['TfaCode'] = cli_ui.ask_string("2FA Required: Please enter PTP 2FA code")
                         loginresponse = session.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
                         await asyncio.sleep(2)
                         resp = loginresponse.json()
