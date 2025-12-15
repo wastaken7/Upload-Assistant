@@ -351,7 +351,6 @@ class TVC():
                         )
 
                 if response.status_code != 200:
-                    body = response.text.removeprefix("application/x-bittorrent\n")
                     if response.status_code == 403:
                         meta['tracker_status'][self.tracker]['status_message'] = (
                             "data error: Forbidden (403). This may indicate that you do not have upload permission."
@@ -362,11 +361,11 @@ class TVC():
                         )
                     else:
                         meta['tracker_status'][self.tracker]['status_message'] = (
-                            f"data error: HTTP {response.status_code} - {body}"
+                            f"data error: HTTP {response.status_code} - {response.text}"
                         )
                     return
                 # TVC returns "application/x-bittorrent\n{json}" so strip the prefix
-                json_data = json.loads(response.text.removeprefix('application/x-bittorrent\n'))
+                json_data = json.loads(response.text.split('\n', 1)[-1])
                 meta['tracker_status'][self.tracker]['status_message'] = json_data
 
                 # Extract torrent ID robustly from returned URL
@@ -397,9 +396,9 @@ class TVC():
             except httpx.TimeoutException:
                 meta['tracker_status'][self.tracker]['status_message'] = 'data error: Request timed out after 30 seconds'
             except httpx.RequestError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}.\nResponse: {response.text.removeprefix("application/x-bittorrent\n") if response else "No response"}'
+                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}.\nResponse: {(response.text) if response else "No response"}'
             except Exception as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e}.\nResponse: {response.text.removeprefix("application/x-bittorrent\n") if response else "No response"}'
+                meta['tracker_status'][self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e}.\nResponse: {(response.text) if response else "No response"}'
                 return
 
         else:
