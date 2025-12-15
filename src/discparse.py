@@ -568,7 +568,7 @@ class DiscParse():
             set = main_set[0][:2]
             each['vob'] = vob = f"{path}/VTS_{set}_1.VOB"
             each['ifo'] = ifo = f"{path}/VTS_{set}_0.IFO"
-            
+
             # Use basenames for mediainfo processing to avoid full paths in output
             vob_basename = os.path.basename(vob)
             ifo_basename = os.path.basename(ifo)
@@ -596,7 +596,7 @@ class DiscParse():
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for VOB: {str(e)}")
                     vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
-                
+
                 # Store VOB mediainfo (same output for both keys)
                 each['vob_mi'] = vob_mi_output
                 each['vob_mi_full'] = vob_mi_output
