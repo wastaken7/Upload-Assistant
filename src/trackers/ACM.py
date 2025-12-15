@@ -357,7 +357,7 @@ class ACM(UNIT3D):
                 name = name.replace(f'{audio}', f'MPEG {audio}')
 
         name = name + self.get_subs_tag(subs)
-        return {'name': name}
+        return name
 
     async def get_description(self, meta):
         async with aiofiles.open(f'{meta["base_dir"]}/tmp/{meta["uuid"]}/DESCRIPTION.txt', 'r', encoding='utf-8') as f:
