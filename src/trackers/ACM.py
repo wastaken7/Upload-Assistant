@@ -200,7 +200,7 @@ class ACM(UNIT3D):
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_resolution_id(meta)
-        await self.get_description(meta)
+        desc = await self.get_description(meta)
         region_id = await self.common.unit3d_region_ids(meta.get('region'))
         distributor_id = await self.common.unit3d_distributor_ids(meta.get('distributor'))
         acm_name = await self.get_name(meta)
@@ -219,8 +219,6 @@ class ACM(UNIT3D):
             async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", 'r', encoding='utf-8') as f:
                 mi_dump = await f.read()
             bd_dump = None
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8') as f:
-            desc = await f.read()
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_file_path, 'rb') as f:
             torrent_bytes = await f.read()
@@ -418,4 +416,4 @@ class ACM(UNIT3D):
         async with aiofiles.open(output_path, 'r', encoding='utf-8') as f:
             final_desc = await f.read()
 
-        return {'description': final_desc}
+        return final_desc
