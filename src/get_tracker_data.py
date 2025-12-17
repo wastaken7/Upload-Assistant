@@ -79,7 +79,7 @@ async def get_tracker_data(video, meta, search_term=None, search_file_folder=Non
         if not meta.get('emby', False):
             tracker_keys = {
                 # preference some unit3d based trackers first
-                # since they can return tdb/imdb/tvdb ids
+                # since they can return tmdb/imdb/tvdb ids
                 'aither': 'AITHER',
                 'blu': 'BLU',
                 'lst': 'LST',

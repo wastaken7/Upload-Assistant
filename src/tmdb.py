@@ -1263,17 +1263,69 @@ async def get_romaji(tmdb_name, mal, meta):
         search_name = meta['filename'].lower()
     else:
         search_name = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", tmdb_name.lower().replace(' ', ''))
+
+    # Extract expected season number from various sources
+    expected_season = None
+
+    # Try manual_season first
+    if meta.get('manual_season'):
+        season_match = re.search(r'S?(\d+)', str(meta['manual_season']), re.IGNORECASE)
+        if season_match:
+            expected_season = int(season_match.group(1))
+
+    # Try parsing the filename with anitopy
+    if expected_season is None and meta.get('filename'):
+        try:
+            parsed = anitopy.parse(meta['filename'])
+            if parsed.get('anime_season'):
+                expected_season = int(parsed['anime_season'])
+        except Exception:
+            pass
+
+    # Fall back to meta['season'] if available
+    if expected_season is None and meta.get('season'):
+        season_match = re.search(r'S?(\d+)', str(meta['season']), re.IGNORECASE)
+        if season_match:
+            expected_season = int(season_match.group(1))
+
     if media not in (None, []):
         result = {'title': {}}
         difference = 0
+        best_match_with_season = None
+        best_season_diff = float('inf')
+
         for anime in media:
+            # Extract season number from AniList title if present
+            anime_season = None
+            for title_value in anime['title'].values():
+                if title_value:
+                    season_match = re.search(r'Season (\d+)', title_value, re.IGNORECASE)
+                    if season_match:
+                        anime_season = int(season_match.group(1))
+                        break
+
+            # Calculate title similarity
             for title in anime['title'].values():
                 if title is not None:
-                    title = re.sub(u'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]+ (?=[A-Za-z ]+–)', "", title.lower().replace(' ', ''), re.U)
-                    diff = SequenceMatcher(None, title, search_name).ratio()
-                    if diff >= difference:
+                    title_clean = re.sub(u'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]+ (?=[A-Za-z ]+–)', "", title.lower().replace(' ', ''), re.U)
+                    diff = SequenceMatcher(None, title_clean, search_name).ratio()
+
+                    # Prioritize season match if expected_season is set
+                    if expected_season is not None and anime_season is not None:
+                        if anime_season == expected_season and diff > difference * 0.8:
+                            # If season matches and title similarity is reasonable, prefer this
+                            if best_match_with_season is None or diff > best_season_diff:
+                                best_match_with_season = anime
+                                best_season_diff = diff
+
+                    # Keep track of best overall match
+                    if diff > difference:
                         result = anime
                         difference = diff
+
+        # Use season-matched result if found, otherwise use best title match
+        if best_match_with_season is not None:
+            result = best_match_with_season
 
         romaji = result['title'].get('romaji', result['title'].get('english', ""))
         mal_id = result.get('idMal', 0)
@@ -1283,7 +1335,9 @@ async def get_romaji(tmdb_name, mal, meta):
     else:
         romaji = eng_title = season_year = ""
         episodes = mal_id = 0
-    if mal_id in [None, 0]:
+    if mal in [None, 0]:
+        mal_id = mal_id
+    else:
         mal_id = mal
     if not episodes:
         episodes = 0
