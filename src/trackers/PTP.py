@@ -525,7 +525,7 @@ class PTP():
     def get_resolution(self, meta):
         other_res = None
         res = meta.get('resolution', "OTHER")
-        if (res == "OTHER" and meta['is_disc'] != "BDMV") or (meta['sd'] == 1 and meta['type'] == "WEBDL"):
+        if (res == "OTHER" and meta['is_disc'] != "BDMV") or (meta['sd'] == 1 and meta['type'] == "WEBDL") or (meta['sd'] == 1 and meta['type'] == "DVDRIP"):
             video_mi = meta['mediainfo']['media']['track'][1]
             other_res = f"{video_mi['Width']}x{video_mi['Height']}"
             res = "Other"
