@@ -2,7 +2,6 @@
 import json
 import traceback
 from guessit import guessit
-from pymediainfo import MediaInfo
 from src.console import console
 from src.exceptions import *  # noqa: F403
 
@@ -33,13 +32,10 @@ async def get_source(type, video, path, is_disc, meta, folder_id, base_dir):
                 source = "BluRay"
         if is_disc == "DVD" or source in ("DVD", "dvd"):
             try:
-                if is_disc == "DVD":
-                    mediainfo = MediaInfo.parse(f"{meta['discs'][0]['path']}/VTS_{meta['discs'][0]['main_set'][0][:2]}_0.IFO")
-                else:
-                    mediainfo = MediaInfo.parse(video)
-                for track in mediainfo.tracks:
-                    if track.track_type == "Video":
-                        system = track.standard
+                mediainfo = mi
+                for track in mediainfo['media']['track']:
+                    if track['@type'] == "Video":
+                        system = track.get('Standard', '')
                 if system not in ("PAL", "NTSC"):
                     raise WeirdSystem  # noqa: F405
             except Exception:
