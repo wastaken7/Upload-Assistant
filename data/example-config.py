@@ -286,6 +286,12 @@ config = {
         # Does not override MTV preference for small pieces
         "prefer_max_16_torrent": False,
 
+        # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
+        "cross_seeding": True,
+        # Set true to cross-seed check every valid tracker defined in your config
+        # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
+        "cross_seed_check_everything": False,
+
     },
 
     # these are used for DB links on AR
@@ -889,6 +895,9 @@ config = {
             "use_tracker_as_tag": False,
             "qbit_tag": "",
             "qbit_cat": "",
+            # If using cross seeding, add cross seed tag/category here
+            "qbit_cross_tag": "",
+            "qbit_cross_cat": "",
             "content_layout": "Original",
             # here you can chose to use either symbolic or hard links, or None to use original path
             # this will disable any automatic torrent management if set

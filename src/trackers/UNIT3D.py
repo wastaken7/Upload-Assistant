@@ -44,10 +44,11 @@ class UNIT3D:
             'api_token': self.api_key,
             'tmdbId': meta['tmdb'],
             'categories[]': (await self.get_category_id(meta))['category_id'],
-            'types[]': (await self.get_type_id(meta))['type_id'],
             'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
             'name': ''
         }
+        if self.tracker not in ['SP']:
+            params['types[]'] = (await self.get_type_id(meta))['type_id']
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}"
 
@@ -66,14 +67,18 @@ class UNIT3D:
                                 'files': [file['name'] for file in attributes.get('files', []) if isinstance(file, dict) and 'name' in file],
                                 'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
                                 'trumpable': attributes.get('trumpable', False),
-                                'link': attributes.get('details_link', None)
+                                'link': attributes.get('details_link', None),
+                                'download': attributes.get('download_link', None)
                             }
                         else:
                             result = {
                                 'name': attributes['name'],
                                 'size': attributes['size'],
+                                'files': [],
+                                'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
                                 'trumpable': attributes.get('trumpable', False),
-                                'link': attributes.get('details_link', None)
+                                'link': attributes.get('details_link', None),
+                                'download': attributes.get('download_link', None)
                             }
                         dupes.append(result)
                 else:
