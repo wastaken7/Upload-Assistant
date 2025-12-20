@@ -803,10 +803,19 @@ class Prep():
         if not meta.get('not_anime', False) and meta.get('category') == "TV":
             meta = await get_season_episode(video, meta)
 
-        if meta['category'] == "TV":
+        # lets check for tv movies
+        meta['tv_movie'] = False
+        is_tv_movie = meta.get('imdb_info', None).get('type', '')
+        tv_movie_keywords = ['tv movie', 'tv special', 'video']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', is_tv_movie, re.IGNORECASE) for keyword in tv_movie_keywords):
+            if meta['debug']:
+                console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
+            meta['tv_movie'] = True
+
+        if meta['category'] == "TV" or meta.get('tv_movie', False):
             both_ids_searched = False
             if meta.get('tvmaze_id', 0) == 0 and meta.get('tvdb_id', 0) == 0:
-                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tmdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False))
+                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tmdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False), tv_movie=meta.get('tv_movie', False))
                 both_ids_searched = True
                 if tvmaze:
                     meta['tvmaze_id'] = tvmaze
@@ -884,7 +893,7 @@ class Prep():
                                         else:
                                             meta['aka'] = ""
 
-            if meta.get('tvdb_series_name'):
+            if meta.get('tvdb_series_name') and meta['category'] == "TV":
                 series_name = meta.get('tvdb_series_name')
                 if series_name and meta.get('title') != series_name:
                     if meta['debug']:

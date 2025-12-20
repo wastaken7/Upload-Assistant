@@ -522,7 +522,7 @@ async def imdb_tmdb(meta, filename):
     return meta
 
 
-async def get_tvmaze_tvdb(filename, search_year, imdb, tmdb, manual_date=None, tvmaze_manual=None, year='', debug=False):
+async def get_tvmaze_tvdb(filename, search_year, imdb, tmdb, manual_date=None, tvmaze_manual=None, year='', debug=False, tv_movie=False):
     tvdb_data = None
     tvmaze = 0
     tvdb = 0
@@ -540,7 +540,7 @@ async def get_tvmaze_tvdb(filename, search_year, imdb, tmdb, manual_date=None, t
     ]
     if (imdb and imdb != 0) or (tmdb and tmdb != 0):
         tasks.append(
-            tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, debug=debug)
+            tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, debug=debug, tv_movie=tv_movie)
         )
     else:
         tasks.append(
