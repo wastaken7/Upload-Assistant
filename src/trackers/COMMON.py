@@ -106,12 +106,11 @@ class COMMON():
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
-            if new_tracker:
-                if isinstance(new_tracker, list):
-                    new_torrent.metainfo['announce'] = new_tracker[0]
-                    new_torrent.metainfo['announce-list'] = [new_tracker]
-                else:
-                    new_torrent.metainfo['announce'] = new_tracker
+            if isinstance(new_tracker, list):
+                new_torrent.metainfo['announce'] = new_tracker[0]
+                new_torrent.metainfo['announce-list'] = [new_tracker]
+            else:
+                new_torrent.metainfo['announce'] = new_tracker
             new_torrent.metainfo['info']['source'] = source_flag
 
             # Calculate hash
