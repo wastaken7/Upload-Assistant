@@ -944,9 +944,19 @@ config = {
             # path/to/session folder
             "torrent_storage_dir": "",
             "rtorrent_label": "",
-            # here you can chose to use either symbolic or hard links, or leave uncommented to use original path
+            # here you can chose to use either symbolic or hard links, or None to use original path
+            # this will disable any automatic torrent management if set
             # use either "symlink" or "hardlink"
+            # on windows, symlinks needs admin privs, both link types need ntfs/refs filesytem (and same drive)
             "linking": "",
+            # Allow fallback to inject torrent into qBitTorrent using the original path
+            # when linking error. eg: unsupported file system.
+            "allow_fallback": True,
+            # A folder or list of folders that will contain the linked content
+            # if using hardlinking, the linked folder must be on the same drive/volume as the original content,
+            # with UA mapping the correct location if multiple paths are specified.
+            # Use local paths, remote path mapping will be handled.
+            # only single \ on windows, path will be handled by UA
             "linked_folder": [""],
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             "local_path": [""],
