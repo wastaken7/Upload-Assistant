@@ -487,22 +487,22 @@ async def process_meta(meta, base_dir, bot=None):
                     except Exception as e:
                         console.print(f"[yellow]Could not load saved image data: {str(e)}")
 
-            if meta.get('is_disc', ""):
-                menus_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/menu_images.json"
-                if os.path.exists(menus_data_file):
-                    try:
-                        with open(menus_data_file, 'r') as menus_file:
-                            menu_image_file = json.load(menus_file)
+                if meta.get('is_disc', ""):
+                    menus_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/menu_images.json"
+                    if os.path.exists(menus_data_file):
+                        try:
+                            with open(menus_data_file, 'r') as menus_file:
+                                menu_image_file = json.load(menus_file)
 
-                            if 'menu_images' in menu_image_file and not meta.get('menu_images'):
-                                meta['menu_images'] = menu_image_file['menu_images']
-                                if meta.get('debug'):
-                                    console.print(f"[cyan]Loaded {len(menu_image_file['menu_images'])} previously saved disc menus")
+                                if 'menu_images' in menu_image_file and not meta.get('menu_images'):
+                                    meta['menu_images'] = menu_image_file['menu_images']
+                                    if meta.get('debug'):
+                                        console.print(f"[cyan]Loaded {len(menu_image_file['menu_images'])} previously saved disc menus")
 
-                    except Exception as e:
-                        console.print(f"[yellow]Could not load saved menu image data: {str(e)}")
-                elif meta.get('path_to_menu_screenshots', ""):
-                    await process_disc_menus(meta, config)
+                        except Exception as e:
+                            console.print(f"[yellow]Could not load saved menu image data: {str(e)}")
+                    elif meta.get('path_to_menu_screenshots', ""):
+                        await process_disc_menus(meta, config)
 
                 # Take Screenshots
                 try:
