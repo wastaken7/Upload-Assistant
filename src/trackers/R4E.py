@@ -14,7 +14,6 @@ class R4E(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'R4E'
-        self.source_flag = 'R4E'
         self.base_url = 'https://racing4everyone.eu'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

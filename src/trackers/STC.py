@@ -10,7 +10,6 @@ class STC(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'STC'
-        self.source_flag = 'STC'
         self.base_url = 'https://skipthecommericals.xyz'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

@@ -101,15 +101,17 @@ class COMMON():
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if downurl is not None:
             await self.download_tracker_torrent(meta, tracker, headers=headers, params=params, downurl=downurl, hash_is_id=hash_is_id)
+            return
 
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
-            if isinstance(new_tracker, list):
-                new_torrent.metainfo['announce'] = new_tracker[0]
-                new_torrent.metainfo['announce-list'] = [new_tracker]
-            else:
-                new_torrent.metainfo['announce'] = new_tracker
+            if new_tracker:
+                if isinstance(new_tracker, list):
+                    new_torrent.metainfo['announce'] = new_tracker[0]
+                    new_torrent.metainfo['announce-list'] = [new_tracker]
+                else:
+                    new_torrent.metainfo['announce'] = new_tracker
             new_torrent.metainfo['info']['source'] = source_flag
 
             # Calculate hash

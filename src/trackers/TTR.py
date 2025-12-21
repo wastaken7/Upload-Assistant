@@ -12,7 +12,6 @@ class TTR(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'TTR'
-        self.source_flag = 'TTR'
         self.base_url = 'https://torrenteros.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

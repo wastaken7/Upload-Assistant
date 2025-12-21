@@ -11,7 +11,6 @@ class SAM(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = "SAM"
-        self.source_flag = "SAMARITANO"
         self.base_url = "https://samaritano.cc"
         self.id_url = f"{self.base_url}/api/torrents/"
         self.upload_url = f"{self.base_url}/api/torrents/upload"

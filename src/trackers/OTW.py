@@ -13,7 +13,6 @@ class OTW(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'OTW'
-        self.source_flag = 'OTW'
         self.base_url = 'https://oldtoons.world'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

@@ -46,7 +46,7 @@ class TVC():
             "sci-fi": "33",
             "sport": "42",
             "holding bin": "53",
-            }
+        }
 
     def format_date_ddmmyyyy(self, date_str):
         """

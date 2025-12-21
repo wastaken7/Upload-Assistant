@@ -14,7 +14,6 @@ class DP(UNIT3D):
         super().__init__(config, tracker_name='DP')
         self.config = config
         self.tracker = 'DP'
-        self.source_flag = 'DarkPeers'
         self.base_url = 'https://darkpeers.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

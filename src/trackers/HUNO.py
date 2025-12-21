@@ -17,7 +17,6 @@ class HUNO(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'HUNO'
-        self.source_flag = 'HUNO'
         self.base_url = 'https://hawke.uno'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

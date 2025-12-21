@@ -13,7 +13,6 @@ class RAS(UNIT3D):
         super().__init__(config, tracker_name='RAS')
         self.config = config
         self.tracker = 'RAS'
-        self.source_flag = 'Rastastugan'
         self.base_url = 'https://rastastugan.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

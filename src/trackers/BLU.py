@@ -13,7 +13,6 @@ class BLU(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'BLU'
-        self.source_flag = 'BLU'
         self.base_url = 'https://blutopia.cc'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

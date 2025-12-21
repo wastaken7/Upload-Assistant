@@ -17,7 +17,6 @@ class TIK(UNIT3D):
         super().__init__(config, tracker_name='TIK')
         self.config = config
         self.tracker = 'TIK'
-        self.source_flag = 'TIK'
         self.base_url = 'https://cinematik.net'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'
