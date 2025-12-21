@@ -698,7 +698,7 @@ class AZTrackerBase:
 
         if not meta.get('debug', False):
             try:
-                await self.common.edit_torrent(meta, self.tracker, self.source_flag, announce_url=default_announce)
+                await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=default_announce)
                 upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
                 torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
@@ -940,7 +940,7 @@ class AZTrackerBase:
                         meta['tracker_status'][self.tracker]['status_message'] = status_message
                         return
 
-                    await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_url, torrent_url)
+                    await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, torrent_url)
 
                     status_message = 'Torrent uploaded successfully.'
 

@@ -74,7 +74,7 @@ class MTV():
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
+            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename="BASE")
 
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
@@ -88,7 +88,7 @@ class MTV():
                 torrent_create = f"[{self.tracker}]"
 
                 create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
-                await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
+                await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
                 console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
@@ -161,7 +161,7 @@ class MTV():
                     try:
                         if "torrents.php" in str(response.url):
                             meta['tracker_status'][self.tracker]['status_message'] = response.url
-                            await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
+                            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
                         elif 'https://www.morethantv.me/upload.php' in str(response.url):
                             meta['tracker_status'][self.tracker]['status_message'] = "data error - Still on upload page - upload may have failed"
                             if "error" in response.text.lower() or "failed" in response.text.lower():

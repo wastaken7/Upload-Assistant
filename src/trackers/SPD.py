@@ -299,12 +299,9 @@ class SPD:
                             meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
                         download_url = f"{self.url}/api/torrent/{torrent_id}/download"
-                        await self.common.add_tracker_torrent(
+                        await self.common.download_tracker_torrent(
                             meta,
                             tracker=self.tracker,
-                            source_flag=None,
-                            new_tracker=None,
-                            comment=None,
                             headers={'Authorization': self.config['TRACKERS'][self.tracker]['api_key']},
                             downurl=download_url
                         )

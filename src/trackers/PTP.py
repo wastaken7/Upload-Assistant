@@ -1325,7 +1325,7 @@ class PTP():
 
     async def fill_upload_form(self, groupID, meta):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
         file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
@@ -1479,7 +1479,7 @@ class PTP():
         common = COMMON(config=self.config)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
+            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename="BASE")
 
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
@@ -1492,7 +1492,7 @@ class PTP():
             torrent_create = f"[{self.tracker}]"
 
             create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
+            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
         # Proceed with the upload process
         with open(torrent_file_path, 'rb') as torrentFile:
@@ -1544,4 +1544,4 @@ class PTP():
                 if match:
                     meta['tracker_status'][self.tracker]['status_message'] = response.url
                     common = COMMON(config=self.config)
-                    await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)
+                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)

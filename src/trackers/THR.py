@@ -28,7 +28,7 @@ class THR():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         pronfo = await self.edit_desc(meta)  # noqa #F841
