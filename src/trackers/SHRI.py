@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 from typing import Literal
 import asyncio
@@ -11,6 +11,7 @@ import random
 import re
 import requests
 from babel import Locale
+from babel.core import UnknownLocaleError
 from src.audio import get_audio_v2
 from src.languages import process_desc_language
 from src.trackers.COMMON import COMMON
@@ -593,10 +594,10 @@ class SHRI(UNIT3D):
 
         for aka in imdb_info.get("akas", []):
             if isinstance(aka, dict):
-                if aka.get("country") == "Italy":
+                if aka.get("country") == "Italy" and not aka.get("attributes"):
                     country_match = aka.get("title")
                     break  # Country match takes priority
-                elif aka.get("language") == "Italy" and not language_match:
+                elif aka.get("language") == "Italy" and not language_match and not aka.get("attributes"):
                     language_match = aka.get("title")
 
         return country_match or language_match
@@ -655,7 +656,7 @@ class SHRI(UNIT3D):
                 if italian_name
                 else self._get_language_name(iso_code).title()
             )
-        except (ValueError, AttributeError, KeyError):
+        except (ValueError, AttributeError, KeyError, UnknownLocaleError):
             return self._get_language_name(iso_code).title()
 
     async def _get_best_italian_audio_format(self, meta):

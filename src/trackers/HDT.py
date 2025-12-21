@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 import aiofiles
 import glob
@@ -157,6 +157,9 @@ class HDT:
         # User description
         desc_parts.append(await builder.get_user_description(meta))
 
+        # Tonemapped Header
+        desc_parts.append(await builder.get_tonemapped_header(meta, self.tracker))
+
         # Screenshot Header
         desc_parts.append(await builder.screenshot_header(self.tracker))
 
@@ -167,9 +170,6 @@ class HDT:
             for image in images:
                 screenshots_block += f"<a href='{image['raw_url']}'><img src='{image['img_url']}' height=137></a> "
             desc_parts.append('[center]\n' + screenshots_block + '[/center]')
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta, self.tracker))
 
         # Signature
         desc_parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]")
@@ -194,6 +194,7 @@ class HDT:
         description = bbcode.remove_img_resize(description)
         description = bbcode.convert_comparison_to_centered(description, 1000)
         description = bbcode.remove_spoiler(description)
+        description = bbcode.remove_list(description)
         description = bbcode.remove_extra_lines(description)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:

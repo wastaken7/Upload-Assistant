@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
 import requests
@@ -37,7 +37,7 @@ async def is_scene(video, meta, imdb=None, lower=False):
                     meta['we_need_tag'] = True
                 if first_result.get('imdbId'):
                     imdb_str = first_result['imdbId']
-                    imdb = int(imdb_str) if imdb_str.isdigit() else 0
+                    imdb = int(imdb_str) if (imdb_str.isdigit() and not meta.get('imdb_manual')) else 0
 
                 # NFO Download Handling
                 if not meta.get('nfo') and not meta.get('emby', False):

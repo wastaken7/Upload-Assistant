@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 import aiofiles
 import httpx
@@ -181,10 +181,12 @@ class GPW():
 
         return title if title and title != meta.get('title') else ''
 
-    async def get_release_desc(self, meta):
+    async def check_image_hosts(self, meta):
         # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
         await check_hosts(meta, self.tracker, url_host_mapping=self.url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
+        return
 
+    async def get_release_desc(self, meta):
         builder = DescriptionBuilder(self.config)
         desc_parts = []
 
@@ -202,6 +204,20 @@ class GPW():
 
         # User description
         desc_parts.append(await builder.get_user_description(meta))
+
+        # Disc menus screenshots header
+        desc_parts.append(await builder.menu_screenshot_header(meta, self.tracker))
+
+        # Disc menus screenshots
+        if f'{self.tracker}_menu_images_key' in meta:
+            menu_images = meta.get(f'{self.tracker}_menu_images_key', [])
+        else:
+            menu_images = meta.get('menu_images', [])
+        if menu_images:
+            menu_screenshots_block = ''
+            for image in menu_images:
+                menu_screenshots_block += f"[img]{image['raw_url']}[/img]\n"
+            desc_parts.append('[center]\n' + menu_screenshots_block + '[/center]')
 
         # Screenshot Header
         desc_parts.append(await builder.screenshot_header(self.tracker))
@@ -229,6 +245,7 @@ class GPW():
         description = bbcode.remove_sup(description)
         description = bbcode.remove_sub(description)
         description = bbcode.convert_to_align(description)
+        description = bbcode.remove_list(description)
         description = bbcode.remove_extra_lines(description)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:

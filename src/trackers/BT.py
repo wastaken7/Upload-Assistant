@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 import aiofiles
 import httpx
@@ -360,6 +360,7 @@ class BT:
 
         bbcode = BBCODE()
         description = bbcode.remove_img_resize(description)
+        description = bbcode.remove_list(description)
         description = bbcode.remove_extra_lines(description)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
@@ -567,13 +568,12 @@ class BT:
         return keyword_map.get(source_type.lower(), 'Outro')
 
     async def get_screens(self, meta):
-        screenshot_urls = [
-            image.get('raw_url')
-            for image in meta.get('image_list', [])
-            if image.get('raw_url')
-        ]
+        urls = []
+        for image in meta.get('menu_images', []) + meta.get('image_list', []):
+            if image.get('raw_url'):
+                urls.append(image['raw_url'])
 
-        return screenshot_urls
+        return urls
 
     async def get_credits(self, meta):
         director = (meta.get('imdb_info', {}).get('directors') or []) + (meta.get('tmdb_directors') or [])

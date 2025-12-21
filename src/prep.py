@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 try:
     import asyncio
@@ -229,7 +229,7 @@ class Prep():
                 except Exception:
                     meta['search_year'] = ""
                 if not meta.get('edit', False):
-                    mi = await exportInfo(f"{meta['discs'][0]['path']}/VTS_{meta['discs'][0]['main_set'][0][:2]}_1.VOB", False, meta['uuid'], meta['base_dir'], export_text=False, is_dvd=True, debug=meta.get('debug', False))
+                    mi = await exportInfo(f"{meta['discs'][0]['path']}/VTS_{meta['discs'][0]['main_set'][0][:2]}_0.IFO", False, meta['uuid'], meta['base_dir'], export_text=False, is_dvd=True, debug=meta.get('debug', False))
                     meta['mediainfo'] = mi
                 else:
                     mi = meta['mediainfo']
@@ -329,6 +329,43 @@ class Prep():
             except Exception as e:
                 console.print(f"[red]Error processing Mediainfo: {e}[/red]")
                 raise Exception(f"Error processing Mediainfo: {e}")
+
+        source_size = 0
+        if not meta['is_disc']:
+            # Sum every non-disc file so downstream steps know the total payload size
+            filelist = meta.get('filelist') or []
+            files_to_measure = filelist if filelist else [videopath]
+            for file_path in files_to_measure:
+                if not os.path.isfile(file_path):
+                    if meta.get('debug'):
+                        console.print(f"[yellow]Skipping size check for missing file: {file_path}")
+                    continue
+                try:
+                    source_size += os.path.getsize(file_path)
+                except OSError as exc:
+                    if meta.get('debug'):
+                        console.print(f"[yellow]Unable to stat {file_path}: {exc}")
+
+        else:
+            # Disc structures can span many files; walk the tree rooted at meta['path']
+            disc_root = meta.get('path')
+            if disc_root and os.path.exists(disc_root):
+                for root, _, files in os.walk(disc_root):
+                    for filename in files:
+                        file_path = os.path.join(root, filename)
+                        try:
+                            source_size += os.path.getsize(file_path)
+                        except OSError as exc:
+                            if meta.get('debug'):
+                                console.print(f"[yellow]Unable to stat {file_path}: {exc}")
+                            continue
+            else:
+                if meta.get('debug'):
+                    console.print(f"[yellow]Disc path missing, source size set to 0: {disc_root}")
+
+        meta['source_size'] = source_size
+        if meta['debug']:
+            console.print(f"[cyan]Calculated source size: {meta['source_size']} bytes")
 
         if " AKA " in filename.replace('.', ' '):
             filename = filename.split('AKA')[0]
@@ -652,22 +689,23 @@ class Prep():
         meta['video_duration'] = await get_video_duration(meta)
         duration = meta.get('video_duration', None)
 
+        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+            unattended = False
+        else:
+            unattended = True
+        if meta.get('emby_debug', False) or meta['debug']:
+            debug = True
+        else:
+            debug = False
+
         # run a search to find tmdb and imdb ids if we don't have them
         if meta.get('tmdb_id') == 0 and meta.get('imdb_id') == 0:
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                unattended = False
-            else:
-                unattended = True
             if meta.get('category') == "TV":
                 year = meta.get('manual_year', '') or meta.get('search_year', '') or meta.get('year', '')
             elif meta.get('emby_debug', False):
                 year = ""
             else:
                 year = meta.get('manual_year', '') or meta.get('year', '') or meta.get('search_year', '')
-            if meta.get('emby_debug', False) or meta['debug']:
-                debug = True
-            else:
-                debug = False
             tmdb_task = get_tmdb_id(filename, year, meta.get('category', None), untouched_filename, attempted=0, debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), unattended=unattended)
             imdb_task = search_imdb(filename, year, quickie=True, category=meta.get('category', None), debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), untouched_filename=untouched_filename, duration=duration, unattended=unattended)
             tmdb_result, imdb_result = await asyncio.gather(tmdb_task, imdb_task)
@@ -726,7 +764,11 @@ class Prep():
 
         # Get IMDb ID if not set
         if meta.get('imdb_id') == 0:
-            meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), untouched_filename=untouched_filename, duration=duration, unattended=unattended)
+            try:
+                meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), untouched_filename=untouched_filename, attempted=0, duration=duration, unattended=unattended)
+            except Exception as e:
+                console.print(f"[red]Error searching IMDb: {e}[/red]")
+                raise Exception(f"Error searching IMDb: {e}")
 
         # user might have skipped tmdb earlier, lets double check
         if meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
@@ -798,10 +840,19 @@ class Prep():
         if not meta.get('not_anime', False) and meta.get('category') == "TV":
             meta = await get_season_episode(video, meta)
 
-        if meta['category'] == "TV":
+        # lets check for tv movies
+        meta['tv_movie'] = False
+        is_tv_movie = meta.get('imdb_info', None).get('type', '')
+        tv_movie_keywords = ['tv movie', 'tv special', 'video']
+        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', is_tv_movie, re.IGNORECASE) for keyword in tv_movie_keywords):
+            if meta['debug']:
+                console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
+            meta['tv_movie'] = True
+
+        if meta['category'] == "TV" or meta.get('tv_movie', False):
             both_ids_searched = False
             if meta.get('tvmaze_id', 0) == 0 and meta.get('tvdb_id', 0) == 0:
-                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tmdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False))
+                tvmaze, tvdb, tvdb_data = await get_tvmaze_tvdb(filename, meta['search_year'], meta.get('imdb_id', 0), meta.get('tmdb_id', 0), meta.get('manual_data'), meta.get('tvmaze_manual', 0), year=meta.get('year', ''), debug=meta.get('debug', False), tv_movie=meta.get('tv_movie', False))
                 both_ids_searched = True
                 if tvmaze:
                     meta['tvmaze_id'] = tvmaze
@@ -879,7 +930,7 @@ class Prep():
                                         else:
                                             meta['aka'] = ""
 
-            if meta.get('tvdb_series_name'):
+            if meta.get('tvdb_series_name') and meta['category'] == "TV":
                 series_name = meta.get('tvdb_series_name')
                 if series_name and meta.get('title') != series_name:
                     if meta['debug']:

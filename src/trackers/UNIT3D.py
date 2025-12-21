@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 # import discord
 import aiofiles
@@ -9,6 +9,7 @@ import os
 import platform
 import re
 from src.console import console
+from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
 
 
@@ -43,14 +44,14 @@ class UNIT3D:
             'api_token': self.api_key,
             'tmdbId': meta['tmdb'],
             'categories[]': (await self.get_category_id(meta))['category_id'],
-            'types[]': (await self.get_type_id(meta))['type_id'],
             'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
             'name': ''
         }
+        if self.tracker not in ['SP']:
+            params['types[]'] = (await self.get_type_id(meta))['type_id']
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}"
-        if meta.get('edition', '') != '':
-            params['name'] = params['name'] + f" {meta['edition']}"
+
         try:
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(url=self.search_url, params=params)
@@ -66,14 +67,18 @@ class UNIT3D:
                                 'files': [file['name'] for file in attributes.get('files', []) if isinstance(file, dict) and 'name' in file],
                                 'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
                                 'trumpable': attributes.get('trumpable', False),
-                                'link': attributes.get('details_link', None)
+                                'link': attributes.get('details_link', None),
+                                'download': attributes.get('download_link', None)
                             }
                         else:
                             result = {
                                 'name': attributes['name'],
                                 'size': attributes['size'],
+                                'files': [],
+                                'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
                                 'trumpable': attributes.get('trumpable', False),
-                                'link': attributes.get('details_link', None)
+                                'link': attributes.get('details_link', None),
+                                'download': attributes.get('download_link', None)
                             }
                         dupes.append(result)
                 else:
@@ -99,11 +104,7 @@ class UNIT3D:
         return {'name': meta['name']}
 
     async def get_description(self, meta):
-        signature = f"\n[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
-        await self.common.unit3d_edit_desc(meta, self.tracker, signature, comparison=True)
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8') as f:
-            desc = await f.read()
-        return {'description': desc}
+        return {'description': await DescriptionBuilder(self.config).unit3d_edit_desc(meta, self.tracker, comparison=True)}
 
     async def get_mediainfo(self, meta):
         if meta['bdinfo'] is not None:

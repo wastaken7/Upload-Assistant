@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
 # import discord
 import aiofiles
@@ -72,6 +72,7 @@ class TL:
     async def generate_description(self, meta):
         builder = DescriptionBuilder(self.config)
         desc_parts = []
+        process_screenshot = not self.tracker_config.get("img_rehost", True) or self.tracker_config.get("api_upload", True)
 
         # Custom Header
         desc_parts.append(await builder.get_custom_header(self.tracker))
@@ -102,23 +103,47 @@ class TL:
         # User description
         desc_parts.append(await builder.get_user_description(meta))
 
-        # Screenshot Header
-        desc_parts.append(await builder.screenshot_header(self.tracker))
+        # Menus Screenshots
+        if process_screenshot:
+            # Disc menus screenshots header
+            menu_images = meta.get("menu_images", [])
+            if menu_images:
+                desc_parts.append(await builder.menu_screenshot_header(meta, self.tracker))
 
-        # Screenshots
-        if not self.tracker_config.get('img_rehost', True) or self.tracker_config.get('api_upload', True):
-            images = meta.get('image_list', [])
-            screenshots_block = ''
-            for i, image in enumerate(images):
-                img_url = image['img_url']
-                web_url = image['web_url']
-                screenshots_block += f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
-                if (i + 1) % 2 == 0:
-                    screenshots_block += '<br><br>'
-            desc_parts.append('<center>' + screenshots_block + '</center>')
+                # Disc menus screenshots
+                menu_screenshots_block = ""
+                for i, image in enumerate(menu_images):
+                    menu_img_url = image.get("img_url")
+                    menu_web_url = image.get("web_url")
+                    if menu_img_url and menu_web_url:
+                        menu_screenshots_block += f"""<a href="{menu_web_url}"><img src="{menu_img_url}" style="max-width: 350px;"></a>  """
+                    if (i + 1) % 2 == 0:
+                        menu_screenshots_block += "<br><br>"
+                if menu_screenshots_block:
+                    desc_parts.append("<center>" + menu_screenshots_block + "</center>")
 
         # Tonemapped Header
         desc_parts.append(await builder.get_tonemapped_header(meta, self.tracker))
+
+        # Screenshots Section
+        if process_screenshot:
+            images = meta.get("image_list", [])
+            if images:
+                # Screenshot Header
+                desc_parts.append(await builder.screenshot_header(self.tracker))
+                # Screenshots
+                screenshots_block = ""
+                for i, image in enumerate(images):
+                    img_url = image.get("img_url")
+                    web_url = image.get("web_url")
+                    if img_url and web_url:
+                        screenshots_block += (
+                            f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
+                        )
+                    if (i + 1) % 2 == 0:
+                        screenshots_block += "<br><br>"
+                if screenshots_block:
+                    desc_parts.append("<center>" + screenshots_block + "</center>")
 
         # Signature
         desc_parts.append(
@@ -130,10 +155,11 @@ class TL:
         bbcode = BBCODE()
         description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
         description = re.sub(r'\[\*\]', '\n[*]', description, flags=re.IGNORECASE)
-        description = re.sub(r'\[list=.*?\]', '[list]', description, flags=re.IGNORECASE)
         description = re.sub(r'\[c\](.*?)\[/c\]', r'[code]\1[/code]', description, flags=re.IGNORECASE | re.DOTALL)
         description = re.sub(r'\[hr\]', '---', description, flags=re.IGNORECASE)
         description = re.sub(r'\[img=[\d"x]+\]', '[img]', description, flags=re.IGNORECASE)
+        description = description.replace('[*] ', '• ').replace('[*]', '• ')
+        description = bbcode.remove_list(description)
         description = bbcode.convert_comparison_to_centered(description, 1000)
         description = bbcode.remove_spoiler(description)
         description = re.sub(r'\n{3,}', '\n\n', description)
@@ -198,13 +224,12 @@ class TL:
         raise NotImplementedError('Failed to determine TL category!')
 
     def get_screens(self, meta):
-        screenshot_urls = [
-            image.get('raw_url')
-            for image in meta.get('image_list', [])
-            if image.get('raw_url')
-        ]
+        urls = []
+        for image in meta.get('menu_images', []) + meta.get('image_list', []):
+            if image.get('raw_url'):
+                urls.append(image['raw_url'])
 
-        return screenshot_urls
+        return urls
 
     def get_name(self, meta):
         is_scene = bool(meta.get('scene_name'))
@@ -352,8 +377,7 @@ class TL:
                     torrent_id = str(response.text)
                     meta['tracker_status'][self.tracker]['status_message'] = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-
-                await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_list, self.torrent_url + torrent_id)
+                    await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_list, self.torrent_url + torrent_id)
 
             else:
                 console.print(data)
@@ -370,9 +394,9 @@ class TL:
             'imdbURL': str(meta.get('imdb_info', {}).get('imdb_url', '')),
             'tvMazeURL': tvMazeURL,
             'igdbURL': '',
-            'torrentNFO': '1',
+            'torrentNFO': '0',
             'torrentDesc': '1',
-            'nfotextbox': await self.generate_description(meta),
+            'nfotextbox': '',
             'torrentComment': '0',
             'uploaderComments': '',
             'is_anonymous_upload': 'off',
@@ -386,6 +410,9 @@ class TL:
         return data
 
     async def cookie_upload(self, meta):
+        await self.generate_description(meta)
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8') as f:
+            description_content = await f.read()
         login = await self.login(meta)
         if not login:
             meta['tracker_status'][self.tracker]['status_message'] = "data error: Login with cookies failed."
@@ -401,7 +428,10 @@ class TL:
 
                 async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb') as f:
                     torrent_bytes = await f.read()
-                files = {'torrent': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent')}
+                files = {
+                    'torrent': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent'),
+                    'nfo': ('description.txt', description_content, 'text/plain'),
+                }
 
                 response = await self.session.post(url=self.http_upload_url, files=files, data=data)
 

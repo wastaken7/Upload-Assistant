@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import aiofiles
 import aiofiles.os
 import asyncio
@@ -47,6 +47,7 @@ class PTP():
         self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
                               'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
                               'WAF', 'x0r', 'YIFY', 'LAMA', 'WORLD']
+        self.approved_image_hosts = ['ptpimg', 'pixhost']
 
         self.sub_lang_map = {
             ("Arabic", "ara", "ar"): 22,
@@ -524,7 +525,7 @@ class PTP():
     def get_resolution(self, meta):
         other_res = None
         res = meta.get('resolution', "OTHER")
-        if (res == "OTHER" and meta['is_disc'] != "BDMV") or (meta['sd'] == 1 and meta['type'] == "WEBDL"):
+        if (res == "OTHER" and meta['is_disc'] != "BDMV") or (meta['sd'] == 1 and meta['type'] == "WEBDL") or (meta['sd'] == 1 and meta['type'] == "DVDRIP"):
             video_mi = meta['mediainfo']['media']['track'][1]
             other_res = f"{video_mi['Width']}x{video_mi['Height']}"
             res = "Other"
@@ -722,23 +723,38 @@ class PTP():
         desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return desc
 
-    async def edit_desc(self, meta):
-        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
-        multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
-        if multi_screens < 2:
-            multi_screens = 2
-            console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
+    async def check_image_hosts(self, meta):
         url_host_mapping = {
             "ptpimg.me": "ptpimg",
             "pixhost.to": "pixhost",
         }
 
-        approved_image_hosts = ['ptpimg', 'pixhost']
-        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=approved_image_hosts)
-        if 'PTP_images_key' in meta:
-            image_list = meta['PTP_images_key']
+        await check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
+        return
+
+    async def edit_desc(self, meta):
+        base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding="utf-8").read()
+        if meta.get('scene_nfo_file', None):
+            # Remove NFO from description
+            meta_description = re.sub(
+                r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]",
+                "",
+                base,
+                flags=re.DOTALL,
+            )
+            base = meta_description
+        multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
+        if multi_screens < 2:
+            multi_screens = 2
+            console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
+
+        if not meta.get('skip_imghost_upload', False):
+            if 'PTP_images_key' in meta:
+                image_list = meta['PTP_images_key']
+            else:
+                image_list = meta['image_list']
         else:
-            image_list = meta['image_list']
+            image_list = []
         images = image_list
 
         # Check for saved pack_image_links.json file
@@ -763,7 +779,7 @@ class PTP():
                                 # Get the main domain name (first part before the dot)
                                 host_key = hostname.split('.')[0] if hostname else ''
 
-                                if host_key in approved_image_hosts:
+                                if host_key in self.approved_image_hosts:
                                     images_to_keep.append(img)
                                 elif meta['debug']:
                                     console.print(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
@@ -897,7 +913,7 @@ class PTP():
                                     print(f"Error during BDMV screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
+                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
                                 if uploaded_images and not meta.get('skip_imghost_upload', False):
                                     await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
@@ -976,7 +992,7 @@ class PTP():
                                         print(f"Error during BDMV screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
+                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
                                 if uploaded_images and not meta.get('skip_imghost_upload', False):
                                     await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
@@ -1046,7 +1062,7 @@ class PTP():
                                         print(f"Error during DVD screenshot capture: {e}")
                                 new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
                                 if new_screens and not meta.get('skip_imghost_upload', False):
-                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
+                                    uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
                                 if uploaded_images and not meta.get('skip_imghost_upload', False):
                                     await self.save_image_links(meta, new_images_key, uploaded_images)
                                     for img in uploaded_images:
@@ -1175,7 +1191,7 @@ class PTP():
                                     print(f"Error during generic screenshot capture: {e}")
                             new_screens = glob.glob1(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
                             if new_screens and not meta.get('skip_imghost_upload', False):
-                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=approved_image_hosts)
+                                uploaded_images, _ = await upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
                                 if uploaded_images and not meta.get('skip_imghost_upload', False):
                                     await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
@@ -1281,7 +1297,7 @@ class PTP():
                     resp = loginresponse.json()
                     if resp['Result'] == "TfaRequired":
                         data['TfaType'] = "normal"
-                        data['TfaCode'] = cli_ui.ask_string("2FA Required: Please enter 2FA code")
+                        data['TfaCode'] = cli_ui.ask_string("2FA Required: Please enter PTP 2FA code")
                         loginresponse = session.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
                         await asyncio.sleep(2)
                         resp = loginresponse.json()
@@ -1404,6 +1420,8 @@ class PTP():
         }
         if data["remaster_year"] != "" or data["remaster_title"] != "":
             data["remaster"] = "on"
+        if meta.get('scene', False) is True:
+            data["scene"] = "on"
         if resolution == "Other":
             data["other_resolution"] = other_resolution
         if meta.get('personalrelease', False) is True:

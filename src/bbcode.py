@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 import html
 import urllib.parse
@@ -630,6 +630,13 @@ class BBCODE:
         Removes [sub] tags
         '''
         desc = desc.replace('[sub]', '').replace('[/sub]', '')
+        return desc
+
+    def remove_list(self, desc):
+        '''
+        Removes [list] tags
+        '''
+        desc = desc.replace('[list]', '').replace('[/list]', '')
         return desc
 
     def convert_comparison_to_collapse(self, desc, max_width):
