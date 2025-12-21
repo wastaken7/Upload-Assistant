@@ -11,6 +11,7 @@ import random
 import re
 import requests
 from babel import Locale
+from babel.core import UnknownLocaleError
 from src.audio import get_audio_v2
 from src.languages import process_desc_language
 from src.trackers.COMMON import COMMON
@@ -655,7 +656,7 @@ class SHRI(UNIT3D):
                 if italian_name
                 else self._get_language_name(iso_code).title()
             )
-        except (ValueError, AttributeError, KeyError):
+        except (ValueError, AttributeError, KeyError, UnknownLocaleError):
             return self._get_language_name(iso_code).title()
 
     async def _get_best_italian_audio_format(self, meta):
