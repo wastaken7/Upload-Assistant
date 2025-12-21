@@ -619,7 +619,9 @@ async def get_tv_data(meta):
                 console.print(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
         if meta.get('tvdb_episode_name', None):
-            if ['episode', 'tba'] not in meta['tvdb_episode_name'].lower():
+            if 'episode' in meta['tvdb_episode_name'].lower() or 'tba' in meta['tvdb_episode_name'].lower():
+                meta['auto_episode_title'] = None
+            else:
                 meta['auto_episode_title'] = meta['tvdb_episode_name']
         if meta.get('tvdb_overview', None):
             meta['overview_meta'] = meta['tvdb_overview']
@@ -638,7 +640,7 @@ async def get_tv_data(meta):
                 meta['tvmaze_episode_data'] = tvmaze_episode_data
         if meta.get('auto_episode_title') is None or meta.get('overview_meta') is None:
             if meta.get('auto_episode_title') is None and meta['tvmaze_episode_data'].get('name') is not None:
-                if ['episode', 'tba'] in meta['tvmaze_episode_data'].get("name").lower():
+                if 'episode' in meta['tvmaze_episode_data'].get("name").lower() or 'tba' in meta['tvmaze_episode_data'].get("name").lower():
                     meta['auto_episode_title'] = None
                 else:
                     meta['auto_episode_title'] = meta['tvmaze_episode_data']['name']
@@ -663,7 +665,7 @@ async def get_tv_data(meta):
             else:
                 episode_details = meta.get('tmdb_episode_data', None)
             if meta.get('auto_episode_title') is None and episode_details.get('name') is not None:
-                if ['episode', 'tba'] in episode_details.get("name").lower():
+                if 'episode' in episode_details.get("name").lower() or 'tba' in episode_details.get("name").lower():
                     meta['auto_episode_title'] = None
                 else:
                     meta['auto_episode_title'] = episode_details['name']
