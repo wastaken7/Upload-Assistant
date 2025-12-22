@@ -231,14 +231,11 @@ class TL:
 
         return urls
 
-    def get_name(self, meta):
-        is_scene = bool(meta.get('scene_name'))
-        if is_scene:
-            name = meta['scene_name']
-        else:
-            name = meta['name'].replace(meta['aka'], '')
+    async def edit_name(self, meta):
+        tl_name = meta.get('name').replace(meta['aka'], '')
+        tl_name = re.sub(r"\s{2,}", " ", tl_name)
 
-        return name
+        return tl_name
 
     async def search_existing(self, meta, disctype):
         login = await self.login(meta, force=True)
@@ -333,14 +330,14 @@ class TL:
 
         with open(torrent_path, 'rb') as open_torrent:
             files = {
-                'torrent': (self.get_name(meta) + '.torrent', open_torrent, 'application/x-bittorrent')
+                'torrent': (await self.edit_name(meta) + '.torrent', open_torrent, 'application/x-bittorrent')
             }
 
             data = {
                 'announcekey': self.passkey,
                 'category': self.get_category(meta),
                 'description': await self.generate_description(meta),
-                'name': self.get_name(meta),
+                'name': await self.edit_name(meta),
                 'nonscene': 'on' if not meta.get('scene') else 'off',
             }
 
@@ -388,7 +385,7 @@ class TL:
             tvMazeURL = f"https://www.tvmaze.com/shows/{meta.get('tvmaze_id')}"
 
         data = {
-            'name': self.get_name(meta),
+            'name': await self.edit_name(meta),
             'category': self.get_category(meta),
             'nonscene': 'on' if not meta.get("scene") else 'off',
             'imdbURL': str(meta.get('imdb_info', {}).get('imdb_url', '')),
@@ -441,6 +438,7 @@ class TL:
                     status_message = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
+                    await self.edit_post_upload(meta)
                     await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
 
                 else:
@@ -456,3 +454,20 @@ class TL:
                 status_message = f'data error - {str(e)}'
 
             meta['tracker_status'][self.tracker]['status_message'] = status_message
+
+    async def edit_post_upload(self, meta):
+        data = {
+            "torrentID": meta["tracker_status"][self.tracker]["torrent_id"],
+            "name": await self.edit_name(meta),
+            "category": self.get_category(meta),
+            "uploaderComments": "",
+        }
+
+        try:
+            response = await self.session.post("https://www.torrentleech.org/torrents/torrent/edit", data=data, timeout=10)
+            if not response.status_code == 302:
+                meta["tracker_status"][self.tracker]["status_message"] += " Failed to edit torrent."
+        except Exception as e:
+            meta["tracker_status"][self.tracker]["status_message"] += f" Failed to edit torrent: {str(e)}"
+
+        return
