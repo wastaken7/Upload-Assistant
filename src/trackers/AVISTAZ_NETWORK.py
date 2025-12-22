@@ -331,7 +331,7 @@ class AZTrackerBase:
                 return f.read()
 
     async def get_lang(self, meta):
-        self.language_map()
+        self.language_map(meta)
         audio_ids = set()
         subtitle_ids = set()
 
@@ -970,7 +970,7 @@ class AZTrackerBase:
 
         meta['tracker_status'][self.tracker]['status_message'] = status_message
 
-    def language_map(self):
+    def language_map(self, meta):
         all_lang_map = {
             ('Abkhazian', 'abk', 'ab'): '1',
             ('Afar', 'aar', 'aa'): '2',
@@ -1182,6 +1182,20 @@ class AZTrackerBase:
                 ('Bissa', 'bib', 'bib'): '190',
                 ('Romani', 'rom', 'rom'): '191',
             })
+
+        if meta.get('is_disc', ''):
+            if self.tracker == 'CZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
+            elif self.tracker == 'AZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '189',
+                })
+            elif self.tracker == 'PHD':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
 
         self.lang_map = {}
         for key_tuple, lang_id in all_lang_map.items():
