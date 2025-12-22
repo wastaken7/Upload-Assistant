@@ -177,7 +177,7 @@ class ANT:
 
         try:
             if not meta['debug']:
-                async with httpx.AsyncClient(timeout=10) as client:
+                async with httpx.AsyncClient(timeout=20) as client:
                     response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                     if response.status_code in [200, 201]:
                         try:
@@ -325,7 +325,7 @@ class ANT:
             params['imdb'] = meta['imdb']
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(url='https://anthelion.me/api', params=params)
                 if response.status_code == 200:
                     try:
@@ -394,7 +394,7 @@ class ANT:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(url='https://anthelion.me/api', params=params)
                 if response.status_code == 200:
                     try:
