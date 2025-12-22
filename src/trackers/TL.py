@@ -464,10 +464,10 @@ class TL:
         }
 
         try:
-            response = await self.session.post("https://www.torrentleech.org/torrents/torrent/edit", data=data, timeout=10)
+            response = await self.session.post("https://www.torrentleech.org/torrents/torrent/edit", data=data, timeout=30)
             if not response.status_code == 302:
-                meta["tracker_status"][self.tracker]["status_message"] += " Failed to edit torrent."
+                console.print("TL: Failed to edit torrent.")
         except Exception as e:
-            meta["tracker_status"][self.tracker]["status_message"] += f" Failed to edit torrent: {str(e)}"
+            console.print(f"TL: Failed to edit torrent: {str(e)}")
 
         return
