@@ -165,7 +165,6 @@ class DC:
 
             if response.text and response.text != '[]':
                 search_results = response.json()
-                console.print(search_results)
                 if search_results and isinstance(search_results, list):
                     for each in search_results:
                         if each.get('category') == category_id:
