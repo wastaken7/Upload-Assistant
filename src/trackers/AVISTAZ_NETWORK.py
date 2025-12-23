@@ -647,6 +647,8 @@ class AZTrackerBase:
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())
 
+        description = description.replace('[*]', '• ')
+
         if not description:
             return ''
 
