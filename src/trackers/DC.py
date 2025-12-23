@@ -151,6 +151,7 @@ class DC:
 
     async def search_existing(self, meta, disctype):
         imdb_id = meta.get('imdb_info', {}).get('imdbID')
+        category_id = await self.get_category_id(meta)
         if not imdb_id:
             console.print(f'[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]')
             return []
@@ -164,18 +165,20 @@ class DC:
 
             if response.text and response.text != '[]':
                 search_results = response.json()
+                console.print(search_results)
                 if search_results and isinstance(search_results, list):
                     for each in search_results:
-                        name = each.get('name')
-                        torrent_id = each.get('id')
-                        size = each.get('size')
-                        torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
-                        dupe_entry = {
-                            'name': name,
-                            'size': size,
-                            'link': torrent_link
-                        }
-                        dupes.append(dupe_entry)
+                        if each.get('category') == category_id:
+                            name = each.get('name')
+                            torrent_id = each.get('id')
+                            size = each.get('size')
+                            torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
+                            dupe_entry = {
+                                'name': name,
+                                'size': size,
+                                'link': torrent_link
+                            }
+                            dupes.append(dupe_entry)
 
                     return dupes
 
