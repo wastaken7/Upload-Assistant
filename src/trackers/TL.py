@@ -255,6 +255,17 @@ class TL:
         season = meta.get('season', '')
         season_episode = f"{season}{episode}" if season or episode else ''
 
+        forbidden_keywords = []
+
+        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
+        _type = str(meta.get("type", "") or "").strip().lower()
+
+        if is_disc == 'bdmv':
+            forbidden_keywords.extend(['remux', 'x264', 'x265'])
+
+        if _type == 'webdl':
+            forbidden_keywords.extend(['webrip', 'bluray', 'blu-ray'])
+
         search_urls = []
 
         if meta['category'] == 'TV':
@@ -286,7 +297,7 @@ class TL:
                     name = torrent.get('name')
                     link = f"{self.torrent_url}{torrent.get('fid')}"
                     size = torrent.get('size')
-                    if name:
+                    if not any(keyword in name.lower() for keyword in forbidden_keywords):
                         results.append({
                             'name': name,
                             'size': size,
