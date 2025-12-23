@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import aiofiles
 import httpx
-import os
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.rehostimages import check_hosts
@@ -193,7 +192,7 @@ class DC:
         Scene uploads should also have "[UNRAR]" in the name, as the UA only uploads unzipped files, which are considered "altered".
         https://digitalcore.club/forum/17/topic/1051/uploading-for-beginners
         """
-        dc_name = meta.get('name_clean')
+        dc_name = meta.get('clean_name')
 
         return dc_name
 
