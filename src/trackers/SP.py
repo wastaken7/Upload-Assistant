@@ -1,9 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # -*- coding: utf-8 -*-
-import re
+import cli_ui
 import os
-from src.trackers.COMMON import COMMON
+import re
+
 from src.console import console
+from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -91,3 +93,17 @@ class SP(UNIT3D):
         console.print(f"[cyan]Name: {name}")
 
         return {'name': name}
+
+    async def get_additional_checks(self, meta):
+        should_continue = True
+        if meta['resolution'] not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i']:
+            console.print(f'[bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]')
+            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    return False
+            else:
+                return False
+
+        return should_continue
