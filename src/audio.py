@@ -257,7 +257,7 @@ async def get_audio_v2(mi, meta, bdinfo):
             dual = "Dual-Audio"
         else:
             # if not meta.get('original_language', '').startswith('en'):
-            if not bd_mi or not bdinfo:
+            if not meta['is_disc']:
                 eng, orig, non_en_non_commentary = False, False, False
                 orig_lang = meta.get('original_language', '').lower()
                 if meta['debug']:

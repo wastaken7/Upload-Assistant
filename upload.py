@@ -1069,13 +1069,17 @@ async def do_the_thing(base_dir):
                     await send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get('debug', False), meta=meta)
 
             find_requests = config['DEFAULT'].get('search_requests', False) if meta.get('search_requests') is None else meta.get('search_requests')
-            if find_requests and meta['trackers'] not in ([], None) and not (meta.get('site_check', False) and 'is_disc' not in meta):
+            if find_requests and meta['trackers'] not in ([], None, "") and not (meta.get('site_check', False) and not meta['is_disc']):
                 console.print("[green]Searching for requests on supported trackers.....")
                 tracker_setup = TRACKER_SETUP(config=config)
                 if meta.get('site_check', False):
                     trackers = meta['requested_trackers']
+                    if meta['debug']:
+                        console.print(f"[cyan]Using requested trackers for site check: {trackers}[/cyan]")
                 else:
                     trackers = meta['trackers']
+                    if meta['debug']:
+                        console.print(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
                 await tracker_setup.tracker_request(meta, trackers)
 
             if meta.get('site_check', False):

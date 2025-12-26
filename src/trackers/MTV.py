@@ -72,10 +72,8 @@ class MTV():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename="BASE")
-
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
 
@@ -83,11 +81,11 @@ class MTV():
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
             if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-                meta['max_piece_size'] = '8'
+                piece_size = '8'
                 tracker_url = config['TRACKERS']['MTV'].get('announce_url', "https://fake.tracker").strip()
                 torrent_create = f"[{self.tracker}]"
 
-                create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
+                create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url, piece_size=piece_size)
                 await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
@@ -658,8 +656,12 @@ class MTV():
                         return []
             else:
                 console.print(f'[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]')
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
+                if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))):
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        meta['skipping'] = "MTV"
+                        return []
                 else:
                     meta['skipping'] = "MTV"
                     return []

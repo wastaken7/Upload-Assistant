@@ -1,6 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import aiofiles
-import aiofiles.os
 import asyncio
 import cli_ui
 import click
@@ -44,7 +42,7 @@ class PTP():
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
         self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
         self.user_agent = f'Upload Assistant/2.3 ({platform.system()} {platform.release()})'
-        self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet',
+        self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDT', 'HDTime', 'ION10', 'iPlanet',
                               'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
                               'WAF', 'x0r', 'YIFY', 'LAMA', 'WORLD']
         self.approved_image_hosts = ['ptpimg', 'pixhost']
@@ -1324,8 +1322,6 @@ class PTP():
         return loggedIn
 
     async def fill_upload_form(self, groupID, meta):
-        common = COMMON(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
         file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
@@ -1477,10 +1473,8 @@ class PTP():
 
     async def upload(self, meta, url, data, disctype):
         common = COMMON(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename="BASE")
-
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
 
@@ -1488,10 +1482,10 @@ class PTP():
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
             console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
             tracker_url = config['TRACKERS']['PTP'].get('announce_url', "https://fake.tracker").strip()
-            meta['max_piece_size'] = '16'
+            piece_size = '16'
             torrent_create = f"[{self.tracker}]"
 
-            create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
+            create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url, piece_size=piece_size)
             await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
         # Proceed with the upload process
@@ -1543,5 +1537,4 @@ class PTP():
                 # having UA add the torrent link as a comment.
                 if match:
                     meta['tracker_status'][self.tracker]['status_message'] = response.url
-                    common = COMMON(config=self.config)
                     await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)

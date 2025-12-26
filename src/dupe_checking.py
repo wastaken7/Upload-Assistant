@@ -314,8 +314,15 @@ async def filter_dupes(dupes, meta, tracker_name):
             return True
 
         if web_dl:
-            if "hdtv" in normalized and not any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
+            if "hdtv" in normalized and not any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
                 await log_exclusion("source mismatch: WEB-DL vs HDTV", each)
+                return True
+            if ['blu-ray', 'blu ray', 'bluray', 'blu -ray'] in normalized and not any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
+                await log_exclusion("source mismatch: WEB-DL vs BluRay", each)
+                return True
+        if not web_dl:
+            if any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
+                await log_exclusion("source mismatch: non-WEB-DL vs WEB-DL", each)
                 return True
 
         if is_dvd or "DVD" in target_source or is_dvdrip:
@@ -367,7 +374,7 @@ async def filter_dupes(dupes, meta, tracker_name):
                 return True
 
         if is_hdtv:
-            if any(web_term in normalized for web_term in ["web-dl", "webdl", "web dl"]):
+            if any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
                 return False
 
         if len(dupes) == 1 and meta.get('is_disc') != "BDMV":
