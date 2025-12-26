@@ -843,7 +843,7 @@ class Prep():
         # lets check for tv movies
         meta['tv_movie'] = False
         is_tv_movie = meta.get('imdb_info', None).get('type', '')
-        tv_movie_keywords = ['tv movie', 'tv special', 'video']
+        tv_movie_keywords = ['tv movie', 'tv special', 'video', 'tvmovie']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', is_tv_movie, re.IGNORECASE) for keyword in tv_movie_keywords):
             if meta['debug']:
                 console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
