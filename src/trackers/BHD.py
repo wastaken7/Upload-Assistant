@@ -48,7 +48,7 @@ class BHD():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         source_id = await self.get_source(meta['source'])
         type_id = await self.get_type(meta)
@@ -157,7 +157,7 @@ class BHD():
 
         if details_link:
             try:
-                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), details_link)
+                await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), details_link)
             except Exception as e:
                 console.print(f"Error while editing the torrent file: {e}")
 

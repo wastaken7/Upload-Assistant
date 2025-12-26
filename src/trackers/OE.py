@@ -17,7 +17,6 @@ class OE(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'OE'
-        self.source_flag = 'OE'
         self.base_url = 'https://onlyencodes.cc'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

@@ -11,7 +11,6 @@ class LST(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'LST'
-        self.source_flag = 'LST.GG'
         self.base_url = 'https://lst.gg'
         self.banned_url = f'{self.base_url}/api/bannedReleaseGroups'
         self.id_url = f'{self.base_url}/api/torrents/'

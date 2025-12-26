@@ -13,7 +13,6 @@ class YUS(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'YUS'
-        self.source_flag = 'YuScene'
         self.base_url = 'https://yu-scene.net'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

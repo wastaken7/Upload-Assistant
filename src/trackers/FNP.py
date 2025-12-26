@@ -10,7 +10,6 @@ class FNP(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'FNP'
-        self.source_flag = 'FnP'
         self.base_url = 'https://fearnopeer.com'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

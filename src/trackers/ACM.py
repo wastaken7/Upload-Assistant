@@ -196,7 +196,7 @@ class ACM(UNIT3D):
         return f" [{subs[0]} subs only]"
 
     async def upload(self, meta, disctype):
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
+        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
         resolution_id = await self.get_resolution_id(meta)
@@ -266,19 +266,17 @@ class ACM(UNIT3D):
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
                 try:
-                    meta['tracker_status'][self.tracker]['status_message'] = response.json()
+                    response_data = response.json()
+                    meta['tracker_status'][self.tracker]['status_message'] = response_data
                     # adding torrent link to comment of torrent file
-                    t_id = response.json()['data'].split('.')[1].split('/')[3]
+                    t_id = response_data['data'].split('.')[1].split('/')[3]
                     meta['tracker_status'][self.tracker]['torrent_id'] = t_id
-                    await self.common.add_tracker_torrent(
+                    await self.common.download_tracker_torrent(
                         meta,
                         self.tracker,
-                        self.source_flag,
-                        self.announce_url,
-                        self.torrent_url + t_id,
                         headers=headers,
                         params=params,
-                        downurl=response.json()['data']
+                        downurl=response_data['data']
                     )
                 except httpx.TimeoutException:
                     meta['tracker_status'][self.tracker]['status_message'] = f'data error: {self.tracker} request timed out after 10 seconds'

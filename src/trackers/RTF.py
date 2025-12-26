@@ -34,7 +34,7 @@ class RTF():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await DescriptionBuilder(self.config).unit3d_edit_desc(meta, self.tracker, self.forum_link)
         if meta['bdinfo'] is not None:
             mi_dump = None
@@ -89,9 +89,9 @@ class RTF():
 
                         t_id = response_json['torrent']['id']
                         meta['tracker_status'][self.tracker]['torrent_id'] = t_id
-                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag,
-                                                         self.config['TRACKERS'][self.tracker].get('announce_url'),
-                                                         "https://retroflix.club/browse/t/" + str(t_id))
+                        await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag,
+                                                                  self.config['TRACKERS'][self.tracker].get('announce_url'),
+                                                                  "https://retroflix.club/browse/t/" + str(t_id))
 
                     except Exception:
                         console.print("It may have uploaded, go check")

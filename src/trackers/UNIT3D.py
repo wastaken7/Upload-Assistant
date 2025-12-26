@@ -349,9 +349,7 @@ class UNIT3D:
 
     async def upload(self, meta, disctype):
         data = await self.get_data(meta)
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
-
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
         async with aiofiles.open(torrent_file_path, 'rb') as f:
             torrent_bytes = await f.read()
         files = {'torrent': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent')}
@@ -371,12 +369,9 @@ class UNIT3D:
                     torrent_id = await self.get_torrent_id(response_data)
 
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                    await self.common.add_tracker_torrent(
+                    await self.common.download_tracker_torrent(
                         meta,
                         self.tracker,
-                        self.source_flag,
-                        self.announce_url,
-                        self.torrent_url + torrent_id,
                         headers=headers,
                         params=params,
                         downurl=response_data['data']

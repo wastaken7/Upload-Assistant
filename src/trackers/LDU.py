@@ -15,7 +15,6 @@ class LDU(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'LDU'
-        self.source_flag = 'LDU'
         self.base_url = 'https://theldu.to'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

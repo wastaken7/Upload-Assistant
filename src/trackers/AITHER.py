@@ -13,7 +13,6 @@ class AITHER(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'AITHER'
-        self.source_flag = 'Aither'
         self.base_url = 'https://aither.cc'
         self.banned_url = f'{self.base_url}/api/blacklists/releasegroups'
         self.claims_url = f'{self.base_url}/api/internals/claim'

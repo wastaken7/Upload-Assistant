@@ -14,7 +14,6 @@ class ULCX(UNIT3D):
         super().__init__(config, tracker_name='ULCX')
         self.config = config
         self.tracker = 'ULCX'
-        self.source_flag = 'ULCX'
         self.base_url = 'https://upload.cx'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

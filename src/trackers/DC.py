@@ -257,12 +257,9 @@ class DC:
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id + '/'
                         status_message = response_data.get('message')
 
-                        await self.common.add_tracker_torrent(
+                        await self.common.download_tracker_torrent(
                             meta,
-                            tracker=self.tracker,
-                            source_flag=None,
-                            new_tracker=None,
-                            comment=None,
+                            self.tracker,
                             headers=self.session.headers,
                             downurl=f'{self.api_base_url}/download/{torrent_id}'
                         )

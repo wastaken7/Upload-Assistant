@@ -13,7 +13,6 @@ class SP(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'SP'
-        self.source_flag = 'seedpool.org'
         self.base_url = 'https://seedpool.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

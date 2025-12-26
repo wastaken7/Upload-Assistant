@@ -458,7 +458,7 @@ class CookieAuthUploader:
             except Exception as e:
                 meta["tracker_status"][tracker]["status_message"] = f"Unexpected upload error: {e}"
 
-        await self.common.add_tracker_torrent(meta, tracker, source_flag, user_announce_url, torrent_url)
+        await self.common.create_torrent_ready_to_seed(meta, tracker, source_flag, user_announce_url, torrent_url)
         return False
 
     def upload_debug(self, tracker, data):
@@ -490,7 +490,7 @@ class CookieAuthUploader:
         self, meta, tracker, torrent_field_name, torrent_name, source_flag, default_announce
     ):
         """Load the torrent file into memory."""
-        await self.common.edit_torrent(meta, tracker, source_flag, announce_url=default_announce)
+        await self.common.create_torrent_for_upload(meta, tracker, source_flag, announce_url=default_announce)
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
             file_bytes = await f.read()
@@ -522,7 +522,7 @@ class CookieAuthUploader:
                     torrent_id = text_match.group(1)
                     meta["tracker_status"][tracker]["torrent_id"] = torrent_id
 
-        torrent_hash = await self.common.add_tracker_torrent(
+        torrent_hash = await self.common.create_torrent_ready_to_seed(
             meta, tracker, source_flag, user_announce_url, torrent_url + torrent_id, hash_is_id=hash_is_id
         )
 

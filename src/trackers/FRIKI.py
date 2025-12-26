@@ -11,7 +11,6 @@ class FRIKI(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'FRIKI'
-        self.source_flag = 'frikibar.com'
         self.base_url = 'https://frikibar.com'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

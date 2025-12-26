@@ -72,10 +72,8 @@ class MTV():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
-
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
 
@@ -83,12 +81,12 @@ class MTV():
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
             if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-                meta['max_piece_size'] = '8'
+                piece_size = '8'
                 tracker_url = config['TRACKERS']['MTV'].get('announce_url', "https://fake.tracker").strip()
                 torrent_create = f"[{self.tracker}]"
 
-                create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
-                await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
+                create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url, piece_size=piece_size)
+                await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
                 console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
@@ -161,7 +159,7 @@ class MTV():
                     try:
                         if "torrents.php" in str(response.url):
                             meta['tracker_status'][self.tracker]['status_message'] = response.url
-                            await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
+                            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.url))
                         elif 'https://www.morethantv.me/upload.php' in str(response.url):
                             meta['tracker_status'][self.tracker]['status_message'] = "data error - Still on upload page - upload may have failed"
                             if "error" in response.text.lower() or "failed" in response.text.lower():
