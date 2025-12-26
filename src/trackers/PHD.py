@@ -335,18 +335,35 @@ class PHD(AZTrackerBase):
 
         return
 
-    def get_rip_type(self, meta):
-        source_type = meta.get('type')
-
-        keyword_map = {
-            'bdrip': '1',
-            'encode': '2',
-            'disc': '3',
-            'hdrip': '6',
-            'hdtv': '7',
-            'webdl': '12',
-            'webrip': '13',
-            'remux': '14',
+    def get_rip_type(self, meta, display_name=False):
+        # Translation from meta keywords to site display labels
+        translation = {
+            "bdrip": "BDRip",
+            "encode": "BluRay",
+            "disc": "BluRay Raw",
+            "hdrip": "HDRip",
+            "hdtv": "HDTV",
+            "remux": "REMUX",
+            "webdl": "WEB-DL",
+            "webrip": "WEBRip"
         }
 
-        return keyword_map.get(source_type.lower())
+        # Available rip types from HTML
+        available_rip_types = {
+            "BDRip": "1",
+            "BluRay": "2",
+            "BluRay Raw": "3",
+            "HDRip": "6",
+            "HDTV": "7",
+            "REMUX": "14",
+            "WEB-DL": "12",
+            "WEBRip": "13",
+        }
+
+        source_type = str(meta.get("type", "") or "").strip().lower()
+        html_label = translation.get(source_type)
+
+        if display_name:
+            return html_label
+
+        return available_rip_types.get(html_label)

@@ -251,6 +251,8 @@ class AZTrackerBase:
         else:
             resolution = 'all'
 
+        rip_type = self.get_rip_type(meta, display_name=True)
+
         page_url = f'{self.base_url}/movies/torrents/{self.media_code}?quality={resolution}'
 
         duplicates = []
@@ -273,6 +275,11 @@ class AZTrackerBase:
                 torrent_rows = torrent_table.find('tbody').find_all('tr', recursive=False)
 
                 for row in torrent_rows:
+                    badges = [b.get_text(strip=True) for b in row.find_all('span', class_='badge-extra')]
+
+                    if rip_type and rip_type not in badges:
+                        continue
+
                     name_tag = row.find('a', class_='torrent-filename')
                     name = name_tag.get_text(strip=True) if name_tag else ''
 
@@ -817,41 +824,71 @@ class AZTrackerBase:
 
         return re.sub(r'\s{2,}', ' ', upload_name)
 
-    def get_rip_type(self, meta):
-        source_type = str(meta.get('type', '') or '').strip().lower()
-        source = str(meta.get('source', '') or '').strip().lower()
-        is_disc = str(meta.get('is_disc', '') or '').strip().upper()
-
-        if is_disc == 'BDMV':
-            return '15'
-        if is_disc == 'HDDVD':
-            return '4'
-        if is_disc == 'DVD':
-            return '4'
-
-        if source_type == 'remux':
-            if 'dvd' in source:
-                return '17'
-            if source in ('bluray', 'blu-ray'):
-                return '14'
-
-        keyword_map = {
-            'bdrip': '1',
-            'brrip': '3',
-            'encode': '2',
-            'dvdrip': '5',
-            'hdrip': '6',
-            'hdtv': '7',
-            'sdtv': '16',
-            'vcd': '8',
-            'vcdrip': '9',
-            'vhsrip': '10',
-            'vodrip': '11',
-            'webdl': '12',
-            'webrip': '13',
+    def get_rip_type(self, meta, display_name=False):
+        # Translation from meta keywords to site display labels
+        translation = {
+            "bdrip": "BDRip",
+            "brrip": "BRRip",
+            "encode": "BluRay",
+            "dvdrip": "DVDRip",
+            "hdrip": "HDRip",
+            "hdtv": "HDTV",
+            "sdtv": "SDTV",
+            "vcd": "VCD",
+            "vcdrip": "VCDRip",
+            "vhsrip": "VHSRip",
+            "vodrip": "VODRip",
+            "webdl": "WEB-DL",
+            "webrip": "WEBRip",
         }
 
-        return keyword_map.get(source_type.lower())
+        # Available rip types from HTML
+        available_rip_types = {
+            "BDRip": "1",
+            "BluRay": "2",
+            "BRRip": "3",
+            "DVD": "4",
+            "DVDRip": "5",
+            "HDRip": "6",
+            "HDTV": "7",
+            "VCD": "8",
+            "VCDRip": "9",
+            "VHSRip": "10",
+            "VODRip": "11",
+            "WEB-DL": "12",
+            "WEBRip": "13",
+            "BluRay REMUX": "14",
+            "BluRay Raw": "15",
+            "SDTV": "16",
+            "DVD Remux": "17",
+        }
+
+        source_type = str(meta.get("type", "") or "").strip().lower()
+        source = str(meta.get("source", "") or "").strip().lower()
+        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
+
+        html_label = ""
+
+        if source_type == 'disc':
+            if is_disc == "bdmv":
+                html_label = "BluRay Raw"
+            elif is_disc in ("dvd", "hddvd"):
+                html_label = "DVD"
+
+        elif source_type == "remux":
+            if "dvd" in source:
+                html_label = "DVD Remux"
+            elif source in ("bluray", "blu-ray"):
+                html_label = "BluRay REMUX"
+            else:
+                return None
+        else:
+            html_label = translation.get(source_type)
+
+        if display_name:
+            return html_label
+
+        return available_rip_types.get(html_label)
 
     async def fetch_data(self, meta):
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
