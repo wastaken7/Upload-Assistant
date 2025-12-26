@@ -106,4 +106,16 @@ class SP(UNIT3D):
             else:
                 return False
 
+        disallowed_keywords = {'XXX', 'Erotic', 'Porn'}
+        disallowed_genres = {'Adult', 'Erotica'}
+        if any(keyword.lower() in disallowed_keywords for keyword in map(str.lower, meta['keywords'])) or any(genre.lower() in disallowed_genres for genre in map(str.lower, meta.get('combined_genres', []))):
+            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))):
+                console.print(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    return False
+            else:
+                return False
+
         return should_continue
