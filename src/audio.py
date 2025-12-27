@@ -280,6 +280,7 @@ async def get_audio_v2(mi, meta, bdinfo):
                         if t.get('@type') == "Audio" and "commentary" not in (t.get('Title') or '').lower() and "compatibility" not in (t.get('Title') or '').lower()
                     ]
                     audio_language = None
+                    language_allowed = True
                     if meta['debug']:
                         console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
                     for t in audio_tracks:
@@ -308,7 +309,7 @@ async def get_audio_v2(mi, meta, bdinfo):
                             audio_language = audio_language.strip().lower()
                             if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en") and not audio_language.startswith("zx"):
                                 non_en_non_commentary = True
-                                language_allowed = bloated_check(meta, audio_language)
+                                language_allowed = language_allowed and bloated_check(meta, audio_language)
 
                     if (
                         orig_lang == "en"
@@ -424,7 +425,7 @@ async def get_audio_v2(mi, meta, bdinfo):
 
 def bloated_check(meta, audio_language):
     bloat_is_allowed = ["ASC", "BJS", "BT", "CBR", "DC", "FF", "LCD", "SAM", "SP", "TL"]
-    tracker_allowed_languages = {
+    tracker_allowed_bloat_language = {
         "AITHER": "English",
         "ANT": "English",
         "BLU": "English",
@@ -437,8 +438,8 @@ def bloated_check(meta, audio_language):
     trackers_to_warn = []
 
     for tracker in meta.get("trackers", []):
-        if tracker in tracker_allowed_languages:
-            if audio_language.lower().startswith(tracker_allowed_languages[tracker].lower()):
+        if tracker in tracker_allowed_bloat_language:
+            if audio_language.lower().startswith(tracker_allowed_bloat_language[tracker].lower()):
                 continue
         if tracker not in bloat_is_allowed:
             trackers_to_warn.append(tracker)
@@ -451,4 +452,4 @@ def bloated_check(meta, audio_language):
         time.sleep(5)
         return False
 
-    return False
+    return True
