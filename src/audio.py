@@ -426,14 +426,14 @@ async def get_audio_v2(mi, meta, bdinfo):
 def bloated_check(meta, audio_language):
     bloat_is_allowed = ["ASC", "BJS", "BT", "CBR", "DC", "FF", "LCD", "SAM", "SP", "TL"]
     tracker_allowed_bloat_language = {
-        "AITHER": "English",
-        "ANT": "English",
-        "BLU": "English",
-        "ITT": "Italian",
-        "LT": "Spanish",
-        "PT": "Portuguese",
-        "SPD": "Romanian",
-        "TTR": "Spanish",
+        "AITHER": "en",
+        "ANT": "en",
+        "BLU": "en",
+        "ITT": "it",
+        "LT": "es",
+        "PT": "pt",
+        "SPD": "ro",
+        "TTR": "es",
     }
     trackers_to_warn = []
 
