@@ -284,6 +284,9 @@ async def get_audio_v2(mi, meta, bdinfo):
                     language_allowed = True
                     if meta['debug']:
                         console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
+
+                    # First pass: collect all audio languages and set flags
+                    non_eng_non_orig_languages = []
                     for t in audio_tracks:
                         audio_language = t.get('Language', '')
                         if meta['debug']:
@@ -309,10 +312,16 @@ async def get_audio_v2(mi, meta, bdinfo):
 
                             if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en") and not audio_language.startswith("zx"):
                                 non_en_non_commentary = True
+                                non_eng_non_orig_languages.append(audio_language)
 
-                                # Check if this is an English original with English audio and non-English tracks
-                                is_eng_original = (orig_lang == "en" and eng and non_en_non_commentary)
-                                language_allowed = language_allowed and bloated_check(meta, audio_language, is_eng_original_with_non_eng=is_eng_original)
+                    # Second pass: now that we have complete information about all tracks, check for bloat
+                    if non_eng_non_orig_languages:
+                        # Compute is_eng_original once with complete track information
+                        is_eng_original = (orig_lang == "en" and eng and non_en_non_commentary)
+
+                        # Check each non-English, non-original language for bloat
+                        for audio_lang in non_eng_non_orig_languages:
+                            language_allowed = language_allowed and bloated_check(meta, audio_lang, is_eng_original_with_non_eng=is_eng_original)
 
                     if ((eng and (orig or non_en_non_commentary)) or (orig and non_en_non_commentary)) and len(audio_tracks) > 1 and not meta.get('no_dual', False):
                         dual = "Dual-Audio"
