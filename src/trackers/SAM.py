@@ -35,7 +35,7 @@ class SAM(UNIT3D):
         if meta.get("category") in ["TV", "ANIMES"]:
             year = str(meta.get("year", ""))
             if year and year in name:
-                name = name.replace(year, "").replace(f"({year})", "").strip()
+                name = name.replace(f"({year})", "").replace(year, "").strip()
 
         # Remove the AKA title, unless it is Brazilian
         if meta.get("original_language") != "pt":
@@ -66,7 +66,17 @@ class SAM(UNIT3D):
             if audio_tag:
                 if "-" in sam_name:
                     parts = sam_name.rsplit("-", 1)
-                    sam_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+
+                    custom_tag = self.config.get("TRACKERS", {}).get(self.tracker, {}).get("tag_for_custom_release", "")
+                    if custom_tag and custom_tag in name:
+                        match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)", meta["uuid"])
+                        if match and match.group(1) != meta["tag"]:
+                            original_group_tag = match.group(1)
+                            sam_name = f"{parts[0]}-{original_group_tag}{audio_tag}-{parts[1]}"
+                        else:
+                            sam_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+                    else:
+                        sam_name = f"{parts[0]}{audio_tag}-{parts[1]}"
                 else:
                     sam_name += audio_tag
 

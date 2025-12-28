@@ -11,6 +11,7 @@ from torf import Torrent
 from unidecode import unidecode
 from urllib.parse import urlparse, quote
 
+from src.bbcode import BBCODE
 from src.console import console
 from data.config import config
 from src.exceptions import *  # noqa F403
@@ -220,9 +221,9 @@ class HDB():
                 console.print("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
                 return
         if "Dual-Audio" in meta['audio']:
-            if not (meta['anime'] or meta['is_disc']):
+            if not (meta['anime'] or not meta['is_disc']):
                 console.print("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
-            return
+                return
 
         hdb_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
@@ -453,7 +454,6 @@ class HDB():
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as descfile:
-            from src.bbcode import BBCODE
             # Add This line for all web-dls
             if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None:
                 descfile.write(f"[center][quote]This release is sourced from {meta['service_longname']}[/quote][/center]")
@@ -537,7 +537,10 @@ class HDB():
                     descfile.write("[/center]")
             if self.signature is not None:
                 descfile.write(self.signature)
-            descfile.close()
+
+        descfile.close()
+
+        return
 
     async def hdbimg_upload(self, meta):
         if meta.get('comparison', False):

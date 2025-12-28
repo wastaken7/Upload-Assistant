@@ -186,11 +186,25 @@ class ANT:
                             meta['tracker_status'][self.tracker]['status_message'] = "data error: ANT json decode error, the API is probably down"
                             return
                         if "Success" not in response_data:
-                            meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
+                            meta['tracker_status'][self.tracker]['status_message'] = f"data error: {response_data}"
                         if meta.get('tag', '') and 'HONE' in meta.get('tag', ''):
                             meta['tracker_status'][self.tracker]['status_message'] = f"{response_data} - HONE release, fix tag at ANT"
                         else:
                             meta['tracker_status'][self.tracker]['status_message'] = response_data
+                    elif response.status_code == 400:
+                        if "exact same" in response.text.lower():
+                            folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+                            meta['tracker_status'][self.tracker]['status_message'] = (
+                                "data error: The exact same media file already exists on ANT. You must use the website to upload a new version if you wish to trump.\n"
+                                f"Use the files from {folder} to assist with manual upload.\n"
+                                "raw_url image links from the image_data.json file"
+                            )
+                        else:
+                            response_data = {
+                                "error": f"Unexpected status code: {response.status_code}",
+                                "response_content": response.text
+                            }
+                            meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
                     elif response.status_code == 502:
                         response_data = {
                             "error": "Bad Gateway",
