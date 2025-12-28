@@ -161,7 +161,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 thr = THR(config=config)
                 try:
+                    upload_start_time = time.time()
                     await thr.upload(meta, disctype)
+                    upload_duration = time.time() - upload_start_time
+                    meta[f'{tracker}_upload_duration'] = upload_duration
                 except Exception as e:
                     console.print(f"[red]Upload failed: {e}")
                     console.print(traceback.format_exc())
@@ -177,7 +180,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     groupID = meta.get('ptp_groupID', None)
                     ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
                     try:
+                        upload_start_time = time.time()
                         await ptp.upload(meta, ptpUrl, ptpData, disctype)
+                        upload_duration = time.time() - upload_start_time
+                        meta[f'{tracker}_upload_duration'] = upload_duration
                         await asyncio.sleep(5)
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
@@ -209,10 +215,12 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             for tracker, status in meta.get('tracker_status', {}).items():
                 try:
                     if 'status_message' in status:
-                        duration = meta[f'{tracker}_upload_duration']
-                        color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
+                        duration = meta.get(f'{tracker}_upload_duration')
                         message = redact_private_info(status['status_message'])
-                        console.print(f"{tracker}: {message} [[{color}]{duration:.2f}s[/{color}]]")
+                        if duration and isinstance(duration, (int, float)):
+                            color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
+                            message += f" [[{color}]{duration:.2f}s[/{color}]]"
+                        console.print(message)
                 except Exception as e:
                     console.print(f"[red]Error printing {tracker} status message: {e}[/red]")
         elif not meta.get('print_tracker_links', True):
