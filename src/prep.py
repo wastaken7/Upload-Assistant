@@ -763,7 +763,7 @@ class Prep():
             meta['imdb_info'] = None
 
         # Get IMDb ID if not set
-        if meta.get('imdb_id') == 0:
+        if meta.get('imdb_id') == 0 and not meta.get('imdb_manual', 0):
             try:
                 meta['imdb_id'] = await search_imdb(filename, meta['search_year'], quickie=False, category=meta.get('category', None), debug=debug, secondary_title=meta.get('secondary_title', None), path=meta.get('path', None), untouched_filename=untouched_filename, attempted=0, duration=duration, unattended=unattended)
             except Exception as e:
@@ -842,12 +842,20 @@ class Prep():
 
         # lets check for tv movies
         meta['tv_movie'] = False
-        is_tv_movie = meta.get('imdb_info', None).get('type', '')
-        tv_movie_keywords = ['tv movie', 'tv special', 'video', 'tvmovie']
-        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', is_tv_movie, re.IGNORECASE) for keyword in tv_movie_keywords):
-            if meta['debug']:
-                console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
-            meta['tv_movie'] = True
+        try:
+            has_imdb = meta.get('imdb_info', None)
+            if has_imdb:
+                is_tv_movie = has_imdb.get('type', '')
+            else:
+                is_tv_movie = None
+            tv_movie_keywords = ['tv movie', 'tv special', 'video', 'tvmovie']
+            if is_tv_movie:
+                if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', is_tv_movie, re.IGNORECASE) for keyword in tv_movie_keywords):
+                    if meta['debug']:
+                        console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
+                    meta['tv_movie'] = True
+        except Exception as e:
+            console.print(f"[red]Error determining TV Movie status: {e}[/red]")
 
         if meta['category'] == "TV" or meta.get('tv_movie', False):
             both_ids_searched = False
@@ -1097,8 +1105,16 @@ class Prep():
         else:
             meta['imdb'] = '0'
         meta['mal'] = meta.get('mal_id')
-        meta['tvdb'] = meta.get('tvdb_id')
-        meta['tvmaze'] = meta.get('tvmaze_id')
+        if int(meta.get('tvmaze_manual', 0)) == 0:
+            meta['tvmaze'] = 0
+            meta['tvmaze_id'] = 0
+        else:
+            meta['tvmaze'] = meta.get('tvmaze_id')
+        if int(meta.get('tvdb_manual', 0)) == 0:
+            meta['tvdb_id'] = 0
+            meta['tvdb'] = 0
+        else:
+            meta['tvdb'] = meta.get('tvdb_id')
 
         # we finished the metadata, time it
         if meta['debug']:
