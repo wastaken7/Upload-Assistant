@@ -21,7 +21,6 @@ from src.get_desc import DescriptionBuilder
 from src.languages import process_desc_language
 from src.tmdb import get_tmdb_localized_data
 from src.trackers.COMMON import COMMON
-from tqdm import tqdm
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -845,11 +844,7 @@ class BJS:
         if local_files:
             paths = local_files[: 6 - len(results)]
 
-            for coro in tqdm(
-                asyncio.as_completed([upload_local_file(p) for p in paths]),
-                total=len(paths),
-                desc=f"Uploading screenshots to {self.tracker}",
-            ):
+            for coro in asyncio.as_completed([upload_local_file(p) for p in paths]):
                 result = await coro
                 if result:
                     results.append(result)
@@ -859,11 +854,7 @@ class BJS:
                 : 6 - len(results)
             ]
 
-            for coro in tqdm(
-                asyncio.as_completed([upload_remote_file(url) for url in image_links]),
-                total=len(image_links),
-                desc=f"Uploading screenshots to {self.tracker}",
-            ):
+            for coro in asyncio.as_completed([upload_remote_file(url) for url in image_links]):
                 result = await coro
                 if result:
                     results.append(result)
