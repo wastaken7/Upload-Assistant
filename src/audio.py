@@ -474,11 +474,11 @@ def bloated_check(meta, audio_language, is_eng_original_with_non_eng=False):
 
         # Handle trackers that warn about bloat
         if warning_trackers:
+            trackers = ", ".join(warning_trackers)
             # If we already printed the not_allowed message, use a simplified message
             if not_allowed_trackers:
-                warning_msg = "[bold red]This release may also be considered bloated on your other trackers[/bold red]"
+                warning_msg = f"[bold red]This release may also be considered bloated on [yellow]{trackers}[/yellow][/bold red]"
             else:
-                trackers = ", ".join(warning_trackers)
                 # Build warning message based on context
                 if is_eng_original_with_non_eng:
                     warning_msg = f"[bold red]This release is English original, has English audio, but also has [bold yellow]{language_display}[/bold yellow] audio (not commentary).\nThis may be considered bloated on [yellow]{trackers}[/yellow][/bold red]"
