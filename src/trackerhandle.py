@@ -215,11 +215,12 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             for tracker, status in meta.get('tracker_status', {}).items():
                 try:
                     if 'status_message' in status:
-                        duration = meta.get(f'{tracker}_upload_duration')
                         message = f"{tracker}: {redact_private_info(status['status_message'])}"
-                        if duration and isinstance(duration, (int, float)):
-                            color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
-                            message += f" [[{color}]{duration:.2f}s[/{color}]]"
+                        if config["DEFAULT"].get("show_upload_duration", True):
+                            duration = meta.get(f'{tracker}_upload_duration')
+                            if duration and isinstance(duration, (int, float)):
+                                color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
+                                message += f" [[{color}]{duration:.2f}s[/{color}]]"
                         console.print(message)
                 except Exception as e:
                     console.print(f"[red]Error printing {tracker} status message: {e}[/red]")
