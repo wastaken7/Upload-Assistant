@@ -783,7 +783,14 @@ class BJS:
             )
             response.raise_for_status()
             data = response.json()
-            return data.get('url', '').replace('\\/', '/')
+
+            img_url = None
+            if data.get('url') and data.get('url').startswith('http'):
+                img_url = data.get('url').replace('\\/', '/')
+            else:
+                console.print(f'{self.tracker}: [bold red]The image host appears to be down.[/bold red]')
+
+            return img_url
         except Exception as e:
             print(f'Exceção no upload de {filename}: {e}')
             return None
