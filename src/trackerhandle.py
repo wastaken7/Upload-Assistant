@@ -3,6 +3,7 @@ import asyncio
 import cli_ui
 import sys
 import traceback
+import time
 
 from cogs.redaction import redact_private_info
 from src.cleanup import cleanup, reset_terminal
@@ -67,7 +68,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
                     if draft == "Yes":
                         console.print(f"(draft: {draft})")
                     try:
+                        upload_start_time = time.time()
                         await tracker_class.upload(meta, disctype)
+                        upload_duration = time.time() - upload_start_time
+                        meta[f'{tracker}_upload_duration'] = upload_duration
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
@@ -85,7 +89,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 try:
                     try:
+                        upload_start_time = time.time()
                         await tracker_class.upload(meta, disctype)
+                        upload_duration = time.time() - upload_start_time
+                        meta[f'{tracker}_upload_duration'] = upload_duration
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
@@ -105,7 +112,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             if upload_status:
                 try:
                     try:
+                        upload_start_time = time.time()
                         await tracker_class.upload(meta, disctype)
+                        upload_duration = time.time() - upload_start_time
+                        meta[f'{tracker}_upload_duration'] = upload_duration
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
@@ -199,7 +209,10 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
             for tracker, status in meta.get('tracker_status', {}).items():
                 try:
                     if 'status_message' in status:
-                        print(f"{tracker}: {redact_private_info(status['status_message'])}")
+                        duration = meta[f'{tracker}_upload_duration']
+                        color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
+                        message = redact_private_info(status['status_message'])
+                        console.print(f"{tracker}: {message} [[{color}]{duration:.2f}s[/{color}]]")
                 except Exception as e:
                     console.print(f"[red]Error printing {tracker} status message: {e}[/red]")
         elif not meta.get('print_tracker_links', True):
