@@ -449,6 +449,8 @@ class TL:
                     status_message = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
+                    await self.edit_post_upload(meta)
+
                     await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
 
                 else:
