@@ -403,6 +403,32 @@ class UNIT3D:
                         break  # Success, exit retry loop
 
                 except httpx.HTTPStatusError as e:
+                    # Check if upload already exists (can happen after timeout)
+                    if "The name has already been taken" in e.response.text or "The info hash has already been taken" in e.response.text:
+                        try:
+                            error_data = e.response.json()
+                            existing_torrent = error_data.get('data', {}).get('existing_torrent', {})
+                            torrent_id = str(existing_torrent.get('existing_id', ''))
+                            download_url = existing_torrent.get('download_url', '')
+
+                            if torrent_id and download_url:
+                                meta['tracker_status'][self.tracker]['status_message'] = (
+                                    "Found the uploaded torrent (it was already uploaded successfully)."
+                                )
+                                meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                                await self.common.download_tracker_torrent(
+                                    meta,
+                                    self.tracker,
+                                    headers=headers,
+                                    params=params,
+                                    downurl=download_url
+                                )
+                                break  # Success, exit retry loop
+                            else:
+                                console.print(f'[yellow]{self.tracker}: Could not extract existing torrent info from error response[/yellow]')
+                        except Exception as parse_error:
+                            console.print(f'[yellow]{self.tracker}: Error parsing existing torrent response: {parse_error}[/yellow]')
+
                     if e.response.status_code in [403, 302]:
                         # Don't retry auth/permission errors
                         if e.response.status_code == 403:
