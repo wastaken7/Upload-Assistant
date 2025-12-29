@@ -44,7 +44,8 @@ class UNIT3D:
             'api_token': self.api_key,
             'tmdbId': meta['tmdb'],
             'categories[]': (await self.get_category_id(meta))['category_id'],
-            'name': ''
+            'name': '',
+            'perPage': '100'
         }
         resolutions = await self.get_resolution_id(meta)
         if resolutions['resolution_id'] in ['3', '4']:
