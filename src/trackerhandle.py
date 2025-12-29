@@ -203,8 +203,21 @@ async def process_trackers(meta, config, client, console, api_trackers, tracker_
         one_disc = False
 
     if (not meta.get('tv_pack') and one_disc) or multi_screens == 0:
-        # Run all tracker tasks concurrently
-        await asyncio.gather(*(process_single_tracker(tracker) for tracker in enabled_trackers))
+        # Run all tracker tasks concurrently with individual error handling
+        tasks = []
+        for tracker in enabled_trackers:
+            task = asyncio.create_task(process_single_tracker(tracker))
+            tasks.append((tracker, task))
+
+        # Wait for all tasks to complete, but don't let one tracker's failure stop others
+        results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+
+        # Log any exceptions that occurred
+        for (tracker, _), result in zip(tasks, results):
+            if isinstance(result, Exception):
+                console.print(f"[red]{tracker} encountered an error: {result}[/red]")
+                if meta.get('debug'):
+                    console.print(traceback.format_exception(type(result), result, result.__traceback__))
     else:
         # Process each tracker sequentially
         for tracker in enabled_trackers:

@@ -58,6 +58,27 @@ class ANT:
             flags.append('Remux')
         return flags
 
+    async def get_tags(self, meta):
+        tags = []
+        if meta.get('genres', []):
+            genres = meta['genres']
+            # Handle both string and list formats
+            if isinstance(genres, str):
+                tags.append(genres)
+            else:
+                for genre in genres:
+                    tags.append(genre)
+        elif meta.get('imdb_info', {}):
+            imdb_genres = meta['imdb_info'].get('genres', [])
+            # Handle both string and list formats
+            if isinstance(imdb_genres, str):
+                tags.append(imdb_genres)
+            else:
+                for genre in imdb_genres:
+                    tags.append(genre)
+
+        return tags
+
     async def get_type(self, meta):
         antType = None
         imdb_info = meta.get('imdb_info', {})
@@ -121,7 +142,7 @@ class ANT:
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta['max_piece_size'] = '128'  # 128 MiB
-            create_torrent(meta, Path(meta['path']), "ANT", tracker_url=tracker_url)
+            await create_torrent(meta, Path(meta['path']), "ANT", tracker_url=tracker_url)
             torrent_filename = "ANT"
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -149,6 +170,10 @@ class ANT:
         if meta['scene']:
             # ID of "Scene?" checkbox on upload form is actually "censored"
             data['censored'] = 1
+
+        tags = await self.get_tags(meta)
+        if tags:
+            data.update({'tags[]': tags})
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
