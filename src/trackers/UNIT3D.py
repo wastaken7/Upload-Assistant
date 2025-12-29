@@ -396,6 +396,10 @@ class UNIT3D:
                     meta['tracker_status'][self.tracker]['status_message'] = (
                         "data error: Redirect (302). This may indicate a problem with authentication. Please verify that your API key is valid."
                     )
+                elif e.response.status_code == 520:
+                    meta['tracker_status'][self.tracker]['status_message'] = (
+                        "data error: Error (520). This is probably a cloudflare issue on the tracker side."
+                    )
                 else:
                     meta['tracker_status'][self.tracker]['status_message'] = f'data error: HTTP {e.response.status_code} - {e.response.text}'
             except httpx.TimeoutException:
