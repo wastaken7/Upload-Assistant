@@ -1328,7 +1328,7 @@ async def process_cross_seeds(meta):
 
 async def get_mkbrr_path(meta, base_dir=None):
     try:
-        mkbrr_path = await ensure_mkbrr_binary(base_dir, debug=meta['debug'], version="v1.14.0")
+        mkbrr_path = await ensure_mkbrr_binary(base_dir, debug=meta['debug'], version="v1.18.0")
         return mkbrr_path
     except Exception as e:
         console.print(f"[red]Error setting up mkbrr binary: {e}[/red]")
