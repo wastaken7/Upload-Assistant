@@ -415,10 +415,39 @@ class ANT:
                         data = response.json()
                         imdb_tmdb_list = []
                         items = data.get('item', [])
+
+                        matched_item = None
                         if len(items) == 1:
-                            each = items[0]
-                            imdb_id = each.get('imdb')
-                            tmdb_id = each.get('tmdb')
+                            matched_item = items[0]
+                        elif len(items) > 1:
+                            # Try to match filename from the files in each result
+                            for item in items:
+                                files = item.get('files', [])
+                                for file in files:
+                                    file_name = file.get('name', '')
+
+                                    # Try exact match first (with extension)
+                                    if filename.lower() == file_name.lower():
+                                        matched_item = item
+                                        break
+
+                                    # Try base filename match (without extension)
+                                    base_filename = os.path.splitext(filename)[0]
+                                    base_file_name = os.path.splitext(file_name)[0]
+                                    if base_filename.lower() == base_file_name.lower():
+                                        matched_item = item
+                                        break
+                                if matched_item:
+                                    break
+
+                            if not matched_item:
+                                if meta['debug']:
+                                    console.print("[yellow]Could not match filename, returning empty list")
+                                imdb_tmdb_list = []
+
+                        if matched_item:
+                            imdb_id = matched_item.get('imdb')
+                            tmdb_id = matched_item.get('tmdb')
                             if imdb_id and imdb_id.startswith('tt'):
                                 imdb_num = int(imdb_id[2:])
                                 imdb_tmdb_list.append({'imdb_id': imdb_num})
