@@ -44,11 +44,21 @@ class UNIT3D:
             'api_token': self.api_key,
             'tmdbId': meta['tmdb'],
             'categories[]': (await self.get_category_id(meta))['category_id'],
-            'resolutions[]': (await self.get_resolution_id(meta))['resolution_id'],
             'name': ''
         }
+        resolutions = await self.get_resolution_id(meta)
+        if resolutions['resolution_id'] in ['3', '4']:
+            # Convert params to list of tuples to support duplicate keys
+            params_list = [(k, v) for k, v in params.items()]
+            params_list.append(('resolutions[]', '3'))
+            params_list.append(('resolutions[]', '4'))
+            params = params_list
+        else:
+            params['resolutions[]'] = resolutions['resolution_id']
+
         if self.tracker not in ['SP']:
             params['types[]'] = (await self.get_type_id(meta))['type_id']
+
         if meta['category'] == 'TV':
             params['name'] = params['name'] + f" {meta.get('season', '')}"
 
