@@ -624,10 +624,6 @@ class MTV():
         return False
 
     async def search_existing(self, meta, disctype):
-        if meta.get('bloated', False):
-            console.print(f'[bold red]Bloated releases are not allowed at {self.tracker}[/bold red]')
-            meta['skipping'] = "MTV"
-            return []
         if meta['type'] not in ['WEBDL']:
             if meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
