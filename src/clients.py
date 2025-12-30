@@ -3056,6 +3056,11 @@ async def match_tracker_url(tracker_urls, meta):
                     found_ids.add(tracker_id.upper())
                     if meta.get('debug'):
                         console.print(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {redact_private_info(tracker)}")
+                    if tracker_id.upper() == 'PTP' and 'passthepopcorn.me' in tracker:
+                        if tracker.startswith('http://'):
+                            console.print("[red]Found PTP announce URL using plaintext HTTP.\n")
+                            console.print("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
+                            await asyncio.sleep(10)
 
     if "remove_trackers" not in meta or not isinstance(meta["remove_trackers"], list):
         meta["remove_trackers"] = []
