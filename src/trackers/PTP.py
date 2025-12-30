@@ -36,8 +36,13 @@ class PTP():
         self.api_user = config['TRACKERS']['PTP'].get('ApiUser', '').strip()
         self.api_key = config['TRACKERS']['PTP'].get('ApiKey', '').strip()
         announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
-        if announce_url:
-            self.announce_url = announce_url.replace('http://', 'https://') if announce_url.startswith('http://') else announce_url
+        if announce_url and announce_url.startswith('http://'):
+            console.print("[red]PTP announce URL is using plaintext HTTP.\n")
+            console.print("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
+            console.print("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
+            self.announce_url = announce_url.replace('http://', 'https://').replace(':2710', '')
+        else:
+            self.announce_url = announce_url
         self.username = config['TRACKERS']['PTP'].get('username', '').strip()
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
         self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
@@ -1537,4 +1542,4 @@ class PTP():
                 # having UA add the torrent link as a comment.
                 if match:
                     meta['tracker_status'][self.tracker]['status_message'] = response.url
-                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)
+                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, response.url)
