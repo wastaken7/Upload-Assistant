@@ -1537,4 +1537,4 @@ class PTP():
                 # having UA add the torrent link as a comment.
                 if match:
                     meta['tracker_status'][self.tracker]['status_message'] = response.url
-                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), response.url)
+                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, response.url)
