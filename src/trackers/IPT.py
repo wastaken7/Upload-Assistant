@@ -71,6 +71,24 @@ class IPT:
         # User description
         desc_parts.append(await builder.get_user_description(meta))
 
+        # Disc menus screenshots header
+        menu_images = meta.get("menu_images", [])
+        if menu_images:
+            desc_parts.append(await builder.menu_screenshot_header(meta, self.tracker))
+
+            # Disc menus screenshots
+            menu_screenshots_block = ""
+            for image in menu_images:
+                menu_web_url = image.get("web_url")
+                menu_img_url = image.get("img_url")
+                if menu_web_url and menu_img_url:
+                    menu_screenshots_block += f"[url={menu_web_url}][img]{menu_img_url}[/img][/url]"
+                    # HDS cannot resize images. If the image host does not provide small thumbnails(<400px), place only one image per line
+                    if "imgbox" not in menu_web_url:
+                        menu_screenshots_block += "\n"
+            if menu_screenshots_block:
+                desc_parts.append(f"[center]\n{menu_screenshots_block}\n[/center]")
+
         # Screenshot Header
         desc_parts.append(await builder.screenshot_header(self.tracker))
 
@@ -121,6 +139,17 @@ class IPT:
             return dupes
         search_url = f"{self.base_url}/t?72=&q={meta['title']}"
 
+        forbidden_keywords = []
+
+        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
+        _type = str(meta.get("type", "") or "").strip().lower()
+
+        if is_disc == 'bdmv':
+            forbidden_keywords.extend(['remux', 'x264', 'x265', 'x 264', 'x 265', 'h 264', 'webrip', 'h 265', 'h264', 'h265',])
+
+        if _type == 'webdl':
+            forbidden_keywords.extend(['webrip', 'bluray', 'blu-ray'])
+
         try:
             response = await self.session.get(search_url, follow_redirects=True)
             response.raise_for_status()
@@ -143,12 +172,13 @@ class IPT:
                             torrent_link = f"{self.base_url}{torrent_path}"
                             size = cells[5].get_text(strip=True)
 
-                            duplicate_entry = {
-                                'name': name,
-                                'size': size,
-                                'link': torrent_link
-                            }
-                            dupes.append(duplicate_entry)
+                            if not any(keyword in name.lower() for keyword in forbidden_keywords):
+                                duplicate_entry = {
+                                    'name': name,
+                                    'size': size,
+                                    'link': torrent_link
+                                }
+                                dupes.append(duplicate_entry)
 
         except Exception as e:
             console.print(f'[bold red]Error searching for duplicates on {self.tracker}: {e}[/bold red]')
