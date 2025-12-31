@@ -14,7 +14,6 @@ class AL(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'AL'
-        self.source_flag = 'al'
         self.base_url = 'https://animelovers.club'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

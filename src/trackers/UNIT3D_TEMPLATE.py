@@ -11,7 +11,6 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'Abbreviated Tracker Name'
-        self.source_flag = 'Source flag for .torrent'
         self.base_url = 'https://domain.tld'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

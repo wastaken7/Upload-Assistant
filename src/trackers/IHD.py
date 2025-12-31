@@ -16,7 +16,6 @@ class IHD(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'IHD'
-        self.source_flag = 'InfinityHD'
         self.base_url = 'https://infinityhd.net'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

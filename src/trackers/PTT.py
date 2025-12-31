@@ -11,7 +11,6 @@ class PTT(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'PTT'
-        self.source_flag = 'PTT'
         self.base_url = 'https://polishtorrent.top'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

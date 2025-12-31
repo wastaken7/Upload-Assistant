@@ -18,6 +18,33 @@ from src.trackers.COMMON import COMMON
 from src.uploadscreens import upload_screens
 
 
+def html_to_bbcode(text):
+    """Convert HTML tags to BBCode format."""
+    if not text:
+        return text
+
+    # Define HTML to BBCode tag mappings
+    html_bbcode_map = [
+        (r'<b>(.*?)</b>', r'[b]\1[/b]'),
+        (r'<i>(.*?)</i>', r'[i]\1[/i]'),
+        (r'<u>(.*?)</u>', r'[u]\1[/u]'),
+        (r'<s>(.*?)</s>', r'[s]\1[/s]'),
+        (r'<em>(.*?)</em>', r'[i]\1[/i]'),
+        (r'<strong>(.*?)</strong>', r'[b]\1[/b]'),
+        (r'<strike>(.*?)</strike>', r'[s]\1[/s]'),
+        (r'<del>(.*?)</del>', r'[s]\1[/s]'),
+        (r'<br\s*/?>', r'\n'),
+        (r'<br>', r'\n'),
+        (r'<p>(.*?)</p>', r'\1\n'),
+    ]
+
+    converted_text = text
+    for html_pattern, bbcode_replacement in html_bbcode_map:
+        converted_text = re.sub(html_pattern, bbcode_replacement, converted_text, flags=re.IGNORECASE | re.DOTALL)
+
+    return converted_text
+
+
 async def gen_desc(meta):
     def clean_text(text):
         return text.replace("\r\n", "\n").strip()
@@ -222,6 +249,11 @@ class DescriptionBuilder:
             season_number = meta.get("season", "")
             episode_number = meta.get("episode", "")
             overview = tvmaze_episode_data.get("overview", "") or meta.get("overview_meta", "")
+
+            # Convert HTML tags to BBCode
+            if overview:
+                overview = html_to_bbcode(overview)
+
             episode_title = meta.get("auto_episode_title") or tvmaze_episode_data.get("episode_name", "")
 
             image = ""
@@ -503,12 +535,9 @@ class DescriptionBuilder:
         if episode_overview:
             if tracker == "HUNO":
                 desc_parts.append(f"[center]{title}[/center]\n")
-            else:
-                desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
-
-            if tracker == "HUNO":
                 desc_parts.append(f"[center]{episode_overview}[/center]\n")
             else:
+                desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
                 desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
 
         # Description that may come from API requests

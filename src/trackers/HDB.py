@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import aiofiles
 import asyncio
 import glob
 import httpx
@@ -12,6 +11,7 @@ from torf import Torrent
 from unidecode import unidecode
 from urllib.parse import urlparse, quote
 
+from src.bbcode import BBCODE
 from src.console import console
 from data.config import config
 from src.exceptions import *  # noqa F403
@@ -209,7 +209,7 @@ class HDB():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         await self.edit_desc(meta)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         hdb_name = await self.edit_name(meta)
         cat_id = await self.get_type_category_id(meta)
         codec_id = await self.get_type_codec_id(meta)
@@ -221,15 +221,12 @@ class HDB():
                 console.print("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
                 return
         if "Dual-Audio" in meta['audio']:
-            if not (meta['anime'] or meta['is_disc']):
+            if not (meta['anime'] or not meta['is_disc']):
                 console.print("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
-            return
+                return
 
         hdb_desc = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'r', encoding='utf-8').read()
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        if not await aiofiles.os.path.exists(torrent_file_path):
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename="BASE")
-
         loop = asyncio.get_running_loop()
         torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
 
@@ -237,11 +234,11 @@ class HDB():
         if torrent.piece_size > 16777216:  # 16 MiB in bytes
             console.print("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
             tracker_url = config['TRACKERS']['HDB'].get('announce_url', "https://fake.tracker").strip()
-            meta['max_piece_size'] = '16'
+            piece_size = '16'
             torrent_create = f"[{self.tracker}]"
 
-            create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url)
-            await common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
+            await create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url, piece_size=piece_size)
+            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
         # Proceed with the upload process
         with open(torrent_file_path, 'rb') as torrentFile:
@@ -457,7 +454,6 @@ class HDB():
     async def edit_desc(self, meta):
         base = open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8').read()
         with open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as descfile:
-            from src.bbcode import BBCODE
             # Add This line for all web-dls
             if meta['type'] == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None:
                 descfile.write(f"[center][quote]This release is sourced from {meta['service_longname']}[/quote][/center]")
@@ -541,7 +537,10 @@ class HDB():
                     descfile.write("[/center]")
             if self.signature is not None:
                 descfile.write(self.signature)
-            descfile.close()
+
+        descfile.close()
+
+        return
 
     async def hdbimg_upload(self, meta):
         if meta.get('comparison', False):
@@ -610,13 +609,22 @@ class HDB():
                     console.print(f"[cyan]{i}: {os.path.basename(path)}")
         else:
             thumb_size = 'w300'
-            image_path = os.path.join(meta['base_dir'], "tmp", os.path.basename(meta['path']), "*.png")
-            image_glob = glob.glob(image_path)
+            screenshot_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+            # similar to uploadscreens.py L546
+            image_patterns = ["*.png", ".[!.]*.png"]
+            image_glob = []
+            for pattern in image_patterns:
+                full_pattern = os.path.join(glob.escape(screenshot_dir), pattern)
+                glob_results = await asyncio.to_thread(glob.glob, full_pattern)
+                image_glob.extend(glob_results)
             unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
             unwanted_files = set()
             for pattern in unwanted_patterns:
-                unwanted_files.update(glob.glob(pattern))
-
+                glob_results = await asyncio.to_thread(glob.glob, full_pattern)
+                unwanted_files.update(glob_results)
+                hidden_pattern = "." + pattern
+                hidden_glob_results = await asyncio.to_thread(glob.glob, hidden_pattern)
+                unwanted_files.update(hidden_glob_results)  # finished with hidden_glob_results
             image_glob = [file for file in image_glob if file not in unwanted_files]
             all_image_files = list(set(image_glob))
 

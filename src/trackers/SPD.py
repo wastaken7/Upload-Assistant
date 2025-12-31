@@ -21,7 +21,6 @@ class SPD:
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'SPD'
-        self.source_flag = "speedapp.io"
         self.upload_url = 'https://speedapp.io/api/upload'
         self.torrent_url = 'https://speedapp.io/browse/'
         self.banned_groups = []
@@ -266,8 +265,7 @@ class SPD:
             'url': str(meta.get('imdb_info', {}).get('imdb_url', '')),
         }
 
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
-        data['file'] = await self.encode_to_base64(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent")
+        data['file'] = await self.encode_to_base64(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         if meta['debug'] is True:
             data['file'] = data['file'][:50] + '...[DEBUG MODE]'
             data['nfo'] = data['nfo'][:50] + '...[DEBUG MODE]'
@@ -301,12 +299,9 @@ class SPD:
                             meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
                         download_url = f"{self.url}/api/torrent/{torrent_id}/download"
-                        await self.common.add_tracker_torrent(
+                        await self.common.download_tracker_torrent(
                             meta,
                             tracker=self.tracker,
-                            source_flag=None,
-                            new_tracker=None,
-                            comment=None,
                             headers={'Authorization': self.config['TRACKERS'][self.tracker]['api_key']},
                             downurl=download_url
                         )

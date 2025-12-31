@@ -31,7 +31,7 @@ class SN():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         # await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
         await self.edit_desc(meta)
         cat_id = ""
@@ -107,7 +107,7 @@ class SN():
                 if response.json().get('success'):
                     meta['tracker_status'][self.tracker]['status_message'] = response.json()['link']
                     if 'link' in response.json():
-                        await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.json()['link']))
+                        await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), str(response.json()['link']))
                     else:
                         console.print("[red]No Link in Response")
                 else:

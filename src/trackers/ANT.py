@@ -58,6 +58,27 @@ class ANT:
             flags.append('Remux')
         return flags
 
+    async def get_tags(self, meta):
+        tags = []
+        if meta.get('genres', []):
+            genres = meta['genres']
+            # Handle both string and list formats
+            if isinstance(genres, str):
+                tags.append(genres)
+            else:
+                for genre in genres:
+                    tags.append(genre)
+        elif meta.get('imdb_info', {}):
+            imdb_genres = meta['imdb_info'].get('genres', [])
+            # Handle both string and list formats
+            if isinstance(imdb_genres, str):
+                tags.append(imdb_genres)
+            else:
+                for genre in imdb_genres:
+                    tags.append(genre)
+
+        return tags
+
     async def get_type(self, meta):
         antType = None
         imdb_info = meta.get('imdb_info', {})
@@ -121,10 +142,10 @@ class ANT:
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta['max_piece_size'] = '128'  # 128 MiB
-            create_torrent(meta, Path(meta['path']), "ANT", tracker_url=tracker_url)
+            await create_torrent(meta, Path(meta['path']), "ANT", tracker_url=tracker_url)
             torrent_filename = "ANT"
 
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
+        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
         flags = await self.get_flags(meta)
 
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
@@ -149,6 +170,10 @@ class ANT:
         if meta['scene']:
             # ID of "Scene?" checkbox on upload form is actually "censored"
             data['censored'] = 1
+
+        tags = await self.get_tags(meta)
+        if tags:
+            data.update({'tags[]': tags})
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
@@ -186,11 +211,25 @@ class ANT:
                             meta['tracker_status'][self.tracker]['status_message'] = "data error: ANT json decode error, the API is probably down"
                             return
                         if "Success" not in response_data:
-                            meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
+                            meta['tracker_status'][self.tracker]['status_message'] = f"data error: {response_data}"
                         if meta.get('tag', '') and 'HONE' in meta.get('tag', ''):
                             meta['tracker_status'][self.tracker]['status_message'] = f"{response_data} - HONE release, fix tag at ANT"
                         else:
                             meta['tracker_status'][self.tracker]['status_message'] = response_data
+                    elif response.status_code == 400:
+                        if "exact same" in response.text.lower():
+                            folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+                            meta['tracker_status'][self.tracker]['status_message'] = (
+                                "data error: The exact same media file already exists on ANT. You must use the website to upload a new version if you wish to trump.\n"
+                                f"Use the files from {folder} to assist with manual upload.\n"
+                                "raw_url image links from the image_data.json file"
+                            )
+                        else:
+                            response_data = {
+                                "error": f"Unexpected status code: {response.status_code}",
+                                "response_content": response.text
+                            }
+                            meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
                     elif response.status_code == 502:
                         response_data = {
                             "error": "Bad Gateway",
@@ -235,7 +274,7 @@ class ANT:
 
     async def mediainfo(self, meta):
         if meta.get('is_disc') == 'BDMV':
-            mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'])
+            mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'], char_limit=100000)
         else:
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mi_path, 'r', encoding='utf-8') as f:
@@ -304,12 +343,6 @@ class ANT:
         if meta.get('category') == "TV":
             if not meta['unattended']:
                 console.print('[bold red]ANT only ALLOWS Movies.')
-            meta['skipping'] = "ANT"
-            return []
-
-        if meta.get('bloated', False):
-            if not meta['unattended']:
-                console.print('[bold red]ANT does not allow bloated releases.')
             meta['skipping'] = "ANT"
             return []
 
@@ -401,10 +434,39 @@ class ANT:
                         data = response.json()
                         imdb_tmdb_list = []
                         items = data.get('item', [])
+
+                        matched_item = None
                         if len(items) == 1:
-                            each = items[0]
-                            imdb_id = each.get('imdb')
-                            tmdb_id = each.get('tmdb')
+                            matched_item = items[0]
+                        elif len(items) > 1:
+                            # Try to match filename from the files in each result
+                            for item in items:
+                                files = item.get('files', [])
+                                for file in files:
+                                    file_name = file.get('name', '')
+
+                                    # Try exact match first (with extension)
+                                    if filename.lower() == file_name.lower():
+                                        matched_item = item
+                                        break
+
+                                    # Try base filename match (without extension)
+                                    base_filename = os.path.splitext(filename)[0]
+                                    base_file_name = os.path.splitext(file_name)[0]
+                                    if base_filename.lower() == base_file_name.lower():
+                                        matched_item = item
+                                        break
+                                if matched_item:
+                                    break
+
+                            if not matched_item:
+                                if meta['debug']:
+                                    console.print("[yellow]Could not match filename, returning empty list")
+                                imdb_tmdb_list = []
+
+                        if matched_item:
+                            imdb_id = matched_item.get('imdb')
+                            tmdb_id = matched_item.get('tmdb')
                             if imdb_id and imdb_id.startswith('tt'):
                                 imdb_num = int(imdb_id[2:])
                                 imdb_tmdb_list.append({'imdb_id': imdb_num})

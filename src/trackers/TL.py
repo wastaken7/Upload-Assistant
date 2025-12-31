@@ -255,6 +255,17 @@ class TL:
         season = meta.get('season', '')
         season_episode = f"{season}{episode}" if season or episode else ''
 
+        forbidden_keywords = []
+
+        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
+        _type = str(meta.get("type", "") or "").strip().lower()
+
+        if is_disc == 'bdmv':
+            forbidden_keywords.extend(['remux', 'x264', 'x265'])
+
+        if _type == 'webdl':
+            forbidden_keywords.extend(['webrip', 'bluray', 'blu-ray'])
+
         search_urls = []
 
         if meta['category'] == 'TV':
@@ -286,7 +297,7 @@ class TL:
                     name = torrent.get('name')
                     link = f"{self.torrent_url}{torrent.get('fid')}"
                     size = torrent.get('size')
-                    if name:
+                    if not any(keyword in name.lower() for keyword in forbidden_keywords):
                         results.append({
                             'name': name,
                             'size': size,
@@ -318,7 +329,7 @@ class TL:
             return media['id'] if media else None
 
     async def upload(self, meta, disctype):
-        await self.common.edit_torrent(meta, self.tracker, self.source_flag)
+        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if self.api_upload:
             await self.upload_api(meta)
@@ -374,7 +385,7 @@ class TL:
                     torrent_id = str(response.text)
                     meta['tracker_status'][self.tracker]['status_message'] = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                    await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_list, self.torrent_url + torrent_id)
+                    await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, self.torrent_url + torrent_id)
 
             else:
                 console.print(data)
@@ -440,7 +451,7 @@ class TL:
 
                     await self.edit_post_upload(meta)
 
-                    await self.common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
+                    await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
 
                 else:
                     status_message = 'data error - Upload failed: No success redirect found.'

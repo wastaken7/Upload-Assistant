@@ -28,7 +28,7 @@ class THR():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         pronfo = await self.edit_desc(meta)  # noqa #F841
@@ -144,7 +144,12 @@ class THR():
             return False
 
     async def get_cat_id(self, meta):
-        if meta['category'] == "MOVIE":
+        genres = meta.get('genres', '').lower()
+        keywords = meta.get('keywords', '').lower()
+
+        if 'documentary' in genres or 'documentary' in keywords:
+            cat = '12'
+        elif meta['category'] == "MOVIE":
             if meta.get('is_disc') == "BMDV":
                 cat = '40'
             elif meta.get('is_disc') == "DVD" or meta.get('is_disc') == "HDDVD":

@@ -46,7 +46,7 @@ class COMMON():
         user_input = await asyncio.to_thread(input)
         return user_input.strip()
 
-    async def edit_torrent(self, meta, tracker, source_flag, torrent_filename="BASE", announce_url=None):
+    async def create_torrent_for_upload(self, meta, tracker, source_flag, torrent_filename="BASE", announce_url=None):
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
@@ -96,12 +96,11 @@ class COMMON():
                 console.print("[yellow]Download manually from the tracker.[/yellow]")
                 return None
 
-    # used to add tracker url, comment and source flag to torrent file
-    async def add_tracker_torrent(self, meta, tracker, source_flag, new_tracker, comment, headers=None, params=None, downurl=None, hash_is_id=False):
+    async def create_torrent_ready_to_seed(self, meta, tracker, source_flag, new_tracker, comment, hash_is_id=False):
+        """
+        Modifies the torrent file to include the tracker's announce URL, a comment, and a source flag.
+        """
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
-        if downurl is not None:
-            await self.download_tracker_torrent(meta, tracker, headers=headers, params=params, downurl=downurl, hash_is_id=hash_is_id)
-
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
@@ -847,14 +846,29 @@ class COMMON():
             bbcode_output += "\n"
             return bbcode_output
 
-    async def get_bdmv_mediainfo(self, meta, remove=None):
+    async def get_bdmv_mediainfo(self, meta, remove=None, char_limit=None):
+        """
+        Generate and sanitize MediaInfo for BDMV discs.
+
+        This is required by specific trackers that demand MediaInfo regardless of the media type.
+        Playlists are preferred because raw .m2ts files lack language metadata.
+        However, since playlists can become bloated with hundreds of tracks, the method
+        falls back to the largest .m2ts file if the output exceeds the character limit.
+
+        :param remove: String or list of strings identifying line prefixes to be filtered out.
+                       Useful for avoiding tracker parser errors (e.g., misinterpreting '2 bytes' as '2TB').
+        :param char_limit: Max character length allowed before falling back to the largest M2TS.
+        :return: A string containing the cleaned MediaInfo content.
+        """
         mediainfo = ''
         mi_path = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/MEDIAINFO_CLEANPATH.txt'
 
         if meta.get('is_disc') == 'BDMV':
+            # 1. Generate/Load initial MediaInfo (Playlist) if not exists
             if not os.path.isfile(mi_path):
-                if meta['debug']:
+                if meta.get('debug'):
                     console.print("[blue]Generating MediaInfo for BDMV...[/blue]")
+
                 path = meta['discs'][0]['playlists'][0]['path']
                 await exportInfo(
                     path,
@@ -866,7 +880,11 @@ class COMMON():
                     debug=meta.get('debug', False)
                 )
 
-            else:
+            # Helper to read and filter lines from the export file
+            async def read_and_clean():
+                if not os.path.isfile(mi_path):
+                    return ""
+
                 async with aiofiles.open(mi_path, 'r', encoding='utf-8') as f:
                     lines = await f.readlines()
 
@@ -881,7 +899,36 @@ class COMMON():
                         if not any(line.strip().startswith(prefix) for prefix in lines_to_remove)
                     ]
 
-                mediainfo = ''.join(lines) if remove else lines
+                return ''.join(lines)
+
+            mediainfo = await read_and_clean()
+
+            # 2. Check char_limit and fallback to largest M2TS if necessary
+            if char_limit and len(mediainfo) > char_limit:
+                if meta.get('debug'):
+                    console.print(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
+
+                items = meta['discs'][0]['playlists'][0].get('items', [])
+
+                if items:
+                    largest_item = max(items, key=lambda x: x.get('size', 0))
+                    largest_m2ts = largest_item.get('file')
+
+                    if largest_m2ts:
+                        if meta.get('debug'):
+                            console.print(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
+
+                        await exportInfo(
+                            largest_m2ts,
+                            False,
+                            meta['uuid'],
+                            meta['base_dir'],
+                            export_text=True,
+                            is_dvd=False,
+                            debug=meta.get('debug', False)
+                        )
+
+                        mediainfo = await read_and_clean()
 
         return mediainfo
 

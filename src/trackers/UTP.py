@@ -10,7 +10,6 @@ class UTP(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'UTP'
-        self.source_flag = 'UTOPIA'
         self.base_url = 'https://utp.to'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

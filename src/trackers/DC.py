@@ -151,6 +151,7 @@ class DC:
 
     async def search_existing(self, meta, disctype):
         imdb_id = meta.get('imdb_info', {}).get('imdbID')
+        category_id = await self.get_category_id(meta)
         if not imdb_id:
             console.print(f'[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]')
             return []
@@ -166,16 +167,17 @@ class DC:
                 search_results = response.json()
                 if search_results and isinstance(search_results, list):
                     for each in search_results:
-                        name = each.get('name')
-                        torrent_id = each.get('id')
-                        size = each.get('size')
-                        torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
-                        dupe_entry = {
-                            'name': name,
-                            'size': size,
-                            'link': torrent_link
-                        }
-                        dupes.append(dupe_entry)
+                        if each.get('category') == category_id:
+                            name = each.get('name')
+                            torrent_id = each.get('id')
+                            size = each.get('size')
+                            torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
+                            dupe_entry = {
+                                'name': name,
+                                'size': size,
+                                'link': torrent_link
+                            }
+                            dupes.append(dupe_entry)
 
                     return dupes
 
@@ -241,7 +243,8 @@ class DC:
         if not meta.get('debug', False):
             try:
                 upload_url = f'{self.api_base_url}/upload'
-                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+                await self.common.create_torrent_for_upload(meta, self.tracker, 'DigitalCore.club')
+                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
                 with open(torrent_path, 'rb') as torrent_file:
                     files = {'file': (torrent_title + '.torrent', torrent_file, 'application/x-bittorrent')}
@@ -255,12 +258,9 @@ class DC:
                         meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id + '/'
                         status_message = response_data.get('message')
 
-                        await self.common.add_tracker_torrent(
+                        await self.common.download_tracker_torrent(
                             meta,
-                            tracker=self.tracker,
-                            source_flag=None,
-                            new_tracker=None,
-                            comment=None,
+                            self.tracker,
                             headers=self.session.headers,
                             downurl=f'{self.api_base_url}/download/{torrent_id}'
                         )

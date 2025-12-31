@@ -343,7 +343,7 @@ class AR():
         """Upload torrent to AR using centralized cookie_upload."""
         # Prepare the data for the upload
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         type_id = await self.get_type(meta)
 

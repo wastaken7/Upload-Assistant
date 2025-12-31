@@ -11,7 +11,6 @@ class LT(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'LT'
-        self.source_flag = 'Lat-Team "Poder Latino"'
         self.base_url = 'https://lat-team.com'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

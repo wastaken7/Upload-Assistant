@@ -1352,6 +1352,7 @@ class Clients():
                             torrents_info = await response.json()
                             if len(torrents_info) > 0:
                                 break
+                            console.print(f"[green]Added {tracker} torrent via qui.")
                         else:
                             pass  # Continue waiting
                 else:
@@ -1377,7 +1378,8 @@ class Clients():
         if not cross:
             try:
                 if proxy_url:
-                    console.print("[yellow]No qui proxy resume support....")
+                    if meta['debug']:
+                        console.print("[yellow]No qui proxy resume support....")
                     # async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume",
                     #                            data={'hashes': torrent.infohash}) as response:
                     #    if response.status != 200:
@@ -2244,12 +2246,12 @@ class Clients():
 
                     if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
                         file_name = os.path.basename(meta['filelist'][0])
-                        if torrent_name == file_name:
+                        if torrent_name.lower() == file_name.lower():
                             is_match = True
-                        elif torrent_name == meta['uuid']:
+                        elif torrent_name.lower() == meta['uuid'].lower():
                             is_match = True
                     else:
-                        if torrent_name == meta['uuid']:
+                        if torrent_name.lower() == meta['uuid'].lower():
                             is_match = True
 
                     if not is_match:
@@ -3055,6 +3057,11 @@ async def match_tracker_url(tracker_urls, meta):
                     found_ids.add(tracker_id.upper())
                     if meta.get('debug'):
                         console.print(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {redact_private_info(tracker)}")
+                    if tracker_id.upper() == 'PTP' and 'passthepopcorn.me' in tracker:
+                        if tracker.startswith('http://'):
+                            console.print("[red]Found PTP announce URL using plaintext HTTP.\n")
+                            console.print("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
+                            await asyncio.sleep(10)
 
     if "remove_trackers" not in meta or not isinstance(meta["remove_trackers"], list):
         meta["remove_trackers"] = []

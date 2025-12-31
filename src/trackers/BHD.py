@@ -48,7 +48,7 @@ class BHD():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         source_id = await self.get_source(meta['source'])
         type_id = await self.get_type(meta)
@@ -157,7 +157,7 @@ class BHD():
 
         if details_link:
             try:
-                await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), details_link)
+                await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), details_link)
             except Exception as e:
                 console.print(f"Error while editing the torrent file: {e}")
 
@@ -326,10 +326,6 @@ class BHD():
                 console.print("[bold red]Modified SD content not allowed at BHD[/bold red]")
             meta['skipping'] = "BHD"
             return []
-        if meta['bloated'] is True:
-            console.print("[bold red]Non-English dub not allowed at BHD[/bold red]")
-            meta['skipping'] = "BHD"
-            return []
 
         if meta['type'] not in ['WEBDL']:
             if meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
@@ -392,10 +388,18 @@ class BHD():
                     data = response.json()
                     if data.get('status_code') == 1:
                         for each in data['results']:
+                            # Extract HDR flags from BHD data
+                            flags = []
+                            if each.get('dv') == 1:
+                                flags.append('DV')
+                            if each.get('hdr10') == 1 or each.get('hdr10+') == 1:
+                                flags.append('HDR')
+
                             result = {
                                 'name': each['name'],
                                 'link': each['url'],
                                 'size': each['size'],
+                                'flags': flags,
                             }
                             if rss_key:
                                 result['download'] = each.get('download_url', None)

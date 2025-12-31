@@ -12,7 +12,6 @@ class PT(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'PT'
-        self.source_flag = 'Portugas'
         self.base_url = 'https://portugas.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

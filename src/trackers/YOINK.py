@@ -10,7 +10,6 @@ class YOINK(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.tracker = 'YOINK'
-        self.source_flag = 'YOiNKED'
         self.base_url = 'https://yoinked.org'
         self.id_url = f'{self.base_url}/api/torrents/'
         self.upload_url = f'{self.base_url}/api/torrents/upload'

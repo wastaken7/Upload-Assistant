@@ -32,7 +32,7 @@ class BHDTV():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         cat_id = await self.get_cat_id(meta)
         sub_cat_id = ""
@@ -102,11 +102,11 @@ class BHDTV():
             meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
         # # adding my anounce url to torrent.
         if 'view' in response.json()['data']:
-            await common.add_tracker_torrent(meta, self.tracker, self.source_flag, self.config['TRACKERS']['BHDTV'].get('my_announce_url'), response.json()['data']['view'])
+            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS']['BHDTV'].get('my_announce_url'), response.json()['data']['view'])
         else:
-            await common.add_tracker_torrent(meta, self.tracker, self.source_flag,
-                                             self.config['TRACKERS']['BHDTV'].get('my_announce_url'),
-                                             "Torrent Did not upload")
+            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag,
+                                                      self.config['TRACKERS']['BHDTV'].get('my_announce_url'),
+                                                      "Torrent Did not upload")
         open_torrent.close()
 
     async def get_cat_id(self, meta):

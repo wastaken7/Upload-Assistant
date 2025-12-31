@@ -33,6 +33,7 @@ from src.get_desc import gen_desc
 from src.get_tracker_data import get_tracker_data
 from src.languages import process_desc_language
 from src.nfo_link import nfo_link
+from src.qbitwait import Wait
 from src.queuemanage import handle_queue, save_processed_path, process_site_upload_item
 from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
 from src.torrentcreate import create_torrent, create_random_torrents, create_base_from_existing_torrent
@@ -662,6 +663,9 @@ async def process_meta(meta, base_dir, bot=None):
                 await tracker_class.check_image_hosts(meta)
 
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        if meta.get('force_recheck', False):
+            waiter = Wait()
+            await waiter.select_and_recheck_best_torrent(meta, meta['path'], check_interval=5)
         if not os.path.exists(torrent_path):
             reuse_torrent = None
             if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
@@ -670,12 +674,12 @@ async def process_meta(meta, base_dir, bot=None):
                     await create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
 
             if meta['nohash'] is False and reuse_torrent is None:
-                create_torrent(meta, Path(meta['path']), "BASE")
+                await create_torrent(meta, Path(meta['path']), "BASE")
             if meta['nohash']:
                 meta['client'] = "none"
 
         elif os.path.exists(torrent_path) and meta.get('rehash', False) is True and meta['nohash'] is False:
-            create_torrent(meta, Path(meta['path']), "BASE")
+            await create_torrent(meta, Path(meta['path']), "BASE")
 
         if int(meta.get('randomized', 0)) >= 1:
             if not meta['mkbrr']:
@@ -1069,13 +1073,17 @@ async def do_the_thing(base_dir):
                     await send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get('debug', False), meta=meta)
 
             find_requests = config['DEFAULT'].get('search_requests', False) if meta.get('search_requests') is None else meta.get('search_requests')
-            if find_requests and meta['trackers'] not in ([], None) and not (meta.get('site_check', False) and 'is_disc' not in meta):
+            if find_requests and meta['trackers'] not in ([], None, "") and not (meta.get('site_check', False) and not meta['is_disc']):
                 console.print("[green]Searching for requests on supported trackers.....")
                 tracker_setup = TRACKER_SETUP(config=config)
                 if meta.get('site_check', False):
                     trackers = meta['requested_trackers']
+                    if meta['debug']:
+                        console.print(f"[cyan]Using requested trackers for site check: {trackers}[/cyan]")
                 else:
                     trackers = meta['trackers']
+                    if meta['debug']:
+                        console.print(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
                 await tracker_setup.tracker_request(meta, trackers)
 
             if meta.get('site_check', False):
@@ -1320,7 +1328,7 @@ async def process_cross_seeds(meta):
 
 async def get_mkbrr_path(meta, base_dir=None):
     try:
-        mkbrr_path = await ensure_mkbrr_binary(base_dir, debug=meta['debug'], version="v1.14.0")
+        mkbrr_path = await ensure_mkbrr_binary(base_dir, debug=meta['debug'], version="v1.18.0")
         return mkbrr_path
     except Exception as e:
         console.print(f"[red]Error setting up mkbrr binary: {e}[/red]")

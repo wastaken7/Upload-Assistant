@@ -320,7 +320,7 @@ class PTER():
     async def upload(self, meta, disctype):
 
         common = COMMON(config=self.config)
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         if not os.path.exists(desc_file):

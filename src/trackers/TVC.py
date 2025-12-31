@@ -46,7 +46,7 @@ class TVC():
             "sci-fi": "33",
             "sport": "42",
             "holding bin": "53",
-            }
+        }
 
     def format_date_ddmmyyyy(self, date_str):
         """
@@ -193,7 +193,7 @@ class TVC():
         if not isinstance(image_list, (list, tuple)):
             image_list = []
 
-        await common.edit_torrent(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.get_tmdb_data(meta)
 
         # load MediaInfo.json
@@ -385,7 +385,7 @@ class TVC():
                 if meta['debug']:
                     console.print(f"[cyan]Extracted torrent ID {t_id} from {data_str}")
 
-                await common.add_tracker_torrent(
+                await common.create_torrent_ready_to_seed(
                     meta,
                     self.tracker,
                     self.source_flag,
