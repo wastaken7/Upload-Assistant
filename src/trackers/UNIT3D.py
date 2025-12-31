@@ -381,7 +381,7 @@ class UNIT3D:
             response_data = {}
             max_retries = 2
             retry_delay = 5
-            timeout = 10.0
+            timeout = 30.0
 
             for attempt in range(max_retries):
                 try:
