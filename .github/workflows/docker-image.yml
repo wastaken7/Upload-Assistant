@@ -107,9 +107,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }},priority=1000
             type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=ref,event=branch
 
       - name: Extract metadata (tags, labels) for Docker - WebUI
         id: meta-webui
@@ -117,9 +117,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch,suffix=-webui
+            type=raw,value=latest-webui,enable=${{ github.event_name == 'release' }},priority=1000
             type=ref,event=tag,suffix=-webui
-            type=raw,value=webui,enable=${{ github.event_name == 'release' }}
+            type=ref,event=branch,suffix=-webui
 
       - name: Build and push Docker image - Standard
         uses: docker/build-push-action@v5
