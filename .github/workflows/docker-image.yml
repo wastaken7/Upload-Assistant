@@ -18,6 +18,11 @@ on:
         description: 'PR SHA (for PR builds)'
         required: false
         type: string
+      use_latest_tag:
+        description: 'Tag as latest instead of branch name'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -107,9 +112,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.use_latest_tag == true) }},priority=1000
             type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=ref,event=branch,enable=${{ !inputs.use_latest_tag }}
 
       - name: Extract metadata (tags, labels) for Docker - WebUI
         id: meta-webui
@@ -117,9 +122,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch,suffix=-webui
             type=ref,event=tag,suffix=-webui
-            type=raw,value=webui,enable=${{ github.event_name == 'release' }}
+            type=ref,event=branch,suffix=-webui
 
       - name: Build and push Docker image - Standard
         uses: docker/build-push-action@v5
