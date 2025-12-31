@@ -1,4 +1,15 @@
-__version__ = "v6.3.1"
+__version__ = "v6.3.2"
+
+"""
+Release Notes for version v6.3.2 (2025-12-31):
+
+# ## What's Changed
+# 
+# * fix: docker tagging by @Audionut in cda7a2c
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v6.3.1...v6.3.2
+"""
+
 
 """
 Release Notes for version v6.3.1 (2025-12-30):
