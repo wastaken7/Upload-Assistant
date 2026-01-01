@@ -347,7 +347,7 @@ class ANT:
             return []
 
         if meta['valid_mi'] is False:
-            console.print("[bold red]No unique ID in mediainfo, skipping AITHER upload.")
+            console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         dupes = []
