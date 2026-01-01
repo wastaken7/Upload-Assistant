@@ -109,6 +109,10 @@ class NBL():
                 meta['skipping'] = "NBL"
                 return []
 
+        if meta['valid_mi'] is False:
+            console.print("[bold red]No unique ID in mediainfo, skipping AITHER upload.")
+            return False
+
         if meta.get('is_disc') is not None:
             if not meta['unattended']:
                 console.print('[bold red]NBL does not allow raw discs')
