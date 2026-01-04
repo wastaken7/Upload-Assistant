@@ -182,19 +182,13 @@ class ANT:
                 console.print('[bold red]Adult content detected[/bold red]')
                 if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
                     data.update({'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])})
-                    if meta.get('is_disc') == 'BDMV':
-                        data.update({'flagchangereason': "(Adult with screens) BDMV Uploaded with Upload Assistant"})
-                    else:
-                        data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant"})
+                    data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant"})
                 else:
                     data.update({'screenshots': ''})  # No screenshots for adult content
             else:
                 data.update({'screenshots': ''})
         else:
             data.update({'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])})
-
-        if meta.get('is_disc') == 'BDMV' and data.get('flagchangereason') is None:
-            data.update({'flagchangereason': "BDMV Uploaded with Upload Assistant"})
 
         headers = {
             'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
