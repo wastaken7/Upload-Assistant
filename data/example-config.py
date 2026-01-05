@@ -161,12 +161,12 @@ config = {
 
         # A list of clients to use for injection (aka actually adding the torrent for uploading)
         # eg: ["qbittorrent", "rtorrent"]
-        "injecting_client_list": [""],
+        # "injecting_client_list": [""],
 
         # A list of clients to search for torrents.
         # eg: ["qbittorrent", "qbittorrent_searching"]
         # will fallback to default_torrent_client if empty
-        "searching_client_list": [""],
+        # "searching_client_list": [""],
 
         # set true to skip automated client torrent searching
         # this will search qbittorrent clients for matching torrents

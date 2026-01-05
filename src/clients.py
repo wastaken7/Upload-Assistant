@@ -88,6 +88,8 @@ class Clients():
     async def add_to_client(self, meta, tracker, cross=False):
         if cross:
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent"
+        elif meta['debug']:
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_DEBUG].torrent"
         else:
             torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if meta.get('no_seed', False) is True:
@@ -97,30 +99,50 @@ class Clients():
         if os.path.exists(torrent_path):
             torrent = Torrent.read(torrent_path)
         else:
+            console.print(f"[bold red]Torrent file {torrent_path} does not exist, cannot add to client")
             return
 
         inject_clients = []
         if meta.get('client') and meta.get('client') != 'none':
             inject_clients = [meta['client']]
+            if meta['debug']:
+                console.print(f"[cyan]DEBUG: Using client from meta: {inject_clients}[/cyan]")
         elif meta.get('client') == 'none':
+            if meta['debug']:
+                console.print("[cyan]DEBUG: meta client is 'none', skipping adding to client[/cyan]")
             return
         else:
-            inject_clients_config = self.config['DEFAULT'].get('injecting_client_list')
-            if isinstance(inject_clients_config, str) and inject_clients_config.strip():
-                inject_clients = [inject_clients_config]
-            elif isinstance(inject_clients_config, list):
-                # Filter out empty strings and whitespace-only strings
-                inject_clients = [c for c in inject_clients_config if c and str(c).strip()]
-            else:
-                inject_clients = []
+            try:
+                inject_clients_config = self.config['DEFAULT'].get('injecting_client_list')
+                if isinstance(inject_clients_config, str) and inject_clients_config.strip():
+                    inject_clients = [inject_clients_config]
+                    if meta['debug']:
+                        console.print(f"[cyan]DEBUG: Converted injecting_client_list string to list: {inject_clients}[/cyan]")
+                elif isinstance(inject_clients_config, list):
+                    # Filter out empty strings and whitespace-only strings
+                    inject_clients = [c for c in inject_clients_config if c and str(c).strip()]
+                    if meta['debug']:
+                        console.print(f"[cyan]DEBUG: Using injecting_client_list from config: {inject_clients}[/cyan]")
+                else:
+                    inject_clients = []
+            except Exception as e:
+                if meta['debug']:
+                    console.print(f"[cyan]DEBUG: Error reading injecting_client_list from config: {e}[/cyan]")
 
             if not inject_clients:
                 default_client = self.config['DEFAULT'].get('default_torrent_client')
                 if default_client and default_client != 'none':
+                    if meta['debug']:
+                        console.print(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_client}[/cyan]")
                     inject_clients = [default_client]
 
         if not inject_clients:
+            if meta['debug']:
+                console.print("[cyan]DEBUG: No clients configured for injecting[/cyan]")
             return
+
+        if meta['debug']:
+            console.print(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
         for client_name in inject_clients:
             if client_name == "none" or not client_name:
@@ -175,11 +197,15 @@ class Clients():
 
         if meta.get('client') and meta['client'] != 'none':
             clients_to_search = [meta['client']]
+            if meta['debug']:
+                console.print(f"[cyan]DEBUG: Using client from meta: {clients_to_search}[/cyan]")
         else:
             searching_list = self.config['DEFAULT'].get('searching_client_list', [])
 
             if isinstance(searching_list, list) and len(searching_list) > 0:
                 clients_to_search = [c for c in searching_list if c and c != 'none']
+                if meta['debug']:
+                    console.print(f"[cyan]DEBUG: Using searching_client_list from config: {clients_to_search}[/cyan]")
             else:
                 clients_to_search = []
 
