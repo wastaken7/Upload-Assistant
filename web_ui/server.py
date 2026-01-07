@@ -152,25 +152,36 @@ def _resolve_user_path(
 
     if expanded and os.path.isabs(expanded):
         # If a user supplies an absolute path, only allow it if it is under
-        # one of the configured browse roots.
+        # one of the configured browse roots (or their realpath equivalents,
+        # since the browse API returns realpath-resolved paths to the frontend).
         for root in roots:
             root_abs = os.path.abspath(root)
-            try:
-                rel = os.path.relpath(expanded, root_abs)
-            except ValueError:
-                # Different drive on Windows.
-                continue
+            root_real = os.path.realpath(root_abs)
 
-            if rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel):
-                continue
+            # Check against both the configured root and its realpath.
+            # This handles the case where the frontend sends back a realpath
+            # (e.g., /mnt/storage/torrents) that was returned by a previous
+            # browse call, but the configured root is a symlink (e.g., /data/torrents).
+            for check_root in (root_abs, root_real):
+                try:
+                    rel = os.path.relpath(expanded, check_root)
+                except ValueError:
+                    # Different drive on Windows.
+                    continue
 
-            joined = safe_join(root_abs, rel)
-            if joined is None:
-                continue
+                if rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel):
+                    continue
 
-            matched_root = root_abs
-            candidate_norm = os.path.normpath(joined)
-            break
+                joined = safe_join(check_root, rel)
+                if joined is None:
+                    continue
+
+                matched_root = check_root
+                candidate_norm = os.path.normpath(joined)
+                break
+
+            if matched_root:
+                break
     else:
         matched_root = os.path.abspath(default_root)
         joined = safe_join(matched_root, expanded)
