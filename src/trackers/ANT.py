@@ -64,18 +64,18 @@ class ANT:
             genres = meta['genres']
             # Handle both string and list formats
             if isinstance(genres, str):
-                tags.append(genres)
+                tags.append(genres.replace(' ', '.'))
             else:
                 for genre in genres:
-                    tags.append(genre)
+                    tags.append(genre.replace(' ', '.'))
         elif meta.get('imdb_info', {}):
             imdb_genres = meta['imdb_info'].get('genres', [])
             # Handle both string and list formats
             if isinstance(imdb_genres, str):
-                tags.append(imdb_genres)
+                tags.append(imdb_genres.replace(' ', '.'))
             else:
                 for genre in imdb_genres:
-                    tags.append(genre)
+                    tags.append(genre.replace(' ', '.'))
 
         return tags
 
@@ -235,10 +235,24 @@ class ANT:
                         else:
                             response_data = {
                                 "error": f"Unexpected status code: {response.status_code}",
-                                "response_content": response.text
+                                "response_content": {response.text}
                             }
                             meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
                             return False
+
+                    elif response.status_code == 403:
+                        response_data = {
+                            "error": "Wrong API key or insufficient permissions",
+                        }
+                        meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
+                        return False
+
+                    elif response.status_code == 500:
+                        response_data = {
+                            "error": "Internal Server Error, report to ANT staff",
+                        }
+                        meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
+                        return False
 
                     elif response.status_code == 502:
                         response_data = {
@@ -250,7 +264,7 @@ class ANT:
                     else:
                         response_data = {
                             "error": f"Unexpected status code: {response.status_code}",
-                            "response_content": response.text
+                            "response_content": {response.text}
                         }
                         meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
                         return False
