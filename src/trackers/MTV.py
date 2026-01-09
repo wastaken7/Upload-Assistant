@@ -71,7 +71,7 @@ class MTV():
 
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
-        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.pkl")
+        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.json")
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
         loop = asyncio.get_running_loop()
