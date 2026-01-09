@@ -387,9 +387,9 @@ class UNIT3D:
 
         if meta['debug'] is False:
             response_data = {}
-            max_retries = 2
+            max_retries = 1
             retry_delay = 5
-            timeout = 30.0
+            timeout = 40.0
 
             for attempt in range(max_retries):
                 try:
@@ -411,31 +411,6 @@ class UNIT3D:
                         return True  # Success
 
                 except httpx.HTTPStatusError as e:
-                    # Check if upload already exists (can happen after timeout)
-                    if "The name has already been taken" in e.response.text or "The info hash has already been taken" in e.response.text:
-                        try:
-                            error_data = e.response.json()
-                            existing_torrent = error_data.get('data', {}).get('existing_torrent', {})
-                            torrent_id = str(existing_torrent.get('existing_id', ''))
-                            download_url = existing_torrent.get('download_url', '')
-
-                            if torrent_id and download_url:
-                                meta['tracker_status'][self.tracker]['status_message'] = (
-                                    "Found the uploaded torrent (it was already uploaded successfully)."
-                                )
-                                meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                                await self.common.download_tracker_torrent(
-                                    meta,
-                                    self.tracker,
-                                    headers=headers,
-                                    downurl=download_url
-                                )
-                                return True  # Success - found existing upload
-                            else:
-                                console.print(f'[yellow]{self.tracker}: Could not extract existing torrent info from error response[/yellow]')
-                        except Exception as parse_error:
-                            console.print(f'[yellow]{self.tracker}: Error parsing existing torrent response: {parse_error}[/yellow]')
-
                     if e.response.status_code in [403, 302]:
                         # Don't retry auth/permission errors
                         if e.response.status_code == 403:
@@ -464,7 +439,7 @@ class UNIT3D:
                             return False  # HTTP error after all retries
                 except httpx.TimeoutException:
                     if attempt < max_retries - 1:
-                        timeout = timeout * 2.00  # Increase timeout by 100% for next retry
+                        timeout = timeout * 1.5  # Increase timeout by 50% for next retry
                         console.print(f'[yellow]{self.tracker}: Request timed out, retrying in {retry_delay} seconds with {timeout}s timeout... (attempt {attempt + 1}/{max_retries})[/yellow]')
                         await asyncio.sleep(retry_delay)
                         continue
