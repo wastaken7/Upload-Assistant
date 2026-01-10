@@ -137,9 +137,19 @@ class UploadHelper:
                             f"{d['name']} - {d['link']}" if isinstance(d, dict) and 'link' in d and d['link'] is not None else (d['name'] if isinstance(d, dict) else d)
                             for d in dupes
                         ])
-                        console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
-                        console.print()
-                        console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
+                        if meta.get('season_pack_exists', False):
+                            # Display only the matched season pack info from dupe_checking
+                            season_pack_name = meta.get('season_pack_name', '')
+                            season_pack_link = meta.get('season_pack_link')
+                            season_pack_text = f"{season_pack_name} - {season_pack_link}" if season_pack_link else season_pack_name
+                            console.print(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
+                            console.print("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
+                            console.print()
+                            console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
+                        else:
+                            console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
+                            console.print()
+                            console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
                         if meta.get('dupe', False) is False:
                             try:
                                 upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
@@ -154,6 +164,7 @@ class UploadHelper:
                     else:
                         # dupes list was emptied after filtering (e.g., season pack declined trump, no other dupes)
                         upload = True
+
             else:
                 if meta.get('dupe', False) is False:
                     upload = False

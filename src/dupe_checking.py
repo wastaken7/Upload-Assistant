@@ -462,6 +462,19 @@ async def filter_dupes(dupes, meta, tracker_name):
                 await log_exclusion("season/episode mismatch", each)
                 return True
 
+            # Check if uploading an episode but a matching season pack exists
+            if is_season and target_episode:
+                # We're uploading an episode and found a matching season pack
+                meta['season_pack_exists'] = True
+                meta['season_pack_name'] = each
+                meta['season_pack_link'] = entry.get('link')
+                meta['season_pack_id'] = entry.get('id')
+                if meta['debug']:
+                    console.log(f"[yellow]Season pack detected for episode upload: {each}")
+                    console.log(f"[yellow]Your episode {target_season}{target_episode} is contained in existing season pack")
+                remember_match('season_pack_contains_episode')
+                return False
+
         if is_hdtv:
             if any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
                 return False
