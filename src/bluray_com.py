@@ -1117,7 +1117,7 @@ async def process_all_releases(releases, meta):
                         expected_format = "bd-100"
 
                     format_match = False
-                    if release_format == "bd" or "bd" == release_format:
+                    if "bd" in release_format:
                         format_match = "generic"
                         log_and_print(f"[yellow]⚠[/yellow] Generic BD format found: {specs['discs']['format']} for size {disc_size_gb:.2f} GB", release_logs)
                     elif expected_format and expected_format in release_format:

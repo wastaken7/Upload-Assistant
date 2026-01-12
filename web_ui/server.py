@@ -11,11 +11,20 @@ import threading
 import queue
 import hmac
 from pathlib import Path
+from typing import TypedDict
 from werkzeug.utils import safe_join
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 app = Flask(__name__)
+
+
+class BrowseItem(TypedDict):
+    """Type definition for browse API response items"""
+    name: str
+    path: str
+    type: str
+    children: list | None
 
 
 def _parse_cors_origins() -> list[str]:
@@ -268,7 +277,7 @@ def browse_path():
     print(f"Browsing path: {path}")
 
     try:
-        items = []
+        items: list[BrowseItem] = []
         try:
             for item in sorted(os.listdir(path)):
                 # Skip hidden files
