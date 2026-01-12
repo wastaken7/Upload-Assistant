@@ -6,6 +6,7 @@ import io
 from io import BytesIO
 import os
 import sys
+from typing import Any, Mapping, cast
 
 from PIL import Image
 
@@ -14,10 +15,14 @@ from src.bbcode import BBCODE
 from src.btnid import get_bhd_torrents
 from src.console import console
 from src.trackers.COMMON import COMMON
+from src.type_utils import to_int
 
 # Define expected amount of screenshots from the config
-expected_images = int(config['DEFAULT']['screens'])
-valid_images = []
+DEFAULT_CONFIG: Mapping[str, Any] = cast(Mapping[str, Any], config.get('DEFAULT', {}))
+TRACKER_CONFIG: Mapping[str, Any] = cast(Mapping[str, Any], config.get('TRACKERS', {}))
+
+
+expected_images = to_int(DEFAULT_CONFIG.get('screens', 0))
 
 
 async def prompt_user_for_confirmation(message: str) -> bool:
@@ -338,26 +343,18 @@ async def update_metadata_from_tracker(tracker_name, tracker_instance, meta, sea
                 found_match = False
 
     elif tracker_name == "BHD":
-        bhd_main_api = config['TRACKERS']['BHD'].get('api_key')
-        bhd_other_api = config['DEFAULT'].get('bhd_api')
-        if bhd_main_api and len(bhd_main_api) < 25:
-            bhd_main_api = None
-        if bhd_other_api and len(bhd_other_api) < 25:
-            bhd_other_api = None
-        elif bhd_other_api and len(bhd_other_api) > 25:
-            console.print("[red]BHD API key is being retired from the DEFAULT config section. Only using api from the BHD tracker section instead.[/red]")
-            await asyncio.sleep(2)
-        bhd_api = bhd_main_api if bhd_main_api else bhd_other_api
-        bhd_main_rss = config['TRACKERS']['BHD'].get('bhd_rss_key')
-        bhd_other_rss = config['DEFAULT'].get('bhd_rss_key')
-        if bhd_main_rss and len(bhd_main_rss) < 25:
-            bhd_main_rss = None
-        if bhd_other_rss and len(bhd_other_rss) < 25:
-            bhd_other_rss = None
-        elif bhd_other_rss and len(bhd_other_rss) > 25:
-            console.print("[red]BHD RSS key is being retired from the DEFAULT config section. Only using rss key from the BHD tracker section instead.[/red]")
-            await asyncio.sleep(2)
-        bhd_rss_key = bhd_main_rss if bhd_main_rss else bhd_other_rss
+        trackers_cfg = config.get('TRACKERS', {})
+        tracker_cfg: dict[str, Any] = trackers_cfg.get('BHD', {}) if isinstance(trackers_cfg, dict) else {}
+        bhd_api = tracker_cfg.get('api_key')
+        bhd_api = bhd_api if isinstance(bhd_api, str) else None
+        if bhd_api and len(bhd_api) < 25:
+            bhd_api = None
+
+        bhd_rss_key = tracker_cfg.get('bhd_rss_key')
+        bhd_rss_key = bhd_rss_key if isinstance(bhd_rss_key, str) else None
+        if bhd_rss_key and len(bhd_rss_key) < 25:
+            bhd_rss_key = None
+
         if not bhd_api or not bhd_rss_key:
             console.print("[red]BHD API or RSS key not found. Please check your configuration.[/red]")
             return meta, False
