@@ -7,8 +7,8 @@ import json
 import os
 import re
 import sys
+from typing import Any, Union
 
-from data.config import config
 from datetime import datetime, timedelta
 from src.cleanup import cleanup, reset_terminal
 from src.console import console
@@ -16,7 +16,6 @@ from src.trackers.COMMON import COMMON
 
 from src.trackers.ACM import ACM
 from src.trackers.AITHER import AITHER
-from src.trackers.AL import AL
 from src.trackers.ANT import ANT
 from src.trackers.AR import AR
 from src.trackers.ASC import ASC
@@ -83,16 +82,20 @@ from src.trackers.EMUW import EMUW
 
 
 class TRACKER_SETUP:
-    def __init__(self, config):
-        self.config = config
-        # Add initialization details here
-        pass
+    def __init__(self, config: dict[str, Any]):
+        self.config: dict[str, Any] = config
+
+    def _create_tracker_instance(self, tracker: str) -> Union[Any, None]:
+        tracker_class = tracker_class_map.get(tracker.upper())
+        if tracker_class is None:
+            return None
+        return tracker_class(self.config)
 
     def trackers_enabled(self, meta):
         if meta.get('trackers') is not None:
             trackers = meta['trackers']
         else:
-            trackers = config['TRACKERS']['default_trackers']
+            trackers = self.config['TRACKERS']['default_trackers']
 
         if isinstance(trackers, str):
             trackers = trackers.split(',')
@@ -113,13 +116,11 @@ class TRACKER_SETUP:
     async def get_banned_groups(self, meta, tracker):
         file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_banned_groups.json')
 
-        tracker_class = tracker_class_map.get(tracker.upper())
-        if tracker_class is None:
+        tracker_instance = self._create_tracker_instance(tracker)
+        if tracker_instance is None:
             return None
-        tracker_instance = tracker_class(self.config)
-        try:
-            banned_url = tracker_instance.banned_url
-        except AttributeError:
+        banned_url = getattr(tracker_instance, 'banned_url', None)
+        if not isinstance(banned_url, str):
             return None
 
         # Check if we need to update
@@ -342,13 +343,11 @@ class TRACKER_SETUP:
 
     async def get_torrent_claims(self, meta, tracker):
         file_path = os.path.join(meta['base_dir'], 'data', 'banned', f'{tracker}_claimed_releases.json')
-        tracker_class = tracker_class_map.get(tracker.upper())
-        if tracker_class is None:
+        tracker_instance = self._create_tracker_instance(tracker)
+        if tracker_instance is None:
             return None
-        tracker_instance = tracker_class(self.config)
-        try:
-            claims_url = tracker_instance.claims_url
-        except AttributeError:
+        claims_url = getattr(tracker_instance, 'claims_url', None)
+        if not isinstance(claims_url, str):
             return None
 
         # Check if we need to update
@@ -420,12 +419,11 @@ class TRACKER_SETUP:
 
         async def process_single_tracker(tracker_name):
             try:
-                tracker_class = tracker_class_map.get(tracker_name.upper())
-                if not tracker_class:
+                tracker_instance = self._create_tracker_instance(tracker_name)
+                if tracker_instance is None:
                     console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
                     return False
 
-                tracker_instance = tracker_class(self.config)
                 # Get name-to-ID mappings directly
                 type_mapping = await tracker_instance.get_type_id(meta, mapping_only=True)
                 type_name = meta.get('type', '')
@@ -493,7 +491,7 @@ class TRACKER_SETUP:
     async def get_tracker_requests(self, meta, tracker, url):
         if meta['debug']:
             console.print(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
-        requests = []
+        requests: list[dict[str, Any]] = []
         headers = {
             'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
             'Accept': 'application/json'
@@ -548,10 +546,10 @@ class TRACKER_SETUP:
     async def bhd_request_check(self, meta, tracker, url):
         if 'BHD' not in self.config['TRACKERS'] or not self.config['TRACKERS']['BHD'].get('api_key'):
             console.print("[red]BHD API key not configured. Skipping BHD request check.[/red]")
-            return False
+            return []
         if meta['debug']:
             console.print(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
-        requests = []
+        requests: list[dict[str, Any]] = []
         params = {
             'action': 'search',
             'tmdb_id': f"{meta['category'].lower()}/{meta['tmdb_id']}",
@@ -610,28 +608,33 @@ class TRACKER_SETUP:
             console.print("[red]Invalid trackers input format.[/red]")
             return False
 
-        async def process_single_tracker(tracker):
-            tracker_class = tracker_class_map.get(tracker)
-            if not tracker_class:
-                console.print(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
+        async def process_single_tracker(tracker_name: str):
+            tracker_instance = self._create_tracker_instance(tracker_name)
+            if tracker_instance is None:
+                console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
                 return False
 
-            tracker_instance = tracker_class(self.config)
+            requests: list[dict[str, Any]] = []
+            url: Union[str, None] = None
             try:
                 url = tracker_instance.requests_url
             except AttributeError:
-                if tracker.upper() in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
-                    pass
-                else:
+                if tracker_name.upper() not in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
                     # tracker without requests url not supported
-                    return
-            if tracker.upper() == "BHD":
-                requests = await self.bhd_request_check(meta, tracker, url)
-            elif tracker.upper() in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
+                    return False
+
+            if tracker_name.upper() == "BHD":
+                if not url:
+                    return False
+                requests = await self.bhd_request_check(meta, tracker_name, url)
+            elif tracker_name.upper() in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
+                # These trackers have custom request handling
                 requests = await tracker_instance.get_requests(meta)
-                return
+                return False
             else:
-                requests = await self.get_tracker_requests(meta, tracker, url)
+                if not url:
+                    return False
+                requests = await self.get_tracker_requests(meta, tracker_name, url)
                 type_mapping = await tracker_instance.get_type_id(meta, mapping_only=True)
                 type_name = meta.get('type', '')
                 type_ids = [type_mapping.get(type_name)] if type_name else []
@@ -662,12 +665,12 @@ class TRACKER_SETUP:
                 return False
 
             # Initialize request log for this tracker
-            common = COMMON(config)
-            log_path = f"{meta['base_dir']}/tmp/{tracker}_request_results.json"
+            common = COMMON(self.config)
+            log_path = f"{meta['base_dir']}/tmp/{tracker_name}_request_results.json"
             if not await common.path_exists(log_path):
                 await common.makedirs(os.path.dirname(log_path))
 
-            request_data = []
+            request_data: list[dict[str, Any]] = []
             try:
                 async with aiofiles.open(log_path, 'r', encoding='utf-8') as f:
                     content = await f.read()
@@ -685,35 +688,46 @@ class TRACKER_SETUP:
                 double_check = False
                 api_id = each.get('id')
                 api_category = each.get('category')
-                api_name = each.get('name')
+                api_name = str(each.get('name') or '')
                 api_type = each.get('type')
+                api_type_str = str(api_type or '')
                 api_bounty = each.get('bounty')
                 api_status = each.get('status')
-                if "BHD" not in tracker:
+                api_description = str(each.get('description') or '')
+                api_resolution = each.get('resolution')
+                api_resolution_str = str(api_resolution or '')
+                api_resolution_lower = api_resolution_str.lower()
+                if "BHD" not in tracker_name:
                     if str(api_type) in [str(tid) for tid in type_ids]:
                         type_name = True
                     elif api_type is None:
                         type_name = True
                         double_check = True
-                    api_resolution = each.get('resolution')
                     if str(api_resolution) in [str(rid) for rid in resolution_ids]:
                         resolution = True
                     elif api_resolution is None:
                         resolution = True
                         double_check = True
                     api_claimed = each.get('claimed')
-                    api_description = each.get('description')
                     if meta['category'] == "TV":
-                        api_season = int(each.get('season')) if each.get('season') is not None else 0
+                        season_value = each.get('season')
+                        if season_value is not None:
+                            api_season = int(season_value)
+                        else:
+                            api_season = 0
                         if api_season and meta.get('season_int') and api_season == meta.get('season_int'):
                             season = True
-                        api_episode = int(each.get('episode')) if each.get('episode') is not None else 0
+                        episode_value = each.get('episode')
+                        if episode_value is not None:
+                            api_episode = int(episode_value)
+                        else:
+                            api_episode = 0
                         if api_episode and meta.get('episode_int') and api_episode == meta.get('episode_int'):
                             episode = True
                     if str(api_category) in [str(cid) for cid in category_ids]:
                         new_url = re.sub(r'/api/requests/filter$', f'/requests/{api_id}', url)
                         if meta.get('category') == "MOVIE" and type_name and resolution and not api_claimed:
-                            console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
+                            console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             console.print(f"[bold green]{api_name}:[/bold green] {new_url}")
                             console.print()
@@ -735,7 +749,7 @@ class TRACKER_SETUP:
                                 request_data.append(request_entry)
                                 existing_uuids.add(meta.get('uuid'))
                         elif meta.get('category') == "TV" and season and episode and type_name and resolution and not api_claimed:
-                            console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
+                            console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             console.print(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]S{api_season:02d} E{api_episode:02d}:[/bold yellow] {new_url}")
                             console.print()
@@ -757,7 +771,7 @@ class TRACKER_SETUP:
                                 request_data.append(request_entry)
                                 existing_uuids.add(meta.get('uuid'))
                         else:
-                            console.print(f"[bold blue]Found request on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
+                            console.print(f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             if meta.get('category') == "MOVIE":
                                 console.print(f"[bold yellow]{api_name}:[/bold yellow] {new_url}")
@@ -804,28 +818,29 @@ class TRACKER_SETUP:
                         dv = True
                     if not each.get('hdr') and meta_hdr not in ("HDR10", "HDR10+", "HDR"):
                         hdr = True
-                    if 'remux' in each.get('resolution', '').lower():
-                        if 'uhd' in each.get('resolution', '').lower() and meta.get('resolution') == "2160p" and meta.get('type') == "REMUX":
+                    if 'remux' in api_resolution_lower:
+                        if 'uhd' in api_resolution_lower and meta.get('resolution') == "2160p" and meta.get('type') == "REMUX":
                             resolution = True
                             type_name = True
-                        elif 'uhd' not in each.get('resolution', '').lower() and meta.get('resolution') == "1080p" and meta.get('type') == "REMUX":
+                        elif 'uhd' not in api_resolution_lower and meta.get('resolution') == "1080p" and meta.get('type') == "REMUX":
                             resolution = True
                             type_name = True
-                    elif 'remux' not in each.get('resolution', '').lower() and meta.get('is_disc') == "BDMV":
-                        if 'uhd' in each.get('resolution', '').lower() and meta.get('resolution') == "2160p":
+                    elif 'remux' not in api_resolution_lower and meta.get('is_disc') == "BDMV":
+                        if 'uhd' in api_resolution_lower and meta.get('resolution') == "2160p":
                             resolution = True
                             type_name = True
-                        elif 'uhd' not in each.get('resolution', '').lower() and meta.get('resolution') == "1080p":
+                        elif 'uhd' not in api_resolution_lower and meta.get('resolution') == "1080p":
                             resolution = True
                             type_name = True
-                    elif each.get('resolution') == meta.get('resolution'):
+                    elif api_resolution == meta.get('resolution'):
                         resolution = True
-                    if 'Blu-ray' in each.get('type') and meta.get('type') == "ENCODE":
+                    meta_type = str(meta.get('type') or '')
+                    if 'Blu-ray' in api_type_str and meta_type == "ENCODE":
                         type_name = True
-                    elif 'WEB' in each.get('type') and 'WEB' in meta.get('type'):
+                    elif 'WEB' in api_type_str and 'WEB' in meta_type:
                         type_name = True
                     if meta.get('category') == "MOVIE" and type_name and resolution and unclaimed and not internal and dv and hdr:
-                        console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
+                        console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
                         console.print(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         console.print()
 
@@ -840,8 +855,8 @@ class TRACKER_SETUP:
                             }
                             request_data.append(request_entry)
                             existing_uuids.add(meta.get('uuid'))
-                    if meta.get('category') == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and 'uhd' in each.get('resolution').lower():
-                        console.print(f"[bold blue]Found request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]")
+                    if meta.get('category') == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and 'uhd' in api_resolution_lower:
+                        console.print(f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]")
                         console.print(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         console.print()
 
@@ -857,7 +872,7 @@ class TRACKER_SETUP:
                             request_data.append(request_entry)
                             existing_uuids.add(meta.get('uuid'))
                     if meta.get('category') == "TV" and season and type_name and resolution and unclaimed and not internal and dv and hdr:
-                        console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
+                        console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
                         console.print(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.get('season')}:[/bold yellow] {each.get('url')}")
                         console.print()
 
@@ -873,7 +888,7 @@ class TRACKER_SETUP:
                             request_data.append(request_entry)
                             existing_uuids.add(meta.get('uuid'))
                     if meta.get('category') == "TV" and season and type_name and resolution and unclaimed and not internal and not dv and not hdr:
-                        console.print(f"[bold blue]Found request match on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]")
+                        console.print(f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]")
                         console.print(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.get('season')}:[/bold yellow] {each.get('url')}")
                         console.print()
 
@@ -889,7 +904,7 @@ class TRACKER_SETUP:
                             request_data.append(request_entry)
                             existing_uuids.add(meta.get('uuid'))
                     else:
-                        console.print(f"[bold blue]Found request on [bold yellow]{tracker}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
+                        console.print(f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
                         if internal:
                             console.print("[bold red]Request is internal only[/bold red]")
                         console.print(f"[bold yellow]{api_name}[/bold yellow] - {each.get('url')}")
@@ -907,9 +922,348 @@ class TRACKER_SETUP:
 
         return match_found
 
+    async def process_trumpables(self, meta, trackers):
+        if isinstance(trackers, str):
+            trackers = [trackers.strip().upper()]
+        elif isinstance(trackers, list):
+            trackers = [s.upper() for s in trackers]
+        else:
+            console.print("[red]Invalid trackers input format.[/red]")
+            return False
 
-tracker_class_map = {
-    'ACM': ACM, 'AITHER': AITHER, 'AL': AL, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'CBR': CBR,
+        # Track which trackers support trumping for later use
+        trumping_trackers: list[str] = []
+
+        for tracker in trackers:
+            tracker_instance = self._create_tracker_instance(tracker)
+            if tracker_instance is None:
+                console.print(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
+                continue
+
+            if not isinstance(getattr(tracker_instance, 'trumping_url', None), str):
+                continue  # Skip trackers without trumping url support
+
+            trumping_trackers.append(tracker)
+        if not trumping_trackers:
+            if meta['debug']:
+                console.print("[yellow]No trackers with trumping support found.[/yellow]")
+            return False
+
+        # Track trackers to skip without mutating meta['trackers'] in-place
+        # NOTE: meta['skip_trackers'] is used elsewhere as a boolean, so use a distinct key here.
+        meta.setdefault('skip_upload_trackers', [])
+
+        # Store which trackers we're trump reporting on (may be filtered later)
+        meta['trumping_trackers'] = trumping_trackers
+
+        for tracker in trumping_trackers:
+            tracker_instance = self._create_tracker_instance(tracker)
+            if tracker_instance is None:
+                console.print(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
+                continue
+            url = getattr(tracker_instance, 'trumping_url', None)
+            if not isinstance(url, str):
+                continue
+
+            reported_torrent_id = f"{meta.get('trumpable_id', '')}"
+            if not reported_torrent_id:
+                # Try tracker-specific matched ID
+                reported_torrent_id = f"{meta.get(f'{tracker}_matched_id', '')}"
+            if not reported_torrent_id and meta.get('matched_episode_ids', []):
+                reported_torrent_id = f"{meta['matched_episode_ids'][0].get('id', '')}"
+            if not reported_torrent_id:
+                console.print(f"[red]No reported torrent ID found in meta for trumpable processing on {tracker}[/red]")
+                continue
+            else:
+                # Store per-tracker to avoid overwriting across multiple trackers
+                meta[f'{tracker}_reported_torrent_id'] = reported_torrent_id
+
+            trumping_reports, status = await self.get_tracker_trumps(meta, tracker, url, reported_torrent_id)
+            if status != 200:
+                console.print(f"[bold red]Failed to retrieve trumping reports from {tracker}. HTTP Status: {status}[/bold red]")
+                # Mark this tracker as failed/skipped and continue to the next tracker
+                console.print(f"[bold red]Marking {tracker} to be skipped due to API failure[/bold red]")
+                if tracker not in meta['skip_upload_trackers']:
+                    meta['skip_upload_trackers'].append(tracker)
+                meta.setdefault('tracker_status', {})
+                meta['tracker_status'].setdefault(tracker, {})
+                meta['tracker_status'][tracker]['skip_upload'] = True
+                continue
+            if trumping_reports:
+                console.print(f"[bold yellow]Found {len(trumping_reports)} existing trumping report/s on {tracker} for this release[/bold yellow]")
+                for report in trumping_reports:
+                    console.print(f"  [cyan]Report ID:[/cyan] {report.get('id')} - [cyan]Title:[/cyan] {report.get('title')}")
+                    if report.get('trumping_torrent'):
+                        for torrent in report.get('trumping_torrent', []):
+                            torrent_name = torrent.get('name', 'Unknown')
+                            torrent_id = torrent.get('id', 'N/A')
+                            console.print(f"  [bold green]Already being trumped by:[/bold green] {torrent_name} (ID: {torrent_id})")
+                    else:
+                        console.print("  [yellow]The trumping torrent for this report seems to be in modq.....[/yellow]")
+                try:
+                    upload = cli_ui.ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
+                except (EOFError, KeyboardInterrupt):
+                    console.print("[yellow]Prompt cancelled; treating as 'no' for safety.[/yellow]")
+                    upload = False
+
+                if not upload:
+                    console.print(f"[bold red]Marking {tracker} to be skipped[/bold red]")
+                    if tracker not in meta['skip_upload_trackers']:
+                        meta['skip_upload_trackers'].append(tracker)
+                    # Also mark in tracker_status when available (used elsewhere to skip upload)
+                    meta.setdefault('tracker_status', {})
+                    meta['tracker_status'].setdefault(tracker, {})
+                    meta['tracker_status'][tracker]['skip_upload'] = True
+                    continue
+                console.print(f"[bold green]Proceeding with upload despite existing trumping reports on {tracker}[/bold green]")
+            else:
+                if meta['debug']:
+                    console.print(f"[bold green]Will make a trumpable report for this upload at {trumping_trackers}[/bold green]")
+
+        # Filter trumping trackers by skip marker (do not mutate meta['trackers'] here)
+        active_trumping_trackers = [t for t in trumping_trackers if t not in meta.get('skip_upload_trackers', [])]
+        meta['trumping_trackers'] = active_trumping_trackers
+        if not active_trumping_trackers:
+            if meta.get('debug'):
+                console.print("[yellow]All trump-capable trackers were marked to skip; skipping trump report creation.[/yellow]")
+            return False
+
+        if not meta.get('tv_pack'):
+            console.print("[yellow]Aither requires comparisons to be provided for trump reports.\n"
+                          "Are the comparison images in the description or are you adding links?")
+            try:
+                where_compare = cli_ui.ask_string(
+                    "Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:",
+                    default=""
+                )
+            except (EOFError, KeyboardInterrupt):
+                console.print("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
+                return False
+
+            where_compare = (where_compare or "").strip()
+            if where_compare.lower() == 'd':
+                meta['screenshots_in_description'] = True
+                return True
+            elif where_compare.upper() == 'L':
+                try:
+                    reported_screenshots = cli_ui.ask_string(
+                        "Paste screenshot links for the reported torrent (comma-separated):",
+                        default=""
+                    )
+                    trumping_screenshots = cli_ui.ask_string(
+                        "Paste screenshot links for the trumping torrent (comma-separated):",
+                        default=""
+                    )
+                except (EOFError, KeyboardInterrupt):
+                    console.print("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
+                    return False
+
+                reported_screenshots = (reported_screenshots or "").strip()
+                trumping_screenshots = (trumping_screenshots or "").strip()
+                if not reported_screenshots or not trumping_screenshots:
+                    console.print("[yellow]No screenshot links provided. Skipping trump report creation.[/yellow]")
+                    return False
+
+                meta['screenshots_reported_torrent'] = [link.strip() for link in reported_screenshots.split(',') if link.strip()]
+                meta['screenshots_trumping_torrent'] = [link.strip() for link in trumping_screenshots.split(',') if link.strip()]
+                if not meta['screenshots_reported_torrent'] or not meta['screenshots_trumping_torrent']:
+                    console.print("[yellow]No valid screenshot links provided. Skipping trump report creation.[/yellow]")
+                    return False
+                return True
+            else:
+                console.print("[yellow]Skipping trump report creation as no comparison method provided.[/yellow]")
+                return False
+        else:
+            if meta.get('debug'):
+                console.print(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {active_trumping_trackers}[/bold green]")
+            return True
+
+    async def get_tracker_trumps(self, meta, tracker, url, reported_torrent_id):
+        if meta['debug']:
+            console.print(f"[bold green]Searching for trumps on {tracker}[/bold green]")
+        requests: list[dict[str, Any]] = []
+        status_code = None
+        headers = {
+            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
+            'Accept': 'application/json'
+        }
+
+        params = {
+            'reported_torrent_id': f"{reported_torrent_id}",
+        }
+
+        all_data: list[dict[str, Any]] = []
+        next_cursor = None
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                while True:
+                    try:
+                        # Add pagination cursor to params if we have one
+                        if next_cursor:
+                            params['cursor'] = next_cursor
+
+                        response = await client.get(url=url, headers=headers, params=params)
+                        status_code = response.status_code
+
+                        if response.status_code == 200:
+                            data = response.json()
+
+                            if 'data' in data and isinstance(data['data'], list):
+                                page_data = data['data']
+                            elif 'results' in data and isinstance(data['results'], list):
+                                page_data = data['results']
+                            else:
+                                console.print(f"[bold red]Unexpected response format: {type(data)}[/bold red]")
+                                return requests, status_code
+
+                            all_data.extend(page_data)
+
+                            # Check for pagination
+                            meta_info = data.get('meta', {})
+                            if not isinstance(meta_info, dict):
+                                console.print(f"[bold red]Unexpected 'meta' format: {type(meta_info)}[/bold red]")
+                                break
+
+                            next_cursor = meta_info.get('next_cursor')
+                            if not next_cursor:
+                                break  # Exit loop if there are no more pages
+                            else:
+                                # Rest between page fetches
+                                console.print(f"[cyan]Fetched {len(page_data)} trumping reports, waiting 1 second before next page...[/cyan]")
+                                await asyncio.sleep(1)
+                        else:
+                            console.print(f"[bold red]Failed to search trumps on {tracker}. HTTP Status: {response.status_code} - {response.text}[/bold red]")
+                            break
+
+                    except httpx.RequestError as e:
+                        console.print(f"[bold red]HTTP Request failed: {e}[/bold red]")
+                        break
+
+                # Process all collected data
+                try:
+                    for each in all_data:
+                        # Normalize trumping_torrent to always be a list
+                        trumping_torrent = each.get('trumping_torrent')
+                        if trumping_torrent is None:
+                            trumping_torrent = []
+                        elif isinstance(trumping_torrent, dict):
+                            trumping_torrent = [trumping_torrent] if trumping_torrent else []
+
+                        result = {
+                            'id': each.get('id'),
+                            'type': each.get('type'),
+                            'title': each.get('title'),
+                            'solved': each.get('solved'),
+                            'reported_torrents': each.get('reported_torrents', []),
+                            'trumping_torrent': trumping_torrent,
+                        }
+                        requests.append(result)
+
+                except Exception as e:
+                    console.print(f"[bold red]Error processing response data: {e}[/bold red]")
+                    return requests, status_code
+
+        except httpx.TimeoutException:
+            console.print("[bold red]Request timed out after 10 seconds")
+            status_code = None
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error: {e}")
+            status_code = None
+
+        if meta['debug']:
+            console.print(f"Total trumping reports retrieved: {len(requests)}")
+
+        return requests, status_code
+
+    async def make_trumpable_report(self, meta, tracker):
+        """Create a trump report by POSTing to the /create endpoint"""
+        if meta['debug']:
+            console.print(f"[bold green]Creating trump report on {tracker}[/bold green]")
+
+        tracker_instance = self._create_tracker_instance(tracker)
+        if not tracker_instance:
+            console.print(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
+            return False
+
+        base_url = getattr(tracker_instance, 'trumping_url', None)
+        if not isinstance(base_url, str):
+            console.print(f"[red]No trumping URL found for {tracker}[/red]")
+            return False
+
+        # Replace /filter with /create
+        create_url = base_url.replace('/filter', '/create')
+
+        headers = {
+            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        # Read per-tracker reported_torrent_id, with fallback to legacy key for backwards compatibility
+        reported_torrent_id = meta.get(f'{tracker}_reported_torrent_id') or meta.get('reported_torrent_id')
+        if not reported_torrent_id:
+            console.print(f"[red]No reported torrent ID found for {tracker}[/red]")
+            return False
+        try:
+            trumping_torrent_id = meta['tracker_status'][tracker]['torrent_id']
+        except KeyError:
+            console.print(f"[red]No torrent ID found in meta for trumping torrent on {tracker}[/red]")
+            console.print("[red]Either the upload failed, or you're in debug[/red]")
+            if not meta.get('debug', False):
+                return False
+            # Set fallback for debug mode so payload construction doesn't fail
+            trumping_torrent_id = None
+
+        if meta.get('tv_pack'):
+            message = "Upload Assistant season pack trump"
+        elif meta.get('trump_reason') == 'exact_match':
+            message = "Upload Assistant exact filename trump"
+        elif meta.get('trump_reason') == 'trumpable_release':
+            message = "Upload Assistant trumpable release trump"
+        else:
+            message = "Upload Assistant is trumping this torrent for reasons Audionut has not correctly caught. User selected yes at a prompt."
+
+        payload = {
+            'reported_torrent_id': reported_torrent_id,
+            'trumping_torrent_id': trumping_torrent_id,
+            'message': message
+        }
+        if 'screenshots_reported_torrent' in meta:
+            payload['screenshots_reported_torrent'] = ','.join(meta['screenshots_reported_torrent'])
+        if 'screenshots_trumping_torrent' in meta:
+            payload['screenshots_trumping_torrent'] = ','.join(meta['screenshots_trumping_torrent'])
+        if 'screenshots_in_description' in meta and meta['screenshots_in_description']:
+            payload['message'] += " - User says comparison screenshots are in description."
+        if not meta.get('debug', False):
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(url=create_url, headers=headers, json=payload)
+                    if response.status_code in (200, 201):
+                        console.print(f"[bold green]Successfully created trump report on {tracker}[/bold green]")
+                        return True
+                    else:
+                        console.print(f"[bold red]Failed to create trump report. HTTP Status: {response.status_code}[/bold red]")
+                        return False
+
+            except httpx.TimeoutException:
+                console.print("[bold red]Request timed out after 10 seconds[/bold red]")
+                return False
+            except httpx.RequestError as e:
+                console.print(f"[bold red]HTTP Request failed: {e}[/bold red]")
+                return False
+            except Exception as e:
+                console.print(f"[bold red]Unexpected error: {e}[/bold red]")
+                return False
+        else:
+            console.print("[bold yellow]Debug mode enabled, skipping actual trump report creation.[/bold yellow]")
+            console.print(f"[cyan]POST URL: {create_url}[/cyan]")
+            console.print(f"[cyan]Payload: {payload}[/cyan]")
+            return True
+
+
+tracker_class_map: dict[str, type[Any]] = {
+    'ACM': ACM, 'AITHER': AITHER, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'CBR': CBR,
     'CZ': CZ, 'DC': DC, 'DP': DP, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IPT': IPT, 'IS': IS, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
@@ -917,7 +1271,7 @@ tracker_class_map = {
 }
 
 api_trackers = {
-    'ACM', 'AITHER', 'AL', 'BHD', 'BLU', 'CBR', 'DP', 'EMUW', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT',
+    'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'DP', 'EMUW', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT',
     'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS'
 }
 

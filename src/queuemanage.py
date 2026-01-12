@@ -110,7 +110,7 @@ async def save_processed_path(processed_files_log, path):
         console.print(f"[red]Error saving processed path: {e}[/red]")
 
 
-async def get_log_file(base_dir, queue_name):
+async def get_log_file(base_dir: str, queue_name: str) -> str:
     """
     Returns the path to the log file for the given base directory and queue name.
     """
@@ -118,7 +118,7 @@ async def get_log_file(base_dir, queue_name):
     return os.path.join(base_dir, "tmp", f"{safe_queue_name}_processed_files.log")
 
 
-async def load_processed_files(log_file):
+async def load_processed_files(log_file: str) -> set[str]:
     """
     Loads the list of processed files from the log file.
     """
@@ -412,13 +412,15 @@ async def handle_queue(path, meta, paths, base_dir):
             if new_files or removed_files:
                 console.print("[bold yellow]Queue changes detected:[/bold yellow]")
                 if new_files:
-                    console.print(f"[green]New files found ({len(new_files)}):[/green]")
-                    for file in sorted(new_files):
-                        console.print(f"  + {file}")
+                    if meta.get('debug'):
+                        console.print(f"[green]New files found ({len(new_files)}):[/green]")
+                        for file in sorted(new_files):
+                            console.print(f"  + {file}")
                 if removed_files:
-                    console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
-                    for file in sorted(removed_files):
-                        console.print(f"  - {file}")
+                    if meta.get('debug'):
+                        console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
+                        for file in sorted(removed_files):
+                            console.print(f"  - {file}")
 
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                     console.print("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")

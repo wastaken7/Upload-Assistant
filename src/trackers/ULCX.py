@@ -47,9 +47,14 @@ class ULCX(UNIT3D):
                     return False
             else:
                 return False
-        if meta['type'] == "ENCODE" and meta['resolution'] not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
+        if meta['type'] in ["ENCODE", "HDTV"] and meta['resolution'] not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i', '720p']:
             if not meta['unattended']:
                 console.print(f'[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]')
+            return False
+
+        if meta['type'] in ["DVDRIP"]:
+            if not meta['unattended']:
+                console.print(f'[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]')
             return False
 
         if not meta['is_disc'] == "BDMV":
@@ -72,7 +77,7 @@ class ULCX(UNIT3D):
         return data
 
     async def get_description(self, meta):
-        desc = await DescriptionBuilder(self.config).unit3d_edit_desc(meta, self.tracker, comparison=True)
+        desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']

@@ -4,16 +4,20 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request_target:
     branches:
       - master
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   code-analysis:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -22,6 +26,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -86,18 +92,19 @@ jobs:
     - name: Type Checking with MyPy
       continue-on-error: true
       run: |
-        echo "Running type checking..."
-        mypy --config-file mypy.ini src/ bin/ upload.py config-generator.py discordbot.py > mypy-results.txt 2>&1 || echo "MyPy scan completed with results saved"
+        echo "Running type checking for Python ${{ matrix.python-version }}..."
+        # Override python_version in mypy to match the matrix version
+        mypy --config-file mypy.ini --python-version ${{ matrix.python-version }} . > mypy-results-${{ matrix.python-version }}.txt 2>&1 || echo "MyPy scan completed with results saved"
         
         # Display results
-        cat mypy-results.txt
+        cat mypy-results-${{ matrix.python-version }}.txt
 
     - name: Upload MyPy Results
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request_target'
       uses: actions/upload-artifact@v4
       with:
         name: mypy-results-${{ matrix.python-version }}
-        path: mypy-results.txt
+        path: mypy-results-${{ matrix.python-version }}.txt
 
     - name: Security Analysis with Bandit
       continue-on-error: false
@@ -133,7 +140,7 @@ jobs:
         cat bandit-results.txt
 
     - name: Upload Bandit Results
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request_target'
       uses: actions/upload-artifact@v4
       with:
         name: bandit-results-${{ matrix.python-version }}
@@ -150,7 +157,7 @@ jobs:
         cat safety-results.txt
 
     - name: Upload Safety Results
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request_target'
       uses: actions/upload-artifact@v4
       with:
         name: safety-results-${{ matrix.python-version }}
@@ -166,7 +173,7 @@ jobs:
         cat vulture-results.txt
 
     - name: Upload Vulture Results
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request_target'
       uses: actions/upload-artifact@v4
       with:
         name: vulture-results-${{ matrix.python-version }}
@@ -192,9 +199,9 @@ jobs:
         echo "Check the job logs above for detailed results."
 
   pr-comment:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     needs: code-analysis
-    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       issues: write
@@ -364,20 +371,34 @@ jobs:
             }
           }
           
-          // Check for merged mypy-results.txt file
-          const mypyFile = 'mypy-results.txt';
+          // Check for mypy results files (one per Python version)
+          // Collect results per version, then deduplicate identical outputs
           let mypyResults = '';
+          const mypyFiles = fs.readdirSync('.').filter(f => f.startsWith('mypy-results-') && f.endsWith('.txt'));
           
-          if (fs.existsSync(mypyFile)) {
-            try {
-              mypyResults = fs.readFileSync(mypyFile, 'utf8');
-              console.log('Found merged MyPy results file');
-            } catch (error) {
-              console.log(`Error reading MyPy file: ${error.message}`);
+          // Map: content -> [versions]
+          const mypyByContent = new Map();
+          
+          if (mypyFiles.length > 0) {
+            for (const file of mypyFiles) {
+              try {
+                const content = fs.readFileSync(file, 'utf8').trim();
+                if (content) {
+                  // Extract version from filename (e.g., mypy-results-3.9.txt -> 3.9)
+                  const version = file.replace('mypy-results-', '').replace('.txt', '');
+                  if (!mypyByContent.has(content)) {
+                    mypyByContent.set(content, []);
+                  }
+                  mypyByContent.get(content).push(version);
+                  console.log(`Found MyPy results for Python ${version}`);
+                }
+              } catch (error) {
+                console.log(`Error reading ${file}: ${error.message}`);
+              }
             }
           } else {
             // Fallback: look for individual result directories
-            console.log('Merged MyPy file not found, checking individual directories...');
+            console.log('No MyPy result files found, checking individual directories...');
             const items = fs.readdirSync('.').filter(item => item.startsWith('mypy-results-'));
             
             for (const item of items) {
@@ -386,24 +407,34 @@ jobs:
                 const stat = fs.statSync(itemPath);
                 
                 if (stat.isDirectory()) {
-                  const filePath = path.join(itemPath, 'mypy-results.txt');
-                  if (fs.existsSync(filePath)) {
-                    const content = fs.readFileSync(filePath, 'utf8');
-                    if (content.trim()) {
-                      mypyResults += content + '\n\n';
-                      console.log(`Found MyPy results in ${item}`);
+                  const dirFiles = fs.readdirSync(itemPath).filter(f => f.endsWith('.txt'));
+                  for (const file of dirFiles) {
+                    const filePath = path.join(itemPath, file);
+                    const content = fs.readFileSync(filePath, 'utf8').trim();
+                    if (content) {
+                      const version = item.replace('mypy-results-', '');
+                      if (!mypyByContent.has(content)) {
+                        mypyByContent.set(content, []);
+                      }
+                      mypyByContent.get(content).push(version);
+                      console.log(`Found MyPy results in ${item}/${file}`);
                     }
-                  }
-                } else if (stat.isFile() && item.endsWith('.txt')) {
-                  const content = fs.readFileSync(itemPath, 'utf8');
-                  if (content.trim()) {
-                    mypyResults += content + '\n\n';
-                    console.log(`Found MyPy results in ${item}`);
                   }
                 }
               } catch (error) {
                 console.log(`Error reading MyPy ${item}: ${error.message}`);
               }
+            }
+          }
+          
+          // Build deduplicated mypy output
+          for (const [content, versions] of mypyByContent.entries()) {
+            // Sort versions for consistent display
+            versions.sort((a, b) => parseFloat(a) - parseFloat(b));
+            if (versions.length === 1) {
+              mypyResults += `=== Python ${versions[0]} ===\n${content}\n\n`;
+            } else {
+              mypyResults += `=== Python ${versions.join(', ')} (identical results) ===\n${content}\n\n`;
             }
           }
           

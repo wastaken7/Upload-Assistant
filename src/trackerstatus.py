@@ -4,6 +4,7 @@ import cli_ui
 import copy
 import os
 import sys
+from typing import Any, Mapping, cast
 
 from torf import Torrent
 
@@ -18,6 +19,8 @@ from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
 from src.uphelper import UploadHelper
 
+TRACKERS_CONFIG: Mapping[str, Mapping[str, Any]] = cast(Mapping[str, Mapping[str, Any]], config.get('TRACKERS', {}))
+
 
 async def process_all_trackers(meta):
     tracker_status = {}
@@ -25,7 +28,7 @@ async def process_all_trackers(meta):
     client = Clients(config=config)
     tracker_setup = TRACKER_SETUP(config=config)
     helper = UploadHelper()
-    meta_lock = asyncio.Lock()  # noqa F841
+    meta_lock = asyncio.Lock()
     for tracker in meta['trackers']:
         if 'tracker_status' not in meta:
             meta['tracker_status'] = {}
@@ -85,7 +88,7 @@ async def process_all_trackers(meta):
 
             if local_meta['tracker_status'][tracker_name].get('skip_upload'):
                 local_tracker_status['skipped'] = True
-            elif 'skipped' not in local_meta and local_tracker_status['skipped'] is None:
+            elif 'skipped' not in local_meta:
                 local_tracker_status['skipped'] = False
 
             if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
@@ -98,13 +101,15 @@ async def process_all_trackers(meta):
                 if tracker_name not in {"PTP"} and not local_tracker_status['skipped']:
                     dupes = await tracker_class.search_existing(local_meta, disctype)
                     # set trackers here so that they are not double checked later with cross seeding
-                    meta.setdefault('dupe_checked_trackers', []).append(tracker_name)
+                    async with meta_lock:
+                        meta.setdefault('dupe_checked_trackers', []).append(tracker_name)
                     if local_meta['tracker_status'][tracker_name].get('other', False):
                         local_tracker_status['other'] = True
                 elif tracker_name == "PTP":
                     ptp = PTP(config=config)
                     groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
-                    meta['ptp_groupID'] = groupID
+                    async with meta_lock:
+                        meta['ptp_groupID'] = groupID
                     dupes = await ptp.search_existing(groupID, local_meta, disctype)
 
                 if tracker_name == "ASC" and meta.get('anon', 'false'):
@@ -113,23 +118,43 @@ async def process_all_trackers(meta):
 
                 if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped']:
                     dupes = await filter_dupes(dupes, local_meta, tracker_name)
-                    meta['we_asked'] = False
-                    is_dupe = await helper.dupe_check(dupes, local_meta, tracker_name)
+
+                    matched_episode_ids = local_meta.get('matched_episode_ids', [])
+                    trumpable_id = local_meta.get('trumpable_id')
+                    cross_seed_key = f'{tracker_name}_cross_seed'
+                    cross_seed_value = local_meta.get(cross_seed_key) if cross_seed_key in local_meta else None
+
+                    # Only shared-state writes go under the lock
+                    async with meta_lock:
+                        if matched_episode_ids:
+                            meta['matched_episode_ids'] = matched_episode_ids
+                        if trumpable_id:
+                            meta['trumpable_id'] = trumpable_id
+                        if cross_seed_key in local_meta:
+                            meta[cross_seed_key] = cross_seed_value
+
+                    is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name)
                     if is_dupe:
                         local_tracker_status['dupe'] = True
 
-                    if tracker_name == "AITHER" and 'aither_trumpable' in local_meta:
-                        meta['aither_trumpable'] = local_meta['aither_trumpable']
-
-                    if f'{tracker_name}_cross_seed' in local_meta:
-                        meta[f'{tracker_name}_cross_seed'] = local_meta[f'{tracker_name}_cross_seed']
+                    if tracker_name == "AITHER":
+                        were_trumping = local_meta.get('were_trumping', False)
+                        trump_reason = local_meta.get('trump_reason')
+                        trumpable_id_after_dupe_check = local_meta.get('trumpable_id')
+                        async with meta_lock:
+                            if were_trumping:
+                                meta['were_trumping'] = were_trumping
+                            if trump_reason:
+                                meta['trump_reason'] = trump_reason
+                            if trumpable_id_after_dupe_check:
+                                meta['trumpable_id'] = trumpable_id_after_dupe_check
 
                 elif 'skipping' in local_meta:
                     local_tracker_status['skipped'] = True
 
                 if tracker_name == "MTV":
                     if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
-                        tracker_config = config['TRACKERS'].get(tracker_name, {})
+                        tracker_config = TRACKERS_CONFIG.get(tracker_name, {})
                         if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
                             torrent_path = os.path.abspath(f"{local_meta['base_dir']}/tmp/{local_meta['uuid']}/BASE.torrent")
                             if not os.path.exists(torrent_path):
@@ -192,7 +217,6 @@ async def process_all_trackers(meta):
             else:
                 local_tracker_status['upload'] = True
                 successful_trackers += 1
-            meta['we_asked'] = False
 
         return tracker_name, local_tracker_status
 
@@ -218,7 +242,7 @@ async def process_all_trackers(meta):
                 skipped_trackers.append(tracker_name)
 
         if skipped_trackers:
-            console.print(f"[red]Trackers skipped due to conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].")
+            console.print(f"[red]Skipped due to specific tracker conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].")
         if dupe_trackers:
             console.print(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow].")
         if passed_trackers:

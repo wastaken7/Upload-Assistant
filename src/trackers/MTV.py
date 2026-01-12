@@ -9,11 +9,9 @@ import os
 import pyotp
 import re
 import traceback
-
+from typing import Any
 from defusedxml import ElementTree as ET
-from torf import Torrent
 
-from data.config import config
 from src.console import console
 from src.rehostimages import check_hosts
 from src.torrentcreate import create_torrent
@@ -72,25 +70,31 @@ class MTV():
     async def upload(self, meta, disctype):
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.json")
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        base_piece_mb = int(meta.get('base_torrent_piece_mb', 0) or 0)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        loop = asyncio.get_running_loop()
-        torrent = await loop.run_in_executor(None, Torrent.read, torrent_file_path)
 
-        if torrent.piece_size > 8388608:
+        if base_piece_mb > 8 and not meta.get('nohash', False):
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
             if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
                 console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
-                piece_size = '8'
-                tracker_url = config['TRACKERS']['MTV'].get('announce_url', "https://fake.tracker").strip()
+                piece_size = 8
+                tracker_url = str(tracker_config.get('announce_url', "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
+                try:
+                    cooldown = int(self.config.get('DEFAULT', {}).get('rehash_cooldown', 0) or 0)
+                except (ValueError, TypeError):
+                    cooldown = 0
+                if cooldown > 0:
+                    await asyncio.sleep(cooldown)  # Small cooldown before rehashing
 
-                await create_torrent(meta, meta['path'], torrent_create, tracker_url=tracker_url, piece_size=piece_size)
+                await create_torrent(meta, str(meta['path']), torrent_create, tracker_url=tracker_url, piece_size=piece_size)
                 await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
                 console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
                 return
+        else:
+            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         cat_id = await self.get_cat_id(meta)
         resolution_id = await self.get_res_id(meta['resolution'])
@@ -156,6 +160,11 @@ class MTV():
 
                     response = await client.post(url=self.upload_url, data=data, files=files)
 
+                    # This is not a header or cookie size issue, but MTV returns this status.
+                    if response.status_code == 400 and ("Request Header" in response.text or "Cookie Too Large" in response.text or "Header Too Large" in response.text):
+                        meta['tracker_status'][self.tracker]['status_message'] = "data error: Request Header or Cookie Too Large error from server"
+                        return False
+
                     try:
                         if "torrents.php" in str(response.url):
                             meta['tracker_status'][self.tracker]['status_message'] = response.url
@@ -197,7 +206,6 @@ class MTV():
             meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        return False
 
     async def edit_desc(self, meta):
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", 'r', encoding='utf-8') as f:
@@ -227,7 +235,8 @@ class MTV():
                 await desc.write("[mediainfo]" + meta['discs'][0]['vob_mi'] + "[/mediainfo]\n\n")
             try:
                 if meta.get('tonemapped', False) and self.config['DEFAULT'].get('tonemapped_header', None):
-                    console.print("[green]Adding tonemapped header to description")
+                    if meta.get("debug", False):
+                        console.print("[green]Adding tonemapped header to description")
                     tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
                     await desc.write(tonemapped_header)
                     await desc.write("\n\n")
@@ -388,7 +397,7 @@ class MTV():
             return '3'
 
     async def get_tags(self, meta):
-        tags = []
+        tags: list[str] = []
         # Genres
         # MTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
         # to regex however many tags need changing, so they're just getting skipped
@@ -444,7 +453,8 @@ class MTV():
             tags.append('atmos.audio')
 
         # Video tags
-        tags.append(meta.get('video_codec').replace('AVC', 'h264').replace('HEVC', 'h265').replace('-', ''))
+        video_codec = str(meta.get('video_codec', ''))
+        tags.append(video_codec.replace('AVC', 'h264').replace('HEVC', 'h265').replace('-', ''))
 
         # Group Tags
         if meta['tag'] != "":
@@ -466,8 +476,8 @@ class MTV():
             if len(meta['bdinfo']['subtitles']) >= 1:
                 tags.append('subtitles')
 
-        tags = ' '.join(tags)
-        return tags
+        tag_string = ' '.join(tag for tag in tags if tag)
+        return tag_string
 
     async def validate_credentials(self, meta):
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/MTV.json")
@@ -589,7 +599,11 @@ class MTV():
 
                         otp_uri = self.config['TRACKERS'][self.tracker].get('otp_uri')
                         if otp_uri:
-                            mfa_code = pyotp.parse_uri(otp_uri).now()
+                            try:
+                                otp = pyotp.parse_uri(otp_uri)
+                                mfa_code = pyotp.TOTP(otp.secret).now()
+                            except (ValueError, TypeError):
+                                mfa_code = console.input('[yellow]MTV 2FA Code: ')
                         else:
                             mfa_code = console.input('[yellow]MTV 2FA Code: ')
 
@@ -683,7 +697,7 @@ class MTV():
                 meta['skipping'] = "MTV"
                 return []
 
-        dupes = []
+        dupes: list[dict[str, Any]] = []
 
         # Build request parameters
         params = {
@@ -738,7 +752,6 @@ class MTV():
             console.print(f"[red]Unable to search for existing torrents: {e}")
         except Exception:
             console.print("[red]Unable to search for existing torrents on site. Most likely the site is down.")
-            dupes.append("FAILED SEARCH")
             traceback.print_exc()
             await asyncio.sleep(5)
 

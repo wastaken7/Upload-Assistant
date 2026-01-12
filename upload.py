@@ -1,99 +1,218 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import aiofiles
-import asyncio
-import cli_ui
-import discord
-import gc
-import json
+
+# Pre-check config.py for syntax and common errors before any imports that depend on it
 import os
-import platform
-import re
-import requests
-import shutil
 import sys
-import time
-import traceback
+from typing import Any, Dict, Optional, cast
+from typing_extensions import TypeAlias
 
-from packaging import version
-from pathlib import Path
+_base_dir = os.path.abspath(os.path.dirname(__file__))
+_config_path = os.path.join(_base_dir, "data", "config.py")
 
-from bin.get_mkbrr import ensure_mkbrr_binary
-from cogs.redaction import clean_meta_for_export, redact_private_info
-from discordbot import send_discord_notification, send_upload_status_notification
-from src.add_comparison import add_comparison
-from src.args import Args
-from src.cleanup import cleanup, reset_terminal
-from src.clients import Clients
-from src.console import console
-from src.disc_menus import process_disc_menus
-from src.dupe_checking import filter_dupes
-from src.get_name import get_name
-from src.get_desc import gen_desc
-from src.get_tracker_data import get_tracker_data
-from src.languages import process_desc_language
-from src.nfo_link import nfo_link
-from src.qbitwait import Wait
-from src.queuemanage import handle_queue, save_processed_path, process_site_upload_item
-from src.takescreens import disc_screenshots, dvd_screenshots, screenshots
-from src.torrentcreate import create_torrent, create_random_torrents, create_base_from_existing_torrent
-from src.trackerhandle import process_trackers
-from src.trackerstatus import process_all_trackers
-from src.trackersetup import TRACKER_SETUP, tracker_class_map, api_trackers, other_api_trackers, http_trackers
-from src.trackers.COMMON import COMMON
-from src.trackers.PTP import PTP
-from src.trackers.AR import AR
-from src.uphelper import UploadHelper
-from src.uploadscreens import upload_screens
+# Enable ANSI colors on Windows
+_use_colors = True
+if sys.platform == "win32":
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        # Enable VIRTUAL_TERMINAL_PROCESSING
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        _use_colors = False
+
+# Color codes (empty strings if colors not supported)
+_RED = "\033[91m" if _use_colors else ""
+_YELLOW = "\033[93m" if _use_colors else ""
+_GREEN = "\033[92m" if _use_colors else ""
+_RESET = "\033[0m" if _use_colors else ""
+
+
+def _print_config_error(error_type: str, message: str, lineno: Optional[int] = None,
+                        text: Optional[str] = None, offset: Optional[int] = None,
+                        suggestion: Optional[str] = None) -> None:
+    """Print a formatted config error message."""
+    print(f"{_RED}{error_type} in config.py:{_RESET}")
+    if lineno:
+        print(f"{_RED}  Line {lineno}: {message}{_RESET}")
+        if text:
+            print(f"{_YELLOW}    {text.rstrip()}{_RESET}")
+            if offset:
+                print(f"{_YELLOW}    {' ' * (offset - 1)}^{_RESET}")
+    else:
+        print(f"{_RED}  {message}{_RESET}")
+    if suggestion:
+        print(f"{_GREEN}  Suggestion: {suggestion}{_RESET}")
+    print(f"\n{_RED}Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example-config.py{_RESET}")
+
+
+config: Dict[str, Any]
+
+if os.path.exists(_config_path):
+    try:
+        from data.config import config as _imported_config  # noqa: E402
+        config = cast(Dict[str, Any], _imported_config)
+    except SyntaxError as e:
+        _print_config_error(
+            "Syntax error",
+            str(e.msg) if e.msg else "Invalid syntax",
+            lineno=e.lineno,
+            text=e.text,
+            offset=e.offset
+        )
+        print(f"\n{_RED}Common syntax issues:{_RESET}")
+        print(f"{_YELLOW}  - Missing comma between dictionary items{_RESET}")
+        print(f"{_YELLOW}  - Missing closing bracket, brace, quote or comma{_RESET}")
+        print(f"{_YELLOW}  - Unclosed string (missing quote at end){_RESET}")
+        sys.exit(1)
+    except NameError as e:
+        # Extract line number from traceback
+        import traceback
+        tb = traceback.extract_tb(sys.exc_info()[2])
+        lineno = tb[-1].lineno if tb else None
+        text = tb[-1].line if tb else None
+
+        # Check for common mistakes
+        suggestion = None
+        error_str = str(e)
+        if "'true'" in error_str.lower():
+            suggestion = "Use 'True' (capital T) instead of 'true'"
+        elif "'false'" in error_str.lower():
+            suggestion = "Use 'False' (capital F) instead of 'false'"
+        elif "'null'" in error_str.lower() or "'none'" in error_str.lower():
+            suggestion = "Use 'None' (capital N) instead of 'null' or 'none'"
+        elif "is not defined" in error_str:
+            # Extract the undefined name from the error message
+            import re as _re
+            match = _re.search(r"name '([^']+)' is not defined", error_str)
+            if match:
+                undefined_name = match.group(1)
+                suggestion = f"Did you forget quotes? Try \"{undefined_name}\" instead of '{undefined_name}'"
+
+        _print_config_error(
+            "Name error",
+            str(e),
+            lineno=lineno,
+            text=text,
+            suggestion=suggestion
+        )
+        sys.exit(1)
+    except TypeError as e:
+        import traceback
+        tb = traceback.extract_tb(sys.exc_info()[2])
+        lineno = tb[-1].lineno if tb else None
+        text = tb[-1].line if tb else None
+
+        _print_config_error(
+            "Type error",
+            str(e),
+            lineno=lineno,
+            text=text
+        )
+        print(f"\n{_RED}Common type issues:{_RESET}")
+        print(f"{_YELLOW}  - Using unhashable type as dictionary key{_RESET}")
+        print(f"{_YELLOW}  - Incorrect data structure nesting{_RESET}")
+        sys.exit(1)
+    except Exception as e:
+        import traceback
+        tb = traceback.extract_tb(sys.exc_info()[2])
+        lineno = tb[-1].lineno if tb else None
+        text = tb[-1].line if tb else None
+
+        _print_config_error(
+            "Error",
+            str(e),
+            lineno=lineno,
+            text=text
+        )
+        sys.exit(1)
+else:
+    print(f"{_RED}Configuration file 'config.py' not found.{_RESET}")
+    print(f"{_RED}Please ensure the file is located at: {_YELLOW}{_config_path}{_RESET}")
+    print(f"{_RED}Follow the setup instructions: https://github.com/Audionut/Upload-Assistant{_RESET}")
+    sys.exit(1)
+
+import aiofiles  # noqa: E402
+import asyncio  # noqa: E402
+import cli_ui  # noqa: E402
+import discord  # noqa: E402
+import gc  # noqa: E402
+import json  # noqa: E402
+import platform  # noqa: E402
+import re  # noqa: E402
+import requests  # noqa: E402
+import shutil  # noqa: E402
+import time  # noqa: E402
+import traceback  # noqa: E402
+
+from packaging import version  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from bin.get_mkbrr import ensure_mkbrr_binary  # noqa: E402
+from cogs.redaction import clean_meta_for_export, redact_private_info  # noqa: E402
+from discordbot import send_discord_notification, send_upload_status_notification  # noqa: E402
+from src.add_comparison import add_comparison  # noqa: E402
+from src.args import Args  # noqa: E402
+from src.cleanup import cleanup, reset_terminal  # noqa: E402
+from src.clients import Clients  # noqa: E402
+from src.console import console  # noqa: E402
+from src.disc_menus import process_disc_menus  # noqa: E402
+from src.dupe_checking import filter_dupes  # noqa: E402
+from src.get_name import get_name  # noqa: E402
+from src.get_desc import gen_desc  # noqa: E402
+from src.get_tracker_data import get_tracker_data  # noqa: E402
+from src.languages import process_desc_language  # noqa: E402
+from src.nfo_link import nfo_link  # noqa: E402
+from src.qbitwait import Wait  # noqa: E402
+from src.queuemanage import handle_queue, save_processed_path, process_site_upload_item  # noqa: E402
+from src.takescreens import disc_screenshots, dvd_screenshots, screenshots  # noqa: E402
+from src.torrentcreate import create_torrent, create_random_torrents, create_base_from_existing_torrent  # noqa: E402
+from src.trackerhandle import process_trackers  # noqa: E402
+from src.trackerstatus import process_all_trackers  # noqa: E402
+from src.trackersetup import TRACKER_SETUP, tracker_class_map, api_trackers, other_api_trackers, http_trackers  # noqa: E402
+from src.trackers.COMMON import COMMON  # noqa: E402
+from src.trackers.PTP import PTP  # noqa: E402
+from src.trackers.AR import AR  # noqa: E402
+from src.uphelper import UploadHelper  # noqa: E402
+from src.uploadscreens import upload_screens  # noqa: E402
+from torf import Torrent  # noqa: E402
 
 cli_ui.setup(color='always', title="Upload Assistant")
-running_subprocesses = set()
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
-try:
-    from data.config import config
-except Exception:
-    if not os.path.exists(os.path.abspath(f"{base_dir}/data/config.py")):
-        cli_ui.info(cli_ui.red, "Configuration file 'config.py' not found.")
-        cli_ui.info(cli_ui.red, "Please ensure the file is located at:", cli_ui.yellow, os.path.abspath(f"{base_dir}/data/config.py"))
-        cli_ui.info(cli_ui.red, "Follow the setup instructions: https://github.com/Audionut/Upload-Assistant")
-        exit()
-    else:
-        traceback.print_exc()
+Meta: TypeAlias = Dict[str, Any]
 
-from src.prep import Prep  # noqa E402
+from src.prep import Prep  # noqa: E402
 client = Clients(config=config)
 parser = Args(config)
 use_discord = False
-discord_config = config.get('DISCORD')
-if discord_config:
-    use_discord = discord_config.get('use_discord', False)
+discord_cfg_obj = config.get('DISCORD')
+discord_config: Optional[Dict[str, Any]] = discord_cfg_obj if isinstance(discord_cfg_obj, dict) else None
+if discord_config is not None:
+    use_discord = bool(discord_config.get('use_discord', False))
 
 
-async def merge_meta(meta, saved_meta, path):
+async def merge_meta(meta: Meta, saved_meta: Meta) -> Dict[str, Any]:
     """Merges saved metadata with the current meta, respecting overwrite rules."""
-    with open(f"{base_dir}/tmp/{os.path.basename(path)}/meta.json") as f:
-        saved_meta = json.load(f)
-        overwrite_list = [
-            'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
-            'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'description_link', 'description_file', 'desc', 'draft',
-            'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
-            'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type', 'tvmaze_manual'
-        ]
-        sanitized_saved_meta = {}
-        for key, value in saved_meta.items():
-            clean_key = key.strip().strip("'").strip('"')
-            if clean_key in overwrite_list:
-                if clean_key in meta and meta.get(clean_key) is not None:
-                    sanitized_saved_meta[clean_key] = meta[clean_key]
-                    if meta['debug']:
-                        console.print(f"Overriding {clean_key} with meta value:", meta[clean_key])
-                else:
-                    sanitized_saved_meta[clean_key] = value
+    overwrite_list = [
+        'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
+        'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'description_link', 'description_file', 'desc', 'draft',
+        'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
+        'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type', 'tvmaze_manual'
+    ]
+    sanitized_saved_meta = {}
+    for key, value in saved_meta.items():
+        clean_key = key.strip().strip("'").strip('"')
+        if clean_key in overwrite_list:
+            if clean_key in meta and meta.get(clean_key) is not None:
+                sanitized_saved_meta[clean_key] = meta[clean_key]
+                if meta.get('debug', False):
+                    console.print(f"Overriding {clean_key} with meta value:", meta[clean_key])
             else:
                 sanitized_saved_meta[clean_key] = value
-        meta.update(sanitized_saved_meta)
-    f.close()
+        else:
+            sanitized_saved_meta[clean_key] = value
+    meta.update(sanitized_saved_meta)
     return sanitized_saved_meta
 
 
@@ -132,9 +251,12 @@ def update_oeimg_to_onlyimage():
         console.print("[yellow]No 'oeimg' or 'oeimg_api' found to update in config.py[/yellow]")
 
 
-async def validate_tracker_logins(meta, trackers=None):
+async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = None) -> None:
     if 'tracker_status' not in meta:
         meta['tracker_status'] = {}
+
+    if not trackers:
+        return
 
     # Filter trackers that are in both the list and tracker_class_map
     valid_trackers = [tracker for tracker in trackers if tracker in tracker_class_map and tracker in http_trackers]
@@ -170,7 +292,7 @@ async def validate_tracker_logins(meta, trackers=None):
         await asyncio.gather(*[validate_single_tracker(tracker) for tracker in valid_trackers])
 
 
-async def process_meta(meta, base_dir, bot=None):
+async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
     """Process the metadata for each queued path."""
     if use_discord and bot:
         await send_discord_notification(config, bot, f"Starting upload process for: {meta['path']}", debug=meta.get('debug', False), meta=meta)
@@ -178,12 +300,12 @@ async def process_meta(meta, base_dir, bot=None):
     if meta['imghost'] is None:
         meta['imghost'] = config['DEFAULT']['img_host_1']
         try:
-            result = any(
+            has_oeimg_config = any(
                 config['DEFAULT'].get(key) == "oeimg"
                 for key in config['DEFAULT']
                 if key.startswith("img_host_")
             )
-            if result:
+            if has_oeimg_config:
                 console.print("[red]oeimg is now onlyimage, your config is being updated[/red]")
                 update_oeimg_to_onlyimage()
         except Exception as e:
@@ -197,15 +319,7 @@ async def process_meta(meta, base_dir, bot=None):
             console.print("[yellow]Running in Auto Mode")
     prep = Prep(screens=meta['screens'], img_host=meta['imghost'], config=config)
     try:
-        results = await asyncio.gather(
-            prep.gather_prep(meta=meta, mode='cli'),
-            return_exceptions=True  # Returns exceptions instead of raising them
-        )
-        for result in results:
-            if isinstance(result, Exception):
-                return
-            else:
-                meta = result
+        meta = await prep.gather_prep(meta=meta, mode='cli')
     except Exception as e:
         console.print(f"Error in gather_prep: {e}")
         console.print(traceback.format_exc())
@@ -262,7 +376,7 @@ async def process_meta(meta, base_dir, bot=None):
                 search_file_folder = 'file'
             await get_tracker_data(meta['video'], meta, search_term, search_file_folder, meta['category'], only_id=meta['only_id'])
 
-    editargs_tracking = ()
+    editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get('trackers', [])
     try:
         confirm = await helper.get_confirmation(meta)
@@ -273,22 +387,22 @@ async def process_meta(meta, base_dir, bot=None):
         sys.exit(1)
     while confirm is False:
         try:
-            editargs = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            editargs_str = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
         except EOFError:
             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup()
             reset_terminal()
             sys.exit(1)
 
-        if editargs == "continue":
+        if editargs_str == "continue":
             break
 
-        if not editargs or not editargs.strip():
+        if not editargs_str or not editargs_str.strip():
             console.print("[yellow]No input provided. Please enter arguments, type `continue` to continue or press Ctrl+C to exit.[/yellow]")
             continue
 
         try:
-            editargs = tuple(editargs.split())
+            editargs = tuple(editargs_str.split())
         except AttributeError:
             console.print("[red]Bad input detected[/red]")
             confirm = False
@@ -296,7 +410,7 @@ async def process_meta(meta, base_dir, bot=None):
         # Tracks multiple edits
         editargs_tracking = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
-        meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')) + editargs_tracking, meta)
+        meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')) + editargs_tracking, meta))
         if not meta.get('trackers'):
             meta['trackers'] = previous_trackers
         if isinstance(meta.get('trackers'), str):
@@ -351,7 +465,7 @@ async def process_meta(meta, base_dir, bot=None):
         for tracker in ["AITHER", "ASC", "BJS", "BT", "CBR", "DP", "FF", "GPW", "HUNO", "IHD", "LDU", "LT", "OE", "PTS", "SAM", "SHRI", "SPD", "TTR", "TVC", "ULCX"]:
             if tracker in trackers:
                 if not audio_prompted:
-                    await process_desc_language(meta, desc=None, tracker=tracker)
+                    await process_desc_language(meta, tracker=tracker)
                     audio_prompted = True
                 else:
                     if 'tracker_status' not in meta:
@@ -402,12 +516,16 @@ async def process_meta(meta, base_dir, bot=None):
                 if not await common.path_exists(log_path):
                     await common.makedirs(os.path.dirname(log_path))
 
-                search_data = []
+                search_data: list[dict[str, Any]] = []
                 if os.path.exists(log_path):
                     try:
                         async with aiofiles.open(log_path, 'r', encoding='utf-8') as f:
                             content = await f.read()
-                            search_data = json.loads(content) if content.strip() else []
+                            loaded = json.loads(content) if content.strip() else []
+                            if isinstance(loaded, list):
+                                search_data = [e for e in loaded if isinstance(e, dict)]
+                            else:
+                                search_data = []
                     except Exception:
                         search_data = []
 
@@ -432,11 +550,11 @@ async def process_meta(meta, base_dir, bot=None):
             meta['we_are_uploading'] = False
             return
 
-        filename = meta.get('title', None)
-        bdmv_filename = meta.get('filename', None)
-        bdinfo = meta.get('bdinfo', None)
-        videopath = meta.get('filelist', [None])
-        videopath = videopath[0] if videopath else None
+        filename: str = meta.get('title', '')
+        bdmv_filename = meta.get('filename', '')
+        bdinfo = meta.get('bdinfo', '')
+        file_list: list[str] = meta.get('filelist', [])
+        videopath: str = file_list[0] if file_list else ""
         console.print(f"Processing {filename} for upload.....")
 
         meta['frame_overlay'] = config['DEFAULT'].get('frame_overlay', False)
@@ -457,7 +575,7 @@ async def process_meta(meta, base_dir, bot=None):
         progress_task = asyncio.create_task(print_progress("[yellow]Still processing, please wait...", interval=10))
         try:
             if 'manual_frames' not in meta:
-                meta['manual_frames'] = {}
+                meta['manual_frames'] = ""
             manual_frames = meta['manual_frames']
 
             if meta.get('comparison', False):
@@ -512,7 +630,7 @@ async def process_meta(meta, base_dir, bot=None):
                         try:
                             await disc_screenshots(
                                 meta, bdmv_filename, bdinfo, meta['uuid'], base_dir, use_vs,
-                                meta.get('image_list', []), meta.get('ffdebug', False), None
+                                meta.get('image_list', []), meta.get('ffdebug', False), 0
                             )
                         except asyncio.CancelledError:
                             await cleanup_screenshot_temp_files(meta)
@@ -532,7 +650,10 @@ async def process_meta(meta, base_dir, bot=None):
                     elif meta['is_disc'] == "DVD":
                         try:
                             await dvd_screenshots(
-                                meta, 0, None, None
+                                meta,
+                                disc_num=0,
+                                num_screens=0,
+                                retry_cap=False
                             )
                         except asyncio.CancelledError:
                             await cleanup_screenshot_temp_files(meta)
@@ -611,7 +732,8 @@ async def process_meta(meta, base_dir, bot=None):
                     manual_frames_count = 0
                 if manual_frames_count > 0:
                     meta['screens'] = manual_frames_count
-                if len(meta.get('image_list', [])) < meta.get('cutoff') and meta.get('skip_imghost_upload', False) is False:
+                cutoff = int(meta.get('cutoff') or 1)
+                if len(meta.get('image_list', [])) < cutoff and meta.get('skip_imghost_upload', False) is False:
                     # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                     trackers_with_image_host_requirements = {'BHD', 'DC', 'GPW', 'HUNO', 'MTV', 'OE', 'PTP', 'STC', 'TVC'}
 
@@ -623,7 +745,7 @@ async def process_meta(meta, base_dir, bot=None):
                     # If all relevant trackers share exactly one common approved host that the user has configured,
                     # and it's not the initially selected host, switch meta['imghost'] to that common host.
                     # If multiple common hosts exist, pick the first by config priority (img_host_1..img_host_9).
-                    allowed_hosts = None
+                    allowed_hosts: Optional[list[str]] = None
                     if relevant_trackers:
                         try:
                             tracker_instances = {
@@ -635,13 +757,15 @@ async def process_meta(meta, base_dir, bot=None):
                                 console.print(f"[cyan]Image host debug: meta['imghost']={meta.get('imghost')} img_host_1={config['DEFAULT'].get('img_host_1')}[/cyan]")
                                 console.print(f"[cyan]Image host debug: relevant_trackers={relevant_trackers}[/cyan]")
 
-                            configured_hosts = []
+                            default_cfg_obj = config.get('DEFAULT', {})
+                            default_cfg: dict[str, Any] = default_cfg_obj if isinstance(default_cfg_obj, dict) else {}
+                            configured_hosts: list[str] = []
                             for host_index in range(1, 10):
                                 host_key = f'img_host_{host_index}'
-                                if host_key in config.get('DEFAULT', {}):
-                                    host = config['DEFAULT'].get(host_key)
+                                if host_key in default_cfg:
+                                    host = default_cfg.get(host_key)
                                     if host and host not in configured_hosts:
-                                        configured_hosts.append(host)
+                                        configured_hosts.append(str(host))
 
                             if meta.get('debug'):
                                 console.print(f"[cyan]Image host debug: configured_hosts={configured_hosts}[/cyan]")
@@ -705,7 +829,7 @@ async def process_meta(meta, base_dir, bot=None):
                             f"[cyan]Image host debug: pre-upload_screens meta['imghost']={meta.get('imghost')} image_list={len(meta.get('image_list', []) or [])} cutoff={meta.get('cutoff')} screens={meta.get('screens')}[/cyan]"  # noqa: E501
                         )
 
-                    return_dict = {}
+                    return_dict: dict[str, Any] = {}
                     try:
                         new_images, dummy_var = await upload_screens(
                             meta, meta['screens'], 1, 0, meta['screens'], [], return_dict=return_dict, allowed_hosts=allowed_hosts
@@ -787,6 +911,35 @@ async def process_meta(meta, base_dir, bot=None):
         elif os.path.exists(torrent_path) and meta.get('rehash', False) is True and meta['nohash'] is False:
             await create_torrent(meta, Path(meta['path']), "BASE")
 
+        if os.path.exists(torrent_path):
+            raw_trackers = meta.get('trackers')
+            trackers_list = [raw_trackers] if isinstance(raw_trackers, str) else (raw_trackers or [])
+            trackers_upper = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
+
+            base_piece_mb: Optional[int] = cast(Optional[int], meta.get('base_torrent_piece_mb'))
+            if base_piece_mb is None and any(t in {"HDB", "MTV", "PTP"} for t in trackers_upper):
+                try:
+                    torrent = await asyncio.to_thread(Torrent.read, torrent_path)
+                    base_piece_mb = int(torrent.piece_size // (1024 * 1024))
+                    meta['base_torrent_piece_mb'] = base_piece_mb
+                except Exception as e:
+                    if meta.get('debug', False):
+                        console.print(f"[yellow]Unable to cache BASE.torrent piece size: {e}")
+                    base_piece_mb = None
+
+            if "MTV" in trackers_upper:
+                mtv_cfg = config.get('TRACKERS', {}).get('MTV', {})
+                if str(mtv_cfg.get('skip_if_rehash', 'false')).lower() == 'true' and base_piece_mb and base_piece_mb > 8:
+                    meta['trackers'] = [t for t in trackers_list if str(t).strip().upper() != "MTV"]
+                    trackers_list = meta.get('trackers') or []
+                    trackers_upper = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
+                    if meta.get('debug', False):
+                        console.print("[yellow]Removed MTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
+                    if not meta['trackers']:
+                        console.print("[red]No trackers remain after removing MTV for skip_if_rehash.[/red]")
+                        meta['we_are_uploading'] = False
+                        return
+
         if int(meta.get('randomized', 0)) >= 1:
             if not meta['mkbrr']:
                 create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
@@ -797,7 +950,7 @@ async def process_meta(meta, base_dir, bot=None):
             json.dump(meta, f, indent=4)
 
 
-async def cleanup_screenshot_temp_files(meta):
+async def cleanup_screenshot_temp_files(meta: Meta) -> None:
     """Cleanup temporary screenshot files to prevent orphaned files in case of failures."""
     tmp_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
     if os.path.exists(tmp_dir):
@@ -812,25 +965,7 @@ async def cleanup_screenshot_temp_files(meta):
             console.print(f"[red]Error cleaning up temporary screenshot files: {e}[/red]", highlight=False)
 
 
-async def get_log_file(base_dir, queue_name):
-    """
-    Returns the path to the log file for the given base directory and queue name.
-    """
-    safe_queue_name = queue_name.replace(" ", "_")
-    return os.path.join(base_dir, "tmp", f"{safe_queue_name}_processed_files.log")
-
-
-async def load_processed_files(log_file):
-    """
-    Loads the list of processed files from the log file.
-    """
-    if os.path.exists(log_file):
-        with open(log_file, "r") as f:
-            return set(json.load(f))
-    return set()
-
-
-async def save_processed_file(log_file, file_path):
+async def save_processed_file(log_file: str, file_path: str) -> None:
     """
     Adds a processed file to the log, deduplicating and always appending to the end.
     """
@@ -963,9 +1098,9 @@ async def do_the_thing(base_dir):
             if os.name != 'nt':
                 os.chmod(subdir_path, 0o700)
 
-    bot = None
-    meta = dict()
-    paths = []
+    bot: Any = None
+    meta: Meta = {}
+    paths: list[str] = []
     for each in sys.argv[1:]:
         if os.path.exists(each):
             paths.append(os.path.abspath(each))
@@ -988,10 +1123,47 @@ async def do_the_thing(base_dir):
         # If cleanup is the only operation, use a dummy path to satisfy the parser
         if cleanup_only:
             args_list = sys.argv[1:] + ['dummy_path']
-            meta, help, before_args = parser.parse(tuple(' '.join(args_list).split(' ')), meta)
+            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(tuple(' '.join(args_list).split(' ')), meta))
             meta['path'] = None  # Clear the dummy path after parsing
         else:
-            meta, help, before_args = parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta)
+            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(tuple(' '.join(sys.argv[1:]).split(' ')), meta))
+
+        # Validate config structure and types (after args parsed so we have trackers list)
+        from src.configvalidator import validate_config, group_warnings
+
+        # Get active trackers from meta (parsed from command line) or fall back to config default
+        active_trackers: Optional[list[str]] = None
+        if meta.get('trackers'):
+            if isinstance(meta['trackers'], str):
+                active_trackers = [t.strip().upper() for t in meta['trackers'].split(',') if t.strip()]
+            elif isinstance(meta['trackers'], list):
+                active_trackers = [t.strip().upper() for t in meta['trackers'] if isinstance(t, str) and t.strip()]
+
+        # Get active imghost from meta (parsed from command line)
+        active_imghost: Optional[str] = None
+        if meta.get('imghost'):
+            imghost_val = meta['imghost']
+            if isinstance(imghost_val, str) and imghost_val.strip():
+                active_imghost = imghost_val.strip()
+
+        is_valid, config_errors, config_warnings = validate_config(config, active_trackers, active_imghost)
+
+        if not is_valid:
+            console.print("[bold red]Configuration validation failed:[/bold red]")
+            for error in config_errors:
+                console.print(f"[red]  ✗ {error}[/red]")
+            console.print("[red]\nPlease fix the above errors in your config.py[/red]")
+            console.print("[yellow]Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example-config.py[/yellow]")
+            raise SystemExit(1)
+
+        if config_warnings:
+            suppress_warnings = config.get('DEFAULT', {}).get('suppress_warnings', False)
+            if not suppress_warnings:
+                grouped = group_warnings(config_warnings)
+                console.print(f"[yellow]Config validation passed with {len(grouped)} warning(s):[/yellow]")
+                for warning_str in grouped:
+                    console.print(f"[yellow]  ⚠ {warning_str}[/yellow]")
+                print()  # Blank line after warnings
 
         if meta.get('cleanup'):
             if os.path.exists(f"{base_dir}/tmp"):
@@ -1031,12 +1203,14 @@ async def do_the_thing(base_dir):
 
         for queue_item in queue:
             total_files = len(queue)
+            bot = None
             try:
                 meta = base_meta.copy()
 
                 if meta.get('site_upload_queue'):
                     # Extract path and metadata from site upload queue item
                     path = await process_site_upload_item(queue_item, meta)
+                    path = cast(str, path)
                     current_item_path = path  # Store for logging
                 else:
                     # Regular queue processing
@@ -1087,20 +1261,23 @@ async def do_the_thing(base_dir):
                     with open(meta_file, "r") as f:
                         saved_meta = json.load(f)
                         console.print("[yellow]Existing metadata file found, it holds cached values")
-                        meta.update(await merge_meta(meta, saved_meta, path))
+                        await merge_meta(meta, saved_meta)
 
             except Exception as e:
                 console.print(f"[red]Exception: '{path}': {e}")
                 reset_terminal()
 
-            if use_discord and config['DISCORD'].get('discord_bot_token') and not meta['debug']:
-                if (config.get('DISCORD', {}).get('only_unattended', False) and meta.get('unattended', False)) or not config.get('DISCORD', {}).get('only_unattended', False):
+            discord_bot_token = discord_config.get('discord_bot_token') if discord_config is not None else None
+            only_unattended = bool(discord_config.get('only_unattended', False)) if discord_config is not None else False
+
+            if use_discord and discord_config is not None and isinstance(discord_bot_token, str) and discord_bot_token and not meta['debug']:
+                if (only_unattended and meta.get('unattended', False)) or not only_unattended:
                     try:
                         console.print("[cyan]Starting Discord bot initialization...")
                         intents = discord.Intents.default()
                         intents.message_content = True
                         bot = discord.Client(intents=intents)
-                        token = config['DISCORD']['discord_bot_token']
+                        token = discord_bot_token
                         await asyncio.wait_for(bot.login(token), timeout=10)
                         connect_task = asyncio.create_task(bot.connect())
 
@@ -1125,7 +1302,7 @@ async def do_the_thing(base_dir):
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
 
             await process_meta(meta, base_dir, bot=bot)
-
+            tracker_setup = TRACKER_SETUP(config=config)
             if 'we_are_uploading' not in meta or not meta.get('we_are_uploading', False):
                 if config['DEFAULT'].get('cross_seeding', True):
                     await process_cross_seeds(meta)
@@ -1149,32 +1326,86 @@ async def do_the_thing(base_dir):
             else:
                 console.print()
                 console.print("[yellow]Processing uploads to trackers.....")
-                await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
-                if use_discord and bot:
-                    await send_upload_status_notification(config, bot, meta)
+                meta['are_we_trump_reporting'] = False
+                if meta.get('were_trumping', False):
+                    console.print("[yellow]Checking for existing trump reports.....")
+                    is_trumping = await tracker_setup.process_trumpables(meta, trackers=meta['trackers'])
 
-                if config['DEFAULT'].get('cross_seeding', True):
-                    await process_cross_seeds(meta)
+                    # Apply any per-tracker skip decisions made during trumpable processing
+                    skip_upload_trackers = set(meta.get('skip_upload_trackers', []) or [])
+                    tracker_status = cast(dict[str, dict[str, Any]], meta.get('tracker_status') or {})
+                    for t, st in tracker_status.items():
+                        if st.get('skip_upload') is True:
+                            skip_upload_trackers.add(t)
 
-                if 'queue' in meta and meta.get('queue') is not None:
-                    processed_files_count += 1
-                    if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
-                        console.print(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count} of {meta['limit_queue']} in limit with {total_files} files.")
+                    if skip_upload_trackers:
+                        for t in skip_upload_trackers:
+                            per_tracker = tracker_status.setdefault(t, {})
+                            per_tracker['upload'] = False
+                            per_tracker['skipped'] = True
+
+                        meta['tracker_status'] = tracker_status
+
+                        meta['trackers'] = [t for t in meta.get('trackers', []) if t not in skip_upload_trackers]
+                        if meta.get('debug', False):
+                            console.print(f"[yellow]Skipping trackers due to trump report selection: {', '.join(sorted(skip_upload_trackers))}[/yellow]")
+
+                        if not meta['trackers']:
+                            console.print("[bold red]No trackers left to upload after trump checking.[/bold red]")
+                            meta['are_we_trump_reporting'] = False
+
+                    if is_trumping:
+                        meta['are_we_trump_reporting'] = True
+
+                # we're uploading. the hardcoded successful_trackers = 10 is to bypass the skip_uploading check if not doing double dupe check
+                # allowing the skip uploading feature to only apply when double dupe checking is enabled
+                successful_trackers = 10
+                if meta.get('dupe_again', False):
+                    console.print("[yellow]Performing double dupe check on trackers that passed initial upload checks.....[/yellow]")
+                    for tracker in list(meta.get('trackers', [])):
+                        tracker_status = meta.get('tracker_status', {}).get(tracker, {})
+                        if tracker_status.get('upload') is not True:
+                            if meta.get('debug'):
+                                console.print(f"[yellow]{tracker} was previously marked to skip upload. Skipping double dupe check.[/yellow]")
+                            meta['trackers'].remove(tracker)
+                            meta['tracker_status'].pop(tracker, None)
+                            continue
+
+                    if meta.get('trackers', []):
+                        successful_trackers = await process_all_trackers(meta)
                     else:
-                        console.print(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count}/{total_files} files.")
-                    if not meta['debug'] or "debug" in os.path.basename(log_file):
-                        if log_file:
-                            if meta.get('site_upload_queue'):
-                                await save_processed_path(log_file, current_item_path)
-                            else:
-                                await save_processed_file(log_file, path)
+                        successful_trackers = 0
+
+                if successful_trackers < int(meta['skip_uploading']) and not meta['debug']:
+                    console.print(f"[red]Not enough successful trackers ({successful_trackers}/{meta['skip_uploading']}). No uploads being processed.[/red]")
+                else:
+                    await process_trackers(meta, config, client, console, api_trackers, tracker_class_map, http_trackers, other_api_trackers)
+                    if use_discord and bot:
+                        await send_upload_status_notification(config, bot, meta)
+
+                    if config['DEFAULT'].get('cross_seeding', True):
+                        await process_cross_seeds(meta)
+
+                    if 'queue' in meta and meta.get('queue') is not None:
+                        processed_files_count += 1
+                        if 'limit_queue' in meta and int(meta['limit_queue']) > 0:
+                            console.print(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count} of {meta['limit_queue']} in limit with {total_files} files.")
+                        else:
+                            console.print(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count}/{total_files} files.")
+                        if not meta['debug'] or "debug" in os.path.basename(log_file):
+                            if log_file:
+                                if meta.get('site_upload_queue'):
+                                    await save_processed_path(log_file, current_item_path)
+                                else:
+                                    await save_processed_file(log_file, path)
 
             if meta['debug']:
                 finish_time = time.time()
                 console.print(f"Uploads processed in {finish_time - start_time:.4f} seconds")
 
             if use_discord and bot:
-                if config['DISCORD'].get('send_upload_links'):
+                send_upload_links = bool(discord_config.get('send_upload_links', False)) if discord_config is not None else False
+                if send_upload_links:
                     try:
                         discord_message = ""
                         for tracker, status in meta.get('tracker_status', {}).items():
@@ -1207,10 +1438,15 @@ async def do_the_thing(base_dir):
                 else:
                     await send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get('debug', False), meta=meta)
 
+            if meta.get('are_we_trump_reporting', False):
+                console.print()
+                for tracker in meta.get('trumping_trackers', []):
+                    console.print(f"[yellow]Submitting trumpable report to {tracker}.....")
+                    await tracker_setup.make_trumpable_report(meta, tracker)
+
             find_requests = config['DEFAULT'].get('search_requests', False) if meta.get('search_requests') is None else meta.get('search_requests')
             if find_requests and meta['trackers'] not in ([], None, "") and not (meta.get('site_check', False) and not meta['is_disc']):
                 console.print("[green]Searching for requests on supported trackers.....")
-                tracker_setup = TRACKER_SETUP(config=config)
                 if meta.get('site_check', False):
                     trackers = meta['requested_trackers']
                     if meta['debug']:
@@ -1366,7 +1602,10 @@ async def process_cross_seeds(meta):
 
                 if dupes:
                     dupes = await filter_dupes(dupes, meta, tracker)
-                    await helper.dupe_check(dupes, meta, tracker)
+                    is_dupe, updated_meta = await helper.dupe_check(dupes, meta, tracker)
+                    # Persist any updates from dupe_check (defensive in case it returns a copy)
+                    if isinstance(updated_meta, dict) and updated_meta is not meta:
+                        meta.update(updated_meta)
 
             except Exception as e:
                 if meta.get('debug'):
@@ -1409,9 +1648,13 @@ async def process_cross_seeds(meta):
         if debug:
             console.print(f"[green]Found cross-seed for {tracker}!")
 
-        download_url = None
+        download_url = ""
         if isinstance(cross_seed_value, str) and cross_seed_value.startswith('http'):
             download_url = cross_seed_value
+        else:
+            if meta.get('debug'):
+                console.print(f"[yellow]Invalid cross-seed URL for {tracker}, skipping[/yellow]")
+            return
 
         headers = None
         if tracker == "RTF":

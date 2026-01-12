@@ -3,7 +3,6 @@
 # import discord
 import cli_ui
 import re
-from data.config import config
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.trackers.UNIT3D import UNIT3D
@@ -59,12 +58,17 @@ class DP(UNIT3D):
                 console.print(f"[bold red]{self.tracker} does not allow EVO for non-WEBDL types, skipping upload.")
             return False
 
+        if meta.get('hardcoded_subs', False):
+            if not meta['unattended']:
+                console.print(f"[bold red]{self.tracker} does not allow hardcoded subtitles.")
+                return False
+
         return should_continue
 
     async def get_description(self, meta):
         if meta.get('logo', "") == "":
             from src.tmdb import get_logo
-            TMDB_API_KEY = config['DEFAULT'].get('tmdb_api', False)
+            TMDB_API_KEY = self.config['DEFAULT'].get('tmdb_api', False)
             TMDB_BASE_URL = "https://api.themoviedb.org/3"
             tmdb_id = meta.get('tmdb')
             category = meta.get('category')
@@ -74,7 +78,7 @@ class DP(UNIT3D):
             if logo_path:
                 meta['logo'] = logo_path
 
-        return {'description': await DescriptionBuilder(self.config).unit3d_edit_desc(meta, self.tracker)}
+        return {'description': await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_additional_data(self, meta):
         data = {
