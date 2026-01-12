@@ -220,16 +220,9 @@ class ANT:
                             return True
 
                     elif response.status_code == 400:
-                        try:
-                            response_data = response.json()
-                        except (json.JSONDecodeError, ValueError):
-                            response_data = {}
-
-                        response_text_lc = str(response_data).lower()
                         is_exact = (
-                            ('exact same' in response_text_lc)
+                            ('exact same' in response_data)
                             or (str(response_data.get('status', '')).lower() == 'exact same')
-                            or ('exact same' in str(response_data.get('error', '')).lower())
                         )
                         if is_exact:
                             folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
@@ -242,7 +235,7 @@ class ANT:
                         else:
                             response_data = {
                                 "error": f"Unexpected status code: {response.status_code}",
-                                "response_content": response.text
+                                "response_content": {response.text}
                             }
                             meta['tracker_status'][self.tracker]['status_message'] = f"data error - {response_data}"
                             return False

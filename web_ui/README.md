@@ -22,7 +22,7 @@ If you use the `-webui` Docker image / Dockerfile that installs Flask, you do **
 
 ## Quick start (Docker)
 
-1. Use an image that includes the Web UI dependencies (the `-webui` tagged image).
+1. Use an image that includes the Web UI dependencies (the `-webui` tagged image, or build from the Web UI Dockerfile).
 2. Set `ENABLE_WEB_UI=true`.
 3. Configure **browse roots** (required): set `UA_BROWSE_ROOTS` to a comma-separated list of directories inside the container that you want the UI to be able to browse and execute against.
 

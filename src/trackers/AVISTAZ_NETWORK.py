@@ -946,10 +946,6 @@ class AZTrackerBase:
         if not meta.get('debug', False):
             if len(data['screenshots[]']) < 3:
                 return f'UPLOAD FAILED: The {self.tracker} image host did not return the minimum number of screenshots.'
-
-            if not self.upload_url_step2 or not data.get("task_id") or not data.get("info_hash"):
-                return "UPLOAD FAILED: Step 1 did not complete (missing redirect/task_id/info_hash)."
-
         return False
 
     async def upload(self, meta, disctype):
@@ -959,8 +955,6 @@ class AZTrackerBase:
         issue = await self.check_data(meta, data)
         if issue:
             status_message = f'data error - {issue}'
-            meta['tracker_status'][self.tracker]['status_message'] = status_message
-            return False
         else:
             if not meta.get('debug', False):
                 response = await self.session.post(self.upload_url_step2, data=data)
@@ -1009,6 +1003,8 @@ class AZTrackerBase:
                 meta['tracker_status'][self.tracker]['status_message'] = 'Debug mode enabled, not uploading.'
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True
+
+        return False
 
     def language_map(self):
         all_lang_map = {

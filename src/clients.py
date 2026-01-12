@@ -694,7 +694,6 @@ class Clients():
         best_match = None
 
         for torrent in matching_torrents:
-            torrent_hash = None
             try:
                 torrent_hash = torrent['hash']
                 if torrent_hash in processed_hashes:
@@ -703,7 +702,7 @@ class Clients():
                 processed_hashes.add(torrent_hash)
 
             except Exception as e:
-                console.print(f"[bold red]Unexpected error while handling torrent{f' {torrent_hash}' if torrent_hash else ''}: {e}")
+                console.print(f"[bold red]Unexpected error while handling {torrent_hash}: {e}")
 
             # **Use `torrent_storage_dir` if available**
             if torrent_storage_dir:
