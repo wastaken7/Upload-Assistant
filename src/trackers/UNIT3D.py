@@ -461,7 +461,7 @@ class UNIT3D:
 
         if meta["debug"] is False:
             response_data = {}
-            max_retries = 1
+            max_retries = 2
             retry_delay = 5
             timeout = 40.0
 
