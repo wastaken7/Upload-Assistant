@@ -374,8 +374,10 @@ async def get_edition(video, bdinfo, filelist, manual_edition, meta):
             while '  ' in edition:
                 edition = edition.replace('  ', ' ')
 
-        if edition != "" and meta['debug']:
-            console.print(f"Final Edition: {edition}")
+        if edition != "":
+            edition = edition.strip().upper()
+            if meta['debug']:
+                console.print(f"Final Edition: {edition}")
 
     return edition, repack, hybrid
 
