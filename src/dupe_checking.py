@@ -330,13 +330,6 @@ async def filter_dupes(dupes, meta, tracker_name):
             await log_exclusion("file extension mismatch (is_disc=True)", each)
             return True
 
-        if meta.get('is_disc') == "BDMV" and tracker_name in ["AITHER", "LST", "HDB", "BHD"]:
-            if len(each) >= 1 and tag == "":
-                return False
-            if tag and tag.strip() and tag.strip() in normalized:
-                return False
-            return True
-
         if is_sd == 1 and (tracker_name == "BHD" or tracker_name == "AITHER"):
             if any(str(res) in each for res in [1080, 720, 2160]):
                 return False
