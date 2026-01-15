@@ -355,7 +355,7 @@ class AZTrackerBase:
         return file_info
 
     async def get_lang(self, meta: dict[str, Any]) -> dict[str, list[str]]:
-        self.language_map()
+        self.language_map(meta)
         audio_ids: set[str] = set()
         subtitle_ids: set[str] = set()
 
