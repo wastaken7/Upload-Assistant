@@ -1,29 +1,33 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-# -*- coding: utf-8 -*-
 # import discord
-import aiofiles
 import asyncio
-import cli_ui
-import httpx
 import json
 import os
 import platform
 import re
 from pathlib import Path
+from typing import Any, Union
+
+import aiofiles
+import cli_ui
+import httpx
+
 from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.torrentcreate import create_torrent
+from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
-from typing import Any
+
+Meta = dict[str, Any]
+Config = dict[str, Any]
 
 
 class ANT:
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         self.tracker = 'ANT'
         self.config = config
         self.common = COMMON(config)
-        self.tracker_config: dict[str, Any] = self.config['TRACKERS'].get(self.tracker, {})
+        self.tracker_config = self.config["TRACKERS"].get(self.tracker, {})
         self.source_flag = 'ANT'
         self.search_url = 'https://anthelion.me/api.php'
         self.upload_url = 'https://anthelion.me/api.php'
@@ -38,14 +42,22 @@ class ANT:
         ]
         pass
 
-    async def get_flags(self, meta: dict[str, Any]) -> list[str]:
+    async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []
-        for each in ['Directors', 'Extended', 'Uncut', 'Unrated', '4KRemaster']:
-            if each in str(meta.get('edition', '')).replace("'", ""):
-                flags.append(each)
-        for each in ['Dual-Audio', 'Atmos']:
-            if each in meta['audio']:
-                flags.append(each.replace('-', ''))
+        flags.extend(
+            [
+                each
+                for each in ['Directors', 'Extended', 'Uncut', 'Unrated', '4KRemaster']
+                if each in str(meta.get('edition', '')).replace("'", "")
+            ]
+        )
+        flags.extend(
+            [
+                each.replace('-', '')
+                for each in ['Dual-Audio', 'Atmos']
+                if each in meta['audio']
+            ]
+        )
         if meta.get('has_commentary', False) or meta.get('manual_commentary', False):
             flags.append('Commentary')
         if meta['3D'] == "3D":
@@ -60,37 +72,65 @@ class ANT:
             flags.append('Remux')
         return flags
 
-    async def get_tags(self, meta: dict[str, Any]) -> list[str]:
+    async def get_release_group(self, meta: Meta) -> str:
+        if meta.get('tag', ''):
+            tag = str(meta['tag'])
+
+            return tag[1:]  # Remove leading character
+
+        return ""
+
+    async def get_tags(self, meta: Meta) -> Union[list[str], str]:
+        no_tags = False
         tags: list[str] = []
         if meta.get('genres', []):
             genres = meta['genres']
             # Handle both string and list formats
             if isinstance(genres, str):
-                tags.append(genres.replace(' ', '.'))
+                tags.append(genres.replace(' ', '.').lower())
             else:
-                for genre in genres:
-                    tags.append(genre.replace(' ', '.'))
-        elif meta.get('imdb_info', {}):
+                tags.extend(genre.replace(' ', '.').lower() for genre in genres)
+        else:
+            no_tags = True
+        if no_tags and meta.get('imdb_info', {}):
             imdb_genres = meta['imdb_info'].get('genres', [])
             # Handle both string and list formats
             if isinstance(imdb_genres, str):
-                tags.append(imdb_genres.replace(' ', '.'))
+                tags.append(imdb_genres.replace(' ', '.').lower())
             else:
-                for genre in imdb_genres:
-                    tags.append(genre.replace(' ', '.'))
+                tags.extend(genre.replace(' ', '.').lower() for genre in imdb_genres)
+            allowed_tags = {
+                'action', 'adventure', 'animation', 'comedy', 'crime', 'documentary', 'drama',
+                'family', 'fantasy', 'history', 'horror', 'music', 'mystery', 'romance', 'sci.fi',
+                'thriller', 'war', 'western'
+            }
+            tags = [tag for tag in tags if tag.lower() in allowed_tags]
 
-        return tags
+            if tags:
+                console.print(f"[green]{self.tracker}: Using IMDb genres for tagging: {', '.join(tags)}")
+                console.print("[yellow]ANT api will accept this upload, but no tag will be added.\n"
+                              "You must manually add at least one tag from the approved list when uploaded.")
+                await asyncio.sleep(3)
 
-    async def get_type(self, meta: dict[str, Any]) -> int:
+        if not tags:
+            console.print(f"[yellow]{self.tracker}: No genres found for tagging. Tag required.")
+            console.print("[yellow]Only use a tag in the approved list found in the site search box.")
+            console.print("[yellow]ANT api will accept this upload, but no tag will be added.\n"
+                            "You must manually add at least one tag from the approved list when uploaded.")
+            await asyncio.sleep(3)
+            user_tag = cli_ui.ask_string("Please enter at least one tag (genre) to use for the upload", default="")
+            if user_tag:
+                tags.append(user_tag.replace(' ', '.').lower())
+
+        return tags if not no_tags else ""
+
+    async def get_type(self, meta: Meta) -> int:
         antType = None
         imdb_info = meta.get('imdb_info', {})
         if imdb_info.get('type') is not None:
             imdbType = imdb_info.get('type', 'movie').lower()
             if imdbType in ("movie", "tv movie", 'tvmovie'):
-                if int(imdb_info.get('runtime', '60')) >= 45 or int(imdb_info.get('runtime', '60')) == 0:
-                    antType = 0
-                else:
-                    antType = 1
+                antType = 0 if int(imdb_info.get('runtime', '60')) >= 45 or int(imdb_info.get('runtime', '60')) == 0 else 1
             if imdbType == "short":
                 antType = 1
             elif imdbType == "tv mini series":
@@ -101,10 +141,7 @@ class ANT:
             keywords = meta.get("keywords", "").lower()
             tmdb_type = meta.get("tmdb_type", "movie").lower()
             if tmdb_type == "movie":
-                if int(meta.get('runtime', 60)) >= 45 or int(meta.get('runtime', 60)) == 0:
-                    antType = 0
-                else:
-                    antType = 1
+                antType = 0 if int(meta.get('runtime', 60)) >= 45 or int(meta.get('runtime', 60)) == 0 else 1
             if tmdb_type == "miniseries" or "miniseries" in keywords:
                 antType = 2
             if "short" in keywords or "short film" in keywords:
@@ -131,7 +168,7 @@ class ANT:
 
         return antType
 
-    async def upload(self, meta: dict[str, Any], _) -> bool:
+    async def upload(self, meta: Meta, _) -> bool:
         torrent_filename = "BASE"
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
         torrent_file_size_kib = os.path.getsize(torrent_path) / 1024
@@ -143,7 +180,7 @@ class ANT:
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta['max_piece_size'] = '128'  # 128 MiB
-            await create_torrent(meta, str(Path(meta['path'])), "ANT", tracker_url=tracker_url)
+            await TorrentCreator.create_torrent(meta, str(Path(meta['path'])), "ANT", tracker_url=tracker_url)
             torrent_filename = "ANT"
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -169,17 +206,20 @@ class ANT:
             'release_desc': await self.edit_desc(meta),
         }
         if meta['bdinfo'] is not None:
-            data.update({
-                'media': 'Blu-ray',
-                'releasegroup': str(meta['tag'])[1:]
-            })
+            data.update({"media": "BluRay"})
         if meta['scene']:
             # ID of "Scene?" checkbox on upload form is actually "censored"
             data['censored'] = 1
 
         tags = await self.get_tags(meta)
         if tags:
-            data.update({'tags[]': tags})
+            data.update({'tags': ','.join(tags)})
+
+        release_group = await self.get_release_group(meta)
+        if release_group and release_group not in self.banned_groups:
+            data.update({'releasegroup': release_group})
+        else:
+            data.update({'noreleasegroup': 1})
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
@@ -188,13 +228,18 @@ class ANT:
                 console.print('[bold red]Adult content detected[/bold red]')
                 if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
                     data.update({'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])})
-                    data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant"})
+                    if not tags:
+                        data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant"})
+                    else:
+                        data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant. User to add tags manually."})
                 else:
                     data.update({'screenshots': ''})  # No screenshots for adult content
             else:
                 data.update({'screenshots': ''})
         else:
             data.update({'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])})
+            if tags:
+                data.update({'flagchangereason': "User prompted to add tags manually"})
 
         headers = {
             'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
@@ -218,9 +263,6 @@ class ANT:
                         if not is_success:
                             meta['tracker_status'][self.tracker]['status_message'] = f"data error: {response_data}"
                             return False
-                        if meta.get('tag', '') and 'HONE' in meta.get('tag', ''):
-                            meta['tracker_status'][self.tracker]['status_message'] = f"{response_data} - HONE release, fix tag at ANT"
-                            return True
                         else:
                             meta['tracker_status'][self.tracker]['status_message'] = response_data
                             return True
@@ -232,6 +274,21 @@ class ANT:
                             or (str(response_data.get('status', '')).lower() == 'exact same')
                             or ('exact same' in str(response_data.get('error', '')).lower())
                         )
+                        is_same_infohash = (
+                            ('same infohash' in response_text_lc)
+                            or (str(response_data.get('status', '')).lower() == 'same infohash')
+                            or ('same infohash' in str(response_data.get('error', '')).lower())
+                        )
+
+                        if is_same_infohash:
+                            folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+                            view_link = response_data.get('view', '')
+                            status_msg = "data error: A torrent with the same infohash already exists on ANT.\n"
+                            if view_link:
+                                status_msg += f"View existing torrent: {view_link}\n"
+                            meta['tracker_status'][self.tracker]['status_message'] = status_msg
+                            return False
+
                         if is_exact:
                             folder = f"{meta['base_dir']}/tmp/{meta['uuid']}"
                             meta['tracker_status'][self.tracker]['status_message'] = (
@@ -240,6 +297,7 @@ class ANT:
                                 "raw_url image links from the image_data.json file"
                             )
                             return False
+
                         else:
                             response_data = {
                                 "error": f"Unexpected status code: {response.status_code}",
@@ -298,7 +356,7 @@ class ANT:
             meta['tracker_status'][self.tracker]['status_message'] = "data error: double check if it uploaded"
             return False
 
-    async def get_audio(self, meta: dict[str, Any]) -> str:
+    async def get_audio(self, meta: Meta) -> str:
         '''
         Possible values:
         MP2, MP3, AAC, AC3, DTS, FLAC, PCM, True-HD, Opus
@@ -321,17 +379,17 @@ class ANT:
         console.print(f'{self.tracker}: Unexpected audio format: {audio}. The format must be one of the following: MP2, MP3, AAC, AC3, DTS, FLAC, PCM, True-HD, Opus')
         return ""
 
-    async def mediainfo(self, meta: dict[str, Any]) -> str:
+    async def mediainfo(self, meta: Meta) -> str:
         if meta.get('is_disc') == 'BDMV':
             mediainfo = str(await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'], char_limit=100000))
         else:
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-            async with aiofiles.open(mi_path, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(mi_path, encoding='utf-8') as f:
                 mediainfo = str(await f.read())
 
         return mediainfo
 
-    async def edit_desc(self, meta: dict[str, Any]) -> str:
+    async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []
 
@@ -388,7 +446,7 @@ class ANT:
 
         return description
 
-    async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta, _) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         if meta.get('category') == "TV":
             if not meta['unattended']:
@@ -420,7 +478,7 @@ class ANT:
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url='https://anthelion.me/api', params=params)
+                response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     try:
                         data = response.json()
@@ -475,7 +533,7 @@ class ANT:
 
         return dupes
 
-    async def get_data_from_files(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
+    async def get_data_from_files(self, meta: Meta) -> list[dict[str, Any]]:
         imdb_tmdb_list: list[dict[str, Any]] = []
         if meta.get('is_disc', False):
             return imdb_tmdb_list
@@ -503,7 +561,7 @@ class ANT:
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url='https://anthelion.me/api', params=params)
+                response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     try:
                         data = response.json()

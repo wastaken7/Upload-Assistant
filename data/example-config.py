@@ -54,6 +54,9 @@ config = {
         # Number of screenshots to capture
         "screens": "4",
 
+        # Minimum successful image uploads required to continue
+        "min_successful_image_uploads": "3",
+
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
         # description, skip creating and uploading any further screenshots.
@@ -322,9 +325,18 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
+
+        "A4K": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "api_key": "",
+            "anon": False,
+            # Send uploads to Aither modq for staff approval
+            "modq": False,
+        },
 
         "ACM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -392,7 +404,7 @@ config = {
             "bhd_rss_key": "",
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
             # Send uploads to BHD drafts
-            "draft_default": "False",
+            "draft_default": False,
             "anon": False,
         },
         "BHDTV": {
