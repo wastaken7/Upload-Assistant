@@ -116,7 +116,7 @@ def compare_bdinfo(meta: dict[str, Any], entry: dict[str, Any], tracker_name: st
             has_detected_changes = True
 
         style = "bold red" if prefix == "- " else "bold green" if prefix == "+ " else "bold white"
-        label = "YOURS" if prefix == "- " else "DUPE TRACK" if prefix == "+ " else "EXACT TRACK MATCH"
+        label = "YOURS" if prefix == "- " else "DUPE TRACK" if prefix == "+ " else "MATCH"
         symbol = prefix.strip() or " "
 
         console.print(f"[{style}][{symbol}] {label.ljust(10)}: {content}[/{style}]", soft_wrap=True)
