@@ -117,7 +117,7 @@ class TRACKER_SETUP:
         removed_trackers = set(trackers) - set(valid_trackers)
 
         for tracker in removed_trackers:
-            print(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.")
+            console.print(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.", markup=False)
 
         return valid_trackers
 
@@ -1008,8 +1008,8 @@ class TRACKER_SETUP:
         if not reported_torrent_id:
             # Try tracker-specific matched ID
             reported_torrent_id = f"{meta.get(f'{tracker}_matched_id', '')}"
-        if not reported_torrent_id and meta.get('matched_episode_ids', []):
-            reported_torrent_id = f"{meta['matched_episode_ids'][0].get('id', '')}"
+        if not reported_torrent_id and meta.get(f'{tracker}_matched_episode_ids', []):
+            reported_torrent_id = f"{meta[f'{tracker}_matched_episode_ids'][0].get('id', '')}"
         if not reported_torrent_id:
             console.print(f"[red]No reported torrent ID found in meta for trumpable processing on {tracker}[/red]")
             return False
@@ -1304,7 +1304,7 @@ class TRACKER_SETUP:
                     console.print("[yellow]Prompt cancelled; no additional message provided.[/yellow]")
                     user_message = None
                 message = message + ": " + user_message if user_message else message + ": No additional message provided by user"
-                message = message + ": https://lst.gg/torrents/" + str(trumping_torrent_id)
+            message = message + ": https://lst.gg/torrents/" + str(trumping_torrent_id)
             payload: JsonDict = {
                 'message': str(message)
             }
