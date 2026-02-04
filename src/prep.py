@@ -1115,12 +1115,17 @@ class Prep:
             meta['hdr'] = await video_manager.get_hdr(mi_data, bdinfo)
 
             meta['distributor'] = await get_distributor(meta['distributor'])
+            if meta['distributor'] is None:
+                meta['distributor'] = ""
 
             if meta.get('is_disc', None) == "BDMV":  # Blu-ray Specific
                 meta['region'] = await get_region(bdinfo, meta.get('region', None))
                 meta['video_codec'] = await video_manager.get_video_codec(bdinfo)
             else:
                 meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await video_manager.get_video_encode(mi_data, meta['type'], bdinfo)
+
+            if meta['region'] is None:
+                meta['region'] = ""
 
             if meta.get('no_edition') is False:
                 manual_edition = meta.get('manual_edition') or ""
@@ -1258,7 +1263,7 @@ class Prep:
         filename_patterns = [
             r'(?i)s\d{1,2}e\d{1,2}',
             r'(?i)s\d{1,2}',
-            r'(?i)\d{1,2}x\d{2}',
+            r'(?i)\b\d{1,2}x\d{2}\b',
             r'(?i)(?:season|series)\s*\d+',
             r'(?i)e\d{2,3}\s*\-',
             r'(?i)\d{4}\.\d{1,2}\.\d{1,2}'
@@ -1266,18 +1271,26 @@ class Prep:
 
         path = meta.get('path', '')
         uuid = meta.get('uuid', '')
+        if meta.get('debug', False):
+            console.print(f"[cyan]Checking category for path: {path} and uuid: {uuid}[/cyan]")
 
         for pattern in path_patterns:
             if re.search(pattern, path):
+                if meta.get('debug', False):
+                    console.print(f"[cyan]Matched TV pattern in path: {pattern}[/cyan]")
                 return "TV"
 
         for pattern in filename_patterns:
             if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
+                if meta.get('debug', False):
+                    console.print(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
 
         if "subsplease" in path.lower() or "subsplease" in uuid.lower():
             anime_pattern = r'(?:\s-\s)?(\d{1,3})\s*\((?:\d+p|480p|480i|576i|576p|720p|1080i|1080p|2160p)\)'
             if re.search(anime_pattern, path.lower()) or re.search(anime_pattern, uuid.lower()):
+                if meta.get('debug', False):
+                    console.print(f"[cyan]Matched Anime pattern for SubsPlease: {anime_pattern}[/cyan]")
                 return "TV"
 
         return "MOVIE"

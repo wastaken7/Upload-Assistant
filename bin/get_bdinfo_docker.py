@@ -21,7 +21,7 @@ except ImportError:
     console = SimpleConsole()
 
 
-BDINFO_VERSION = "v1.0.1"
+BDINFO_VERSION = "v1.0.6"
 BASE_RELEASE_URL = "https://github.com/Audionut/BDInfoCLI-ng/releases/download"
 
 
