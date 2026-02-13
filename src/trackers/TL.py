@@ -242,7 +242,7 @@ class TL:
         )
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
-    async def edit_name(self, meta):
+    async def get_name(self, meta):
         tl_name = meta.get('name').replace(meta['aka'], '')
         tl_name = re.sub(r"\s{2,}", " ", tl_name)
 
@@ -361,15 +361,15 @@ class TL:
         async with aiofiles.open(torrent_path, 'rb') as open_torrent:
             torrent_bytes = await open_torrent.read()
         files: dict[str, tuple[Any, Any, str]] = {
-            'torrent': (self.get_name(meta) + '.torrent', torrent_bytes, 'application/x-bittorrent')
+            "torrent": (f"{self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
         }
 
         data: dict[str, Any] = {
-            'announcekey': self.passkey,
-            'category': self.get_category(meta),
-            'description': await self.generate_description(meta),
-            'name': await self.edit_name(meta),
-            'nonscene': 'on' if not meta.get('scene') else 'off',
+            "announcekey": self.passkey,
+            "category": self.get_category(meta),
+            "description": await self.generate_description(meta),
+            "name": await self.get_name(meta),
+            "nonscene": "on" if not meta.get("scene") else "off",
         }
 
         if meta.get('anime', False):
@@ -501,7 +501,7 @@ class TL:
     async def edit_post_upload(self, meta):
         data = {
             "torrentID": meta["tracker_status"][self.tracker]["torrent_id"],
-            "name": await self.edit_name(meta),
+            "name": await self.get_name(meta),
             "category": self.get_category(meta),
             "uploaderComments": "",
         }
