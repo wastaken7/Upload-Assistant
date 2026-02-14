@@ -361,7 +361,7 @@ class TL:
         async with aiofiles.open(torrent_path, 'rb') as open_torrent:
             torrent_bytes = await open_torrent.read()
         files: dict[str, tuple[Any, Any, str]] = {
-            "torrent": (f"{self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
+            "torrent": (f"{await self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
         }
 
         data: dict[str, Any] = {
@@ -426,19 +426,19 @@ class TL:
             tvMazeURL = f"https://www.tvmaze.com/shows/{meta.get('tvmaze_id')}"
 
         data: dict[str, Any] = {
-            'name': self.get_name(meta),
-            'category': self.get_category(meta),
-            'nonscene': 'on' if not meta.get("scene") else 'off',
-            'imdbURL': str(cast(dict[str, Any], meta.get('imdb_info', {})).get('imdb_url', '')),
-            'tvMazeURL': tvMazeURL,
-            'igdbURL': '',
-            'torrentNFO': '0',
-            'torrentDesc': '1',
-            'nfotextbox': '',
-            'torrentComment': '0',
-            'uploaderComments': '',
-            'is_anonymous_upload': 'off',
-            'screenshots[]': self.get_screens(meta) if self.tracker_config.get('img_rehost', True) else '',
+            "name": await self.get_name(meta),
+            "category": self.get_category(meta),
+            "nonscene": "on" if not meta.get("scene") else "off",
+            "imdbURL": str(cast(dict[str, Any], meta.get("imdb_info", {})).get("imdb_url", "")),
+            "tvMazeURL": tvMazeURL,
+            "igdbURL": "",
+            "torrentNFO": "0",
+            "torrentDesc": "1",
+            "nfotextbox": "",
+            "torrentComment": "0",
+            "uploaderComments": "",
+            "is_anonymous_upload": "off",
+            "screenshots[]": self.get_screens(meta) if self.tracker_config.get("img_rehost", True) else "",
         }
 
         anon = not (meta.get('anon') == 0 and not self.tracker_config.get('anon', False))
