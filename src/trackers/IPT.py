@@ -14,7 +14,7 @@ from src.get_desc import DescriptionBuilder
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
-
+torrent_file_name = ""
 
 class IPT:
     def __init__(self, config: Config):
@@ -359,7 +359,7 @@ class IPT:
             return tv_x264
 
     async def get_name(self, meta: Meta):
-        name = meta.get("scene_name") if meta.get("scene_name", "") else meta.get("clean_name")
+        name: str = meta.get("scene_name", "") if meta.get("scene_name", "") else meta.get("clean_name", "")
 
         replacements = {
             "3DAccess": "3DA",
@@ -399,9 +399,8 @@ class IPT:
         if meta.get("scene", False) and "[NO RAR]" not in name.upper():
             name += " [NO RAR]"
 
-        name = re.sub(r"\s{2,}", " ", name)
-
-        return name
+        global torrent_file_name
+        torrent_file_name = re.sub(r"\s{2,}", " ", name)
 
     async def get_is_freeleech(self, meta: Meta):
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
@@ -445,6 +444,7 @@ class IPT:
     async def upload(self, meta: Meta, _disctype) -> bool:
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta)
+        global torrent_file_name
 
         upload = await self.cookie_auth_uploader.handle_upload(
             meta=meta,
@@ -453,7 +453,7 @@ class IPT:
             torrent_url=self.torrent_url,
             data=data,
             torrent_field_name="file",
-            torrent_name=await self.get_name(meta),
+            torrent_name=torrent_file_name,
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/takeupload.php",
             error_text="Upload failed!",
