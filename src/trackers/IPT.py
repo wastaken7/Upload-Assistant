@@ -442,7 +442,7 @@ class IPT:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype):
+    async def upload(self, meta: Meta, _disctype) -> bool:
         self.session.cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         data = await self.get_data(meta)
 
@@ -463,7 +463,7 @@ class IPT:
         if upload and self.config["TRACKERS"][self.tracker]["force_data"]:
             await self.edit_post_upload(meta)
 
-        return
+        return upload
 
     async def edit_post_upload(self, meta: Meta):
         torrent_id = meta["tracker_status"][self.tracker]["torrent_id"]
