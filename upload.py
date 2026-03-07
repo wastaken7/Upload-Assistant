@@ -30,6 +30,7 @@ from cogs.redaction import Redaction
 from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
+from src.audio_spectrogram import process_audio_spectrograms
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -770,6 +771,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                     elif meta.get('path_to_menu_screenshots', ""):
                         await process_disc_menus(meta, config)
 
+                if config["DEFAULT"].get("add_audio_spectrogram", False):
+                    try:
+                        await process_audio_spectrograms(meta, config, uploadscreens_manager)
+                    except Exception as e:
+                        console.print(f"[red]Error processing audio spectrograms: {e}[/red]")
+
                 # Take Screenshots
                 try:
                     if meta['is_disc'] == "BDMV":
@@ -1291,6 +1298,7 @@ async def do_the_thing(base_dir: str) -> None:
     # Clients, managers, etc.) pointing at the same dict object.
     try:
         import importlib
+
         import data.config as _cfg_mod  # may already be cached
         importlib.reload(_cfg_mod)
         _reloaded = _cfg_mod.config  # may raise AttributeError
