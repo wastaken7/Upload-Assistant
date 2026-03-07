@@ -511,6 +511,33 @@ class DescriptionBuilder:
 
         return release_url, cover_images
 
+    async def get_audio_spectrogram_section(self, meta: dict[str, Any]) -> str:
+        """Returns the audio spectrogram section if applicable."""
+        try:
+            add_spec = self.config["DEFAULT"].get("add_audio_spectrogram", False)
+            if not add_spec:
+                return ""
+
+            spectrograms_images = meta.get("spectrograms_images", [])
+            if not spectrograms_images:
+                return ""
+            desc_parts: list[str] = [self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")]
+            desc_parts.append("\n[center]")
+            screensPerRow = self.config["DEFAULT"].get("screensPerRow", 2)
+            for img_index, spec_img in enumerate(spectrograms_images):
+                if isinstance(spec_img, dict):
+                    web_url = spec_img.get("web_url")
+                    raw_url = spec_img.get("raw_url")
+                    if web_url and raw_url:
+                        desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                        if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                            desc_parts.append("\n")
+            desc_parts.append("[/center]\n")
+            return "".join(desc_parts)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Error getting audio spectrogram section: {str(e)}[/yellow]")
+        return ""
+
     async def unit3d_edit_desc(
         self,
         meta: dict[str, Any],
@@ -623,6 +650,9 @@ class DescriptionBuilder:
             meta, approved_image_hosts, images, multi_screens
         )
         desc_parts.append(discs_and_screenshots)
+
+        # Audio Spectrograms
+        desc_parts.append(await self.get_audio_spectrogram_section(meta))
 
         # Custom Signature
         desc_parts.append(await self.get_custom_signature())
