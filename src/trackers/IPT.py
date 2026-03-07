@@ -167,6 +167,22 @@ class IPT:
                 screenshots_block += f"[url={image['web_url']}][img]{image['img_url']}[/img][/url] "
             desc_parts.append("[center]\n" + screenshots_block + "[/center]")
 
+        # Audio Spectrograms
+        audio_spectrograms = meta.get("spectrograms_images", [])
+        if audio_spectrograms:
+            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+            spectrograms_block = ""
+            for image in audio_spectrograms:
+                web_url = image.get("web_url")
+                img_url = image.get("img_url", image.get("raw_url"))
+                if web_url and img_url:
+                    spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url]"
+                    if "imgbox" not in web_url:
+                        spectrograms_block += "\n"
+            if spectrograms_block:
+                desc_parts.append(f"[center]\n{spectrograms_block}\n[/center]")
+
         # Tonemapped Header
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
