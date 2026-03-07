@@ -511,6 +511,8 @@ class AZTrackerBase:
             if img.get('raw_url')
         ][:12]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
+        audio_spectrogram_links = [img.get("raw_url") for img in meta.get("spectrograms_images", []) if img.get("raw_url")]
+
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, 'rb') as f:
                 image_bytes = await f.read()
@@ -536,7 +538,7 @@ class AZTrackerBase:
                 if result:
                     results.append(result)
 
-        remaining_slots = max(0, limit - len(results))
+        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
 
         if local_files and remaining_slots > 0:
             paths = local_files[:remaining_slots]
@@ -548,13 +550,24 @@ class AZTrackerBase:
 
         else:
             image_links = [img.get('raw_url') for img in meta.get('image_list', []) if img.get('raw_url')]
-            remaining_slots = max(0, limit - len(results))
+            remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
             links = image_links[:remaining_slots]
 
             for url in links:
                 result = await upload_remote_file(url)
                 if result:
                     results.append(result)
+
+        # Upload audio spectrogram images
+        remaining_slots = max(0, limit - len(results))
+        if remaining_slots > 0 and audio_spectrogram_links:
+            for url in audio_spectrogram_links[:remaining_slots]:
+                if not url.lower().endswith(".png"):
+                    console.print(f"{self.tracker}: Skipping non-PNG audio spectrogram image: {url}")
+                else:
+                    result = await upload_remote_file(url)
+                    if result:
+                        results.append(result)
 
         return results
 

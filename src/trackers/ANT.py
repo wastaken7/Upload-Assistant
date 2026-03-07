@@ -437,6 +437,19 @@ class ANT:
             if menu_screenshots_block:
                 desc_parts.append(f"[align=center]{menu_screenshots_block}[/align]")
 
+        # Audio Spectrograms
+        audio_spectrograms = meta.get("spectrograms_images", [])
+        if audio_spectrograms:
+            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[align=center][b]Audio Spectrogram[/b][/align]"))
+
+            spectrograms_block = ""
+            for image in audio_spectrograms:
+                raw_url = image.get("raw_url")
+                if raw_url:
+                    spectrograms_block += f"[img]{raw_url}[/img] "
+            if spectrograms_block:
+                desc_parts.append(f"[align=center]{spectrograms_block}[/align]")
+
         # Tonemapped Header
         desc_parts.append(await builder.get_tonemapped_header(meta))
 

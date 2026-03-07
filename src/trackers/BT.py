@@ -655,6 +655,7 @@ class BT:
     async def get_screens(self, meta: dict[str, Any]) -> list[str]:
         menu_images = meta.get('menu_images')
         image_list = meta.get('image_list')
+        spectrograms_images = meta.get("spectrograms_images", [])
 
         combined_images: list[dict[str, Any]] = []
         if isinstance(menu_images, list):
@@ -667,6 +668,9 @@ class BT:
             combined_images.extend(
                 [cast(dict[str, Any], img) for img in image_list_items if isinstance(img, dict)]
             )
+        if isinstance(spectrograms_images, list):
+            spectrograms_images_list = cast(list[Any], spectrograms_images)
+            combined_images.extend([cast(dict[str, Any], img) for img in spectrograms_images_list if isinstance(img, dict)])
 
         urls: list[str] = []
         for image in combined_images:

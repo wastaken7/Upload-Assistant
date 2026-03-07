@@ -273,6 +273,23 @@ class GPW:
                     screenshots_block += f"[img]{raw_url}[/img]\n"
             desc_parts.append('[center]\n' + screenshots_block + '[/center]')
 
+        # Audio Spectrograms
+        audio_spectrograms_key = f"{self.tracker}_audio_spectrograms_key"
+        audio_spectrograms_value = meta.get(audio_spectrograms_key) if audio_spectrograms_key in meta else meta.get("spectrograms_images", [])
+        if isinstance(audio_spectrograms_value, list) and audio_spectrograms_value:
+            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+            spectrograms_block = ""
+            audio_spectrograms_list = cast(list[Any], audio_spectrograms_value)
+            for image in audio_spectrograms_list:
+                if not isinstance(image, dict):
+                    continue
+                image_dict = cast(dict[str, Any], image)
+                raw_url = image_dict.get("raw_url")
+                if isinstance(raw_url, str) and raw_url:
+                    spectrograms_block += f"[img]{raw_url}[/img]\n"
+            desc_parts.append("[center]\n" + spectrograms_block + "[/center]")
+
         # Tonemapped Header
         tonemapped_header = await builder.get_tonemapped_header(meta)
         desc_parts.append(tonemapped_header)
