@@ -120,6 +120,7 @@ async def process_audio_spectrograms(meta: dict[str, Any], config: dict[str, Any
 
     if bdinfo and audio_path == disc_final_path:
         bdinfo_audios = bdinfo.get("audio", [])
+        valid_streams = []
         for i, s in enumerate(streams):
             if i < len(bdinfo_audios):
                 if "tags" not in s:
@@ -127,6 +128,8 @@ async def process_audio_spectrograms(meta: dict[str, Any], config: dict[str, Any
                 if not s["tags"].get("language") or s["tags"].get("language") == "und":
                     s["tags"]["language"] = bdinfo_audios[i].get("language", "und")
                 s["tags"]["title"] = bdinfo_audios[i].get("codec", "No Title")
+                valid_streams.append(s)
+        streams = valid_streams
 
     if not streams:
         console.print("No audio streams found.")
