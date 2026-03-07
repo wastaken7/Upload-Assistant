@@ -253,6 +253,24 @@ class FF:
             if screenshots_block:
                 desc_parts.append(f"[center]{screenshots_block}[/center]")
 
+        # Audio Spectrograms
+        audio_spectrograms = meta.get("spectrograms_images", [])
+        if isinstance(audio_spectrograms, list) and audio_spectrograms:
+            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+            spectrograms_block = ""
+            audio_spectrograms_list = cast(list[Any], audio_spectrograms)
+            for image in audio_spectrograms_list:
+                if not isinstance(image, dict):
+                    continue
+                image_dict = cast(dict[str, Any], image)
+                img_url = image_dict.get("img_url", image_dict.get("raw_url"))
+                web_url = image_dict.get("web_url")
+                if isinstance(img_url, str) and isinstance(web_url, str) and img_url and web_url:
+                    spectrograms_block += f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="220"></a> '
+            if spectrograms_block:
+                desc_parts.append(f"[center]{spectrograms_block}[/center]")
+
         # Signature
         desc_parts.append(f"[url=https://github.com/Audionut/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]")
 

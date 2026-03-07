@@ -153,6 +153,22 @@ class TL:
                 if screenshots_block:
                     desc_parts.append("<center>" + screenshots_block + "</center>")
 
+            # Audio Spectrograms
+            audio_spectrograms = cast(list[dict[str, Any]], meta.get("spectrograms_images", []))
+            if audio_spectrograms:
+                desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+                spectrograms_block = ""
+                for i, image in enumerate(audio_spectrograms):
+                    img_url = image.get("img_url", image.get("raw_url"))
+                    web_url = image.get("web_url")
+                    if img_url and web_url:
+                        spectrograms_block += f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
+                    if (i + 1) % 2 == 0:
+                        spectrograms_block += "<br><br>"
+                if spectrograms_block:
+                    desc_parts.append("<center>" + spectrograms_block + "</center>")
+
         # Signature
         desc_parts.append(
             f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/Audionut/Upload-Assistant">{meta.get('ua_signature', '')}</a></div>"""
