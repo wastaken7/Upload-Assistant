@@ -253,9 +253,7 @@ class TL:
         raise NotImplementedError('Failed to determine TL category!')
 
     def get_screens(self, meta: Meta) -> list[str]:
-        images = cast(list[dict[str, Any]], meta.get('menu_images', [])) + cast(
-            list[dict[str, Any]], meta.get('image_list', [])
-        )
+        images = cast(list[dict[str, Any]], meta.get("menu_images", [])) + cast(list[dict[str, Any]], meta.get("image_list", []) + meta.get("spectrograms_images", []))
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
     async def get_name(self, meta):
