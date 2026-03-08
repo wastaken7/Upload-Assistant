@@ -237,6 +237,7 @@ class DC:
             dc_name = dc_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
             dc_name = unicodedata.normalize("NFD", dc_name)
             dc_name = "".join(c for c in dc_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
+            dc_name = dc_name.replace("!", "")
             if scene_name:
                 dc_name += " [UNRAR]"
 
