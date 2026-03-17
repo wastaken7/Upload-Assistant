@@ -220,7 +220,7 @@ class IPT:
         cat_id = 72 if meta["category"] == "MOVIE" else 73 if meta["category"] == "TV" else 0
         if not cat_id:
             return dupes
-        search_url = f"{self.base_url}/t?72=&q={meta['title']}"
+        search_url = f"{self.base_url}/t?{cat_id}=&q={meta['title']}"
 
         forbidden_keywords = []
 
