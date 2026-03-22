@@ -1316,10 +1316,9 @@ class PTP:
                 loggedIn = await self.validate_login(uploadresponse)
                 if loggedIn is True:
                     token_match = re.search(r'data-AntiCsrfToken="(.*)"', uploadresponse.text)
-                    if not token_match:
-                        raise LoginException("Failed to find AntiCsrfToken on upload page.")  # noqa F405
-                    AntiCsrfToken = token_match.group(1)
-                    return AntiCsrfToken
+                    if token_match:
+                        AntiCsrfToken = token_match.group(1)
+                        return AntiCsrfToken
         else:
             console.print("[yellow]PTP Cookies not found. Creating new session.")
 
