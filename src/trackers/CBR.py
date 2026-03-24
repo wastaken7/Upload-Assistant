@@ -187,6 +187,10 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        return await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
-        )
+        subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+        if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
+            proceed = await self.common.prompt_user_for_confirmation(
+                f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
+            )
+            return proceed
+        return subtitles
