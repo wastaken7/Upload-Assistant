@@ -2096,11 +2096,7 @@ if __name__ == "__main__":
         signal.signal(signal.SIGTERM, _handle_shutdown_signal)
 
     try:
-        # Use ProactorEventLoop for Windows subprocess handling
-        if sys.platform == "win32":
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-        asyncio.run(main())  # Ensures proper loop handling and cleanup
+        asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         if not _shutdown_requested:
             console.print("\n[yellow]Shutting down...[/yellow]")
