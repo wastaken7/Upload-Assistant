@@ -133,7 +133,7 @@ class LDU(UNIT3D):
                     iso_audio = lang.upper()
                     if not await languages_manager.has_english_language(audio_language):
                         non_eng_audio = True
-                except Exception as e:
+                except (LookupError, AttributeError, ValueError) as e:
                     console.print(f"[bold red]Error extracting audio language: {e}[/bold red]")
 
         if meta.get('no_subs', False):
@@ -147,7 +147,7 @@ class LDU(UNIT3D):
                     try:
                         lang = langcodes.find(subtitle_language).to_alpha3()
                         iso_subtitle = f"Subs {lang.upper()}"
-                    except Exception as e:
+                    except (LookupError, AttributeError, ValueError) as e:
                         console.print(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
 
         if cat_id == '18' and iso_subtitle:
