@@ -126,13 +126,16 @@ class LDU(UNIT3D):
         audio_languages_value = meta.get('audio_languages', [])
         if isinstance(audio_languages_value, list) and audio_languages_value:
             audio_languages_list = cast(list[Any], audio_languages_value)
-            audio_language = str(audio_languages_list[0])
-            if audio_language:
+            for audio_item in audio_languages_list:
+                audio_language = str(audio_item).strip()
+                if not audio_language:
+                    continue
                 try:
                     lang = langcodes.find(audio_language).to_alpha3()
                     iso_audio = lang.upper()
                     if not await languages_manager.has_english_language(audio_language):
                         non_eng_audio = True
+                    break
                 except (LookupError, AttributeError, ValueError) as e:
                     console.print(f"[bold red]Error extracting audio language: {e}[/bold red]")
 
@@ -142,11 +145,14 @@ class LDU(UNIT3D):
             subtitle_languages_value = meta.get('subtitle_languages', [])
             if isinstance(subtitle_languages_value, list) and subtitle_languages_value:
                 subtitle_languages_list = cast(list[Any], subtitle_languages_value)
-                subtitle_language = str(subtitle_languages_list[0])
-                if subtitle_language:
+                for subtitle_item in subtitle_languages_list:
+                    subtitle_language = str(subtitle_item).strip()
+                    if not subtitle_language:
+                        continue
                     try:
                         lang = langcodes.find(subtitle_language).to_alpha3()
                         iso_subtitle = f"Subs {lang.upper()}"
+                        break
                     except (LookupError, AttributeError, ValueError) as e:
                         console.print(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
 
