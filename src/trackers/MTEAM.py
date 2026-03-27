@@ -18,7 +18,6 @@ Config = dict[str, Any]
 
 
 class MTEAM:
-    douban_id = ""
     """
     https://test2.m-team.cc/api/swagger-ui/index.html
     https://wiki.m-team.cc/zh-tw/api
@@ -83,7 +82,7 @@ class MTEAM:
         api_url = f"{self.api_base_url}/media/douban/infoV2"
 
         params = {
-            "code": MTEAM.douban_id,
+            "code": self.douban_id,
             "refresh": False,
         }
 
@@ -348,6 +347,7 @@ class MTEAM:
             console.print(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
             return False
 
+        # Upscaled Content
         uuid: str = meta["uuid"]
         if "upscale" in uuid.lower() and "upscale" not in meta["title"]:
             console.print(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
@@ -358,9 +358,27 @@ class MTEAM:
             else:
                 return False
 
+        # Screenshots
         if meta.get("screens", 0) < 3:
             console.print(f"{self.tracker}: [bold yellow]At least 3 screenshots are required for video uploads. Skipping upload.[/bold yellow]")
             return False
+
+        # LGBT Content
+        keywords: str = meta.get("keywords", "")
+        combined_genres: str = meta.get("combined_genres", "")
+        combined_text = f"{keywords}, {combined_genres}".lower()
+        combined_list = [item.strip() for item in combined_text.split(",") if item.strip()]
+        lgbt_keywords = ["lgbt", "queer", "lgbtq", "lgbtqia", "transgender", "trans", "gay", "lesbian", "bisexual", "pansexual", "non-binary", "homoerotic"]
+        if any(kw in combined_list for kw in lgbt_keywords):
+            console.print(
+                f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
+            )
+            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                if not user_input:
+                    return False
+            else:
+                return False
 
         return should_continue
 
@@ -384,7 +402,7 @@ class MTEAM:
                     link_mobile = str(link_tag["href"])
                     match = re.search(r"subject/(\d+)", link_mobile)
                     if match:
-                        MTEAM.douban_id = int(match.group(1))
+                        self.douban_id = int(match.group(1))
                         return
 
             console.print(f"{self.tracker}: [bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
@@ -402,7 +420,6 @@ class MTEAM:
             meta["skipping"] = f"{self.tracker}"
             return dupes
 
-        await self.get_douban_id(meta)
         imdb_id = meta.get("imdb_info", {}).get("imdbID")
 
         if not imdb_id:
@@ -435,7 +452,7 @@ class MTEAM:
                 dupe_entry = {
                     "name": torrent.get("name"),
                     "size": int(torrent.get("size", 0)),
-                    "link": f"https://kp.m-team.cc/detail/{t_id}",
+                    "link": f"{self.base_url}/detail/{t_id}",
                     "file_count": torrent.get("file_count", 0),
                     "download": f"{self.api_base_url}/torrent/genDlToken?id={t_id}",
                     "id": t_id,
@@ -557,6 +574,7 @@ class MTEAM:
         """
         https://test2.m-team.cc/api/swagger-ui/index.html#/種子/createOredit
         """
+        await self.get_douban_id(meta)
         await self.get_douban_info()
 
         data = {
@@ -575,7 +593,7 @@ class MTEAM:
             # "processing": 0,
             # "countries": "",
             "imdb": meta.get("imdb_info", {}).get("imdbID", ""),
-            "douban": MTEAM.douban_id,
+            "douban": self.douban_id,
             # "dmmCode": "",
             # "cids": "",
             # "aids": "",
@@ -620,8 +638,16 @@ class MTEAM:
                     data = response.json()
                     final_download_url = data.get("data")
                     if final_download_url:
-                        await self.common.download_tracker_torrent(meta, self.tracker, headers=dict(self.session.headers), downurl=final_download_url)
-                        return True
+                        downloaded_torrent = await self.common.download_tracker_torrent(
+                            meta,
+                            self.tracker,
+                            headers=dict(self.session.headers),
+                            downurl=final_download_url,
+                        )
+                        if downloaded_torrent:
+                            return True
+                        meta["tracker_status"][self.tracker]["status_message"] = "Upload succeeded but downloading the tracker torrent failed"
+                        return False
                     console.print(f"{self.tracker}: Failed to get download URL from API response.")
                     meta["tracker_status"][self.tracker]["status_message"] = "Failed to get download URL from API response"
                     return False
