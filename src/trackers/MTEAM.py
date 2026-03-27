@@ -399,6 +399,13 @@ class MTEAM:
 
     async def get_douban_id(self, meta: Meta) -> int:
         douban_id: int = 0
+        douban_manual = int(meta.get("douban_manual", 0))
+
+        if douban_manual:
+            console.print(f"{self.tracker}: Using manual Douban ID: {douban_manual}")
+            self.douban_id = douban_manual
+            return douban_manual
+
         imdb_id = meta.get("imdb_info", {}).get("imdbID")
         if not imdb_id:
             return douban_id
@@ -407,8 +414,10 @@ class MTEAM:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 
         try:
-            response = await self.session.get(search_url, headers=headers)
-            response.raise_for_status()
+            async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
+                response = await client.get(search_url)
+                response.raise_for_status()
+
             soup = BeautifulSoup(response.text, "html.parser")
             result = soup.find("ul", class_="search_results_subjects")
 
@@ -425,8 +434,8 @@ class MTEAM:
             console.print(f"{self.tracker}: [bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
             return douban_id
 
-        except Exception:
-            console.print(f"{self.tracker}: [bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}.[/bold yellow]")
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}: {e}[/bold yellow]")
             return douban_id
 
     async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
@@ -690,7 +699,7 @@ class MTEAM:
                 return False
 
         else:
-            console.print("[cyan]DC Request Data:")
+            console.print("[cyan]M-Team Request Data:")
             console.print(Redaction.redact_private_info(data))
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
