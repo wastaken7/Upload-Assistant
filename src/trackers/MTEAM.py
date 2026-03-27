@@ -5,10 +5,12 @@ from typing import Any, Optional, cast
 
 import aiofiles
 import httpx
+from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
@@ -16,6 +18,7 @@ Config = dict[str, Any]
 
 
 class MTEAM:
+    douban_id = ""
     """
     https://test2.m-team.cc/api/swagger-ui/index.html
     https://wiki.m-team.cc/zh-tw/api
@@ -24,11 +27,12 @@ class MTEAM:
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
+        self.tmdb_manager = TmdbManager(config)
         self.tracker = "MTEAM"
         self.base_url = f"https://{self.config['TRACKERS'][self.tracker].get('base_url', 'kp.m-team.cc')}"
         self.api_base_url = "https://api.m-team.cc/api"
         self.torrent_url = f"{self.base_url}/detail/"
-        self.banned_groups = [""]
+        self.banned_groups = ["FGT"]
         self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
         self.session = httpx.AsyncClient(
             headers={
@@ -75,7 +79,76 @@ class MTEAM:
 
         return text
 
+    async def get_douban_info(self) -> None:
+        api_url = f"{self.api_base_url}/media/douban/infoV2"
+
+        params = {
+            "code": MTEAM.douban_id,
+            "refresh": False,
+        }
+
+        headers = {
+            "x-api-key": self.api_key,
+            "Accept": "*/*",
+        }
+
+        try:
+            response = await self.session.post(api_url, headers=headers, params=params, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            self.douban_info = data
+            return
+
+        except Exception as e:
+            console.print(f"Error fetching Douban info: {e}")
+            return
+
     def mteam_standard_desc(self, meta: Meta):
+        db_info = getattr(self, "douban_info", None)
+
+        if db_info and db_info.get("code") == "0":
+            d = db_info.get("data", {})
+            title = d.get("title", "")
+            aka = d.get("aka", [])
+            translated_names = " / ".join([title] + aka) if title else " / ".join(aka)
+
+            countries = " / ".join(d.get("countries", []))
+            genres = " / ".join(d.get("genres", []))
+            languages = " / ".join(d.get("languages", []))
+            pubdates = " / ".join(d.get("pubdate", []))
+            durations = " / ".join(d.get("durations", []))
+
+            directors = " / ".join([person.get("name", "") for person in d.get("directors", [])])
+            actors = " / ".join([person.get("name", "") for person in d.get("actors", [])])
+
+            rating_val = d.get("score", "0")
+            rating_count = d.get("rating", {}).get("count", "0")
+            subject_id = d.get("subjectId", "")
+
+            desc = [
+                f"![]({d.get('coverUrl', '')})",
+                "",
+                f"**◎译　　名** {translated_names}",
+                f"**◎片　　名** {title}",
+                f"**◎年　　代** {d.get('year', 'N/A')}",
+                f"**◎产　　地** {countries}",
+                f"**◎类　　别** {genres}",
+                f"**◎语　　言** {languages}",
+                f"**◎上映日期** {pubdates}",
+                f"**◎豆瓣评分** {rating_val}/10 from {rating_count} users",
+                f"**◎豆瓣链接** https://www.douban.com/subject/{subject_id}/",
+                f"**◎片　　长** {durations}",
+                f"**◎导　　演** {directors}",
+                f"**◎主　　演** {actors}",
+                "",
+                "**◎简　　介**",
+                "",
+                f"　　{d.get('intro', '')}",
+            ]
+            return "\n".join(desc)
+
+        # Fallback
+        console.print(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
         imdb = meta.get("imdb_info", {})
 
         tmdb_poster_path = str(meta.get("tmdb_poster") or "").strip()
@@ -267,11 +340,74 @@ class MTEAM:
 
         return (clean_to_int(v_raw, is_bdmv), clean_to_int(a_raw, is_bdmv))
 
+    async def get_additional_checks(self, meta: dict[str, Any]):
+        should_continue = True
+
+        imdb_id = meta.get("imdb_info", {}).get("imdbID")
+        if not imdb_id:
+            console.print(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
+            return False
+
+        uuid: str = meta["uuid"]
+        if "upscale" in uuid.lower() and "upscale" not in meta["title"]:
+            console.print(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
+            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                if not user_input:
+                    return False
+            else:
+                return False
+
+        if meta.get("screens", 0) < 3:
+            console.print(f"{self.tracker}: [bold yellow]At least 3 screenshots are required for video uploads. Skipping upload.[/bold yellow]")
+            return False
+
+        return should_continue
+
+    async def get_douban_id(self, meta: Meta) -> None:
+        imdb_id = meta.get("imdb_info", {}).get("imdbID")
+        if not imdb_id:
+            return
+
+        search_url = f"https://m.douban.com/search/?query={imdb_id}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+
+        try:
+            response = await self.session.get(search_url, headers=headers)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            result = soup.find("ul", class_="search_results_subjects")
+
+            if result:
+                link_tag = result.find("a")
+                if link_tag and "href" in link_tag.attrs:
+                    link_mobile = str(link_tag["href"])
+                    match = re.search(r"subject/(\d+)", link_mobile)
+                    if match:
+                        MTEAM.douban_id = int(match.group(1))
+                        return
+
+            console.print(f"{self.tracker}: [bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
+            return
+
+        except Exception:
+            console.print(f"{self.tracker}: [bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}.[/bold yellow]")
+            return
+
     async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
+        dupes: list[dict[str, Any]] = []
+
+        should_continue = await self.get_additional_checks(meta)
+        if not should_continue:
+            meta["skipping"] = f"{self.tracker}"
+            return dupes
+
+        await self.get_douban_id(meta)
         imdb_id = meta.get("imdb_info", {}).get("imdbID")
 
         if not imdb_id:
-            print(f"[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
+            console.print(f"{self.tracker}: [bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
+
             return []
 
         api_url = f"{self.api_base_url}/torrent/search"
@@ -280,7 +416,6 @@ class MTEAM:
             "mode": "normal",
             "imdb": imdb_id,
         }
-        dupes: list[dict[str, Any]] = []
 
         try:
             response = await self.session.post(api_url, json=payload, timeout=15)
@@ -297,7 +432,20 @@ class MTEAM:
                 if not t_id:
                     continue
 
-                dupes.append({"name": torrent.get("name"), "size": int(torrent.get("size", 0)), "link": f"https://kp.m-team.cc/detail/{t_id}"})
+                dupe_entry = {
+                    "name": torrent.get("name"),
+                    "size": int(torrent.get("size", 0)),
+                    "link": f"https://kp.m-team.cc/detail/{t_id}",
+                    "file_count": torrent.get("file_count", 0),
+                    "download": f"{self.api_base_url}/torrent/genDlToken?id={t_id}",
+                    "id": t_id,
+                }
+                if meta.get("is_disc") == "BDMV":
+                    bdinfo = await self.get_dupe_bdinfo(t_id)
+                    if bdinfo:
+                        dupe_entry["bd_info"] = bdinfo
+
+                dupes.append(dupe_entry)
 
             return dupes
 
@@ -305,6 +453,23 @@ class MTEAM:
             print(f"[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]")
 
         return []
+
+    async def get_dupe_bdinfo(self, torrent_id: int) -> str:
+        api_url = f"{self.api_base_url}/torrent/detail?id={torrent_id}"
+
+        try:
+            response = await self.session.post(api_url, timeout=15)
+            response.raise_for_status()
+
+            response_data = response.json()
+            bdinfo = response_data.get("data", {}).get("mediainfo")
+            if not bdinfo:
+                bdinfo = response_data.get("data", {}).get("descr")
+            return bdinfo
+
+        except Exception as e:
+            console.print(f"{self.tracker}: Error fetching BDinfo: {e}")
+            return ""
 
     def get_standard(self, meta: Meta) -> int:
         _1080p = 1
@@ -392,6 +557,8 @@ class MTEAM:
         """
         https://test2.m-team.cc/api/swagger-ui/index.html#/種子/createOredit
         """
+        await self.get_douban_info()
+
         data = {
             # "torrent": 0,
             # "offer": 0,
@@ -408,7 +575,7 @@ class MTEAM:
             # "processing": 0,
             # "countries": "",
             "imdb": meta.get("imdb_info", {}).get("imdbID", ""),
-            # "douban": "",
+            "douban": MTEAM.douban_id,
             # "dmmCode": "",
             # "cids": "",
             # "aids": "",
