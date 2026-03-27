@@ -1,78 +1,73 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
-import unicodedata
+import re
 from typing import Any, Optional, cast
 
-import re
-import hmac
-import hashlib
-import base64
 import aiofiles
-import time
-import platform
 import httpx
 
 from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
+
 
 class MTEAM:
     """
     https://test2.m-team.cc/api/swagger-ui/index.html
     https://wiki.m-team.cc/zh-tw/api
     """
+
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'MTEAM'
-        self.base_url = 'https://kp.m-team.cc'
-        self.api_base_url = f'https://api.m-team.cc/api'
-        self.torrent_url = f'{self.base_url}/detail/'
-        self.banned_groups = ['']
-        self.api_key = self.config['TRACKERS'][self.tracker].get('api_key')
+        self.tracker = "MTEAM"
+        self.base_url = "https://kp.m-team.cc"
+        self.api_base_url = "https://api.m-team.cc/api"
+        self.torrent_url = f"{self.base_url}/detail/"
+        self.banned_groups = [""]
+        self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
         self.session = httpx.AsyncClient(
-            headers = {
+            headers={
                 "x-api-key": self.api_key,
                 "Accept": "*/*",
             },
-            timeout=30.0
-            )
+            timeout=30.0,
+        )
 
     async def mediainfo(self, meta: Meta) -> str:
         mi_path: str = ""
         mediainfo: str = ""
 
-        if meta.get('is_disc') == 'BDMV':
-            disc_folder = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+        if meta.get("is_disc") == "BDMV":
+            disc_folder = os.path.join(meta["base_dir"], "tmp", meta["uuid"])
             for filename in os.listdir(disc_folder):
-                if filename.endswith('_FULL.txt'):
+                if filename.endswith("_FULL.txt"):
                     mi_path = os.path.join(disc_folder, filename)
         else:
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
 
         if mi_path:
-            async with aiofiles.open(mi_path, encoding='utf-8') as f:
+            async with aiofiles.open(mi_path, encoding="utf-8") as f:
                 mediainfo = await f.read()
 
         return mediainfo
 
     def bbcode_to_markdown(self, text):
-        specific_img_pattern = r'\[url=[^\]]*\]\[img(?:=[^\]]*)?\](.*?)\[/img\]\[/url\]'
-        text = re.sub(specific_img_pattern, r'![](\1)', text, flags=re.IGNORECASE)
+        specific_img_pattern = r"\[url=[^\]]*\]\[img(?:=[^\]]*)?\](.*?)\[/img\]\[/url\]"
+        text = re.sub(specific_img_pattern, r"![](\1)", text, flags=re.IGNORECASE)
 
         patterns = [
-            (r'\[b\](.*?)\[/b\]', r'**\1**'),
-            (r'\[i\](.*?)\[/i\]', r'*\1*'),
-            (r'\[u\](.*?)\[/u\]', r'<u>\1</u>'),
-            (r'\[s\](.*?)\[/s\]', r'~~\1~~'),
-            (r'\[img(?:=[^\]]*)?\](.*?)\[/img\]', r'![](\1)'),
-            (r'\[url=(.*?)\](.*?)\[/url\]', r'[\2](\1)'),
-            (r'\[url\](.*?)\[/url\]', r'<\1>'),
+            (r"\[b\](.*?)\[/b\]", r"**\1**"),
+            (r"\[i\](.*?)\[/i\]", r"*\1*"),
+            (r"\[u\](.*?)\[/u\]", r"<u>\1</u>"),
+            (r"\[s\](.*?)\[/s\]", r"~~\1~~"),
+            (r"\[img(?:=[^\]]*)?\](.*?)\[/img\]", r"![](\1)"),
+            (r"\[url=(.*?)\](.*?)\[/url\]", r"[\2](\1)"),
+            (r"\[url\](.*?)\[/url\]", r"<\1>"),
         ]
 
         for pattern, replacement in patterns:
@@ -81,20 +76,21 @@ class MTEAM:
         return text
 
     def mteam_standard_desc(self, meta: Meta):
-        imdb = meta.get('imdb_info', {})
+        imdb = meta.get("imdb_info", {})
 
-        poster_url = imdb.get('cover', meta.get('poster', ''))
-        title = meta.get('title', 'N/A')
-        year = meta.get('year', 'N/A')
-        rating = imdb.get('rating', 'N/A')
+        tmdb_poster = f"https://image.tmdb.org/t/p/w200{meta.get('tmdb_poster')}"
+        poster_url = tmdb_poster if tmdb_poster else imdb.get("cover", "")
+        title = meta.get("title", "N/A")
+        year = meta.get("year", "N/A")
+        rating = imdb.get("rating", "N/A")
 
-        writers = imdb.get('writers', [])
+        writers = imdb.get("writers", [])
         creators_str = " / ".join(writers)
 
-        cast = meta.get('tmdb_cast', [])
+        cast = meta.get("tmdb_cast", [])
         actors_str = " / ".join(cast)
 
-        plot = imdb.get('plot', meta.get('overview', ''))
+        plot = imdb.get("plot", meta.get("overview", ""))
 
         desc = [
             f"![]({poster_url})",
@@ -107,7 +103,7 @@ class MTEAM:
             "",
             "### Introduction",
             "",
-            f"  {plot}"
+            f"  {plot}",
         ]
 
         return "\n".join(desc)
@@ -132,13 +128,7 @@ class MTEAM:
         menu_images: list[dict[str, Any]] = []
         if isinstance(menu_images_value, list):
             menu_images_list = cast(list[Any], menu_images_value)
-            menu_images.extend(
-                [
-                    cast(dict[str, Any], item)
-                    for item in menu_images_list
-                    if isinstance(item, dict)
-                ]
-            )
+            menu_images.extend([cast(dict[str, Any], item) for item in menu_images_list if isinstance(item, dict)])
         if menu_images:
             desc_parts.append(await builder.menu_screenshot_header(meta))
 
@@ -159,13 +149,7 @@ class MTEAM:
         images: list[dict[str, Any]] = []
         if isinstance(images_value, list):
             images_list = cast(list[Any], images_value)
-            images.extend(
-                [
-                    cast(dict[str, Any], item)
-                    for item in images_list
-                    if isinstance(item, dict)
-                ]
-            )
+            images.extend([cast(dict[str, Any], item) for item in images_list if isinstance(item, dict)])
         if images:
             desc_parts.append(await builder.screenshot_header())
 
@@ -182,59 +166,60 @@ class MTEAM:
         # Signature
         desc_parts.append(f"[{meta['ua_signature']}](https://github.com/Audionut/Upload-Assistant)")
 
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
+        description = "\n\n".join(part for part in desc_parts if part.strip())
 
         from src.bbcode import BBCODE
+
         bbcode = BBCODE()
         description = description.strip()
-        description = description.replace('[*] ', '• ').replace('[*]', '• ')
+        description = description.replace("[*] ", "• ").replace("[*]", "• ")
         description = self.bbcode_to_markdown(description)
         description = bbcode.remove_extra_lines(description)
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
             await description_file.write(description)
 
         return description
 
     def get_category_id(self, meta: Meta) -> Optional[int]:
-        movie_sd = 401          # Movie/SD
-        movie_hd = 419          # Movie/HD
-        movie_dvdiso = 420      # Movie/DVDiSo
-        movie_blu_ray = 421     # Movie/Blu-Ray
-        movie_remux = 439       # Movie/Remux
-        tv_series_sd = 403      # TV Series/SD
-        tv_series_hd = 402      # TV Series/HD
-        tv_series_bd = 438      # TV Series/BD
+        movie_sd = 401  # Movie/SD
+        movie_hd = 419  # Movie/HD
+        movie_dvdiso = 420  # Movie/DVDiSo
+        movie_blu_ray = 421  # Movie/Blu-Ray
+        movie_remux = 439  # Movie/Remux
+        tv_series_sd = 403  # TV Series/SD
+        tv_series_hd = 402  # TV Series/HD
+        tv_series_bd = 438  # TV Series/BD
         tv_series_dvdiso = 435  # TV Series/DVDiSo
-        anime = 405             # Anime
+        anime = 405  # Anime
 
-        is_sd = meta.get('sd', False)
-        is_dvd = meta.get('is_disc') == 'DVD'
-        is_bd = meta.get('is_disc') == 'BDMV'
-        is_remux = meta.get('type', '') == "REMUX"
-        is_anime = meta.get('anime', False)
+        is_sd = meta.get("sd", False)
+        is_dvd = meta.get("is_disc") == "DVD"
+        is_bd = meta.get("is_disc") == "BDMV"
+        is_remux = meta.get("type", "") == "REMUX"
+        is_anime = meta.get("anime", False)
 
         if is_anime:
             return anime
 
         if is_bd:
-            return tv_series_bd if meta['category'] == 'TV' else movie_blu_ray
+            return tv_series_bd if meta["category"] == "TV" else movie_blu_ray
 
-        if is_remux and meta['category'] == "MOVIE":
+        if is_remux and meta["category"] == "MOVIE":
             return movie_remux
 
         if is_dvd:
-            return tv_series_dvdiso if meta['category'] == 'TV' else movie_dvdiso
+            return tv_series_dvdiso if meta["category"] == "TV" else movie_dvdiso
 
         if is_sd:
-            return tv_series_sd if meta['category'] == 'TV' else movie_sd
+            return tv_series_sd if meta["category"] == "TV" else movie_sd
 
         # Default to HD
-        return tv_series_hd if meta['category'] == 'TV' else movie_hd
+        return tv_series_hd if meta["category"] == "TV" else movie_hd
 
     def get_small_description(self, meta: Meta) -> str:
-        resolution = meta.get('resolution', '')
-        audio = meta.get('audio', '')
+        resolution = meta.get("resolution", "")
+        audio = meta.get("audio", "")
         video_bitrate, audio_bitrate = self.get_bitrates(meta)
 
         return f"{resolution} @ {video_bitrate} kbps - {audio} @ {audio_bitrate} kbps"
@@ -251,8 +236,10 @@ class MTEAM:
                 bdinfo = discs[0].get("bdinfo", {})
                 v_tracks = bdinfo.get("video", [])
                 a_tracks = bdinfo.get("audio", [])
-                if v_tracks: v_raw = v_tracks[0].get("bitrate")
-                if a_tracks: a_raw = a_tracks[0].get("bitrate")
+                if v_tracks:
+                    v_raw = v_tracks[0].get("bitrate")
+                if a_tracks:
+                    a_raw = a_tracks[0].get("bitrate")
         elif is_dvd:
             pass
         else:
@@ -270,7 +257,7 @@ class MTEAM:
 
             try:
                 if bdmv_mode:
-                    numeric_match = re.search(r'\d+', str(val).replace('.', '').replace(',', ''))
+                    numeric_match = re.search(r"\d+", str(val).replace(".", "").replace(",", ""))
                     return int(numeric_match.group()) if numeric_match else 0
                 else:
                     return int(val) // 1000
@@ -280,10 +267,10 @@ class MTEAM:
         return (clean_to_int(v_raw, is_bdmv), clean_to_int(a_raw, is_bdmv))
 
     async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
-        imdb_id = meta.get('imdb_info', {}).get('imdbID')
+        imdb_id = meta.get("imdb_info", {}).get("imdbID")
 
         if not imdb_id:
-            print(f'[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]')
+            print(f"[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
             return []
 
         api_url = f"{self.api_base_url}/torrent/search"
@@ -295,33 +282,26 @@ class MTEAM:
         dupes: list[dict[str, Any]] = []
 
         try:
-            response = await self.session.post(
-                api_url,
-                json=payload, timeout=15
-                )
+            response = await self.session.post(api_url, json=payload, timeout=15)
             res_json = response.json()
 
-            if res_json.get('code') != '0':
+            if res_json.get("code") != "0":
                 print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
                 return []
 
-            torrents = res_json.get('data', {}).get('data', [])
+            torrents = res_json.get("data", {}).get("data", [])
 
             for torrent in torrents:
-                t_id = torrent.get('id')
+                t_id = torrent.get("id")
                 if not t_id:
                     continue
 
-                dupes.append({
-                    'name': torrent.get('name'),
-                    'size': int(torrent.get('size', 0)),
-                    'link': f"https://kp.m-team.cc/detail/{t_id}"
-                })
+                dupes.append({"name": torrent.get("name"), "size": int(torrent.get("size", 0)), "link": f"https://kp.m-team.cc/detail/{t_id}"})
 
             return dupes
 
         except Exception as e:
-            print(f'[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]')
+            print(f"[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]")
 
         return []
 
@@ -333,75 +313,75 @@ class MTEAM:
         _4k = 6
         _8k = 7
 
-        resolution = meta.get('resolution', '').lower()
-        if resolution == '1080p':
+        resolution = meta.get("resolution", "").lower()
+        if resolution == "1080p":
             return _1080p
-        elif resolution == '1080i':
+        elif resolution == "1080i":
             return _1080i
-        elif resolution == '720p':
+        elif resolution == "720p":
             return _720p
-        elif resolution == '2160p':
+        elif resolution == "2160p":
             return _4k
-        elif resolution == '4320p':
+        elif resolution == "4320p":
             return _8k
-        elif meta.get('sd', False):
+        elif meta.get("sd", False):
             return sd
         else:
             console.print(f"{self.tracker}: Unknown or unsupported resolution '{resolution}', defaulting to 1080p.")
             return _1080p
 
     def get_videocodec(self, meta: Meta) -> int:
-        x264 = 1    # H.264(x264/AVC)
-        x265 = 16   # H.265(x265/HEVC)
-        vc1 = 2     # VC-1
-        mpeg2 = 4   # MPEG-2
-        xvid = 3    # Xvid
-        av1 = 19    # AV1
+        x264 = 1  # H.264(x264/AVC)
+        x265 = 16  # H.265(x265/HEVC)
+        vc1 = 2  # VC-1
+        mpeg2 = 4  # MPEG-2
+        xvid = 3  # Xvid
+        av1 = 19  # AV1
         vp8_9 = 21  # VP8/9
 
-        codec = meta.get('video_codec', '').lower()
-        if codec in ('h264', 'x264', 'avc', 'h.264', 'h.265'):
+        codec = meta.get("video_codec", "").lower()
+        if codec in ("h264", "x264", "avc", "h.264", "h.265"):
             return x264
-        elif codec in ('h265', 'hevc', 'x265'):
+        elif codec in ("h265", "hevc", "x265"):
             return x265
-        elif codec in ('vc1', 'vc-1'):
+        elif codec in ("vc1", "vc-1"):
             return vc1
-        elif codec in ('mpeg2', 'mpeg-2'):
+        elif codec in ("mpeg2", "mpeg-2"):
             return mpeg2
-        elif codec == 'xvid':
+        elif codec == "xvid":
             return xvid
-        elif codec == 'av1':
+        elif codec == "av1":
             return av1
-        elif codec in ('vp8', 'vp9'):
+        elif codec in ("vp8", "vp9"):
             return vp8_9
         else:
             console.print(f"{self.tracker}: Unknown or unsupported video codec '{codec}', defaulting to x264.")
             return x264
 
     def get_audiocodec(self, meta: Meta) -> int:
-        aac = 6          # AAC
-        ac3 = 8          # AC3(DD)
-        dts = 3          # DTS
-        dts_hd_ma = 11   # DTS-HD MA
-        eac3 = 12        # E-AC3(DDP)
+        aac = 6  # AAC
+        ac3 = 8  # AC3(DD)
+        dts = 3  # DTS
+        dts_hd_ma = 11  # DTS-HD MA
+        eac3 = 12  # E-AC3(DDP)
         atmos_eac3 = 13  # E-AC3 Atoms(DDP Atoms)
-        true_hd = 9      # TrueHD
+        true_hd = 9  # TrueHD
 
-        codec = meta.get('audio', '').lower()
+        codec = meta.get("audio", "").lower()
 
-        if 'aac' in codec:
+        if "aac" in codec:
             return aac
-        elif 'dd+' in codec:
+        elif "dd+" in codec:
             return eac3
-        elif 'dd ' in codec:
+        elif "dd " in codec:
             return ac3
-        elif 'dts-hd' in codec:
+        elif "dts-hd" in codec:
             return dts_hd_ma
-        elif 'dts' in codec:
+        elif "dts" in codec:
             return dts
-        elif 'atmos' in codec and 'dd+' in codec:
+        elif "atmos" in codec and "dd+" in codec:
             return atmos_eac3
-        elif 'truehd' in codec:
+        elif "truehd" in codec:
             return true_hd
         else:
             console.print(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
@@ -426,12 +406,12 @@ class MTEAM:
             # "team": 0,
             # "processing": 0,
             # "countries": "",
-            "imdb": meta.get('imdb_info', {}).get('imdbID', ""),
+            "imdb": meta.get("imdb_info", {}).get("imdbID", ""),
             # "douban": "",
             # "dmmCode": "",
             # "cids": "",
             # "aids": "",
-            "anonymous": bool(meta.get('anonymous', False)),
+            "anonymous": bool(meta.get("anonymous", False)),
             # "labels": 0,
             # "tags": "",
             # "file": "",
@@ -439,7 +419,7 @@ class MTEAM:
             "mediainfo": await self.mediainfo(meta),
             "mediaInfoAnalysisResult": True,
             # "labelsNew": ""
-            }
+        }
 
         return data
 
@@ -447,63 +427,58 @@ class MTEAM:
         data = await self.fetch_data(meta)
         response = None
 
-        if not meta.get('debug', False):
+        if not meta.get("debug", False):
             try:
-                upload_url = f'{self.api_base_url}/torrent/createOredit'
-                await self.common.create_torrent_for_upload(meta, self.tracker, '[kp.m-team.cc] M-Team - TP')
+                upload_url = f"{self.api_base_url}/torrent/createOredit"
+                await self.common.create_torrent_for_upload(meta, self.tracker, "[kp.m-team.cc] M-Team - TP")
                 torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
 
-                async with aiofiles.open(torrent_path, 'rb') as torrent_file:
+                async with aiofiles.open(torrent_path, "rb") as torrent_file:
                     torrent_bytes = await torrent_file.read()
-                files = {'file': ('upload.torrent', torrent_bytes, 'application/x-bittorrent')}
+                files = {"file": ("upload.torrent", torrent_bytes, "application/x-bittorrent")}
 
                 response = await self.session.post(upload_url, data=data, files=files, headers=dict(self.session.headers), timeout=90)
                 response.raise_for_status()
                 response_json = response.json()
                 response_data: dict[str, Any] = cast(dict[str, Any], response_json) if isinstance(response_json, dict) else {}
 
-                if response_data.get('message') == "SUCCESS":
-                    torrent_id = str(response_data['data']['id'])
-                    meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                    meta['tracker_status'][self.tracker]['status_message'] = response_data.get('message')
+                if response_data.get("message") == "SUCCESS":
+                    torrent_id = str(response_data["data"]["id"])
+                    meta["tracker_status"][self.tracker]["torrent_id"] = torrent_id
+                    meta["tracker_status"][self.tracker]["status_message"] = response_data.get("message")
 
                     download_api_url = f"{self.api_base_url}/torrent/genDlToken?id={torrent_id}"
                     response = await self.session.post(download_api_url)
                     data = response.json()
                     final_download_url = data.get("data")
                     if final_download_url:
-                        await self.common.download_tracker_torrent(
-                            meta,
-                            self.tracker,
-                            headers=dict(self.session.headers),
-                            downurl=final_download_url
-                        )
+                        await self.common.download_tracker_torrent(meta, self.tracker, headers=dict(self.session.headers), downurl=final_download_url)
                         return True
                     console.print(f"{self.tracker}: Failed to get download URL from API response.")
-                    meta['tracker_status'][self.tracker]['status_message'] = "Failed to get download URL from API response"
+                    meta["tracker_status"][self.tracker]["status_message"] = "Failed to get download URL from API response"
                     return False
                 else:
-                    meta['tracker_status'][self.tracker]['status_message'] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                    meta["tracker_status"][self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
                     return False
 
             except httpx.HTTPStatusError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: HTTP {e.response.status_code} - {e.response.text}'
+                meta["tracker_status"][self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
                 return False
             except httpx.TimeoutException:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Request timed out after {self.session.timeout.write} seconds'
+                meta["tracker_status"][self.tracker]["status_message"] = f"data error: Request timed out after {self.session.timeout.write} seconds"
                 return False
             except httpx.RequestError as e:
-                resp_text = getattr(getattr(e, 'response', None), 'text', 'No response received')
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}.\nResponse: {resp_text}'
+                resp_text = getattr(getattr(e, "response", None), "text", "No response received")
+                meta["tracker_status"][self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {resp_text}"
                 return False
             except Exception as e:
-                resp_text = response.text if response is not None else 'No response received'
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e}.\nResponse: {resp_text}'
+                resp_text = response.text if response is not None else "No response received"
+                meta["tracker_status"][self.tracker]["status_message"] = f"data error: It may have uploaded, go check. Error: {e}.\nResponse: {resp_text}"
                 return False
 
         else:
             console.print("[cyan]DC Request Data:")
             console.print(Redaction.redact_private_info(data))
-            meta['tracker_status'][self.tracker]['status_message'] = 'Debug mode enabled, not uploading'
+            meta["tracker_status"][self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
