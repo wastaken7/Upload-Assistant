@@ -25,7 +25,7 @@ class MTEAM:
         self.config = config
         self.common = COMMON(config)
         self.tracker = "MTEAM"
-        self.base_url = "https://kp.m-team.cc"
+        self.base_url = f"https://{self.config['TRACKERS'][self.tracker].get('base_url', 'kp.m-team.cc')}"
         self.api_base_url = "https://api.m-team.cc/api"
         self.torrent_url = f"{self.base_url}/detail/"
         self.banned_groups = [""]
@@ -78,8 +78,9 @@ class MTEAM:
     def mteam_standard_desc(self, meta: Meta):
         imdb = meta.get("imdb_info", {})
 
-        tmdb_poster = f"https://image.tmdb.org/t/p/w200{meta.get('tmdb_poster')}"
-        poster_url = tmdb_poster if tmdb_poster else imdb.get("cover", "")
+        tmdb_poster_path = str(meta.get("tmdb_poster") or "").strip()
+        tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""
+        poster_url = tmdb_poster or str(imdb.get("cover") or "")
         title = meta.get("title", "N/A")
         year = meta.get("year", "N/A")
         rating = imdb.get("rating", "N/A")
@@ -340,9 +341,9 @@ class MTEAM:
         vp8_9 = 21  # VP8/9
 
         codec = meta.get("video_codec", "").lower()
-        if codec in ("h264", "x264", "avc", "h.264", "h.265"):
+        if codec in ("h264", "x264", "avc", "h.264"):
             return x264
-        elif codec in ("h265", "hevc", "x265"):
+        elif codec in ("h265", "h.265", "hevc", "x265"):
             return x265
         elif codec in ("vc1", "vc-1"):
             return vc1
@@ -369,7 +370,9 @@ class MTEAM:
 
         codec = meta.get("audio", "").lower()
 
-        if "aac" in codec:
+        if "atmos" in codec and "dd+" in codec:
+            return atmos_eac3
+        elif "aac" in codec:
             return aac
         elif "dd+" in codec:
             return eac3
@@ -379,8 +382,6 @@ class MTEAM:
             return dts_hd_ma
         elif "dts" in codec:
             return dts
-        elif "atmos" in codec and "dd+" in codec:
-            return atmos_eac3
         elif "truehd" in codec:
             return true_hd
         else:
@@ -411,7 +412,7 @@ class MTEAM:
             # "dmmCode": "",
             # "cids": "",
             # "aids": "",
-            "anonymous": bool(meta.get("anonymous", False)),
+            "anonymous": bool(meta.get("anon", False)),
             # "labels": 0,
             # "tags": "",
             # "file": "",

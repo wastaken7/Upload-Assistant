@@ -681,6 +681,7 @@ config = {
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            "base_url": "kp.m-team.cc"
         },
         "MTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
