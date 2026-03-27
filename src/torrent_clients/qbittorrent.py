@@ -1835,6 +1835,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         'lst': ["https://lst.gg"],
         'lt': ["https://lat-team.com"],
         'lume': ["https://luminarr.me"],
+        'mteam': ["https://tracker.m-team.cc"],
         'mtv': ["tracker.morethantv"],
         'nbl': ["tracker.nebulance"],
         'oe': ["https://onlyencodes.cc"],
