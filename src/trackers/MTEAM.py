@@ -2,6 +2,7 @@
 import os
 import re
 from typing import Any, Optional, cast
+from urllib.parse import urlparse, urlunparse
 
 import aiofiles
 import httpx
@@ -19,20 +20,29 @@ Config = dict[str, Any]
 
 class MTEAM:
     """
-    https://test2.m-team.cc/api/swagger-ui/index.html
-    https://wiki.m-team.cc/zh-tw/api
+    API Docs: https://test2.m-team.cc/api/swagger-ui/index.html
+    API Limits: https://wiki.m-team.cc/zh-tw/api
+    Upload Rules: https://wiki.m-team.cc/zh-tw/upload-rules
     """
 
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
         self.tmdb_manager = TmdbManager(config)
+
         self.tracker = "MTEAM"
-        self.base_url = f"https://{self.config['TRACKERS'][self.tracker].get('base_url', 'kp.m-team.cc')}"
+
+        raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
+        parsed_raw = urlparse(raw_url)
+        clean_netloc = parsed_raw.netloc if parsed_raw.netloc else parsed_raw.path
+        self.base_url = urlunparse(("https", clean_netloc, "", "", "", ""))
+
         self.api_base_url = "https://api.m-team.cc/api"
         self.torrent_url = f"{self.base_url}/detail/"
-        self.banned_groups = ["FGT"]
         self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
+
+        self.banned_groups = ["FGT"]
+
         self.session = httpx.AsyncClient(
             headers={
                 "x-api-key": self.api_key,
@@ -40,6 +50,8 @@ class MTEAM:
             },
             timeout=30.0,
         )
+
+        self.douban_id: int = 0
 
     async def mediainfo(self, meta: Meta) -> str:
         mi_path: str = ""
@@ -78,7 +90,11 @@ class MTEAM:
 
         return text
 
-    async def get_douban_info(self) -> None:
+    async def get_douban_info(self) -> dict[str, Any]:
+        info: dict[str, Any] = {}
+        if not self.douban_id:
+            return info
+
         api_url = f"{self.api_base_url}/media/douban/infoV2"
 
         params = {
@@ -94,16 +110,15 @@ class MTEAM:
         try:
             response = await self.session.post(api_url, headers=headers, params=params, timeout=15)
             response.raise_for_status()
-            data = response.json()
-            self.douban_info = data
-            return
+            info = response.json()
+            return info
 
         except Exception as e:
             console.print(f"Error fetching Douban info: {e}")
-            return
+            return info
 
-    def mteam_standard_desc(self, meta: Meta):
-        db_info = getattr(self, "douban_info", None)
+    async def mteam_standard_desc(self, meta: Meta):
+        db_info = await self.get_douban_info()
 
         if db_info and db_info.get("code") == "0":
             d = db_info.get("data", {})
@@ -190,7 +205,7 @@ class MTEAM:
         desc_parts.append(custom_header)
 
         # M-Team Standard Description
-        desc_parts.append(self.mteam_standard_desc(meta))
+        desc_parts.append(await self.mteam_standard_desc(meta))
 
         # User description
         user_description = await builder.get_user_description(meta)
@@ -382,10 +397,11 @@ class MTEAM:
 
         return should_continue
 
-    async def get_douban_id(self, meta: Meta) -> None:
+    async def get_douban_id(self, meta: Meta) -> int:
+        douban_id: int = 0
         imdb_id = meta.get("imdb_info", {}).get("imdbID")
         if not imdb_id:
-            return
+            return douban_id
 
         search_url = f"https://m.douban.com/search/?query={imdb_id}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
@@ -402,15 +418,16 @@ class MTEAM:
                     link_mobile = str(link_tag["href"])
                     match = re.search(r"subject/(\d+)", link_mobile)
                     if match:
-                        self.douban_id = int(match.group(1))
-                        return
+                        douban_id = int(match.group(1))
+                        self.douban_id = douban_id
+                        return douban_id
 
             console.print(f"{self.tracker}: [bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
-            return
+            return douban_id
 
         except Exception:
             console.print(f"{self.tracker}: [bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}.[/bold yellow]")
-            return
+            return douban_id
 
     async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -424,8 +441,7 @@ class MTEAM:
 
         if not imdb_id:
             console.print(f"{self.tracker}: [bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
-
-            return []
+            return dupes
 
         api_url = f"{self.api_base_url}/torrent/search"
 
@@ -439,8 +455,8 @@ class MTEAM:
             res_json = response.json()
 
             if res_json.get("code") != "0":
-                print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
-                return []
+                console.print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
+                return dupes
 
             torrents = res_json.get("data", {}).get("data", [])
 
@@ -467,9 +483,13 @@ class MTEAM:
             return dupes
 
         except Exception as e:
-            print(f"[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]")
+            console.print(f"[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]")
+            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+                pass
+            else:
+                meta["skipping"] = f"{self.tracker}"
 
-        return []
+        return dupes
 
     async def get_dupe_bdinfo(self, torrent_id: int) -> str:
         api_url = f"{self.api_base_url}/torrent/detail?id={torrent_id}"
@@ -574,8 +594,7 @@ class MTEAM:
         """
         https://test2.m-team.cc/api/swagger-ui/index.html#/種子/createOredit
         """
-        await self.get_douban_id(meta)
-        await self.get_douban_info()
+        douban_id = await self.get_douban_id(meta)
 
         data = {
             # "torrent": 0,
@@ -593,11 +612,11 @@ class MTEAM:
             # "processing": 0,
             # "countries": "",
             "imdb": meta.get("imdb_info", {}).get("imdbID", ""),
-            "douban": self.douban_id,
+            "douban": douban_id,
             # "dmmCode": "",
             # "cids": "",
             # "aids": "",
-            "anonymous": bool(meta.get("anon", False)),
+            "anonymous": bool(meta.get("anon", False) or self.config["TRACKERS"][self.tracker].get("anon", False)),
             # "labels": 0,
             # "tags": "",
             # "file": "",
