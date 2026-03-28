@@ -724,16 +724,13 @@ class MTEAM:
                     data = response.json()
                     final_download_url = data.get("data")
                     if final_download_url:
-                        downloaded_torrent = await self.common.download_tracker_torrent(
+                        await self.common.download_tracker_torrent(
                             meta,
                             self.tracker,
                             headers=dict(self.session.headers),
                             downurl=final_download_url,
                         )
-                        if downloaded_torrent:
-                            return True
-                        meta["tracker_status"][self.tracker]["status_message"] = "Upload succeeded but downloading the tracker torrent failed"
-                        return False
+                        return True
                     console.print(f"{self.tracker}: Failed to get download URL from API response.")
                     meta["tracker_status"][self.tracker]["status_message"] = "Failed to get download URL from API response"
                     return False
