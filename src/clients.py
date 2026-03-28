@@ -153,6 +153,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             console.print(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
         for client_name in inject_clients:
+            if tracker == "MTEAM":
+                continue
             if client_name == "none" or not client_name:
                 continue
 
