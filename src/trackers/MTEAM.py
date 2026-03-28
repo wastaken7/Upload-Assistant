@@ -70,7 +70,6 @@ class MTEAM:
             response = await self.session.post(self.requests_url, json=payload, timeout=15)
             response.raise_for_status()
             res_json = response.json()
-            console.print(res_json)
 
             data_list = res_json.get("data", {}).get("data", [])
 
@@ -450,7 +449,11 @@ class MTEAM:
 
     async def get_douban_id(self, meta: Meta) -> int:
         douban_id: int = 0
-        douban_manual = int(meta.get("douban_manual", 0))
+        try:
+            douban_manual = int(meta.get("douban_manual") or 0)
+        except (ValueError, TypeError):
+            console.print(f"{self.tracker}: [bold yellow]Invalid douban_manual value, ignoring.[/bold yellow]")
+            douban_manual = 0
 
         if douban_manual:
             console.print(f"{self.tracker}: Using manual Douban ID: {douban_manual}")
@@ -498,6 +501,8 @@ class MTEAM:
             return dupes
 
         imdb_id = meta.get("imdb_info", {}).get("imdbID")
+        category = self.get_category_id(meta)
+        standard = self.get_standard(meta)
 
         if not imdb_id:
             console.print(f"{self.tracker}: [bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
@@ -508,6 +513,8 @@ class MTEAM:
         payload = {
             "mode": "normal",
             "imdb": imdb_id,
+            "categories": [category],
+            "standards": [standard],
         }
 
         try:
