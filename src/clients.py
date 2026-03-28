@@ -153,7 +153,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             console.print(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
         for client_name in inject_clients:
-            if tracker == "MTEAM":
+            client_to_skip = self.config["TRACKERS"][tracker].get("client_to_skip", [])
+            if client_name in client_to_skip:
+                if meta["debug"]:
+                    console.print(f"[cyan]DEBUG: Skipping client '{client_name}' for tracker '{tracker}' as it's in client_to_skip list[/cyan]")
                 continue
             if client_name == "none" or not client_name:
                 continue
