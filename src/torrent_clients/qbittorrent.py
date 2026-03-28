@@ -1436,8 +1436,7 @@ class QbittorrentClientMixin:
                                     if meta['debug']:
                                         console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
                                 else:
-                                    msg = display_tracker.get('msg', '')
-                                    console.print(f"[yellow]Tracker not working: {url[:15]} - {status_text}{f' - {msg}' if msg else ''}")
+                                    msg = display_tracker.get("msg", "")
 
                         except qbittorrentapi.APIError as e:
                             if meta['debug']:
