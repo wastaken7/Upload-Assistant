@@ -719,7 +719,7 @@ class TRACKER_SETUP:
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
+            elif tracker_name.upper() in ("ASC", "BJS", "FF", "HDS", "AZ", "CZ", "PHD", "MTEAM"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 return False
