@@ -39,6 +39,7 @@ class MTEAM:
 
         self.api_base_url = "https://api.m-team.cc/api"
         self.torrent_url = f"{self.base_url}/detail/"
+        self.requests_url = f"{self.api_base_url}/seek/search"
         self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
 
         self.banned_groups = ["FGT"]
@@ -52,6 +53,56 @@ class MTEAM:
         )
 
         self.douban_id: int = 0
+
+    async def get_requests(self, meta: dict[str, Any]) -> list[dict[str, str]]:
+        requests: list[dict[str, str]] = []
+
+        category = self.get_category_id(meta)
+
+        payload = {
+            "pageNumber": 1,
+            "pageSize": 10,
+            "keyword": meta["title"],
+            "take": False,
+        }
+
+        try:
+            response = await self.session.post(self.requests_url, json=payload, timeout=15)
+            response.raise_for_status()
+            res_json = response.json()
+            console.print(res_json)
+
+            data_list = res_json.get("data", {}).get("data", [])
+
+            for item in data_list:
+                if item.get("category") != category:
+                    continue
+
+                name = item.get("title", "N/A")
+                reward = item.get("rewardCurrent", "0")
+                link = f"{self.base_url}/seekDetail?id={item.get('id')}"
+
+                requests.append(
+                    {
+                        "Name": name,
+                        "Reward": reward,
+                        "Link": link,
+                    }
+                )
+
+            if requests:
+                message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
+                for r in requests:
+                    message += f"[bold green]Name:[/bold green] {r['Name']}\n"
+                    message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
+                    message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
+                console.print(message)
+
+            return requests
+
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Error searching for requests with title {meta['title']}: {e}[/bold red]")
+            return requests
 
     async def mediainfo(self, meta: Meta) -> str:
         mi_path: str = ""
