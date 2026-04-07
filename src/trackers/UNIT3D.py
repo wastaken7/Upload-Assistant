@@ -76,15 +76,16 @@ class UNIT3D:
             "perPage": "100",
         }
         params_list: Optional[ParamsList] = None
-        resolutions = await self.get_resolution_id(meta)
-        resolution_id = str(resolutions["resolution_id"])
-        if resolution_id in ["3", "4"]:
-            # Convert params to list of tuples to support duplicate keys
-            params_list = list(params_dict.items())
-            params_list.append(("resolutions[]", "3"))
-            params_list.append(("resolutions[]", "4"))
-        else:
-            params_dict["resolutions[]"] = resolution_id
+        if self.tracker not in ["OTW"]:
+            resolutions = await self.get_resolution_id(meta)
+            resolution_id = str(resolutions["resolution_id"])
+            if resolution_id in ["3", "4"]:
+                # Convert params to list of tuples to support duplicate keys
+                params_list = list(params_dict.items())
+                params_list.append(("resolutions[]", "3"))
+                params_list.append(("resolutions[]", "4"))
+            else:
+                params_dict["resolutions[]"] = resolution_id
 
         if self.tracker not in ["SP", "STC"]:
             type_id = str((await self.get_type_id(meta))["type_id"])
