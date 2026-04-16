@@ -488,7 +488,6 @@ class ANT:
             return dupes
 
         params = {
-            'apikey': api_key.strip(),
             't': 'search',
             'o': 'json'
         }
@@ -497,9 +496,14 @@ class ANT:
         elif int(meta['imdb_id']) != 0:
             params['imdb'] = meta['imdb']
 
+        headers = {
+            "X-API-Key": api_key.strip(),
+            'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
+        }
+
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url=self.search_url, params=params)
+                response = await client.get(url=self.search_url, params=params, headers=headers)
                 if response.status_code == 200:
                     try:
                         data = response.json()
@@ -573,8 +577,12 @@ class ANT:
                 console.print(f"[yellow]{self.tracker}: API key not configured, skipping file-based search.")
             return imdb_tmdb_list
 
+        headers = {
+            "X-API-Key": api_key.strip(),
+            'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
+        }
+
         params: dict[str, Any] = {
-            'apikey': api_key.strip(),
             't': 'search',
             'filename': filename,
             'o': 'json'
@@ -582,7 +590,7 @@ class ANT:
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url=self.search_url, params=params)
+                response = await client.get(url=self.search_url, params=params, headers=headers)
                 if response.status_code == 200:
                     try:
                         data = response.json()
