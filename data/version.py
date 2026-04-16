@@ -1,4 +1,19 @@
-__version__ = "v7.1.3"
+__version__ = "v7.1.4"
+
+"""
+Release Notes for version v7.1.4 (2026-04-16):
+
+# ## What's Changed
+# 
+# * ANT: key in header by @Audionut in 27cb44e
+# * DP: banned groups by @Audionut in d1da3dc
+# * BHD: encode settings by @Audionut in 4066131
+# * fix tvmovie handle when no imdb by @Audionut in 323b3e3
+# * fix: ffmpeg round to even scale by @Audionut in 2f614c5
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.1.3...v7.1.4
+"""
+
 
 """
 Release Notes for version v7.1.3 (2026-04-14):
