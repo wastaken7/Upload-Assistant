@@ -109,7 +109,7 @@ class IPT:
             meta=meta,
             tracker=self.tracker,
             test_url=f"{self.base_url}/upload.php",
-            success_text="Your announce url is",
+            success_text="Your announce URL",
         )
 
     async def generate_description(self, meta: Meta):
@@ -487,7 +487,7 @@ class IPT:
             "name": meta["name"],
             "descr": await self.generate_description(meta),
             "type": await self.get_category_id(meta),
-            "imdb_id": str(meta.get("imdb_info", {}).get("imdbID", "")),
+            "imdb_id": str(meta.get("tmdb_id", "")),
             "id": torrent_id,
         }
 

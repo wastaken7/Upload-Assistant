@@ -1356,5 +1356,5 @@ other_api_trackers = {
 }  # fmt: off
 
 http_trackers = {
-    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'IS', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG'
+    'AR', 'ASC', 'AZ', 'BJS', 'BT', 'CZ', 'FF', 'FL', 'HDB', 'HDS', 'HDT', 'IS', 'IPT', 'MTV', 'PHD', 'PTER', 'PTS', 'TTG'
 }  # fmt: off
