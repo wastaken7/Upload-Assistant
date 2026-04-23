@@ -345,6 +345,11 @@ class BHD:
             meta['skipping'] = "BHD"
             return []
 
+        if meta.get('type') in ['REMUX', 'ENCODE', 'WEBDL', 'WEBRIP'] and meta.get('container') not in ['mkv', 'mp4']:
+            console.print(f"[bold red]Container '{meta.get('container')}' is not allowed for {meta['type']}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
+            meta['skipping'] = "BHD"
+            return []
+
         if meta['type'] not in ['WEBDL'] and meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
             if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
                 console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content at BHD[/bold red]')
