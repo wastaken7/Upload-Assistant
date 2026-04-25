@@ -305,6 +305,10 @@ def configure_default_section(
         "get_bluray_info": {
             "condition": lambda value: value.lower() == "true",
             "settings": ["add_bluray_link", "use_bluray_images", "bluray_image_size", "bluray_score", "bluray_single_score"]
+        },
+        "qbit_bandwidth_control": {
+            "condition": lambda value: value.lower() == "true",
+            "settings": ["qbit_bandwidth_threshold", "qbit_bandwidth_time"],
         }
     }
 

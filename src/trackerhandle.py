@@ -11,8 +11,10 @@ from typing_extensions import TypeAlias
 
 from cogs.redaction import Redaction
 from src.cleanup import cleanup_manager
+from src.dupe_checking import DupeChecker
 from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
+from src.qbitwait import Wait
 from src.trackers.PTP import PTP
 from src.trackers.THR import THR
 from src.trackersetup import TRACKER_SETUP
@@ -125,6 +127,53 @@ async def process_trackers(
         disctype_value = str(disctype) if disctype is not None else ""
         tracker = tracker.replace(" ", "").upper().strip()
 
+        async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
+            qbit_bw_control = meta.get("qbit_bandwidth_control") or config["DEFAULT"].get("qbit_bandwidth_control", False)
+            if qbit_bw_control:
+                console.print(f"[yellow]Checking bandwidth for {tracker_name}...[/yellow]")
+                waiter = Wait(config)
+                bw_thresh = meta.get("qbit_bandwidth_threshold") or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
+                bw_time = meta.get("qbit_bandwidth_time") or config["DEFAULT"].get("qbit_bandwidth_time", 0)
+                try:
+                    bw_thresh = int(bw_thresh)
+                    bw_time = int(bw_time)
+                except (ValueError, TypeError) as e:
+                    console.print(f"[red]Invalid bandwidth settings: {e}, skipping bandwidth wait.[/red]")
+                    bw_thresh = 0
+                    bw_time = 0
+
+                if bw_thresh > 0 and bw_time > 0:
+                    waited = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
+                    if waited:
+                        console.print(f"[yellow]Redoing dupe check for {tracker_name} after bandwidth wait...[/yellow]")
+                        if tracker_name not in {"PTP"}:
+                            new_dupes = cast(list[Any], await t_class.search_existing(meta, disctype_value))
+                        else:
+                            ptp = PTP(config=config)
+                            groupID = meta.get("ptp_groupID")
+                            new_dupes = cast(list[Any], await ptp.search_existing(groupID or "", meta, disctype_value))
+
+                        initial_dupes = meta.get("initial_dupes", {}).get(tracker_name, [])
+
+                        def is_in_initial(dupe: Any) -> bool:
+                            for initial_dupe in initial_dupes:
+                                if isinstance(dupe, dict) and isinstance(initial_dupe, dict):
+                                    if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
+                                        return True
+                                elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:
+                                    return True
+                            return False
+
+                        real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
+
+                        if real_new_dupes:
+                            dupe_checker = DupeChecker(config)
+                            real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
+                            if real_new_dupes:
+                                console.print(f"[red]New dupe found on {tracker_name} during wait! Automatically skipping upload.[/red]")
+                                return False
+            return True
+
         if tracker in api_trackers:
             tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
@@ -137,6 +186,11 @@ async def process_trackers(
                         console.print(f"{tracker} (draft: {draft})")
                     is_uploaded = False
                     try:
+                        if not await check_bandwidth_and_dupes(tracker, tracker_class):
+                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            print_tracker_result(tracker, tracker_class, status, False)
+                            return
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta, disctype_value)
                         upload_duration = time.time() - upload_start_time
@@ -168,6 +222,11 @@ async def process_trackers(
                 try:
                     is_uploaded = False
                     try:
+                        if not await check_bandwidth_and_dupes(tracker, tracker_class):
+                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            print_tracker_result(tracker, tracker_class, status, False)
+                            return
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta, disctype_value)
                         upload_duration = time.time() - upload_start_time
@@ -202,6 +261,11 @@ async def process_trackers(
                 try:
                     is_uploaded = False
                     try:
+                        if not await check_bandwidth_and_dupes(tracker, tracker_class):
+                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            print_tracker_result(tracker, tracker_class, status, False)
+                            return
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta, disctype_value)
                         upload_duration = time.time() - upload_start_time
@@ -318,7 +382,9 @@ async def process_trackers(
     elif discs and len(discs) > 1:
         one_disc = False
 
-    if (not meta.get('tv_pack') and one_disc) or multi_screens == 0:
+    bandwidth_control = meta.get("qbit_bandwidth_control") or config["DEFAULT"].get("qbit_bandwidth_control", False)
+
+    if ((not meta.get("tv_pack") and one_disc) or multi_screens == 0) and not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling
         tasks: list[tuple[str, asyncio.Task[None]]] = []
         for tracker in enabled_trackers:

@@ -2,6 +2,7 @@
 import asyncio
 import os
 import traceback
+from collections import deque
 from typing import Any, Optional, Union, cast
 
 import aiohttp
@@ -132,6 +133,63 @@ class Wait:
         finally:
             if self.qbt_session:
                 await self.qbt_session.close()
+
+    async def wait_for_bandwidth(self, threshold_kb: int, wait_time: int) -> bool:
+        if not self.proxy_url and not self.qbt_client:
+            return False
+
+        if threshold_kb <= 0 or wait_time <= 0:
+            console.print("[yellow]Bandwidth control enabled but threshold or time is 0. Skipping bandwidth check.[/yellow]")
+            return False
+
+        threshold_bytes = threshold_kb * 1024
+        check_interval = 5
+        max_samples = max(1, wait_time // check_interval)
+        speeds: deque[int] = deque(maxlen=max_samples)
+
+        if self.proxy_url:
+            self.qbt_session = aiohttp.ClientSession()
+
+        try:
+            console.print(f"[yellow]Monitoring upload speed for {wait_time}s (Threshold: {threshold_kb} KB/s)...[/yellow]")
+            while True:
+                up_speed = 0
+                if self.proxy_url:
+                    if self.qbt_session is None:
+                        raise RuntimeError("qbt_session is not initialized")
+                    async with self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/transfer/info") as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            up_speed = int(data.get("up_info_speed", 0))
+                        else:
+                            console.print(f"[ERROR] Failed to get transfer info via proxy: {response.status}", markup=False)
+                            break
+                else:
+                    if self.qbt_client is None:
+                        raise RuntimeError("qbt_client is not initialized")
+                    data = self.qbt_client.transfer_info()
+                    up_speed_raw = data.get("up_info_speed", 0) if hasattr(data, "get") else getattr(data, "up_info_speed", 0)
+                    up_speed = int(cast(Union[int, str, float], up_speed_raw))
+
+                speeds.append(up_speed)
+                avg_speed = sum(speeds) / len(speeds)
+                current_samples = len(speeds)
+
+                if current_samples >= max_samples and avg_speed <= threshold_bytes:
+                    console.print(f"[green]Average upload speed ({avg_speed / 1024:.2f} KB/s) below threshold for {wait_time}s. Proceeding.[/green]")
+                    break
+                else:
+                    console.print(f"[yellow]Average speed: {avg_speed / 1024:.2f} KB/s. Using last {current_samples * check_interval} seconds...[/yellow]", end="\r")
+
+                await asyncio.sleep(check_interval)
+            return True
+        except Exception as e:
+            console.print(f"\n[red]Error checking bandwidth: {e}[/red]")
+            return False
+        finally:
+            if self.proxy_url and self.qbt_session:
+                await self.qbt_session.close()
+                self.qbt_session = None
 
     async def select_and_recheck_best_torrent(self, meta: dict[str, Any], path: str, check_interval: int = 5) -> bool:
         if not self.proxy_url and not self.qbt_client:
