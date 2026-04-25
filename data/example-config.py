@@ -257,6 +257,15 @@ config = {
 
         # CLIENT SETUP
 
+        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
+        "qbit_bandwidth_control": False,
+
+        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
+        "qbit_bandwidth_threshold": 0,
+
+        # The duration of time in seconds to average the upload speed over.
+        "qbit_bandwidth_time": 0,
+
         # Which client are you using.
         "default_torrent_client": "qbittorrent",
 

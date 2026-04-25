@@ -119,6 +119,11 @@ class TrackerStatusManager:
                     else:
                         dupes = []
 
+                    async with meta_lock:
+                        if 'initial_dupes' not in meta:
+                            meta['initial_dupes'] = {}
+                        meta['initial_dupes'][tracker_name] = copy.deepcopy(dupes)
+
                     if tracker_name == "ASC" and meta.get('anon', 'false'):
                         console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
                         console.print("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
