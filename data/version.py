@@ -1,4 +1,22 @@
-__version__ = "v7.1.4"
+__version__ = "v7.1.5"
+
+"""
+Release Notes for version v7.1.5 (2026-04-27):
+
+# ## What's Changed
+# 
+# * ulcx: remove hybrid from web by @Audionut in 3a4e5e6
+# * Only allow MKV for non-disc on BLU (#1342) by @glibbright in 39c7e8c
+# * Allow modified SD content upload at BHD (#1343) by @glibbright in 1954346
+# * Add more banned groups to BHD tracker (#1344) by @glibbright in 2e9e7c0
+# * Add validation for media container types in BHD (#1346) by @glibbright in e355dcb
+# * ANT: just return api message by @Audionut in b33e4c4
+# * validate mediainfo debugging by @Audionut in 994e314
+# * fix aither flags by @Audionut in 6ab394f
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.1.4...v7.1.5
+"""
+
 
 """
 Release Notes for version v7.1.4 (2026-04-16):
