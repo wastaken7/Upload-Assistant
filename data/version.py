@@ -1,4 +1,19 @@
-__version__ = "v7.1.5"
+__version__ = "v7.1.6"
+
+"""
+Release Notes for version v7.1.6 (2026-05-05):
+
+# ## What's Changed
+# 
+# * fix rtorrent skip check by @Audionut in 4ccc94b
+# * fix: docker version tracking by @Audionut in f3c1bf3
+# * chore: update qbittorrent-api dependency version (#1356) by @wastaken7 in 338e21b
+# * fix(GPW): update request data handling, add exclusive arg and auto upload posters (#1357) by @wastaken7 in 83a77d6
+# * BJS: limit director/creator fields to 1 person and fix type hint (#1358) by @wastaken7 in 7bdf433
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.1.5...v7.1.6
+"""
+
 
 """
 Release Notes for version v7.1.5 (2026-04-27):
