@@ -1,4 +1,19 @@
-__version__ = "v7.1.6"
+__version__ = "v7.1.7"
+
+"""
+Release Notes for version v7.1.7 (2026-05-11):
+
+# ## What's Changed
+# 
+# * Actually skip GPW when additional checks fail (#1360) by @WOSSFOSS in ea724fa
+# * feat(trackers/bjs): refactor duplicate search for new layout (#1361) by @wastaken7 in 8b28b1d
+# * fix: Uploading FraMeSToR releases from BHD to Aither (#1362) by @GamerGirlN6467 in f9758aa
+# * Fix key type for frame_info retrieval (#1363) by @GizmoBal in f384bc0
+# * Fix SP modq not being applied (#1364) by @brrbie in ffd4150
+# 
+# **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.1.6...v7.1.7
+"""
+
 
 """
 Release Notes for version v7.1.6 (2026-05-05):
