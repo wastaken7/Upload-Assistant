@@ -75,6 +75,20 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _title_without_leading_article(title: str) -> str:
+    return re.sub(r'^(the|a|an)\s+', '', title.strip().lower(), flags=re.IGNORECASE)
+
+
+def _tvdb_title_drops_existing_leading_article(current_title: Any, tvdb_title: str) -> bool:
+    if not isinstance(current_title, str) or not current_title.strip() or not tvdb_title.strip():
+        return False
+
+    current = current_title.strip().lower()
+    tvdb = tvdb_title.strip().lower()
+    current_has_article = re.match(r'^(the|a|an)\s+', current, flags=re.IGNORECASE) is not None
+    return current_has_article and current != tvdb and _title_without_leading_article(current) == tvdb
+
+
 class Prep:
     """
     Prepare for upload:
@@ -1084,10 +1098,13 @@ class Prep:
                     year_match = re.search(r'\b(19|20)\d{2}\b', series_name)
                     if year_match:
                         extracted_year = year_match.group(0)
-                        meta['search_year'] = extracted_year
                         series_name = re.sub(r'\s*\b(19|20)\d{2}\b\s*', '', series_name).strip()
                     series_name = series_name.replace('(', '').replace(')', '').strip()
-                    if series_name and year_match:  # Only set if not empty and year was found
+                    should_use_tvdb_series_name = (
+                        series_name
+                        and not _tvdb_title_drops_existing_leading_article(meta.get('title'), series_name)
+                    )
+                    if should_use_tvdb_series_name:
                         meta['title'] = series_name
 
         # bluray.com data if config
