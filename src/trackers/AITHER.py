@@ -63,12 +63,14 @@ class AITHER(UNIT3D):
         source: str = meta.get("source", "")
         alt_title = meta.get("aka", "") if not meta.get("no_aka", False) else ""
 
-        year = str(meta.get("year", "")) if not meta.get("no_year", False) else ""
+        year = str(meta.get("year", ""))
         if meta["category"] == "TV":
-            year = meta["year"] if meta["search_year"] != "" else ""
+            year = str(meta["year"]) if meta["search_year"] != "" else ""
         manual_year_value = str(meta.get("manual_year", ""))
         if manual_year_value and int(manual_year_value) > 0:
             year = manual_year_value
+        if meta.get("no_year", False):
+            year = ""
 
         if not meta.get('language_checked', False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
@@ -76,7 +78,8 @@ class AITHER(UNIT3D):
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
             if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-                aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
+                if year:
+                    aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
             elif meta.get('is_disc') != "BDMV":
                 aither_name = aither_name.replace(meta['resolution'], f"{foreign_lang} {meta['resolution']}", 1)
 
