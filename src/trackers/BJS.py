@@ -1061,13 +1061,29 @@ class BJS:
         return data
 
     def get_year(self, meta: dict[str, Any]) -> str:
-        start_year = meta.get("year", "N/A")
-        imdb_info = dict(meta.get("imdb_info", {}))
-        end_year = imdb_info.get("end_year")
+        """
+        Returns the year of the release.
 
-        year_label = f"{start_year}-{end_year}" if end_year else f"{start_year}-"
+        For Movies:
+            - Standard year
+        For TV Shows:
+            - The year the episode/season aired.
+        """
+        year = meta.get("year", "N/A")
+        if meta["category"] == "MOVIE":
+            return year
 
-        return year_label
+        imdb_info: dict[str, Any] = meta.get("imdb_info", {})
+        imdb_tv_year = imdb_info.get("tv_year", "")
+        tvdb_episode_year = meta.get("tvdb_episode_year", "")
+
+        if tvdb_episode_year and str(tvdb_episode_year).isdigit():
+            return str(tvdb_episode_year)
+
+        if imdb_tv_year and str(imdb_tv_year).isdigit():
+            return str(imdb_tv_year)
+
+        return year
 
     def get_adulto(self, meta: dict[str, Any]) -> str:
         """
