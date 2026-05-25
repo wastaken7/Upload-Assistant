@@ -230,6 +230,9 @@ config = {
         # Can be overridden in a per-tracker setting by adding this same config
         "disc_menu_header": "",
 
+        # Header to add above the audio spectrograms
+        "audio_spectrogram_header": "[center][b]Audio Spectrogram[/b][/center]",
+
         # Allows adding a custom signature, in BBCode, at the bottom of the description section
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_signature": "",
@@ -246,6 +249,11 @@ config = {
         # bbcode is width limited, cover images are mostly height dominant
         # So you probably want a smaller size than screenshots for instance
         "bluray_image_size": "250",
+
+        # Set true to add audio spectrograms to the description
+        "add_audio_spectrogram": False,
+        # Set true to generate spectrograms for all audio streams
+        "process_all_audio_spectrogram": False,
 
         # CLIENT SETUP
 

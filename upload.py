@@ -31,6 +31,7 @@ from cogs.redaction import Redaction
 from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
+from src.audio_spectrogram import process_audio_spectrograms
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -787,6 +788,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                             console.print(f"[yellow]Could not load saved menu image data: {str(e)}")
                     elif meta.get('path_to_menu_screenshots', ""):
                         await process_disc_menus(meta, config)
+
+                if meta.get("audio_spectrogram") or meta.get("audio_spectrogram_tracks") or config["DEFAULT"].get("add_audio_spectrogram", False):
+                    try:
+                        await process_audio_spectrograms(meta, config, uploadscreens_manager)
+                    except Exception as e:
+                        console.print(f"[red]Error processing audio spectrograms: {e}[/red]")
 
                 # Take Screenshots
                 try:

@@ -85,6 +85,12 @@ class DC:
             [cast(dict[str, Any], img) for img in images_list if isinstance(img, dict)]
         )
 
+        spectrograms_images = meta.get("spectrograms_images", [])
+        spectrograms_images_list: list[Any] = []
+        if isinstance(spectrograms_images, list):
+            spectrograms_images_list = cast(list[Any], spectrograms_images)
+        all_images.extend([cast(dict[str, Any], img) for img in spectrograms_images_list if isinstance(img, dict)])
+
         if all_images:
             screenshots_block = ""
             for image in all_images:
