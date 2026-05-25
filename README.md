@@ -21,6 +21,9 @@ Discord support https://discord.gg/QHHAZu7e2A
 
 # Upload Assistant
 
+> [!IMPORTANT]
+> **This is a modified version of the Upload Assistant project and is not affiliated with or endorsed by Audionut.**
+
 A simple tool to take the work out of uploading.
 
 This project is a fork of the original work of L4G https://github.com/L4GSP1KE/Upload-Assistant
