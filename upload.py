@@ -31,6 +31,7 @@ from cogs.redaction import Redaction
 from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
+from src.audio_spectrogram import process_audio_spectrograms
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -620,7 +621,33 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         trackers = meta['trackers']
 
         audio_prompted = False
-        for tracker in ["AITHER", "ASC", "BJS", "BT", "CBR", "DP", "FF", "GPW", "HUNO", "IHD", "LDU", "LT", "OE", "PTS", "SAM", "SHRI", "SPD", "TTR", "TVC", "ULCX"]:
+        for tracker in [
+            "AITHER",
+            "ASC",
+            "BJS",
+            "BT",
+            "CBR",
+            "DP",
+            "FF",
+            "GPW",
+            "HUNO",
+            "IHD",
+            "LAJIDUI",
+            "LDU",
+            "LPT",
+            "LT",
+            "OE",
+            "PTCAFE",
+            "PTGTK",
+            "PTS",
+            "RPT",
+            "SAM",
+            "SHRI",
+            "SPD",
+            "TTR",
+            "TVC",
+            "ULCX",
+        ]:
             if tracker in trackers:
                 if not audio_prompted:
                     await languages_manager.process_desc_language(meta, tracker=tracker)
@@ -787,6 +814,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                             console.print(f"[yellow]Could not load saved menu image data: {str(e)}")
                     elif meta.get('path_to_menu_screenshots', ""):
                         await process_disc_menus(meta, config)
+
+                if meta.get("audio_spectrogram") or meta.get("audio_spectrogram_tracks") or config["DEFAULT"].get("add_audio_spectrogram", False):
+                    try:
+                        await process_audio_spectrograms(meta, config, uploadscreens_manager)
+                    except Exception as e:
+                        console.print(f"[red]Error processing audio spectrograms: {e}[/red]")
 
                 # Take Screenshots
                 try:
@@ -2108,11 +2141,7 @@ if __name__ == "__main__":
         signal.signal(signal.SIGTERM, _handle_shutdown_signal)
 
     try:
-        # Use ProactorEventLoop for Windows subprocess handling
-        if sys.platform == "win32":
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-        asyncio.run(main())  # Ensures proper loop handling and cleanup
+        asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         if not _shutdown_requested:
             console.print("\n[yellow]Shutting down...[/yellow]")

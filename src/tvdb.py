@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # Restricted-use credential — permitted only under UAPL v1.0 and associated service provider terms
 import asyncio
-import base64
 import contextlib
 import json
 import os
@@ -16,22 +15,6 @@ from tvdb_v4_official import TVDB
 from src.console import console
 
 YEAR_PATTERN = re.compile(r'\((19\d\d|20[0-3]\d)\)')
-
-
-def _get_tvdb_k() -> str:
-    k = (
-        b"MDEwMTEwMDEwMDExMDAxMDAxMDExMDAxMDExMTEwMDAwMTAwMTExMDAxMTAxMTAxMDEwMTAwMDEwMDExMDEwMD"
-        b"AxMDAxMTAxMDExMDEwMTAwMTAxMDAwMTAxMTEwMTAwMDEwMTEwMDEwMDExMDAxMDAxMDAxMDAxMDAxMTAwMTEw"
-        b"MTAwMTEwMTAxMDEwMDExMDAxMTAwMDAwMDExMDAwMDAxMDAxMTEwMDExMDEwMTAwMTEwMTAwMDAxMTAxMTAwMD"
-        b"EwMDExMDAwMTAxMDExMTAxMDAwMTAxMDAxMTAwMTAwMTAxMTAwMTAxMDEwMTAwMDEwMDAxMDEwMTExMDEwMDAx"
-        b"MDAxMTEwMDExMTEwMTAwMTAwMDAxMDAxMTAxMDEwMDEwMTEwMTAwMTAwMDExMTAxMDEwMDAxMDExMTEwMDAwMT"
-        b"AxMTAwMTAxMDEwMTExMDEwMTAwMTAwMTEwMTAxMDAxMDAxMTEwMDEwMTAxMTEwMTAxMTAxMDAxMTAxMDEw"
-    )
-    binary_bytes = base64.b64decode(k)
-    b64_bytes = bytes(
-        int(binary_bytes[i: i + 8], 2) for i in range(0, len(binary_bytes), 8)
-    )
-    return base64.b64decode(b64_bytes).decode()
 
 
 tvdb: Union[TVDB, None] = None
@@ -53,10 +36,7 @@ def _as_dict_list(value: Any) -> list[dict[str, Any]]:
 
 
 def _english_alias_names(aliases: list[dict[str, Any]]) -> list[str]:
-    return [
-        str(alias.get('name', '')).strip() for alias in aliases
-        if alias.get('language') == 'eng' and str(alias.get('name', '')).strip()
-    ]
+    return [str(alias.get("name", "")).strip() for alias in aliases if alias.get("language") == "eng" and str(alias.get("name", "")).strip()]
 
 
 def _pick_eng_alias(
@@ -80,7 +60,7 @@ def _extract_year_from_text(value: Any) -> Optional[str]:
     if not isinstance(value, (str, int)):
         return None
 
-    match = re.search(r'(19\d\d|20[0-3]\d)', str(value))
+    match = re.search(r"(19\d\d|20[0-3]\d)", str(value))
     return match.group(1) if match else None
 
 
@@ -88,7 +68,7 @@ def _best_effort_series_year(series_info: Optional[dict[str, Any]]) -> Optional[
     if not series_info:
         return None
 
-    return _extract_year_from_text(series_info.get('year')) or _extract_year_from_text(series_info.get('slug'))
+    return _extract_year_from_text(series_info.get("year")) or _extract_year_from_text(series_info.get("slug"))
 
 
 def _series_translation_metadata(
@@ -102,11 +82,11 @@ def _series_translation_metadata(
     translation_aliases: list[str] = []
 
     try:
-        translation = cast(dict[str, Any], client.get_series_translation(series_id, 'eng'))
-        name = translation.get('name')
+        translation = cast(dict[str, Any], client.get_series_translation(series_id, "eng"))
+        name = translation.get("name")
         if isinstance(name, str) and name.strip():
             translation_name = name.strip()
-        aliases_value = translation.get('aliases')
+        aliases_value = translation.get("aliases")
         if isinstance(aliases_value, list):
             translation_aliases = [str(alias).strip() for alias in aliases_value if str(alias).strip()]
     except Exception as translation_error:
@@ -129,21 +109,44 @@ def _series_translation_metadata(
         console.print(f"[blue]TVDB English series title: {title}" + (f" ({year})" if year else "") + "[/blue]")
 
     return {
-        'series_title': title,
-        'series_year': year,
+        "series_title": title,
+        "series_year": year,
     }
 
 
-try:
-    tvdb = TVDB(_get_tvdb_k())
-except (ssl.SSLError, URLError) as e:
-    _tvdb_init_error = e
-except Exception as e:
-    _tvdb_init_error = e
+def _get_tvdb_or_warn(config: Optional[dict[str, Any]] = None) -> Optional[TVDB]:
+    global tvdb, _tvdb_error_reported, _tvdb_init_error
 
+    if tvdb is not None:
+        return tvdb
 
-def _get_tvdb_or_warn() -> Optional[TVDB]:
-    global _tvdb_error_reported
+    # Extract key from passed config
+    tvdb_api_key = ""
+    if isinstance(config, dict):
+        tvdb_api_key = config.get("DEFAULT", {}).get("tvdb_api", "")
+
+    # Fallback to importing data.config if not found in the passed config
+    if not tvdb_api_key:
+        try:
+            from data.config import config as imported_config
+
+            if isinstance(imported_config, dict):
+                tvdb_api_key = imported_config.get("DEFAULT", {}).get("tvdb_api", "")
+        except Exception:
+            pass
+
+    if not isinstance(tvdb_api_key, str) or not tvdb_api_key.strip():
+        if not _tvdb_error_reported:
+            _tvdb_error_reported = True
+            console.print("[yellow]TVDB API key is missing in config.py under DEFAULT section. Continuing without TVDB.[/yellow]")
+        return None
+
+    try:
+        tvdb = TVDB(tvdb_api_key.strip())
+    except (ssl.SSLError, URLError) as e:
+        _tvdb_init_error = e
+    except Exception as e:
+        _tvdb_init_error = e
 
     if tvdb is not None:
         return tvdb
@@ -179,7 +182,7 @@ class tvdb_data:
     ) -> tuple[Optional[list[dict[str, Any]]], Optional[int]]:
         if debug:
             console.print(f"filename for TVDB search: {filename} year: {year}")
-        client = _get_tvdb_or_warn()
+        client = _get_tvdb_or_warn(self.config)
         if client is None:
             return None, None
 
@@ -330,7 +333,7 @@ class tvdb_data:
                             }
 
                             if not episodes_data.get('series_title') and not episodes_data.get('series_year'):
-                                client = _get_tvdb_or_warn()
+                                client = _get_tvdb_or_warn(self.config)
                                 if client is not None:
                                     try:
                                         series_info = cast(dict[str, Any], cast(Any, client).get_series_extended(series_id_int))
@@ -357,7 +360,7 @@ class tvdb_data:
                     console.print(f"[yellow]Failed to read TVDB cache for {series_id}: {cache_error}[/yellow]")
 
         try:
-            client = _get_tvdb_or_warn()
+            client = _get_tvdb_or_warn(self.config)
             if client is None:
                 return None, None
 
@@ -492,7 +495,7 @@ class tvdb_data:
         debug: bool = False,
         tv_movie: bool = False,
     ) -> tuple[Optional[int], Optional[str]]:
-        client = _get_tvdb_or_warn()
+        client = _get_tvdb_or_warn(self.config)
         if client is None:
             return None, None
 
@@ -641,7 +644,7 @@ class tvdb_data:
         debug: bool = False,
     ) -> Optional[str]:
         try:
-            client = _get_tvdb_or_warn()
+            client = _get_tvdb_or_warn(self.config)
             if client is None:
                 return None
 

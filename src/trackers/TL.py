@@ -152,6 +152,22 @@ class TL:
                 if screenshots_block:
                     desc_parts.append("<center>" + screenshots_block + "</center>")
 
+            # Audio Spectrograms
+            audio_spectrograms = cast(list[dict[str, Any]], meta.get("spectrograms_images", []))
+            if audio_spectrograms:
+                desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+                spectrograms_block = ""
+                for i, image in enumerate(audio_spectrograms):
+                    img_url = image.get("img_url", image.get("raw_url"))
+                    web_url = image.get("web_url")
+                    if img_url and web_url:
+                        spectrograms_block += f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
+                    if (i + 1) % 2 == 0:
+                        spectrograms_block += "<br><br>"
+                if spectrograms_block:
+                    desc_parts.append("<center>" + spectrograms_block + "</center>")
+
         # Signature
         desc_parts.append(
             f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/Audionut/Upload-Assistant">{meta.get('ua_signature', '')}</a></div>"""
@@ -236,16 +252,14 @@ class TL:
         raise NotImplementedError('Failed to determine TL category!')
 
     def get_screens(self, meta: Meta) -> list[str]:
-        images = cast(list[dict[str, Any]], meta.get('menu_images', [])) + cast(
-            list[dict[str, Any]], meta.get('image_list', [])
-        )
+        images = cast(list[dict[str, Any]], meta.get("menu_images", [])) + cast(list[dict[str, Any]], meta.get("image_list", []) + meta.get("spectrograms_images", []))
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
-    def get_name(self, meta: Meta) -> str:
-        is_scene = bool(meta.get('scene_name'))
-        name = str(meta.get('scene_name', '')) if is_scene else str(meta.get('name', '')).replace(str(meta.get('aka', '')), '')
+    async def get_name(self, meta):
+        tl_name = meta.get('name').replace(meta['aka'], '')
+        tl_name = re.sub(r"\s{2,}", " ", tl_name)
 
-        return name
+        return tl_name
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
         login = await self.login(meta, force=True)
@@ -341,15 +355,15 @@ class TL:
         async with aiofiles.open(torrent_path, 'rb') as open_torrent:
             torrent_bytes = await open_torrent.read()
         files: dict[str, tuple[Any, Any, str]] = {
-            'torrent': (self.get_name(meta) + '.torrent', torrent_bytes, 'application/x-bittorrent')
+            "torrent": (f"{await self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
         }
 
         data: dict[str, Any] = {
-            'announcekey': self.passkey,
-            'category': self.get_category(meta),
-            'description': await self.generate_description(meta),
-            'name': self.get_name(meta),
-            'nonscene': 'on' if not meta.get('scene') else 'off',
+            "announcekey": self.passkey,
+            "category": self.get_category(meta),
+            "description": await self.generate_description(meta),
+            "name": await self.get_name(meta),
+            "nonscene": "on" if not meta.get("scene") else "off",
         }
 
         if meta.get('anime', False) and meta.get('mal_id', 0) != 0:
@@ -404,19 +418,19 @@ class TL:
             tvMazeURL = f"https://www.tvmaze.com/shows/{meta.get('tvmaze_id')}"
 
         data: dict[str, Any] = {
-            'name': self.get_name(meta),
-            'category': self.get_category(meta),
-            'nonscene': 'on' if not meta.get("scene") else 'off',
-            'imdbURL': str(cast(dict[str, Any], meta.get('imdb_info', {})).get('imdb_url', '')),
-            'tvMazeURL': tvMazeURL,
-            'igdbURL': '',
-            'torrentNFO': '0',
-            'torrentDesc': '1',
-            'nfotextbox': '',
-            'torrentComment': '0',
-            'uploaderComments': '',
-            'is_anonymous_upload': 'off',
-            'screenshots[]': self.get_screens(meta) if self.tracker_config.get('img_rehost', True) else '',
+            "name": await self.get_name(meta),
+            "category": self.get_category(meta),
+            "nonscene": "on" if not meta.get("scene") else "off",
+            "imdbURL": str(cast(dict[str, Any], meta.get("imdb_info", {})).get("imdb_url", "")),
+            "tvMazeURL": tvMazeURL,
+            "igdbURL": "",
+            "torrentNFO": "0",
+            "torrentDesc": "1",
+            "nfotextbox": "",
+            "torrentComment": "0",
+            "uploaderComments": "",
+            "is_anonymous_upload": "off",
+            "screenshots[]": self.get_screens(meta) if self.tracker_config.get("img_rehost", True) else "",
         }
 
         anon = not (meta.get('anon') == 0 and not self.tracker_config.get('anon', False))
@@ -460,6 +474,8 @@ class TL:
                     meta['tracker_status'][self.tracker]['status_message'] = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
+                    await self.edit_post_upload(meta)
+
                     await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
                     return True
 
@@ -470,5 +486,23 @@ class TL:
                     return False
 
             except httpx.RequestError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error - {str(e)}'
-                return False
+                status_message = f'data error - {str(e)}'
+
+            meta['tracker_status'][self.tracker]['status_message'] = status_message
+
+    async def edit_post_upload(self, meta):
+        data = {
+            "torrentID": meta["tracker_status"][self.tracker]["torrent_id"],
+            "name": await self.get_name(meta),
+            "category": self.get_category(meta),
+            "uploaderComments": "",
+        }
+
+        try:
+            response = await self.session.post("https://www.torrentleech.org/torrents/torrent/edit", data=data, timeout=30)
+            if not response.status_code == 302:
+                console.print("TL: Failed to edit torrent.")
+        except Exception as e:
+            console.print(f"TL: Failed to edit torrent: {str(e)}")
+
+        return

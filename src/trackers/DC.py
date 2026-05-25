@@ -85,6 +85,12 @@ class DC:
             [cast(dict[str, Any], img) for img in images_list if isinstance(img, dict)]
         )
 
+        spectrograms_images = meta.get("spectrograms_images", [])
+        spectrograms_images_list: list[Any] = []
+        if isinstance(spectrograms_images, list):
+            spectrograms_images_list = cast(list[Any], spectrograms_images)
+        all_images.extend([cast(dict[str, Any], img) for img in spectrograms_images_list if isinstance(img, dict)])
+
         if all_images:
             screenshots_block = ""
             for image in all_images:
@@ -232,6 +238,7 @@ class DC:
             dc_name = dc_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
             dc_name = unicodedata.normalize("NFD", dc_name)
             dc_name = "".join(c for c in dc_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
+            dc_name = dc_name.replace("!", "")
             if scene_name:
                 dc_name += " [UNRAR]"
 

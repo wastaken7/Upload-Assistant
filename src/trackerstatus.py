@@ -15,6 +15,7 @@ from src.clients import Clients
 from src.console import console
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
+from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
@@ -35,6 +36,8 @@ class TrackerStatusManager:
         tracker_setup: Any = TRACKER_SETUP(config=self.config)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
+        if any(tracker in meta["trackers"] for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):
+            meta["douban_id"] = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
         for tracker in meta['trackers']:
             if 'tracker_status' not in meta:
@@ -118,6 +121,11 @@ class TrackerStatusManager:
                         dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta), disctype))
                     else:
                         dupes = []
+
+                    async with meta_lock:
+                        if 'initial_dupes' not in meta:
+                            meta['initial_dupes'] = {}
+                        meta['initial_dupes'][tracker_name] = copy.deepcopy(dupes)
 
                     if tracker_name == "ASC" and meta.get('anon', 'false'):
                         console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")

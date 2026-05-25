@@ -13,6 +13,14 @@ config = {
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
 
+        # tvdb api key
+        # visit "https://www.thetvdb.com/dashboard/account/apikey" copy api key and insert below
+        "tvdb_api": "",
+
+        # visit "https://thetvdb.github.io/v4-api/#/Login/post_login" enter api key, generate token and insert token below
+        # the pin in the login form is not needed (don't modify), only enter your api key
+        "tvdb_token": "",
+
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
 
@@ -230,6 +238,9 @@ config = {
         # Can be overridden in a per-tracker setting by adding this same config
         "disc_menu_header": "",
 
+        # Header to add above the audio spectrograms
+        "audio_spectrogram_header": "[center][b]Audio Spectrogram[/b][/center]",
+
         # Allows adding a custom signature, in BBCode, at the bottom of the description section
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_signature": "",
@@ -247,7 +258,21 @@ config = {
         # So you probably want a smaller size than screenshots for instance
         "bluray_image_size": "250",
 
+        # Set true to add audio spectrograms to the description
+        "add_audio_spectrogram": False,
+        # Set true to generate spectrograms for all audio streams
+        "process_all_audio_spectrogram": False,
+
         # CLIENT SETUP
+
+        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
+        "qbit_bandwidth_control": False,
+
+        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
+        "qbit_bandwidth_threshold": 0,
+
+        # The duration of time in seconds to average the upload speed over.
+        "qbit_bandwidth_time": 0,
 
         # Which client are you using.
         "default_torrent_client": "qbittorrent",
@@ -350,7 +375,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, DT, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, DT, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MTEAM, MTV, NBL, OE, OTW, PHD, PT, PTCAFE, PTER, PTFANS, PTGTK, PTP, PTS, PTT, R4E, RAS, RF, RPT, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -618,6 +643,18 @@ config = {
             "api_key": "",
             "anon": False,
         },
+        "IPT": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # For IPT to work, you need to export cookies from the site using:
+            # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # Cookies must be in Netscape format and saved in: data/cookies/IPT.txt
+            "announce_url": "https://ssl.empirehost.me/<PASS_KEY/PID>/announce",
+            # By default, IPT removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
+            # It also does not have the option to set the IMDb during upload.
+            # Set this to True to edit the torrent after the upload to force the correct naming and IMDb.
+            "force_data": False,
+        },
         "IHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -638,6 +675,14 @@ config = {
             "api_key": "",
             "anon": False,
         },
+        "LAJIDUI": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for LAJIDUI to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/LAJIDUI.txt
+            "announce_url": "https://pt.lajidui.top/announce.php?passkey=<PASSKEY>",
+            "anon": False,
+        },
         "LCD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -648,6 +693,14 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
+            "anon": False,
+        },
+        "LPT": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for LPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/LPT.txt
+            "announce_url": "https://longpt.org/announce.php?passkey=<PASSKEY>",
             "anon": False,
         },
         "LST": {
@@ -677,6 +730,13 @@ config = {
             "anon": False,
             # Send uploads to LUME modq for staff approval
             "modq": False,
+        },
+        "MTEAM": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "api_key": "",
+            "anon": False,
+            "base_url": "kp.m-team.cc"
         },
         "MTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -732,6 +792,14 @@ config = {
             "api_key": "",
             "anon": False,
         },
+        "PTCAFE": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for PTCAFE to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTCAFE.txt
+            "announce_url": "https://tracker.ptcafe.club/announce.php?passkey=<PASSKEY>",
+            "anon": False,
+        },
         "PTER": {  # Does not appear to be working at all
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -741,6 +809,22 @@ config = {
             "password": "",
             "ptgen_api": "",
             "anon": True,
+        },
+        "PTFANS": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for PTFANS to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTFANS.txt
+            "announce_url": "https://ptfans.cc/announce.php?passkey=<PASSKEY>",
+            "anon": False,
+        },
+        "PTGTK": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for PTGTK to work you need to export cookies from https://pt.gtkpw.xyz using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTGTK.txt
+            "announce_url": "https://t.myaltbox.com/announce.php?passkey=<PASSKEY>",
+            "anon": False,
         },
         "PTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -784,6 +868,14 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
+            "anon": False,
+        },
+        "RPT": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # for RPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/RPT.txt
+            "announce_url": "https://bilibili.download/announce.php?passkey=<PASSKEY>",
             "anon": False,
         },
         "RTF": {

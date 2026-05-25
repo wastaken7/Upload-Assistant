@@ -139,6 +139,27 @@ class HDS:
                 if screenshots_block:
                     desc_parts.append(f"[center]\n{screenshots_block}\n[/center]")
 
+        # Audio Spectrograms
+        audio_spectrograms_value = meta.get("spectrograms_images", [])
+        audio_spectrograms: list[dict[str, Any]] = []
+        if isinstance(audio_spectrograms_value, list):
+            audio_spectrograms_list = cast(list[Any], audio_spectrograms_value)
+            audio_spectrograms.extend([cast(dict[str, Any], item) for item in audio_spectrograms_list if isinstance(item, dict)])
+        if audio_spectrograms:
+            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
+
+            spectrograms_block = ""
+            for image in audio_spectrograms:
+                web_url = str(image.get("web_url", ""))
+                img_url = str(image.get("img_url", str(image.get("raw_url", ""))))
+                if web_url and img_url:
+                    spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url]"
+                    # HDS cannot resize images. If the image host does not provide small thumbnails(<400px), place only one image per line
+                    if "imgbox" not in web_url:
+                        spectrograms_block += "\n"
+            if spectrograms_block:
+                desc_parts.append(f"[center]\n{spectrograms_block}\n[/center]")
+
         # Signature
         desc_parts.append(
             f"[center][url=https://github.com/Audionut/Upload-Assistant][size=2]{meta.get('ua_signature', '')}[/size][/url][/center]"

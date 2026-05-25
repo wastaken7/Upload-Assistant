@@ -41,3 +41,7 @@ reportMissingTypeStubs = false
 reportUnknownMemberType = true
 reportUnknownVariableType = true
 exclude = ["data"]
+
+[tool.pyrefly]
+disable-search-path-heuristics = true
+search-path = ["."]

@@ -382,7 +382,7 @@ class AZTrackerBase:
         return file_info
 
     async def get_lang(self, meta: Meta) -> dict[str, list[str]]:
-        self.language_map()
+        self.language_map(meta)
         audio_ids: set[str] = set()
         subtitle_ids: set[str] = set()
 
@@ -511,6 +511,8 @@ class AZTrackerBase:
             if img.get('raw_url')
         ][:12]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
+        audio_spectrogram_links = [img.get("raw_url") for img in meta.get("spectrograms_images", []) if img.get("raw_url")]
+
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, 'rb') as f:
                 image_bytes = await f.read()
@@ -536,7 +538,7 @@ class AZTrackerBase:
                 if result:
                     results.append(result)
 
-        remaining_slots = max(0, limit - len(results))
+        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
 
         if local_files and remaining_slots > 0:
             paths = local_files[:remaining_slots]
@@ -548,13 +550,24 @@ class AZTrackerBase:
 
         else:
             image_links = [img.get('raw_url') for img in meta.get('image_list', []) if img.get('raw_url')]
-            remaining_slots = max(0, limit - len(results))
+            remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
             links = image_links[:remaining_slots]
 
             for url in links:
                 result = await upload_remote_file(url)
                 if result:
                     results.append(result)
+
+        # Upload audio spectrogram images
+        remaining_slots = max(0, limit - len(results))
+        if remaining_slots > 0 and audio_spectrogram_links:
+            for url in audio_spectrogram_links[:remaining_slots]:
+                if not url.lower().endswith(".png"):
+                    console.print(f"{self.tracker}: Skipping non-PNG audio spectrogram image: {url}")
+                else:
+                    result = await upload_remote_file(url)
+                    if result:
+                        results.append(result)
 
         return results
 
@@ -694,6 +707,8 @@ class AZTrackerBase:
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())
+
+        description = description.replace('[*]', '• ')
 
         if not description:
             return ''
@@ -1089,7 +1104,7 @@ class AZTrackerBase:
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True
 
-    def language_map(self) -> None:
+    def language_map(self, meta) -> None:
         all_lang_map = {
             ('Abkhazian', 'abk', 'ab'): '1',
             ('Afar', 'aar', 'aa'): '2',
@@ -1301,6 +1316,34 @@ class AZTrackerBase:
                 ('Bissa', 'bib', 'bib'): '190',
                 ('Romani', 'rom', 'rom'): '191',
             })
+
+        if meta.get('is_disc', ''):
+            if self.tracker == 'CZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
+            elif self.tracker == 'AZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '189',
+                })
+            elif self.tracker == 'PHD':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
+
+        if meta.get('is_disc', ''):
+            if self.tracker == 'CZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
+            elif self.tracker == 'AZ':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '189',
+                })
+            elif self.tracker == 'PHD':
+                all_lang_map.update({
+                    ('Portuguese', 'por', 'pt-br'): '187',
+                })
 
         self.lang_map: dict[str, str] = {}
         for key_tuple, lang_id in all_lang_map.items():
