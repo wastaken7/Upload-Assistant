@@ -5,6 +5,7 @@ import glob
 import json
 import os
 import re
+import shlex
 from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, Optional, Union, cast
@@ -432,8 +433,6 @@ class QueueManager:
                     if not line_stripped or line_stripped.startswith("#"):
                         continue
 
-                    import shlex
-
                     try:
                         args_list = shlex.split(line_stripped, posix=False)
                         cleaned_args = []
@@ -451,8 +450,10 @@ class QueueManager:
 
                         if line_stripped not in processed_files and item_path not in processed_files:
                             queue.append(queue_item)
+                    except ValueError as e:
+                        console.print(f"[red]Error parsing line (shlex) in queue file: {line_stripped}. Error: {e}[/red]")
                     except Exception as e:
-                        console.print(f"[red]Error parsing line in queue file: {line_stripped}. Error: {e}[/red]")
+                        console.print(f"[red]Unexpected error processing line in queue file: {line_stripped}. Error: {e}[/red]")
 
                 if not queue:
                     console.print(f"[bold yellow]All items in the {queue_name} queue have already been processed.[/bold yellow]")
@@ -748,7 +749,7 @@ async def extract_safe_file_locations(log_file: str) -> list[str]:
 
 
 async def display_queue(
-    queue: Sequence[str],
+    queue: Sequence[Any],
     base_dir: Optional[str] = None,
     queue_name: Optional[str] = None,
     save_to_log: bool = True,

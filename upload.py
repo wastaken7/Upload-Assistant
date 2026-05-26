@@ -1551,7 +1551,7 @@ async def do_the_thing(base_dir: str) -> None:
                     for key, val in base_meta.items():
                         if val not in (None, False, []):
                             option_strings = dest_to_options.get(key, [])
-                            if option_strings and not any(opt in args_list for opt in option_strings):
+                            if option_strings and not any(arg == opt or arg.startswith(opt + "=") for opt in option_strings for arg in args_list):
                                 meta[key] = val
 
                     path = meta.get("path")
