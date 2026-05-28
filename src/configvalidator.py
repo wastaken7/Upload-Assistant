@@ -483,7 +483,7 @@ def _validate_trackers_section(
                 )
 
         # Check boolean fields are actually booleans (must be real bool, not string)
-        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost"]
+        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles"]
         for field in bool_fields:
             if field in tracker_config_dict:
                 value = tracker_config_dict[field]

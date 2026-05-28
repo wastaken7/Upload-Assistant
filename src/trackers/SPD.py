@@ -292,7 +292,9 @@ class SPD:
             'url': str(cast(dict[str, Any], meta.get('imdb_info', {})).get('imdb_url', '')),
         }
 
-        data['file'] = await self.encode_to_base64(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
+        torrent_filename = await self.common.get_torrent_filename(meta, tracker_config)
+        data["file"] = await self.encode_to_base64(f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent")
         if meta.get('debug') is True:
             data['file'] = str(data['file'])[:50] + '...[DEBUG MODE]'
             if data.get('nfo'):

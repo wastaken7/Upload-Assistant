@@ -1113,24 +1113,36 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             with contextlib.suppress(asyncio.CancelledError):
                 await progress_task
 
+        has_local_subs = bool(meta.get("subtitle_files"))
         torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
+        subs_torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE_SUBS.torrent")
+
         if meta.get('force_recheck', False):
             waiter = Wait(config)
             await waiter.select_and_recheck_best_torrent(meta, meta['path'], check_interval=5)
-        if not os.path.exists(torrent_path):
-            reuse_torrent = None
-            if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
-                reuse_torrent = await client.find_existing_torrent(meta)
-                if reuse_torrent is not None:
-                    await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
 
-            if meta['nohash'] is False and reuse_torrent is None:
-                await TorrentCreator.create_torrent(meta, Path(meta['path']), "BASE")
-            if meta['nohash']:
-                meta['client'] = "none"
+        # 1. Reuse existing torrent from client if possible
+        reuse_torrent = None
+        if meta.get("rehash", False) is False and not meta["base_torrent_created"] and not meta["we_checked_them_all"]:
+            reuse_torrent = await client.find_existing_torrent(meta)
+            if reuse_torrent is not None:
+                await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta["base_dir"], meta["uuid"])
 
-        elif os.path.exists(torrent_path) and meta.get('rehash', False) is True and meta['nohash'] is False:
-            await TorrentCreator.create_torrent(meta, Path(meta['path']), "BASE")
+        # 2. Re-create base torrents if rehash is True
+        if meta.get("rehash", False) is True and meta["nohash"] is False:
+            await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE")
+            if has_local_subs:
+                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
+
+        # 3. Otherwise generate if missing
+        else:
+            if not os.path.exists(torrent_path) and meta["nohash"] is False:
+                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE")
+            if has_local_subs and not os.path.exists(subs_torrent_path) and meta["nohash"] is False:
+                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
+
+        if meta["nohash"]:
+            meta["client"] = "none"
 
         if os.path.exists(torrent_path):
             raw_trackers = meta.get('trackers')

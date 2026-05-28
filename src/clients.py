@@ -558,32 +558,45 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 if meta['debug']:
                     console.log(f"Torrent is valid based on disc/basename or keep-folder: {valid}")
 
-            # If one file, check for folder
-            elif len(torrent.files) == len(filelist) == 1:
-                if os.path.basename(torrent.files[0]) == os.path.basename(filelist[0]):
-                    if str(torrent.files[0]) == os.path.basename(torrent.files[0]):
-                        valid = True
-                    else:
-                        wrong_file = True
-                if meta['debug']:
-                    console.log(f"Single file match status: valid={valid}, wrong_file={wrong_file}")
+            # Otherwise we match either only videos (no subtitles) OR videos + subtitles (if subtitles are present)
+            else:
+                subtitle_files = meta.get("subtitle_files", [])
+                candidates = [filelist]
+                if subtitle_files:
+                    candidates.append(filelist + subtitle_files)
 
-            # Check if number of files matches number of videos
-            elif len(torrent.files) == len(filelist):
-                torrent_filepath = os.path.commonpath(torrent.files)
-                actual_filepath = os.path.commonpath(filelist)
-                local_path, remote_path = await self.remote_path_map(meta, client)
-                if local_path.lower() in meta_path.lower() and local_path.lower() != remote_path.lower():
-                    actual_filepath = actual_filepath.replace(local_path, remote_path).replace(os.sep, '/')
+                for cand in candidates:
+                    # If one file, check for folder
+                    if len(torrent.files) == len(cand) == 1:
+                        if os.path.basename(torrent.files[0]) == os.path.basename(cand[0]):
+                            if str(torrent.files[0]) == os.path.basename(torrent.files[0]):
+                                valid = True
+                                break
+                            else:
+                                wrong_file = True
+                        if meta["debug"]:
+                            console.log(f"Single file match status: valid={valid}, wrong_file={wrong_file}")
 
-                if meta['debug']:
-                    console.log(f"Torrent_filepath: {torrent_filepath}")
-                    console.log(f"Actual_filepath: {actual_filepath}")
+                    # Check if number of files matches number of videos (+ subtitles optionally)
+                    elif len(torrent.files) == len(cand):
+                        torrent_filepath = os.path.commonpath(torrent.files)
+                        actual_filepath = os.path.commonpath(cand)
+                        local_path, remote_path = await self.remote_path_map(meta, client)
+                        if local_path.lower() in meta_path.lower() and local_path.lower() != remote_path.lower():
+                            actual_filepath = actual_filepath.replace(local_path, remote_path).replace(os.sep, "/")
 
-                if torrent_filepath in actual_filepath:
-                    valid = True
-                if meta['debug']:
-                    console.log(f"Multiple file match status: valid={valid}")
+                        if meta["debug"]:
+                            console.log(f"Torrent_filepath: {torrent_filepath}")
+                            console.log(f"Actual_filepath: {actual_filepath}")
+
+                        cand_basenames = sorted([os.path.basename(f) for f in cand])
+                        torrent_basenames = sorted([os.path.basename(f) for f in torrent.files])
+
+                        if torrent_filepath in actual_filepath and cand_basenames == torrent_basenames:
+                            valid = True
+                            break
+                        if meta["debug"]:
+                            console.log(f"Multiple file match status: valid={valid}")
 
         else:
             console.print(f'[bold yellow]{torrent_path} was not found')

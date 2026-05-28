@@ -407,7 +407,9 @@ config = {
             # anon is not an option when uploading to ASC
             # for ASC to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/ASC.txt
-            "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY"
+            "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY",
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "AZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -450,6 +452,8 @@ config = {
             "anon": False,
             # Set to False if during an anonymous upload you want your release group to be hidden
             "show_group_if_anon": True,
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "BLU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -465,6 +469,8 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/BT.txt
             "announce_url": "https://t.brasiltracker.org/<PASSKEY>/announce",
             "anon": False,
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "CBR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -477,6 +483,8 @@ config = {
             # If set, the script will try to preserve the original group's name.
             # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
             "tag_for_custom_release": "",
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -643,6 +651,8 @@ config = {
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "LDU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -805,6 +815,8 @@ config = {
             # If set, the script will try to preserve the original group's name.
             # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
             "tag_for_custom_release": "",
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "SHRI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

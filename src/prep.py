@@ -156,6 +156,7 @@ class Prep:
         meta['audio_languages'] = None
         meta['subtitle_languages'] = None
         meta['aither_trumpable'] = None
+        meta["subtitle_files"] = cast(list[str], [])
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid') is None:
@@ -333,6 +334,28 @@ class Prep:
             meta['filelist'] = filelist
             search_term = os.path.basename(filelist[0]) if filelist else ""
             search_file_folder = 'file'
+
+            # Scan for external subtitle files
+            meta["subtitle_files"] = cast(list[str], [])
+            subtitle_exts = {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}
+            if meta["isdir"]:
+                for root, _, files in os.walk(meta["path"]):
+                    if any(x in root.upper() for x in ["BDMV", "VIDEO_TS", "HVDVD_TS"]):
+                        continue
+                    for file in files:
+                        ext = os.path.splitext(file)[1].lower()
+                        if ext in subtitle_exts:
+                            meta["subtitle_files"].append(os.path.abspath(os.path.join(root, file)))
+            else:
+                parent_dir = os.path.dirname(meta["path"])
+                if parent_dir and os.path.exists(parent_dir):
+                    base_name = os.path.splitext(os.path.basename(meta["path"]))[0]
+                    for file in os.listdir(parent_dir):
+                        if os.path.isfile(os.path.join(parent_dir, file)):
+                            ext = os.path.splitext(file)[1].lower()
+                            if ext in subtitle_exts and file.lower().startswith(base_name.lower()):
+                                meta["subtitle_files"].append(os.path.abspath(os.path.join(parent_dir, file)))
+            meta["subtitle_files"] = sorted(set(meta["subtitle_files"]))
 
             video, meta['scene'], meta['imdb_id'] = await self.scene_manager.is_scene(videopath, meta, meta.get('imdb_id', 0))
 
