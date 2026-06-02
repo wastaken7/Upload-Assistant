@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import filecmp
 import gc
+import glob
 import json
 import os
 import platform
@@ -428,6 +429,88 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
         await asyncio.gather(*[validate_single_tracker(tracker) for tracker in valid_trackers])
 
 
+async def _prompt_book_meta(meta: Meta) -> None:
+    """Prompt the user to fill in missing BOOK metadata fields (title, author, year, language).
+
+    Runs only in interactive (attended) mode.  When any field is filled in the
+    torrent name is rebuilt so the confirmation screen and the per-tracker
+    uploads reflect the new values.
+    """
+    book_required_fields = ["title", "author", "year", "book_language"]
+    book_missing = [f for f in book_required_fields if not meta.get(f) or str(meta.get(f)).strip().lower() in ("", "none", "null")]
+    if not book_missing:
+        return
+
+    if meta.get("unattended", False):
+        console.print(
+            f"[yellow]BOOK upload: the following required fields are missing: "
+            f"{', '.join(book_missing)}. "
+            f"Re-run with -btitle / -author / -year / -blang to supply them, "
+            f"or trackers that require them will be skipped.[/yellow]"
+        )
+        return
+
+    console.print(f"[bold yellow]BOOK upload: the following fields are required by some trackers: {', '.join(book_missing)}.[/bold yellow]")
+    name_needs_rebuild = False
+    try:
+        for field in book_missing:
+            prompt_label = "language" if field == "book_language" else field
+            value = (cli_ui.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
+            if value:
+                if field == "book_language":
+                    try:
+                        import langcodes
+
+                        # Try get() for ISO codes first, then find() for names
+                        try:
+                            lc = langcodes.get(value.lower())
+                            full_name = lc.display_name("en") or value.title()
+                            alpha3 = lc.to_alpha3() or ""
+                            if full_name and full_name.lower() != value.lower():
+                                meta["book_language"] = full_name
+                                meta["book_language_iso"] = alpha3
+                            else:
+                                raise LookupError("no change")
+                        except Exception:
+                            lc = langcodes.find(value)
+                            meta["book_language"] = lc.display_name("en") or value.title()
+                            meta["book_language_iso"] = lc.to_alpha3() or ""
+                    except Exception:
+                        meta["book_language"] = value.title()
+                        meta["book_language_iso"] = ""
+                else:
+                    meta[field] = value
+                name_needs_rebuild = True
+    except EOFError:
+        console.print("[yellow]Input cancelled — continuing with missing book fields.[/yellow]")
+        name_needs_rebuild = False
+
+    # Rebuild the torrent name so the confirmation screen and upload reflect the new values
+    if name_needs_rebuild and not meta.get("emby", False):
+        meta["name_notag"], meta["name"], meta["clean_name"], meta["potential_missing"] = await name_manager.get_name(meta)
+
+
+def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
+    """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
+
+    Args:
+        meta: The metadata dictionary (needs ``base_dir`` and ``uuid``).
+        min_successful_uploads: The configured minimum number of successful image uploads.
+
+    Returns:
+        A ``(actual_screens, capped_min)`` tuple where *actual_screens* is the
+        number of non-poster PNGs found and *capped_min* is
+        ``min(min_successful_uploads, actual_screens)`` so the upload loop never
+        requires more images than actually exist.
+    """
+    tmp_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}"
+    img_files = glob.glob(f"{tmp_dir}/*.png")
+    screenshot_files = [f for f in img_files if not os.path.basename(f).startswith("POSTER")]
+    actual_screens = len(screenshot_files)
+    capped_min = min(min_successful_uploads, actual_screens)
+    return actual_screens, capped_min
+
+
 async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
     """Process the metadata for each queued path."""
     if use_discord and bot:
@@ -525,6 +608,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             await tracker_data_manager.get_tracker_data(
                 meta['video'], meta, search_term, search_file_folder, meta['category'], only_id=meta['only_id']
             )
+
+    # For BOOK category, certain trackers (e.g. CBR) require title, author, year and language.
+    # Prompt here - on the shared meta - so the data flows into every tracker's upload
+    # and into get_name (which runs again below if any field was filled in).
+    if meta.get("category") == "BOOK" and not meta.get("emby", False):
+        await _prompt_book_meta(meta)
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get('trackers', [])
@@ -1006,12 +1095,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                         console.print(
                             f"[cyan]Image host debug: pre-upload_screens meta['imghost']={meta.get('imghost')} image_list={len(image_list_for_debug)} cutoff={meta.get('cutoff')} screens={meta.get('screens')}[/cyan]"  # noqa: E501
                         )
-
                     return_dict: dict[str, Any] = {}
                     try:
                         default_cfg_obj = config.get('DEFAULT', {})
                         default_cfg = cast(dict[str, Any], default_cfg_obj) if isinstance(default_cfg_obj, dict) else {}
                         min_successful_uploads = int(default_cfg.get('min_successful_image_uploads', 3))
+                        if meta.get("category") == "BOOK":
+                            meta["screens"], min_successful_uploads = book_screens(meta, min_successful_uploads)
+
                         host_order: list[str] = []
                         for host_index in range(1, 10):
                             host_key = f'img_host_{host_index}'

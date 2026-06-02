@@ -37,7 +37,7 @@ Common options:
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
-  -c, --category             Category (movie, tv, fanres)
+  -c, --category             Category (movie, tv, fanres, ebook)
   -t, --type                 Type (disc, remux, encode, webdl, etc.)
   --source                   Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
   -comps, --comparison       Use comparison images from a folder (input folder path): see -comps_index
@@ -92,7 +92,9 @@ class Args:
         parser.add_argument('-comps', '--comparison', nargs='+', required=False, help="Use comparison images from a folder (input folder path). See: https://github.com/Audionut/Upload-Assistant/pull/487", default=None)
         parser.add_argument('-comps_index', '--comparison_index', nargs=1, required=False, help="Which of your comparison indexes is the main images (required when comps)", type=int, default=None)
         parser.add_argument('-mf', '--manual_frames', nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
-        parser.add_argument('-c', '--category', nargs=1, required=False, help="Category [movie, tv, fanres]", choices=['movie', 'tv', 'fanres'], dest="manual_category")
+        parser.add_argument(
+            "-c", "--category", nargs=1, required=False, help="Category [movie, tv, fanres, book]", choices=["movie", "tv", "fanres", "book"], dest="manual_category"
+        )
         parser.add_argument('-t', '--type', nargs=1, required=False, help="Type [DISC, REMUX, ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP]", choices=['disc', 'remux', 'encode', 'webdl', 'web-dl', 'webrip', 'hdtv', 'dvdrip'], dest="manual_type")
         parser.add_argument('--source', nargs=1, required=False, help="Source [Blu-ray, BluRay, DVD, DVD5, DVD9, HDDVD, WEB, HDTV, UHDTV, LaserDisc, DCP]", choices=['Blu-ray', 'BluRay', 'DVD', 'DVD5', 'DVD9', 'HDDVD', 'WEB', 'HDTV', 'UHDTV', 'LaserDisc', 'DCP'], dest="manual_source")
         parser.add_argument('-res', '--resolution', nargs=1, required=False, help="Resolution [2160p, 1080p, 1080i, 720p, 576p, 576i, 480p, 480i, 8640p, 4320p, OTHER]", choices=['2160p', '1080p', '1080i', '720p', '576p', '576i', '480p', '480i', '8640p', '4320p', 'other'])
@@ -122,6 +124,26 @@ class Args:
         parser.add_argument('-oil', '--only-if-languages', dest='has_languages',  nargs='*', required=False, help="Require at least one of the languages to upload. Comma separated list e.g. 'English, French, Spanish'", type=str)
         parser.add_argument('-ns', '--no-seed', action='store_true', required=False, help="Do not add torrent to the client")
         parser.add_argument('-year', '--year', dest='manual_year', nargs=1, required=False, help="Override the year found", type=int, default=0)
+        parser.add_argument("-author", "--author", nargs=1, required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
+        parser.add_argument("-btitle", "--book-title", nargs=1, required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument(
+            "-blang",
+            "--book-language",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook language (overrides auto-detected value, e.g. 'English', 'Portuguese', 'pt')",
+            type=str,
+            dest="book_language",
+        )
+        parser.add_argument(
+            "-isbn",
+            "--isbn",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook ISBN (overrides auto-detected value)",
+            type=str,
+            dest="book_isbn",
+        )
         parser.add_argument('-mc', '--commentary', dest='manual_commentary', action='store_true', required=False, help="Manually indicate whether commentary tracks are included")
         parser.add_argument('-sfxs', '--sfx-subtitles', dest='sfx_subtitles', action='store_true', required=False, help="Manually indicate whether subtitles with visual enhancements like animations, effects, or backgrounds are included")
         parser.add_argument('-e', '--extras', dest='extras', action='store_true', required=False, help="Indicates that extras are included. Mainly used for Blu-rays discs")
@@ -489,7 +511,59 @@ class Args:
                 sys.exit(1)
         else:
             meta['manual_frames'] = None
+
+        # Apply book metadata overrides: --author and --book-title map to meta keys
+        # used by trackers like CBR when constructing the torrent name for BOOK category.
+        self._apply_book_meta_overrides(meta)
+
         return meta, parser, before_args
+
+    @staticmethod
+    def _apply_book_meta_overrides(meta: dict[str, Any]) -> None:
+        """Normalise CLI book arguments (--author, --book-title, --blang, --isbn) into *meta*.
+
+        Maps ``book_author`` / ``book_title`` to the ``author`` / ``title`` keys
+        expected by trackers like CBR.  Maps ``book_isbn`` to ``isbn``.
+        Resolves the ``book_language`` value via
+        *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
+        Falls back gracefully when *langcodes* is unavailable or the code is unknown.
+        """
+        book_author_arg = meta.get("book_author")
+        if book_author_arg not in (None, ""):
+            meta["author"] = str(book_author_arg).strip()
+
+        book_title_arg = meta.get("book_title")
+        if book_title_arg not in (None, ""):
+            meta["title"] = str(book_title_arg).strip()
+
+        book_isbn_arg = meta.get("book_isbn")
+        if book_isbn_arg not in (None, ""):
+            meta["isbn"] = str(book_isbn_arg).strip()
+
+        book_language_arg = meta.get("book_language")
+        if book_language_arg not in (None, ""):
+            raw_lang = str(book_language_arg).strip()
+            try:
+                import langcodes
+
+                # Try get() first (ISO 639-1/3 codes like "pt", "por")
+                try:
+                    lc = langcodes.get(raw_lang.lower())
+                    full_name = lc.display_name("en") or raw_lang.title()
+                    alpha3 = lc.to_alpha3() or ""
+                    if full_name and full_name.lower() != raw_lang.lower():
+                        meta["book_language"] = full_name
+                        meta["book_language_iso"] = alpha3
+                    else:
+                        raise LookupError("no display name change")
+                except Exception:
+                    # Fall back to find() for natural language names ("Portuguese")
+                    lc = langcodes.find(raw_lang)
+                    meta["book_language"] = lc.display_name("en") or raw_lang.title()
+                    meta["book_language_iso"] = lc.to_alpha3() or ""
+            except Exception:
+                meta["book_language"] = raw_lang.title()
+                meta["book_language_iso"] = ""
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:

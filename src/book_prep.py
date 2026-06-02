@@ -1,0 +1,456 @@
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+"""Book and Audiobook preparation helpers.
+
+This module contains the logic that was previously inlined inside the
+``Prep`` class in ``prep.py``.  It is intentionally kept free of any
+``Prep``-specific imports so it can be tested and extended in isolation.
+"""
+from __future__ import annotations
+
+import contextlib
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+import zipfile
+from typing import Any, Optional
+
+import langcodes
+
+from src.console import console
+from src.exportmi import exportInfo
+
+# ---------------------------------------------------------------------------
+# File-list resolution
+# ---------------------------------------------------------------------------
+
+def resolve_book_filelist(
+    meta: dict[str, Any],
+    videoloc: str,
+) -> tuple[str, list[str], str, str]:
+    """Scan *videoloc* for book/audiobook files and update *meta* in-place.
+
+    Populates ``meta["filelist"]``, ``meta["scene"]``, ``meta["imdb_id"]``,
+    and ``meta["is_audiobook"]``.
+
+    Returns:
+        A 4-tuple ``(videopath, filelist, search_term, search_file_folder)``
+        where *videopath* is the primary/largest file used as the "video"
+        reference for downstream processing.
+    """
+    book_extensions: set[str] = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
+    audiobook_extensions: set[str] = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
+    allowed_extensions = book_extensions | audiobook_extensions
+
+    filelist: list[str] = []
+    if os.path.isdir(videoloc):
+        for root, _, files in os.walk(videoloc):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in allowed_extensions:
+                    filelist.append(os.path.abspath(os.path.join(root, file)))
+        filelist = sorted(filelist)
+        if not filelist:
+            console.print("[bold red]No Book or Audiobook files found!")
+            sys.exit(1)
+        videopath = sorted(filelist, key=os.path.getsize, reverse=True)[0]
+    else:
+        videopath = videoloc
+        filelist.append(videoloc)
+
+    meta["filelist"] = filelist
+    meta["scene"] = False
+    meta["imdb_id"] = 0
+
+    primary_ext = os.path.splitext(videopath)[1].lower()
+    meta["is_audiobook"] = primary_ext in audiobook_extensions
+
+    search_term = os.path.basename(filelist[0]) if filelist else ""
+    search_file_folder = "file"
+    return videopath, filelist, search_term, search_file_folder
+
+
+# ---------------------------------------------------------------------------
+# Language resolution helper
+# ---------------------------------------------------------------------------
+
+def _resolve_book_language(raw: str) -> tuple[str, str]:
+    """Return ``(full_english_name, iso_639_3_alpha3)`` for any language input."""
+    raw = raw.strip()
+    try:
+        lc = langcodes.get(raw.lower())
+        full_name = lc.display_name("en") or raw.title()
+        alpha3 = lc.to_alpha3() or ""
+        if full_name and full_name.lower() != raw.lower():
+            return full_name, alpha3
+    except Exception:
+        pass
+    try:
+        lc = langcodes.find(raw)
+        return lc.display_name("en") or raw.title(), lc.to_alpha3() or ""
+    except Exception:
+        return raw.title(), ""
+
+
+# ---------------------------------------------------------------------------
+# MediaInfo metadata extraction
+# ---------------------------------------------------------------------------
+
+def _extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]:
+    """Extract metadata from an EPUB zip container's OPF file."""
+    metadata: dict[str, Any] = {}
+    if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+        return metadata
+
+    try:
+        with zipfile.ZipFile(epub_path, "r") as z:
+            # 1. Read META-INF/container.xml to find the .opf file path
+            rootfile_path: Optional[str] = None
+            try:
+                container_data = z.read("META-INF/container.xml")
+                root = ET.fromstring(container_data)
+                for elem in root.iter():
+                    if elem.tag.endswith("rootfile"):
+                        rootfile_path = elem.attrib.get("full-path")
+                        if rootfile_path:
+                            break
+            except Exception as e:
+                if debug:
+                    console.print(f"[yellow]Debug: META-INF/container.xml not found or unreadable: {e}[/yellow]")
+
+            # Fallback: search for any .opf file in the archive
+            if not rootfile_path:
+                for name in z.namelist():
+                    if name.endswith(".opf"):
+                        rootfile_path = name
+                        break
+
+            if not rootfile_path:
+                if debug:
+                    console.print("[yellow]Debug: No OPF metadata file found in EPUB ZIP[/yellow]")
+                return metadata
+
+            # 2. Read and parse the .opf file
+            opf_data = z.read(rootfile_path)
+            root = ET.fromstring(opf_data)
+
+            title = ""
+            author = ""
+            language = ""
+            date = ""
+            identifier = ""
+            description = ""
+            publisher = ""
+
+            for elem in root.iter():
+                tag_local = elem.tag.split("}")[-1]
+                if tag_local == "title":
+                    title = (elem.text or "").strip()
+                elif tag_local == "creator":
+                    author = (elem.text or "").strip()
+                elif tag_local == "language":
+                    language = (elem.text or "").strip()
+                elif tag_local == "date":
+                    date = (elem.text or "").strip()
+                elif tag_local == "identifier":
+                    val = (elem.text or "").strip()
+                    if val.lower().startswith("urn:isbn:"):
+                        identifier = val[9:]
+                    elif val.lower().startswith("isbn:"):
+                        identifier = val[5:]
+                    elif not identifier:
+                        identifier = val
+                elif tag_local == "description":
+                    description = (elem.text or "").strip()
+                elif tag_local == "publisher":
+                    publisher = (elem.text or "").strip()
+
+            if title:
+                metadata["title"] = title
+            if author:
+                metadata["author"] = author
+            if language:
+                metadata["book_language_raw"] = language
+            if date:
+                match = re.search(r"\b\d{4}\b", date)
+                if match:
+                    metadata["year"] = match.group(0)
+            if identifier:
+                cleaned_id = re.sub(r"[^\d]", "", identifier)
+                if len(cleaned_id) in (10, 13):
+                    metadata["isbn"] = cleaned_id
+            if description:
+                metadata["overview"] = description
+            if publisher:
+                metadata["publisher"] = publisher
+
+    except Exception as e:
+        if debug:
+            console.print(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
+
+    return metadata
+
+
+def _validate_isbn_checksum(candidate: str) -> Optional[str]:
+    """Validate and return cleaned ISBN-10 or ISBN-13 if valid, else None."""
+    cleaned = re.sub(r"[- ]", "", candidate).upper()
+
+    # Check ISBN-13
+    if len(cleaned) == 13 and cleaned.isdigit():
+        total = sum(int(cleaned[i]) * (1 if i % 2 == 0 else 3) for i in range(13))
+        if total % 10 == 0:
+            return cleaned
+
+    # Check ISBN-10
+    if len(cleaned) == 10 and cleaned[:9].isdigit() and (cleaned[9].isdigit() or cleaned[9] == "X"):
+        total = sum((10 if cleaned[i] == "X" else int(cleaned[i])) * (10 - i) for i in range(10))
+        if total % 11 == 0:
+            return cleaned
+
+    return None
+
+
+def _extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> Optional[str]:
+    """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
+    try:
+        import fitz
+    except ImportError:
+        if debug:
+            console.print("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
+        return None
+
+    if not os.path.isfile(pdf_path):
+        return None
+
+    try:
+        # Disable mupdf display errors to avoid spamming console
+        with contextlib.suppress(Exception):
+            fitz.TOOLS.mupdf_display_errors(False)
+
+        with fitz.open(pdf_path) as doc:
+            num_pages = len(doc)
+            if num_pages == 0:
+                return None
+
+            # Determine page ranges: check first 30 and last 30 pages first
+            front_limit = min(30, num_pages)
+            back_limit = max(0, num_pages - 30)
+
+            pages_to_check: list[int] = list(range(front_limit))
+            # Last N pages (avoiding duplicates)
+            for p in range(back_limit, num_pages):
+                if p not in pages_to_check:
+                    pages_to_check.append(p)
+            # Middle pages as fallback
+            for p in range(num_pages):
+                if p not in pages_to_check:
+                    pages_to_check.append(p)
+
+            for page_num in pages_to_check:
+                text = doc[page_num].get_text()
+                if not isinstance(text, str) or not text:
+                    continue
+
+                # Find ISBN candidates
+                candidates = re.findall(
+                    r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b",
+                    text,
+                    re.IGNORECASE
+                )
+                for cand in candidates:
+                    validated = _validate_isbn_checksum(cand)
+                    if validated:
+                        console.print(f"[cyan]Found valid ISBN {validated} on PDF page {page_num}[/cyan]")
+                        return validated
+    except Exception as e:
+        if debug:
+            console.print(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
+
+    return None
+
+
+async def gather_book_prep(
+    meta: dict[str, Any],
+    videopath: str,
+    base_dir: str,
+    config: Optional[dict[str, Any]] = None,
+) -> None:
+    """Set up BOOK/Audiobook category fields and extract embedded MediaInfo metadata.
+
+    Sets ``meta["category"]``, ``meta["resolution"]``, ``meta["search_year"]``,
+    ``meta["hfr"]``, ``meta["sd"]``, and ``meta["mediainfo"]``, then attempts
+    to populate title, author, narrator, publisher, ISBN, overview, year,
+    keywords, and language from the file's embedded tags.
+    """
+    meta["category"] = "BOOK"
+    meta["search_year"] = ""
+    meta["resolution"] = "Other"
+    meta["hfr"] = False
+    meta["sd"] = 0
+    meta["valid_mi_settings"] = True
+
+    # Extract EPUB metadata directly if the file is an EPUB
+    if videopath.lower().endswith(".epub") and os.path.isfile(videopath):  # noqa: ASYNC240
+        epub_meta = _extract_epub_metadata(videopath, debug=meta.get("debug", False))
+        if epub_meta:
+            if meta.get("debug", False):
+                console.print(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
+            for key, val in epub_meta.items():
+                if key == "book_language_raw":
+                    full, iso3 = _resolve_book_language(val)
+                    if not meta.get("book_language"):
+                        meta["book_language"] = full
+                        meta["book_language_iso"] = iso3
+                else:
+                    if not meta.get(key) and val:
+                        meta[key] = val
+                        if key == "year":
+                            meta["search_year"] = int(val)
+
+    # Extract ISBN from PDF directly if the file is a PDF
+    if videopath.lower().endswith(".pdf") and os.path.isfile(videopath):  # noqa: ASYNC240
+        pdf_isbn = _extract_isbn_from_pdf(videopath, debug=meta.get("debug", False))
+        if pdf_isbn and not meta.get("isbn"):
+            meta["isbn"] = pdf_isbn
+            if meta.get("debug", False):
+                console.print(f"[cyan]PDF ISBN extracted: {pdf_isbn}[/cyan]")
+
+    if not meta.get("edit", False):
+        try:
+            mi = await exportInfo(
+                videopath,
+                meta["isdir"],
+                meta["uuid"],
+                base_dir,
+                is_dvd=meta.get("is_disc", False),
+                debug=meta.get("debug", False),
+            )
+            meta["mediainfo"] = mi
+        except Exception as e:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: MediaInfo export failed for book: {e}[/yellow]")
+            meta["mediainfo"] = {}
+    else:
+        pass  # meta["mediainfo"] already populated from a previous run
+
+    if meta.get("mediainfo"):
+        try:
+            tracks = meta["mediainfo"].get("media", {}).get("track", [])
+            general_track = next((t for t in tracks if t.get("@type") == "General"), None)
+            if general_track:
+                # 1. Title/Album
+                album = general_track.get("Album") or general_track.get("album")
+                track_name = general_track.get("Track_name") or general_track.get("track_name")
+                if album and str(album).strip() and not isinstance(album, dict):
+                    meta["title"] = str(album).strip()
+                elif track_name and str(track_name).strip() and not isinstance(track_name, dict):
+                    meta["title"] = str(track_name).strip()
+
+                # 2. Author
+                performer = general_track.get("Performer") or general_track.get("performer")
+                album_performer = general_track.get("Album_Performer") or general_track.get("album_performer")
+                if performer and str(performer).strip() and not isinstance(performer, dict):
+                    meta["author"] = str(performer).strip()
+                elif album_performer and str(album_performer).strip() and not isinstance(album_performer, dict):
+                    meta["author"] = str(album_performer).strip()
+
+                # 3. Narrator
+                composer = general_track.get("Composer") or general_track.get("composer")
+                if composer and str(composer).strip() and not isinstance(composer, dict):
+                    meta["narrator"] = str(composer).strip()
+
+                # 4. Publisher
+                publisher = general_track.get("Publisher") or general_track.get("publisher")
+                if publisher and str(publisher).strip() and not isinstance(publisher, dict):
+                    meta["publisher"] = str(publisher).strip()
+
+                # 5. ISBN
+                isbn = general_track.get("ISBN") or general_track.get("isbn")
+                if isbn and str(isbn).strip() and not isinstance(isbn, dict) and not meta.get("isbn"):
+                    meta["isbn"] = str(isbn).strip()
+
+                # 6. Overview/Comment
+                comment = general_track.get("Comment") or general_track.get("comment")
+                description = general_track.get("Description") or general_track.get("description")
+                if comment and str(comment).strip() and not isinstance(comment, dict):
+                    meta["overview"] = str(comment).strip()
+                elif description and str(description).strip() and not isinstance(description, dict):
+                    meta["overview"] = str(description).strip()
+
+                # 7. Year (extract 4-digit number)
+                rec_date = general_track.get("Recorded_Date") or general_track.get("recorded_date")
+                if rec_date and str(rec_date).strip() and not isinstance(rec_date, dict):
+                    match = re.search(r"\b\d{4}\b", str(rec_date))
+                    if match:
+                        meta["year"] = match.group(0)
+                        meta["search_year"] = int(match.group(0))
+
+                # 8. Genre -> Keywords
+                genre = general_track.get("Genre") or general_track.get("genre")
+                if genre and str(genre).strip() and not isinstance(genre, dict):
+                    words = re.split(r"[;,]", str(genre))
+                    cleaned_words = [w.strip().lower() for w in words if w.strip()]
+                    if cleaned_words:
+                        existing_keywords = meta.get("keywords")
+                        existing_list: list[str] = []
+                        if existing_keywords:
+                            if isinstance(existing_keywords, list):
+                                for ek in existing_keywords:
+                                    existing_list.extend([x.strip().lower() for x in ek.split(",") if x.strip()])
+                            elif isinstance(existing_keywords, str):
+                                existing_list.extend([x.strip().lower() for x in existing_keywords.split(",") if x.strip()])
+                        for cw in cleaned_words:
+                            if cw not in existing_list:
+                                existing_list.append(cw)
+                        meta["keywords"] = ", ".join(existing_list)
+
+                # 9. Language
+                if not meta.get("book_language"):
+                    lang_val = general_track.get("Language") or general_track.get("language")
+                    if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
+                        full, iso3 = _resolve_book_language(str(lang_val).strip())
+                        meta["book_language"] = full
+                        meta["book_language_iso"] = iso3
+
+                if not meta.get("book_language"):
+                    # Fallback: Audio track language (audiobooks)
+                    for t in tracks:
+                        if t.get("@type") == "Audio":
+                            lang_val = t.get("Language") or t.get("language")
+                            if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
+                                full, iso3 = _resolve_book_language(str(lang_val).strip())
+                                meta["book_language"] = full
+                                meta["book_language_iso"] = iso3
+                                break
+
+                if not meta.get("book_language"):
+                    # Fallback: Text track language (ebooks like PDF/EPUB)
+                    for t in tracks:
+                        if t.get("@type") == "Text":
+                            lang_val = t.get("Language") or t.get("language")
+                            if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
+                                full, iso3 = _resolve_book_language(str(lang_val).strip())
+                                meta["book_language"] = full
+                                meta["book_language_iso"] = iso3
+                                break
+
+        except Exception as ex:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
+
+    # Google Books API search using ISBN
+    isbn = meta.get("isbn")
+    if isbn:
+        try:
+            api_key = ""
+            if config and "DEFAULT" in config:
+                api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
+            from src.google_books import google_books_manager
+            google_books_data = await google_books_manager.search_by_isbn(isbn, base_dir=base_dir, api_key=api_key, debug=meta.get("debug", False))
+            if google_books_data:
+                for key, val in google_books_data.items():
+                    if not meta.get(key) and val:
+                        meta[key] = val
+        except Exception as ex:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")

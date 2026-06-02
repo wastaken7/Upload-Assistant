@@ -45,10 +45,13 @@ class UNIT3D:
 
     async def search_existing(self, meta: dict[str, Any], _: Any) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
+        params_list: Optional[ParamsList] = None
+        category = meta.get("category")
 
         # Ensure tracker_status keys exist before any potential writes
         meta.setdefault("tracker_status", {})
         meta["tracker_status"].setdefault(self.tracker, {})
+        category_id = str((await self.get_category_id(meta))["category_id"])
 
         if not self.api_key:
             if not meta["debug"]:
@@ -68,42 +71,46 @@ class UNIT3D:
             "accept": "application/json",
         }
 
-        category_id = str((await self.get_category_id(meta))['category_id'])
-        params_dict: dict[str, str] = {
-            "tmdbId": str(meta['tmdb']),
-            "categories[]": category_id,
-            "name": "",
-            "perPage": "100",
-        }
-        params_list: Optional[ParamsList] = None
-        if self.tracker not in ["OTW"]:
-            resolutions = await self.get_resolution_id(meta)
-            resolution_id = str(resolutions["resolution_id"])
-            if resolution_id in ["3", "4"]:
-                # Convert params to list of tuples to support duplicate keys
-                params_list = list(params_dict.items())
-                params_list.append(("resolutions[]", "3"))
-                params_list.append(("resolutions[]", "4"))
-            else:
-                params_dict["resolutions[]"] = resolution_id
+        if category in ("MOVIE", "TV"):
+            params_dict: dict[str, str] = {
+                "tmdbId": str(meta["tmdb"]),
+                "categories[]": category_id,
+                "name": "",
+                "perPage": "100",
+            }
 
-        if self.tracker not in ["SP", "STC"]:
-            type_id = str((await self.get_type_id(meta))["type_id"])
-            if params_list is not None:
-                params_list.append(("types[]", type_id))
-            else:
-                params_dict["types[]"] = type_id
+            if self.tracker not in ["OTW"]:
+                resolutions = await self.get_resolution_id(meta)
+                resolution_id = str(resolutions["resolution_id"])
+                if resolution_id in ["3", "4"]:
+                    # Convert params to list of tuples to support duplicate keys
+                    params_list = list(params_dict.items())
+                    params_list.append(("resolutions[]", "3"))
+                    params_list.append(("resolutions[]", "4"))
+                else:
+                    params_dict["resolutions[]"] = resolution_id
 
-        if meta["category"] == "TV":
-            season_value = f" {meta.get('season', '')}"
-            if params_list is not None:
-                # Update the 'name' parameter in the list
-                params_list = [
-                    (k, (v + season_value if k == "name" and isinstance(v, str) else v))
-                    for k, v in params_list
-                ]
-            else:
-                params_dict["name"] = params_dict["name"] + season_value
+            if self.tracker not in ["SP", "STC"]:
+                type_id = str((await self.get_type_id(meta))["type_id"])
+                if params_list is not None:
+                    params_list.append(("types[]", type_id))
+                else:
+                    params_dict["types[]"] = type_id
+
+            if meta["category"] == "TV":
+                season_value = f" {meta.get('season', '')}"
+                if params_list is not None:
+                    # Update the 'name' parameter in the list
+                    params_list = [(k, (v + season_value if k == "name" and isinstance(v, str) else v)) for k, v in params_list]
+                else:
+                    params_dict["name"] = params_dict["name"] + season_value
+
+        else:
+            params_dict = {
+                "name": meta.get("title", "") or meta.get("name", ""),
+                "categories[]": category_id,
+                "perPage": "100",
+            }
 
         request_params: ParamsList
         request_params = params_list if params_list is not None else list(params_dict.items())

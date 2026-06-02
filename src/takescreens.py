@@ -856,6 +856,267 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, dict[str, Any],
         return (index, None)
 
 
+async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
+    import shutil
+
+    def _check_and_copy():
+        search_dir = path if os.path.isdir(path) else os.path.dirname(path)
+        valid_names = {"cover.png", "cover.jpg", "cover.jpeg", "folder.png", "folder.jpg", "folder.jpeg", "poster.png", "poster.jpg", "poster.jpeg"}
+        if os.path.exists(search_dir):
+            for f in os.listdir(search_dir):
+                if f.lower() in valid_names:
+                    local_file = os.path.join(search_dir, f)
+                    shutil.copy2(local_file, dest_path)
+                    return True
+        return False
+
+    try:
+        return await asyncio.to_thread(_check_and_copy)
+    except Exception as e:
+        console.print(f"[yellow]Error checking/copying local cover: {e}[/yellow]")
+        return False
+
+
+async def extract_embedded_cover_from_audiobook(meta: dict[str, Any], dest_path: str) -> bool:
+    import mutagen
+
+    def _extract():
+        filelist = meta.get("filelist", [])
+        if not filelist:
+            p = meta.get("path")
+            if p and os.path.isfile(p):
+                filelist = [p]
+            else:
+                return False
+
+        audio_extensions = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
+
+        for audio_path in filelist:
+            ext = os.path.splitext(audio_path)[1].lower()
+            if ext not in audio_extensions:
+                continue
+            if not os.path.exists(audio_path):
+                continue
+
+            try:
+                audio = mutagen.File(audio_path)
+                if audio is None:
+                    continue
+
+                # 1. FLAC / OGG pictures
+                if hasattr(audio, "pictures") and audio.pictures:
+                    pic = audio.pictures[0]
+                    with open(dest_path, "wb") as f:
+                        f.write(pic.data)
+                    return True
+
+                # 2. MP3 ID3 APIC
+                if audio.tags:
+                    for key in audio.tags.keys():
+                        if key.startswith("APIC"):
+                            apic = audio.tags[key]
+                            with open(dest_path, "wb") as f:
+                                f.write(apic.data)
+                            return True
+
+                # 3. MP4 / M4A / M4B
+                if "covr" in audio:
+                    covr = audio["covr"]
+                    if isinstance(covr, list) and len(covr) > 0:
+                        item = covr[0]
+                        with open(dest_path, "wb") as f:
+                            f.write(bytes(item))
+                        return True
+            except Exception as e:
+                if meta.get("debug", False):
+                    console.print(f"[yellow]Error extracting from {audio_path}: {e}[/yellow]")
+        return False
+
+    try:
+        return await asyncio.to_thread(_extract)
+    except Exception as e:
+        console.print(f"[yellow]Error extracting embedded cover: {e}[/yellow]")
+        return False
+
+
+async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bool:
+    poster_url = meta.get("poster")
+    if not poster_url:
+        return False
+    try:
+        import httpx
+        console.print(f"[cyan]Downloading poster from {poster_url}[/cyan]")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(poster_url)
+            if response.status_code == 200:
+                await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
+                meta["cover_path"] = cover_path
+                console.print(f"[green]Successfully downloaded poster to {cover_path}[/green]")
+                return True
+            else:
+                console.print(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
+    except Exception as e:
+        console.print(f"[yellow]Warning: Error downloading poster: {e}[/yellow]")
+    return False
+
+
+async def generate_ebook_screenshots(
+    path: str,
+    filename: str,
+    folder_id: str,
+    base_dir: str,
+    meta: dict[str, Any],
+    num_screens: int = 5,
+) -> list[str]:
+    import random
+    import shutil
+    import zipfile
+
+    import fitz  # PyMuPDF
+    from PIL import Image
+    from rarfile import RarFile
+
+    try:
+        fitz.TOOLS.mupdf_display_errors(False)
+    except Exception:
+        pass
+
+    output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")
+    os.makedirs(output_dir, exist_ok=True)
+    sanitized_filename = await sanitize_filename(filename)
+
+    extension = os.path.splitext(path)[1].lower().lstrip(".")
+    screenshots = []
+
+    cover_path = os.path.join(output_dir, "POSTER.png")
+    banner_path = os.path.join(output_dir, "POSTER_BANNER.png")
+
+    local_found = await load_local_cover_if_exists(path, cover_path)
+    downloaded_poster = False
+    if local_found:
+        meta["cover_path"] = cover_path
+        console.print(f"[green]Local cover found and copied to {cover_path}[/green]")
+    else:
+        downloaded_poster = await download_poster_from_meta(meta, cover_path)
+
+    if extension in ["cbr", "cbz"]:
+        temp_extract = os.path.join(output_dir, "temp_compressed_extract")
+        os.makedirs(temp_extract, exist_ok=True)
+        try:
+            compressed_file = None
+            if "cbz" in extension:
+                try:
+                    compressed_file = zipfile.ZipFile(path, "r")
+                except Exception:
+                    try:
+                        compressed_file = RarFile(path, "r")
+                    except Exception:
+                        pass
+            else:
+                try:
+                    compressed_file = RarFile(path, "r")
+                except Exception:
+                    try:
+                        compressed_file = zipfile.ZipFile(path, "r")
+                    except Exception:
+                        pass
+
+            if not compressed_file:
+                console.print(f"[red]Invalid CBR/CBZ file: {path}[/red]")
+                return []
+
+            image_files = [f for f in compressed_file.namelist() if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"))]
+
+            def natural_sort_key(s):
+                return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+            image_files.sort(key=natural_sort_key)
+
+            if not image_files:
+                console.print("[yellow]CBR/CBZ does not contain images[/yellow]")
+                compressed_file.close()
+                return []
+
+            num_screens = min(num_screens, len(image_files))
+            selected_images = sorted(random.sample(range(len(image_files)), num_screens))
+
+            async def process_compressed_image(img_idx: int, out_name: str) -> str:
+                img_name = image_files[img_idx]
+                compressed_file.extract(img_name, temp_extract)
+                src_path = os.path.join(temp_extract, img_name)
+                dest_path = os.path.join(output_dir, f"{out_name}.png")
+
+                def _convert():
+                    img = Image.open(src_path)
+                    img.save(dest_path, "PNG")
+
+                if not img_name.lower().endswith(".png"):
+                    await asyncio.to_thread(_convert)
+                else:
+                    shutil.copy2(src_path, dest_path)
+                return dest_path
+
+            for i, img_idx in enumerate(selected_images):
+                scr_path = await process_compressed_image(img_idx, f"{sanitized_filename}-{i}")
+                screenshots.append(scr_path)
+
+            if not local_found and not downloaded_poster:
+                await process_compressed_image(0, "POSTER")
+            await process_compressed_image(len(image_files) - 1, "POSTER_BANNER")
+
+            meta["cover_path"] = cover_path
+            meta["banner_path"] = banner_path
+
+            compressed_file.close()
+
+        finally:
+            if os.path.exists(temp_extract):
+                shutil.rmtree(temp_extract, ignore_errors=True)
+
+    elif extension in ["pdf", "mobi", "epub"]:
+        try:
+            doc = fitz.open(path)
+            total_pages = len(doc)
+
+            if total_pages == 0:
+                console.print(f"[yellow]{extension.upper()} does not have pages[/yellow]")
+                return []
+
+            num_screens = min(num_screens, total_pages)
+            selected_pages = sorted(random.sample(range(total_pages), num_screens))
+
+            async def process_page(page_num: int, out_name: str) -> str:
+                def _render():
+                    page = doc[page_num]
+                    mat = fitz.Matrix(2.0, 2.0)
+                    pix = page.get_pixmap(matrix=mat)
+                    scr_path = os.path.join(output_dir, f"{out_name}.png")
+                    pix.save(scr_path)
+                    return scr_path
+
+                return await asyncio.to_thread(_render)
+
+            for i, page_num in enumerate(selected_pages):
+                scr_path = await process_page(page_num, f"{sanitized_filename}-{i}")
+                screenshots.append(scr_path)
+
+            if not local_found and not downloaded_poster:
+                await process_page(0, "POSTER")
+            await process_page(total_pages - 1, "POSTER_BANNER")
+
+            meta["cover_path"] = cover_path
+            meta["banner_path"] = banner_path
+
+            doc.close()
+        except Exception as e:
+            console.print(f"[red]Error while generating {extension.upper()} screenshots: {e}[/red]")
+            import traceback
+
+            console.print(traceback.format_exc())
+
+    return screenshots
+
+
 async def screenshots(
         path: str,
         filename: str,
@@ -866,6 +1127,25 @@ async def screenshots(
         force_screenshots: bool = False,
         manual_frames: Union[str, list[str]] = "",
 ) -> Union[list[str], None]:
+    if meta.get("category") == "BOOK":
+        if meta.get("is_audiobook", False):
+            output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")
+            os.makedirs(output_dir, exist_ok=True)
+            cover_path = os.path.join(output_dir, "POSTER.png")
+            local_found = await load_local_cover_if_exists(path, cover_path)
+            if local_found:
+                meta["cover_path"] = cover_path
+                console.print(f"[green]Local cover found for audiobook and copied to {cover_path}[/green]")
+            else:
+                extracted_found = await extract_embedded_cover_from_audiobook(meta, cover_path)
+                if extracted_found:
+                    meta["cover_path"] = cover_path
+                    console.print(f"[green]Embedded cover extracted for audiobook to {cover_path}[/green]")
+                else:
+                    await download_poster_from_meta(meta, cover_path)
+            return []
+        return await generate_ebook_screenshots(path, filename, folder_id, base_dir, meta, num_screens if num_screens > 0 else meta["screens"])
+
     img_host = await get_image_host(meta)
     screens = meta['screens']
     start_time = time.time() if meta.get('debug') else 0.0
