@@ -7,6 +7,7 @@ This module contains the logic that was previously inlined inside the
 """
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import re
@@ -557,9 +558,8 @@ async def gather_book_prep(
                             is_override = True
 
                         # Do not overwrite fields already populated by MAM
-                        if mam_data:
-                            if key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data:
-                                is_override = True
+                        if mam_data and (key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data):
+                            is_override = True
 
                         if not is_override:
                             meta[key] = val
@@ -568,3 +568,37 @@ async def gather_book_prep(
         except Exception as ex:
             if meta.get("debug", False):
                 console.print(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")
+
+    if meta.get("is_audiobook", False):
+        filelist = meta.get("filelist", [])
+        total_duration = await get_audiobook_duration(filelist)
+        meta["audiobook_duration"] = total_duration
+
+
+async def get_audiobook_duration(filelist: list[str]) -> float:
+    """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
+    from pymediainfo import MediaInfo
+
+    audiobook_extensions = (".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav")
+    audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
+
+    if not audio_files:
+        return 0.0
+
+    def _get_file_duration(file_path: str) -> float:
+        try:
+            if not os.path.isfile(file_path):
+                return 0.0
+            media_info = MediaInfo.parse(file_path)
+            for track in media_info.tracks:
+                if track.track_type == "General":
+                    duration_ms = track.duration
+                    if duration_ms is not None:
+                        return float(duration_ms) / 1000.0
+        except Exception:
+            pass
+        return 0.0
+
+    tasks = [asyncio.to_thread(_get_file_duration, f) for f in audio_files]
+    durations = await asyncio.gather(*tasks)
+    return float(sum(durations))
