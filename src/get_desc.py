@@ -526,6 +526,10 @@ class DescriptionBuilder:
         isbn = meta.get("isbn")
         overview = meta.get("overview")
 
+        if overview:
+            overview = html_to_bbcode(str(overview))
+            overview = re.sub(r"<[^>]+>", "", overview).strip()
+
         if author:
             book_parts.append(f"[b]Author:[/b] {author}")
         if narrator:

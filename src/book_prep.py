@@ -92,6 +92,17 @@ def _resolve_book_language(raw: str) -> tuple[str, str]:
         return raw.title(), ""
 
 
+def is_valid_book_language(full: str, iso: str) -> bool:
+    """Return True if the language is valid (not undefined, unknown, or empty)."""
+    if not full or not iso:
+        return False
+    full_lower = full.strip().lower()
+    iso_lower = iso.strip().lower()
+    if full_lower in ("", "unknown", "unknown language", "undetermined", "und", "none", "null"):
+        return False
+    return iso_lower not in ("", "und", "zxx")
+
+
 # ---------------------------------------------------------------------------
 # MediaInfo metadata extraction
 # ---------------------------------------------------------------------------
@@ -289,6 +300,16 @@ async def gather_book_prep(
     meta["sd"] = 0
     meta["valid_mi_settings"] = True
 
+    # Identify CLI overrides at the very start
+    cli_overrides = {
+        "title": bool(meta.get("book_title")),
+        "author": bool(meta.get("book_author")),
+        "isbn": bool(meta.get("book_isbn")),
+        "book_language": bool(meta.get("book_language")),
+        "year": bool("manual_year" in meta and int(meta.get("manual_year") or 0) > 0),
+        "keywords": bool(meta.get("keywords")),
+    }
+
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and os.path.isfile(videopath):  # noqa: ASYNC240
         epub_meta = _extract_epub_metadata(videopath, debug=meta.get("debug", False))
@@ -298,7 +319,7 @@ async def gather_book_prep(
             for key, val in epub_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
-                    if not meta.get("book_language"):
+                    if is_valid_book_language(full, iso3) and not meta.get("book_language"):
                         meta["book_language"] = full
                         meta["book_language_iso"] = iso3
                 else:
@@ -333,6 +354,7 @@ async def gather_book_prep(
     else:
         pass  # meta["mediainfo"] already populated from a previous run
 
+    # Parse MediaInfo metadata as local fallback first
     if meta.get("mediainfo"):
         try:
             tracks = meta["mediainfo"].get("media", {}).get("track", [])
@@ -341,45 +363,48 @@ async def gather_book_prep(
                 # 1. Title/Album
                 album = general_track.get("Album") or general_track.get("album")
                 track_name = general_track.get("Track_name") or general_track.get("track_name")
-                if album and str(album).strip() and not isinstance(album, dict):
-                    meta["title"] = str(album).strip()
-                elif track_name and str(track_name).strip() and not isinstance(track_name, dict):
-                    meta["title"] = str(track_name).strip()
+                if not meta.get("title"):
+                    if album and str(album).strip() and not isinstance(album, dict):
+                        meta["title"] = str(album).strip()
+                    elif track_name and str(track_name).strip() and not isinstance(track_name, dict):
+                        meta["title"] = str(track_name).strip()
 
                 # 2. Author
                 performer = general_track.get("Performer") or general_track.get("performer")
                 album_performer = general_track.get("Album_Performer") or general_track.get("album_performer")
-                if performer and str(performer).strip() and not isinstance(performer, dict):
-                    meta["author"] = str(performer).strip()
-                elif album_performer and str(album_performer).strip() and not isinstance(album_performer, dict):
-                    meta["author"] = str(album_performer).strip()
+                if not meta.get("author"):
+                    if performer and str(performer).strip() and not isinstance(performer, dict):
+                        meta["author"] = str(performer).strip()
+                    elif album_performer and str(album_performer).strip() and not isinstance(album_performer, dict):
+                        meta["author"] = str(album_performer).strip()
 
                 # 3. Narrator
                 composer = general_track.get("Composer") or general_track.get("composer")
-                if composer and str(composer).strip() and not isinstance(composer, dict):
+                if composer and str(composer).strip() and not isinstance(composer, dict) and not meta.get("narrator"):
                     meta["narrator"] = str(composer).strip()
 
                 # 4. Publisher
                 publisher = general_track.get("Publisher") or general_track.get("publisher")
-                if publisher and str(publisher).strip() and not isinstance(publisher, dict):
+                if publisher and str(publisher).strip() and not isinstance(publisher, dict) and not meta.get("publisher"):
                     meta["publisher"] = str(publisher).strip()
 
                 # 5. ISBN
-                isbn = general_track.get("ISBN") or general_track.get("isbn")
-                if isbn and str(isbn).strip() and not isinstance(isbn, dict) and not meta.get("isbn"):
-                    meta["isbn"] = str(isbn).strip()
+                isbn_val = general_track.get("ISBN") or general_track.get("isbn")
+                if isbn_val and str(isbn_val).strip() and not isinstance(isbn_val, dict) and not meta.get("isbn"):
+                    meta["isbn"] = str(isbn_val).strip()
 
                 # 6. Overview/Comment
                 comment = general_track.get("Comment") or general_track.get("comment")
                 description = general_track.get("Description") or general_track.get("description")
-                if comment and str(comment).strip() and not isinstance(comment, dict):
-                    meta["overview"] = str(comment).strip()
-                elif description and str(description).strip() and not isinstance(description, dict):
-                    meta["overview"] = str(description).strip()
+                if not meta.get("overview"):
+                    if comment and str(comment).strip() and not isinstance(comment, dict):
+                        meta["overview"] = str(comment).strip()
+                    elif description and str(description).strip() and not isinstance(description, dict):
+                        meta["overview"] = str(description).strip()
 
                 # 7. Year (extract 4-digit number)
                 rec_date = general_track.get("Recorded_Date") or general_track.get("recorded_date")
-                if rec_date and str(rec_date).strip() and not isinstance(rec_date, dict):
+                if rec_date and str(rec_date).strip() and not isinstance(rec_date, dict) and not meta.get("year"):
                     match = re.search(r"\b\d{4}\b", str(rec_date))
                     if match:
                         meta["year"] = match.group(0)
@@ -409,8 +434,9 @@ async def gather_book_prep(
                     lang_val = general_track.get("Language") or general_track.get("language")
                     if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
                         full, iso3 = _resolve_book_language(str(lang_val).strip())
-                        meta["book_language"] = full
-                        meta["book_language_iso"] = iso3
+                        if is_valid_book_language(full, iso3):
+                            meta["book_language"] = full
+                            meta["book_language_iso"] = iso3
 
                 if not meta.get("book_language"):
                     # Fallback: Audio track language (audiobooks)
@@ -419,9 +445,10 @@ async def gather_book_prep(
                             lang_val = t.get("Language") or t.get("language")
                             if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
                                 full, iso3 = _resolve_book_language(str(lang_val).strip())
-                                meta["book_language"] = full
-                                meta["book_language_iso"] = iso3
-                                break
+                                if is_valid_book_language(full, iso3):
+                                    meta["book_language"] = full
+                                    meta["book_language_iso"] = iso3
+                                    break
 
                 if not meta.get("book_language"):
                     # Fallback: Text track language (ebooks like PDF/EPUB)
@@ -430,15 +457,81 @@ async def gather_book_prep(
                             lang_val = t.get("Language") or t.get("language")
                             if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
                                 full, iso3 = _resolve_book_language(str(lang_val).strip())
-                                meta["book_language"] = full
-                                meta["book_language_iso"] = iso3
-                                break
-
+                                if is_valid_book_language(full, iso3):
+                                    meta["book_language"] = full
+                                    meta["book_language_iso"] = iso3
+                                    break
         except Exception as ex:
             if meta.get("debug", False):
                 console.print(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
 
-    # Google Books API search using ISBN
+    # MyAnonamouse API search using torrent client comments (online lookup takes precedence)
+    if not meta.get("torrent_comments") and not meta.get("skip_auto_torrent", False) and not meta.get("edit", False) and config:
+        from src.clients import Clients
+
+        try:
+            client = Clients(config=config)
+            await client.get_pathed_torrents(meta.get("path", videopath), meta)
+        except Exception as e:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: Could not search client for book torrent comments: {e}[/yellow]")
+
+    mam_id = None
+    if meta.get("torrent_comments"):
+        for comment_data in meta.get("torrent_comments", []):
+            trackers = str(comment_data.get("trackers", ""))
+            comment = str(comment_data.get("comment", ""))
+
+            is_mam = "myanonamouse.net" in trackers
+            if not is_mam and comment_data.get("tracker_urls"):
+                for tu in comment_data["tracker_urls"]:
+                    if isinstance(tu, dict) and "myanonamouse.net" in str(tu.get("url", "")) or isinstance(tu, str) and "myanonamouse.net" in tu:
+                        is_mam = True
+                        break
+
+            if is_mam:
+                match = re.search(r"\bMID=(\d+)", comment)
+                if match:
+                    mam_id = match.group(1)
+                    if meta.get("debug", False):
+                        console.print(f"[cyan]Found MyAnonamouse ID {mam_id} in torrent comment[/cyan]")
+                    break
+
+    mam_data = None
+    if mam_id:
+        try:
+            api_key = ""
+            if config and "DEFAULT" in config:
+                api_key = config["DEFAULT"].get("mam_api_key", "").strip() or config["DEFAULT"].get("mam_id", "").strip()
+            api_key = api_key or os.environ.get("MAM_API_KEY", "").strip() or os.environ.get("MAM_ID", "").strip()
+
+            from src.myanonamouse import myanonamouse_manager
+
+            mam_data = await myanonamouse_manager.search_by_id(mam_id, base_dir=base_dir, api_key=api_key, debug=meta.get("debug", False))
+            if mam_data:
+                for key, val in mam_data.items():
+                    if val:
+                        # Enforce priority: CLI override > MAM > local metadata
+                        is_override = False
+                        if (
+                            (key == "title" and cli_overrides["title"])
+                            or (key == "author" and cli_overrides["author"])
+                            or (key == "isbn" and cli_overrides["isbn"])
+                            or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
+                            or (key in ("year", "search_year") and cli_overrides["year"])
+                            or (key == "keywords" and cli_overrides["keywords"])
+                        ):
+                            is_override = True
+
+                        if not is_override:
+                            meta[key] = val
+                            if key == "year" and "search_year" not in mam_data:
+                                meta["search_year"] = int(val)
+        except Exception as ex:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: MyAnonamouse API lookup failed: {ex}[/yellow]")
+
+    # Google Books API search using ISBN (online lookup takes precedence)
     isbn = meta.get("isbn")
     if isbn:
         try:
@@ -446,11 +539,32 @@ async def gather_book_prep(
             if config and "DEFAULT" in config:
                 api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
             from src.google_books import google_books_manager
+
             google_books_data = await google_books_manager.search_by_isbn(isbn, base_dir=base_dir, api_key=api_key, debug=meta.get("debug", False))
             if google_books_data:
                 for key, val in google_books_data.items():
-                    if not meta.get(key) and val:
-                        meta[key] = val
+                    if val:
+                        # Enforce priority: CLI override > MAM > Google Books > local metadata
+                        is_override = False
+                        if (
+                            (key == "title" and cli_overrides["title"])
+                            or (key == "author" and cli_overrides["author"])
+                            or (key == "isbn" and cli_overrides["isbn"])
+                            or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
+                            or (key in ("year", "search_year") and cli_overrides["year"])
+                            or (key == "keywords" and cli_overrides["keywords"])
+                        ):
+                            is_override = True
+
+                        # Do not overwrite fields already populated by MAM
+                        if mam_data:
+                            if key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data:
+                                is_override = True
+
+                        if not is_override:
+                            meta[key] = val
+                            if key == "year" and "search_year" not in google_books_data:
+                                meta["search_year"] = int(val)
         except Exception as ex:
             if meta.get("debug", False):
                 console.print(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")

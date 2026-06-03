@@ -943,11 +943,26 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
     poster_url = meta.get("poster")
     if not poster_url:
         return False
+    if os.path.exists(cover_path) and os.path.getsize(cover_path) > 0:
+        meta["cover_path"] = cover_path
+        return True
     try:
         import httpx
         console.print(f"[cyan]Downloading poster from {poster_url}[/cyan]")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(poster_url)
+        cookies = {}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        if "myanonamouse.net" in poster_url:
+            api_key = (
+                default_config.get("mam_api_key", "").strip()
+                or default_config.get("mam_id", "").strip()
+                or os.environ.get("MAM_API_KEY", "").strip()
+                or os.environ.get("MAM_ID", "").strip()
+            )
+            if api_key:
+                cookies["mam_id"] = api_key
+
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(poster_url, cookies=cookies, headers=headers)
             if response.status_code == 200:
                 await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
                 meta["cover_path"] = cover_path

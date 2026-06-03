@@ -276,6 +276,57 @@ class DupeChecker:
                 if entry.get('id'):
                     meta[matched_torrent_id] = entry.get('id')
 
+            if meta.get("category") == "BOOK":
+                import unicodedata
+
+                # Normalize titles for comparison
+                target_title = str(meta.get("title", "") or meta.get("name", ""))
+                norm_target_title = unicodedata.normalize("NFKD", target_title).encode("ascii", "ignore").decode("utf-8").lower()
+                norm_target_title = re.sub(r"[^a-z0-9\s]", "", norm_target_title)
+                norm_target_title = re.sub(r"\s+", " ", norm_target_title).strip()
+
+                norm_each = unicodedata.normalize("NFKD", each).encode("ascii", "ignore").decode("utf-8").lower()
+                norm_each = re.sub(r"[^a-z0-9\s]", "", norm_each)
+                norm_each = re.sub(r"\s+", " ", norm_each).strip()
+
+                if not norm_target_title:
+                    await log_exclusion("empty target book title", each)
+                    return True
+
+                if norm_target_title not in norm_each:
+                    await log_exclusion("book title mismatch", each)
+                    return True
+
+                # Check format/type compatibility
+                target_is_audiobook = bool(meta.get("is_audiobook", False))
+
+                dupe_type = str(entry.get("type") or "").lower()
+                audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg"}
+                dupe_is_audiobook = (dupe_type in audiobook_types) or ("audiobook" in each.lower())
+
+                if target_is_audiobook != dupe_is_audiobook:
+                    await log_exclusion("book format type mismatch (audiobook vs ebook)", each)
+                    return True
+
+                if not target_is_audiobook:
+                    # Compare ebook formats (e.g. EPUB vs PDF)
+                    target_type = str(meta.get("type") or "").lower()
+
+                    # Check if formats match either by type_id/dupe_type or file extension
+                    format_match = target_type == dupe_type
+                    if not format_match and files:
+                        format_match = any(f.lower().endswith(f".{target_type}") for f in files)
+
+                    if not format_match:
+                        await log_exclusion(f"book format type mismatch (expected {target_type})", each)
+                        return True
+
+                # Title and format match! It is a duplicate.
+                remember_match("title")
+                if meta.get("debug"):
+                    console.log(f"[cyan]Book duplicate matched: {each}")
+                return False
+
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
             if tracker_name in ["AITHER", "LST"] and entry.get('trumpable', False) and res_id and target_resolution == res_id:
                 meta['trumpable_id'] = entry.get('id')

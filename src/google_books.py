@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import httpx
 
-from src.book_prep import _resolve_book_language
+from src.book_prep import _resolve_book_language, is_valid_book_language
 from src.console import console
 
 
@@ -28,7 +28,7 @@ class GoogleBooksManager:
         metadata: dict[str, Any] = {}
 
         # Poster URL (Google Books cover image)
-        if volume_id:
+        if volume_id and volume_info.get("imageLinks"):
             metadata["poster"] = f"https://books.google.com/books/content?id={volume_id}&printsec=frontcover&img=1"
 
         # Title & Subtitle
@@ -71,9 +71,10 @@ class GoogleBooksManager:
         if lang:
             try:
                 full, iso3 = _resolve_book_language(lang)
-                metadata["book_language"] = full
-                if iso3:
-                    metadata["book_language_iso"] = iso3
+                if is_valid_book_language(full, iso3):
+                    metadata["book_language"] = full
+                    if iso3:
+                        metadata["book_language_iso"] = iso3
             except Exception as ex:
                 if debug:
                     console.print(f"[yellow]Warning: Could not resolve language '{lang}': {ex}[/yellow]")

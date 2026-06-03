@@ -187,6 +187,7 @@ if _is_webui_arg and not os.path.exists(_config_path):
 
 Meta: TypeAlias = dict[str, Any]
 
+from src.book_prep import is_valid_book_language
 from src.prep import Prep  # noqa: E402
 
 # Enable ANSI colors on Windows
@@ -437,7 +438,15 @@ async def _prompt_book_meta(meta: Meta) -> None:
     uploads reflect the new values.
     """
     book_required_fields = ["title", "author", "year", "book_language"]
-    book_missing = [f for f in book_required_fields if not meta.get(f) or str(meta.get(f)).strip().lower() in ("", "none", "null")]
+    book_missing = []
+    for f in book_required_fields:
+        val = meta.get(f)
+        if not val or str(val).strip().lower() in ("", "none", "null"):
+            book_missing.append(f)
+        elif f == "book_language":
+            iso = meta.get("book_language_iso", "")
+            if not is_valid_book_language(str(val), str(iso)):
+                book_missing.append(f)
     if not book_missing:
         return
 

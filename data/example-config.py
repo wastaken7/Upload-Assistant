@@ -17,6 +17,10 @@ config = {
         # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
         "google_books_api_key": "",
 
+        # MyAnonamouse (MAM) API key / session cookie (mam_id). "" = disabled
+        # You can get it from Preferences > Security > View IP locked session cookie
+        "mam_api_key": "",
+
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
 
