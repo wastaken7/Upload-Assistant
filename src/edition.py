@@ -20,8 +20,13 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
     edition = ""
     imdb_info = cast(dict[str, Any], meta.get('imdb_info', {}))
     edition_details = cast(dict[str, dict[str, Any]], imdb_info.get('edition_details', {}))
+    imdb_edition_count_value = imdb_info.get('edition_count', len(edition_details))
+    try:
+        imdb_edition_count = int(imdb_edition_count_value)
+    except (TypeError, ValueError):
+        imdb_edition_count = len(edition_details)
 
-    if meta.get('category') == "MOVIE" and not meta.get('anime') and edition_details and not manual_edition:
+    if meta.get('category') == "MOVIE" and not meta.get('anime') and edition_details and imdb_edition_count > 1 and not manual_edition:
         if meta.get('is_disc') != "BDMV" and meta.get('mediainfo', {}).get('media', {}).get('track'):
                 mediainfo = cast(dict[str, Any], meta.get('mediainfo', {}))
                 tracks = cast(list[dict[str, Any]], mediainfo.get('media', {}).get('track', []))
