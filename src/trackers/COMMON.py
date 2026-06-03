@@ -1192,6 +1192,25 @@ class COMMON:
         :return: True if the media meets the specified language requirements, False otherwise.
         :rtype: bool
         """
+        category = meta.get("category", "")
+        if category not in ("TV", "MOVIE", "BOOK"):
+            return True
+
+        if category == "BOOK":
+            book_language = meta.get("book_language", "")
+            if book_language:
+                book_language_lower = book_language.lower()
+                languages_lower = [lang.lower() for lang in languages_to_check]
+                meets_requirement = not (languages_lower and book_language_lower not in languages_lower)
+                if not meets_requirement:
+                    console.print(
+                        f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
+                        f"[yellow]Required one of:[/yellow] {', '.join(languages_to_check)}\n"
+                        f"[cyan]Found book language:[/cyan] {book_language}"
+                    )
+                return meets_requirement
+            return True
+
         try:
             if not meta.get("language_checked", False):
                 await languages_manager.process_desc_language(meta, tracker=tracker)

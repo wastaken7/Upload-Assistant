@@ -536,6 +536,60 @@ class DescriptionBuilder:
             console.print(f"[yellow]Warning: Error getting audio spectrogram section: {str(e)}[/yellow]")
         return ""
 
+    @staticmethod
+    def _build_book_desc_section(meta: dict[str, Any]) -> str:
+        """Build the BBCode table for BOOK-category uploads.
+
+        Assembles a ``[table]`` block containing a *TECHNICAL DETAILS* section
+        (author, narrator, publisher, ISBN) and an *OVERVIEW* section when the
+        relevant fields are present in *meta*.
+
+        Returns an empty string when there is nothing to render.
+        """
+        book_parts: list[str] = [""]
+        author = meta.get("author")
+        narrator = meta.get("narrator")
+        publisher = meta.get("publisher")
+        isbn = meta.get("isbn")
+        overview = meta.get("overview")
+
+        if overview:
+            overview = html_to_bbcode(str(overview))
+            overview = re.sub(r"<[^>]+>", "", overview).strip()
+
+        if author:
+            book_parts.append(f"[b]Author:[/b] {author}")
+        if narrator:
+            book_parts.append(f"[b]Narrator:[/b] {narrator}")
+        if publisher:
+            book_parts.append(f"[b]Publisher:[/b] {publisher}")
+        if isbn:
+            book_parts.append(f"[b]ISBN:[/b] {isbn}")
+        if meta.get("is_audiobook", False):
+            audiobook_duration = meta.get("audiobook_duration")
+            if audiobook_duration:
+                hours = int(audiobook_duration // 3600)
+                minutes = int((audiobook_duration % 3600) // 60)
+                seconds = int(audiobook_duration % 60)
+                duration_str = f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
+                book_parts.append(f"[b]Duration:[/b] {duration_str}")
+
+        final_book_parts: list[str] = []
+
+        if book_parts:
+            final_book_parts.append("[tr][td][b][size=4]TECHNICAL DETAILS[/size][/b][/td][/tr][tr][td]")
+            final_book_parts.append("\n".join(book_parts))
+            final_book_parts.append("[/td][/tr]")
+
+        if overview:
+            final_book_parts.append(f"[tr][td][b][size=4]OVERVIEW[/size][/b][/td][/tr][tr][td][i]{overview}[/i][/td][/tr]")
+
+        if not (book_parts or overview):
+            return ""
+
+        book_p = "\n".join(final_book_parts)
+        return "[table]\n" + book_p + "\n[/table]"
+
     async def unit3d_edit_desc(
         self,
         meta: dict[str, Any],
@@ -607,6 +661,12 @@ class DescriptionBuilder:
                 if title:
                     desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
                 desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
+
+        # Book details
+        if meta.get("category") == "BOOK":
+            book_section = self._build_book_desc_section(meta)
+            if book_section:
+                desc_parts.append(book_section)
 
         # Description that may come from API requests
         meta_description_value = meta.get("description", "")

@@ -497,19 +497,22 @@ class UploadHelper:
             'imdb': 'IMDb ID (tt1234567)',
             'distributor': "Disc Distributor e.g.(BFI, Criterion)"
         }
-        if meta.get('imdb_id', 0) == 0:
-            meta['imdb_id'] = 0
-            potential_missing = cast(list[str], meta.get('potential_missing', []))
-            if 'imdb_id' not in potential_missing:
-                potential_missing.append('imdb_id')
-                meta['potential_missing'] = potential_missing
-        else:
-            potential_missing = cast(list[str], meta.get('potential_missing', []))
+        potential_missing = cast(list[str], meta.get("potential_missing", []))
+        if meta["category"] in ("TV", "MOVIE"):
+            if meta.get("imdb_id", 0) == 0:
+                meta["imdb_id"] = 0
+                if "imdb_id" not in potential_missing:
+                    potential_missing.append("imdb_id")
+                    meta["potential_missing"] = potential_missing
+            else:
+                potential_missing = cast(list[str], meta.get("potential_missing", []))
+
         missing = [
             f"--{each} | {info_notes.get(each, '')}"
             for each in potential_missing
             if str(meta.get(each, '')).strip() in ["", "None", "0"]
         ]
+
         if missing:
             console.print("[bold yellow]Potentially missing information:[/bold yellow]")
             for each in missing:

@@ -192,33 +192,36 @@ async def exportInfo(
         for track in tracks:
             track_type = track.get("@type")
             if track_type == "General":
-                media_tracks.append(
-                    {
-                        "@type": track_type,
-                        "UniqueID": track.get("UniqueID", {}),
-                        "VideoCount": track.get("VideoCount", {}),
-                        "AudioCount": track.get("AudioCount", {}),
-                        "TextCount": track.get("TextCount", {}),
-                        "MenuCount": track.get("MenuCount", {}),
-                        "FileExtension": track.get("FileExtension", {}),
-                        "Format": track.get("Format", {}),
-                        "Format_Version": track.get("Format_Version", {}),
-                        "FileSize": track.get("FileSize", {}),
-                        "Duration": track.get("Duration", {}),
-                        "OverallBitRate": track.get("OverallBitRate", {}),
-                        "FrameRate": track.get("FrameRate", {}),
-                        "FrameCount": track.get("FrameCount", {}),
-                        "StreamSize": track.get("StreamSize", {}),
-                        "IsStreamable": track.get("IsStreamable", {}),
-                        "File_Created_Date": track.get("File_Created_Date", {}),
-                        "File_Created_Date_Local": track.get("File_Created_Date_Local", {}),
-                        "File_Modified_Date": track.get("File_Modified_Date", {}),
-                        "File_Modified_Date_Local": track.get("File_Modified_Date_Local", {}),
-                        "Encoded_Application": track.get("Encoded_Application", {}),
-                        "Encoded_Library": track.get("Encoded_Library", {}),
-                        "extra": track.get("extra", {}),
-                    }
-                )
+                general_track = {
+                    "@type": track_type,
+                    "UniqueID": track.get("UniqueID", {}),
+                    "VideoCount": track.get("VideoCount", {}),
+                    "AudioCount": track.get("AudioCount", {}),
+                    "TextCount": track.get("TextCount", {}),
+                    "MenuCount": track.get("MenuCount", {}),
+                    "FileExtension": track.get("FileExtension", {}),
+                    "Format": track.get("Format", {}),
+                    "Format_Version": track.get("Format_Version", {}),
+                    "FileSize": track.get("FileSize", {}),
+                    "Duration": track.get("Duration", {}),
+                    "OverallBitRate": track.get("OverallBitRate", {}),
+                    "FrameRate": track.get("FrameRate", {}),
+                    "FrameCount": track.get("FrameCount", {}),
+                    "StreamSize": track.get("StreamSize", {}),
+                    "IsStreamable": track.get("IsStreamable", {}),
+                    "File_Created_Date": track.get("File_Created_Date", {}),
+                    "File_Created_Date_Local": track.get("File_Created_Date_Local", {}),
+                    "File_Modified_Date": track.get("File_Modified_Date", {}),
+                    "File_Modified_Date_Local": track.get("File_Modified_Date_Local", {}),
+                    "Encoded_Application": track.get("Encoded_Application", {}),
+                    "Encoded_Library": track.get("Encoded_Library", {}),
+                    "extra": track.get("extra", {}),
+                }
+                # Preserve standard audio / book tags if present
+                for tag in ["Album", "Album_Performer", "Track_name", "Performer", "Composer", "Publisher", "Genre", "Recorded_Date", "ISBN", "Comment", "Description", "album", "album_performer", "track_name", "performer", "composer", "publisher", "genre", "recorded_date", "isbn", "comment", "description"]:
+                    if tag in track:
+                        general_track[tag] = track[tag]
+                media_tracks.append(general_track)
             elif track_type == "Video":
                 media_tracks.append(
                     {

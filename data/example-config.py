@@ -13,6 +13,14 @@ config = {
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
 
+        # Google Books API key. "" = disabled
+        # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
+        "google_books_api_key": "",
+
+        # MyAnonamouse (MAM) API key / session cookie (mam_id). "" = disabled
+        # You can get it from Preferences > Security > View IP locked session cookie
+        "mam_api_key": "",
+
         # tvdb api key
         # visit "https://www.thetvdb.com/dashboard/account/apikey" copy api key and insert below
         "tvdb_api": "",

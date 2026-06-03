@@ -558,7 +558,9 @@ class QbittorrentClientMixin:
             path = os.path.dirname(path)
         else:
             isdir = os.path.isdir(path)
-            if len(filelist) != 1 or not isdir:
+            if meta.get('category') == 'BOOK' and isdir:
+                path = os.path.dirname(path)
+            elif len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
         # Get the appropriate source path
@@ -1162,8 +1164,14 @@ class QbittorrentClientMixin:
     def _torrent_name_matches(self, torrent_name: str, meta: dict[str, Any]) -> bool:
         is_disc = meta.get('is_disc', "")
         if is_disc in ("", None) and len(meta.get('filelist', [])) == 1:
-            file_name = os.path.basename(meta['filelist'][0])
-            return torrent_name.lower() == file_name.lower() or torrent_name.lower() == meta['uuid'].lower()
+            file_path = meta['filelist'][0]
+            file_name = os.path.basename(file_path)
+            parent_dir = os.path.basename(os.path.dirname(file_path))
+            return (
+                torrent_name.lower() == file_name.lower()
+                or torrent_name.lower() == meta['uuid'].lower()
+                or (parent_dir and torrent_name.lower() == parent_dir.lower())
+            )
         return torrent_name.lower() == meta['uuid'].lower()
 
     def _extract_tracker_matches(self, torrent: Any, tracker_patterns: dict[str, dict[str, str]], tracker_priority: list[str], has_working_tracker: bool, meta: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:

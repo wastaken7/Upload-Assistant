@@ -15,10 +15,13 @@ try:
     import aiofiles
     import cli_ui
     import guessit
+    import langcodes
 
     from src.apply_overrides import ApplyOverrides
     from src.audio import AudioManager
     from src.bluray_com import get_bluray_releases
+    from src.book_prep import gather_book_prep as _gather_book_prep_fn
+    from src.book_prep import resolve_book_filelist as _resolve_book_filelist_fn
     from src.cleanup import cleanup_manager
     from src.clients import Clients
     from src.console import console
@@ -116,6 +119,23 @@ class Prep:
         self.sonarr_manager = SonarrManager(config)
         self.rehost_images_manager = RehostImagesManager(config)
 
+    @staticmethod
+    def _resolve_book_filelist(
+        meta: dict[str, Any],
+        videoloc: str,
+    ) -> tuple[str, list[str], str, str]:
+        """Delegate to :func:`src.book_prep.resolve_book_filelist`."""
+        return _resolve_book_filelist_fn(meta, videoloc)
+
+    async def _gather_book_prep(
+        self,
+        meta: dict[str, Any],
+        videopath: str,
+        base_dir: str,
+    ) -> None:
+        """Delegate to :func:`src.book_prep.gather_book_prep`."""
+        await _gather_book_prep_fn(meta, videopath, base_dir, self.config)
+
     async def gather_prep(self, meta: dict[str, Any], mode: str) -> dict[str, Any]:
         # set a timer to check speed
         meta_start_time = time.time()
@@ -156,6 +176,8 @@ class Prep:
         meta['audio_languages'] = None
         meta['subtitle_languages'] = None
         meta['aither_trumpable'] = None
+        meta["anime"] = False
+        meta["not_anime"] = False
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid') is None:
@@ -328,13 +350,17 @@ class Prep:
             meta['sd'] = await video_manager.is_sd(meta['resolution'])
 
         else:
-            videopath, meta['filelist'] = await video_manager.get_video(videoloc, meta.get('mode', 'discord'), meta.get('sorted_filelist', False), meta.get('debug', False))
-            filelist = cast(list[str], meta.get('filelist') or [])
-            meta['filelist'] = filelist
-            search_term = os.path.basename(filelist[0]) if filelist else ""
-            search_file_folder = 'file'
+            if meta.get("category") == "BOOK" or str(meta.get("manual_category") or "").upper() == "BOOK":
+                videopath, filelist, search_term, search_file_folder = self._resolve_book_filelist(meta, videoloc)
+                video = videopath
+            else:
+                videopath, meta["filelist"] = await video_manager.get_video(videoloc, meta.get("mode", "discord"), meta.get("sorted_filelist", False), meta.get("debug", False))
+                filelist = cast(list[str], meta.get("filelist") or [])
+                meta["filelist"] = filelist
+                search_term = os.path.basename(filelist[0]) if filelist else ""
+                search_file_folder = "file"
 
-            video, meta['scene'], meta['imdb_id'] = await self.scene_manager.is_scene(videopath, meta, meta.get('imdb_id', 0))
+                video, meta["scene"], meta["imdb_id"] = await self.scene_manager.is_scene(videopath, meta, meta.get("imdb_id", 0))
 
             try:
                 title, secondary_title, extracted_year = await self.name_manager.extract_title_and_year(meta, video)
@@ -382,7 +408,9 @@ class Prep:
                 raise Exception(f"Error processing filename: {e}") from e
 
             try:
-                if not meta.get('emby', False):
+                if meta.get("category") == "BOOK" or str(meta.get("manual_category") or "").upper() == "BOOK":
+                    await self._gather_book_prep(meta, videopath, base_dir)
+                elif not meta.get("emby", False):
                     # rely only on guessit for search_year for tv matching
                     try:
                         meta['search_year'] = guessit_fn(video)['year']
@@ -480,7 +508,7 @@ class Prep:
                 raise Exception("Conformance errors found in mediainfo")
 
         meta['valid_mi'] = True
-        if not meta['is_disc'] and not meta.get('emby', False):
+        if not meta["is_disc"] and not meta.get("emby", False) and meta.get("category") != "BOOK":
             try:
                 valid_mi = validate_mediainfo(meta, debug=meta['debug'])
             except NoAudioMediaError as e:
@@ -761,7 +789,10 @@ class Prep:
         if isinstance(manual_language, str) and manual_language:
             meta['original_language'] = manual_language.lower()
 
-        meta['type'] = await video_manager.get_type(video, meta['scene'], meta['is_disc'], meta)
+        if meta.get("category") == "BOOK":
+            meta["type"] = os.path.splitext(video)[1].lstrip(".").upper()
+        else:
+            meta["type"] = await video_manager.get_type(video, meta["scene"], meta["is_disc"], meta)
 
         # if it's not an anime, we can run season/episode checks now to speed the process
         if meta.get("not_anime", False) and meta.get("category") == "TV":
@@ -770,7 +801,7 @@ class Prep:
         mi_data: dict[str, Any] = mi or {}
 
         # Run a check against mediainfo to see if it has tmdb/imdb
-        if (meta.get('tmdb_id') == 0 or meta.get('imdb_id') == 0) and not meta.get('emby', False):
+        if (meta.get("tmdb_id") == 0 or meta.get("imdb_id") == 0) and not meta.get("emby", False) and meta.get("category") != "BOOK":
             meta['category'], meta['tmdb_id'], meta['imdb_id'], meta['tvdb_id'] = await self.tmdb_manager.get_tmdb_imdb_from_mediainfo(
                 mi_data, meta
             )
@@ -786,7 +817,7 @@ class Prep:
         debug = bool(meta.get('emby_debug', False) or meta['debug'])
 
         # run a search to find tmdb and imdb ids if we don't have them
-        if int(meta.get('tmdb_id') or 0) == 0 and int(meta.get('imdb_id') or 0) == 0:
+        if int(meta.get("tmdb_id") or 0) == 0 and int(meta.get("imdb_id") or 0) == 0 and meta.get("category") != "BOOK":
             if meta.get('category') == "TV":
                 year = meta.get('manual_year', '') or meta.get('search_year', '') or meta.get('year', '')
             elif meta.get('emby_debug', False):
@@ -829,7 +860,7 @@ class Prep:
             meta['no_ids'] = True
 
         # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
-        if int(meta.get('imdb_id') or 0) != 0 and int(meta.get('tmdb_id') or 0) == 0:
+        if int(meta.get("imdb_id") or 0) != 0 and int(meta.get("tmdb_id") or 0) == 0 and meta.get("category") != "BOOK":
             imdb_id_value = _to_int(meta.get('imdb_id'))
             tvdb_id_value = _to_int(meta.get('tvdb_id'))
             search_year_value = _normalize_search_year(meta.get('search_year'))
@@ -887,7 +918,7 @@ class Prep:
             meta['imdb_info'] = None
 
         # Get IMDb ID if not set
-        if meta.get('imdb_id') == 0:
+        if meta.get("imdb_id") == 0 and meta.get("category") != "BOOK":
             try:
                 search_year_value = _normalize_search_year(meta.get('search_year'))
                 meta['imdb_id'] = await imdb_manager.search_imdb(
@@ -907,7 +938,7 @@ class Prep:
                 raise Exception(f"Error searching IMDb: {e}") from e
 
         # user might have skipped tmdb earlier, lets double check
-        if meta.get('imdb_id') != 0 and meta.get('tmdb_id') == 0:
+        if meta.get("imdb_id") != 0 and meta.get("tmdb_id") == 0 and meta.get("category") != "BOOK":
             console.print("[yellow]No TMDB ID found, attempting to fetch from IMDb...[/yellow]")
             imdb_id_value = _to_int(meta.get('imdb_id'))
             tvdb_id_value = _to_int(meta.get('tvdb_id'))
@@ -929,12 +960,12 @@ class Prep:
             meta['no_ids'] = filename_search
 
         tmdb_id_value = _to_int(meta.get('tmdb_id'))
-        if tmdb_id_value != 0:
+        if tmdb_id_value != 0 and meta.get("category") != "BOOK":
             await self.tmdb_manager.set_tmdb_metadata(meta, filename)
 
         # Ensure IMDb info is retrieved if it wasn't already fetched
         imdb_id_value = _to_int(meta.get('imdb_id'))
-        if meta.get('imdb_info', None) is None and imdb_id_value != 0:
+        if meta.get("imdb_info", None) is None and imdb_id_value != 0 and meta.get("category") != "BOOK":
             imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
             meta['imdb_info'] = imdb_info
 
@@ -995,7 +1026,7 @@ class Prep:
                         console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
                     meta['tv_movie'] = True
 
-        if meta['category'] == "TV" or meta.get('tv_movie', False):
+        if (meta["category"] == "TV" or meta.get("tv_movie", False)) and meta.get("category") != "BOOK":
             both_ids_searched = False
             search_year_value = _normalize_search_year(meta.get('search_year'))
             if meta.get('tvmaze_id', 0) == 0 and meta.get('tvdb_id', 0) == 0:
@@ -1138,7 +1169,7 @@ class Prep:
 
         meta['video'] = video
 
-        if not meta.get('emby', False):
+        if not meta.get("emby", False) and meta.get("category") in ("TV", "MOVIE"):
             meta['container'] = await video_manager.get_container(meta)
 
             meta['audio'], meta['channels'], meta['has_commentary'] = await self.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
@@ -1191,40 +1222,6 @@ class Prep:
             meta.get('stream', False)
             meta['stream'] = await self.stream_optimized(meta['stream'])
 
-            if meta.get('tag', None) is None:
-                if meta.get('we_need_tag', False):
-                    meta['tag'] = await get_tag(meta['scene_name'], meta)
-                else:
-                    meta['tag'] = await get_tag(video, meta)
-                    # all lowercase filenames will have bad group tag, it's probably a scene release.
-                    # some extracted files do not match release name so lets double check if it really is a scene release
-                    if not meta.get('scene') and meta['tag']:
-                        base = os.path.basename(video)
-                        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
-                        if match and (not meta['is_disc'] or meta.get('keep_folder', False)):
-                            base = match.group(1)
-                            is_all_lowercase = base.islower()
-                            if is_all_lowercase:
-                                release_name, _, _ = await self.scene_manager.is_scene(videopath, meta, meta.get('imdb_id', 0), lower=True)
-                                if release_name:
-                                    try:
-                                        meta['scene_name'] = release_name
-                                        meta['tag'] = await get_tag(release_name, meta)
-                                    except Exception:
-                                        console.print("[red]Error getting tag from scene name, check group tag.[/red]")
-
-            else:
-                if not meta['tag'].startswith('-') and meta['tag'] != "":
-                    meta['tag'] = f"-{meta['tag']}"
-
-            meta = await tag_override(meta)
-
-            if meta['tag'][1:].startswith(meta['channels']):
-                meta['tag'] = meta['tag'].replace(f"-{meta['channels']}", '')
-
-            if meta.get('no_tag', False):
-                meta['tag'] = ""
-
             if meta.get('tag') == "-SubsPlease":  # SubsPlease-specific
                 tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])  # Get all tracks
                 bitrate = tracks[1].get('BitRate', '') if len(tracks) > 1 and not isinstance(tracks[1].get('BitRate', ''), dict) else ''  # Check that bitrate is not a dict
@@ -1270,6 +1267,42 @@ class Prep:
 
             meta['combined_genres'] = ', '.join(unique_genres) if unique_genres else ''
 
+        # Process group tag for all categories (TV, MOVIE, BOOK, etc.)
+        if meta.get("tag", None) is None:
+            if meta.get("we_need_tag", False):
+                meta["tag"] = await get_tag(meta["scene_name"], meta)
+            else:
+                meta["tag"] = await get_tag(video, meta)
+                # all lowercase filenames will have bad group tag, it's probably a scene release.
+                # some extracted files do not match release name so lets double check if it really is a scene release
+                if not meta.get("scene") and meta["tag"]:
+                    base = os.path.basename(video)
+                    match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+                    if match and (not meta["is_disc"] or meta.get("keep_folder", False)):
+                        base = match.group(1)
+                        is_all_lowercase = base.islower()
+                        if is_all_lowercase:
+                            release_name, _, _ = await self.scene_manager.is_scene(videopath, meta, meta.get("imdb_id", 0), lower=True)
+                            if release_name:
+                                try:
+                                    meta["scene_name"] = release_name
+                                    meta["tag"] = await get_tag(release_name, meta)
+                                except Exception:
+                                    console.print("[red]Error getting tag from scene name, check group tag.[/red]")
+
+        else:
+            if not meta["tag"].startswith("-") and meta["tag"] != "":
+                meta["tag"] = f"-{meta['tag']}"
+
+        meta = await tag_override(meta)
+
+        channels = meta.get("channels", "")
+        if channels and meta["tag"][1:].startswith(channels):
+            meta["tag"] = meta["tag"].replace(f"-{channels}", "")
+
+        if meta.get("no_tag", False):
+            meta["tag"] = ""
+
         # return duplicate ids so I don't have to catch every site file
         # this has the other advantage of stringing imdb for this object
         meta['tmdb'] = meta.get('tmdb_id')
@@ -1282,6 +1315,36 @@ class Prep:
         meta['mal'] = meta.get('mal_id')
         meta['tvdb'] = meta.get('tvdb_id')
         meta['tvmaze'] = meta.get('tvmaze_id')
+
+        if meta.get("category") == "BOOK":
+            meta["container"] = os.path.splitext(videopath)[1].lstrip(".").lower()
+            meta["audio"] = ""
+            meta["channels"] = ""
+            meta["has_commentary"] = False
+            meta["3D"] = ""
+            meta["source"] = "WEB"
+            if not meta.get("type"):
+                meta["type"] = os.path.splitext(videopath)[1].lstrip(".").upper()
+            meta["uhd"] = ""
+            meta["hdr"] = ""
+            meta["distributor"] = ""
+            meta["region"] = ""
+            meta["video_codec"] = ""
+            meta["video_encode"] = ""
+            meta["has_encode_settings"] = False
+            meta["bit_depth"] = "0"
+            meta["edition"] = ""
+            meta["repack"] = ""
+            meta["webdv"] = False
+
+            if not meta.get("title"):
+                meta["title"] = ""
+            if not meta.get("year"):
+                meta["year"] = ""
+            if not meta.get("overview"):
+                meta["overview"] = ""
+            if not meta.get("genres"):
+                meta["genres"] = ""
 
         # we finished the metadata, time it
         if meta['debug']:

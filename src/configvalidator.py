@@ -83,6 +83,9 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "cross_seeding": (bool,),
     "cross_seed_check_everything": (bool,),
     "auto_mode": (bool, str),
+    "google_books_api_key": (str,),
+    "mam_api_key": (str,),
+    "mam_id": (str,),
 }
 
 # Valid image hosts

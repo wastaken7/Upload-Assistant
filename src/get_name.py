@@ -183,6 +183,9 @@ class NameManager:
             elif type == "DVDRIP":
                 name = f"{title} {year} {alt_title} {season} {source} DVDRip {audio} {video_encode}"
                 potential_missing = []
+        elif meta["category"] == "BOOK":
+            name = self.extract_book_name(meta)
+            potential_missing = []
 
         try:
             name = ' '.join(name.split())
@@ -198,6 +201,25 @@ class NameManager:
         name = name_notag + tag
         clean_name = await self.clean_filename(name)
         return name_notag, name, clean_name, potential_missing
+
+    def extract_book_name(self, meta: Meta) -> str:
+        year = meta.get("year", "")
+        is_audiobook = meta.get("is_audiobook", False)
+        author = meta.get("author", "")
+        title = meta.get("title", "")
+        ebook_type = meta.get("type", "")
+        if ebook_type == "EPUB":
+            ebook_type = "ePUB"
+        book_type = "AUDIOBOOK" if is_audiobook else "eBOOK"
+        book_language = meta.get("book_language", "")
+        book_language_iso = meta.get("book_language_iso", "")
+        book_lang_to_use = book_language_iso or book_language or ""
+
+        name = f"{author} - {title} {year} {book_lang_to_use.upper()} {ebook_type} {book_type}"
+        if is_audiobook:
+            name = f"{author} - {title} {year} {book_lang_to_use.upper()} {book_type}"
+
+        return name
 
     async def clean_filename(self, name: str) -> str:
         invalid = '<>:"/\\|?*'
