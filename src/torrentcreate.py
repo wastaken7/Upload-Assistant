@@ -168,8 +168,11 @@ class TorrentCreator:
         return piece_size
 
     @staticmethod
-    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str]) -> str:
-        manual_patterns = ["*.nfo", "*.jpg", "*.png", '*.srt', '*.sub', '*.vtt', '*.ssa', '*.ass', "*.txt", "*.xml"]
+    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+        if allow_subs:
+            manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.txt", "*.xml"]
+        else:
+            manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.txt", "*.xml"]
         keep_set = {os.path.abspath(f) for f in filelist}
 
         exclude_files: set[str] = set()
@@ -217,6 +220,11 @@ class TorrentCreator:
                 include: list[str] = []
                 exclude: list[str] = []
 
+                is_subs = "BASE_SUBS" in str(output_filename)
+                creation_filelist = list(meta["filelist"])
+                if is_subs and meta.get("subtitle_files"):
+                    creation_filelist.extend(meta["subtitle_files"])
+
                 if meta['keep_folder']:
                     console.print('--keep-folder was specified. Using complete folder for torrent creation.')
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
@@ -227,10 +235,7 @@ class TorrentCreator:
                         meta['mkbrr'] = False
                     elif not meta.get('tv_pack', False):
                         folder_name = os.path.basename(str(path))
-                        include = [
-                            f"{folder_name}/{os.path.basename(f)}"
-                            for f in meta['filelist']
-                        ]
+                        include = [f"{folder_name}/{os.path.basename(f)}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
 
                 elif meta['isdir']:
@@ -252,16 +257,13 @@ class TorrentCreator:
                             os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs
                             if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
                         ]
-                        if len(no_sample_globs) == 1:
+                        if len(no_sample_globs) == 1 and not is_subs:
                             path = meta['filelist'][0]
                         exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else []
                         include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else []
                     else:
                         folder_name = os.path.basename(str(path))
-                        include = [
-                            f"{folder_name}/{os.path.basename(f)}"
-                            for f in meta['filelist']
-                        ]
+                        include = [f"{folder_name}/{os.path.basename(f)}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else []
@@ -312,7 +314,7 @@ class TorrentCreator:
                             cmd.extend(["--workers", str(meta['mkbrr_threads'])])
 
                         if not meta.get('is_disc', False):
-                            exclude_str = cls.build_mkbrr_exclude_string(str(path), meta['filelist'])
+                            exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
 
                         cmd.extend(["-o", output_path])
@@ -401,6 +403,9 @@ class TorrentCreator:
                 piece_size = cls.calculate_piece_size(initial_size, 32768, 134217728, meta, piece_size=piece_size)
 
                 # Fallback to CustomTorrent if mkbrr is not used
+                custom_include = include or []
+                if is_subs and not custom_include and not meta["is_disc"]:
+                    custom_include = ["*.mkv", "*.mp4", "*.ts", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.idx"]
                 torrent = CustomTorrent(
                     meta=meta,
                     path=path,
@@ -408,11 +413,11 @@ class TorrentCreator:
                     source="UA",
                     private=True,
                     exclude_globs=exclude or [],
-                    include_globs=include or [],
+                    include_globs=custom_include,
                     creation_date=datetime.now(timezone.utc),
                     comment="Created by Upload Assistant",
                     created_by="Upload Assistant",
-                    piece_size=piece_size
+                    piece_size=piece_size,
                 )
 
                 # Run torrent generation in thread to avoid blocking the event loop
@@ -502,7 +507,14 @@ class TorrentCreator:
                     base_torrent.metainfo.pop(each, None)  # type: ignore
             base_torrent.source = 'L4G'
             base_torrent.private = True
-            Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
+            has_subs = False
+            for f in base_torrent.files:
+                ext = os.path.splitext(str(f))[1].lower()
+                if ext in {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}:
+                    has_subs = True
+                    break
+            out_name = "BASE_SUBS.torrent" if has_subs else "BASE.torrent"
+            Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/{out_name}", overwrite=True)
 
     @staticmethod
     def get_mkbrr_path(meta: Mapping[str, Any]) -> str:
@@ -545,8 +557,8 @@ class TorrentCreator:
         return binary_path
 
 
-def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str]) -> str:
-    return TorrentCreator.build_mkbrr_exclude_string(root_folder, filelist)
+def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+    return TorrentCreator.build_mkbrr_exclude_string(root_folder, filelist, allow_subs)
 
 
 async def create_torrent(

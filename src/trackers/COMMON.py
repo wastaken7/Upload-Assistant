@@ -135,6 +135,21 @@ class COMMON:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda p, e: os.makedirs(p, exist_ok=e), path, exist_ok)
 
+    async def get_torrent_filename(self, meta: dict[str, Any], tracker_config: Any) -> str:
+        """
+        Decide which torrent filename/prefix to use (BASE or BASE_SUBS) depending on
+        the allow_ext_subtitles setting and presence of the subtitles torrent.
+        """
+        torrent_filename = "BASE"
+        allow_ext_subtitles = False
+        if isinstance(tracker_config, dict):
+            allow_ext_subtitles = tracker_config.get("allow_ext_subtitles", False)
+        if allow_ext_subtitles:
+            subs_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE_SUBS.torrent"
+            if await self.path_exists(subs_path):
+                torrent_filename = "BASE_SUBS"
+        return torrent_filename
+
     async def create_torrent_for_upload(
         self,
         meta: dict[str, Any],
@@ -143,6 +158,10 @@ class COMMON:
         torrent_filename: str = "BASE",
         announce_url: str = "",
     ) -> None:
+        tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
+        if torrent_filename == "BASE":
+            torrent_filename = await self.get_torrent_filename(meta, tracker_cfg)
+
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
