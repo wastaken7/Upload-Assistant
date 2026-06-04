@@ -26,13 +26,15 @@ from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
+Meta = dict[str, Any]
+Config = dict[str, Any]
 
 class BJS:
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         self.config = config
         self.tmdb_manager = TmdbManager(config)
         self.common = COMMON(config)
@@ -50,11 +52,11 @@ class BJS:
         self.episode_tmdb_data: dict[str, Any] = {}
         self.semaphore = asyncio.Semaphore(1)
 
-    def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+    def get_additional_checks(self, _meta: Meta) -> bool:
         should_continue = True
         return should_continue
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
+    async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
@@ -69,7 +71,7 @@ class BJS:
 
         return False
 
-    async def load_localized_data(self, meta: dict[str, Any]) -> None:
+    async def load_localized_data(self, meta: Meta) -> None:
         localized_data_file: str = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"
         main_ptbr_data: dict[str, Any] = {}
         episode_ptbr_data: dict[str, Any] = {}
@@ -102,7 +104,7 @@ class BJS:
 
         return
 
-    def get_container(self, meta: dict[str, Any]) -> str:
+    def get_container(self, meta: Meta) -> str:
         container: str = meta.get('container', '')
         category = meta["category"]
 
@@ -123,7 +125,7 @@ class BJS:
 
         return ""
 
-    def get_type(self, meta: dict[str, Any]) -> str:
+    def get_type(self, meta: Meta) -> str:
         category = meta["category"]
         if meta.get('anime'):
             return '13'
@@ -209,7 +211,7 @@ class BJS:
         else:
             return "Outro"
 
-    async def get_audio(self, meta: dict[str, Any]) -> str:
+    async def get_audio(self, meta: Meta) -> str:
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -232,7 +234,7 @@ class BJS:
 
         return "Legendado"
 
-    async def get_subtitle(self, meta: dict[str, Any]) -> str:
+    async def get_subtitle(self, meta: Meta) -> str:
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         found_language_strings = meta.get("subtitle_languages", [])
@@ -244,7 +246,7 @@ class BJS:
 
         return subtitle_type
 
-    def get_resolution(self, meta: dict[str, Any]) -> tuple[str, str]:
+    def get_resolution(self, meta: Meta) -> tuple[str, str]:
         width, height = "0", "0"
 
         if meta.get("is_disc") == "BDMV":
@@ -265,7 +267,7 @@ class BJS:
 
         return width, height
 
-    def get_video_codec(self, meta: dict[str, Any]) -> str:
+    def get_video_codec(self, meta: Meta) -> str:
         codec_map = {
             "x265": "x265",
             "h.265": "H.265",
@@ -299,7 +301,7 @@ class BJS:
 
         return video_codec if video_codec else "Outro"
 
-    def get_audio_codec(self, meta: dict[str, Any]) -> str:
+    def get_audio_codec(self, meta: Meta) -> str:
         priority_order = ["DTS-X", "E-AC-3 JOC", "TrueHD", "DTS-HD", "LPCM", "PCM", "FLAC", "DTS-ES", "DTS", "E-AC-3", "AC3", "AAC", "Opus", "Vorbis", "MP3", "MP2"]
 
         codec_map = {
@@ -337,7 +339,7 @@ class BJS:
 
         return "Outro"
 
-    def get_title(self, meta: dict[str, Any]) -> tuple[str, str]:
+    def get_title(self, meta: Meta) -> tuple[str, str]:
         original_title = meta["title"]
         brazilian_title = ""
 
@@ -350,7 +352,7 @@ class BJS:
 
         return original_title, brazilian_title
 
-    async def build_description(self, meta: dict[str, Any]) -> str:
+    async def build_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         category = meta["category"]
         desc_parts: list[str] = []
@@ -428,7 +430,7 @@ class BJS:
 
         return description
 
-    def build_book_desc(self, meta: dict[str, Any]) -> str:
+    def build_book_desc(self, meta: Meta) -> str:
         """Build the BBCode table for BOOK-category uploads."""
         book_parts: list[str] = [""]
         narrator = meta.get("narrator")
@@ -465,7 +467,7 @@ class BJS:
 
         return "\n".join(final_book_parts)
 
-    def get_trailer(self, meta: dict[str, Any]) -> str:
+    def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get("videos", {})).get("results", [])
         youtube_code = video_results[-1].get("key", "") if video_results else ""
         youtube = f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.get("youtube") or ""
@@ -543,16 +545,26 @@ class BJS:
 
         return original_title
 
-    async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
+        category = meta["category"]
         should_continue = self.get_additional_checks(meta)
         if not should_continue:
             meta["skipping"] = f"{self.tracker}"
             return dupes
 
-        if not dict(meta.get("imdb_info", {})).get("imdbID"):
-            console.print(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
-            return dupes
+        elif category in ("TV", "MOVIE"):
+            if not dict(meta.get("imdb_info", {})).get("imdbID"):
+                console.print(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
+                return dupes
+            search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
+
+        if category == "BOOK":
+            filter_cat = "11" if meta.get("is_audiobook") else "10"
+            search_url = f"{self.base_url}/torrents.php?searchstr={meta['title']}&filter_cat[{filter_cat}]=1&action=basic&searchsubmit=1"
+
+        else:
+            search_url = f"{self.base_url}/torrents.php?searchstr={meta['title']}"
 
         try:
             cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -562,34 +574,84 @@ class BJS:
             BJS.already_has_the_info = False
             BJS.database_title = ""
 
-            search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
             response = await self.session.get(search_url, follow_redirects=True)
             soup = BeautifulSoup(response.text, "html.parser")
 
+            # Check if we were redirected to a details page (it contains class "main_column")
             torrent_details_table: Optional[Tag] = soup.find("div", class_="main_column")
+            # Or if we remained on the search results page (it contains id "torrent_table")
+            torrent_search_table: Optional[Tag] = soup.find("table", id="torrent_table")
 
             if torrent_details_table:
                 BJS.already_has_the_info = True
                 BJS.database_title = self.get_database_title(soup)
-            else:
-                return dupes
 
-            for row in torrent_details_table.find_all('tr'):
-                row_id = row.get("id")
-                if isinstance(row_id, str) and row_id.startswith("torrent") and not row_id.startswith("torrent_"):
-                    torrent_id = row_id.replace("torrent", "")
+                for row in torrent_details_table.find_all("tr"):
+                    row_id = row.get("id")
+                    if isinstance(row_id, str) and row_id.startswith("torrent") and not row_id.startswith("torrent_"):
+                        torrent_id = row_id.replace("torrent", "")
+                        if not torrent_id:
+                            continue
+
+                        name = row.get("data-torrentname", "")
+                        if not name:
+                            continue
+                        name = str(name).strip()
+
+                        size_tag = row.find("td", class_="number_column nobr")
+                        size = size_tag.get_text(strip=True) if size_tag else ""
+
+                        link = f"{self.torrent_url}{torrent_id}"
+
+                        dupes.append({"name": name, "size": size, "link": link})
+
+            elif torrent_search_table:
+                for row in torrent_search_table.find_all("tr", class_="torrent"):
+                    title_link_tag = row.find("a", href=re.compile(r"torrentid=\d+"))
+                    torrent_id = None
+                    if title_link_tag and isinstance(title_link_tag, Tag):
+                        href = title_link_tag.get("href", "")
+                        if isinstance(href, str):
+                            match = re.search(r"torrentid=(\d+)", href)
+                            if match:
+                                torrent_id = match.group(1)
+
+                    if not torrent_id:
+                        download_link_tag = row.find("a", href=re.compile(r"action=download&id=\d+"))
+                        if download_link_tag and isinstance(download_link_tag, Tag):
+                            href = download_link_tag.get("href", "")
+                            if isinstance(href, str):
+                                match = re.search(r"id=(\d+)", href)
+                                if match:
+                                    torrent_id = match.group(1)
+
                     if not torrent_id:
                         continue
 
-                    name = row.get("data-torrentname", "")
+                    link = f"{self.torrent_url}{torrent_id}"
+
+                    torrent_info_div = row.find("div", class_="torrent_info")
+                    name = ""
+                    if torrent_info_div and isinstance(torrent_info_div, Tag):
+                        name = torrent_info_div.get("data-torrentname", "")
+                        if not name:
+                            name = torrent_info_div.get("data-name", "")
+
                     if not name:
-                        continue
+                        if title_link_tag:
+                            name = title_link_tag.get_text(strip=True)
+                        else:
+                            continue
+
                     name = str(name).strip()
 
-                    size_tag = row.find("td", class_="number_column nobr")
-                    size = size_tag.get_text(strip=True) if size_tag else ""
-
-                    link = f"{self.torrent_url}{torrent_id}"
+                    size = ""
+                    tds = row.find_all("td")
+                    if len(tds) >= 5:
+                        size_candidates = [
+                            td.get_text(strip=True) for td in tds if re.search(r"\d+(\.\d+)?\s*(B|KiB|MiB|GiB|TiB|KB|MB|GB|TB)", td.get_text(strip=True), re.IGNORECASE)
+                        ]
+                        size = size_candidates[0] if size_candidates else tds[4].get_text(strip=True)
 
                     dupes.append({"name": name, "size": size, "link": link})
 
@@ -602,7 +664,7 @@ class BJS:
             traceback.print_exc()
             return dupes
 
-    def get_edition(self, meta: dict[str, Any]) -> str:
+    def get_edition(self, meta: Meta) -> str:
         edition_str = str(meta.get("edition", "")).lower()
         if not edition_str:
             return ""
@@ -625,7 +687,7 @@ class BJS:
 
         return ""
 
-    def get_bitrate(self, meta: dict[str, Any]) -> str:
+    def get_bitrate(self, meta: Meta) -> str:
         if meta.get("type") == "DISC":
             is_disc_type = meta.get("is_disc")
 
@@ -708,7 +770,7 @@ class BJS:
             console.print(f"Exceção no upload de {filename}: {e}", markup=False)
             return None
 
-    async def get_cover(self, meta: dict[str, Any]):
+    async def get_cover(self, meta: Meta):
         category = meta["category"]
 
         if category in ("MOVIE", "TV"):
@@ -748,7 +810,7 @@ class BJS:
                 console.print(f"{self.tracker}: Falha ao ler ou enviar capa do livro {cover_path}: {e}", markup=False)
                 return None
 
-    async def get_screenshots(self, meta: dict[str, Any]) -> list[str]:
+    async def get_screenshots(self, meta: Meta) -> list[str]:
         screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
         local_files = sorted(screenshot_dir.glob("*.png"))
 
@@ -797,7 +859,7 @@ class BJS:
 
         return results
 
-    def get_runtime(self, meta: dict[str, Any]) -> tuple[int, int]:
+    def get_runtime(self, meta: Meta) -> tuple[int, int]:
         """
         Extracts runtime from metadata and converts total minutes into hours and minutes.
         """
@@ -821,7 +883,7 @@ class BJS:
         except ValueError:
             return ""
 
-    def find_remaster_tags(self, meta: dict[str, Any]) -> set[str]:
+    def find_remaster_tags(self, meta: Meta) -> set[str]:
         found_tags: set[str] = set()
 
         edition = self.get_edition(meta)
@@ -864,7 +926,7 @@ class BJS:
 
         return found_tags
 
-    def build_remaster_title(self, meta: dict[str, Any]) -> str:
+    def build_remaster_title(self, meta: Meta) -> str:
         tag_priority = [
             "Dolby Atmos",
             "Remux",
@@ -890,7 +952,7 @@ class BJS:
 
         return " / ".join(ordered_tags)
 
-    async def get_credits(self, meta: dict[str, Any], role: str) -> str:
+    async def get_credits(self, meta: Meta, role: str) -> str:
         if BJS.already_has_the_info:
             return "N/A"
 
@@ -935,7 +997,7 @@ class BJS:
 
         return "skipped"
 
-    def get_imdb_rating(self, meta: dict[str, Any]):
+    def get_imdb_rating(self, meta: Meta):
         imdb_info = dict(meta.get("imdb_info", {}))
         rating = imdb_info.get("rating")
 
@@ -944,7 +1006,7 @@ class BJS:
 
         return str(rating)
 
-    async def get_requests(self, meta: dict[str, Any]) -> list[dict[str, str]]:
+    async def get_requests(self, meta: Meta) -> list[dict[str, str]]:
         results: list[dict[str, str]] = []
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.get("search_requests", False):
             return results
@@ -1025,7 +1087,7 @@ class BJS:
                 console.print(traceback.format_exc())
                 return results
 
-    async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
@@ -1161,7 +1223,7 @@ class BJS:
 
         return data
 
-    def get_year(self, meta: dict[str, Any]) -> str:
+    def get_year(self, meta: Meta) -> str:
         """
         Returns the year of the release.
 
@@ -1186,7 +1248,7 @@ class BJS:
 
         return year
 
-    def get_adulto(self, meta: dict[str, Any]) -> str:
+    def get_adulto(self, meta: Meta) -> str:
         """
         Check for adult classification eligibility.
 
@@ -1208,7 +1270,7 @@ class BJS:
 
         return adult_no
 
-    def get_imdblink(self, meta: dict[str, Any]) -> str:
+    def get_imdblink(self, meta: Meta) -> str:
         """
         Get the media identifier for the upload.
         Uses IMDb ID as primary source, falling back to TMDb ID if unavailable.
@@ -1245,7 +1307,7 @@ class BJS:
 
         return "N/A"
 
-    def check_data(self, meta: dict[str, Any], data: dict[str, Any]) -> str:
+    def check_data(self, meta: Meta, data: dict[str, Any]) -> str:
         if not meta.get("debug", False) and len(data["screenshots[]"]) < 2:
             return "The number of successful screenshots uploaded is less than 2."
 
@@ -1257,7 +1319,7 @@ class BJS:
 
         return ""
 
-    async def upload(self, meta: dict[str, Any], _):
+    async def upload(self, meta: Meta, _):
         data = await self.get_data(meta)
 
         issue = self.check_data(meta, data)
