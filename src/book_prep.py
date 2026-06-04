@@ -203,6 +203,114 @@ def _extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any
     return metadata
 
 
+def _extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, Any]:
+    """Extract metadata from a CBR (RAR) or CBZ (ZIP) container's ComicInfo.xml file."""
+    metadata: dict[str, Any] = {}
+    if not os.path.isfile(filepath):
+        return metadata
+
+    ext = os.path.splitext(filepath)[1].lower()
+    xml_data: Optional[bytes] = None
+
+    if ext == ".cbz" or zipfile.is_zipfile(filepath):
+        try:
+            with zipfile.ZipFile(filepath, "r") as z:
+                # Find ComicInfo.xml (case-insensitive search)
+                xml_name = next((name for name in z.namelist() if name.lower().endswith("comicinfo.xml")), None)
+                if xml_name:
+                    xml_data = z.read(xml_name)
+        except Exception as e:
+            if debug:
+                console.print(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
+    elif ext == ".cbr":
+        try:
+            from rarfile import RarFile
+        except ImportError:
+            if debug:
+                console.print("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
+            RarFile = None
+
+        if RarFile:
+            try:
+                with RarFile(filepath, "r") as r:
+                    xml_name = next((name for name in r.namelist() if name.lower().endswith("comicinfo.xml")), None)
+                    if xml_name:
+                        xml_data = r.read(xml_name)
+            except Exception as e:
+                if debug:
+                    console.print(f"[yellow]Debug: Error reading CBR rar archive: {e}[/yellow]")
+
+    if not xml_data:
+        return metadata
+
+    try:
+        root = ET.fromstring(xml_data)
+
+        series = ""
+        title = ""
+        writer = ""
+        penciller = ""
+        publisher = ""
+        year = ""
+        language_iso = ""
+        summary = ""
+        genre = ""
+
+        for elem in root.iter():
+            tag_local = elem.tag.split("}")[-1]
+            if tag_local == "Series":
+                series = (elem.text or "").strip()
+            elif tag_local == "Title":
+                title = (elem.text or "").strip()
+            elif tag_local == "Writer":
+                writer = (elem.text or "").strip()
+            elif tag_local == "Penciller":
+                penciller = (elem.text or "").strip()
+            elif tag_local == "Publisher":
+                publisher = (elem.text or "").strip()
+            elif tag_local == "Year":
+                year = (elem.text or "").strip()
+            elif tag_local == "LanguageISO":
+                language_iso = (elem.text or "").strip()
+            elif tag_local == "Summary":
+                summary = (elem.text or "").strip()
+            elif tag_local == "Genre":
+                genre = (elem.text or "").strip()
+
+        # Map to common metadata fields
+        final_title = series or title
+        if final_title:
+            metadata["title"] = final_title
+
+        final_author = writer or penciller
+        if final_author:
+            metadata["author"] = final_author
+
+        if publisher:
+            metadata["publisher"] = publisher
+
+        if year:
+            match = re.search(r"\b\d{4}\b", year)
+            if match:
+                metadata["year"] = match.group(0)
+
+        if language_iso:
+            metadata["book_language_raw"] = language_iso
+
+        if summary:
+            metadata["overview"] = summary
+
+        if genre:
+            genres_list = [g.strip() for g in genre.split(",") if g.strip()]
+            metadata["keywords"] = metadata["genres"] = ", ".join(genres_list)
+
+    except Exception as e:
+        if debug:
+            console.print(f"[yellow]Warning: Error parsing ComicInfo.xml metadata: {e}[/yellow]")
+
+    return metadata
+
+
 def _validate_isbn_checksum(candidate: str) -> Optional[str]:
     """Validate and return cleaned ISBN-10 or ISBN-13 if valid, else None."""
     cleaned = re.sub(r"[- ]", "", candidate).upper()
@@ -319,6 +427,24 @@ async def gather_book_prep(
             if meta.get("debug", False):
                 console.print(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
             for key, val in epub_meta.items():
+                if key == "book_language_raw":
+                    full, iso3 = _resolve_book_language(val)
+                    if is_valid_book_language(full, iso3) and not meta.get("book_language"):
+                        meta["book_language"] = full
+                        meta["book_language_iso"] = iso3
+                else:
+                    if not meta.get(key) and val:
+                        meta[key] = val
+                        if key == "year":
+                            meta["search_year"] = int(val)
+
+    # Extract CBR/CBZ metadata directly if the file is a CBR/CBZ
+    if videopath.lower().endswith((".cbr", ".cbz")) and os.path.isfile(videopath):  # noqa: ASYNC240
+        cbr_cbz_meta = _extract_cbr_cbz_metadata(videopath, debug=meta.get("debug", False))
+        if cbr_cbz_meta:
+            if meta.get("debug", False):
+                console.print(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
+            for key, val in cbr_cbz_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
                     if is_valid_book_language(full, iso3) and not meta.get("book_language"):

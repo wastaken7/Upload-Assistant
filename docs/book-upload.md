@@ -21,8 +21,9 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 
 ### A. Local File Metadata
 1. **EPUB**: Automatically decompresses and parses the internal OPF file (`META-INF/container.xml` or any `.opf` file) to extract `title`, `author`, `language`, `year` (from `date`), `isbn` (from `identifier`), `overview` (description), and `publisher`.
-2. **PDF**: Scans the first 30 pages and the last 30 pages using **PyMuPDF** (`fitz`). It searches for ISBN strings using regular expressions and validates them mathematically using ISBN-10 and ISBN-13 checksum algorithms to avoid false matches.
-3. **MediaInfo**: Standard container tags (e.g., `Album`, `Performer`, `Composer`, `Publisher`, `Genre`, `ISBN`, `Comment`, `Description`) are preserved during the extraction phase for audiobooks and ebook files.
+2. **CBR/CBZ**: Automatically parses the internal `ComicInfo.xml` metadata file (case-insensitively located) to extract `title` (from `<Series>` or `<Title>`), `author` (from `<Writer>` or `<Penciller>`), `publisher` (from `<Publisher>`), `year` (from `<Year>`), `book_language` (from `<LanguageISO>`), `overview` (from `<Summary>`), and `genres`/`keywords` (from `<Genre>`, normalized to space-separated commas).
+3. **PDF**: Scans the first 30 pages and the last 30 pages using **PyMuPDF** (`fitz`). It searches for ISBN strings using regular expressions and validates them mathematically using ISBN-10 and ISBN-13 checksum algorithms to avoid false matches.
+4. **MediaInfo**: Standard container tags (e.g., `Album`, `Performer`, `Composer`, `Publisher`, `Genre`, `ISBN`, `Comment`, `Description`) are preserved during the extraction phase for audiobooks and ebook files.
 
 ### B. API Metadata Integrations
 - **MyAnonamouse (MAM)**: If the files being uploaded correspond to an active torrent in your local client containing `myanonamouse.net` in trackers, the assistant extracts the torrent ID (`MID=(\d+)`) from the client comments. It then queries the MAM API using your configured `mam_api_key` / `mam_id` to retrieve details like title, authors, narrators, description, ISBN, language, and cover image URL.

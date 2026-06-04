@@ -315,15 +315,19 @@ class UploadHelper:
         if meta["category"] == "BOOK":
             author = meta.get("author") or missing_warning
             publisher = meta.get("publisher") or missing_warning
+            book_language = meta.get("book_language") or missing_warning
             isbn = meta.get("isbn") or missing_warning
             narrator = meta.get("narrator") or missing_warning
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
+            poster = meta.get("poster") or "[yellow][italic]not found, will be auto-generated[/italic][/yellow]"
             lines.append(("Author", str(author)))
             lines.append(("Publisher", str(publisher)))
+            lines.append(("Language", str(book_language)))
             lines.append(("ISBN", str(isbn)))
             if meta.get("is_audiobook"):
                 lines.append(("Narrator", str(narrator)))
                 lines.append(("Duration", str(audiobook_duration_formatted)))
+            lines.append(("Poster", str(poster)))
 
         if not meta.get('emby', False):
             lines.append(("Overview", f"{meta['overview'][:60]}...."))

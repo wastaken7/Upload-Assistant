@@ -34,7 +34,7 @@ class CBR(UNIT3D):
     async def get_category_id(
         self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False
     ) -> dict[str, str]:
-        category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11"}
+        category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11", "COMIC_MANGA": "10"}
 
         if mapping_only:
             return category_id
@@ -44,6 +44,9 @@ class CBR(UNIT3D):
         resolved_category = category if category else meta.get("category", "")
         if meta.get("anime", False) is True and resolved_category == "TV":
             resolved_category = "ANIMES"
+
+        if resolved_category == "BOOK" and meta.get("type", "").upper() in ("CBR", "CBZ"):
+            resolved_category = "COMIC_MANGA"
 
         if resolved_category:
             return {"category_id": category_id.get(resolved_category, "0")}
@@ -126,6 +129,9 @@ class CBR(UNIT3D):
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}] [AUDIOBOOK]"
             else:
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}]"
+            book_language_iso = meta.get("book_language_iso", "")
+            if book_language_iso and book_language_iso != "por":
+                cbr_name += f" [{book_language_iso.upper()}]"
 
         elif category in ("MOVIE", "TV"):
             cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
@@ -198,9 +204,9 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        return await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
-        )
+        if meta.get("category") in ("MOVIE", "TV"):
+            return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+        return True
 
     async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)
