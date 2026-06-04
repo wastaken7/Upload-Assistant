@@ -704,6 +704,10 @@ async def gather_book_prep(
         meta["audiobook_duration"] = total_duration
         meta["audiobook_duration_formatted"] = duration_formatted
 
+        avg_bitrate = await get_audiobook_bitrate(filelist)
+        if avg_bitrate is not None:
+            meta["audiobook_bitrate"] = avg_bitrate
+
 
 async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
@@ -741,3 +745,54 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     duration_formatted = f"{hours:02d}h {minutes:02d}m {seconds:02d}s" if hours > 0 else f"{minutes:02d}m {seconds:02d}s"
 
     return total_seconds, duration_formatted
+
+
+async def get_audiobook_bitrate(filelist: list[str]) -> Optional[int]:
+    """Calculate the average bitrate (in kbps) of a sample of audio files (max 5) in the file list using MediaInfo."""
+    from pymediainfo import MediaInfo
+
+    audiobook_extensions = (".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav")
+    audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
+
+    # Limit to a maximum of 5 files to optimize performance
+    audio_files = audio_files[:5]
+
+    if not audio_files:
+        return None
+
+    def _get_file_bitrate(file_path: str) -> Optional[int]:
+        try:
+            if not os.path.isfile(file_path):
+                return None
+            media_info = MediaInfo.parse(file_path)
+            for track in media_info.tracks:
+                if track.track_type == "Audio":
+                    track_data = track.to_data()
+                    br = track_data.get("bit_rate") or track_data.get("BitRate")
+                    if br is not None:
+                        match = re.search(r'\d+', str(br))
+                        if match:
+                            return int(match.group(0))
+            # Fallback to General track
+            for track in media_info.tracks:
+                if track.track_type == "General":
+                    track_data = track.to_data()
+                    br = track_data.get("overall_bit_rate") or track_data.get("OverallBitRate")
+                    if br is not None:
+                        match = re.search(r'\d+', str(br))
+                        if match:
+                            return int(match.group(0))
+        except Exception:
+            pass
+        return None
+
+    tasks = [asyncio.to_thread(_get_file_bitrate, f) for f in audio_files]
+    bitrates = await asyncio.gather(*tasks)
+
+    valid_bitrates = [br for br in bitrates if br is not None]
+    if not valid_bitrates:
+        return None
+
+    avg_bps = sum(valid_bitrates) / len(valid_bitrates)
+    avg_kbps = int(avg_bps / 1000) if avg_bps >= 1000 else int(avg_bps)
+    return avg_kbps
