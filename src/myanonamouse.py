@@ -131,7 +131,7 @@ class MyAnonamouseManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
-                            console.print(f"{mam_color}:ID match found (cached): {clean_id}")
+                            console.print(f"{mam_color}: ID match found (cached): {clean_id}")
 
                             if "data" in cached_data and cached_data["data"]:
                                 return self._parse_torrent_info(cached_data["data"][0], debug)
