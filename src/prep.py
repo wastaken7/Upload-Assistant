@@ -197,6 +197,41 @@ class Prep:
         # Debugging information
         # console.print(f"Debug: meta['filelist'] before population: {meta.get('filelist', 'Not Set')}")
 
+        # Auto-detect BOOK category if category/manual_category is not already set and it's not a disc
+        if not meta.get("category") and not meta.get("manual_category") and not meta.get("is_disc"):
+            is_book = False
+            book_extensions = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
+            audiobook_extensions = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
+            video_extensions = {".mkv", ".mp4", ".ts"}
+
+            path_to_check = meta.get("path")
+            if path_to_check and os.path.exists(path_to_check):
+                if os.path.isdir(path_to_check):
+                    has_books = False
+                    has_audio = False
+                    has_video = False
+                    for root, _, files in os.walk(path_to_check):
+                        for file in files:
+                            ext = os.path.splitext(file)[1].lower()
+                            if ext in book_extensions:
+                                has_books = True
+                            elif ext in audiobook_extensions:
+                                has_audio = True
+                            elif ext in video_extensions:
+                                has_video = True
+                    # If we have books/audio files and NO video files, classify as BOOK
+                    if (has_books or has_audio) and not has_video:
+                        is_book = True
+                else:
+                    ext = os.path.splitext(path_to_check)[1].lower()
+                    if ext in book_extensions or ext in audiobook_extensions:
+                        is_book = True
+
+            if is_book:
+                meta["category"] = "BOOK"
+                if meta.get("debug", False):
+                    console.print("[cyan]Auto-detected category: BOOK[/cyan]")
+
         if meta['is_disc'] == "BDMV":
             video, meta['scene'], meta['imdb_id'] = await self.scene_manager.is_scene(meta['path'], meta, meta.get('imdb_id', 0))
             meta['filelist'] = []  # No filelist for discs, use path

@@ -12,11 +12,12 @@ import httpx
 from src.book_prep import _resolve_book_language, is_valid_book_language
 from src.console import console
 
+mam_color = "[#eac117]MyAnonamouse[/#eac117]"
 
 class MyAnonamouseManager:
     def _parse_torrent_info(self, item: dict[str, Any], debug: bool = False) -> dict[str, Any]:
         if debug:
-            console.print(f"[cyan]MyAnonamouse raw item: {item}[/cyan]")
+            console.print(f"{mam_color} raw item: {item}")
 
         metadata: dict[str, Any] = {}
 
@@ -40,7 +41,7 @@ class MyAnonamouseManager:
                     metadata["author"] = ", ".join(authors)
             except Exception as e:
                 if debug:
-                    console.print(f"[yellow]Warning: Could not parse MAM authors: {e}[/yellow]")
+                    console.print(f"{mam_color}: [yellow]Warning: Could not parse MAM authors: {e}[/yellow]")
 
         # Narrator
         narrator_info = item.get("narrator_info")
@@ -130,23 +131,20 @@ class MyAnonamouseManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
-                            if debug:
-                                console.print(f"[cyan]MyAnonamouse: Using cached search for ID: {clean_id}[/cyan]")
-                            else:
-                                console.print(f"MyAnonamouse: Using cached search for ID: {clean_id}")
+                            console.print(f"{mam_color}:ID match found (cached): {clean_id}")
 
                             if "data" in cached_data and cached_data["data"]:
                                 return self._parse_torrent_info(cached_data["data"][0], debug)
                     except Exception as ex:
                         if debug:
-                            console.print(f"[yellow]Warning: Could not read cache file for MyAnonamouse ID '{clean_id}': {ex}[/yellow]")
+                            console.print(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
             except Exception as ex:
                 if debug:
-                    console.print(f"[yellow]Warning: Could not create MyAnonamouse cache directory: {ex}[/yellow]")
+                    console.print(f"{mam_color}: [yellow]Warning: Could not create cache directory: {ex}[/yellow]")
 
         if not api_key:
             if debug:
-                console.print("[yellow]MyAnonamouse: API key/session cookie not configured, skipping search[/yellow]")
+                console.print(f"{mam_color}: [yellow]API key/session cookie not configured, skipping search[/yellow]")
             return None
 
         url = "https://www.myanonamouse.net/tor/js/loadSearchJSONbasic.php"
@@ -166,7 +164,7 @@ class MyAnonamouseManager:
         }
 
         if debug:
-            console.print(f"[cyan]Searching MyAnonamouse API for ID: {clean_id}[/cyan]")
+            console.print(f"{mam_color}: Searching API for ID: {clean_id}")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -176,10 +174,7 @@ class MyAnonamouseManager:
                     if "data" in data and isinstance(data["data"], list) and data["data"]:
                         metadata = self._parse_torrent_info(data["data"][0], debug)
                         if metadata:
-                            if debug:
-                                console.print(f"[green]MyAnonamouse match found: {metadata.get('title')}[/green]")
-                            else:
-                                console.print(f"MyAnonamouse match found: {metadata.get('title')}")
+                            console.print(f"{mam_color}: match found: {metadata.get('title')}")
 
                             # Save raw response to cache
                             if cache_file:
@@ -187,20 +182,22 @@ class MyAnonamouseManager:
                                     cache_content = json.dumps(data, indent=4)
                                     await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
                                     if debug:
-                                        console.print(f"[cyan]MyAnonamouse: Saved cache for ID: {clean_id}[/cyan]")
+                                        console.print(f"{mam_color}: Saved cache for ID: {clean_id}")
                                 except Exception as ex:
                                         if debug:
-                                            console.print(f"[yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
+                                            console.print(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
 
                             return metadata
                     else:
-                        console.print(f"[yellow]MyAnonamouse: No items found for ID: {clean_id}[/yellow]")
+                        console.print(f"{mam_color}: [yellow]No items found for ID: {clean_id}[/yellow]")
                 elif resp.status_code in (401, 403):
-                    console.print(f"[bold red]MyAnonamouse API: Unauthorized/Forbidden (Status {resp.status_code}). Check your mam_api_key/mam_id and IP locked session cookie setting on the website.[/bold red]")
+                    console.print(
+                        f"{mam_color}: [bold red]API: Unauthorized/Forbidden (Status {resp.status_code}). Check your mam_api_key/mam_id and IP locked session cookie setting on the website.[/bold red]"
+                    )
                 else:
-                    console.print(f"[red]MyAnonamouse API returned error status code {resp.status_code} for ID: {clean_id}[/red]")
+                    console.print(f"{mam_color}: [red]API returned error status code {resp.status_code} for ID: {clean_id}[/red]")
         except Exception as e:
-            console.print(f"[red]MyAnonamouse API: Network or query error for ID {clean_id}: {e}[/red]")
+            console.print(f"{mam_color}: [red]API: Network or query error for ID {clean_id}: {e}[/red]")
 
         return None
 

@@ -305,6 +305,7 @@ async def gather_book_prep(
     cli_overrides = {
         "title": bool(meta.get("book_title")),
         "author": bool(meta.get("book_author")),
+        "publisher": bool(meta.get("book_publisher")),
         "isbn": bool(meta.get("book_isbn")),
         "book_language": bool(meta.get("book_language")),
         "year": bool("manual_year" in meta and int(meta.get("manual_year") or 0) > 0),
@@ -517,6 +518,7 @@ async def gather_book_prep(
                         if (
                             (key == "title" and cli_overrides["title"])
                             or (key == "author" and cli_overrides["author"])
+                            or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
@@ -550,6 +552,7 @@ async def gather_book_prep(
                         if (
                             (key == "title" and cli_overrides["title"])
                             or (key == "author" and cli_overrides["author"])
+                            or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
@@ -571,11 +574,12 @@ async def gather_book_prep(
 
     if meta.get("is_audiobook", False):
         filelist = meta.get("filelist", [])
-        total_duration = await get_audiobook_duration(filelist)
+        total_duration, duration_formatted = await get_audiobook_duration(filelist)
         meta["audiobook_duration"] = total_duration
+        meta["audiobook_duration_formatted"] = duration_formatted
 
 
-async def get_audiobook_duration(filelist: list[str]) -> float:
+async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
@@ -583,7 +587,7 @@ async def get_audiobook_duration(filelist: list[str]) -> float:
     audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
 
     if not audio_files:
-        return 0.0
+        return 0.0, ""
 
     def _get_file_duration(file_path: str) -> float:
         try:
@@ -601,4 +605,13 @@ async def get_audiobook_duration(filelist: list[str]) -> float:
 
     tasks = [asyncio.to_thread(_get_file_duration, f) for f in audio_files]
     durations = await asyncio.gather(*tasks)
-    return float(sum(durations))
+    total_seconds = float(sum(durations))
+
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
+
+    # Format as HH:MM:SS if hours > 0, otherwise MM:SS
+    duration_formatted = f"{hours:02d}h {minutes:02d}m {seconds:02d}s" if hours > 0 else f"{minutes:02d}m {seconds:02d}s"
+
+    return total_seconds, duration_formatted

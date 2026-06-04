@@ -566,13 +566,9 @@ class DescriptionBuilder:
         if isbn:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
         if meta.get("is_audiobook", False):
-            audiobook_duration = meta.get("audiobook_duration")
-            if audiobook_duration:
-                hours = int(audiobook_duration // 3600)
-                minutes = int((audiobook_duration % 3600) // 60)
-                seconds = int(audiobook_duration % 60)
-                duration_str = f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
-                book_parts.append(f"[b]Duration:[/b] {duration_str}")
+            audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
+            if audiobook_duration_formatted:
+                book_parts.append(f"[b]Duration:[/b] {audiobook_duration_formatted}")
 
         final_book_parts: list[str] = []
 

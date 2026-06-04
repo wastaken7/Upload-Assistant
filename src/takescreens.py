@@ -948,7 +948,6 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
         return True
     try:
         import httpx
-        console.print(f"[cyan]Downloading poster from {poster_url}[/cyan]")
         cookies = {}
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         if "myanonamouse.net" in poster_url:
@@ -966,7 +965,7 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
             if response.status_code == 200:
                 await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
                 meta["cover_path"] = cover_path
-                console.print(f"[green]Successfully downloaded poster to {cover_path}[/green]")
+                console.print(f"[green]Successfully downloaded poster from {poster_url}[/green]")
                 return True
             else:
                 console.print(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
