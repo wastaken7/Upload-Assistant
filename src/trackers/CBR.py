@@ -123,6 +123,7 @@ class CBR(UNIT3D):
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         category = meta["category"]
         cbr_name = str(meta["name"])
+        name = str(meta["name"])
 
         if category == "BOOK":
             if meta.get("is_audiobook", False):
