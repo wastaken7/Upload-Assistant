@@ -378,6 +378,7 @@ class ImdbManager:
                         'attributes': attribute_texts
                     }
 
+            imdb_info['edition_count'] = len(edition_list)
             imdb_info['editions'] = ', '.join(edition_list)
 
         akas_edges = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['akas', 'edges'], default=[]))
