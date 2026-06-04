@@ -198,7 +198,10 @@ class NameManager:
 
             exit()
         name_notag = name
-        name = name_notag + tag
+
+        if meta["category"] != "BOOK":
+            name = name_notag + tag
+
         clean_name = await self.clean_filename(name)
         return name_notag, name, clean_name, potential_missing
 

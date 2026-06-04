@@ -79,6 +79,11 @@ class GoogleBooksManager:
                 if debug:
                     console.print(f"[yellow]Warning: Could not resolve language '{lang}': {ex}[/yellow]")
 
+        # Genre
+        categories = volume_info.get("categories")
+        if categories:
+            metadata["keywords"] = metadata["genres"] = ", ".join(categories)
+
         metadata["isbn"] = isbn
         return metadata
 

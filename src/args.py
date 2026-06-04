@@ -144,6 +144,15 @@ class Args:
             type=str,
             dest="book_isbn",
         )
+        parser.add_argument(
+            "-pub",
+            "--publisher",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook publisher (overrides auto-detected value)",
+            type=str,
+            dest="book_publisher",
+        )
         parser.add_argument('-mc', '--commentary', dest='manual_commentary', action='store_true', required=False, help="Manually indicate whether commentary tracks are included")
         parser.add_argument('-sfxs', '--sfx-subtitles', dest='sfx_subtitles', action='store_true', required=False, help="Manually indicate whether subtitles with visual enhancements like animations, effects, or backgrounds are included")
         parser.add_argument('-e', '--extras', dest='extras', action='store_true', required=False, help="Indicates that extras are included. Mainly used for Blu-rays discs")
@@ -539,6 +548,10 @@ class Args:
         book_isbn_arg = meta.get("book_isbn")
         if book_isbn_arg not in (None, ""):
             meta["isbn"] = str(book_isbn_arg).strip()
+
+        book_publisher_arg = meta.get("book_publisher")
+        if book_publisher_arg not in (None, ""):
+            meta["publisher"] = str(book_publisher_arg).strip()
 
         book_language_arg = meta.get("book_language")
         if book_language_arg not in (None, ""):

@@ -302,71 +302,108 @@ class UploadHelper:
 
     async def get_confirmation(self, meta: Meta) -> bool:
         confirm: bool = False
+        lines: list[Union[str, tuple[str, str]]] = []
+        missing_warning = "[bold red]⚠️ Missing[/bold red]"
         if meta['debug'] is True:
-            console.print("[bold red]DEBUG: True - Will not actually upload!")
-            console.print(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
-        console.print()
-        console.print("[bold yellow]Database Info[/bold yellow]")
-        console.print(f"[bold]Title:[/bold] {meta['title']} ({meta['year']})")
-        console.print()
+            lines.append("[bold red]DEBUG: True - Will not actually upload![/bold red]")
+            lines.append(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
+        lines.append("[bold yellow]Database Info[/bold yellow]\n")
+        lines.append(("Category", str(meta["category"])))
+        lines.append(("Title", f"{meta['title']} ({meta['year']})"))
+
+        # BOOK
+        if meta["category"] == "BOOK":
+            author = meta.get("author") or missing_warning
+            publisher = meta.get("publisher") or missing_warning
+            isbn = meta.get("isbn") or missing_warning
+            narrator = meta.get("narrator") or missing_warning
+            audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
+            lines.append(("Author", str(author)))
+            lines.append(("Publisher", str(publisher)))
+            lines.append(("ISBN", str(isbn)))
+            if meta.get("is_audiobook"):
+                lines.append(("Narrator", str(narrator)))
+                lines.append(("Duration", str(audiobook_duration_formatted)))
+
         if not meta.get('emby', False):
-            console.print(f"[bold]Overview:[/bold] {meta['overview'][:100]}....")
-            console.print()
+            lines.append(("Overview", f"{meta['overview'][:60]}...."))
             if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('auto_episode_title'):
-                console.print(f"[bold]Episode Title:[/bold] {meta['auto_episode_title']}")
-                console.print()
+                lines.append(("Episode Title", str(meta["auto_episode_title"])))
             if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('overview_meta'):
-                console.print(f"[bold]Episode overview:[/bold] {meta['overview_meta']}")
-                console.print()
-            console.print(f"[bold]Genre:[/bold] {meta['genres']}")
-            console.print()
+                lines.append(("Episode overview", str(meta["overview_meta"])))
+            lines.append(("Genre", str(meta["genres"])))
             if str(meta.get('demographic', '')) != '':
-                console.print(f"[bold]Demographic:[/bold] {meta['demographic']}")
-                console.print()
-        console.print(f"[bold]Category:[/bold] {meta['category']}")
-        console.print()
+                lines.append(("Demographic", str(meta["demographic"])))
         if meta.get('emby_debug', False):
             if int(meta.get('original_imdb', 0)) != 0:
                 imdb = str(meta.get('original_imdb', 0)).zfill(7)
-                console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{imdb}")
+                lines.append(("IMDB", f"https://www.imdb.com/title/tt{imdb}"))
             if int(meta.get('original_tmdb', 0)) != 0:
-                console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['original_tmdb']}")
+                lines.append(("TMDB", f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['original_tmdb']}"))
             if int(meta.get('original_tvdb', 0)) != 0:
-                console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['original_tvdb']}&tab=series")
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta['original_tvdb']}&tab=series"))
             if int(meta.get('original_tvmaze', 0)) != 0:
-                console.print(f"[bold]TVMaze:[/bold] https://www.tvmaze.com/shows/{meta['original_tvmaze']}")
+                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta['original_tvmaze']}"))
             if int(meta.get('original_mal', 0)) != 0:
-                console.print(f"[bold]MAL:[/bold] https://myanimelist.net/anime/{meta['original_mal']}")
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta['original_mal']}"))
         else:
             if int(meta.get('tmdb_id') or 0) != 0:
-                console.print(f"[bold]TMDB:[/bold] https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}")
+                lines.append(("TMDB", f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}"))
             if int(meta.get('imdb_id') or 0) != 0:
-                console.print(f"[bold]IMDB:[/bold] https://www.imdb.com/title/tt{meta['imdb']}")
+                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta['imdb']}"))
             if int(meta.get('tvdb_id') or 0) != 0:
-                console.print(f"[bold]TVDB:[/bold] https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series"))
             if int(meta.get('tvmaze_id') or 0) != 0:
-                console.print(f"[bold]TVMaze:[/bold] https://www.tvmaze.com/shows/{meta['tvmaze_id']}")
+                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta['tvmaze_id']}"))
             if int(meta.get('mal_id') or 0) != 0:
-                console.print(f"[bold]MAL:[/bold] https://myanimelist.net/anime/{meta['mal_id']}")
-        console.print()
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta['mal_id']}"))
+
+        resolution = meta.get("resolution", "")
+        source = meta.get("source", "")
+        type_ = meta.get("type", "")
+        tag = meta.get("tag", "")
+        if tag and tag.startswith("-"):
+            tag = tag[1:]
+        region = meta.get("region") or missing_warning
+        distributor = meta.get("distributor") or missing_warning
+
+        lines.append(("Resolution", str(resolution)))
+        lines.append(("Source", str(source)))
+        lines.append(("Type", str(type_)))
+
+        if meta.get("category") != "BOOK":
+            lines.append(("Group Tag", str(tag)))
+
+        if meta.get("is_disc"):
+            lines.append(("Region", str(region)))
+            lines.append(("Distributor", str(distributor)))
+
         if not meta.get('emby', False):
             if int(meta.get('freeleech', 0)) != 0:
-                console.print(f"[bold]Freeleech:[/bold] {meta['freeleech']}")
-
-            info_parts: list[str] = []
-            info_parts.append(str(meta['source'] if meta['is_disc'] == 'DVD' else meta['resolution']))
-            info_parts.append(str(meta['type']))
-            if meta.get('tag', ''):
-                info_parts.append(str(meta['tag'])[1:])
-            if meta.get('region', ''):
-                info_parts.append(str(meta['region']))
-            if meta.get('distributor', ''):
-                info_parts.append(str(meta['distributor']))
-            console.print(' / '.join(info_parts))
+                lines.append(("Freeleech", str(meta["freeleech"])))
+            lines.append("")
 
             if meta.get('personalrelease', False) is True:
-                console.print("[bold green]Personal Release![/bold green]")
-            console.print()
+                lines.append("[bold green]Personal Release![/bold green]")
+
+        # Format and align labels and values
+        max_label_len = 0
+        for item in lines:
+            if isinstance(item, tuple):
+                label, _ = item
+                if len(label) > max_label_len:
+                    max_label_len = len(label)
+
+        formatted_lines: list[str] = []
+        for item in lines:
+            if isinstance(item, tuple):
+                label, value = item
+                padding = f"[white]{'.' * (max_label_len - len(label))}[/white]"
+                formatted_lines.append(f"[bold cyan]{label}[/bold cyan]{padding} {value}")
+            else:
+                formatted_lines.append(item)
+
+        console.print("\n".join(formatted_lines), soft_wrap=True, highlight=False)
 
         if meta.get('unattended', False) and not meta.get('unattended_confirm', False) and not meta.get('emby_debug', False):
             if meta['debug'] is True:
@@ -389,7 +426,7 @@ class UploadHelper:
                     exit()
 
             if not meta.get('emby', False):
-                console.print(f"[bold]Name:[/bold] {meta['name']}")
+                console.print(f"[bold]Base Name:[/bold] {meta['name']}\n", soft_wrap=True, highlight=False)
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
             elif not meta.get('emby_debug', False):
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
