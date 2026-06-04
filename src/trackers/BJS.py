@@ -21,7 +21,7 @@ from langcodes.tag_parser import LanguageTagError
 from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.get_desc import DescriptionBuilder
+from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -87,7 +87,7 @@ class BJS:
         episode_ptbr_data: dict[str, Any] = {}
         data: dict[str, Any] = {}
 
-        if os.path.isfile(localized_data_file):
+        if await self.common.path_exists(localized_data_file):
             try:
                 async with aiofiles.open(localized_data_file, encoding='utf-8') as f:
                     content = await f.read()
@@ -126,21 +126,38 @@ class BJS:
 
     def get_container(self, meta: dict[str, Any]) -> str:
         container: str = meta.get('container', '')
-        if container in ['mkv', 'mp4', 'avi', 'vob', 'm2ts', 'ts']:
-            return container.upper()
+        category = meta["category"]
 
-        return 'Outro'
+        if category in ("MOVIE", "TV"):
+            if container in ["mkv", "mp4", "avi", "vob", "m2ts", "ts"]:
+                return container.upper()
+            return "Outro"
+
+        if category == "BOOK":
+            if meta.get("is_audiobook"):
+                if container in ["aac", "ac3", "dff", "dsf", "flac", "m4a", "mp3", "ogg", "wav", "wma"]:
+                    return container.upper()
+                return "Outro"
+            if container == "pdf":
+                return "PDF"
+            if container == "epub":
+                return "ePub"
+
+        return ""
 
     def get_type(self, meta: dict[str, Any]) -> str:
+        category = meta["category"]
         if meta.get('anime'):
             return '13'
 
-        category_map = {
-            'TV': '1',
-            'MOVIE': '0'
-        }
+        if category == "BOOK":
+            if meta.get("is_audiobook", False):
+                return "10"
+            return "9"
 
-        return category_map.get(meta['category'], '0')
+        category_map = {"TV": "1", "MOVIE": "0"}
+
+        return category_map.get(category, "0")
 
     def get_languages(self) -> str:
         possible_languages = {
@@ -320,38 +337,43 @@ class BJS:
 
     async def build_description(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
+        category = meta["category"]
         desc_parts: list[str] = []
 
         # Custom Header
         desc_parts.append(await builder.get_custom_header())
 
-        # Logo
-        logo_resize_url = str(meta.get("tmdb_logo", ""))
-        if logo_resize_url:
-            if logo_resize_url.endswith(".svg"):
-                logo_resize_url = logo_resize_url.replace(".svg", ".png")
-            desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/align]")
+        if category in ("MOVIE", "TV"):
+            # Logo
+            logo_resize_url = str(meta.get("tmdb_logo", ""))
+            if logo_resize_url:
+                if logo_resize_url.endswith(".svg"):
+                    logo_resize_url = logo_resize_url.replace(".svg", ".png")
+                desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/align]")
 
-        # TV
-        title = self.episode_tmdb_data.get('name', '')
-        episode_image = self.episode_tmdb_data.get('still_path', '')
-        episode_overview = self.episode_tmdb_data.get('overview', '')
+            # TV
+            title = self.episode_tmdb_data.get("name", "")
+            episode_image = self.episode_tmdb_data.get("still_path", "")
+            episode_overview = self.episode_tmdb_data.get("overview", "")
 
-        if episode_overview:
-            desc_parts.append(f'[align=center]{title}[/align]')
+            if episode_overview:
+                desc_parts.append(f"[align=center]{title}[/align]")
 
-            if episode_image:
-                desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300{episode_image}[/img][/align]")
+                if episode_image:
+                    desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300{episode_image}[/img][/align]")
 
-            desc_parts.append(f'[align=center]{episode_overview}[/align]')
+                desc_parts.append(f"[align=center]{episode_overview}[/align]")
 
-        # File information
-        if meta.get('is_disc', '') == 'DVD':
-            desc_parts.append(f'[hide=DVD MediaInfo][pre]{await builder.get_mediainfo_section(meta)}[/pre][/hide]')
+            # File information
+            if meta.get("is_disc", "") == "DVD":
+                desc_parts.append(f"[hide=DVD MediaInfo][pre]{await builder.get_mediainfo_section(meta)}[/pre][/hide]")
 
-        bd_info = await builder.get_bdinfo_section(meta)
-        if bd_info:
-            desc_parts.append(f'[hide=BDInfo][pre]{bd_info}[/pre][/hide]')
+            bd_info = await builder.get_bdinfo_section(meta)
+            if bd_info:
+                desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
+
+        if category == "BOOK":
+            desc_parts.append(self.build_book_desc(meta))
 
         # User description
         desc_parts.append(await builder.get_user_description(meta))
@@ -376,6 +398,43 @@ class BJS:
             await description_file.write(description)
 
         return description
+
+    def build_book_desc(self, meta: dict[str, Any]) -> str:
+        """Build the BBCode table for BOOK-category uploads."""
+        book_parts: list[str] = [""]
+        narrator = meta.get("narrator")
+        publisher = meta.get("publisher")
+        isbn = meta.get("isbn")
+        overview = meta.get("overview")
+
+        if overview:
+            overview = html_to_bbcode(str(overview))
+            overview = re.sub(r"<[^>]+>", "", overview).strip()
+
+        if narrator:
+            book_parts.append(f"[b]Narrador:[/b] {narrator}")
+        if publisher:
+            book_parts.append(f"[b]Editora:[/b] {publisher}")
+        if isbn:
+            book_parts.append(f"[b]ISBN:[/b] {isbn}")
+        if meta.get("is_audiobook", False):
+            audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
+            if audiobook_duration_formatted:
+                book_parts.append(f"[b]Duração:[/b] {audiobook_duration_formatted}")
+
+        final_book_parts: list[str] = []
+
+        if book_parts:
+            final_book_parts.append("[b][size=3]DETALHES TÉCNICOS[/size][/b]")
+            final_book_parts.append("\n".join(book_parts))
+
+        if overview:
+            final_book_parts.append(f"\n[b][size=3]VISÃO GERAL[/size][/b]\n\n{overview}")
+
+        if not (book_parts or overview):
+            return ""
+
+        return "\n".join(final_book_parts)
 
     def get_trailer(self, meta: dict[str, Any]) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get('videos', {})).get('results', [])
@@ -842,25 +901,44 @@ class BJS:
             return None
 
     async def get_cover(self, meta: dict[str, Any]):
-        cover_path = self.main_tmdb_data.get('poster_path') or meta.get('tmdb_poster')
-        if not cover_path:
-            console.print('Nenhum poster_path encontrado nos dados do TMDB.', markup=False)
-            return None
+        category = meta["category"]
 
-        cover_tmdb_url = f'https://image.tmdb.org/t/p/w500{cover_path}'
-        if BJS.already_has_the_info:
-            return cover_tmdb_url
+        if category in ("MOVIE", "TV"):
+            cover_path = self.main_tmdb_data.get("poster_path") or meta.get("tmdb_poster")
+            if not cover_path:
+                console.print("Nenhum poster_path encontrado nos dados do TMDB.", markup=False)
+                return None
 
-        try:
-            response = await self.session.get(cover_tmdb_url, timeout=120)
-            response.raise_for_status()
-            image_bytes = response.content
-            filename = os.path.basename(cover_path)
+            cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
+            if BJS.already_has_the_info:
+                return cover_tmdb_url
 
-            return await self.img_host(image_bytes, filename)
-        except Exception as e:
-            console.print(f'Falha ao processar pôster da URL {cover_tmdb_url}: {e}', markup=False)
-            return None
+            try:
+                response = await self.session.get(cover_tmdb_url, timeout=120)
+                response.raise_for_status()
+                image_bytes = response.content
+                filename = os.path.basename(cover_path)
+
+                return await self.img_host(image_bytes, filename)
+            except Exception as e:
+                console.print(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", markup=False)
+                return None
+
+        if category == "BOOK":
+            cover_path = meta.get("cover_path")
+            if not cover_path or not await self.common.path_exists(cover_path):
+                console.print("Nenhum cover_path válido encontrado nos metadados para BOOK.", markup=False)
+                return None
+
+            try:
+                async with aiofiles.open(cover_path, "rb") as f:
+                    image_bytes = await f.read()
+                filename = os.path.basename(cover_path)
+
+                return await self.img_host(image_bytes, filename)
+            except Exception as e:
+                console.print(f"{self.tracker}: Falha ao ler ou enviar capa do livro {cover_path}: {e}", markup=False)
+                return None
 
     async def get_screenshots(self, meta: dict[str, Any]) -> list[str]:
         screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
@@ -1144,26 +1222,40 @@ class BJS:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
-        await self.load_localized_data(meta)
-        category = meta['category']
-        original_title, brazilian_title = self.get_title(meta)
-        width, height = self.get_resolution(meta)
-        hours, minutes = self.get_runtime(meta)
-
-        data: dict[str, Any] = {}
+        category = meta["category"]
 
         # These fields are common across all upload types
-        data.update(
-            {
+        data: dict[str, Any] = {
+            "submit": "true",
+            "auth": BJS.secret_token,
+            "formato": self.get_container(meta),
+            "type": self.get_type(meta),
+            "year": self.get_year(meta),
+        }
+
+        if category == "BOOK":
+            b_lang = meta.get("book_language_iso")
+            data.update({
+                "title": meta["title"],
+                "diretor": meta["author"],
+                "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
+                "release_desc": await self.build_description(meta),
+            })
+
+        else:
+            await self.load_localized_data(meta)
+            original_title, brazilian_title = self.get_title(meta)
+            width, height = self.get_resolution(meta)
+            hours, minutes = self.get_runtime(meta)
+
+            data.update({
                 "audio": await self.get_audio(meta),
-                "auth": BJS.secret_token,
                 "codecaudio": self.get_audio_codec(meta),
                 "codecvideo": self.get_video_codec(meta),
                 "duracaoHR": str(hours),
                 "duracaoMIN": str(minutes),
                 "duracaotipo": "selectbox",
                 "fichatecnica": await self.build_description(meta),
-                "formato": self.get_container(meta),
                 "idioma": self.get_languages(),
                 "imdblink": self.get_imdblink(meta),
                 "qualidade": self.get_bitrate(meta),
@@ -1172,72 +1264,62 @@ class BJS:
                 "resolucaoh": height,
                 "resolucaow": width,
                 "sinopse": await self.get_overview(),
-                "submit": "true",
                 "tags": await self.get_tags(),
                 "tipolegenda": await self.get_subtitle(meta),
                 "title": original_title,
                 "titulobrasileiro": brazilian_title,
                 "traileryoutube": self.get_trailer(meta),
-                "type": self.get_type(meta),
-                "year": self.get_year(meta),
-            }
-        )
-
-        # These fields are common in movies and TV shows, even if it's anime
-        if category == 'MOVIE':
-            data.update({
-                'adulto': self.get_adulto(meta),
-                'diretor': await self.get_credits(meta, 'director'),
             })
 
-        if category == 'TV':
-            data.update({
-                'diretor': await self.get_credits(meta, 'creator'),
-                'tipo': 'episode' if meta.get('tv_pack') == 0 else 'season',
-                'season': meta.get('season_int', ''),
-                'episode': meta.get('episode_int', ''),
-            })
-
-        # These fields are common in movies and TV shows, if not Anime
-        if not meta.get('anime'):
-            data.update({
-                'validimdb': 'yes',
-                'imdbrating': self.get_imdb_rating(meta),
-                'elenco': await self.get_credits(meta, 'cast'),
-            })
-            if category == 'MOVIE':
+            # These fields are common in movies and TV shows, even if it's anime
+            if category == "MOVIE":
                 data.update({
-                    'datalancamento': self.get_release_date(),
+                    "adulto": self.get_adulto(meta),
+                    "diretor": await self.get_credits(meta, "director"),
                 })
 
-            if category == 'TV':
-                # Convert country code to name
-                country_list = [
-                    country.name
-                    for code in self.main_tmdb_data.get('origin_country', [])
-                    if (country := pycountry.countries.get(alpha_2=code))
-                ]
-                data.update(
-                    {
+            if category == "TV":
+                data.update({
+                    "diretor": await self.get_credits(meta, "creator"),
+                    "tipo": "episode" if meta.get("tv_pack") == 0 else "season",
+                    "season": meta.get("season_int", ""),
+                    "episode": meta.get("episode_int", ""),
+                })
+
+            # These fields are common in movies and TV shows, if not Anime
+            if not meta.get("anime"):
+                data.update({
+                    "validimdb": "yes",
+                    "imdbrating": self.get_imdb_rating(meta),
+                    "elenco": await self.get_credits(meta, "cast"),
+                })
+                if category == "MOVIE":
+                    data.update({
+                        "datalancamento": self.get_release_date(),
+                    })
+
+                if category == "TV":
+                    # Convert country code to name
+                    country_list = [country.name for code in self.main_tmdb_data.get("origin_country", []) if (country := pycountry.countries.get(alpha_2=code))]
+                    data.update({
                         "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
                         "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
                         "datalancamento": self.get_release_date(),
                         "pais": ", ".join(country_list),  # Optional
                         "diretorserie": ", ".join(list(dict.fromkeys(meta.get("tmdb_directors", []) or meta.get("imdb_info", {}).get("directors", [])))[:1]),  # Optional
                         "avaliacao": self.get_rating(),  # Optional
-                    }
-                )
+                    })
 
-        # Anime-specific data
-        if meta.get('anime'):
-            if category == 'MOVIE':
-                data.update({
-                    'tipo': 'movie',
-                })
-            if category == 'TV':
-                data.update({
-                    'adulto': self.get_adulto(meta),
-                })
+            # Anime-specific data
+            if meta.get("anime"):
+                if category == "MOVIE":
+                    data.update({
+                        "tipo": "movie",
+                    })
+                if category == "TV":
+                    data.update({
+                        "adulto": self.get_adulto(meta),
+                    })
 
         # Anon
         anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
@@ -1267,9 +1349,12 @@ class BJS:
         # Only upload images if not debugging
         if not meta.get('debug', False):
             data.update({
-                'image': await self.get_cover(meta),
-                'screenshots[]': await self.get_screenshots(meta),
+                "image": await self.get_cover(meta),
             })
+            if not meta.get("is_audiobook", False):
+                data.update({
+                    "screenshots[]": await self.get_screenshots(meta),
+                })
 
         return data
 
@@ -1355,7 +1440,7 @@ class BJS:
         ):
             return "Missing required credits information (director/cast/creator)."
 
-        if not data.get("imdblink"):
+        if not data.get("imdblink") and meta["category"] in ("TV", "MOVIE"):
             return "Missing IMDb or TMDb identifier."
 
         return ""
