@@ -745,6 +745,27 @@ class BJS:
 
         return keyword_map.get(source_type.lower(), "Outro")
 
+    def get_audiobook_bitrate(self, meta: dict[str, Any]) -> str:
+        """
+        Extracts the audiobook bitrate from metadata, finds the closest option
+        from [128, 192, 256, 320] within a threshold, otherwise returns 'Outro'.
+        """
+        avg_bitrate = meta.get("audiobook_bitrate")
+        if avg_bitrate is None:
+            return "Outro"
+
+        options = [128, 192, 256, 320]
+
+        # Find option with the minimum absolute difference
+        closest_option = min(options, key=lambda opt: abs(opt - avg_bitrate))
+        distance = abs(closest_option - avg_bitrate)
+
+        # If distance is greater than 32 (meaning beyond midpoints), return "Outro"
+        if distance > 32:
+            return "Outro"
+
+        return str(closest_option)
+
     async def img_host(self, image_bytes: bytes, filename: str) -> Optional[str]:
         upload_url = f"{self.base_url}/ajax.php?action=screen_up"
         headers = {
@@ -1110,6 +1131,12 @@ class BJS:
                 "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
                 "release_desc": await self.build_description(meta),
             })
+            if meta.get("is_audiobook", False):
+                audiobook_bitrate = self.get_audiobook_bitrate(meta)
+                data.update({
+                    "bitrateTypes": audiobook_bitrate,
+                    "bitrate": audiobook_bitrate,
+                })
 
         else:
             await self.load_localized_data(meta)
@@ -1307,15 +1334,16 @@ class BJS:
 
         return "N/A"
 
-    def check_data(self, meta: Meta, data: dict[str, Any]) -> str:
-        if not meta.get("debug", False) and len(data["screenshots[]"]) < 2:
-            return "The number of successful screenshots uploaded is less than 2."
+    def check_data(self, meta: dict[str, Any], data: dict[str, Any]) -> str:
+        if meta["category"] in ("TV", "MOVIE"):
+            if not meta.get("debug", False) and len(data["screenshots[]"]) < 2:
+                return "The number of successful screenshots uploaded is less than 2."
 
-        if any(value == "skipped" for value in (data.get("diretor"), data.get("elenco"), data.get("creators"))):
-            return "Missing required credits information (director/cast/creator)."
+            if any(value == "skipped" for value in (data.get("diretor"), data.get("elenco"), data.get("creators"))):
+                return "Missing required credits information (director/cast/creator)."
 
-        if not data.get("imdblink") and meta["category"] in ("TV", "MOVIE"):
-            return "Missing IMDb or TMDb identifier."
+            if not data.get("imdblink"):
+                return "Missing IMDb or TMDb identifier."
 
         return ""
 
