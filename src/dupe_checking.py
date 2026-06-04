@@ -316,6 +316,11 @@ class DupeChecker:
                     format_match = target_type == dupe_type
                     if not format_match and files:
                         format_match = any(f.lower().endswith(f".{target_type}") for f in files)
+                    if not format_match:
+                        # Fallback: check if the target format is in the torrent name (extension or word)
+                        each_lower = each.lower()
+                        if each_lower.endswith(f".{target_type}") or re.search(rf"\b{re.escape(target_type)}\b", each_lower):
+                            format_match = True
 
                     if not format_match:
                         await log_exclusion(f"book format type mismatch (expected {target_type})", each)
