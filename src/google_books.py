@@ -11,6 +11,7 @@ import httpx
 from src.book_prep import _resolve_book_language, is_valid_book_language
 from src.console import console
 
+google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05][#4285f4]g[/#4285f4][#34a853]l[/#34a853][#ea4335]e[/#ea4335] [#4285f4]Books[/#4285f4]"
 
 class GoogleBooksManager:
     def _parse_volume_info(self, data: dict[str, Any], isbn: str, debug: bool = False) -> Optional[dict[str, Any]]:
@@ -108,10 +109,7 @@ class GoogleBooksManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
-                            if debug:
-                                console.print(f"[cyan]Google Books: Using cached search for ISBN: {clean_isbn}[/cyan]")
-                            else:
-                                console.print(f"Google Books: Using cached search for ISBN: {clean_isbn}")
+                            console.print(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
 
                             # Support backwards compatibility if cache is in the old parsed format
                             if "items" in cached_data or "totalItems" in cached_data:
@@ -129,7 +127,7 @@ class GoogleBooksManager:
         if api_key:
             url += f"&key={api_key}"
         if debug:
-            console.print(f"[cyan]Searching Google Books API for ISBN: {clean_isbn}[/cyan]")
+            console.print(f"{google_color_str}: Searching API for ISBN: {clean_isbn}[/cyan]")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -140,10 +138,7 @@ class GoogleBooksManager:
                     if total_items > 0 and "items" in data:
                         metadata = self._parse_volume_info(data, isbn, debug)
                         if metadata:
-                            if debug:
-                                console.print(f"[green]Google Books match found: {metadata.get('title')} by {metadata.get('author')}[/green]")
-                            else:
-                                console.print(f"Google Books match found: {metadata.get('title')} by {metadata.get('author')}")
+                            console.print(f"{google_color_str}: ISBN match found: {clean_isbn}")
 
                             # Save full response to cache since response was successful
                             if cache_file:
@@ -151,21 +146,21 @@ class GoogleBooksManager:
                                     cache_content = json.dumps(data, indent=4)
                                     await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
                                     if debug:
-                                        console.print(f"[cyan]Google Books: Saved cache for ISBN: {clean_isbn}[/cyan]")
+                                        console.print(f"{google_color_str}: Saved cache for ISBN: {clean_isbn}")
                                 except Exception as ex:
                                     if debug:
                                         console.print(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
 
                             return metadata
                     else:
-                        console.print(f"[yellow]Google Books: No items found for ISBN: {clean_isbn}[/yellow]")
+                        console.print(f"{google_color_str}: No items found for ISBN: {clean_isbn}")
                 else:
                     if resp.status_code == 429:
-                        console.print(f"[bold red]Google Books API: Rate limited (Status 429) for ISBN: {clean_isbn}[/bold red]")
+                        console.print(f"{google_color_str}: Rate limited (Status 429) for ISBN: {clean_isbn}")
                     else:
-                        console.print(f"[red]Google Books API returned error status code {resp.status_code} for ISBN: {clean_isbn}[/red]")
+                        console.print(f"{google_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
         except Exception as e:
-            console.print(f"[red]Google Books API: Network or query error for ISBN {clean_isbn}: {e}[/red]")
+            console.print(f"{google_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 
         return None
 

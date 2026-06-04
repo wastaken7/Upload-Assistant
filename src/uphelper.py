@@ -307,7 +307,7 @@ class UploadHelper:
         if meta['debug'] is True:
             lines.append("[bold red]DEBUG: True - Will not actually upload![/bold red]")
             lines.append(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
-        lines.append("[bold yellow]Database Info[/bold yellow]\n")
+        lines.append("")
         lines.append(("Category", str(meta["category"])))
         lines.append(("Title", f"{meta['title']} ({meta['year']})"))
 
