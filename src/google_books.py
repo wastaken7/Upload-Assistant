@@ -136,7 +136,7 @@ class GoogleBooksManager:
         if api_key:
             url += f"&key={api_key}"
         if debug:
-            console.print(f"{google_color_str}: Searching API for ISBN: {clean_isbn}[/cyan]")
+            console.print(f"[cyan]{google_color_str}: Searching API for ISBN: {clean_isbn}[/cyan]")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:

@@ -943,7 +943,7 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
     poster_url = meta.get("poster")
     if not poster_url:
         return False
-    if os.path.exists(cover_path) and os.path.getsize(cover_path) > 0:
+    if os.path.exists(cover_path) and os.path.getsize(cover_path) >= 20480:
         meta["cover_path"] = cover_path
         return True
     try:
@@ -963,6 +963,9 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(poster_url, cookies=cookies, headers=headers)
             if response.status_code == 200:
+                if len(response.content) < 20480:
+                    console.print(f"[yellow]Warning: Downloaded poster from {poster_url} is too small ({len(response.content)} bytes < 20 KB) and will be ignored.[/yellow]")
+                    return False
                 await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
                 meta["cover_path"] = cover_path
                 console.print(f"[green]Successfully downloaded poster from {poster_url}[/green]")
@@ -972,6 +975,110 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
     except Exception as e:
         console.print(f"[yellow]Warning: Error downloading poster: {e}[/yellow]")
     return False
+
+
+async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
+    import xml.etree.ElementTree as ET
+    import zipfile
+
+    def _extract():
+        if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+            return False
+        try:
+            with zipfile.ZipFile(epub_path, "r") as z:
+                rootfile_path = None
+                try:
+                    container_data = z.read("META-INF/container.xml")
+                    root = ET.fromstring(container_data)
+                    for elem in root.iter():
+                        if elem.tag.endswith("rootfile"):
+                            rootfile_path = elem.attrib.get("full-path")
+                            if rootfile_path:
+                                break
+                except Exception:
+                    pass
+
+                if not rootfile_path:
+                    for name in z.namelist():
+                        if name.endswith(".opf"):
+                            rootfile_path = name
+                            break
+
+                if not rootfile_path:
+                    return False
+
+                opf_data = z.read(rootfile_path)
+                root = ET.fromstring(opf_data)
+
+                manifest_items = {}
+                cover_item_id = None
+                cover_href_direct = None
+
+                for elem in root.iter():
+                    tag_local = elem.tag.split("}")[-1]
+                    if tag_local == "item":
+                        item_id = elem.attrib.get("id")
+                        href = elem.attrib.get("href")
+                        properties = elem.attrib.get("properties", "")
+                        if item_id and href:
+                            manifest_items[item_id] = href
+                            if "cover-image" in properties:
+                                cover_href_direct = href
+                            if item_id.lower() in ("cover", "cover-image", "coverimage") and not cover_href_direct:
+                                cover_href_direct = href
+                    elif tag_local == "meta":
+                        name_attr = elem.attrib.get("name")
+                        content_attr = elem.attrib.get("content")
+                        if name_attr == "cover" and content_attr:
+                            cover_item_id = content_attr
+
+                cover_href = cover_href_direct
+                if not cover_href and cover_item_id and cover_item_id in manifest_items:
+                    cover_href = manifest_items[cover_item_id]
+
+                if not cover_href:
+                    for name in z.namelist():
+                        base = os.path.basename(name).lower()
+                        if "cover" in base and base.endswith((".jpg", ".jpeg", ".png")):
+                            cover_zip_path = name
+                            break
+                    else:
+                        return False
+                else:
+                    opf_dir = os.path.dirname(rootfile_path)
+                    raw_path = os.path.join(opf_dir, cover_href).replace("\\", "/") if opf_dir else cover_href.replace("\\", "/")
+
+                    parts = []
+                    for part in raw_path.split("/"):
+                        if part == "." or not part:
+                            continue
+                        if part == "..":
+                            if parts:
+                                parts.pop()
+                        else:
+                            parts.append(part)
+                    cover_zip_path = "/".join(parts)
+
+                zip_names = z.namelist()
+                matched_name = None
+                if cover_zip_path in zip_names:
+                    matched_name = cover_zip_path
+                else:
+                    cover_zip_path_lower = cover_zip_path.lower()
+                    for name in zip_names:
+                        if name.lower() == cover_zip_path_lower:
+                            matched_name = name
+                            break
+
+                if matched_name:
+                    with open(dest_path, "wb") as dest:
+                        dest.write(z.read(matched_name))
+                    return True
+        except Exception:
+            pass
+        return False
+
+    return await asyncio.to_thread(_extract)
 
 
 async def generate_ebook_screenshots(
@@ -1005,13 +1112,22 @@ async def generate_ebook_screenshots(
     cover_path = os.path.join(output_dir, "POSTER.png")
     banner_path = os.path.join(output_dir, "POSTER_BANNER.png")
 
-    local_found = await load_local_cover_if_exists(path, cover_path)
-    downloaded_poster = False
-    if local_found:
+    cover_cached = os.path.exists(cover_path) and os.path.getsize(cover_path) >= 20480 and not meta.get("retake", False)
+    banner_cached = os.path.exists(banner_path) and os.path.getsize(banner_path) > 0 and not meta.get("retake", False)
+
+    if cover_cached:
         meta["cover_path"] = cover_path
-        console.print(f"[green]Local cover found and copied to {cover_path}[/green]")
+        console.print(f"[green]Cached cover found at {cover_path}[/green]")
+        local_found = True
+        downloaded_poster = True
     else:
-        downloaded_poster = await download_poster_from_meta(meta, cover_path)
+        local_found = await load_local_cover_if_exists(path, cover_path)
+        downloaded_poster = False
+        if local_found:
+            meta["cover_path"] = cover_path
+            console.print(f"[green]Local cover found and copied to {cover_path}[/green]")
+        else:
+            downloaded_poster = await download_poster_from_meta(meta, cover_path)
 
     if extension in ["cbr", "cbz"]:
         temp_extract = os.path.join(output_dir, "temp_compressed_extract")
@@ -1076,7 +1192,10 @@ async def generate_ebook_screenshots(
 
             if not local_found and not downloaded_poster:
                 await process_compressed_image(0, "POSTER")
-            await process_compressed_image(len(image_files) - 1, "POSTER_BANNER")
+            if not banner_cached:
+                await process_compressed_image(len(image_files) - 1, "POSTER_BANNER")
+            else:
+                meta["banner_path"] = banner_path
 
             meta["cover_path"] = cover_path
             meta["banner_path"] = banner_path
@@ -1089,6 +1208,17 @@ async def generate_ebook_screenshots(
 
     elif extension in ["pdf", "mobi", "epub"]:
         try:
+            if extension == "epub" and not local_found and not downloaded_poster:
+                try:
+                    epub_cover_extracted = await extract_epub_cover(path, cover_path)
+                    if epub_cover_extracted:
+                        downloaded_poster = True
+                        meta["cover_path"] = cover_path
+                        console.print(f"[green]Smart cover extracted from EPUB file directly to {cover_path}[/green]")
+                except Exception as e:
+                    if meta.get("debug", False):
+                        console.print(f"[yellow]Warning: Smart EPUB cover extraction failed: {e}[/yellow]")
+
             doc = fitz.open(path)
             total_pages = len(doc)
 
@@ -1116,7 +1246,10 @@ async def generate_ebook_screenshots(
 
             if not local_found and not downloaded_poster:
                 await process_page(0, "POSTER")
-            await process_page(total_pages - 1, "POSTER_BANNER")
+            if not banner_cached:
+                await process_page(total_pages - 1, "POSTER_BANNER")
+            else:
+                meta["banner_path"] = banner_path
 
             meta["cover_path"] = cover_path
             meta["banner_path"] = banner_path
@@ -1146,6 +1279,10 @@ async def screenshots(
             output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")
             os.makedirs(output_dir, exist_ok=True)
             cover_path = os.path.join(output_dir, "POSTER.png")
+            if os.path.exists(cover_path) and os.path.getsize(cover_path) >= 20480 and not meta.get("retake", False):
+                meta["cover_path"] = cover_path
+                console.print(f"[green]Cached cover found for audiobook at {cover_path}[/green]")
+                return []
             local_found = await load_local_cover_if_exists(path, cover_path)
             if local_found:
                 meta["cover_path"] = cover_path

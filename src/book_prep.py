@@ -9,16 +9,25 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import contextlib
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
-import zipfile
 from typing import Any, Optional
 
 import langcodes
 
+from src.book_extractors import (
+    extract_cbr_cbz_metadata as _extract_cbr_cbz_metadata,
+)
+from src.book_extractors import (
+    extract_epub_metadata as _extract_epub_metadata,
+)
+from src.book_extractors import (
+    extract_isbn_from_pdf as _extract_isbn_from_pdf,
+)
+from src.book_extractors import (
+    extract_mobi_metadata as _extract_mobi_metadata,
+)
 from src.console import console
 from src.exportmi import exportInfo
 
@@ -109,286 +118,6 @@ def is_valid_book_language(full: str, iso: str) -> bool:
 # MediaInfo metadata extraction
 # ---------------------------------------------------------------------------
 
-def _extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]:
-    """Extract metadata from an EPUB zip container's OPF file."""
-    metadata: dict[str, Any] = {}
-    if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
-        return metadata
-
-    try:
-        with zipfile.ZipFile(epub_path, "r") as z:
-            # 1. Read META-INF/container.xml to find the .opf file path
-            rootfile_path: Optional[str] = None
-            try:
-                container_data = z.read("META-INF/container.xml")
-                root = ET.fromstring(container_data)
-                for elem in root.iter():
-                    if elem.tag.endswith("rootfile"):
-                        rootfile_path = elem.attrib.get("full-path")
-                        if rootfile_path:
-                            break
-            except Exception as e:
-                if debug:
-                    console.print(f"[yellow]Debug: META-INF/container.xml not found or unreadable: {e}[/yellow]")
-
-            # Fallback: search for any .opf file in the archive
-            if not rootfile_path:
-                for name in z.namelist():
-                    if name.endswith(".opf"):
-                        rootfile_path = name
-                        break
-
-            if not rootfile_path:
-                if debug:
-                    console.print("[yellow]Debug: No OPF metadata file found in EPUB ZIP[/yellow]")
-                return metadata
-
-            # 2. Read and parse the .opf file
-            opf_data = z.read(rootfile_path)
-            root = ET.fromstring(opf_data)
-
-            title = ""
-            author = ""
-            language = ""
-            date = ""
-            identifier = ""
-            description = ""
-            publisher = ""
-
-            for elem in root.iter():
-                tag_local = elem.tag.split("}")[-1]
-                if tag_local == "title":
-                    title = (elem.text or "").strip()
-                elif tag_local == "creator":
-                    author = (elem.text or "").strip()
-                elif tag_local == "language":
-                    language = (elem.text or "").strip()
-                elif tag_local == "date":
-                    date = (elem.text or "").strip()
-                elif tag_local == "identifier":
-                    val = (elem.text or "").strip()
-                    if val.lower().startswith("urn:isbn:"):
-                        identifier = val[9:]
-                    elif val.lower().startswith("isbn:"):
-                        identifier = val[5:]
-                    elif not identifier:
-                        identifier = val
-                elif tag_local == "description":
-                    description = (elem.text or "").strip()
-                elif tag_local == "publisher":
-                    publisher = (elem.text or "").strip()
-
-            if title:
-                metadata["title"] = title
-            if author:
-                metadata["author"] = author
-            if language:
-                metadata["book_language_raw"] = language
-            if date:
-                match = re.search(r"\b\d{4}\b", date)
-                if match:
-                    metadata["year"] = match.group(0)
-            if identifier:
-                cleaned_id = re.sub(r"[^\d]", "", identifier)
-                if len(cleaned_id) in (10, 13):
-                    metadata["isbn"] = cleaned_id
-            if description:
-                metadata["overview"] = description
-            if publisher:
-                metadata["publisher"] = publisher
-
-    except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
-
-    return metadata
-
-
-def _extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, Any]:
-    """Extract metadata from a CBR (RAR) or CBZ (ZIP) container's ComicInfo.xml file."""
-    metadata: dict[str, Any] = {}
-    if not os.path.isfile(filepath):
-        return metadata
-
-    ext = os.path.splitext(filepath)[1].lower()
-    xml_data: Optional[bytes] = None
-
-    if ext == ".cbz" or zipfile.is_zipfile(filepath):
-        try:
-            with zipfile.ZipFile(filepath, "r") as z:
-                # Find ComicInfo.xml (case-insensitive search)
-                xml_name = next((name for name in z.namelist() if name.lower().endswith("comicinfo.xml")), None)
-                if xml_name:
-                    xml_data = z.read(xml_name)
-        except Exception as e:
-            if debug:
-                console.print(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
-    elif ext == ".cbr":
-        try:
-            from rarfile import RarFile
-        except ImportError:
-            if debug:
-                console.print("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
-            RarFile = None
-
-        if RarFile:
-            try:
-                with RarFile(filepath, "r") as r:
-                    xml_name = next((name for name in r.namelist() if name.lower().endswith("comicinfo.xml")), None)
-                    if xml_name:
-                        xml_data = r.read(xml_name)
-            except Exception as e:
-                if debug:
-                    console.print(f"[yellow]Debug: Error reading CBR rar archive: {e}[/yellow]")
-
-    if not xml_data:
-        return metadata
-
-    try:
-        root = ET.fromstring(xml_data)
-
-        series = ""
-        title = ""
-        writer = ""
-        penciller = ""
-        publisher = ""
-        year = ""
-        language_iso = ""
-        summary = ""
-        genre = ""
-
-        for elem in root.iter():
-            tag_local = elem.tag.split("}")[-1]
-            if tag_local == "Series":
-                series = (elem.text or "").strip()
-            elif tag_local == "Title":
-                title = (elem.text or "").strip()
-            elif tag_local == "Writer":
-                writer = (elem.text or "").strip()
-            elif tag_local == "Penciller":
-                penciller = (elem.text or "").strip()
-            elif tag_local == "Publisher":
-                publisher = (elem.text or "").strip()
-            elif tag_local == "Year":
-                year = (elem.text or "").strip()
-            elif tag_local == "LanguageISO":
-                language_iso = (elem.text or "").strip()
-            elif tag_local == "Summary":
-                summary = (elem.text or "").strip()
-            elif tag_local == "Genre":
-                genre = (elem.text or "").strip()
-
-        # Map to common metadata fields
-        final_title = series or title
-        if final_title:
-            metadata["title"] = final_title
-
-        final_author = writer or penciller
-        if final_author:
-            metadata["author"] = final_author
-
-        if publisher:
-            metadata["publisher"] = publisher
-
-        if year:
-            match = re.search(r"\b\d{4}\b", year)
-            if match:
-                metadata["year"] = match.group(0)
-
-        if language_iso:
-            metadata["book_language_raw"] = language_iso
-
-        if summary:
-            metadata["overview"] = summary
-
-        if genre:
-            genres_list = [g.strip() for g in genre.split(",") if g.strip()]
-            metadata["keywords"] = metadata["genres"] = ", ".join(genres_list)
-
-    except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error parsing ComicInfo.xml metadata: {e}[/yellow]")
-
-    return metadata
-
-
-def _validate_isbn_checksum(candidate: str) -> Optional[str]:
-    """Validate and return cleaned ISBN-10 or ISBN-13 if valid, else None."""
-    cleaned = re.sub(r"[- ]", "", candidate).upper()
-
-    # Check ISBN-13
-    if len(cleaned) == 13 and cleaned.isdigit():
-        total = sum(int(cleaned[i]) * (1 if i % 2 == 0 else 3) for i in range(13))
-        if total % 10 == 0:
-            return cleaned
-
-    # Check ISBN-10
-    if len(cleaned) == 10 and cleaned[:9].isdigit() and (cleaned[9].isdigit() or cleaned[9] == "X"):
-        total = sum((10 if cleaned[i] == "X" else int(cleaned[i])) * (10 - i) for i in range(10))
-        if total % 11 == 0:
-            return cleaned
-
-    return None
-
-
-def _extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> Optional[str]:
-    """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
-    try:
-        import fitz
-    except ImportError:
-        if debug:
-            console.print("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
-        return None
-
-    if not os.path.isfile(pdf_path):
-        return None
-
-    try:
-        # Disable mupdf display errors to avoid spamming console
-        with contextlib.suppress(Exception):
-            fitz.TOOLS.mupdf_display_errors(False)
-
-        with fitz.open(pdf_path) as doc:
-            num_pages = len(doc)
-            if num_pages == 0:
-                return None
-
-            # Determine page ranges: check first 30 and last 30 pages first
-            front_limit = min(30, num_pages)
-            back_limit = max(0, num_pages - 30)
-
-            pages_to_check: list[int] = list(range(front_limit))
-            # Last N pages (avoiding duplicates)
-            for p in range(back_limit, num_pages):
-                if p not in pages_to_check:
-                    pages_to_check.append(p)
-            # Middle pages as fallback
-            for p in range(num_pages):
-                if p not in pages_to_check:
-                    pages_to_check.append(p)
-
-            for page_num in pages_to_check:
-                text = doc[page_num].get_text()
-                if not isinstance(text, str) or not text:
-                    continue
-
-                # Find ISBN candidates
-                candidates = re.findall(
-                    r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b",
-                    text,
-                    re.IGNORECASE
-                )
-                for cand in candidates:
-                    validated = _validate_isbn_checksum(cand)
-                    if validated:
-                        console.print(f"[cyan]Found valid ISBN {validated} on PDF page {page_num}[/cyan]")
-                        return validated
-    except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
-
-    return None
-
 
 async def gather_book_prep(
     meta: dict[str, Any],
@@ -451,6 +180,24 @@ async def gather_book_prep(
             if meta.get("debug", False):
                 console.print(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
             for key, val in cbr_cbz_meta.items():
+                if key == "book_language_raw":
+                    full, iso3 = _resolve_book_language(val)
+                    if is_valid_book_language(full, iso3) and not meta.get("book_language"):
+                        meta["book_language"] = full
+                        meta["book_language_iso"] = iso3
+                else:
+                    if not meta.get(key) and val:
+                        meta[key] = val
+                        if key == "year":
+                            meta["search_year"] = int(val)
+
+    # Extract MOBI metadata directly if the file is a MOBI
+    if videopath.lower().endswith(".mobi") and os.path.isfile(videopath):  # noqa: ASYNC240
+        mobi_meta = _extract_mobi_metadata(videopath, debug=meta.get("debug", False))
+        if mobi_meta:
+            if meta.get("debug", False):
+                console.print(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
+            for key, val in mobi_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
                     if is_valid_book_language(full, iso3) and not meta.get("book_language"):
@@ -692,8 +439,8 @@ async def gather_book_prep(
                         ):
                             is_override = True
 
-                        # Do not overwrite fields already populated by MAM
-                        if mam_data and (key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data):
+                        # Do not overwrite fields already populated by MAM, except for the poster/cover image (prefer Google Books cover)
+                        if key != "poster" and mam_data and (key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data):
                             is_override = True
 
                         if not is_override:
