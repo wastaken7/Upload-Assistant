@@ -42,12 +42,7 @@ class FF:
         if cookie_jar is None:
             return False
         self.session.cookies = cookie_jar
-        valid_cookies = await self.validate_cookies(meta)
-        if valid_cookies:
-            return True
-        else:
-            await self.login(meta)
-            return await self.validate_cookies(meta)
+        return True
 
     async def validate_cookies(self, meta: dict[str, Any]) -> bool:
         return await self.cookie_validator.cookie_validation(
@@ -103,11 +98,17 @@ class FF:
         search_url = f"{self.base_url}/suggest.php?q={query}"
         response = await self.session.get(search_url)
 
-        if response.status_code == 200 and 'login' not in str(response.url):
-            items = [line.strip() for line in response.text.splitlines() if line.strip()]
-            return items
+        if response.status_code != 200 or 'login' in str(response.url) or 'login' in response.text:
+            # Try to login and retry
+            await self.login(meta)
+            response = await self.session.get(search_url)
+            if response.status_code != 200 or 'login' in str(response.url) or 'login' in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta['skipping'] = self.tracker
+                return []
 
-        return []
+        items = [line.strip() for line in response.text.splitlines() if line.strip()]
+        return items
 
     async def get_requests(self, meta: dict[str, Any]) -> Union[bool, list[dict[str, str]]]:
         if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:

@@ -105,12 +105,8 @@ class AR:
         return '7'
 
     async def validate_credentials(self, meta: dict[str, Any]) -> bool:
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=self.test_url,
-            error_text="login.php?act=recover",
-        )
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        return cookie_jar is not None
 
     def get_links(self, movie: dict[str, Any], subheading: str, heading_end: str) -> str:
         description = ""
@@ -272,8 +268,9 @@ class AR:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
                 response = await client.get(search_url)
 
-                if response.status_code != 200:
-                    console.print("[bold red]Request failed. Site May be down")
+                if "login.php" in str(response.url) or "login.php" in response.text or response.status_code != 200:
+                    await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                    meta['skipping'] = f"{self.tracker}"
                     return dupes
 
                 json_response = response.json()

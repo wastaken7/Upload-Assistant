@@ -107,6 +107,10 @@ class NEXUSPHP:
                 self.session.cookies.update(cookies)
 
             response = await self.session.get(base_url, params=params)
+            if "login.php" in str(response.url) or "login.php" in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta["skipping"] = self.tracker
+                return []
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, "html.parser")
@@ -167,7 +171,11 @@ class NEXUSPHP:
             return ""
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        return await self.cookie_validator.cookie_validation(meta=meta, tracker=self.tracker, test_url=f"{self.base_url}/upload.php", success_text="/announce.php")
+        cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookies:
+            self.session.cookies.update(cookies)
+            return True
+        return False
 
     async def standard_desc(self, meta: Meta) -> str:
         data = getattr(self, "tmdb_data", {})

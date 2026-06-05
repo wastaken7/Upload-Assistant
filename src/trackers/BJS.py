@@ -84,14 +84,7 @@ class BJS:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
-            if await self.cookie_validator.cookie_validation(
-                meta=meta,
-                tracker=self.tracker,
-                test_url=f"{self.base_url}/upload.php",
-                error_text="login.php",
-                token_pattern=r'name="auth" value="([^"]+)"',  # nosec B106
-            ):
-                return True
+            return True
 
         return False
 
@@ -671,6 +664,20 @@ class BJS:
             BJS.database_title = ""
 
             response = await self.session.get(search_url, follow_redirects=True)
+            if "login.php" in str(response.url) or "login.php" in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta["skipping"] = f"{self.tracker}"
+                return dupes
+
+            # Extract auth token if present
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
+            if auth_match:
+                BJS.secret_token = auth_match.group(1)
+            else:
+                console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta["skipping"] = f"{self.tracker}"
+                return dupes
+
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Check if we were redirected to a details page (it contains class "main_column")

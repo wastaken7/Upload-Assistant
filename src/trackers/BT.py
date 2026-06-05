@@ -111,13 +111,7 @@ class BT:
         if cookie_jar is None:
             return False
         self.session.cookies = cast(Any, cookie_jar)
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=f'{self.base_url}/upload.php',
-            error_text='login.php',
-            token_pattern=r'name="auth" value="([^"]+)"'  # nosec B106
-        )
+        return True
 
     async def load_localized_data(self, meta: dict[str, Any]) -> None:
         localized_data_file = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/tmdb_localized_data.json'
@@ -488,6 +482,20 @@ class BT:
             self.session.cookies = cast(Any, cookie_jar)
 
             response = await self.session.get(search_url)
+            if "login.php" in str(response.url) or "login.php" in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta["skipping"] = f"{self.tracker}"
+                return found_items
+
+            # Extract auth token if present
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
+            if auth_match:
+                BT.secret_token = auth_match.group(1)
+            else:
+                console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta["skipping"] = f"{self.tracker}"
+                return found_items
+
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 

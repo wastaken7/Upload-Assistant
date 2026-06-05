@@ -37,12 +37,7 @@ class PTS:
     async def validate_credentials(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies = cast(Any, cookies)
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=f'{self.base_url}/upload.php',
-            success_text='forums.php',
-        )
+        return cookies is not None
 
     async def get_type(self, meta: Meta) -> Optional[str]:
         if meta.get('anime'):
@@ -166,6 +161,10 @@ class PTS:
 
         try:
             response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
+            if "login.php" in str(response.url) or "login.php" in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta["skipping"] = f"{self.tracker}"
+                return found_items
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, 'html.parser')

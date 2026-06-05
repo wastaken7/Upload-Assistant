@@ -38,12 +38,8 @@ class HDS:
         self.session.cookies.clear()
         if cookies is not None:
             self.session.cookies.update(cookies)
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=f'{self.base_url}/index.php?page=upload',
-            error_text='Recover password',
-        )
+            return True
+        return False
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -226,6 +222,10 @@ class HDS:
 
             try:
                 response = await self.session.get(search_url, params=params)
+                if "Recover password" in response.text or "page=login" in str(response.url) or "page=login" in response.text:
+                    await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                    meta["skipping"] = f"{self.tracker}"
+                    return dupes
                 response.raise_for_status()
                 parts = response.text.split("Show/Hide Categories", 1)
                 if len(parts) < 2:

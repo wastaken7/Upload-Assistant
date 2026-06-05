@@ -65,12 +65,8 @@ class ASC:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=f'{self.base_url}/gerador.php',
-            error_text='Esqueceu sua senha',
-        )
+            return True
+        return False
 
     async def load_localized_data(self, meta: dict[str, Any]) -> None:
         localized_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"
@@ -603,6 +599,10 @@ class ASC:
 
         try:
             response = await self.session.get(search_url, timeout=30)
+            if 'Esqueceu sua senha' in response.text or 'login.php' in str(response.url) or 'login.php' in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta["skipping"] = f"{self.tracker}"
+                return found_items
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             releases = soup.find_all('li', class_='list-group-item dark-gray')
