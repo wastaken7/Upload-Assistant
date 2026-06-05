@@ -10,7 +10,6 @@ import cli_ui
 from torf import Torrent
 from typing_extensions import TypeAlias
 
-from src.book_prep import is_valid_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -102,8 +101,10 @@ class TrackerStatusManager:
 
                 # Check for missing required BOOK fields in unattended mode
                 if local_meta.get("category") == "BOOK" and local_meta.get("unattended", False):
+                    from src.book_prep import is_valid_book_language
+
                     book_required_fields = ["title", "author", "year", "book_language"]
-                    if local_meta.get("is_audiobook", False) and tracker_name == "CBR":
+                    if local_meta.get("audiobook", False) and tracker_name == "CBR":
                         book_required_fields.append("narrator")
                     book_missing = []
                     for f in book_required_fields:

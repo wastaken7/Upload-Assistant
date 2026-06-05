@@ -84,6 +84,15 @@ class GoogleBooksManager:
         categories = volume_info.get("categories")
         if categories:
             metadata["keywords"] = metadata["genres"] = ", ".join(categories)
+            # Detect comic and manga
+            if any("comic" in cat.lower() for cat in categories):
+                metadata["comic"] = True
+            if any("manga" in cat.lower() for cat in categories):
+                metadata["manga"] = True
+            if any("magazine" in cat.lower() for cat in categories):
+                metadata["magazine"] = True
+            if any("newspaper" in cat.lower() for cat in categories):
+                metadata["newspaper"] = True
 
         metadata["isbn"] = isbn
         return metadata

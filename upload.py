@@ -32,6 +32,7 @@ from cogs.redaction import Redaction
 from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
+from src.book_prep import detect_newspaper
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -331,7 +332,7 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
         'trackers', 'dupe', 'debug', 'anon', 'category', 'type', 'screens', 'nohash', 'manual_edition', 'imdb', 'tmdb_manual', 'mal', 'manual',
         'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'description_link', 'description_file', 'desc', 'draft',
         'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
-        'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type', 'tvmaze_manual'
+        'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type', 'tvmaze_manual', "comic", "manga", "magazine", "newspaper",
     ]
     sanitized_saved_meta: dict[str, Any] = {}
     for key, value in saved_meta.items():
@@ -438,7 +439,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
     uploads reflect the new values.
     """
     book_required_fields = ["title", "author", "year", "book_language"]
-    if meta.get("is_audiobook", False) and "CBR" in meta.get("trackers", []):
+    if meta.get("audiobook", False) and "CBR" in meta.get("trackers", []):
         book_required_fields.append("narrator")
     book_missing = []
     for f in book_required_fields:
@@ -498,6 +499,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
 
     # Rebuild the torrent name so the confirmation screen and upload reflect the new values
     if name_needs_rebuild and not meta.get("emby", False):
+        detect_newspaper(meta)
         meta["name_notag"], meta["name"], meta["clean_name"], meta["potential_missing"] = await name_manager.get_name(meta)
 
 

@@ -45,7 +45,7 @@ class CBR(UNIT3D):
         if meta.get("anime", False) is True and resolved_category == "TV":
             resolved_category = "ANIMES"
 
-        if resolved_category == "BOOK" and meta.get("type", "").upper() in ("CBR", "CBZ"):
+        if resolved_category == "BOOK" and (meta.get("type", "").upper() in ("CBR", "CBZ") or meta.get("manga", False) or meta.get("comic", False)):
             resolved_category = "COMIC_MANGA"
 
         if resolved_category:
@@ -123,9 +123,10 @@ class CBR(UNIT3D):
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         category = meta["category"]
         cbr_name = str(meta["name"])
+        name = str(meta["name"])
 
         if category == "BOOK":
-            if meta.get("is_audiobook", False):
+            if meta.get("audiobook", False):
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}] [AUDIOBOOK]"
             else:
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}]"
@@ -204,9 +205,16 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta.get("category") in ("MOVIE", "TV"):
-            return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-        return True
+        if meta.get("category") == "BOOK":
+            return True
+
+        subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+        if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
+            proceed = await self.common.prompt_user_for_confirmation(
+                f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
+            )
+            return proceed
+        return subtitles
 
     async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)

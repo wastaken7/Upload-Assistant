@@ -314,17 +314,29 @@ class UploadHelper:
         # BOOK
         if meta["category"] == "BOOK":
             author = meta.get("author") or missing_warning
-            publisher = meta.get("publisher") or missing_warning
+            publisher = meta.get("publisher") or ""  # not essential
             book_language = meta.get("book_language") or missing_warning
-            isbn = meta.get("isbn") or missing_warning
+            isbn = meta.get("isbn") or ""  # not essential
             narrator = meta.get("narrator") or missing_warning
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
             poster = meta.get("poster") or "[yellow][italic]not found, will be auto-generated[/italic][/yellow]"
+            comic = bool(meta.get("comic"))
+            manga = bool(meta.get("manga"))
+            magazine = bool(meta.get("magazine"))
+            newspaper = bool(meta.get("newspaper"))
+
+            def format_value(value: bool) -> str:
+                return "[green]True[/green]" if value else "[purple]False[/purple]"
+
             lines.append(("Author", str(author)))
             lines.append(("Publisher", str(publisher)))
             lines.append(("Language", str(book_language)))
             lines.append(("ISBN", str(isbn)))
-            if meta.get("is_audiobook"):
+            lines.append(("Comic", format_value(comic)))
+            lines.append(("Manga", format_value(manga)))
+            lines.append(("Magazine", format_value(magazine)))
+            lines.append(("Newspaper", format_value(newspaper)))
+            if meta.get("audiobook"):
                 lines.append(("Narrator", str(narrator)))
                 lines.append(("Duration", str(audiobook_duration_formatted)))
             lines.append(("Poster", str(poster)))

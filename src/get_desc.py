@@ -321,7 +321,7 @@ class DescriptionBuilder:
         return title, image, overview
 
     async def get_mediainfo_section(self, meta: dict[str, Any]) -> str:
-        """Returns the mediainfo/bdinfo section, using a cache file if available."""
+        """Returns the mediainfo section, using a cache file if available."""
         if meta.get("is_disc") == "BDMV":
             return ""
 
@@ -538,7 +538,7 @@ class DescriptionBuilder:
             book_parts.append(f"[b]Publisher:[/b] {publisher}")
         if isbn:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
-        if meta.get("is_audiobook", False):
+        if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:
                 book_parts.append(f"[b]Duration:[/b] {audiobook_duration_formatted}")

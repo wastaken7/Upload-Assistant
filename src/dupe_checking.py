@@ -331,7 +331,7 @@ class DupeChecker:
                     return True
 
                 # Check format/type compatibility
-                target_is_audiobook = bool(meta.get("is_audiobook", False))
+                target_is_audiobook = bool(meta.get("audiobook", False))
 
                 dupe_type = str(entry.get("type") or "").lower()
                 audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg", "aac", "ac3", "wma", "opus"}

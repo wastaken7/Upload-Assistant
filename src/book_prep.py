@@ -8,6 +8,7 @@ This module contains the logic that was previously inlined inside the
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import os
 import re
@@ -32,7 +33,7 @@ def resolve_book_filelist(
     """Scan *videoloc* for book/audiobook files and update *meta* in-place.
 
     Populates ``meta["filelist"]``, ``meta["scene"]``, ``meta["imdb_id"]``,
-    and ``meta["is_audiobook"]``.
+    and ``meta["audiobook"]``.
 
     Returns:
         A 4-tuple ``(videopath, filelist, search_term, search_file_folder)``
@@ -64,7 +65,7 @@ def resolve_book_filelist(
     meta["imdb_id"] = 0
 
     primary_ext = os.path.splitext(videopath)[1].lower()
-    meta["is_audiobook"] = primary_ext in audiobook_extensions
+    meta["audiobook"] = primary_ext in audiobook_extensions
 
     search_term = os.path.basename(filelist[0]) if filelist else ""
     search_file_folder = "file"
@@ -409,6 +410,11 @@ async def gather_book_prep(
     meta["sd"] = 0
     meta["valid_mi_settings"] = True
 
+    # Check if the file format is CBR or CBZ and automatically set comic to True
+    file_ext = os.path.splitext(videopath)[1].lstrip(".").upper()
+    if file_ext in ("CBR", "CBZ"):
+        meta["comic"] = True
+
     # Identify CLI overrides at the very start
     cli_overrides = {
         "title": bool(meta.get("book_title")),
@@ -698,7 +704,7 @@ async def gather_book_prep(
             if meta.get("debug", False):
                 console.print(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")
 
-    if meta.get("is_audiobook", False):
+    if meta.get("audiobook", False):
         filelist = meta.get("filelist", [])
         total_duration, duration_formatted = await get_audiobook_duration(filelist)
         meta["audiobook_duration"] = total_duration
@@ -707,6 +713,45 @@ async def gather_book_prep(
         avg_bitrate = await get_audiobook_bitrate(filelist)
         if avg_bitrate is not None:
             meta["audiobook_bitrate"] = avg_bitrate
+
+    detect_newspaper(meta)
+
+
+def detect_newspaper(meta: dict[str, Any]) -> None:
+    np_names = [
+        # Brazil
+        "Zm9saGEgZGUgcy5wYXVsbw==", "Zm9saGEgZGUgcy4gcGF1bG8=", "Zm9saGEgZGUgc2FvIHBhdWxv", "Zm9saGEgZGUgc8OjbyBwYXVsbw==", "ZXN0YWRhbw==", "ZXN0YWTDo28=",
+        "byBlc3RhZG8gZGUgcy4gcGF1bG8=", "byBlc3RhZG8gZGUgcy5wYXVsbw==", "byBlc3RhZG8gZGUgc8OjbyBwYXVsbw==", "byBnbG9ibw==", "dmFsb3IgZWNvbm9taWNv",
+        "dmFsb3IgZWNvbsO0bWljbw==", "Y29ycmVpbyBicmF6aWxpZW5zZQ==", "Y29ycmVpbyBicmFzaWxpZW5zZQ==", "emVybyBob3Jh", "ZXN0YWRvIGRlIG1pbmFz",
+        "ZGlhcmlvIGRvIG5vcmRlc3Rl", "ZGnDoXJpbyBkbyBub3JkZXN0ZQ==", "Z2F6ZXRhIGRvIHBvdm8=", "am9ybmFsIGRvIGJyYXNpbA==", "am9ybmFsIGRvIGNvbWVyY2lv",
+        "am9ybmFsIGRvIGNvbW1lcmNpbw==", "YSB0cmlidW5hIGRhIGltcHJlbnNh", "Zm9saGEgZGlyaWdpZGE=", "YSB2b3ogZGEgc2VycmE=", "dHJpYnVuYSBkZSBwZXRyb3BvbGlz",
+        "dHJpYnVuYSBkZSBwZXRyw7Nwb2xpcw==", "aW52ZXJ0YSAtIGpvcm5hbCBwcmEgdmVyZGFkZQ==", "am9ybmFsIGRlIGJyYXNpbGlh", "am9ybmFsIGRlIGJyYXPDrWxpYQ==",
+        "YnJhc2lsIGVtIHRlbXBvIHJlYWw=", "Y29ycmVpbyBkbyBwb3Zv", "am9ybmFsIG5o", "am9ybmFsIHZz", "ZGlhcmlvIGRlIGNhbm9hcw==", "ZGnDoXJpbyBkZSBjYW5vYXM=",
+        "am9ybmFsIGRvIHR1cmZl", "YnJhc2lsIGRlIGZhdG8=", "am9ybmFsIGdhemV0YSBkbyBvZXN0ZQ==", "cG9ydGFsIGRvIHRyaWFuZ3Vsbw==", "cG9ydGFsIGRvIHRyacOibmd1bG8=",
+        "Z2F6ZXRhIG9ubGluZQ==", "ZGlhcmlvIGRlIGN1aWFiYQ==", "ZGnDoXJpbyBkZSBjdWlhYsOh", "YSBjcml0aWNhIGRlIGNhbXBvIGdyYW5kZQ==",
+        "YSBjcsOtdGljYSBkZSBjYW1wbyBncmFuZGU=", "Y29ycmVpbyBkbyBlc3RhZG8=", "ZGlhcmlvIGRlIHBlcm5hbWJ1Y28=", "ZGnDoXJpbyBkZSBwZXJuYW1idWNv",
+        "Zm9saGEgZGUgcGVybmFtYnVjbw==", "am9ybmFsIGltcHJlbnNhIGRvIGFncmVzdGU=", "ZGlhcmlvIGRhIGJvcmJvcmVtYQ==", "ZGnDoXJpbyBkYSBib3Jib3JlbWE=",
+        "am9ybmFsIGRhIHBhcmFpYmE=", "am9ybmFsIGRhIHBhcmHDrWJh", "dmFsZSBwYXJhaWJhbm8=", "Y29ycmVpbyBkYSBwYXJhaWJh", "Y29ycmVpbyBkYSBwYXJhw61iYQ==",
+        "dHJpYnVuYSBkbyBub3J0ZQ==", "Z2F6ZXRhIGRlIG1hY2F1", "ZGlhcmlvIGRlIG5hdGFs", "ZGnDoXJpbyBkZSBuYXRhbA==", "YXJhY2F0aSBvbmxpbmU=",
+        "ZGlhcmlvIGRlIHNvcm9jYWJh", "ZGnDoXJpbyBkZSBzb3JvY2FiYQ==", "ZGlhcmlvIGRvIGdyYW5kZSBhYmM=", "ZGnDoXJpbyBkbyBncmFuZGUgYWJj", "bm90aWNpYXMgcG9wdWxhcmVz",
+        "bm90w61jaWFzIHBvcHVsYXJlcw==", "Zm9saGEgdW5pdmVyc2Fs", "ZGlhcmlvIG9maWNpYWwgZG8gZXN0YWRvIGRlIHNhbyBwYXVsbw==",
+        "ZGnDoXJpbyBvZmljaWFsIGRvIGVzdGFkbyBkZSBzw6NvIHBhdWxv", "Z2F6ZXRhIGRlIHByYWlhIGdyYW5kZQ==", "YWdvcmEgc2FvIHBhdWxv", "YWdvcmEgc8OjbyBwYXVsbw==",
+        "am9ybmFsIGRlIHNhbnRhIGNhdGFyaW5h", "ZGlhcmlvIGNhdGFyaW5lbnNl", "ZGnDoXJpbyBjYXRhcmluZW5zZQ==", "dHJpYnVuYSBjYXRhcmluZW5zZQ==",
+        "Zm9saGEgZGUgbG9uZHJpbmE=", "dHJpYnVuYSBkbyBwYXJhbmE=", "dHJpYnVuYSBkbyBwYXJhbsOh", "byBlc3RhZG8gZG8gcGFyYW5h", "byBlc3RhZG8gZG8gcGFyYW7DoQ==",
+        "Z2F6ZXRhIGRvIHBhcmFuYQ==", "Z2F6ZXRhIGRvIHBhcmFuw6E=", "am9ybmFsIGRlIGxvbmRyaW5h", "Z2F6ZXRhIGRvIGlndWFjdQ==", "Z2F6ZXRhIGRvIGlndWHDp3U=",
+        "Y29ycmVpbyBkYSBiYWhpYQ==", "dHJpYnVuYSBkYSBiYWhpYQ==", "am9ybmFsIGdyYXBpdW5h", "am9ybmFsIGdyYXBpw7puYQ==", "Z2F6ZXRhIGRlIHNlcmdpcGU=",
+        "Z2F6ZXRhIGRlIGFsYWdvYXM=", "am9ybmFsIGRlIGFsYWdvYXM=", "dHJpYnVuYSBkZSBhbGFnb2Fz", "ZGlhcmlvIGRhIGFtYXpvbmlh", "ZGnDoXJpbyBkYSBhbWF6w7RuaWE=",
+        "am9ybmFsIG1laW8gbm9ydGU=", "byBlc3RhZG8gZG8gbWFyYW5oYW8=", "byBlc3RhZG8gZG8gbWFyYW5ow6Nv",
+    ]  # fmt: off
+    title_lower = meta.get("title", "").lower()
+    for encoded in np_names:
+        try:
+            decoded = base64.b64decode(encoded).decode("utf-8")
+            if decoded in title_lower:
+                meta["newspaper"] = True
+                break
+        except Exception:
+            pass
 
 
 async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:

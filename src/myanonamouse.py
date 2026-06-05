@@ -108,6 +108,20 @@ class MyAnonamouseManager:
                 ext = "gif"
             metadata["poster"] = f"https://cdn.myanonamouse.net/t/p/large/{mam_id}.{ext}"
 
+        # Comic / Manga detection
+        catname = str(item.get("catname") or "").lower()
+        tags = str(item.get("tags") or "").lower()
+        categories = str(item.get("categories") or "").lower()
+
+        if "comic" in catname or "comic" in tags or "comic" in categories:
+            metadata["comic"] = True
+        if "manga" in catname or "manga" in tags or "manga" in categories:
+            metadata["manga"] = True
+        if "magazine" in catname or "magazine" in tags or "magazine" in categories:
+            metadata["magazine"] = True
+        if "newspaper" in catname or "newspaper" in tags or "newspaper" in categories:
+            metadata["newspaper"] = True
+
         return metadata
 
     async def search_by_id(self, torrent_id: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> Optional[dict[str, Any]]:

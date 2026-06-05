@@ -826,6 +826,8 @@ class Prep:
 
         if meta.get("category") == "BOOK":
             meta["type"] = os.path.splitext(video)[1].lstrip(".").upper()
+            if meta["type"] in ("CBR", "CBZ"):
+                meta["comic"] = True
         else:
             meta["type"] = await video_manager.get_type(video, meta["scene"], meta["is_disc"], meta)
 
@@ -1360,6 +1362,8 @@ class Prep:
             meta["source"] = "WEB"
             if not meta.get("type"):
                 meta["type"] = os.path.splitext(videopath)[1].lstrip(".").upper()
+            if meta.get("type", "").upper() in ("CBR", "CBZ"):
+                meta["comic"] = True
             meta["uhd"] = ""
             meta["hdr"] = ""
             meta["distributor"] = ""
