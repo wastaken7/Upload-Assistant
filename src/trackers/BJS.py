@@ -131,7 +131,7 @@ class BJS:
             return "Outro"
 
         if category == "BOOK":
-            if meta.get("is_audiobook"):
+            if meta.get("audiobook"):
                 if container in ["aac", "ac3", "dff", "dsf", "flac", "m4a", "mp3", "ogg", "wav", "wma"]:
                     return container.upper()
                 return "Outro"
@@ -142,19 +142,38 @@ class BJS:
 
         return ""
 
-    def get_type(self, meta: Meta) -> str:
+    def get_type(self, meta: Meta) -> int:
+        anime = 13
+        audiobook = 10
+        comic = 11
+        ebook = 9
+        magazine = 8
+        manga = 4
+        movie = 0
+        newspaper = 23
+        tv = 1
+
         category = meta["category"]
         if meta.get('anime'):
-            return '13'
+            return anime
 
         if category == "BOOK":
-            if meta.get("is_audiobook", False):
-                return "10"
-            return "9"
+            if meta.get("audiobook", False):
+                return audiobook
+            if meta.get("manga", False):
+                return manga
+            if meta.get("comic", False):
+                return comic
 
-        category_map = {"TV": "1", "MOVIE": "0"}
+            if meta.get("newspaper", False):
+                return newspaper
+            if meta.get("magazine", False):
+                return magazine
+            return ebook
 
-        return category_map.get(category, "0")
+        category_map = {"TV": tv, "MOVIE": movie}
+
+        return category_map.get(category, 0)
 
     def get_languages(self) -> str:
         possible_languages = {
@@ -465,7 +484,7 @@ class BJS:
             book_parts.append(f"[b]Editora:[/b] {publisher}")
         if isbn:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
-        if meta.get("is_audiobook", False):
+        if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:
                 book_parts.append(f"[b]Duração:[/b] {audiobook_duration_formatted}")
@@ -649,7 +668,7 @@ class BJS:
             search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
 
         if category == "BOOK":
-            filter_cat = "11" if meta.get("is_audiobook") else "10"
+            filter_cat = "11" if meta.get("audiobook") else "10"
             search_url = f"{self.base_url}/torrents.php?searchstr={title}&filter_cat[{filter_cat}]=1&action=basic&searchsubmit=1"
 
         else:
@@ -710,7 +729,7 @@ class BJS:
                         if self.has_extension(name):
                             dupe_entry["files"] = [name]
                         if category == "BOOK":
-                            if meta.get("is_audiobook"):
+                            if meta.get("audiobook"):
                                 dupe_entry["type"] = "audiobook"
                             else:
                                 name_lower = name.lower()
@@ -774,7 +793,7 @@ class BJS:
                     if self.has_extension(name):
                         dupe_entry["files"] = [name]
                     if category == "BOOK":
-                        if meta.get("is_audiobook"):
+                        if meta.get("audiobook"):
                             dupe_entry["type"] = "audiobook"
                         else:
                             name_lower = name.lower()
@@ -1253,7 +1272,7 @@ class BJS:
             "submit": "true",
             "auth": BJS.secret_token,
             "formato": self.get_container(meta),
-            "type": self.get_type(meta),
+            "type": str(self.get_type(meta)),
             "year": self.get_year(meta),
         }
 
@@ -1265,7 +1284,7 @@ class BJS:
                 "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
                 "release_desc": await self.build_description(meta),
             })
-            if meta.get("is_audiobook", False):
+            if meta.get("audiobook", False):
                 audiobook_bitrate = self.get_audiobook_bitrate(meta)
                 data.update({
                     "bitrateTypes": audiobook_bitrate,
@@ -1377,7 +1396,7 @@ class BJS:
             data.update({
                 "image": await self.get_cover(meta),
             })
-            if not meta.get("is_audiobook", False):
+            if not meta.get("audiobook", False):
                 data.update({
                     "screenshots[]": await self.get_screenshots(meta),
                 })
@@ -1469,7 +1488,8 @@ class BJS:
         return "N/A"
 
     def check_data(self, meta: dict[str, Any], data: dict[str, Any]) -> str:
-        if meta["category"] in ("TV", "MOVIE"):
+        category = meta["category"]
+        if category in ("TV", "MOVIE"):
             if not meta.get("debug", False) and len(data["screenshots[]"]) < 2:
                 return "The number of successful screenshots uploaded is less than 2."
 
@@ -1478,6 +1498,9 @@ class BJS:
 
             if not data.get("imdblink"):
                 return "Missing IMDb or TMDb identifier."
+
+        if category == "BOOK" and not data.get("formato"):
+            return "Missing compatible ebook format."
 
         return ""
 

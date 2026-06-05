@@ -1142,7 +1142,7 @@ async def screenshots(
         manual_frames: Union[str, list[str]] = "",
 ) -> Union[list[str], None]:
     if meta.get("category") == "BOOK":
-        if meta.get("is_audiobook", False):
+        if meta.get("audiobook", False):
             output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")
             os.makedirs(output_dir, exist_ok=True)
             cover_path = os.path.join(output_dir, "POSTER.png")

@@ -45,7 +45,7 @@ class CBR(UNIT3D):
         if meta.get("anime", False) is True and resolved_category == "TV":
             resolved_category = "ANIMES"
 
-        if resolved_category == "BOOK" and meta.get("type", "").upper() in ("CBR", "CBZ"):
+        if resolved_category == "BOOK" and (meta.get("type", "").upper() in ("CBR", "CBZ") or meta.get("manga", False) or meta.get("comic", False)):
             resolved_category = "COMIC_MANGA"
 
         if resolved_category:
@@ -126,7 +126,7 @@ class CBR(UNIT3D):
         name = str(meta["name"])
 
         if category == "BOOK":
-            if meta.get("is_audiobook", False):
+            if meta.get("audiobook", False):
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}] [AUDIOBOOK]"
             else:
                 cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}]"

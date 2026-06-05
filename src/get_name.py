@@ -207,19 +207,19 @@ class NameManager:
 
     def extract_book_name(self, meta: Meta) -> str:
         year = meta.get("year", "")
-        is_audiobook = meta.get("is_audiobook", False)
+        audiobook = meta.get("audiobook", False)
         author = meta.get("author", "")
         title = meta.get("title", "")
         ebook_type = meta.get("type", "")
         if ebook_type == "EPUB":
             ebook_type = "ePUB"
-        book_type = "AUDIOBOOK" if is_audiobook else "eBOOK"
+        book_type = "AUDIOBOOK" if audiobook else "eBOOK"
         book_language = meta.get("book_language", "")
         book_language_iso = meta.get("book_language_iso", "")
         book_lang_to_use = book_language_iso or book_language or ""
 
         name = f"{author} - {title} {year} {book_lang_to_use.upper()} {ebook_type} {book_type}"
-        if is_audiobook:
+        if audiobook:
             name = f"{author} - {title} {year} {book_lang_to_use.upper()} {book_type}"
 
         return name

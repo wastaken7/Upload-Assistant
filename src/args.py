@@ -8,6 +8,7 @@ import urllib.parse
 from collections.abc import Sequence
 from typing import Any, Optional, cast
 
+from src.book_prep import detect_newspaper
 from src.console import console
 
 
@@ -127,6 +128,10 @@ class Args:
         parser.add_argument('-year', '--year', dest='manual_year', nargs=1, required=False, help="Override the year found", type=int, default=0)
         parser.add_argument("-author", "--author", nargs=1, required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs=1, required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
+        parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
+        parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
+        parser.add_argument("--newspaper", "-newspaper", action="store_true", required=False, help="Identify the book upload as a Newspaper", dest="newspaper", default=False)
         parser.add_argument(
             "-blang",
             "--book-language",
@@ -583,6 +588,9 @@ class Args:
             except Exception:
                 meta["book_language"] = raw_lang.title()
                 meta["book_language_iso"] = ""
+
+        # Detect newspapers in overridden titles
+        detect_newspaper(meta)
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:
