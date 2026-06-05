@@ -361,8 +361,12 @@ class DupeChecker:
                             format_match = True
 
                     if not format_match:
-                        await log_exclusion(f"book format type mismatch (expected {target_type})", each)
-                        return True
+                        if tracker_name == "CBR":
+                            if meta.get("debug"):
+                                console.log("[debug] CBR allows only one ebook format per book, so different formats are considered duplicates.")
+                        else:
+                            await log_exclusion(f"book format type mismatch (expected {target_type})", each)
+                            return True
 
                 # Check for exact file/filename match for cross-seeding
                 if not meta.get("is_disc") and filenames and files:
