@@ -99,8 +99,28 @@ class TrackerStatusManager:
 
                 if local_meta['tracker_status'][tracker_name].get('skip_upload'):
                     local_tracker_status['skipped'] = True
-                elif 'skipped' not in local_meta:
+                elif "skipped" not in local_meta and not local_tracker_status["skipped"]:
                     local_tracker_status['skipped'] = False
+
+                # Check for missing required BOOK fields in unattended mode
+                if local_meta.get("category") == "BOOK" and local_meta.get("unattended", False):
+                    from src.book_prep import is_valid_book_language
+
+                    book_required_fields = ["title", "author", "year", "book_language"]
+                    if local_meta.get("is_audiobook", False) and tracker_name == "CBR":
+                        book_required_fields.append("narrator")
+                    book_missing = []
+                    for f in book_required_fields:
+                        val = local_meta.get(f)
+                        if not val or str(val).strip().lower() in ("", "none", "null"):
+                            book_missing.append(f)
+                        elif f == "book_language":
+                            iso = local_meta.get("book_language_iso", "")
+                            if not is_valid_book_language(str(val), str(iso)):
+                                book_missing.append(f)
+                    if book_missing:
+                        console.print(f"[yellow]{tracker_name}: Skipping upload because required BOOK fields are missing: {', '.join(book_missing)}[/yellow]")
+                        local_tracker_status["skipped"] = True
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)

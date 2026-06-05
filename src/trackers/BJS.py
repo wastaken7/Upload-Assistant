@@ -33,6 +33,18 @@ class BJS:
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
+    file_extensions = {
+        "mkv", "mp4", "avi", "ts", "m2ts", "wmv", "mov", "flv", "webm", "mpg", "mpeg", "vob", "divx", "xvid",
+        "mp3", "m4b", "flac", "aac", "m4a", "ogg", "wav", "opus", "wma", "ape", "cue", "m3u",
+        "epub", "pdf", "mobi", "azw3", "kfx", "cbz", "cbr", "cbt", "fb2", "ibooks", "djvu", "txt", "html", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "zip", "rar", "7z", "tar", "gz", "bz2",
+        "iso", "dmg", "pkg", "exe", "bin", "msi", "apk",
+        "srt", "ass", "vtt", "sub", "idx"
+    }
+
+    def has_extension(self, name: str) -> bool:
+        _, ext = os.path.splitext(name)
+        return ext.lower().lstrip(".") in self.file_extensions
 
     def __init__(self, config: Config):
         self.config = config
@@ -44,7 +56,8 @@ class BJS:
         self.banned_groups: list[str] = []
         self.source_flag = "BJ"
         self.base_url = "https://bj-share.info"
-        self.torrent_url = "https://bj-share.info/torrents.php?torrentid="
+        self.torrent_url = f"{self.base_url}/torrents.php?torrentid="
+        self.torrent_download_url = f"{self.base_url}/torrents.php?action=download&id="
         self.requests_url = f"{self.base_url}/requests.php?"
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
@@ -52,9 +65,20 @@ class BJS:
         self.episode_tmdb_data: dict[str, Any] = {}
         self.semaphore = asyncio.Semaphore(1)
 
-    def get_additional_checks(self, _meta: Meta) -> bool:
-        should_continue = True
-        return should_continue
+    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+        if meta.get("category") == "BOOK":
+            if meta["book_language_iso"] != "por":
+                console.print(f"{self.tracker}: Only books in Portuguese are allowed.")
+                return False
+            return True
+
+        subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+        if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
+            proceed = await self.common.prompt_user_for_confirmation(
+                f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
+            )
+            return proceed
+        return subtitles
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -545,10 +569,82 @@ class BJS:
 
         return original_title
 
+    def format_book_title(self, meta: Meta) -> str:
+        lowercase_words = {
+            # Articles
+            "a", "o", "as", "os", "um", "uma", "uns", "umas",
+            # Prepositions
+            "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+            "por", "pelo", "pela", "pelos", "pelas", "para", "com", "sob", "sobre", "sem",
+            # Conjunctions
+            "e", "ou", "mas", "nem", "que", "se"
+        }  # fmt: off
+
+        # Split by separators (like :, -, (, ), [, ]) so each segment is capitalized independently
+        parts = re.split(r"([:\-\(\)\[\]])", meta["title"])
+
+        formatted_parts = []
+        for part in parts:
+            if not part:
+                formatted_parts.append("")
+                continue
+            if re.match(r"^[:\-\(\)\[\]]$", part):
+                formatted_parts.append(part)
+                continue
+
+            # For this text segment, split into words and spaces
+            tokens = re.split(r"(\s+)", part)
+            formatted_tokens = []
+            word_count = 0
+
+            for token in tokens:
+                if not token:
+                    formatted_tokens.append("")
+                    continue
+                if token.isspace():
+                    formatted_tokens.append(token)
+                    continue
+
+                # This is a word token
+                # Extract core word (ignoring punctuation at start/end)
+                prefix_match = re.match(r"^[^\w]+", token)
+                prefix = prefix_match.group(0) if prefix_match else ""
+
+                suffix_match = re.search(r"[^\w]+$", token)
+                suffix = suffix_match.group(0) if suffix_match else ""
+
+                core = token[len(prefix) : len(token) - len(suffix)] if suffix else token[len(prefix) :]
+
+                if not core:
+                    # No alphanumeric chars, keep as is
+                    formatted_tokens.append(token)
+                    word_count += 1
+                    continue
+
+                clean_core = core.lower()
+
+                if word_count == 0:
+                    # First word in the segment
+                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
+                elif clean_core in lowercase_words:
+                    capitalized_core = clean_core
+                else:
+                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
+
+                formatted_tokens.append(prefix + capitalized_core + suffix)
+                word_count += 1
+
+            formatted_parts.append("".join(formatted_tokens))
+
+        return "".join(formatted_parts)
+
     async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
         category = meta["category"]
-        should_continue = self.get_additional_checks(meta)
+        title = meta["title"]
+        if category == "BOOK" and meta.get("title"):
+            title = self.format_book_title(meta)
+        should_continue = await self.get_additional_checks(meta)
         if not should_continue:
             meta["skipping"] = f"{self.tracker}"
             return dupes
@@ -561,10 +657,10 @@ class BJS:
 
         if category == "BOOK":
             filter_cat = "11" if meta.get("is_audiobook") else "10"
-            search_url = f"{self.base_url}/torrents.php?searchstr={meta['title']}&filter_cat[{filter_cat}]=1&action=basic&searchsubmit=1"
+            search_url = f"{self.base_url}/torrents.php?searchstr={title}&filter_cat[{filter_cat}]=1&action=basic&searchsubmit=1"
 
         else:
-            search_url = f"{self.base_url}/torrents.php?searchstr={meta['title']}"
+            search_url = f"{self.base_url}/torrents.php?searchstr={title}"
 
         try:
             cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -603,7 +699,21 @@ class BJS:
 
                         link = f"{self.torrent_url}{torrent_id}"
 
-                        dupes.append({"name": name, "size": size, "link": link})
+                        dupe_entry = {"name": name, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                        if self.has_extension(name):
+                            dupe_entry["files"] = [name]
+                        if category == "BOOK":
+                            if meta.get("is_audiobook"):
+                                dupe_entry["type"] = "audiobook"
+                            else:
+                                name_lower = name.lower()
+                                for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                    if fmt in name_lower:
+                                        dupe_entry["type"] = fmt
+                                        break
+                                else:
+                                    dupe_entry["type"] = "ebook"
+                        dupes.append(dupe_entry)
 
             elif torrent_search_table:
                 for row in torrent_search_table.find_all("tr", class_="torrent"):
@@ -653,7 +763,21 @@ class BJS:
                         ]
                         size = size_candidates[0] if size_candidates else tds[4].get_text(strip=True)
 
-                    dupes.append({"name": name, "size": size, "link": link})
+                    dupe_entry = {"name": name, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                    if self.has_extension(name):
+                        dupe_entry["files"] = [name]
+                    if category == "BOOK":
+                        if meta.get("is_audiobook"):
+                            dupe_entry["type"] = "audiobook"
+                        else:
+                            name_lower = name.lower()
+                            for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                if fmt in name_lower:
+                                    dupe_entry["type"] = fmt
+                                    break
+                            else:
+                                dupe_entry["type"] = "ebook"
+                    dupes.append(dupe_entry)
 
             return dupes
 
@@ -1029,6 +1153,9 @@ class BJS:
 
     async def get_requests(self, meta: Meta) -> list[dict[str, str]]:
         results: list[dict[str, str]] = []
+        title = meta["title"]
+        if meta.get("category") == "BOOK":
+            title = self.format_book_title(meta)
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.get("search_requests", False):
             return results
         else:
@@ -1044,7 +1171,7 @@ class BJS:
                 if meta.get("anime"):
                     cat = 14
 
-                query = meta["title"]
+                query = title
 
                 search_url = f"{self.requests_url}submit=true&search={query}&showall=on&filter_cat[{cat}]=1"
 
@@ -1126,7 +1253,7 @@ class BJS:
         if category == "BOOK":
             b_lang = meta.get("book_language_iso")
             data.update({
-                "title": meta["title"],
+                "title": self.format_book_title(meta),
                 "diretor": meta["author"],
                 "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
                 "release_desc": await self.build_description(meta),

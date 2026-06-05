@@ -279,21 +279,54 @@ class DupeChecker:
             if meta.get("category") == "BOOK":
                 import unicodedata
 
-                # Normalize titles for comparison
                 target_title = str(meta.get("title", "") or meta.get("name", ""))
-                norm_target_title = unicodedata.normalize("NFKD", target_title).encode("ascii", "ignore").decode("utf-8").lower()
-                norm_target_title = re.sub(r"[^a-z0-9\s]", "", norm_target_title)
-                norm_target_title = re.sub(r"\s+", " ", norm_target_title).strip()
-
-                norm_each = unicodedata.normalize("NFKD", each).encode("ascii", "ignore").decode("utf-8").lower()
-                norm_each = re.sub(r"[^a-z0-9\s]", "", norm_each)
-                norm_each = re.sub(r"\s+", " ", norm_each).strip()
-
-                if not norm_target_title:
+                if not target_title.strip():
                     await log_exclusion("empty target book title", each)
                     return True
 
-                if norm_target_title not in norm_each:
+                # Clean book title helper
+                def clean_book_title(t: str) -> str:
+                    normalized = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode("utf-8").lower()
+                    # Remove common book/audiobook extensions at the end of the string
+                    normalized = re.sub(r"\.(pdf|epub|mobi|azw3|kfx|cbz|cbr|mp3|m4b|flac|aac|m4a|ogg|wav)$", "", normalized)
+                    cleaned = re.sub(r"[^a-z0-9\s\-:]", "", normalized)
+                    return cleaned.strip()
+
+                # Get main title candidates
+                def get_main_title_candidates(cleaned_t: str) -> list[str]:
+                    parts = re.split(r"[:]|\s+-\s+|\s+by\s+", cleaned_t)
+                    candidates = []
+                    for p in parts:
+                        p_clean = re.sub(r"[^a-z0-9\s]", "", p)
+                        p_clean = re.sub(r"\s+", " ", p_clean).strip()
+                        if len(p_clean) >= 2:
+                            candidates.append(p_clean)
+                    return candidates
+
+                clean_target = clean_book_title(target_title)
+                clean_each = clean_book_title(each)
+
+                norm_target = re.sub(r"[^a-z0-9\s]", "", clean_target)
+                norm_target = re.sub(r"\s+", " ", norm_target).strip()
+
+                norm_each_str = re.sub(r"[^a-z0-9\s]", "", clean_each)
+                norm_each_str = re.sub(r"\s+", " ", norm_each_str).strip()
+
+                is_title_match = False
+                if norm_target == norm_each_str:
+                    is_title_match = True
+                else:
+                    target_candidates = get_main_title_candidates(clean_target)
+                    dupe_candidates = get_main_title_candidates(clean_each)
+
+                    if target_candidates and dupe_candidates:
+                        target_main = target_candidates[0]
+                        dupe_main = dupe_candidates[0]
+
+                        if (target_main == dupe_main) or re.search(rf"\b{re.escape(target_main)}\b", norm_each_str) or re.search(rf"\b{re.escape(dupe_main)}\b", norm_target):
+                            is_title_match = True
+
+                if not is_title_match:
                     await log_exclusion("book title mismatch", each)
                     return True
 
@@ -301,8 +334,13 @@ class DupeChecker:
                 target_is_audiobook = bool(meta.get("is_audiobook", False))
 
                 dupe_type = str(entry.get("type") or "").lower()
-                audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg"}
-                dupe_is_audiobook = (dupe_type in audiobook_types) or ("audiobook" in each.lower())
+                audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg", "aac", "ac3", "wma", "opus"}
+                dupe_is_audiobook = (
+                    (dupe_type in audiobook_types)
+                    or ("audiobook" in each.lower())
+                    or ("audio book" in each.lower())
+                    or any(re.search(rf"\b{re.escape(t)}\b", each.lower()) for t in audiobook_types)
+                )
 
                 if target_is_audiobook != dupe_is_audiobook:
                     await log_exclusion("book format type mismatch (audiobook vs ebook)", each)
@@ -325,6 +363,22 @@ class DupeChecker:
                     if not format_match:
                         await log_exclusion(f"book format type mismatch (expected {target_type})", each)
                         return True
+
+                # Check for exact file/filename match for cross-seeding
+                if not meta.get("is_disc") and filenames and files:
+                    for file in filenames:
+                        if any(file.lower() == f.lower() for f in files):
+                            meta["filename_match"] = f"{entry.get('name')} = {entry.get('link', None)}"
+                            if meta.get("debug"):
+                                console.log(f"[debug] Book filename match found: {meta['filename_match']}")
+                            remember_match("filename")
+                            remember_match("id")
+                            if file_count and file_count == len(filelist):
+                                meta["file_count_match"] = file_count
+                                if meta.get("debug"):
+                                    console.log(f"[debug] Book file count match found: {meta['file_count_match']}")
+                                remember_match("file_count")
+                                break
 
                 # Title and format match! It is a duplicate.
                 remember_match("title")

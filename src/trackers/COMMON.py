@@ -208,7 +208,19 @@ class COMMON:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent" if cross else f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if downurl:
             try:
-                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0) as session, session.stream("GET", downurl) as r:
+                cookie_jar = None
+                try:
+                    from src.cookie_auth import CookieValidator
+
+                    cookie_validator = CookieValidator(self.config)
+                    cookie_jar = await cookie_validator.load_session_cookies(meta, tracker)
+                except Exception:
+                    pass
+
+                async with (
+                    httpx.AsyncClient(headers=headers, params=params, cookies=cookie_jar, follow_redirects=True, timeout=30.0) as session,
+                    session.stream("GET", downurl) as r,
+                ):
                     r.raise_for_status()
                     async with aiofiles.open(path, "wb") as f:
                         async for chunk in r.aiter_bytes():
