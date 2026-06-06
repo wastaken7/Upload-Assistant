@@ -11,16 +11,16 @@ Config = dict[str, Any]
 
 class HHD(UNIT3D):
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='HHD')
+        super().__init__(config, tracker_name="HHD")
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'HHD'
-        self.base_url = 'https://homiehelpdesk.net'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
+        self.tracker = "HHD"
+        self.base_url = "https://homiehelpdesk.net"
+        self.id_url = f"{self.base_url}/api/torrents/"
+        self.upload_url = f"{self.base_url}/api/torrents/upload"
+        self.search_url = f"{self.base_url}/api/torrents/filter"
+        self.requests_url = f"{self.base_url}/api/requests/filter"
+        self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = [
             'aXXo', 'BONE', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'dAV1nci', 'd3g',
             'DNL', 'FaNGDiNG0', 'GalaxyTV', 'HD2DVD', 'HDTime', 'iHYTECH', 'ION10',
@@ -28,12 +28,12 @@ class HHD(UNIT3D):
             'nHD', 'nikt0', 'nSD', 'OFT', 'PRODJi', 'RARBG', 'Rifftrax', 'SANTi',
             'SasukeducK', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'TGALAXY', 'TORRENTGALAXY',
             'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'x0r', 'YAWNiX', 'YIFY', 'YTS', 'PSA', ['EVO', 'WEB-DL only']
-        ]
+        ]  # fmt: off
         pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
-        if meta['type'] == "DVDRIP":
+        if meta["type"] == "DVDRIP":
             console.print("[bold red]DVDRIP uploads are not allowed on HHD.[/bold red]")
             return False
 
@@ -120,30 +120,6 @@ class HHD(UNIT3D):
             resolved_type = "OTHER"
 
         return {"type_id": type_id.get(resolved_type, "0")}
-
-    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        files = await super().get_additional_files(meta)
-        import os
-
-        cover_path = meta.get("cover_path")
-        if cover_path and os.path.exists(cover_path):
-            try:
-                cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
-                if cover_bytes:
-                    files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
-            except Exception as e:
-                console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
-
-        banner_path = meta.get("banner_path")
-        if banner_path and os.path.exists(banner_path):
-            try:
-                banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
-                if banner_bytes:
-                    files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
-            except Exception as e:
-                console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
-
-        return files
 
     async def get_resolution_id(
         self,

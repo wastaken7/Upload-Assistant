@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
-from typing import Any, cast
+from typing import Any, Optional
 
+from src.trackers.CBR import CBR
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -25,78 +25,76 @@ class SAM(UNIT3D):
         pass
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = (
-            str(meta.get("name", ""))
-            .replace("DD+ ", "DDP")
-            .replace("DD ", "DD")
-            .replace("AAC ", "AAC")
-            .replace("FLAC ", "FLAC")
-            .replace("Dubbed", "")
-            .replace("Dual-Audio", "")
-        )
+        cbr = CBR(self.config)
+        cbr.tracker = self.tracker
+        return await cbr.get_name(meta)
 
-        # If it is a Series or Anime, remove the year from the title.
-        if meta.get("category") in ["TV", "ANIMES"]:
-            year = str(meta.get("year", ""))
-            if year and year in name:
-                name = name.replace(f"({year})", "").replace(year, "").strip()
+    async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        cat_map = {
+            "MOVIE": "1",
+            "TV": "2",
+            "ANIME": "3",
+            "CURSOS": "4",
+            "GAMES": "5",
+            "LIVROS": "6",
+            "HQS_E_MANGAS": "7",
+            "AUDIOBOOK": "8",
+            "PROGRAMAS": "9",
+            "MATERIAIS_DE_APOIO": "10",
+            "DIVERSOS": "11",
+            "MUSIC": "12",
+        }
+        if mapping_only:
+            return cat_map
+        elif reverse:
+            return {v: k for k, v in cat_map.items()}
 
-        # Remove the AKA title, unless it is Brazilian
-        if meta.get("original_language") != "pt":
-            name = name.replace(str(meta.get("aka", "")), "")
+        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        if resolved_category == "BOOK":
+            if meta.get("audiobook", False):
+                resolved_category = "AUDIOBOOK"
+            elif meta.get("comic", False) or meta.get("manga", False):
+                resolved_category = "HQS_E_MANGAS"
+            else:
+                resolved_category = "LIVROS"
 
-        # If it is Brazilian, use only the AKA title, deleting the foreign title
-        if meta.get("original_language") == "pt" and meta.get("aka"):
-            aka_value = str(meta.get("aka", ""))
-            aka_clean = aka_value.replace("AKA", "").strip()
-            title = str(meta.get("title", ""))
-            name = name.replace(aka_value, "").replace(title, aka_clean).strip()
+        category_id = cat_map.get(resolved_category, "0")
+        return {"category_id": category_id}
 
-        sam_name = name
-        tag_value = str(meta.get("tag", ""))
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "AZW3": "57",
+            "CBR": "58",
+            "CBZ": "59",
+            "MOBI": "60",
+            "PDF": "61",
+            "EPUB": "62",
+            "KFX": "63",
+            "MP3": "67",
+            "FLAC": "78",
+            "OTHER": "68",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
 
-        if not meta.get('is_disc'):
-            audio_tag = ""
-            if meta.get("audio_languages"):
-                audio_languages_value = meta.get("audio_languages", [])
-                audio_languages_list = [str(lang) for lang in cast(list[Any], audio_languages_value)] if isinstance(audio_languages_value, list) else []
-                audio_languages = set(audio_languages_list)
+        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        if isinstance(resolved_type, str):
+            resolved_type = resolved_type.upper().strip().lstrip(".")
 
-                if "Portuguese" in audio_languages:
-                    if len(audio_languages) >= 3:
-                        audio_tag = " MULTI"
-                    elif len(audio_languages) == 2:
-                        audio_tag = " DUAL"
-                    else:
-                        audio_tag = ""
+        val = type_id.get(resolved_type, "0")
+        if meta.get("category") == "BOOK" and val == "0":
+            val = "68"
 
-                if audio_tag:
-                    if "-" in sam_name:
-                        parts = sam_name.rsplit("-", 1)
-
-                        custom_tag = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("tag_for_custom_release", ""))
-                        if custom_tag and custom_tag in name:
-                            match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)", meta["uuid"])
-                            if match and match.group(1) != tag_value:
-                                original_group_tag = match.group(1)
-                                sam_name = f"{parts[0]}-{original_group_tag}{audio_tag}-{parts[1]}"
-                            else:
-                                sam_name = f"{parts[0]}{audio_tag}-{parts[1]}"
-                        else:
-                            sam_name = f"{parts[0]}{audio_tag}-{parts[1]}"
-                    else:
-                        sam_name += audio_tag
-
-        if tag_value == "" or any(
-            invalid_tag in tag_lower for invalid_tag in invalid_tags
-        ):
-            for invalid_tag in invalid_tags:
-                sam_name = re.sub(f"-{invalid_tag}", "", sam_name, flags=re.IGNORECASE)
-            sam_name = f"{sam_name}-NoGroup"
-
-        return {"name": re.sub(r"\s{2,}", " ", sam_name)}
+        return {"type_id": val}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -106,6 +104,8 @@ class SAM(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.get("category") == "BOOK":
+            return True
         return await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
         )

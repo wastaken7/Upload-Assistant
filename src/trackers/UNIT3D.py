@@ -460,6 +460,25 @@ class UNIT3D:
                 nfo_bytes = await f.read()
             files["nfo"] = ("nfo_file.nfo", nfo_bytes, "text/plain")
 
+        if meta["category"] not in ("MOVIE", "TV"):
+            cover_path = meta.get("cover_path")
+            if cover_path and os.path.exists(cover_path):
+                try:
+                    cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
+                    if cover_bytes:
+                        files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
+                except Exception as e:
+                    console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
+
+            banner_path = meta.get("banner_path")
+            if banner_path and os.path.exists(banner_path):
+                try:
+                    banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
+                    if banner_bytes:
+                        files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
+                except Exception as e:
+                    console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
+
         return files
 
     async def upload(self, meta: dict[str, Any], _: Any) -> bool:

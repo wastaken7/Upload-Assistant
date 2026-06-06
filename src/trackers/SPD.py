@@ -86,6 +86,9 @@ class SPD:
             if media_type == 'SD':
                 return '35' if romanian else '10'
 
+        # BOOK/EBOOK category
+        if category == "BOOK":
+            return "6"
         return None
 
     async def get_file_info(self, meta: Meta) -> tuple[Optional[str], Optional[str]]:
