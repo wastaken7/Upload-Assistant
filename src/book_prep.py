@@ -155,6 +155,13 @@ async def gather_book_prep(
     meta["sd"] = 0
     meta["valid_mi_settings"] = True
 
+    # Warn if Google Books API key is missing
+    api_key = ""
+    if config and "DEFAULT" in config:
+        api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
+    if not api_key:
+        console.print("[bold red]Warning: Google Books API key is not configured. Book metadata searches will be limited and incomplete.[/bold red]")
+
     # Check if the file format is CBR or CBZ and automatically set comic to True
     file_ext = os.path.splitext(videopath)[1].lstrip(".").upper()
     if file_ext in ("CBR", "CBZ"):
