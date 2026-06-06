@@ -4,8 +4,10 @@ import json
 import os
 import platform
 import re
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Optional, Union, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -18,6 +20,7 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
+from src.uploadscreens import UploadScreensManager
 
 
 class ASC:
@@ -149,9 +152,30 @@ class ASC:
                     self.episode_tmdb_data = {}
 
     async def get_container(self, meta: dict[str, Any]) -> Optional[str]:
-        if meta['is_disc'] == 'BDMV':
+        if meta.get("category") == "BOOK":
+            filelist = meta.get("filelist") or []
+            file_path = filelist[0] if filelist else str(meta.get("path") or "")
+            ext = os.path.splitext(file_path)[1].lower().strip(".")
+            ext_map = {
+                "mp3": "31",
+                "png": "36",
+                "jpg": "37",
+                "jpeg": "37",
+                "pdf": "38",
+                "doc": "39",
+                "docx": "39",
+                "epub": "52",
+                "mobi": "54",
+                "cbr": "55",
+                "cbz": "55",
+                "html": "58",
+                "htm": "58",
+            }
+            return ext_map.get(ext, "17")
+
+        if meta.get("is_disc") == "BDMV":
             return '5'
-        elif meta['is_disc'] == 'DVD':
+        elif meta.get("is_disc") == "DVD":
             return '15'
 
         try:
@@ -166,6 +190,18 @@ class ASC:
         return None
 
     async def get_type(self, meta: dict[str, Any]) -> Union[str, int]:
+        if meta.get("category") == "BOOK":
+            if meta.get("audiobook", False):
+                return "121"
+            elif meta.get("comic", False):
+                return "112"
+            elif meta.get("manga", False):
+                return "147"
+            elif meta.get("magazine", False):
+                return "68"
+            else:
+                return "67"
+
         bd_disc_map = {'BD25': '40', 'BD50': '41', 'BD66': '42', 'BD100': '43'}
         standard_map = {'ENCODE': '9', 'REMUX': '39', 'WEBDL': '23', 'WEBRIP': '38', 'BDRIP': '8', 'DVDRIP': '3'}
         dvd_map = {'DVD5': '45', 'DVD9': '46'}
@@ -341,6 +377,11 @@ class ASC:
         return '20'
 
     async def get_title(self, meta: dict[str, Any]) -> str:
+        if meta.get("category") == "BOOK":
+            author = meta.get("author", "").strip()
+            title = meta.get("title", "").strip()
+            return f"{author} - {title}"
+
         name = meta['title']
         base_name = name
 
@@ -358,7 +399,125 @@ class ASC:
 
             return f"{base_name}"
 
+    async def get_book_cover(self, meta: dict[str, Any]) -> str:
+        cover_url = ""
+        cover_path = meta.get("cover_path")
+
+        # If we don't have cover_path but we have a poster URL, we download it first
+        poster_url = meta.get("poster")
+        if not cover_path and isinstance(poster_url, str) and poster_url:
+            if os.path.exists(poster_url):
+                cover_path = poster_url
+            else:
+                poster_jpg_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/poster.jpg"
+                try:
+                    parsed_url = urlparse(poster_url)
+                    if parsed_url.scheme in ("http", "https"):
+                        os.makedirs(os.path.dirname(poster_jpg_path), exist_ok=True)
+                        urllib.request.urlretrieve(poster_url, poster_jpg_path)
+                        cover_path = poster_jpg_path
+                        meta["cover_path"] = cover_path
+                except Exception as e:
+                    console.print(f"Erro ao baixar poster de {poster_url}: {e}")
+
+        if cover_path and os.path.exists(cover_path):
+            try:
+                uploadscreens_manager = UploadScreensManager(self.config)
+                uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
+                if uploaded_cover and len(uploaded_cover) > 0:
+                    cover_url = str(uploaded_cover[0].get("raw_url", ""))
+            except Exception as e:
+                console.print(f"Erro ao fazer upload da capa do livro: {e}")
+
+        if not cover_url and poster_url and not os.path.exists(poster_url):
+            cover_url = poster_url
+
+        return cover_url
+
+    async def build_book_description(self, meta: dict[str, Any]) -> str:
+        description_parts = ["[center]"]
+
+        # Title & Author
+        title = meta.get("title", "")
+        author = meta.get("author", "")
+        description_parts.append(f"[size=4][b]{title}[/b][/size]")
+        if author:
+            description_parts.append(f"[size=3]por {author}[/size]\n\n")
+
+        description_parts.append("")
+
+        # Cover
+        cover_url = await self.get_book_cover(meta)
+        if cover_url:
+            description_parts.append(await self.format_image(cover_url))
+            description_parts.append("")
+
+        description_parts.append("[/center]")
+
+        # Technical details
+        details = []
+        if author:
+            details.append(f"[b]Autor:[/b] {author}")
+        if meta.get("narrator"):
+            details.append(f"[b]Narrador:[/b] {meta['narrator']}")
+        if meta.get("publisher"):
+            details.append(f"[b]Editora:[/b] {meta['publisher']}")
+        if meta.get("isbn"):
+            details.append(f"[b]ISBN:[/b] {meta['isbn']}")
+        if meta.get("year"):
+            details.append(f"[b]Ano de Lançamento:[/b] {meta['year']}")
+        if meta.get("audiobook", False):
+            duration = meta.get("audiobook_duration_formatted")
+            if duration:
+                details.append(f"[b]Duração:[/b] {duration}")
+
+        if details:
+            description_parts.append("[b][size=3]Ficha Técnica[/size][/b]\n")
+            description_parts.append("\n".join(details))
+            description_parts.append("")
+
+        # Overview
+        overview = meta.get("overview", "").strip()
+        if overview:
+            description_parts.append("\n[b][size=3]Sinopse[/size][/b]")
+            description_parts.append(overview)
+            description_parts.append("")
+
+        # External DESCRIPTION.txt
+        desc = ""
+        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+        if os.path.exists(base_desc_path):
+            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
+                desc = (await f.read()).strip()
+                # strip standard formatting codes
+                desc = desc.replace("[user]", "").replace("[/user]", "")
+                desc = desc.replace("[align=left]", "").replace("[/align]", "")
+                desc = desc.replace("[align=right]", "").replace("[/align]", "")
+                desc = desc.replace("[alert]", "").replace("[/alert]", "")
+                desc = desc.replace("[note]", "").replace("[/note]", "")
+                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+                description_parts.append(desc)
+                description_parts.append("")
+
+        custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
+        if custom_description_header:
+            description_parts.append(custom_description_header + "\n")
+
+        description_parts.append(f"\n[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+
+        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
+            final_description = "\n".join(filter(None, description_parts))
+            await descfile.write(final_description)
+
+        return final_description
+
     async def build_description(self, meta: dict[str, Any]) -> str:
+        if meta.get("category") == "BOOK":
+            return await self.build_book_description(meta)
         user_layout = await self.fetch_layout_data(meta)
         fileinfo_dump = await self.media_info(meta)
 
@@ -577,7 +736,7 @@ class ASC:
 
     async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
         found_items: list[dict[str, str]] = []
-        if not meta.get("imdb_id") and not meta.get("anime"):
+        if meta.get("category") != "BOOK" and not meta.get("imdb_id") and not meta.get("anime"):
             console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             meta["skipping"] = f"{self.tracker}"
             return found_items
@@ -586,7 +745,12 @@ class ASC:
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)
 
-        if meta.get('anime'):
+        if meta.get("category") == "BOOK":
+            search_name = f"{meta.get('author', '')} {meta.get('title', '')}".strip()
+            search_query = search_name.replace(" ", "+")
+            search_url = f"{self.base_url}/torrents-search.php?search={search_query}"
+
+        elif meta.get("anime"):
             await self.load_localized_data(meta)
             search_name = await self.get_title(meta)
             search_query = search_name.replace(' ', '+')
@@ -684,7 +848,9 @@ class ASC:
         return found_items
 
     async def get_upload_url(self, meta: dict[str, Any]) -> str:
-        if meta.get('anime'):
+        if meta.get("category") == "BOOK":
+            return f"{self.base_url}/enviar-ebook.php"
+        elif meta.get("anime"):
             return f'{self.base_url}/enviar-anime.php'
         elif meta['category'] == 'MOVIE':
             return f'{self.base_url}/enviar-filme.php'
@@ -828,7 +994,9 @@ class ASC:
                 self.session.cookies = cast(Any, cookie_jar)
             try:
                 category = meta['category']
-                if meta.get('anime'):
+                if category == "BOOK":
+                    category = await self.get_type(meta)
+                elif meta.get("anime"):
                     if category == 'TV':
                         category = 118
                     if category == 'MOVIE':
@@ -891,6 +1059,58 @@ class ASC:
                 return []
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+        if meta.get("category") == "BOOK":
+            if not meta.get("language_checked", False):
+                await languages_manager.process_desc_language(meta, tracker=self.tracker)
+
+            book_lang = (meta.get("book_language_iso") or meta.get("book_language") or "").lower()
+            lang_code_map = {
+                "de": "3",
+                "deu": "3",
+                "ger": "3",
+                "zh": "9",
+                "zho": "9",
+                "chi": "9",
+                "ko": "11",
+                "kor": "11",
+                "es": "1",
+                "spa": "1",
+                "esp": "1",
+                "en": "4",
+                "eng": "4",
+                "ja": "8",
+                "jpn": "8",
+                "pt": "5",
+                "por": "5",
+                "ru": "2",
+                "rus": "2",
+            }
+            idioma_val = lang_code_map.get(book_lang, "6")
+
+            cover_url = await self.get_book_cover(meta)
+
+            data = {
+                "takeupload": "yes",
+                "name": await self.get_title(meta),
+                "type": await self.get_type(meta),
+                "ano": str(meta.get("year", "")),
+                "idioma": idioma_val,
+                "extencao": await self.get_container(meta),
+                "capa": cover_url,
+                "screens1": meta.get("author", ""),
+                "screens2": cover_url,
+                "screens3": cover_url,
+                "descr": await self.build_description(meta),
+            }
+
+            image_list = cast(list[dict[str, Any]], meta.get("image_list") or [])
+            if len(image_list) > 0:
+                data["screens2"] = image_list[0].get("raw_url") or ""
+            if len(image_list) > 1:
+                data["screens3"] = image_list[1].get("raw_url") or ""
+
+            return data
+
         await self.load_localized_data(meta)
         if not meta.get('language_checked', False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)

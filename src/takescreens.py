@@ -10,6 +10,9 @@ import re
 import sys
 import time
 import traceback
+import urllib.parse
+import xml.etree.ElementTree as ET
+import zipfile
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Any, Optional, Union, cast
@@ -978,9 +981,6 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
 
 
 async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
-    import xml.etree.ElementTree as ET
-    import zipfile
-
     def _extract():
         if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
             return False
@@ -1013,6 +1013,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                 manifest_items = {}
                 cover_item_id = None
                 cover_href_direct = None
+                opf_dir = os.path.dirname(rootfile_path)
 
                 for elem in root.iter():
                     tag_local = elem.tag.split("}")[-1]
@@ -1020,11 +1021,10 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                         item_id = elem.attrib.get("id")
                         href = elem.attrib.get("href")
                         properties = elem.attrib.get("properties", "")
+                        media_type = elem.attrib.get("media-type", "").lower()
                         if item_id and href:
-                            manifest_items[item_id] = href
+                            manifest_items[item_id] = {"href": href, "media-type": media_type, "properties": properties}
                             if "cover-image" in properties:
-                                cover_href_direct = href
-                            if item_id.lower() in ("cover", "cover-image", "coverimage") and not cover_href_direct:
                                 cover_href_direct = href
                     elif tag_local == "meta":
                         name_attr = elem.attrib.get("name")
@@ -1032,24 +1032,10 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                         if name_attr == "cover" and content_attr:
                             cover_item_id = content_attr
 
-                cover_href = cover_href_direct
-                if not cover_href and cover_item_id and cover_item_id in manifest_items:
-                    cover_href = manifest_items[cover_item_id]
-
-                if not cover_href:
-                    for name in z.namelist():
-                        base = os.path.basename(name).lower()
-                        if "cover" in base and base.endswith((".jpg", ".jpeg", ".png")):
-                            cover_zip_path = name
-                            break
-                    else:
-                        return False
-                else:
-                    opf_dir = os.path.dirname(rootfile_path)
-                    raw_path = os.path.join(opf_dir, cover_href).replace("\\", "/") if opf_dir else cover_href.replace("\\", "/")
-
+                def resolve_path(base_dir: str, rel_path: str) -> str:
+                    combined = os.path.join(base_dir, rel_path).replace("\\", "/") if base_dir else rel_path.replace("\\", "/")
                     parts = []
-                    for part in raw_path.split("/"):
+                    for part in combined.split("/"):
                         if part == "." or not part:
                             continue
                         if part == "..":
@@ -1057,23 +1043,106 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                                 parts.pop()
                         else:
                             parts.append(part)
-                    cover_zip_path = "/".join(parts)
+                    return "/".join(parts)
 
-                zip_names = z.namelist()
-                matched_name = None
-                if cover_zip_path in zip_names:
-                    matched_name = cover_zip_path
-                else:
-                    cover_zip_path_lower = cover_zip_path.lower()
-                    for name in zip_names:
-                        if name.lower() == cover_zip_path_lower:
-                            matched_name = name
+                def is_image_item(href: str, media_type: str) -> bool:
+                    if media_type.startswith("image/"):
+                        return True
+                    return bool(href.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg")))
+
+                def get_image_from_html(html_href: str) -> Optional[str]:
+                    try:
+                        html_zip_path = resolve_path(opf_dir, html_href)
+                        zip_names = z.namelist()
+                        matched_name = None
+                        if html_zip_path in zip_names:
+                            matched_name = html_zip_path
+                        else:
+                            for name in zip_names:
+                                if name.lower() == html_zip_path.lower():
+                                    matched_name = name
+                                    break
+                        if matched_name:
+                            html_content = z.read(matched_name).decode("utf-8", errors="ignore")
+                            img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+                            if img_match:
+                                img_src = urllib.parse.unquote(img_match.group(1))
+                                html_dir = os.path.dirname(html_zip_path)
+                                return resolve_path(html_dir, img_src)
+                            svg_match = re.search(r'<image[^>]+(?:xlink:)?href=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+                            if svg_match:
+                                img_src = urllib.parse.unquote(svg_match.group(1))
+                                html_dir = os.path.dirname(html_zip_path)
+                                return resolve_path(html_dir, img_src)
+                    except Exception:
+                        pass
+                    return None
+
+                cover_zip_path = None
+
+                # 1. Properties has "cover-image"
+                if cover_href_direct:
+                    cover_zip_path = resolve_path(opf_dir, cover_href_direct)
+
+                # 2. Meta cover tag points to an item ID
+                if not cover_zip_path and cover_item_id and cover_item_id in manifest_items:
+                    item = manifest_items[cover_item_id]
+                    if is_image_item(item["href"], item["media-type"]):
+                        cover_zip_path = resolve_path(opf_dir, item["href"])
+                    elif item["media-type"] in ("application/xhtml+xml", "text/html") or item["href"].lower().endswith((".xhtml", ".html", ".htm")):
+                        cover_zip_path = get_image_from_html(item["href"])
+
+                # 3. Item with standard IDs
+                if not cover_zip_path:
+                    for item_id in ("cover", "cover-image", "coverimage"):
+                        if item_id in manifest_items:
+                            item = manifest_items[item_id]
+                            if is_image_item(item["href"], item["media-type"]):
+                                cover_zip_path = resolve_path(opf_dir, item["href"])
+                                break
+                            elif item["media-type"] in ("application/xhtml+xml", "text/html") or item["href"].lower().endswith((".xhtml", ".html", ".htm")):
+                                cover_zip_path = get_image_from_html(item["href"])
+                                if cover_zip_path:
+                                    break
+
+                # 4. Any image item with "cover" in its ID or href
+                if not cover_zip_path:
+                    for item_id, item in manifest_items.items():
+                        if is_image_item(item["href"], item["media-type"]) and ("cover" in item_id.lower() or "cover" in item["href"].lower()):
+                            cover_zip_path = resolve_path(opf_dir, item["href"])
                             break
 
-                if matched_name:
-                    with open(dest_path, "wb") as dest:
-                        dest.write(z.read(matched_name))
-                    return True
+                # 5. Search zip entries for names containing "cover" and ending with image extensions
+                if not cover_zip_path:
+                    for name in z.namelist():
+                        base = os.path.basename(name).lower()
+                        if "cover" in base and base.endswith((".jpg", ".jpeg", ".png", ".webp", ".svg")):
+                            cover_zip_path = name
+                            break
+
+                # 6. First image item in manifest
+                if not cover_zip_path:
+                    for item_id, item in manifest_items.items():
+                        if is_image_item(item["href"], item["media-type"]):
+                            cover_zip_path = resolve_path(opf_dir, item["href"])
+                            break
+
+                if cover_zip_path:
+                    zip_names = z.namelist()
+                    matched_name = None
+                    if cover_zip_path in zip_names:
+                        matched_name = cover_zip_path
+                    else:
+                        cover_zip_path_lower = cover_zip_path.lower()
+                        for name in zip_names:
+                            if name.lower() == cover_zip_path_lower:
+                                matched_name = name
+                                break
+
+                    if matched_name:
+                        with open(dest_path, "wb") as dest:
+                            dest.write(z.read(matched_name))
+                        return True
         except Exception:
             pass
         return False

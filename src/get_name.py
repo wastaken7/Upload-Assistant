@@ -199,30 +199,97 @@ class NameManager:
             exit()
         name_notag = name
 
-        if meta["category"] != "BOOK":
-            name = name_notag + tag
+        name = name_notag + tag
 
         clean_name = await self.clean_filename(name)
         return name_notag, name, clean_name, potential_missing
 
     def extract_book_name(self, meta: Meta) -> str:
-        year = meta.get("year", "")
-        audiobook = meta.get("audiobook", False)
-        author = meta.get("author", "")
-        title = meta.get("title", "")
-        ebook_type = meta.get("type", "")
-        if ebook_type == "EPUB":
+        comic = bool(meta.get("comic", False))
+        manga = bool(meta.get("manga", False))
+        magazine = bool(meta.get("magazine", False))
+        newspaper = bool(meta.get("newspaper", False))
+        audiobook = bool(meta.get("audiobook", False))
+
+        author = str(meta.get("author", "")).strip()
+        publisher = str(meta.get("publisher", "")).strip()
+        title = str(meta.get("title", "")).strip()
+        year = str(meta.get("year", "")).strip()
+
+        # Edition/Issue logic
+        edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+        if edition and not any(x in edition.lower() for x in ["edition", "ed.", "ed"]):
+            edition = f"{edition} Edition"
+
+        volume = str(meta.get("manual_season") or meta.get("season") or "").strip()
+        issue = str(meta.get("manual_episode") or meta.get("episode") or "").strip()
+
+        # Language logic (needed for non-English only)
+        book_language = str(meta.get("book_language", "")).strip()
+        book_language_iso = str(meta.get("book_language_iso", "")).strip()
+        lang_display = book_language or book_language_iso
+        lang_display = "" if lang_display.lower() in ("english", "eng", "en") else lang_display.upper().replace("I", "i")
+
+        # Source logic: RETAiL, SCAN, HYBRiD
+        source = str(meta.get("source") or "").strip().upper()
+        manual_source = str(meta.get("manual_source") or "").strip().upper()
+        if manual_source in ("RETAIL", "SCAN", "HYBRID"):
+            source = manual_source
+
+        if source not in ("RETAIL", "SCAN", "HYBRID"):
+            filename_lower = (str(meta.get("uuid", "")) + " " + str(meta.get("title", ""))).lower()
+            if "scan" in filename_lower:
+                source = "SCAN"
+            elif "hybrid" in filename_lower:
+                source = "HYBRiD"
+            elif "retail" in filename_lower:
+                source = "RETAiL"
+            else:
+                ext = str(meta.get("type", "")).upper()
+                source = "SCAN" if ext == "PDF" else "RETAiL"
+        else:
+            if source == "RETAIL":
+                source = "RETAiL"
+            elif source == "HYBRID":
+                source = "HYBRiD"
+            elif source == "SCAN":
+                source = "SCAN"
+
+        # Format logic
+        ebook_type = str(meta.get("type", "")).strip()
+        if ebook_type.upper() == "EPUB":
             ebook_type = "ePUB"
-        book_type = "AUDIOBOOK" if audiobook else "eBOOK"
-        book_language = meta.get("book_language", "")
-        book_language_iso = meta.get("book_language_iso", "")
-        book_lang_to_use = book_language_iso or book_language or ""
+        elif ebook_type.upper() == "PDF":
+            ebook_type = ""  # PDF format tag is omitted per rules.txt
+        else:
+            ebook_type = ebook_type.upper()
 
-        name = f"{author} - {title} {year} {book_lang_to_use.upper()} {ebook_type} {book_type}"
+        # Construct final string parts based on subtype
+        parts = []
+
         if audiobook:
-            name = f"{author} - {title} {year} {book_lang_to_use.upper()} {book_type}"
+            parts.extend([author, title, year, lang_display, "AUDIOBOOK"])
+        elif comic:
+            vol_str = f"Vol {volume}" if volume else ""
+            no_str = f"No {issue}" if issue else ""
+            parts.extend([title, vol_str, no_str, year, lang_display, source, ebook_type, "COMiC", "eBOOK"])
+        elif manga:
+            vol_str = f"Vol {volume}" if volume else ""
+            parts.extend([title, vol_str, year, lang_display, source, ebook_type, "MANGA", "eBOOK"])
+        elif magazine:
+            no_str = f"No {issue}" if issue else ""
+            parts.extend([title, no_str, year, lang_display, source, ebook_type, "MAGAZiNE", "eBOOK"])
+        elif newspaper:
+            parts.extend([title, year, lang_display, source, ebook_type, "eBOOK"])
+        else:
+            author_or_publisher = author or publisher
+            parts.extend([author_or_publisher, title, edition, year, lang_display, source, ebook_type, "eBOOK"])
 
-        return name
+        cleaned_parts = [p for p in parts if p]
+        base_name = " ".join(cleaned_parts)
+        base_name = " ".join(base_name.split())
+
+        return base_name
 
     async def clean_filename(self, name: str) -> str:
         invalid = '<>:"/\\|?*'

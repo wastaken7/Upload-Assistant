@@ -395,7 +395,11 @@ class Prep:
                 search_term = os.path.basename(filelist[0]) if filelist else ""
                 search_file_folder = "file"
 
-                video, meta["scene"], meta["imdb_id"] = await self.scene_manager.is_scene(videopath, meta, meta.get("imdb_id", 0))
+            video, meta["scene"], meta["imdb_id"] = await self.scene_manager.is_scene(videopath, meta, meta.get("imdb_id", 0))
+            if meta.get("category") == "BOOK" or str(meta.get("manual_category") or "").upper() == "BOOK":
+                orig_ext = os.path.splitext(videopath)[1]
+                if video.endswith(".mkv") and not videopath.endswith(".mkv"):
+                    video = video[:-4] + orig_ext
 
             try:
                 title, secondary_title, extracted_year = await self.name_manager.extract_title_and_year(meta, video)
@@ -1314,7 +1318,7 @@ class Prep:
                 # some extracted files do not match release name so lets double check if it really is a scene release
                 if not meta.get("scene") and meta["tag"]:
                     base = os.path.basename(video)
-                    match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+                    match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", os.path.basename(video))
                     if match and (not meta["is_disc"] or meta.get("keep_folder", False)):
                         base = match.group(1)
                         is_all_lowercase = base.islower()

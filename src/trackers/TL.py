@@ -178,22 +178,24 @@ class TL:
 
     def get_category(self, meta: Meta) -> int:
         categories = {
-            'Anime': 34,
-            'Movie4K': 47,
-            'MovieBluray': 13,
-            'MovieBlurayRip': 14,
-            'MovieCam': 8,
-            'MovieTS': 9,
-            'MovieDocumentary': 29,
-            'MovieDvd': 12,
-            'MovieDvdRip': 11,
-            'MovieForeign': 36,
-            'MovieHdRip': 43,
-            'MovieWebrip': 37,
-            'TvBoxsets': 27,
-            'TvEpisodes': 26,
-            'TvEpisodesHd': 32,
-            'TvForeign': 44
+            "Anime": 34,
+            "Movie4K": 47,
+            "MovieBluray": 13,
+            "MovieBlurayRip": 14,
+            "MovieCam": 8,
+            "MovieTS": 9,
+            "MovieDocumentary": 29,
+            "MovieDvd": 12,
+            "MovieDvdRip": 11,
+            "MovieForeign": 36,
+            "MovieHdRip": 43,
+            "MovieWebrip": 37,
+            "TvBoxsets": 27,
+            "TvEpisodes": 26,
+            "TvEpisodesHd": 32,
+            "TvForeign": 44,
+            "Ebook": 45,
+            "Comics": 46,
         }
 
         if meta.get('anime', 0):
@@ -232,6 +234,11 @@ class TL:
                 return categories['TvEpisodes']
             else:
                 return categories['TvEpisodesHd']
+        elif category == "BOOK":
+            if meta.get("comic", False) or meta.get("manga", False):
+                return categories["Comics"]
+            else:
+                return categories["Ebook"]
 
         raise NotImplementedError('Failed to determine TL category!')
 
@@ -293,6 +300,10 @@ class TL:
 
         elif meta['category'] == 'MOVIE':
             param = f"{cat_id}/query/{search_name} {year} {resolution}"
+            search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
+
+        elif meta["category"] == "BOOK":
+            param = f"{cat_id}/query/{search_name}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
         for url in search_urls:

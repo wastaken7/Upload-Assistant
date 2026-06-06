@@ -32,7 +32,7 @@ from cogs.redaction import Redaction
 from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
-from src.book_prep import detect_newspaper
+from src.book_prep import _resolve_book_language, detect_newspaper, is_valid_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
@@ -188,7 +188,7 @@ if _is_webui_arg and not os.path.exists(_config_path):
 
 Meta: TypeAlias = dict[str, Any]
 
-from src.book_prep import is_valid_book_language
+from src.book_prep import sanitize_book_language
 from src.prep import Prep  # noqa: E402
 
 # Enable ANSI colors on Windows
@@ -347,6 +347,7 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
         else:
             sanitized_saved_meta[clean_key] = value
     meta.update(sanitized_saved_meta)
+    sanitize_book_language(meta)
     return sanitized_saved_meta
 
 
@@ -467,35 +468,42 @@ async def _prompt_book_meta(meta: Meta) -> None:
     try:
         for field in book_missing:
             prompt_label = "language" if field == "book_language" else field
-            value = (cli_ui.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
-            if value:
-                if field == "book_language":
-                    try:
-                        import langcodes
+            if field == "book_language":
+                while True:
+                    value = (cli_ui.ask_string("Enter language (leave blank to skip): ") or "").strip()
+                    if not value:
+                        break
 
-                        # Try get() for ISO codes first, then find() for names
-                        try:
-                            lc = langcodes.get(value.lower())
-                            full_name = lc.display_name("en") or value.title()
-                            alpha3 = lc.to_alpha3() or ""
-                            if full_name and full_name.lower() != value.lower():
-                                meta["book_language"] = full_name
-                                meta["book_language_iso"] = alpha3
-                            else:
-                                raise LookupError("no change")
-                        except Exception:
-                            lc = langcodes.find(value)
-                            meta["book_language"] = lc.display_name("en") or value.title()
-                            meta["book_language_iso"] = lc.to_alpha3() or ""
-                    except Exception:
-                        meta["book_language"] = value.title()
-                        meta["book_language_iso"] = ""
-                else:
+                    full, iso = _resolve_book_language(value)
+                    if is_valid_book_language(full, iso):
+                        meta["book_language"] = full
+                        meta["book_language_iso"] = iso
+                        name_needs_rebuild = True
+                        break
+                    else:
+                        console.print("[red]Invalid language. Please try again.[/red]")
+            elif field == "year":
+                while True:
+                    value = (cli_ui.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                    if not value:
+                        break
+                    if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
+                        meta["year"] = value
+                        meta["search_year"] = int(value)
+                        name_needs_rebuild = True
+                        break
+                    else:
+                        console.print("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
+            else:
+                value = (cli_ui.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
+                if value:
                     meta[field] = value
-                name_needs_rebuild = True
+                    name_needs_rebuild = True
     except EOFError:
         console.print("[yellow]Input cancelled — continuing with missing book fields.[/yellow]")
         name_needs_rebuild = False
+
+    sanitize_book_language(meta)
 
     # Rebuild the torrent name so the confirmation screen and upload reflect the new values
     if name_needs_rebuild and not meta.get("emby", False):
