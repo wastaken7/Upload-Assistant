@@ -36,8 +36,8 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 - **Google Books**: If a valid ISBN is resolved locally or provided via CLI, the assistant calls the Google Books API (using `google_books_api_key` if configured) to fetch title, authors, publisher, publication year, genres/keywords, book description, and front cover URL.
 - **OpenLibrary**: If an OpenLibrary Work ID is provided via `-openlib` / `--openlibrary` CLI flag, **or** if an ISBN is available, the assistant queries the OpenLibrary API to fetch title, authors, description, cover image, publisher, publication year, and subjects/keywords. OpenLibrary results have the lowest priority among API sources — they will not override fields already populated by MAM or Google Books.
 
-  > [!IMPORTANT]
-  > If `google_books_api_key` is not configured in your `config.py`, the terminal will display a warning message in red alerting you that book metadata searches will be limited and incomplete.
+> [!IMPORTANT]
+> If `google_books_api_key` is not configured in your `config.py`, the terminal will display a warning message in red alerting you that book metadata searches will be limited and incomplete.
 
 ---
 
@@ -73,8 +73,8 @@ The duplicate checking module (`dupe_checking.py`) uses custom rules for books t
 - **Format Distinction**: Ebooks and audiobooks of the same title are kept separate and are not flagged as duplicates of each other.
 - **File Type Validation**: For ebooks, different file formats (e.g., EPUB vs PDF) are checked. Uploading an EPUB will not be marked as a duplicate of an existing PDF, allowing multiple formats of the same book to co-exist.
 
-  > [!IMPORTANT]
-  > **CBR Tracker Exception**: For the **CBR** tracker, different ebook formats *are* considered duplicates under the `BOOK` category because this tracker only allows one format per book.
+> [!IMPORTANT]
+> **CBR Tracker Exception**: For the **CBR** tracker, different ebook formats *are* considered duplicates under the `BOOK` category because this tracker only allows one format per book.
 
 ---
 
