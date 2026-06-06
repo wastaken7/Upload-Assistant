@@ -70,7 +70,6 @@ def resolve_book_filelist(
         filelist.append(videoloc)
 
     meta["filelist"] = filelist
-    meta["scene"] = False
     meta["imdb_id"] = 0
 
     primary_ext = os.path.splitext(videopath)[1].lower()
@@ -112,6 +111,23 @@ def is_valid_book_language(full: str, iso: str) -> bool:
     if full_lower in ("", "unknown", "unknown language", "undetermined", "und", "none", "null"):
         return False
     return iso_lower not in ("", "und", "zxx")
+
+
+def sanitize_book_language(meta: dict[str, Any]) -> None:
+    """Validate and sanitize book_language and book_language_iso in meta. Clear them if invalid."""
+    lang = meta.get("book_language")
+    if not lang:
+        meta["book_language"] = ""
+        meta["book_language_iso"] = ""
+        return
+
+    full, iso = _resolve_book_language(str(lang).strip())
+    if is_valid_book_language(full, iso):
+        meta["book_language"] = full
+        meta["book_language_iso"] = iso
+    else:
+        meta["book_language"] = ""
+        meta["book_language_iso"] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -462,6 +478,7 @@ async def gather_book_prep(
             meta["audiobook_bitrate"] = avg_bitrate
 
     detect_newspaper(meta)
+    sanitize_book_language(meta)
 
 
 def detect_newspaper(meta: dict[str, Any]) -> None:

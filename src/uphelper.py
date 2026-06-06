@@ -319,7 +319,7 @@ class UploadHelper:
             isbn = meta.get("isbn") or ""  # not essential
             narrator = meta.get("narrator") or missing_warning
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
-            poster = meta.get("poster") or "[yellow][italic]not found, will be auto-generated[/italic][/yellow]"
+            poster = meta.get("poster") or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
             comic = bool(meta.get("comic"))
             manga = bool(meta.get("manga"))
             magazine = bool(meta.get("magazine"))

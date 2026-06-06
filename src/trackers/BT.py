@@ -5,22 +5,28 @@ import os
 import platform
 import re
 import unicodedata
+import urllib.request
+import zipfile
 from typing import Any, Optional, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
+import fitz
 import httpx
 import langcodes
+import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 
 from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.get_desc import DescriptionBuilder
+from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
+from src.uploadscreens import UploadScreensManager
 
 
 class BT:
@@ -166,6 +172,47 @@ class BT:
     async def get_container(self, meta: dict[str, Any]) -> str:
         container = meta.get('container', '')
         container_str = str(container) if container is not None else ''
+        container_lower = container_str.lower()
+
+        if meta.get("category") == "BOOK":
+            if meta.get("audiobook", False):
+                audio_format_map = {
+                    "acc": "ACC",
+                    "aac": "ACC",
+                    "ac3": "AC3",
+                    "dff": "DFF",
+                    "mp2": "MP2",
+                    "dsf": "DSF",
+                    "flac": "FLAC",
+                    "m4a": "M4A",
+                    "mp3": "MP3",
+                    "ogg": "OGG",
+                    "wav": "WAV",
+                    "wma": "WMA",
+                }
+                return audio_format_map.get(container_lower, "Outro")
+            elif meta.get("magazine", False) or meta.get("comic", False):
+                mag_comic_format_map = {
+                    "cbr": "CBR",
+                    "cbz": "CBR",
+                    "docx": "DOCX",
+                    "doc": "DOC",
+                    "epub": "ePUB",
+                    "gif": "GIF",
+                    "img": "IMG",
+                    "iso": "ISO",
+                    "jpg": "JPG",
+                    "jpeg": "JPG",
+                    "mobi": "MOBI",
+                    "nrg": "NRG",
+                    "pdf": "PDF",
+                    "png": "PNG",
+                }
+                return mag_comic_format_map.get(container_lower, "Outro")
+            else:
+                ebook_format_map = {"azw3": "AZW3", "mobi": "MOBI", "pdf": "PDF", "epub": "ePub", "kfx": "KFX"}
+                return ebook_format_map.get(container_lower, "")
+
         if container_str in ['avi', 'm2ts', 'm4v', 'mkv', 'mp4', 'ts', 'vob', 'wmv', 'mkv']:
             return container_str.upper()
 
@@ -175,12 +222,22 @@ class BT:
         if meta.get('anime'):
             return '5'
 
+        category = meta.get("category")
+        if category == "BOOK":
+            if meta.get("audiobook", False):
+                return "15"
+            if meta.get("magazine", False):
+                return "9"
+            if meta.get("comic", False):
+                return "11"
+            return "12"
+
         category_map = {
             'TV': '1',
             'MOVIE': '0'
         }
 
-        return category_map.get(meta['category'])
+        return category_map.get(category) if isinstance(category, str) else None
 
     async def get_languages(self, _meta: dict[str, Any]) -> Optional[str]:
         lang_code = self.main_tmdb_data.get('original_language')
@@ -358,28 +415,58 @@ class BT:
         custom_header = await builder.get_custom_header()
         desc_parts.append(custom_header)
 
+        if meta.get("category") == "BOOK":
+            custom_header = await builder.get_custom_header()
+            if custom_header:
+                desc_parts.append(custom_header)
+
+            book_desc = self.build_book_desc(meta)
+            if book_desc:
+                desc_parts.append(book_desc)
+
+            user_desc = await builder.get_user_description(meta)
+            if user_desc:
+                desc_parts.append(user_desc)
+
+            audiobook = bool(meta.get("audiobook", False))
+            magazine = bool(meta.get("magazine", False))
+            comic = bool(meta.get("comic", False))
+
+            if audiobook or not (magazine or comic):  # audiobook or eBook
+                audio_spectrograms = meta.get("spectrograms_images", [])
+                if audio_spectrograms:
+                    spectrograms_header = self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
+                    spectrograms_block = ""
+                    for image in audio_spectrograms:
+                        web_url = image.get("web_url")
+                        img_url = image.get("img_url")
+                        if isinstance(web_url, str) and isinstance(img_url, str) and web_url and img_url:
+                            spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url] "
+                    if spectrograms_block:
+                        desc_parts.append(f"\n\n{spectrograms_header}\n[center]{spectrograms_block}[/center]")
+
         # Logo
-        logo_resize_url = meta.get('tmdb_logo', '')
+        logo_resize_url = meta.get("tmdb_logo", "")
         if logo_resize_url:
             desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
 
         # TV
-        title_value = self.episode_tmdb_data.get('name')
-        title = title_value if isinstance(title_value, str) else ''
+        title_value = self.episode_tmdb_data.get("name")
+        title = title_value if isinstance(title_value, str) else ""
 
-        episode_image_value = self.episode_tmdb_data.get('still_path')
-        episode_image = episode_image_value if isinstance(episode_image_value, str) else ''
+        episode_image_value = self.episode_tmdb_data.get("still_path")
+        episode_image = episode_image_value if isinstance(episode_image_value, str) else ""
 
-        episode_overview_value = self.episode_tmdb_data.get('overview')
-        episode_overview = episode_overview_value if isinstance(episode_overview_value, str) else ''
+        episode_overview_value = self.episode_tmdb_data.get("overview")
+        episode_overview = episode_overview_value if isinstance(episode_overview_value, str) else ""
 
         if episode_overview:
-            desc_parts.append(f'[center]{title}[/center]')
+            desc_parts.append(f"[center]{title}[/center]")
 
             if episode_image:
                 desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300{episode_image}[/img][/center]")
 
-            desc_parts.append(f'[center]{episode_overview}[/center]')
+            desc_parts.append(f"[center]{episode_overview}[/center]")
 
         # User description
         user_description = await builder.get_user_description(meta)
@@ -392,7 +479,7 @@ class BT:
         # Signature
         desc_parts.append(f"[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
 
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
+        description = "\n\n".join(part for part in desc_parts if part.strip())
 
         bbcode = BBCODE()
         description = bbcode.remove_img_resize(description)
@@ -430,32 +517,27 @@ class BT:
 
         return youtube
 
-    async def get_tags(self, _meta: dict[str, Any]) -> str:
+    async def get_tags(self, meta: dict[str, Any]) -> str:
         tags = ''
 
-        genres = self.main_tmdb_data.get('genres')
-        if isinstance(genres, list):
-            genre_names: list[str] = []
-            genres_list_raw = cast(list[Any], genres)
-            genres_list: list[dict[str, Any]] = [
-                cast(dict[str, Any], genre)
-                for genre in genres_list_raw
-                if isinstance(genre, dict)
-            ]
-            for genre in genres_list:
-                name = genre.get('name')
-                if isinstance(name, str) and name.strip():
-                    genre_names.append(name)
+        if meta.get("category") == "BOOK":
+            keywords_str = meta.get("keywords") or meta.get("genres") or ""
+            if keywords_str:
+                keyword_list = [k.strip() for k in keywords_str.split(",") if k.strip()]
+                tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in keyword_list)
+        else:
+            genres = self.main_tmdb_data.get("genres")
+            if isinstance(genres, list):
+                genre_names: list[str] = []
+                genres_list_raw = cast(list[Any], genres)
+                genres_list: list[dict[str, Any]] = [cast(dict[str, Any], genre) for genre in genres_list_raw if isinstance(genre, dict)]
+                for genre in genres_list:
+                    name = genre.get("name")
+                    if isinstance(name, str) and name.strip():
+                        genre_names.append(name)
 
-            if genre_names:
-                tags = ', '.join(
-                    unicodedata.normalize('NFKD', name)
-                    .encode('ASCII', 'ignore')
-                    .decode('utf-8')
-                    .replace(' ', '.')
-                    .lower()
-                    for name in genre_names
-                )
+                if genre_names:
+                    tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
 
         if not tags:
             tags_raw = await asyncio.to_thread(cli_ui.ask_string, f'Digite os gêneros (no formato do {self.tracker}): ')
@@ -463,16 +545,21 @@ class BT:
 
         return tags
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[str]:
-        found_items: list[str] = []
-        imdb_info: dict[str, Any] = meta.get("imdb_info", {})
-        if not imdb_info.get("imdbID") and not meta.get("anime"):
-            console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
-            meta["skipping"] = f"{self.tracker}"
-            return found_items
+    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, Any]]:
+        dupes: list[dict[str, Any]] = []
+        is_book = meta.get("category") == "BOOK"
+
+        if is_book:
+            searchstr = meta["title"]
+        else:
+            imdb_info: dict[str, Any] = meta.get("imdb_info", {})
+            if not imdb_info.get("imdbID") and not meta.get("anime"):
+                console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
+                meta["skipping"] = f"{self.tracker}"
+                return dupes
+            searchstr = meta["title"] if meta.get("anime") else imdb_info.get("imdbID")
 
         is_tv_pack = bool(meta.get("tv_pack"))
-        searchstr = meta["title"] if meta.get("anime") else imdb_info.get("imdbID")
 
         search_url = f"{self.base_url}/torrents.php?searchstr={searchstr}"
         try:
@@ -533,6 +620,27 @@ class BT:
                     if not file_div:
                         continue
 
+                    # Parse all files
+                    files = []
+                    file_table = file_div.find("table", class_="filelist_table")
+                    if file_table:
+                        for r in file_table.find_all("tr"):
+                            class_attr = r.get("class")
+                            class_list = []
+                            if isinstance(class_attr, str):
+                                class_list = [class_attr]
+                            elif isinstance(class_attr, list):
+                                class_list = [str(value) for value in class_attr]
+                            if "colhead_dark" in class_list:
+                                continue
+                            cell = r.find("td")
+                            if cell:
+                                fn = cell.get_text(strip=True)
+                                if fn:
+                                    files.append(fn)
+
+                    # Determine name (folder or first filename)
+                    name = ""
                     is_existing_torrent_a_disc = any(keyword in description_text.lower() for keyword in ['bd25', 'bd50', 'bd66', 'bd100', 'dvd5', 'dvd9', 'm2ts'])
 
                     if is_existing_torrent_a_disc or is_tv_pack:
@@ -540,34 +648,51 @@ class BT:
                         if path_div:
                             folder_name = path_div.get_text(strip=True).strip('/')
                             if folder_name:
-                                found_items.append(folder_name)
+                                name = folder_name
                     else:
-                        file_table = file_div.find('table', class_='filelist_table')
-                        if file_table:
-                            for row in file_table.find_all('tr'):
-                                class_attr = row.get('class')
-                                if isinstance(class_attr, str):
-                                    class_list = [class_attr]
-                                elif isinstance(class_attr, list):
-                                    class_list = [str(value) for value in class_attr]
-                                else:
-                                    class_list = []
+                        if files:
+                            name = files[0]
 
-                                if 'colhead_dark' in class_list:
-                                    continue
+                    if not name:
+                        name = description_text
 
-                                cell = row.find('td')
-                                if cell:
-                                    filename = cell.get_text(strip=True)
-                                    if filename:
-                                        found_items.append(filename)
-                                        break
+                    # Size
+                    tds = torrent_row.find_all("td")
+                    size = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+
+                    link = f"{self.base_url}/torrents.php?torrentid={torrent_id}"
+                    download = f"{self.base_url}/torrents.php?action=download&id={torrent_id}"
+
+                    dupe_entry = {
+                        "name": name,
+                        "size": size,
+                        "link": link,
+                        "download": download,
+                        "id": torrent_id,
+                        "files": files,
+                    }
+
+                    if is_book:
+                        audio_exts = {".mp3", ".m4b", ".flac", ".m4a", ".wav", ".ogg", ".aac", ".ac3", ".wma", ".opus"}
+                        name_lower = name.lower()
+                        is_dupe_audiobook = "audiobook" in name_lower or "audio book" in name_lower or any(any(f.lower().endswith(ext) for ext in audio_exts) for f in files)
+                        if is_dupe_audiobook:
+                            dupe_entry["type"] = "audiobook"
+                        else:
+                            for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                if fmt in name_lower:
+                                    dupe_entry["type"] = fmt
+                                    break
+                            else:
+                                dupe_entry["type"] = "ebook"
+
+                    dupes.append(dupe_entry)
 
         except Exception as e:
             console.print(f'[bold red]Ocorreu um erro inesperado ao processar a busca: {e}[/bold red]')
             return []
 
-        return found_items
+        return dupes
 
     async def get_media_info(self, meta: dict[str, Any]) -> str:
         info_file_path = ''
@@ -710,74 +835,137 @@ class BT:
         return 'N/A'
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
-        await self.load_localized_data(meta)
-        has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
-        resolution_width, resolution_height = await self.get_resolution(meta)
+        description = await self.get_description(meta)
+        tags = await self.get_tags(meta)
 
-        data = {
-            'audio_c': await self.get_audio_codec(meta),
-            'audio': await self.get_audio(meta),
-            'auth': BT.secret_token,
-            'bitrate': await self.get_bitrate(meta),
-            'desc': '',
-            'diretor': await self.get_credits(meta),
-            'duracao': f"{str(meta.get('runtime', ''))} min",
-            'especificas': await self.get_description(meta),
-            'format': await self.get_container(meta),
-            'idioma_ori': await self.get_languages(meta) or meta.get('original_language', ''),
-            'image': f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.get('tmdb_poster', '')}",
-            'legenda': has_pt_subtitles,
-            'mediainfo': await self.get_media_info(meta),
-            'resolucao_1': resolution_width,
-            'resolucao_2': resolution_height,
-            'screen[]': await self.get_screens(meta),
-            'sinopse': self.main_tmdb_data.get('overview', 'Nenhuma sinopse disponível.'),
-            'submit': 'true',
-            'subtitles[]': subtitle_ids,
-            'tags': await self.get_tags(meta),
-            'title': meta['title'],
-            'type': await self.get_type(meta),
-            'video_c': await self.get_video_codec(meta),
-            'year': str(meta['year']),
-            'youtube': await self.get_trailer(meta),
+        data: dict[str, Any] = {
+            "submit": "true",
+            "auth": BT.secret_token,
+            "year": str(meta.get("year", "")),
+            "title": meta["title"],
+            "type": await self.get_type(meta),
         }
 
-        # Common data MOVIE/TV
-        if not meta.get('anime'):
-            if meta['category'] in ('MOVIE', 'TV'):
+        if meta.get("category") == "BOOK":
+            cover_url = await self.get_book_cover(meta)
+            resolved_lang = await self.get_book_language(meta)
+            resolved_format = await self.get_container(meta)
+
+            audiobook = bool(meta.get("audiobook", False))
+            magazine = bool(meta.get("magazine", False))
+            comic = bool(meta.get("comic", False))
+
+            data.update({
+                "idioma_ori": resolved_lang,
+                "format": resolved_format,
+                "image": cover_url,
+            })
+
+            if audiobook:
                 data.update({
-                    '3d': 'Sim' if meta.get('3d') else 'Nao',
-                    'adulto': '0',
-                    'imdb_input': meta.get('imdb_info', {}).get('imdbID', ''),
-                    'nota_imdb': str(meta.get('imdb_info', {}).get('rating', '')),
-                    'title_br': await self.get_title(meta),
+                    "banda": meta.get("author", ""),
+                    "bitrate": self.get_audiobook_bitrate(meta),
+                    "especificas": description,
                 })
-            if meta.get('scene', False):
-                data['scene'] = 'on'
 
-        # Common data TV/Anime
-        tv_pack = bool(meta.get('tv_pack'))
-        if meta['category'] == 'TV' or meta.get('anime'):
-            data.update({
-                'episodio': meta.get('episode', ''),
-                'ntorrent': f"{meta.get('season', '')}{meta.get('episode', '')}",
-                'temporada_e': meta.get('season', '') if not tv_pack else '',
-                'temporada': meta.get('season', '') if tv_pack else '',
-                'tipo': 'ep_individual' if not tv_pack else 'completa',
-            })
+            elif magazine or comic:
+                edicao = str(meta.get("manual_edition") or meta.get("edition") or meta.get("episode") or meta.get("manual_episode") or "")
+                edicao_str = "".join(c for c in edicao if c.isdigit())
 
-        # Specific
-        if meta['category'] == 'MOVIE':
-            data['versao'] = await self.get_edition(meta)
-        elif meta.get('anime'):
-            data.update({
-                'fundo_torrent': meta.get('backdrop'),
-                'horas': '',
-                'minutos': '',
-                'rating': str(meta.get('imdb_info', {}).get('rating', '')),
-                'releasedate': str(meta['year']),
-                'vote': '',
-            })
+                data.update({
+                    "diretor": meta.get("publisher", "") or meta.get("author", ""),
+                    "edicao": edicao_str,
+                    "paginas": self.get_book_pages(meta),
+                    "tags": tags,
+                    "desc": html_to_bbcode(str(meta.get("overview", ""))),
+                    "especificas": description,
+                    "screen[]": await self.get_screens(meta),
+                })
+
+                if magazine:
+                    data["adulto"] = "1" if meta.get("xxx") or meta.get("nsfw") else "0"
+
+                    months_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                    months_en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                    text_to_search = (meta.get("title", "") + " " + meta.get("uuid", "")).lower()
+                    found_month = ""
+                    for m_pt, m_en in zip(months_pt, months_en):
+                        if m_pt.lower() in text_to_search or m_en.lower() in text_to_search:
+                            found_month = m_pt
+                            break
+                    if found_month:
+                        data.update({"mensal": "on", "mes_resvista": found_month})
+            else:
+                # eBook
+                data.update({
+                    "diretor": meta.get("author", ""),
+                    "tags": tags,
+                    "desc": html_to_bbcode(str(meta.get("overview", ""))),
+                    "screen[]": await self.get_screens(meta),
+                })
+        else:
+            await self.load_localized_data(meta)
+            has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
+            resolution_width, resolution_height = await self.get_resolution(meta)
+            data = {
+                "audio_c": await self.get_audio_codec(meta),
+                "audio": await self.get_audio(meta),
+                "bitrate": await self.get_bitrate(meta),
+                "desc": "",
+                "diretor": await self.get_credits(meta),
+                "duracao": f"{str(meta.get('runtime', ''))} min",
+                "especificas": description,
+                "format": await self.get_container(meta),
+                "idioma_ori": await self.get_languages(meta) or meta.get("original_language", ""),
+                "image": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.get('tmdb_poster', '')}",
+                "legenda": has_pt_subtitles,
+                "mediainfo": await self.get_media_info(meta),
+                "resolucao_1": resolution_width,
+                "resolucao_2": resolution_height,
+                "screen[]": await self.get_screens(meta),
+                "sinopse": self.main_tmdb_data.get("overview", "Nenhuma sinopse disponível."),
+                "subtitles[]": subtitle_ids,
+                "tags": tags,
+                "video_c": await self.get_video_codec(meta),
+                "youtube": await self.get_trailer(meta),
+            }
+
+            # Common data MOVIE/TV
+            if not meta.get("anime"):
+                if meta["category"] in ("MOVIE", "TV"):
+                    data.update({
+                        "3d": "Sim" if meta.get("3d") else "Nao",
+                        "adulto": "0",
+                        "imdb_input": meta.get("imdb_info", {}).get("imdbID", ""),
+                        "nota_imdb": str(meta.get("imdb_info", {}).get("rating", "")),
+                        "title_br": await self.get_title(meta),
+                    })
+                if meta.get("scene", False):
+                    data["scene"] = "on"
+
+            # Common data TV/Anime
+            tv_pack = bool(meta.get("tv_pack"))
+            if meta["category"] == "TV" or meta.get("anime"):
+                data.update({
+                    "episodio": meta.get("episode", ""),
+                    "ntorrent": f"{meta.get('season', '')}{meta.get('episode', '')}",
+                    "temporada_e": meta.get("season", "") if not tv_pack else "",
+                    "temporada": meta.get("season", "") if tv_pack else "",
+                    "tipo": "ep_individual" if not tv_pack else "completa",
+                })
+
+            # Specific
+            if meta["category"] == "MOVIE":
+                data["versao"] = await self.get_edition(meta)
+            elif meta.get("anime"):
+                data.update({
+                    "fundo_torrent": meta.get("backdrop"),
+                    "horas": "",
+                    "minutos": "",
+                    "rating": str(meta.get("imdb_info", {}).get("rating", "")),
+                    "releasedate": str(meta["year"]),
+                    "vote": "",
+                })
 
         # Anon
         anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
@@ -795,6 +983,134 @@ class BT:
             })
 
         return data
+
+    def get_audiobook_bitrate(self, meta: dict[str, Any]) -> str:
+        container_lower = str(meta.get("container", "")).lower()
+        if container_lower in ("flac", "wav", "alac", "ape", "dsf", "dff"):
+            return "Lossless"
+
+        avg_bitrate = meta.get("audiobook_bitrate")
+        if avg_bitrate is None:
+            return "Outro"
+
+        options = [96, 128, 192, 256, 320]
+
+        # Find option with the minimum absolute difference
+        closest_option = min(options, key=lambda opt: abs(opt - avg_bitrate))
+        distance = abs(closest_option - avg_bitrate)
+
+        # If distance is greater than 32 (meaning beyond midpoints), return "Outro"
+        if distance > 32:
+            return "Outro"
+
+        return str(closest_option)
+
+    def build_book_desc(self, meta: dict[str, Any]) -> str:
+        """Build the BBCode table for BOOK-category uploads."""
+        book_parts: list[str] = [""]
+        narrator = meta.get("narrator")
+        publisher = meta.get("publisher")
+        isbn = meta.get("isbn")
+        overview = meta.get("overview")
+
+        if overview:
+            overview = html_to_bbcode(str(overview))
+            overview = re.sub(r"<[^>]+>", "", overview).strip()
+
+        if narrator:
+            book_parts.append(f"[b]Narrador:[/b] {narrator}")
+        if publisher:
+            book_parts.append(f"[b]Editora:[/b] {publisher}")
+        if isbn:
+            book_parts.append(f"[b]ISBN:[/b] {isbn}")
+        if meta.get("audiobook", False):
+            audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
+            if audiobook_duration_formatted:
+                book_parts.append(f"[b]Duração:[/b] {audiobook_duration_formatted}")
+
+        final_book_parts: list[str] = []
+
+        if book_parts:
+            final_book_parts.append("[b][size=3]DETALHES TÉCNICOS[/size][/b]")
+            final_book_parts.append("\n".join(book_parts))
+
+        if overview:
+            final_book_parts.append(f"\n[b][size=3]VISÃO GERAL[/size][/b]\n\n{overview}")
+
+        if not (book_parts or overview):
+            return ""
+
+        return "\n".join(final_book_parts)
+
+    async def get_book_cover(self, meta: dict[str, Any]) -> str:
+        cover_url = ""
+        cover_path = meta.get("cover_path")
+
+        # If we don't have cover_path but we have a poster URL, we download it first
+        poster_url = meta.get("poster")
+        if not cover_path and isinstance(poster_url, str) and poster_url:
+            poster_jpg_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/poster.jpg"
+            try:
+                parsed_url = urlparse(poster_url)
+                if parsed_url.scheme in ("http", "https"):
+                    os.makedirs(os.path.dirname(poster_jpg_path), exist_ok=True)
+                    urllib.request.urlretrieve(poster_url, poster_jpg_path)
+                    cover_path = poster_jpg_path
+                    meta["cover_path"] = cover_path
+            except Exception as e:
+                console.print(f"Erro ao baixar poster de {poster_url}: {e}")
+
+        if cover_path and os.path.exists(cover_path):
+            try:
+                uploadscreens_manager = UploadScreensManager(self.config)
+                uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
+                if uploaded_cover and len(uploaded_cover) > 0:
+                    cover_url = str(uploaded_cover[0].get("raw_url", ""))
+            except Exception as e:
+                console.print(f"Erro ao fazer upload da capa do livro: {e}")
+        return cover_url
+
+    async def get_book_language(self, meta: dict[str, Any]) -> str:
+        book_lang_code = meta.get("book_language_iso") or meta.get("book_language")
+        lang_name = ""
+        if book_lang_code:
+            try:
+                lang_name = langcodes.Language.make(book_lang_code).display_name("pt").capitalize()
+            except Exception:
+                lang_name = str(book_lang_code)
+
+        lang_map = {"português": "Português", "inglês": "Inglês", "italiano": "Italiano", "alemão": "Alemão", "espanhol": "Espanhol", "japonês": "Japonês"}
+        resolved_lang = lang_map.get(lang_name.lower(), "Outro")
+        if meta.get("audiobook", False) and resolved_lang == "Japonês":
+            resolved_lang = "Outro"
+        return resolved_lang
+
+    def get_book_pages(self, meta: dict[str, Any]) -> str:
+        if meta.get("audiobook", False):
+            return ""
+
+        file_path = meta["filelist"][0] if meta.get("filelist") else meta.get("path", "")
+        if not file_path or not os.path.exists(file_path):
+            return ""
+
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            try:
+                doc = fitz.open(file_path)
+                return str(len(doc))
+            except Exception:
+                pass
+        elif ext in (".cbz", ".cbr"):
+            try:
+                if ext == ".cbz":
+                    with zipfile.ZipFile(file_path) as z:
+                        return str(len([f for f in z.namelist() if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]))
+                else:
+                    with rarfile.RarFile(file_path) as r:
+                        return str(len([f for f in r.namelist() if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]))
+            except Exception:
+                pass
+        return ""
 
     async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)

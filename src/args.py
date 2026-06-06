@@ -8,7 +8,7 @@ import urllib.parse
 from collections.abc import Sequence
 from typing import Any, Optional, cast
 
-from src.book_prep import detect_newspaper
+from src.book_prep import detect_newspaper, sanitize_book_language
 from src.console import console
 
 
@@ -591,6 +591,7 @@ class Args:
 
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
+        sanitize_book_language(meta)
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:

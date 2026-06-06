@@ -39,7 +39,7 @@ class SceneManager:
         scene = False
         is_all_lowercase = False
         base = os.path.basename(video)
-        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3}$", os.path.basename(video))
+        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", os.path.basename(video))
 
         if match and (not meta['is_disc'] or meta['keep_folder']):
             base = match.group(1)
