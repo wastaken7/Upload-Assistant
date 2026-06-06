@@ -1193,7 +1193,6 @@ async def generate_ebook_screenshots(
         downloaded_poster = False
         if local_found:
             meta["cover_path"] = cover_path
-            console.print(f"[green]Local cover found and copied to {cover_path}[/green]")
         else:
             downloaded_poster = await download_poster_from_meta(meta, cover_path)
 
@@ -1282,10 +1281,9 @@ async def generate_ebook_screenshots(
                     if epub_cover_extracted:
                         downloaded_poster = True
                         meta["cover_path"] = cover_path
-                        console.print(f"[green]Smart cover extracted from EPUB file directly to {cover_path}[/green]")
                 except Exception as e:
                     if meta.get("debug", False):
-                        console.print(f"[yellow]Warning: Smart EPUB cover extraction failed: {e}[/yellow]")
+                        console.print(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
             doc = fitz.open(path)
             total_pages = len(doc)
@@ -1349,17 +1347,14 @@ async def screenshots(
             cover_path = os.path.join(output_dir, "POSTER.png")
             if os.path.exists(cover_path) and os.path.getsize(cover_path) >= 20480 and not meta.get("retake", False):
                 meta["cover_path"] = cover_path
-                console.print(f"[green]Cached cover found for audiobook at {cover_path}[/green]")
                 return []
             local_found = await load_local_cover_if_exists(path, cover_path)
             if local_found:
                 meta["cover_path"] = cover_path
-                console.print(f"[green]Local cover found for audiobook and copied to {cover_path}[/green]")
             else:
                 extracted_found = await extract_embedded_cover_from_audiobook(meta, cover_path)
                 if extracted_found:
                     meta["cover_path"] = cover_path
-                    console.print(f"[green]Embedded cover extracted for audiobook to {cover_path}[/green]")
                 else:
                     await download_poster_from_meta(meta, cover_path)
             return []

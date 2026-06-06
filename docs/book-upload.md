@@ -23,6 +23,7 @@ The assistant automatically detects the subcategory or format of a book upload u
 To gather rich metadata with minimal manual input, Upload Assistant implements a hierarchical resolution flow:
 
 $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API} > \text{OpenLibrary API} > \text{Local File Metadata}$$
+$$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API} > \text{OpenLibrary API} > \text{Local File Metadata}$$
 
 ### A. Local File Metadata
 1. **EPUB**: Automatically decompresses and parses the internal OPF file (`META-INF/container.xml` or any `.opf` file) to extract `title`, `author`, `language`, `year` (from `date`), `isbn` (from `identifier`), `overview` (description), and `publisher`.

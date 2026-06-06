@@ -1335,7 +1335,6 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
                         if not use_cached_cover:
                             try:
-                                console.print(f"Uploading book cover {cover_path}...")
                                 uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
                                 if uploaded_cover and len(uploaded_cover) > 0:
                                     os.makedirs(os.path.dirname(covers_file), exist_ok=True)

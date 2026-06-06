@@ -536,9 +536,9 @@ class BT:
                 if genre_names:
                     tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
 
-        if not tags:
-            tags_raw = await asyncio.to_thread(cli_ui.ask_string, f'Digite os gêneros (no formato do {self.tracker}): ')
-            tags = (tags_raw or "").strip()
+            if not tags:
+                tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+                tags = (tags_raw or "").strip()
 
         return tags
 

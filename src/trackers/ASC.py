@@ -15,6 +15,7 @@ from pymediainfo import MediaInfo
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.get_desc import html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -449,7 +450,7 @@ class ASC:
             description_parts.append("")
 
         # Overview
-        overview = meta.get("overview", "").strip()
+        overview = html_to_bbcode(str(meta.get("overview", "")))
         if overview:
             description_parts.append("\n[b][size=3]Sinopse[/size][/b]")
             description_parts.append(overview)
@@ -708,6 +709,11 @@ class ASC:
 
     async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
         found_items: list[dict[str, str]] = []
+        if meta.get("category") == "BOOK" and meta.get("source_size", 0) <= 1024 * 1024:
+            console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
+            meta["skipping"] = f"{self.tracker}"
+            return found_items
+
         if meta.get("category") != "BOOK" and not meta.get("imdb_id") and not meta.get("anime"):
             console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             meta["skipping"] = f"{self.tracker}"
@@ -1131,6 +1137,9 @@ class ASC:
         return data
 
     async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+        if meta.get("category") == "BOOK" and meta.get("source_size", 0) <= 1024 * 1024:
+            console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
+            return False
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)
