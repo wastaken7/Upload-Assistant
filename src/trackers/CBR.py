@@ -1,8 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional
+from typing import Any
 
-from src.console import console
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -77,7 +76,10 @@ class CBR(UNIT3D):
             "MP3": "24",
             "M4B": "24",
             "FLAC": "24",
+            "AAC": "24",
             "M4A": "24",
+            "OGG": "24",
+            "WAV": "24",
             "AUDIOBOOK": "24",
             "OUTROS": "43",
         }

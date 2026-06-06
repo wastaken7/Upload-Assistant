@@ -116,6 +116,9 @@ class IS:
         elif category == "TV":
             search_type = 't_name'
             search_query = f"{meta.get('title', '')} {meta.get('season', '')}{meta.get('episode', '')}"
+        elif category == "BOOK":
+            search_type = "t_name"
+            search_query = str(meta.get("title", ""))
         else:
             return dupes
 
@@ -199,6 +202,11 @@ class IS:
         tv_season_packs_hd = 4
         tv_season_packs_sd = 6
 
+        audiobooks = 35
+        comics = 41
+        ebooks = 22
+        magazines = 46
+
         if category == "MOVIE":
             if "documentary" in genres or "documentary" in keywords:
                 if sd:
@@ -257,6 +265,16 @@ class IS:
             else:
                 return tv_480p
 
+        elif category == "BOOK":
+            if meta.get("audiobook", False):
+                return audiobooks
+            elif meta.get("comic", False) or meta.get("manga", False):
+                return comics
+            elif meta.get("magazine", False):
+                return magazines
+            else:
+                return ebooks
+
         return 0
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
@@ -286,30 +304,43 @@ class IS:
             is_name = is_name.replace(' ', '.')
         return is_name
 
+    async def get_book_cover(self, meta: Meta) -> str:
+        covers = meta.get("covers")
+        if isinstance(covers, list) and len(covers) > 0:
+            raw_url = covers[0].get("raw_url")
+            if raw_url:
+                return str(raw_url)
+
+        # Fallback to poster URL if remote
+        poster_url = meta.get("poster")
+        if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
+            return poster_url
+
+        return ""
+
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        message = f"{meta.get('overview', '')}\n\n[youtube]{meta.get('youtube', '')}[/youtube]"
+        cover = meta.get("poster")
+        if meta["category"] == "BOOK":
+            message = meta.get("overview", "")
+            cover = await self.get_book_cover(meta)
+
         data: dict[str, Any] = {
-            'UseNFOasDescr': 'no',
-            'message': f"{meta.get('overview', '')}\n\n[youtube]{meta.get('youtube', '')}[/youtube]",
-            'category': await self.get_category_id(meta),
-            'subject': self.get_name(meta),
-            'nothingtopost': "1",
-            't_image_url': meta.get('poster'),
-            'submit': 'Upload Torrent',
+            "UseNFOasDescr": "no",
+            "message": message,
+            "category": await self.get_category_id(meta),
+            "subject": self.get_name(meta),
+            "nothingtopost": "1",
+            "t_image_url": cover,
+            "submit": "Upload Torrent",
         }
 
         if meta.get('category') == "MOVIE":
             data['t_link'] = str(meta.get('imdb_info', {}).get('imdb_url', ''))
 
         # Anon
-        anon = not (int(meta.get('anon', 0) or 0) == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
-        if anon:
-            data.update({
-                'anonymous': 'yes'
-            })
-        else:
-            data.update({
-                'anonymous': 'no'
-            })
+        anon = not (int(meta.get("anon", 0) or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        data.update({"anonymous": "yes" if anon else "no"})
 
         return data
 

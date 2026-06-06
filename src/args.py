@@ -151,6 +151,15 @@ class Args:
             dest="book_isbn",
         )
         parser.add_argument(
+            "-openlib",
+            "--openlibrary",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook OpenLibrary Work ID (e.g. OL45883W)",
+            type=str,
+            dest="openlibrary",
+        )
+        parser.add_argument(
             "-pub",
             "--publisher",
             nargs=1,
@@ -337,6 +346,22 @@ class Args:
                                 console.print('[red]Continuing without --lst')
                         else:
                             meta['lst'] = value2
+                    elif key == "openlibrary":
+                        if value2.startswith("http"):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                path_parts = parsed.path.strip("/").split("/")
+                                for part in path_parts:
+                                    if part.upper().startswith("OL") and (part.upper().endswith("W") or part.upper().endswith("M")):
+                                        meta["openlibrary"] = part
+                                        break
+                                else:
+                                    meta["openlibrary"] = path_parts[-1]
+                            except Exception:
+                                console.print("[red]Unable to parse OpenLibrary ID from url")
+                                console.print("[red]Continuing without --openlibrary")
+                        else:
+                            meta["openlibrary"] = value2
                     elif key == 'oe':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -559,6 +584,10 @@ class Args:
         book_isbn_arg = meta.get("book_isbn")
         if book_isbn_arg not in (None, ""):
             meta["isbn"] = str(book_isbn_arg).strip()
+
+        openlibrary_arg = meta.get("openlibrary")
+        if openlibrary_arg not in (None, ""):
+            meta["openlibrary"] = str(openlibrary_arg).strip()
 
         book_publisher_arg = meta.get("book_publisher")
         if book_publisher_arg not in (None, ""):

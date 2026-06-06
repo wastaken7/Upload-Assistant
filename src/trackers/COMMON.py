@@ -209,13 +209,16 @@ class COMMON:
         if downurl:
             try:
                 cookie_jar = None
-                try:
-                    from src.cookie_auth import CookieValidator
+                from src.trackersetup import http_trackers
 
-                    cookie_validator = CookieValidator(self.config)
-                    cookie_jar = await cookie_validator.load_session_cookies(meta, tracker)
-                except Exception:
-                    pass
+                if tracker in http_trackers:
+                    try:
+                        from src.cookie_auth import CookieValidator
+
+                        cookie_validator = CookieValidator(self.config)
+                        cookie_jar = await cookie_validator.load_session_cookies(meta, tracker)
+                    except Exception:
+                        pass
 
                 async with (
                     httpx.AsyncClient(headers=headers, params=params, cookies=cookie_jar, follow_redirects=True, timeout=30.0) as session,

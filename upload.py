@@ -613,6 +613,21 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         console.print(traceback.format_exc())
         return
 
+    # Load covers.json if it exists and not already present in meta
+    covers_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"
+    if os.path.exists(covers_file) and not meta.get("covers"):
+        try:
+            async with aiofiles.open(covers_file, encoding="utf-8") as f:
+                content = await f.read()
+                loaded_covers = json.loads(content)
+                if isinstance(loaded_covers, list):
+                    meta["covers"] = loaded_covers
+                    if meta.get("debug"):
+                        console.print(f"[green]Loaded {len(loaded_covers)} covers from covers.json into meta['covers']")
+        except Exception as e:
+            if meta.get("debug"):
+                console.print(f"[red]Error loading covers.json into meta['covers']: {e}")
+
     meta['emby_debug'] = meta.get('emby_debug') if meta.get('emby_debug', False) else config['DEFAULT'].get('emby_debug', False)
     if meta.get('emby_cat', None) == "movie" and meta.get('category', None) != "MOVIE":
         console.print(f"[red]Wrong category detected! Expected 'MOVIE', but found: {meta.get('category', None)}[/red]")
@@ -1278,6 +1293,61 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
                 elif meta.get('skip_imghost_upload', False) is True and meta.get('image_list', False) is False:
                     meta['image_list'] = []
+
+                # Host book cover if it's a BOOK and save to covers.json
+                if meta.get("category") == "BOOK":
+                    cover_path = meta.get("cover_path")
+                    poster_url = meta.get("poster")
+                    if not cover_path and isinstance(poster_url, str) and poster_url:
+                        if os.path.exists(poster_url):
+                            cover_path = poster_url
+                        else:
+                            poster_jpg_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/poster.jpg"
+                            try:
+                                import urllib.parse
+                                import urllib.request
+
+                                parsed_url = urllib.parse.urlparse(poster_url)
+                                if parsed_url.scheme in ("http", "https"):
+                                    os.makedirs(os.path.dirname(poster_jpg_path), exist_ok=True)
+                                    urllib.request.urlretrieve(poster_url, poster_jpg_path)
+                                    cover_path = poster_jpg_path
+                                    meta["cover_path"] = cover_path
+                            except Exception as e:
+                                console.print(f"[red]Error downloading cover from {poster_url}: {e}[/red]")
+
+                    if cover_path and os.path.exists(cover_path):
+                        covers_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"
+                        use_cached_cover = False
+                        if os.path.exists(covers_file):
+                            try:
+                                async with aiofiles.open(covers_file, encoding="utf-8") as f:
+                                    content = await f.read()
+                                    loaded_covers = json.loads(content)
+                                    if isinstance(loaded_covers, list) and len(loaded_covers) > 0 and loaded_covers[0].get("raw_url"):
+                                        use_cached_cover = True
+                                        meta["covers"] = loaded_covers
+                                        if meta.get("debug"):
+                                            console.print(f"[green]Using cached cover from covers.json: {loaded_covers[0]['raw_url']}")
+                            except Exception as e:
+                                if meta.get("debug"):
+                                    console.print(f"[red]Error reading covers.json cache: {e}")
+
+                        if not use_cached_cover:
+                            try:
+                                console.print(f"Uploading book cover {cover_path}...")
+                                uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
+                                if uploaded_cover and len(uploaded_cover) > 0:
+                                    os.makedirs(os.path.dirname(covers_file), exist_ok=True)
+                                    async with aiofiles.open(covers_file, "w", encoding="utf-8") as f:
+                                        await f.write(json.dumps(uploaded_cover, indent=4))
+                                    meta["covers"] = uploaded_cover
+                                    if meta.get("debug"):
+                                        console.print(f"[green]Successfully uploaded book cover and saved to covers.json: {uploaded_cover[0].get('raw_url')}")
+                                else:
+                                    console.print("[red]Failed to upload book cover: upload_screens returned empty result")
+                            except Exception as e:
+                                console.print(f"[red]Error uploading book cover: {e}[/red]")
 
                 async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
                     await f.write(json.dumps(meta, indent=4))

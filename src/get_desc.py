@@ -470,36 +470,25 @@ class DescriptionBuilder:
             if meta.get("is_disc") in ["BDMV", "DVD"] and bluray_link and meta.get("release_url", ""):
                 release_url = meta["release_url"]
 
-            covers = False
-            if await self.common.path_exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"):
-                covers = True
+            cover_data = meta.get("covers")
+            if not cover_data and await self.common.path_exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"):
+                try:
+                    async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json", encoding="utf-8") as f:
+                        cover_data = json.loads(await f.read())
+                except Exception:
+                    cover_data = None
 
-            if (
-                meta.get("is_disc") in ["BDMV", "DVD"]
-                and self.config["DEFAULT"].get("use_bluray_images", False)
-                and covers
-            ):
-                async with aiofiles.open(
-                    f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json", encoding="utf-8"
-                ) as f:
-                    cover_data: list[dict[str, str]] = json.loads(await f.read())
+            if meta.get("is_disc") in ["BDMV", "DVD"] and self.config["DEFAULT"].get("use_bluray_images", False) and cover_data:
+                for img_data in cover_data:
+                    web_url = img_data.get("web_url", "")
+                    raw_url = img_data.get("raw_url", "")
 
-                    for img_data in cover_data:
-                        web_url = img_data.get("web_url", "")
-                        raw_url = img_data.get("raw_url", "")
-
-                        if self.tracker == "TL":
-                            cover_list.append(
-                                f"""<a href="{web_url}"><img src="{raw_url}" style="max-width: {cover_size}px;"></a>  """
-                            )
-                        elif self.tracker == "HDT":
-                            cover_list.append(
-                                f"<a href='{raw_url}'><img src='{web_url}' height=137></a> "
-                            )
-                        else:
-                            cover_list.append(
-                                f"[url={web_url}][img={cover_size}]{raw_url}[/img][/url]"
-                            )
+                    if self.tracker == "TL":
+                        cover_list.append(f"""<a href="{web_url}"><img src="{raw_url}" style="max-width: {cover_size}px;"></a>  """)
+                    elif self.tracker == "HDT":
+                        cover_list.append(f"<a href='{raw_url}'><img src='{web_url}' height=137></a> ")
+                    else:
+                        cover_list.append(f"[url={web_url}][img={cover_size}]{raw_url}[/img][/url]")
 
             if cover_list:
                 cover_images = "".join(cover_list)

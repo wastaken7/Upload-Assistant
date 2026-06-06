@@ -40,7 +40,7 @@ class BJS:
         "zip", "rar", "7z", "tar", "gz", "bz2",
         "iso", "dmg", "pkg", "exe", "bin", "msi", "apk",
         "srt", "ass", "vtt", "sub", "idx"
-    }
+    } # fmt: off
 
     def has_extension(self, name: str) -> bool:
         _, ext = os.path.splitext(name)
@@ -1224,7 +1224,7 @@ class BJS:
 
                     name: str = link_element.text.strip()
                     quality: str = quality_element.text.strip()
-                    url = link_element.get('href')
+                    url = link_element.get("href")
                     if isinstance(url, str):
                         link: str = url
                     else:

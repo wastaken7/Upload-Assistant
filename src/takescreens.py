@@ -1186,7 +1186,6 @@ async def generate_ebook_screenshots(
 
     if cover_cached:
         meta["cover_path"] = cover_path
-        console.print(f"[green]Cached cover found at {cover_path}[/green]")
         local_found = True
         downloaded_poster = True
     else:
