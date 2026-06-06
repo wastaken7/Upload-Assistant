@@ -775,21 +775,36 @@ class BJS:
 
                         link = f"{self.torrent_url}{torrent_id}"
 
-                        dupe_entry = {"name": name, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
-                        if self.has_extension(name):
-                            dupe_entry["files"] = [name]
+                        row_type = "ebook"
                         if category == "BOOK":
                             if meta.get("audiobook"):
-                                dupe_entry["type"] = "audiobook"
+                                row_type = "audiobook"
                             else:
-                                name_lower = name.lower()
-                                for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
-                                    if fmt in name_lower:
-                                        dupe_entry["type"] = fmt
-                                        break
-                                else:
-                                    dupe_entry["type"] = "ebook"
-                        dupes.append(dupe_entry)
+                                fmt_attr = row.get("data-format")
+                                if fmt_attr:
+                                    fmt_attr = str(fmt_attr).lower().strip()
+                                    if fmt_attr in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                        row_type = fmt_attr
+                                if row_type == "ebook":
+                                    name_lower = name.lower()
+                                    for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                        if fmt in name_lower:
+                                            row_type = fmt
+                                            break
+
+                        names = []
+                        if name:
+                            names.append(name)
+                        if category == "BOOK" and BJS.database_title:
+                            names.append(str(BJS.database_title).strip())
+
+                        for n in names:
+                            dupe_entry = {"name": n, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                            if self.has_extension(n):
+                                dupe_entry["files"] = [n]
+                            if category == "BOOK":
+                                dupe_entry["type"] = row_type
+                            dupes.append(dupe_entry)
 
             elif torrent_search_table:
                 for row in torrent_search_table.find_all("tr", class_="torrent"):
@@ -817,19 +832,47 @@ class BJS:
                     link = f"{self.torrent_url}{torrent_id}"
 
                     torrent_info_div = row.find("div", class_="torrent_info")
-                    name = ""
+                    data_name = ""
                     if torrent_info_div and isinstance(torrent_info_div, Tag):
-                        name = torrent_info_div.get("data-torrentname", "")
-                        if not name:
-                            name = torrent_info_div.get("data-name", "")
+                        data_name = torrent_info_div.get("data-torrentname", "") or torrent_info_div.get("data-name", "")
 
-                    if not name:
-                        if title_link_tag:
-                            name = title_link_tag.get_text(strip=True)
+                    site_name = ""
+                    if title_link_tag:
+                        site_name = title_link_tag.get_text(strip=True)
+
+                    row_type = "ebook"
+                    if category == "BOOK":
+                        if meta.get("audiobook"):
+                            row_type = "audiobook"
                         else:
-                            continue
+                            fmt_attr = ""
+                            if torrent_info_div and isinstance(torrent_info_div, Tag):
+                                fmt_attr = torrent_info_div.get("data-format", "")
+                            if fmt_attr:
+                                fmt_attr = str(fmt_attr).lower().strip()
+                                if fmt_attr in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                    row_type = fmt_attr
+                            if row_type == "ebook":
+                                name_to_check = data_name or site_name
+                                name_lower = str(name_to_check).lower()
+                                for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                    if fmt in name_lower:
+                                        row_type = fmt
+                                        break
 
-                    name = str(name).strip()
+                    names = []
+                    if category == "BOOK":
+                        if data_name:
+                            names.append(str(data_name).strip())
+                        if site_name:
+                            names.append(str(site_name).strip())
+                    else:
+                        name = data_name or site_name
+                        if name:
+                            names.append(str(name).strip())
+
+                    if not names:
+                        continue
 
                     size = ""
                     tds = row.find_all("td")
@@ -839,21 +882,13 @@ class BJS:
                         ]
                         size = size_candidates[0] if size_candidates else tds[4].get_text(strip=True)
 
-                    dupe_entry = {"name": name, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
-                    if self.has_extension(name):
-                        dupe_entry["files"] = [name]
-                    if category == "BOOK":
-                        if meta.get("audiobook"):
-                            dupe_entry["type"] = "audiobook"
-                        else:
-                            name_lower = name.lower()
-                            for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
-                                if fmt in name_lower:
-                                    dupe_entry["type"] = fmt
-                                    break
-                            else:
-                                dupe_entry["type"] = "ebook"
-                    dupes.append(dupe_entry)
+                    for n in names:
+                        dupe_entry = {"name": n, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                        if self.has_extension(n):
+                            dupe_entry["files"] = [n]
+                        if category == "BOOK":
+                            dupe_entry["type"] = row_type
+                        dupes.append(dupe_entry)
 
             return dupes
 
