@@ -1071,16 +1071,25 @@ class BT:
         return cover_url
 
     async def get_book_language(self, meta: dict[str, Any]) -> str:
-        book_lang_code = meta.get("book_language_iso") or meta.get("book_language")
-        lang_name = ""
-        if book_lang_code:
-            try:
-                lang_name = langcodes.Language.make(book_lang_code).display_name("pt").capitalize()
-            except Exception:
-                lang_name = str(book_lang_code)
+        book_lang_code = meta.get("book_language_iso")
+        book_lang_code = book_lang_code.lower() if isinstance(book_lang_code, str) else ""
 
-        lang_map = {"português": "Português", "inglês": "Inglês", "italiano": "Italiano", "alemão": "Alemão", "espanhol": "Espanhol", "japonês": "Japonês"}
-        resolved_lang = lang_map.get(lang_name.lower(), "Outro")
+        lang_map = {
+            "pt": "Português",
+            "por": "Português",
+            "en": "Inglês",
+            "eng": "Inglês",
+            "it": "Italiano",
+            "ita": "Italiano",
+            "de": "Alemão",
+            "deu": "Alemão",
+            "ger": "Alemão",
+            "es": "Espanhol",
+            "spa": "Espanhol",
+            "ja": "Japonês",
+            "jpn": "Japonês",
+        }
+        resolved_lang = lang_map.get(book_lang_code, "Outro")
         if meta.get("audiobook", False) and resolved_lang == "Japonês":
             resolved_lang = "Outro"
         return resolved_lang
