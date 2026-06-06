@@ -430,6 +430,7 @@ async def gather_book_prep(
                 console.print(f"[yellow]Warning: MyAnonamouse API lookup failed: {ex}[/yellow]")
 
     # Google Books API search using ISBN (online lookup takes precedence)
+    google_books_data = None
     isbn = meta.get("isbn")
     if isbn:
         try:
@@ -466,6 +467,57 @@ async def gather_book_prep(
         except Exception as ex:
             if meta.get("debug", False):
                 console.print(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")
+
+    # OpenLibrary API search (online lookup takes precedence)
+    openlibrary_data = None
+    openlibrary_id = meta.get("openlibrary")
+    if openlibrary_id:
+        try:
+            from src.openlibrary import openlibrary_manager
+
+            openlibrary_data = await openlibrary_manager.search_by_work_id(openlibrary_id, base_dir=base_dir, debug=meta.get("debug", False))
+        except Exception as ex:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: OpenLibrary API lookup by Work ID failed: {ex}[/yellow]")
+    elif meta.get("isbn"):
+        try:
+            from src.openlibrary import openlibrary_manager
+
+            openlibrary_data = await openlibrary_manager.search_by_isbn(meta["isbn"], base_dir=base_dir, debug=meta.get("debug", False))
+        except Exception as ex:
+            if meta.get("debug", False):
+                console.print(f"[yellow]Warning: OpenLibrary API lookup by ISBN failed: {ex}[/yellow]")
+
+    if openlibrary_data:
+        for key, val in openlibrary_data.items():
+            if val:
+                # Enforce priority: CLI override > MAM > Google Books > OpenLibrary > local metadata
+                is_override = False
+                if (
+                    (key == "title" and cli_overrides["title"])
+                    or (key == "author" and cli_overrides["author"])
+                    or (key == "publisher" and cli_overrides["publisher"])
+                    or (key == "isbn" and cli_overrides["isbn"])
+                    or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
+                    or (key in ("year", "search_year") and cli_overrides["year"])
+                    or (key == "keywords" and cli_overrides["keywords"])
+                ):
+                    is_override = True
+
+                # Do not overwrite fields already populated by MAM
+                if mam_data and (key in mam_data or key == "book_language_iso" and "book_language" in mam_data or key == "search_year" and "year" in mam_data):
+                    is_override = True
+
+                # Do not overwrite fields already populated by Google Books
+                if google_books_data and (
+                    key in google_books_data or key == "book_language_iso" and "book_language" in google_books_data or key == "search_year" and "year" in google_books_data
+                ):
+                    is_override = True
+
+                if not is_override:
+                    meta[key] = val
+                    if key == "year" and "search_year" not in openlibrary_data:
+                        meta["search_year"] = int(val)
 
     if meta.get("audiobook", False):
         filelist = meta.get("filelist", [])

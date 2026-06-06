@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional
+from typing import Any
 
 from src.console import console
 from src.trackers.COMMON import COMMON
@@ -77,7 +77,10 @@ class CBR(UNIT3D):
             "MP3": "24",
             "M4B": "24",
             "FLAC": "24",
+            "AAC": "24",
             "M4A": "24",
+            "OGG": "24",
+            "WAV": "24",
             "AUDIOBOOK": "24",
             "OUTROS": "43",
         }
@@ -239,56 +242,3 @@ class CBR(UNIT3D):
                 console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
 
         return files
-
-    async def process_image_for_api(self, img_path: str, target_width: int, target_height: int) -> Optional[bytes]:
-        import asyncio
-        import io
-
-        from PIL import Image
-
-        def _process():
-            img_original = Image.open(img_path)
-            largura_orig, altura_orig = img_original.size
-
-            if img_original.mode in ("RGBA", "LA"):
-                fundo = Image.new("RGB", img_original.size, (255, 255, 255))
-                alpha = img_original.split()[-1]
-                fundo.paste(img_original, mask=alpha)
-                img_final = fundo
-            elif img_original.mode != "RGB":
-                img_final = img_original.convert("RGB")
-            else:
-                img_final = img_original
-
-            if largura_orig != target_width or altura_orig != target_height:
-                img_ratio = largura_orig / altura_orig
-                target_ratio = target_width / target_height
-
-                if img_ratio > target_ratio:
-                    nova_altura = target_height
-                    nova_largura = int(largura_orig * (target_height / altura_orig))
-                else:
-                    nova_largura = target_width
-                    nova_altura = int(altura_orig * (target_width / largura_orig))
-
-                img_resized = img_final.resize((nova_largura, nova_altura), Image.Resampling.LANCZOS)
-
-                left = (nova_largura - target_width) // 2
-                top = (nova_offset := (nova_altura - target_height) // 2)
-                right = left + target_width
-                bottom = top + target_height
-
-                img_final = img_resized.crop((left, top, right, bottom))
-
-            buf = io.BytesIO()
-            img_final.save(buf, format="JPEG", quality=95)
-            img_bytes = buf.getvalue()
-
-            if len(img_bytes) > 5 * 1024 * 1024:
-                buf = io.BytesIO()
-                img_final.save(buf, format="JPEG", quality=85)
-                img_bytes = buf.getvalue()
-
-            return img_bytes if len(img_bytes) <= 5 * 1024 * 1024 else None
-
-        return await asyncio.to_thread(_process)

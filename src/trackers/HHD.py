@@ -39,6 +39,112 @@ class HHD(UNIT3D):
 
         return should_continue
 
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "ANIME": "3",
+            "MUSIC": "4",
+            "GAMES": "5",
+            "APPS": "6",
+            "BOOKS": "7",
+            "AUDIOBOOK": "8",
+            "MANGA": "9",
+            "ADULT": "10",
+            "COMICS": "11",
+            "MAGAZINE": "12",
+        }
+        if mapping_only:
+            return category_id
+        elif reverse:
+            return {v: k for k, v in category_id.items()}
+
+        resolved_category = category if category else meta.get("category", "")
+        if resolved_category == "BOOK":
+            if meta.get("audiobook", False):
+                resolved_category = "AUDIOBOOK"
+            elif meta.get("comic", False):
+                resolved_category = "COMICS"
+            elif meta.get("manga", False):
+                resolved_category = "MANGA"
+            elif meta.get("magazine", False):
+                resolved_category = "MAGAZINE"
+            else:
+                resolved_category = "BOOKS"
+
+        return {"category_id": category_id.get(resolved_category, "0")}
+
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "FLAC": "7",
+            "AAC": "8",
+            "ALAC": "9",
+            "M4A": "10",
+            "M4B": "11",
+            "MP4": "12",
+            "MP3": "13",
+            "ISO": "14",
+            "APK": "15",
+            "RAR": "16",
+            "7Z": "17",
+            "ROM": "18",
+            "PDF": "19",
+            "EPUB": "20",
+            "MOBI": "21",
+            "CBZ": "22",
+            "CBR": "22",
+            "OTHER": "23",
+            "GAME": "24",
+            "WINDOWS": "25",
+            "MAC": "26",
+            "LINUX": "27",
+            "CONSOLE": "28",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
+
+        resolved_type = type if type else meta.get("type", "")
+        if isinstance(resolved_type, str):
+            resolved_type = resolved_type.upper()
+
+        if meta.get("category") == "BOOK" and resolved_type not in type_id:
+            resolved_type = "OTHER"
+
+        return {"type_id": type_id.get(resolved_type, "0")}
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        files = await super().get_additional_files(meta)
+        import os
+
+        cover_path = meta.get("cover_path")
+        if cover_path and os.path.exists(cover_path):
+            try:
+                cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
+                if cover_bytes:
+                    files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
+
+        banner_path = meta.get("banner_path")
+        if banner_path and os.path.exists(banner_path):
+            try:
+                banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
+                if banner_bytes:
+                    files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
+
+        return files
+
     async def get_resolution_id(
         self,
         meta: Meta,

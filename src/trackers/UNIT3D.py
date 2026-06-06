@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import glob
+import io
 import json
 import os
 import platform
@@ -9,6 +10,7 @@ from typing import Any, Optional, Union
 
 import aiofiles
 import httpx
+from PIL import Image
 from typing_extensions import TypeAlias
 
 from src.console import console
@@ -609,3 +611,51 @@ class UNIT3D:
         if error_msg:
             return f"API response: {error_msg}"
         return f"API response: {response_data}"
+
+    async def process_image_for_api(self, img_path: str, target_width: int, target_height: int) -> Optional[bytes]:
+        def _process():
+            img_original = Image.open(img_path)
+            width_orig, height_orig = img_original.size
+
+            if img_original.mode in ("RGBA", "LA"):
+                fundo = Image.new("RGB", img_original.size, (255, 255, 255))
+                alpha = img_original.split()[-1]
+                fundo.paste(img_original, mask=alpha)
+                img_final = fundo
+            elif img_original.mode != "RGB":
+                img_final = img_original.convert("RGB")
+            else:
+                img_final = img_original
+
+            if width_orig != target_width or height_orig != target_height:
+                img_ratio = width_orig / height_orig
+                target_ratio = target_width / target_height
+
+                if img_ratio > target_ratio:
+                    new_h = target_height
+                    new_w = int(width_orig * (target_height / height_orig))
+                else:
+                    new_w = target_width
+                    new_h = int(height_orig * (target_width / width_orig))
+
+                img_resized = img_final.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+                left = (new_w - target_width) // 2
+                top = (_new_height := (new_h - target_height) // 2)
+                right = left + target_width
+                bottom = top + target_height
+
+                img_final = img_resized.crop((left, top, right, bottom))
+
+            buf = io.BytesIO()
+            img_final.save(buf, format="JPEG", quality=95)
+            img_bytes = buf.getvalue()
+
+            if len(img_bytes) > 5 * 1024 * 1024:
+                buf = io.BytesIO()
+                img_final.save(buf, format="JPEG", quality=85)
+                img_bytes = buf.getvalue()
+
+            return img_bytes if len(img_bytes) <= 5 * 1024 * 1024 else None
+
+        return await asyncio.to_thread(_process)

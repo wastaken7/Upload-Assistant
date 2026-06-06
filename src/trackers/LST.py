@@ -26,6 +26,9 @@ class LST(UNIT3D):
         pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.get("category") == "BOOK":
+            return True
+
         should_continue = True
         if not meta['valid_mi_settings']:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
@@ -38,25 +41,54 @@ class LST(UNIT3D):
 
         return should_continue
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: Optional[str] = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
-        _ = (reverse, mapping_only)
-        type = str(meta.get('type', '')).upper()
+    async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "BOOK": "9",
+        }
+        if mapping_only:
+            return category_id
+        elif reverse:
+            return {v: k for k, v in category_id.items()}
+
+        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        return {"category_id": category_id.get(resolved_category, "0")}
+
+    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6',
-            'ENCODE': '3',
-            'DVDRIP': '3'
-        }.get(type, '0')
-        return {'type_id': type_id}
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "SDTV": "16",
+            "FLAC": "7",
+            "ALAC": "8",
+            "AC3": "9",
+            "AAC": "10",
+            "MP3": "11",
+            "MAC": "12",
+            "WINDOWS": "13",
+            "LINUX": "14",
+            "OTHER": "15",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
+
+        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        if isinstance(resolved_type, str):
+            resolved_type = resolved_type.upper().strip().lstrip(".")
+
+        val = type_id.get(resolved_type, "0")
+        if meta.get("category") == "BOOK" and resolved_type not in type_id:
+            val = "15"
+
+        return {"type_id": val}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -68,6 +100,15 @@ class LST(UNIT3D):
         edition_id = await self.get_edition(meta)
         if edition_id is not None:
             data['edition_id'] = edition_id
+
+        if meta.get("category") == "BOOK":
+            openlibrary_id = meta.get("openlibrary") or meta.get("openlibrary_id") or meta.get("openlibrary_book_id") or ""
+            isbn = meta.get("isbn") or ""
+
+            data["book_exists_on_openlibrary"] = "1"
+            data["openlibrary_book_id"] = openlibrary_id
+            data["openlibrary_isbn"] = isbn
+            data["extra_openlibrary_ids"] = meta.get("extra_openlibrary_ids") or ""
 
         return data
 

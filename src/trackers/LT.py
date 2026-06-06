@@ -1,7 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import os
 import re
 from typing import Any, Optional, cast
 
+from src.console import console
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -30,11 +32,31 @@ class LT(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
-        _ = (category, reverse, mapping_only)
-        category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-        }.get(meta['category'], '0')
+        cat_map = {
+            "MOVIE": "1",
+            "TV": "2",
+            "EBOOK": "18",
+            "AUDIOBOOK": "11",
+            "MAGAZINE": "29",
+            "COMIC": "30",
+        }
+        if mapping_only:
+            return cat_map
+        elif reverse:
+            return {v: k for k, v in cat_map.items()}
+
+        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        if resolved_category == "BOOK":
+            if meta.get("audiobook", False):
+                resolved_category = "AUDIOBOOK"
+            elif meta.get("comic", False) or meta.get("manga", False):
+                resolved_category = "COMIC"
+            elif meta.get("magazine", False):
+                resolved_category = "MAGAZINE"
+            else:
+                resolved_category = "EBOOK"
+
+        category_id = cat_map.get(resolved_category, "0")
 
         keywords = str(meta.get('keywords', '')).lower()
         overview = str(meta.get('overview', '')).lower()
@@ -43,7 +65,7 @@ class LT(UNIT3D):
         origin_countries_value = meta.get('origin_country', [])
         origin_countries = cast(list[str], origin_countries_value) if isinstance(origin_countries_value, list) else []
 
-        if meta['category'] == 'TV':
+        if resolved_category == "TV":
             # Anime
             if meta.get('anime', False):
                 category_id = '5'
@@ -61,7 +83,94 @@ class LT(UNIT3D):
 
         return {'category_id': category_id}
 
+    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "DVDRIP": "3",
+            "FLAC": "7",
+            "ALAC": "8",
+            "AC3": "9",
+            "AAC": "10",
+            "MP3": "11",
+            "M4A": "18",
+            "M4B": "17",
+            "EPUB": "14",
+            "PDF": "23",
+            "CBZ": "25",
+            "CBR": "25",
+            "AZW3": "26",
+            "MOBI": "26",
+            "KFX": "26",
+            "OTHER": "21",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
+
+        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        if isinstance(resolved_type, str):
+            resolved_type = resolved_type.upper().strip().lstrip(".")
+            if resolved_type in ("CBZ", "CBR"):
+                resolved_type = "CBZ"
+            elif resolved_type in ("AZW3", "MOBI", "KFX"):
+                resolved_type = "AZW3"
+
+        val = type_id.get(resolved_type, "0")
+        if meta.get("category") == "BOOK" and val == "0":
+            val = "21"
+
+        return {"type_id": val}
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.get("category") == "BOOK":
+            author = str(meta.get("author", "")).strip()
+            title = str(meta.get("title", "")).strip()
+            fmt = str(meta.get("type", "")).strip().upper()
+
+            extra_info = []
+
+            # If it's comic/manga/magazine/newspaper, we can add volume, issue/number info if available
+            volume = str(meta.get("manual_season") or meta.get("season") or "").strip()
+            issue = str(meta.get("manual_episode") or meta.get("episode") or "").strip()
+
+            if volume:
+                extra_info.append(f"Vol {volume}")
+            if issue:
+                extra_info.append(f"No {issue}")
+
+            edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+            if edition:
+                if not any(x in edition.lower() for x in ["edición", "edicion", "edition", "ed.", "ed"]):
+                    extra_info.append(f"{edition} Edition")
+                else:
+                    extra_info.append(edition)
+
+            if meta.get("audiobook", False):
+                book_lang = str(meta.get("book_language", "")).lower()
+                if "spain" in book_lang or "castilian" in book_lang or "castellano" in book_lang:
+                    extra_info.append("Narración en Castellano")
+                elif "latin" in book_lang or "latino" in book_lang:
+                    extra_info.append("Narración en Latino")
+                elif "portuguese" in book_lang or "português" in book_lang or "portugues" in book_lang:
+                    extra_info.append("Narración en Portugués")
+                elif book_lang:
+                    lang_title = str(meta.get("book_language", "")).title()
+                    extra_info.append(f"Narración en {lang_title}")
+
+            extra_str = ""
+            if extra_info:
+                extra_str = " " + " ".join(f"({info})" for info in extra_info)
+
+            lt_name = f"{author} - {title}{extra_str} {fmt}" if author else f"{title}{extra_str} {fmt}"
+
+            return {"name": re.sub(r"\s{2,}", " ", lt_name).strip()}
+
         aka_value = str(meta.get('aka', ''))
         lt_name = (
             str(meta.get('name', ''))
@@ -137,6 +246,8 @@ class LT(UNIT3D):
         return {"name": re.sub(r"\s{2,}", " ", lt_name)}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.get("category") == "BOOK":
+            return True
         spanish_languages = ["spanish", "spanish (latin america)"]
         return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=spanish_languages, check_audio=True, check_subtitle=True)
 
@@ -146,6 +257,29 @@ class LT(UNIT3D):
         }
 
         return data
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        files = await super().get_additional_files(meta)
+
+        cover_path = meta.get("cover_path")
+        if cover_path and os.path.exists(cover_path):
+            try:
+                cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
+                if cover_bytes:
+                    files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
+
+        banner_path = meta.get("banner_path")
+        if banner_path and os.path.exists(banner_path):
+            try:
+                banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
+                if banner_bytes:
+                    files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
+
+        return files
 
     async def get_distributor_ids(self, _meta: Meta) -> dict[str, str]:
         return {}

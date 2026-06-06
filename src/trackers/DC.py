@@ -8,7 +8,7 @@ import httpx
 
 from cogs.redaction import Redaction
 from src.console import console
-from src.get_desc import DescriptionBuilder
+from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
@@ -55,6 +55,51 @@ class DC:
         # File information
         bdinfo_section = await builder.get_bdinfo_section(meta)
         desc_parts.append(bdinfo_section)
+
+        # Book
+        if meta.get("category") == "BOOK":
+            book_parts = []
+            title = meta.get("title", "")
+            author = meta.get("author", "")
+
+            title_line = f"[b]{title}[/b]"
+            if author:
+                title_line += f" by [b]{author}[/b]"
+            book_parts.append(f"[center]{title_line}[/center]")
+
+            cover_url = await self.get_firstpic(meta)
+            if cover_url:
+                book_parts.append(f"[center][img]{cover_url}[/img][/center]")
+
+            details = []
+            if author:
+                details.append(f"• [b]Author:[/b] {author}")
+            narrator = meta.get("narrator")
+            if narrator:
+                details.append(f"• [b]Narrator:[/b] {narrator}")
+            publisher = meta.get("publisher")
+            if publisher:
+                details.append(f"• [b]Publisher:[/b] {publisher}")
+            isbn = meta.get("isbn")
+            if isbn:
+                details.append(f"• [b]ISBN:[/b] {isbn}")
+            year = meta.get("year")
+            if year:
+                details.append(f"• [b]Release Year:[/b] {year}")
+
+            if meta.get("audiobook", False):
+                duration = meta.get("audiobook_duration_formatted")
+                if duration:
+                    details.append(f"• [b]Duration:[/b] {duration}")
+
+            if details:
+                book_parts.append("\n[b][u]Technical Info[/u][/b]\n" + "\n".join(details))
+
+            overview = html_to_bbcode(str(meta.get("overview", "")))
+            if overview:
+                book_parts.append(f"\n[b][u]Synopsis[/u][/b]\n{overview}")
+
+            desc_parts.append("\n".join(book_parts))
 
         # NFO
         nfo_content = meta.get('description_nfo_content')
@@ -153,6 +198,12 @@ class DC:
                 return 11
         if category == 'TV' and tv_pack == 1:
             return 12
+
+        if category == "BOOK":
+            if meta.get("audiobook", False):
+                return 44
+            return 28
+
         if sd == 1:
             if category == 'MOVIE':
                 return 2
@@ -265,6 +316,15 @@ class DC:
         )
         return
 
+    async def get_firstpic(self, meta: Meta) -> str:
+        if meta["category"] == "BOOK":
+            covers = meta.get("covers")
+            if isinstance(covers, list) and len(covers) > 0:
+                raw_url = covers[0].get("raw_url")
+                if raw_url:
+                    return str(raw_url)
+        return ""
+
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         anon = '1' if meta['anon'] or self.config['TRACKERS'][self.tracker].get('anon', False) else '0'
 
@@ -279,6 +339,8 @@ class DC:
             "anonymousUpload": anon,
             "p2p": "0",
             "unrar": "1",
+            "firstpic": await self.get_firstpic(meta),
+            "language": meta.get("book_language", ""),
         }
 
         return data

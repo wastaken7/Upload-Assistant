@@ -121,3 +121,78 @@ class DP(UNIT3D):
             dp_name = dp_name.replace("Dual-Audio", audio)
 
         return {'name': dp_name}
+
+    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {"MOVIE": "1", "TV": "2", "BOOK": "8"}
+        if mapping_only:
+            return category_id
+        elif reverse:
+            return {v: k for k, v in category_id.items()}
+        elif category:
+            return {"category_id": category_id.get(category, "0")}
+        else:
+            meta_category = meta.get("category", "")
+            resolved_id = category_id.get(meta_category, "0")
+            return {"category_id": resolved_id}
+
+    async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            "DISC": "1",
+            "REMUX": "2",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "AUDIOBOOK": "15",
+            "COMIC": "17",
+            "EBOOK": "18",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
+        elif type:
+            t_upper = type.upper()
+            if t_upper in ("CBR", "CBZ"):
+                t_upper = "COMIC"
+            elif t_upper in ("EPUB", "PDF", "MOBI", "AZW3", "KFX"):
+                t_upper = "EBOOK"
+            elif t_upper in ("MP3", "M4B", "FLAC", "AAC", "M4A", "OGG", "WAV"):
+                t_upper = "AUDIOBOOK"
+            return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
+        else:
+            meta_type = meta.get("type", "").upper()
+            if meta.get("category") == "BOOK":
+                if meta.get("audiobook", False):
+                    meta_type = "AUDIOBOOK"
+                elif meta.get("comic", False) or meta_type in ("CBR", "CBZ"):
+                    meta_type = "COMIC"
+                else:
+                    meta_type = "EBOOK"
+            resolved_id = type_id.get(meta_type, "0")
+            return {"type_id": resolved_id}
+
+    async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
+        files = await super().get_additional_files(meta)
+        import os
+
+        cover_path = meta.get("cover_path")
+        if cover_path and os.path.exists(cover_path):
+            try:
+                cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
+                if cover_bytes:
+                    files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
+
+        banner_path = meta.get("banner_path")
+        if banner_path and os.path.exists(banner_path):
+            try:
+                banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
+                if banner_bytes:
+                    files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
+            except Exception as e:
+                console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
+
+        return files

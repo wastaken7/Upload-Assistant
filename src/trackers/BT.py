@@ -5,10 +5,8 @@ import os
 import platform
 import re
 import unicodedata
-import urllib.request
 import zipfile
 from typing import Any, Optional, cast
-from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -26,7 +24,6 @@ from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
-from src.uploadscreens import UploadScreensManager
 
 
 class BT:
@@ -1031,32 +1028,18 @@ class BT:
         return "\n".join(final_book_parts)
 
     async def get_book_cover(self, meta: dict[str, Any]) -> str:
-        cover_url = ""
-        cover_path = meta.get("cover_path")
+        covers = meta.get("covers")
+        if isinstance(covers, list) and len(covers) > 0:
+            raw_url = covers[0].get("raw_url")
+            if raw_url:
+                return str(raw_url)
 
-        # If we don't have cover_path but we have a poster URL, we download it first
+        # Fallback to poster URL if remote
         poster_url = meta.get("poster")
-        if not cover_path and isinstance(poster_url, str) and poster_url:
-            poster_jpg_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/poster.jpg"
-            try:
-                parsed_url = urlparse(poster_url)
-                if parsed_url.scheme in ("http", "https"):
-                    os.makedirs(os.path.dirname(poster_jpg_path), exist_ok=True)
-                    urllib.request.urlretrieve(poster_url, poster_jpg_path)
-                    cover_path = poster_jpg_path
-                    meta["cover_path"] = cover_path
-            except Exception as e:
-                console.print(f"Erro ao baixar poster de {poster_url}: {e}")
+        if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
+            return poster_url
 
-        if cover_path and os.path.exists(cover_path):
-            try:
-                uploadscreens_manager = UploadScreensManager(self.config)
-                uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
-                if uploaded_cover and len(uploaded_cover) > 0:
-                    cover_url = str(uploaded_cover[0].get("raw_url", ""))
-            except Exception as e:
-                console.print(f"Erro ao fazer upload da capa do livro: {e}")
-        return cover_url
+        return ""
 
     async def get_book_language(self, meta: dict[str, Any]) -> str:
         book_lang_code = meta.get("book_language_iso")
