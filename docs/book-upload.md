@@ -9,7 +9,12 @@ The Upload Assistant supports the `BOOK` category, enabling automated metadata g
 - **Ebooks**: Supports `.pdf`, `.epub`, `.mobi`, `.cbz`, and `.cbr` formats.
 - **Audiobooks**: Supports `.mp3`, `.m4b`, `.flac`, `.aac`, `.m4a`, `.ogg`, and `.wav` formats.
 
-The script automatically detects if a release is an audiobook by checking the file extensions of the largest file in the upload directory. If it is an audio format, it treats the upload as an audiobook.
+### Automated Type & Subcategory Detection
+The assistant automatically detects the subcategory or format of a book upload using a set of rules:
+- **Audiobooks**: If the file extension of the largest file in the upload directory is an audio format, the upload is treated as an audiobook.
+- **Comics/Manga**: Files with `.cbz` or `.cbr` extensions are automatically classified as Comics.
+- **Newspapers**: Titles are matched (case-insensitively) against a built-in list of newspapers to auto-flag the upload as a Newspaper.
+- **API Tags/Categories**: If MyAnonamouse (MAM) or Google Books APIs return relevant categories or tags (e.g. `manga`, `comic`, `magazine`, `newspaper`), the assistant updates the upload classification accordingly.
 
 ---
 
@@ -28,6 +33,9 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 ### B. API Metadata Integrations
 - **MyAnonamouse (MAM)**: If the files being uploaded correspond to an active torrent in your local client containing `myanonamouse.net` in trackers, the assistant extracts the torrent ID (`MID=(\d+)`) from the client comments. It then queries the MAM API using your configured `mam_api_key` / `mam_id` to retrieve details like title, authors, narrators, description, ISBN, language, and cover image URL.
 - **Google Books**: If a valid ISBN is resolved locally or provided via CLI, the assistant calls the Google Books API (using `google_books_api_key` if configured) to fetch title, authors, publisher, publication year, genres/keywords, book description, and front cover URL.
+
+  > [!NOTE]
+  > If `google_books_api_key` is not configured in your `config.py`, the terminal will display a warning message in red alerting you that book metadata searches will be limited and incomplete.
 
 ---
 
@@ -63,6 +71,9 @@ The duplicate checking module (`dupe_checking.py`) uses custom rules for books t
 - **Format Distinction**: Ebooks and audiobooks of the same title are kept separate and are not flagged as duplicates of each other.
 - **File Type Validation**: For ebooks, different file formats (e.g., EPUB vs PDF) are checked. Uploading an EPUB will not be marked as a duplicate of an existing PDF, allowing multiple formats of the same book to co-exist.
 
+  > [!NOTE]
+  > **CBR Tracker Exception**: For the **CBR** tracker, different ebook formats *are* considered duplicates under the `BOOK` category because this tracker only allows one format per book.
+
 ---
 
 ## 5. Console Prompting & Output Formatting
@@ -82,6 +93,10 @@ You can override auto-detected values using the following command-line flags:
 | `-author` | `--book_author` | Overrides the book author |
 | `-isbn` | `--book_isbn` | Overrides the ISBN number |
 | `-blang` | `--book_language` | Overrides the book language (e.g. English, Portuguese) |
+| `-comic` | `--comic` | Identifies the book upload as a Comic |
+| `-manga` | `--manga` | Identifies the book upload as a Manga |
+| `-magazine` | `--magazine` | Identifies the book upload as a Magazine |
+| `-newspaper` | `--newspaper` | Identifies the book upload as a Newspaper |
 
 ---
 
@@ -100,3 +115,14 @@ config = {
     }
 }
 ```
+
+---
+
+## 8. Supported Trackers
+
+The following trackers support the `BOOK` category with custom metadata mapping (e.g., custom form templates, category IDs, and naming patterns):
+- **ASC**: Maps book-specific metadata (author, title) using the tracker templates and structures the torrent name as `{author} - {title}`.
+- **BJS** (BJ-Share): Fully supports books, audiobooks, comics, mangas, magazines, and newspapers with detailed metadata mappings (such as format, page count, publisher, ISBN, cover image, and description).
+- **CBR**: Supports comics/manga, audiobooks, and books, and treats different ebook formats as duplicates since only one format is allowed per book.
+- **BT**: Supports standard book metadata mapping.
+- **TL**: Supports standard book metadata mapping.
