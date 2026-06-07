@@ -215,6 +215,20 @@ class BT:
 
         return 'Outro'
 
+    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+        if meta.get("category") == "GAME":
+            pc_platforms = {"PC", "MAC", "LINUX"}
+            platform = str(meta.get("platform", "")).upper().strip()
+            if platform in pc_platforms:
+                has_install_notes = bool(str(meta.get("description_link", "")).strip() or str(meta.get("description_file", "")).strip())
+                if not has_install_notes:
+                    console.print(
+                        f"{self.tracker}: [red]Installation notes are required for PC game uploads. "
+                        "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
+                    )
+                    return False
+        return True
+
     async def get_type(self, meta: dict[str, Any]) -> Optional[str]:
         if meta.get('anime'):
             return '5'
@@ -230,11 +244,167 @@ class BT:
             return "12"
 
         category_map = {
-            'TV': '1',
-            'MOVIE': '0'
+            "TV": "1",
+            "MOVIE": "0",
+            "GAME": "8",
         }
 
         return category_map.get(category) if isinstance(category, str) else None
+
+    def get_game_language(self, meta: dict[str, Any]) -> str:
+        """Map game languages from IGDB to BT idioma_ori field (same logic as BJS)."""
+        language_map: dict[str, str] = {
+            "german": "Alemão",
+            "spanish": "Espanhol",
+            "french": "Francês",
+            "english": "Inglês",
+            "japanese": "Japonês",
+            "portuguese": "Português",
+            "russian": "Russo",
+        }
+
+        languages = meta.get("languages", {})
+        if not languages:
+            return ""
+
+        lang_names: list[str] = list(languages.keys()) if isinstance(languages, dict) else []
+        if not lang_names:
+            return ""
+
+        lang_names_lower = [ln.lower() for ln in lang_names]
+
+        has_portuguese = any("portuguese" in ln or "português" in ln for ln in lang_names_lower)
+
+        if has_portuguese and len(lang_names) > 1:
+            return "Multilinguagem"
+
+        if len(lang_names) == 1:
+            for key, value in language_map.items():
+                if key in lang_names_lower[0]:
+                    return value
+            return lang_names[0]
+
+        # Multiple languages, no Portuguese → first matching
+        for ln in lang_names_lower:
+            for key, value in language_map.items():
+                if key in ln:
+                    return value
+
+        return lang_names[0] if lang_names else ""
+
+    def get_game_genre(self, meta: dict[str, Any]) -> str:
+        genre_map: dict[str, str] = {
+            "action": "Ação",
+            "adventure": "Aventura",
+            "arcade": "Arcade",
+            "card": "Jogos de Cartas e Tabuleiro",
+            "board": "Jogos de Cartas e Tabuleiro",
+            "racing": "Corrida",
+            "driving": "Corrida",
+            "sport": "Esporte",
+            "sports": "Esporte",
+            "strategy": "Estratégia Baseada em Turnos",
+            "real time strategy": "RTS - Estratégia em Tempo Real",
+            "turn-based strategy": "Estratégia Baseada em Turnos",
+            "shooter": "Tiro",
+            "fighting": "Luta",
+            "moba": "Moba",
+            "music": "Musical",
+            "rhythm": "Musical",
+            "platform": "Plataforma",
+            "puzzle": "Puzzle",
+            "rpg": "RPG",
+            "role-playing": "RPG",
+            "simulation": "Simulador",
+            "simulator": "Simulador",
+            "horror": "Terror",
+            "hack and slash": "Hack and Slash Beat em Up",
+            "indie": "Indie",
+            "point-and-click": "Point and Click",
+            "visual novel": "Ficção",
+        }
+
+        genres_str = meta.get("genres", "") or meta.get("keywords", "")
+        if not genres_str:
+            return ""
+
+        for genre in [g.strip() for g in str(genres_str).split(",") if g.strip()]:
+            genre_lower = genre.lower()
+            for key, value in genre_map.items():
+                if key in genre_lower:
+                    return value
+
+        return ""
+
+    def get_game_platform_bt(self, meta: dict[str, Any]) -> str:
+        """Map meta['platform'] to BT plataforma_jogo dropdown value."""
+        platform_map: dict[str, str] = {
+            "PC": "PC",
+            "MAC": "PC",
+            "LINUX": "PC",
+            "MOBILE": "Celular/Tablet",
+            "EMULATOR": "Emulador",
+            "PS1": "PS1",
+            "PS2": "PS2",
+            "PS3": "PS3",
+            "PS4": "PS4",
+            "PSVITA": "PS Vita",
+            "SWITCH": "Nintendo Switch",
+            "WII": "Wii",
+            "WIIU": "Wii U",
+            "XBOX": "Xbox Clássico",
+            "X360": "Xbox 360",
+            "XONE": "Multiplataforma",
+            "XSX": "Multiplataforma",
+        }
+
+        platform = str(meta.get("platform", "")).upper().strip()
+        return platform_map.get(platform, "")
+
+    def get_game_os(self, meta: dict[str, Any]) -> str:
+        """Map meta['platform'] to BT sys_jogo dropdown value."""
+        platform = str(meta.get("platform", "")).upper().strip()
+        if platform == "PC":
+            return "Windows"
+        elif platform == "MAC":
+            return "Mac"
+        elif platform == "LINUX":
+            return "Linux"
+        elif platform == "MOBILE":
+            return "Android"
+        elif platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSVITA", "SWITCH", "WII", "WIIU", "XBOX", "X360", "XONE", "XSX"}:
+            return "Console"
+        return ""
+
+    def get_game_format(self, meta: dict[str, Any]) -> str:
+        """Map game container/type to BT formato_jogo dropdown value."""
+        platform = str(meta.get("platform", "")).upper().strip()
+        container = str(meta.get("container", "")).lower()
+
+        if platform == "MOBILE":
+            return "APK"
+        if container in ("exe", "exe"):
+            return "EXE"
+        if container in ("iso",):
+            return "ISO"
+        if container in ("rar", "zip", "7z"):
+            return "RAR/ZIP"
+        if container in ("bin",):
+            return "BIN"
+        if container in ("nrg",):
+            return "NRG"
+        if container in ("ndf",):
+            return "NDF"
+
+        # Infer from platform
+        if platform in {"PS1", "PS2"}:
+            return "ISO"
+        if platform in {"PS3", "PS4", "SWITCH"}:
+            return "ISO"
+        if platform == "PC":
+            return "EXE"
+
+        return "Outros"
 
     async def get_languages(self, _meta: dict[str, Any]) -> Optional[str]:
         lang_code = self.main_tmdb_data.get('original_language')
@@ -442,6 +612,11 @@ class BT:
                     if spectrograms_block:
                         desc_parts.append(f"\n\n{spectrograms_header}\n[center]{spectrograms_block}[/center]")
 
+        # Game
+        game_section = builder._build_game_desc_section(meta, header_size=3)
+        if game_section:
+            desc_parts.append(game_section)
+
         # Logo
         logo_resize_url = meta.get("tmdb_logo", "")
         if logo_resize_url:
@@ -517,7 +692,7 @@ class BT:
     async def get_tags(self, meta: dict[str, Any]) -> str:
         tags = ''
 
-        if meta.get("category") == "BOOK":
+        if meta.get("category") in ("BOOK", "GAME"):
             keywords_str = meta.get("keywords") or meta.get("genres") or ""
             if keywords_str:
                 keyword_list = [k.strip() for k in keywords_str.split(",") if k.strip()]
@@ -545,8 +720,9 @@ class BT:
     async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         is_book = meta.get("category") == "BOOK"
+        is_game = meta.get("category") == "GAME"
 
-        if is_book:
+        if is_book or is_game:
             searchstr = meta["title"]
         else:
             imdb_info: dict[str, Any] = meta.get("imdb_info", {})
@@ -555,6 +731,12 @@ class BT:
                 meta["skipping"] = f"{self.tracker}"
                 return dupes
             searchstr = meta["title"] if meta.get("anime") else imdb_info.get("imdbID")
+
+        if is_game:
+            should_continue = await self.get_additional_checks(meta)
+            if not should_continue:
+                meta["skipping"] = f"{self.tracker}"
+                return dupes
 
         is_tv_pack = bool(meta.get("tv_pack"))
 
@@ -569,7 +751,7 @@ class BT:
             if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
                 meta["skipping"] = f"{self.tracker}"
-                return found_items
+                return dupes
 
             # Extract auth token if present
             auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
@@ -578,7 +760,7 @@ class BT:
             else:
                 console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
                 meta["skipping"] = f"{self.tracker}"
-                return found_items
+                return dupes
 
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -640,7 +822,7 @@ class BT:
                     name = ""
                     is_existing_torrent_a_disc = any(keyword in description_text.lower() for keyword in ['bd25', 'bd50', 'bd66', 'bd100', 'dvd5', 'dvd9', 'm2ts'])
 
-                    if is_existing_torrent_a_disc or is_tv_pack:
+                    if is_existing_torrent_a_disc or is_tv_pack or is_game:
                         path_div = file_div.find('div', class_='filelist_path')
                         if path_div:
                             folder_name = path_div.get_text(strip=True).strip('/')
@@ -843,7 +1025,49 @@ class BT:
             "type": await self.get_type(meta),
         }
 
-        if meta.get("category") == "BOOK":
+        if meta.get("category") == "GAME":
+            overview = ""
+            localized_overviews = meta.get("localized_overviews", {})
+            if isinstance(localized_overviews, dict):
+                overview = localized_overviews.get("brazilian", "") or meta.get("overview", "")
+            if not overview:
+                overview = meta.get("overview", "")
+
+            # Cover image
+            cover_url = ""
+            cover_path = meta.get("cover_path", "")
+            if isinstance(cover_path, str) and cover_path.startswith(("http://", "https://")):
+                cover_url = cover_path
+            elif meta.get("poster", "") and str(meta.get("poster", "")).startswith(("http://", "https://")):
+                cover_url = str(meta.get("poster", ""))
+
+            data.update({
+                "idioma_ori": self.get_game_language(meta),
+                "genero_jogo": self.get_game_genre(meta),
+                "plataforma_jogo": self.get_game_platform_bt(meta),
+                "sys_jogo": self.get_game_os(meta),
+                "format": self.get_game_format(meta),
+                "tags": tags,
+                "image": cover_url,
+                "sinopse": overview,
+                "especificas": description,
+                "screen[]": await self.get_screens(meta),
+                "releasedate": meta.get("igdb_first_release_date", ""),
+                "vote": str(meta.get("igdb_rating_count", "")),
+                "rating": str(meta.get("igdb_rating", "")),
+            })
+
+            platform = str(meta.get("platform", "")).upper().strip()
+            if platform == "PC":
+                tag = str(meta.get("tag", ""))
+                if tag:
+                    data["versaoapp"] = tag.lstrip("-")
+
+            youtube = meta.get("youtube", "")
+            if youtube:
+                data["youtube"] = youtube
+
+        elif meta.get("category") == "BOOK":
             cover_url = await self.get_book_cover(meta)
             resolved_lang = await self.get_book_language(meta)
             resolved_format = await self.get_container(meta)

@@ -86,7 +86,7 @@ class IGDBAPI:
         headers = {"Client-ID": self.client_id, "Authorization": f"Bearer {token}", "Accept": "application/json", "Content-Type": "text/plain"}
 
         # Apicalypse query
-        query = f'search "{title}"; fields name, summary, storyline, first_release_date, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name; limit 5;'
+        query = f'search "{title}"; fields name, summary, storyline, first_release_date, rating, rating_count, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name; limit 5;'
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -148,7 +148,7 @@ class IGDBAPI:
         }
 
         # Apicalypse query by ID
-        query = f"where id = {igdb_id_str}; fields name, summary, storyline, first_release_date, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name;"
+        query = f"where id = {igdb_id_str}; fields name, summary, storyline, first_release_date, rating, rating_count, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name;"
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -209,7 +209,7 @@ class IGDBAPI:
         headers = {"Client-ID": self.client_id, "Authorization": f"Bearer {token}", "Accept": "application/json", "Content-Type": "text/plain"}
 
         # Query games where external_games.external_game_source = 1 (Steam) and external_games.uid = steam_id_str
-        query = f'where external_games.external_game_source = 1 & external_games.uid = "{steam_id_str}"; fields name, summary, storyline, first_release_date, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name;'
+        query = f'where external_games.external_game_source = 1 & external_games.uid = "{steam_id_str}"; fields name, summary, storyline, first_release_date, rating, rating_count, cover.url, screenshots.url, genres.name, platforms.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, websites.url, websites.type, external_games.url, external_games.external_game_source, external_games.uid, language_supports.language.name, language_supports.language_support_type.name;'
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

@@ -15,7 +15,7 @@ from pymediainfo import MediaInfo
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.get_desc import html_to_bbcode
+from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -184,7 +184,8 @@ class ASC:
         return None
 
     async def get_type(self, meta: dict[str, Any]) -> Union[str, int]:
-        if meta.get("category") == "BOOK":
+        category = meta["category"]
+        if category == "BOOK":
             if meta.get("audiobook", False):
                 return "121"
             elif meta.get("comic", False):
@@ -195,6 +196,9 @@ class ASC:
                 return "68"
             else:
                 return "67"
+
+        if category == "GAME":
+            return self.get_game_type(meta)
 
         bd_disc_map = {'BD25': '40', 'BD50': '41', 'BD66': '42', 'BD100': '43'}
         standard_map = {'ENCODE': '9', 'REMUX': '39', 'WEBDL': '23', 'WEBRIP': '38', 'BDRIP': '8', 'DVDRIP': '3'}
@@ -376,6 +380,9 @@ class ASC:
             title = meta.get("title", "").strip()
             return f"{author} - {title}"
 
+        if meta.get("category") == "GAME":
+            return self.get_game_name(meta)
+
         name = meta['title']
         base_name = name
 
@@ -491,6 +498,10 @@ class ASC:
     async def build_description(self, meta: dict[str, Any]) -> str:
         if meta.get("category") == "BOOK":
             return await self.build_book_description(meta)
+
+        if meta.get("category") == "GAME":
+            return await self.build_game_description(meta)
+
         user_layout = await self.fetch_layout_data(meta)
         fileinfo_dump = await self.media_info(meta)
 
@@ -707,6 +718,155 @@ class ASC:
             'link': torrent_link
         }
 
+    def get_game_name(self, meta: dict[str, Any]) -> str:
+        """Build the torrent name for GAME category."""
+        tag = meta.get("tag", "")
+        if tag:
+            tag = tag.lstrip("-")
+
+        languages = meta.get("languages", {})
+        lang_list = list(languages.keys()) if isinstance(languages, dict) else []
+        lang_lower = [ln.lower() for ln in lang_list]
+
+        has_pt = any("portuguese" in ln or "português" in ln for ln in lang_lower)
+        has_en = any("english" in ln for ln in lang_lower)
+
+        if len(lang_list) > 1 and has_pt:
+            game_lang = "MULTI"
+        elif len(lang_list) > 1 and has_en:
+            game_lang = "INGLÊS"
+        elif lang_list:
+            game_lang = lang_list[0].upper()
+        else:
+            game_lang = ""
+
+        game_subcategory = str(meta.get("game_subcategory", "")).lower()
+        update = "Update" if game_subcategory == "update" else ""
+        dlc = "[DLC]" if game_subcategory == "dlc" else "[+DLC]" if game_subcategory == "full_game_dlc" else ""
+        if dlc:
+            dlc = f" {dlc}"
+
+        name = f"{meta.get('title', '')} {update} {meta.get('game_version', '')} {meta.get('year', '')} - {tag} [{game_lang}]{dlc}"
+        return re.sub(r"\s{2,}", " ", name).strip()
+
+    def get_game_type(self, meta: dict[str, Any]) -> str:
+        """Map meta['platform'] to ASC game category (type field) value."""
+        platform_map: dict[str, str] = {
+            "ANDROID": "57",
+            "DREAMCAST": "52",
+            "EMULATOR": "109",
+            "DS": "58",
+            "SWITCH": "110",
+            "PC": "47",
+            "MAC": "48",
+            "PS1": "49",
+            "PS2": "50",
+            "PS3": "51",
+            "PS4": "79",
+            "PSP": "82",
+            "WII": "55",
+            "X360": "54",
+            "XBOX": "56",
+            "XONE": "78",
+        }
+        platform = str(meta.get("platform", "")).upper().strip()
+        return platform_map.get(platform, "47")  # Default to PC
+
+    def get_game_genre(self, meta: dict[str, Any]) -> str:
+        """Map IGDB genres to ASC genero field value."""
+        genre_map: dict[str, str] = {
+            "action": "1",
+            "hack and slash": "1",
+            "hack and slash/beat 'em up": "1",
+            "adventure": "2",
+            "point-and-click": "2",
+            "visual novel": "2",
+            "arcade": "3",
+            "racing": "14",
+            "driving": "14",
+            "sport": "15",
+            "sports": "15",
+            "strategy": "22",
+            "real time strategy": "22",
+            "rts": "22",
+            "turn-based strategy": "22",
+            "tactical": "22",
+            "shooter": "21",
+            "fps": "21",
+            "fighting": "13",
+            "music": "16",
+            "rhythm": "16",
+            "puzzle": "18",
+            "rpg": "12",
+            "role-playing": "12",
+            "role-playing (rpg)": "12",
+            "simulation": "5",
+            "simulator": "5",
+            "board": "7",
+            "board game": "7",
+            "platform": "1",
+            "platformer": "1",
+        }
+        genres_str = meta.get("genres", "") or meta.get("keywords", "")
+        if not genres_str:
+            return "0"
+
+        genre_list = [g.strip().lower() for g in str(genres_str).split(",") if g.strip()]
+        for genre in genre_list:
+            if genre in genre_map:
+                return genre_map[genre]
+
+        return "0"
+
+    def get_game_idioma(self, meta: dict[str, Any]) -> str:
+        """Map game languages to ASC idioma field value."""
+        language_map: dict[str, str] = {
+            "german": "3",
+            "chinese": "9",
+            "spanish": "1",
+            "english": "4",
+            "japanese": "8",
+            "portuguese": "5",
+            "russian": "2",
+        }
+        languages = meta.get("languages", {})
+        lang_list = list(languages.keys()) if isinstance(languages, dict) else []
+        if not lang_list:
+            return "6"  # Outros
+
+        lang_lower = [ln.lower() for ln in lang_list]
+        has_pt = any("portuguese" in ln or "português" in ln for ln in lang_lower)
+
+        if has_pt and len(lang_list) > 1:
+            return "7"  # Multilinguagem
+
+        for ln in lang_lower:
+            for key, val in language_map.items():
+                if key in ln:
+                    return val
+
+        return "6"  # Outros
+
+    async def build_game_description(self, meta: dict[str, Any]) -> str:
+        """Build GAME description using only the _build_game_desc_section block."""
+        builder = DescriptionBuilder(self.tracker, self.config)
+        desc_parts: list[str] = []
+
+        game_section = builder._build_game_desc_section(meta, header_size=5, table=False)
+        if game_section:
+            desc_parts.append(game_section)
+
+        desc_parts.append(await builder.get_user_description(meta))
+        desc_parts.append(f"[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+
+        final_description = "\n\n".join(part for part in desc_parts if part.strip())
+
+        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
+            await descfile.write(final_description)
+
+        return final_description
+
     async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
         found_items: list[dict[str, str]] = []
         if meta.get("category") == "BOOK" and meta.get("source_size", 0) <= 1024 * 1024:
@@ -714,7 +874,7 @@ class ASC:
             meta["skipping"] = f"{self.tracker}"
             return found_items
 
-        if meta.get("category") != "BOOK" and not meta.get("imdb_id") and not meta.get("anime"):
+        if meta.get("category") not in ("BOOK", "GAME") and not meta.get("imdb_id") and not meta.get("anime"):
             console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             meta["skipping"] = f"{self.tracker}"
             return found_items
@@ -727,6 +887,11 @@ class ASC:
             search_name = f"{meta.get('author', '')} {meta.get('title', '')}".strip()
             search_query = search_name.replace(" ", "+")
             search_url = f"{self.base_url}/torrents-search.php?search={search_query}"
+
+        elif meta.get("category") == "GAME":
+            search_name = meta.get("title", "")
+            search_query = search_name.replace(" ", "+")
+            search_url = f"{self.base_url}/torrents-search.php?search={search_query}&cat={self.get_game_type(meta)}"
 
         elif meta.get("anime"):
             await self.load_localized_data(meta)
@@ -816,8 +981,17 @@ class ASC:
                     if not isinstance(href_value, str):
                         continue
 
-                    torrent_id = href_value.split('id=')[-1]
-                    name_search_tasks.append(asyncio.create_task(self._fetch_file_info(torrent_id, torrent_link, size)))
+                    if meta.get("category") == "GAME":
+                        title_tag = release.select_one(".tooltips p a")
+                        game_title = title_tag.get_text(strip=True) if title_tag else "N/A"
+                        found_items.append({
+                            "name": game_title,
+                            "size": size,
+                            "link": torrent_link,
+                        })
+                    else:
+                        torrent_id = href_value.split("id=")[-1]
+                        name_search_tasks.append(asyncio.create_task(self._fetch_file_info(torrent_id, torrent_link, size)))
 
             except Exception as e:
                 console.print(f'[bold red]Falha ao processar um release da lista: {e}[/bold red]')
@@ -832,6 +1006,8 @@ class ASC:
     async def get_upload_url(self, meta: dict[str, Any]) -> str:
         if meta.get("category") == "BOOK":
             return f"{self.base_url}/enviar-ebook.php"
+        elif meta.get("category") == "GAME":
+            return f"{self.base_url}/enviar-jogos.php"
         elif meta.get("anime"):
             return f'{self.base_url}/enviar-anime.php'
         elif meta['category'] == 'MOVIE':
@@ -976,7 +1152,7 @@ class ASC:
                 self.session.cookies = cast(Any, cookie_jar)
             try:
                 category = meta['category']
-                if category == "BOOK":
+                if category in ["BOOK", "GAME"]:
                     category = await self.get_type(meta)
                 elif meta.get("anime"):
                     if category == 'TV':
@@ -1041,49 +1217,55 @@ class ASC:
                 return []
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+        description = await self.build_description(meta)
+        upload_type = await self.get_type(meta)
+
+        data: dict[str, Any] = {
+            "takeupload": "yes",
+            "name": await self.get_title(meta),
+            "descr": description,
+            "ano": str(meta.get("year", "")),
+        }
+
         if meta.get("category") == "BOOK":
             if not meta.get("language_checked", False):
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
             book_lang = (meta.get("book_language_iso") or meta.get("book_language") or "").lower()
             lang_code_map = {
+                "chi": "9",
                 "de": "3",
                 "deu": "3",
-                "ger": "3",
-                "zh": "9",
-                "zho": "9",
-                "chi": "9",
-                "ko": "11",
-                "kor": "11",
-                "es": "1",
-                "spa": "1",
-                "esp": "1",
                 "en": "4",
                 "eng": "4",
+                "es": "1",
+                "esp": "1",
+                "ger": "3",
                 "ja": "8",
                 "jpn": "8",
-                "pt": "5",
+                "ko": "11",
+                "kor": "11",
                 "por": "5",
+                "pt": "5",
                 "ru": "2",
                 "rus": "2",
+                "spa": "1",
+                "zh": "9",
+                "zho": "9",
             }
             idioma_val = lang_code_map.get(book_lang, "6")
 
             cover_url = await self.get_book_cover(meta)
 
-            data = {
-                "takeupload": "yes",
-                "name": await self.get_title(meta),
-                "type": await self.get_type(meta),
-                "ano": str(meta.get("year", "")),
-                "idioma": idioma_val,
-                "extencao": await self.get_container(meta),
+            data.update({
                 "capa": cover_url,
+                "extencao": await self.get_container(meta),
+                "idioma": idioma_val,
                 "screens1": meta.get("author", ""),
                 "screens2": cover_url,
                 "screens3": cover_url,
-                "descr": await self.build_description(meta),
-            }
+                "type": upload_type,
+            })
 
             image_list = cast(list[dict[str, Any]], meta.get("image_list") or [])
             if len(image_list) > 0:
@@ -1093,32 +1275,45 @@ class ASC:
 
             return data
 
+        if meta.get("category") == "GAME":
+            data.update({
+                "capa": meta.get("poster", ""),
+                "genero": self.get_game_genre(meta),
+                "idioma": self.get_game_idioma(meta),
+                "type": upload_type,
+            })
+
+            # Screenshots
+            image_list = cast(list[dict[str, Any]], meta.get("image_list") or [])
+            for i, img in enumerate(image_list[:4]):
+                raw_url = img.get("raw_url", "")
+                if raw_url:
+                    data[f"screens{i + 1}"] = raw_url
+
+            return data
+
         await self.load_localized_data(meta)
         if not meta.get('language_checked', False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         resolution = await self.get_resolution(meta)
 
-        data = {
-            'ano': str(meta['year']),
-            'audio': await self.get_audio(meta),
-            'capa': f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path') or meta.get('tmdb_poster')}",
-            'codecaudio': await self.get_audio_codec(meta),
-            'codecvideo': await self.get_video_codec(meta),
-            'descr': await self.build_description(meta),
-            'extencao': await self.get_container(meta),
-            'genre': await self.get_tags(meta),
-            'imdb': meta['imdb_info']['imdbID'],
-            'altura': resolution['height'],
-            'largura': resolution['width'],
-            'lang': self.language_map.get(meta.get('original_language', '').lower(), '11'),
-            'layout': self.layout,
-            'legenda': await self.get_subtitle(meta),
-            'name': await self.get_title(meta),
-            'qualidade': await self.get_type(meta),
-            'takeupload': 'yes',
-            'tresd': '1' if meta.get('3d') else '2',
-            'tube': await self.get_trailer(meta),
-        }
+        data.update({
+            "altura": resolution["height"],
+            "audio": await self.get_audio(meta),
+            "capa": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path') or meta.get('tmdb_poster')}",
+            "codecaudio": await self.get_audio_codec(meta),
+            "codecvideo": await self.get_video_codec(meta),
+            "extencao": await self.get_container(meta),
+            "genre": await self.get_tags(meta),
+            "imdb": meta["imdb_info"]["imdbID"],
+            "lang": self.language_map.get(meta.get("original_language", "").lower(), "11"),
+            "largura": resolution["width"],
+            "layout": self.layout,
+            "legenda": await self.get_subtitle(meta),
+            "qualidade": upload_type,
+            "tresd": "1" if meta.get("3d") else "2",
+            "tube": await self.get_trailer(meta),
+        })
 
         if meta.get('anime'):
             anime_info = await self.get_languages(meta)

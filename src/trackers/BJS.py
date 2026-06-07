@@ -68,11 +68,21 @@ class BJS:
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         if meta.get("category") == "BOOK":
             if meta["book_language_iso"] != "por":
-                console.print(f"{self.tracker}: Only books in Portuguese are allowed.")
+                console.print(f"{self.tracker}: [red]Only books in Portuguese are allowed.[/red]")
                 return False
             return True
 
         if meta.get("category") == "GAME":
+            pc_platforms = {"PC", "MAC", "LINUX"}
+            platform = str(meta.get("platform", "")).upper().strip()
+            if platform in pc_platforms:
+                has_install_notes = bool(str(meta.get("description_file", "")).strip() or str(meta.get("description_link", "")).strip())
+                if not has_install_notes:
+                    console.print(
+                        f"{self.tracker}: [red]Installation notes are required for PC game uploads. "
+                        "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
+                    )
+                    return False
             return True
 
         subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)

@@ -586,7 +586,7 @@ class DescriptionBuilder:
         book_p = "\n".join(final_book_parts)
         return "[table]\n" + book_p + "\n[/table]"
 
-    def _build_game_desc_section(self, meta: dict[str, Any], header_size: int = 0) -> str:
+    def _build_game_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True) -> str:
         """Build the beautiful BBCode layout for GAME-category uploads."""
         game_parts: list[str] = []
 
@@ -670,25 +670,41 @@ class DescriptionBuilder:
                 clean_rec = re.sub(r"<[^>]+>", "", clean_rec).strip()
                 clean_rec = re.sub(r"^\[b\](Recommended|Recomendado):\[/b\]\s*", "", clean_rec, flags=re.IGNORECASE)
 
-            table_lines = ["[table]"]
-            table_lines.append(f"[tr][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
-            table_lines.append(f"[tr][td]{clean_min}[/td][td]{clean_rec}[/td][/tr]")
-            table_lines.append("[/table]")
-
-            game_parts.append("\n".join(table_lines))
+            if table:
+                table_lines = ["[table]"]
+                table_lines.append(f"[tr][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
+                table_lines.append(f"[tr][td]{clean_min}[/td][td]{clean_rec}[/td][/tr]")
+                table_lines.append("[/table]")
+                game_parts.append("\n".join(table_lines))
+            else:
+                # Simple BBCode format without table
+                simple_lines = []
+                if clean_min:
+                    simple_lines.append(f"[b]{col_min_header}[/b] {clean_min}")
+                if clean_rec:
+                    simple_lines.append(f"\n[b]{col_rec_header}[/b] {clean_rec}")
+                game_parts.append("\n".join(simple_lines))
 
         # 4. Supported Languages
         languages = meta.get("languages", {})
         if languages and isinstance(languages, dict):
-            table_rows = []
-            table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
-            for lang, support in sorted(languages.items()):
-                support_str = ", ".join(support)
-                table_rows.append(f"[tr][td]{lang}[/td][td]{support_str}[/td][/tr]")
-            table_text = "\n".join(table_rows)
-
-            spoiler_str = f"{header}{str_official_supported_languages}{header_end}\n[table]\n{table_text}\n[/table]\n"
-            game_parts.append(spoiler_str)
+            if table:
+                table_rows = []
+                table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
+                for lang, support in sorted(languages.items()):
+                    support_str = ", ".join(support)
+                    table_rows.append(f"[tr][td]{lang}[/td][td]{support_str}[/td][/tr]")
+                table_text = "\n".join(table_rows)
+                spoiler_str = f"{header}{str_official_supported_languages}{header_end}\n[table]\n{table_text}\n[/table]\n"
+                game_parts.append(spoiler_str)
+            else:
+                # Simple BBCode format without table
+                simple_lang_lines = []
+                for lang, support in sorted(languages.items()):
+                    support_str = ", ".join(support)
+                    simple_lang_lines.append(f"[b]{lang}[/b]: {support_str}")
+                simple_section = f"{header}{str_official_supported_languages}{header_end}\n" + "\n".join(simple_lang_lines) + "\n"
+                game_parts.append(simple_section)
 
         return "\n".join(part for part in game_parts if part.strip())
 

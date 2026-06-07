@@ -377,9 +377,19 @@ async def gather_game_prep(
 
     release_date = selected_game.get("first_release_date")
     if release_date and not cli_overrides["year"]:
-        year_val = datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc).year
+        dt = datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc)
+        year_val = dt.year
         meta["year"] = str(year_val)
         meta["search_year"] = year_val
+        meta["igdb_first_release_date"] = dt.strftime("%d/%m/%Y")
+
+    # IGDB rating data (0-100 scale)
+    igdb_rating = selected_game.get("rating")
+    igdb_rating_count = selected_game.get("rating_count")
+    if igdb_rating is not None:
+        meta["igdb_rating"] = round(float(igdb_rating), 1)
+    if igdb_rating_count is not None:
+        meta["igdb_rating_count"] = int(igdb_rating_count)
 
     # Overview / Storyline
     summary = selected_game.get("summary")
