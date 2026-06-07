@@ -42,9 +42,6 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 ---
 
 ## 3. Artwork & Screenshot Generation
-
-Instead of using FFmpeg frame extraction, the `BOOK` category utilizes specialized image workflows:
-
 ### A. Ebooks (PDF, EPUB, MOBI)
 - Uses **PyMuPDF** (`fitz`) to render pages at double resolution (`matrix=Matrix(2.0, 2.0)`) into PNG files.
 - Randomly samples a configured number of pages (e.g., 5) to generate gallery screenshots.
@@ -60,10 +57,6 @@ Instead of using FFmpeg frame extraction, the `BOOK` category utilizes specializ
 - The assistant first searches for local images (e.g., `cover.jpg`) in the source directory.
 - If not found, it attempts to extract embutted/embedded cover art using **mutagen** (supports FLAC pictures, MP3 ID3 APIC frames, and MP4/M4B `covr` boxes).
 - If no embedded art exists, it attempts to download the cover image using poster URLs resolved from MAM or Google Books.
-
-### D. Image Upload Controls
-- The `book_screens` utility counts the actual screenshots generated and overrides the configured `min_successful_image_uploads` value dynamically. This prevents the script from blocking the upload if a short book has fewer pages than the global minimum image requirement.
-
 ---
 
 ## 4. Duplicate Checking Rules
