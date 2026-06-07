@@ -138,5 +138,5 @@ The following trackers support the `BOOK` category with custom metadata mapping 
 - **LT**: Supports ebooks, audiobooks, comics, and magazines. For audiobooks, appends the narration language to the torrent name (e.g., `(Narración en Castellano)`). Also supports volume/issue and edition info in the name.
 - **SAM**: Brazilian tracker (UNIT3D). Maps books to `LIVROS`, audiobooks to `AUDIOBOOK`, and comics/manga to `HQS_E_MANGAS`.
 - **SPD**: Supports the `BOOK` category as a unified type (category ID 6), without subcategory splitting.
-- **TL**: Supports standard book metadata mapping (UNIT3D).
+- **TL**: Supports standard book metadata mapping.
 - **YUS**: Supports ebooks and audiobooks as distinct UNIT3D categories.

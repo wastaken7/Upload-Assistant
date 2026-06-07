@@ -88,7 +88,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
                 metadata["author"] = author
             if language:
                 metadata["book_language_raw"] = language
-            if date:
+            if date and not date.startswith("0101-01-01"):  # ignore placeholder date
                 match = re.search(r"\b\d{4}\b", date)
                 if match:
                     metadata["year"] = match.group(0)
@@ -294,7 +294,7 @@ def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]
                     metadata["author"] = author
                 if language:
                     metadata["book_language_raw"] = language
-                if date:
+                if date and not date.startswith("0101-01-01"):
                     match = re.search(r"\b\d{4}\b", date)
                     if match:
                         metadata["year"] = match.group(0)
