@@ -276,6 +276,110 @@ class DupeChecker:
                 if entry.get('id'):
                     meta[matched_torrent_id] = entry.get('id')
 
+            if meta.get("category") == "GAME":
+                target_title = str(meta.get("title", "") or meta.get("name", ""))
+                if not target_title.strip():
+                    await log_exclusion("empty target game title", each)
+                    return True
+
+                def get_platform_category(p: str) -> str:
+                    p_lower = p.lower()
+                    if any(w in p_lower for w in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
+                        return "playstation"
+                    if "xbox" in p_lower:
+                        return "xbox"
+                    if any(w in p_lower for w in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
+                        return "nintendo"
+                    return "pc"
+
+                target_platform = get_platform_category(str(meta.get("platform", "")))
+                dupe_platform = get_platform_category(str(entry.get("type", "")))
+                if target_platform != dupe_platform:
+                    await log_exclusion(f"game platform mismatch (expected {target_platform}, got {dupe_platform})", each)
+                    return True
+
+                # Clean game title helper
+                def clean_game_title(name: str) -> str:
+                    name = name.lower()
+
+                    # Remove trailing group/tag if there is a hyphen
+                    if "-" in name:
+                        parts = name.split("-")
+                        if len(parts) > 1:
+                            last_part = parts[-1].strip()
+                            if len(last_part) < 15 and " " not in last_part:
+                                name = "-".join(parts[:-1])
+
+                    # Remove versions/builds/updates (like v1.0.4, v2026.06.07, etc.)
+                    name = re.sub(r"(?i)\b(?:update|patch|build|version|ver|v)\b[.:=\-_\s]*\d+[\d._-]*", "", name)
+                    name = re.sub(r"(?i)\bv\d+[\d._-]*\b", "", name)
+
+                    # Remove isolated version-like numbers (e.g., 1.15, 1.0.4)
+                    name = re.sub(r"\b\d+(?:\.\d+)+\b", "", name)
+
+                    # Remove years: 4-digit numbers between 1900 and 2100
+                    name = re.sub(r"\b(19|20)\d{2}\b", "", name)
+
+                    # Remove common platform names
+                    platforms = [
+                        "pc",
+                        "windows",
+                        "win",
+                        "mac",
+                        "osx",
+                        "linux",
+                        "ps1",
+                        "ps2",
+                        "ps3",
+                        "ps4",
+                        "ps5",
+                        "playstation",
+                        "xbox",
+                        "x360",
+                        "xone",
+                        "xsx",
+                        "switch",
+                        "nsw",
+                        "nintendo",
+                    ]
+                    for p in platforms:
+                        name = re.sub(rf"\b{p}\b", "", name)
+
+                    # Remove common store / distribution / formatting keywords
+                    keywords = ["gog", "steam", "epic", "multi", "multilang", "repack", "iso", "zip", "rar", "setup", "download", "cracked", "crack"]
+                    for kw in keywords:
+                        name = re.sub(rf"\b{kw}\b", "", name)
+
+                    # Replace dots, underscores, brackets, parentheses with spaces
+                    name = re.sub(r"[._\[\]()\-:+]", " ", name)
+
+                    # Collapse multiple spaces and strip
+                    name = re.sub(r"\s+", " ", name).strip()
+                    return name
+
+                clean_target = clean_game_title(target_title)
+                clean_each = clean_game_title(each)
+
+                if meta.get("debug"):
+                    console.log(f"[debug] Game title comparison: Target='{clean_target}' vs Dupe='{clean_each}'")
+
+                is_match = False
+                if clean_target == clean_each:
+                    is_match = True
+                elif clean_target and clean_each:
+                    if re.search(rf"\b{re.escape(clean_target)}\b", clean_each) or re.search(rf"\b{re.escape(clean_each)}\b", clean_target):
+                        is_match = True
+
+                if not is_match:
+                    await log_exclusion("game title mismatch", each)
+                    return True
+
+                # Title match! It is a duplicate.
+                remember_match("title")
+                if meta.get("debug"):
+                    console.log(f"[cyan]Game duplicate matched: {each}")
+                return False
+
             if meta.get("category") == "BOOK":
                 import unicodedata
 

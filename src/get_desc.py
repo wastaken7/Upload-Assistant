@@ -26,25 +26,36 @@ def html_to_bbcode(text: str) -> str:
     if not text:
         return text
 
+    # Clean up <br> tags adjacent to list item tags to prevent empty lines
+    text = re.sub(r"<br\s*/?>\s*</li>", "</li>", text, flags=re.IGNORECASE)
+    text = re.sub(r"<li>\s*<br\s*/?>", "<li>", text, flags=re.IGNORECASE)
+
     # Define HTML to BBCode tag mappings
     html_bbcode_map = [
-        (r'<b>(.*?)</b>', r'[b]\1[/b]'),
-        (r'<i>(.*?)</i>', r'[i]\1[/i]'),
-        (r'<u>(.*?)</u>', r'[u]\1[/u]'),
-        (r'<s>(.*?)</s>', r'[s]\1[/s]'),
-        (r'<em>(.*?)</em>', r'[i]\1[/i]'),
-        (r'<strong>(.*?)</strong>', r'[b]\1[/b]'),
-        (r'<strike>(.*?)</strike>', r'[s]\1[/s]'),
-        (r'<del>(.*?)</del>', r'[s]\1[/s]'),
-        (r'<br\s*/?>', r'\n'),
-        (r'<br>', r'\n'),
-        (r'<p>(.*?)</p>', r'\1\n'),
+        (r"<b>(.*?)</b>", r"[b]\1[/b]"),
+        (r"<i>(.*?)</i>", r"[i]\1[/i]"),
+        (r"<u>(.*?)</u>", r"[u]\1[/u]"),
+        (r"<s>(.*?)</s>", r"[s]\1[/s]"),
+        (r"<em>(.*?)</em>", r"[i]\1[/i]"),
+        (r"<strong>(.*?)</strong>", r"[b]\1[/b]"),
+        (r"<strike>(.*?)</strike>", r"[s]\1[/s]"),
+        (r"<del>(.*?)</del>", r"[s]\1[/s]"),
+        (r"<br\s*/?>", r"\n"),
+        (r"<br>", r"\n"),
+        (r"<p>(.*?)</p>", r"\1\n"),
+        (r"<li>(.*?)</li>", r"* \1\n"),
+        (r"<li>", r"* "),
+        (r"</li>", r"\n"),
+        (r"<ul[^>]*>", r""),
+        (r"</ul>", r""),
     ]
 
     converted_text = text
     for html_pattern, bbcode_replacement in html_bbcode_map:
         converted_text = re.sub(html_pattern, bbcode_replacement, converted_text, flags=re.IGNORECASE | re.DOTALL)
 
+    # Strip any residual HTML tags
+    converted_text = re.sub(r"<[^>]+>", "", converted_text)
     return converted_text
 
 
@@ -575,6 +586,112 @@ class DescriptionBuilder:
         book_p = "\n".join(final_book_parts)
         return "[table]\n" + book_p + "\n[/table]"
 
+    def _build_game_desc_section(self, meta: dict[str, Any], header_size: int = 0) -> str:
+        """Build the beautiful BBCode layout for GAME-category uploads."""
+        game_parts: list[str] = []
+
+        header = "[h2]" if not header_size else f"[size={header_size}][b]"
+        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+
+        use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
+        str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
+        str_overview = "Overview" if not use_pt_br else "Visão Geral"
+        str_platform = "Platform" if not use_pt_br else "Plataforma"
+        str_version = "Version" if not use_pt_br else "Versão"
+        str_genre = "Genre" if not use_pt_br else "Gênero"
+        str_developer = "Developer" if not use_pt_br else "Desenvolvedor"
+        str_publisher = "Publisher" if not use_pt_br else "Distribuidora"
+        str_system_requirements = "System Requirements" if not use_pt_br else "Requisitos do Sistema"
+        str_minimum = "Minimum" if not use_pt_br else "Mínimo"
+        str_recommended = "Recommended" if not use_pt_br else "Recomendado"
+        str_official_supported_languages = "Officially Supported Languages" if not use_pt_br else "Idiomas Oficialmente Suportados"
+        str_language = "Language" if not use_pt_br else "Idioma"
+        str_support = "Support" if not use_pt_br else "Suporte"
+
+        # 1. Technical Details
+        details_lines: list[str] = []
+        details_lines.append(f"{header}{str_technical_details}{header_end}")
+        if meta.get("platform"):
+            details_lines.append(f"[b]{str_platform}[/b] {meta['platform']}")
+        if meta.get("game_version"):
+            details_lines.append(f"[b]{str_version}[/b] {meta['game_version']}")
+        if meta.get("genres"):
+            details_lines.append(f"[b]{str_genre}[/b] {meta['genres']}")
+        if meta.get("developer"):
+            details_lines.append(f"[b]{str_developer}[/b] {meta['developer']}")
+        if meta.get("publisher"):
+            details_lines.append(f"[b]{str_publisher}[/b] {meta['publisher']}")
+        if meta.get("steam_url"):
+            details_lines.append(f"[b]Steam[/b] [url]{meta['steam_url']}[/url]")
+
+        game_parts.append("\n".join(details_lines))
+
+        # 2. Overview Section
+        overview_text = ""
+        localized_overviews = meta.get("localized_overviews", {})
+        pt_br_overview = localized_overviews.get("brazilian", "") if isinstance(localized_overviews, dict) else ""
+        overview = meta.get("overview", "") if not use_pt_br else pt_br_overview
+
+        # Strip HTML tags and convert to BBCode if present
+        if overview:
+            overview = html_to_bbcode(str(overview))
+            overview = re.sub(r"<[^>]+>", "", overview).strip()
+
+        if overview:
+            overview_text = f"\n{header}{str_overview}{header_end}\n{overview}\n"
+
+        if overview_text:
+            game_parts.append(overview_text)
+
+        # 3. System Requirements Section
+        req_min = meta.get("requirements_minimum", "")
+        req_rec = meta.get("requirements_recommended", "")
+
+        if req_min or req_rec:
+            import html
+
+            header_title = f"{str_system_requirements}"
+            game_parts.append(f"{header}{header_title}{header_end}")
+
+            col_min_header = f"{str_minimum}"
+            col_rec_header = f"{str_recommended}"
+
+            clean_min = ""
+            if req_min:
+                clean_min = html_to_bbcode(str(req_min))
+                clean_min = html.unescape(clean_min)
+                clean_min = re.sub(r"<[^>]+>", "", clean_min).strip()
+                clean_min = re.sub(r"^\[b\](Minimum|Mínimo):\[/b\]\s*", "", clean_min, flags=re.IGNORECASE)
+
+            clean_rec = ""
+            if req_rec:
+                clean_rec = html_to_bbcode(str(req_rec))
+                clean_rec = html.unescape(clean_rec)
+                clean_rec = re.sub(r"<[^>]+>", "", clean_rec).strip()
+                clean_rec = re.sub(r"^\[b\](Recommended|Recomendado):\[/b\]\s*", "", clean_rec, flags=re.IGNORECASE)
+
+            table_lines = ["[table]"]
+            table_lines.append(f"[tr][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
+            table_lines.append(f"[tr][td]{clean_min}[/td][td]{clean_rec}[/td][/tr]")
+            table_lines.append("[/table]")
+
+            game_parts.append("\n".join(table_lines))
+
+        # 4. Supported Languages
+        languages = meta.get("languages", {})
+        if languages and isinstance(languages, dict):
+            table_rows = []
+            table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
+            for lang, support in sorted(languages.items()):
+                support_str = ", ".join(support)
+                table_rows.append(f"[tr][td]{lang}[/td][td]{support_str}[/td][/tr]")
+            table_text = "\n".join(table_rows)
+
+            spoiler_str = f"{header}{str_official_supported_languages}{header_end}\n[table]\n{table_text}\n[/table]\n"
+            game_parts.append(spoiler_str)
+
+        return "\n".join(part for part in game_parts if part.strip())
+
     async def unit3d_edit_desc(
         self,
         meta: dict[str, Any],
@@ -652,6 +769,12 @@ class DescriptionBuilder:
             book_section = self._build_book_desc_section(meta)
             if book_section:
                 desc_parts.append(book_section)
+
+        # Game details
+        if meta.get("category") == "GAME":
+            game_section = self._build_game_desc_section(meta)
+            if game_section:
+                desc_parts.append(game_section)
 
         # Description that may come from API requests
         meta_description_value = meta.get("description", "")
@@ -833,6 +956,19 @@ class DescriptionBuilder:
         screensPerRow = await self.get_screens_per_row()
 
         desc_parts: list[str] = []
+
+        if meta.get("category") == "GAME":
+            if screenheader is not None:
+                desc_parts.append(screenheader + "\n")
+            desc_parts.append("[center]")
+            for img_index in range(len(images[: int(meta.get("screens", 6))])):
+                web_url = images[img_index]["web_url"]
+                raw_url = images[img_index]["raw_url"]
+                desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                    desc_parts.append("\n")
+            desc_parts.append("[/center]")
+            return "".join(desc_parts)
 
         discs = meta.get("discs", [])
         if len(discs) == 1:

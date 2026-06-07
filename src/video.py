@@ -365,6 +365,8 @@ class VideoManager:
         return sd
 
     async def get_video_duration(self, meta: dict[str, Any]) -> Optional[int]:
+        if meta.get("category") in ("BOOK", "GAME"):
+            return None
         if meta.get('is_disc') != "BDMV" and meta.get('mediainfo', {}).get('media', {}).get('track'):
             general_track = next((track for track in meta['mediainfo']['media']['track']
                                   if track.get('@type') == 'General'), None)

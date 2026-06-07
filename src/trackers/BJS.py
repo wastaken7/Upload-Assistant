@@ -72,6 +72,9 @@ class BJS:
                 return False
             return True
 
+        if meta.get("category") == "GAME":
+            return True
+
         subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
         if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
             proceed = await self.common.prompt_user_for_confirmation(
@@ -147,6 +150,7 @@ class BJS:
         audiobook = 10
         comic = 11
         ebook = 9
+        game = 3
         magazine = 8
         manga = 4
         movie = 0
@@ -171,7 +175,7 @@ class BJS:
                 return magazine
             return ebook
 
-        category_map = {"TV": tv, "MOVIE": movie}
+        category_map = {"TV": tv, "MOVIE": movie, "GAME": game}
 
         return category_map.get(category, 0)
 
@@ -246,6 +250,260 @@ class BJS:
             return language_name
         else:
             return "Outro"
+
+    def get_game_platform(self, meta: Meta) -> str:
+        """Map meta['platform'] to BJS platform ID for the Jogos category."""
+        platform_map: dict[str, str] = {
+            "3DS": "13",
+            "MOBILE": "2",
+            "DS": "12",
+            "EMULATOR": "1",
+            "PC": "3",
+            "MAC": "3",
+            "LINUX": "3",
+            "PSVITA": "15",
+            "PS1": "4",
+            "PS2": "5",
+            "PS3": "6",
+            "PS4": "7",
+            "PS5": "18",
+            "PSP": "14",
+            "SWITCH": "16",
+            "WII": "8",
+            "WIIU": "9",
+            "XBOX": "17",
+            "XONE": "17",
+            "X360": "10",
+            "XSX": "17",
+        }
+
+        platform = str(meta.get("platform", "")).upper().strip()
+        return platform_map.get(platform, "3")  # Default to PC
+
+    def get_game_language(self, meta: Meta) -> str:
+        """Map game languages from IGDB/Steam to BJS idioma field.
+
+        Logic (similar to CBR.py get_name):
+        - If Portuguese is present AND there are other languages → "Multilinguagem"
+        - If only one language → map to BJS name
+        - If multiple languages without Portuguese → use the first match from BJS list
+        - Fallback → "Outro"
+        """
+        language_map: dict[str, str] = {
+            "german": "Alemão",
+            "spanish": "Espanhol",
+            "french": "Francês",
+            "english": "Inglês",
+            "japanese": "Japonês",
+            "portuguese": "Português",
+            "russian": "Russo",
+        }
+
+        languages = meta.get("languages", {})
+        if not languages:
+            return "Outro"
+
+        # Get unique language names (keys of the languages dict from IGDB)
+        lang_names: list[str] = list(languages.keys()) if isinstance(languages, dict) else []
+        if not lang_names:
+            return "Outro"
+
+        lang_names_lower = [ln.lower() for ln in lang_names]
+
+        has_portuguese = any("portuguese" in ln or "português" in ln for ln in lang_names_lower)
+
+        if has_portuguese and len(lang_names) > 1:
+            return "Multilinguagem"
+
+        if len(lang_names) == 1:
+            for key, bjs_value in language_map.items():
+                if key in lang_names_lower[0]:
+                    return bjs_value
+            return "Outro"
+
+        # Multiple languages, no Portuguese → try to find first matching BJS language
+        for ln in lang_names_lower:
+            for key, bjs_value in language_map.items():
+                if key in ln:
+                    return bjs_value
+
+        return "Outro"
+
+    def get_game_tags(self, meta: Meta) -> str:
+        """Map IGDB genres/keywords to BJS game-specific genre tags."""
+        valid_tags: set[str] = {
+            "ação",
+            "adulto",
+            "arcade",
+            "aventura",
+            "cartas",
+            "casual",
+            "classico",
+            "corrida",
+            "educativo",
+            "esportes",
+            "estrategia",
+            "fps",
+            "indie",
+            "luta",
+            "mmo",
+            "moba",
+            "musical",
+            "plataforma",
+            "puzzle",
+            "rpg",
+            "rts",
+            "rv",
+            "sandbox",
+            "simulacao",
+            "sobrevivencia",
+            "tabuleiro",
+            "terror",
+            "tps",
+            "outros",
+        }
+
+        # Map from IGDB English genre names to BJS Portuguese tags
+        genre_map: dict[str, str] = {
+            "action": "ação",
+            "adventure": "aventura",
+            "arcade": "arcade",
+            "card": "cartas",
+            "casual": "casual",
+            "classic": "classico",
+            "racing": "corrida",
+            "driving": "corrida",
+            "educational": "educativo",
+            "sport": "esportes",
+            "sports": "esportes",
+            "strategy": "estrategia",
+            "shooter": "fps",
+            "fighting": "luta",
+            "mmo": "mmo",
+            "moba": "moba",
+            "music": "musical",
+            "rhythm": "musical",
+            "platform": "plataforma",
+            "platformer": "plataforma",
+            "puzzle": "puzzle",
+            "rpg": "rpg",
+            "role-playing": "rpg",
+            "role-playing (rpg)": "rpg",
+            "real time strategy": "rts",
+            "real time strategy (rts)": "rts",
+            "rts": "rts",
+            "vr": "rv",
+            "virtual reality": "rv",
+            "sandbox": "sandbox",
+            "simulation": "simulacao",
+            "simulator": "simulacao",
+            "survival": "sobrevivencia",
+            "board": "tabuleiro",
+            "board game": "tabuleiro",
+            "horror": "terror",
+            "hack and slash": "ação",
+            "hack and slash/beat 'em up": "ação",
+            "tactical": "estrategia",
+            "turn-based strategy": "estrategia",
+            "turn-based strategy (tbs)": "estrategia",
+            "indie": "indie",
+            "point-and-click": "aventura",
+            "visual novel": "aventura",
+        }
+
+        genres_str = meta.get("genres", "") or meta.get("keywords", "")
+        if not genres_str:
+            return "outros"
+
+        genre_list = [g.strip() for g in str(genres_str).split(",") if g.strip()]
+
+        matched_tags: list[str] = []
+        for genre in genre_list:
+            genre_lower = genre.lower()
+            mapped = genre_map.get(genre_lower)
+            if mapped and mapped not in matched_tags:
+                matched_tags.append(mapped)
+
+        if not matched_tags:
+            return "outros"
+
+        return ", ".join(matched_tags)
+
+    async def build_game_description(self, meta: Meta) -> tuple[str, str]:
+        """Build the game description for BJS.
+
+        Returns (release_desc, fichatecnica):
+        - release_desc: overview text only
+        - fichatecnica: full game description using _build_game_desc_section
+        """
+        builder = DescriptionBuilder(self.tracker, self.config)
+
+        # fichatecnica = full game description (technical details, system requirements, etc.)
+        fichatecnica_parts: list[str] = []
+
+        # Custom Header
+        fichatecnica_parts.append(await builder.get_custom_header())
+
+        # Game description section (using the existing _build_game_desc_section)
+        game_section = builder._build_game_desc_section(meta, header_size=3)
+        if game_section:
+            fichatecnica_parts.append(game_section)
+
+        # User description
+        fichatecnica_parts.append(await builder.get_user_description(meta))
+
+        # Signature
+        fichatecnica_parts.append(
+            f"[align=center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]"
+        )
+
+        fichatecnica = "\n\n".join(part for part in fichatecnica_parts if part.strip())
+
+        bbcode = BBCODE()
+        fichatecnica = bbcode.convert_named_spoiler_to_named_hide(fichatecnica)
+        fichatecnica = bbcode.convert_spoiler_to_hide(fichatecnica)
+        fichatecnica = bbcode.remove_img_resize(fichatecnica)
+        fichatecnica = bbcode.convert_to_align(fichatecnica)
+        fichatecnica = bbcode.remove_list(fichatecnica)
+        fichatecnica = bbcode.remove_extra_lines(fichatecnica)
+
+        # release_desc = overview only
+        localized_overviews = meta.get("localized_overviews", {})
+        pt_br_overview = localized_overviews.get("brazilian", "") if isinstance(localized_overviews, dict) else ""
+        release_desc = pt_br_overview or meta.get("overview", "")
+
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
+            await description_file.write(fichatecnica)
+
+        return release_desc, fichatecnica
+
+    def is_console_platform(self, meta: Meta) -> bool:
+        """Check if the platform is a console (not PC/Mac/Linux/Emulator)."""
+        pc_platforms = {"PC", "MAC", "LINUX", "EMULATOR"}
+        platform = str(meta.get("platform", "")).upper().strip()
+        return platform not in pc_platforms and platform != ""
+
+    def get_game_subcategory(self, meta: Meta) -> str:
+        """Get the game subcategory for BJS."""
+        subcategory = meta.get("game_subcategory", "")
+        subcategory_values = {"full_game": "1", "full_game_dlc": "2", "dlc": "3", "update": "4"}
+        return subcategory_values.get(subcategory, "1")
+
+    def get_sistema(self, meta: Meta) -> str:
+        available_platforms = meta.get("available_platforms", [])
+        amount_available_platforms = len(available_platforms)
+        if amount_available_platforms > 0:
+            if amount_available_platforms > 1:
+                return "Multiplataforma"
+            if amount_available_platforms == 1:
+                platform = available_platforms[0].lower()
+                if "pc" in platform or "windows" in platform:
+                    return "Windows"
+                elif "mac" in platform:
+                    return "Mac"
+                elif "linux" in platform:
+                    return "Linux"
+        return ""
 
     async def get_audio(self, meta: Meta) -> str:
         if not meta.get("language_checked", False):
@@ -427,6 +685,11 @@ class BJS:
 
         if category == "BOOK":
             desc_parts.append(self.build_book_desc(meta))
+
+        if category == "GAME":
+            game_section = builder._build_game_desc_section(meta, header_size=3)
+            if game_section:
+                desc_parts.append(game_section)
 
         # User description
         desc_parts.append(await builder.get_user_description(meta))
@@ -657,6 +920,7 @@ class BJS:
         if category == "BOOK" and meta.get("title"):
             title = self.format_book_title(meta)
         should_continue = await self.get_additional_checks(meta)
+        search_url = f"{self.base_url}/torrents.php"
         if not should_continue:
             meta["skipping"] = f"{self.tracker}"
             return dupes
@@ -665,14 +929,33 @@ class BJS:
             if not dict(meta.get("imdb_info", {})).get("imdbID"):
                 console.print(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
                 return dupes
-            search_url = f"{self.base_url}/torrents.php?searchstr={meta['imdb_info']['imdbID']}"
+
+            params = {
+                "searchstr": meta["imdb_info"]["imdbID"],
+            }
 
         if category == "BOOK":
             filter_cat = "11" if meta.get("audiobook") else "10"
-            search_url = f"{self.base_url}/torrents.php?searchstr={title}&filter_cat[{filter_cat}]=1&action=basic&searchsubmit=1"
+            params = {
+                "searchstr": title,
+                f"filter_cat[{filter_cat}]": "1",
+                "action": "basic",
+                "searchsubmit": "1",
+            }
+
+        elif category == "GAME":
+            params = {
+                "searchstr": title,
+                "filter_cat[4]": "1",
+                "plataforma": self.get_game_platform(meta),
+                "action": "basic",
+                "searchsubmit": "1",
+            }
 
         else:
-            search_url = f"{self.base_url}/torrents.php?searchstr={title}"
+            params = {
+                "searchstr": title,
+            }
 
         try:
             cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -682,7 +965,7 @@ class BJS:
             BJS.already_has_the_info = False
             BJS.database_title = ""
 
-            response = await self.session.get(search_url, follow_redirects=True)
+            response = await self.session.get(search_url, params=params, follow_redirects=True)
             if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
                 meta["skipping"] = f"{self.tracker}"
@@ -745,7 +1028,7 @@ class BJS:
                         names = []
                         if name:
                             names.append(name)
-                        if category == "BOOK" and BJS.database_title:
+                        if category in ("BOOK", "GAME") and BJS.database_title:
                             names.append(str(BJS.database_title).strip())
 
                         for n in names:
@@ -1000,10 +1283,10 @@ class BJS:
                 console.print(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", markup=False)
                 return None
 
-        if category == "BOOK":
+        if category in ("BOOK", "GAME"):
             cover_path = meta.get("cover_path")
             if not cover_path or not await self.common.path_exists(cover_path):
-                console.print("Nenhum cover_path válido encontrado nos metadados para BOOK.", markup=False)
+                console.print("Nenhum cover_path válido encontrado.", markup=False)
                 return None
 
             try:
@@ -1013,12 +1296,12 @@ class BJS:
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                console.print(f"{self.tracker}: Falha ao ler ou enviar capa do livro {cover_path}: {e}", markup=False)
+                console.print(f"{self.tracker}: Falha ao ler ou enviar capa {cover_path}: {e}", markup=False)
                 return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
-        local_files = sorted(screenshot_dir.glob("*.png"))
+        local_files = sorted([f for f in screenshot_dir.glob("*.png") if "POSTER" not in f.stem.upper() and "COVER" not in f.stem.upper()])
 
         disc_menu_links = [img.get("raw_url") for img in meta.get("menu_images", []) if img.get("raw_url")][:3]
 
@@ -1326,7 +1609,49 @@ class BJS:
                     "bitrate": audiobook_bitrate,
                 })
 
-        else:
+        elif category == "GAME":
+            localized_overviews = meta.get("localized_overviews", {})
+            pt_br_overview = localized_overviews.get("brazilian", "") if isinstance(localized_overviews, dict) else ""
+            release_desc = pt_br_overview or meta.get("overview", "")
+
+            data.update({
+                "title": meta.get("title", ""),
+                "plataforma": self.get_game_platform(meta),
+                "idioma": self.get_game_language(meta),
+                "tags": self.get_game_tags(meta),
+                "adulto": self.get_adulto(meta),
+                "release_desc": release_desc,
+                "fichatecnica": await self.build_description(meta),
+                "traileryoutube": meta.get("youtube", ""),
+                "subcategoria": self.get_game_subcategory(meta),
+            })
+
+            if meta["platform"] == "PC":
+                tag = str(meta.get("tag", ""))
+                if tag:
+                    data["release"] = tag.lstrip("-")
+                game_version = meta.get("game_version", "")
+                if game_version:
+                    data["versao"] = game_version
+
+            sistema = self.get_sistema(meta)
+            if sistema:
+                data["sistema"] = sistema
+
+            # Repack
+            if meta.get("repack", ""):
+                data["repack"] = "on"
+
+            # Console-specific fields
+            if self.is_console_platform(meta):
+                game_system = meta.get("game_system", "")
+                game_region = meta.get("game_region", "")
+                if game_system:
+                    data["sistema"] = game_system
+                if game_region:
+                    data["regiao"] = game_region
+
+        elif category in ("MOVIE", "TV"):
             await self.load_localized_data(meta)
             original_title, brazilian_title = self.get_title(meta)
             width, height = self.get_resolution(meta)
@@ -1533,6 +1858,12 @@ class BJS:
 
             if not data.get("imdblink"):
                 return "Missing IMDb or TMDb identifier."
+
+        if category == "GAME":
+            if not data.get("plataforma"):
+                return "Missing game platform."
+            if not meta.get("debug", False) and len(data.get("screenshots[]", [])) < 2:
+                return "The number of successful screenshots uploaded is less than 2."
 
         if category == "BOOK" and not data.get("formato"):
             return "Missing compatible ebook format."

@@ -122,6 +122,18 @@ class TrackerStatusManager:
                         console.print(f"[yellow]{tracker_name}: Skipping upload because required BOOK fields are missing: {', '.join(book_missing)}[/yellow]")
                         local_tracker_status["skipped"] = True
 
+                # Check for missing required GAME fields in unattended mode
+                elif local_meta.get("category") == "GAME" and local_meta.get("unattended", False):
+                    game_required_fields = ["title", "year", "platform", "game_version"]
+                    game_missing = []
+                    for f in game_required_fields:
+                        val = local_meta.get(f)
+                        if not val or str(val).strip().lower() in ("", "none", "null") or f == "platform" and "," in str(val):
+                            game_missing.append(f)
+                    if game_missing:
+                        console.print(f"[yellow]{tracker_name}: Skipping upload because required GAME fields are missing: {', '.join(game_missing)}[/yellow]")
+                        local_tracker_status["skipped"] = True
+
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)
                     local_tracker_status['skipped'] = bool(claimed)

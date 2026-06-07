@@ -1340,6 +1340,9 @@ async def screenshots(
         force_screenshots: bool = False,
         manual_frames: Union[str, list[str]] = "",
 ) -> Union[list[str], None]:
+    if meta.get("category") == "GAME":
+        return []
+
     if meta.get("category") == "BOOK":
         if meta.get("audiobook", False):
             output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")

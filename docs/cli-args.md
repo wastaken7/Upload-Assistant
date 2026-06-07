@@ -107,6 +107,11 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
   - Passing the option with no words sets an empty string.
 - `-daily`, `--daily YYYY-MM-DD`: Air date (parsed via `datetime.date.fromisoformat`).
 
+### Game fields
+
+- `-plat`, `--platform`, `--platforms PLATFORM`: Game platform (e.g. PC, PS5, XBOX) (overrides auto-detected value).
+  - Stored as `manual_platform` in `meta`.
+
 ### Title shaping toggles
 
 - `--no-season`: Remove Season from title.

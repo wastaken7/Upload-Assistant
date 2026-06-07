@@ -1,0 +1,644 @@
+# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+import datetime
+import html
+import io
+import os
+import re
+import sys
+from typing import Any, Optional
+
+import aiofiles
+import cli_ui
+import httpx
+from PIL import Image
+
+from src.console import console
+from src.igdb import IGDBAPI
+
+
+def normalize_version(version_str: str) -> str:
+    version_str = version_str.strip()
+    if not version_str:
+        return ""
+    if version_str.lower().startswith("v"):
+        return "v" + version_str[1:]
+    if version_str[0].isdigit():
+        return "v" + version_str
+    return version_str
+
+
+def extract_version_from_text(text: str) -> Optional[str]:
+    if not text:
+        return None
+
+    # 1. Match version/update/build prefixes:
+    m = re.search(r"(?i)(?<![a-zA-Z0-9])(?:update|version|ver|build)[.:=\-_\s]*[vV]?(\d+(?:[.\-]\d+)+)(?![a-zA-Z0-9])", text)
+    if m:
+        return normalize_version(m.group(1))
+
+    m = re.search(r"(?i)(?<![a-zA-Z0-9])(?:update|version|ver|build)[.:=\-_\s]*[vV]?(\d+)(?![a-zA-Z0-9])", text)
+    if m:
+        return normalize_version(m.group(1))
+
+    m = re.search(r"(?i)(?<![a-zA-Z0-9])[vV](\d+(?:[.\-]\d+)*)(?![a-zA-Z0-9])", text)
+    if m:
+        return normalize_version(m.group(1))
+
+    # 2. Match isolated version numbers:
+    for m in re.finditer(r"(?i)(?<![a-zA-Z0-9])(\d+(?:[.\-]\d+)+)(?![a-zA-Z0-9])", text):
+        candidate = m.group(1)
+        # Filter out years
+        if len(candidate) == 4 and candidate.isdigit():
+            val_int = int(candidate)
+            if 1900 <= val_int <= 2100:
+                continue
+        # Filter out resolutions
+        if candidate in ("1080", "2160", "4320", "8640", "720", "576", "480"):
+            continue
+        return normalize_version(candidate)
+
+    return None
+
+
+def extract_version_from_nfo(nfo_path: str) -> Optional[str]:
+    try:
+        content = ""
+        try:
+            with open(nfo_path, encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            with open(nfo_path, encoding="latin-1") as f:
+                content = f.read()
+
+        lines = content.splitlines()
+
+        # First pass: look for strong patterns
+        for line in lines:
+            m = re.search(r"(?i)(?<![a-zA-Z0-9])(?:update|version|ver|build)[.:=\-_\s]*[vV]?(\d+(?:[.\-]\d+)+)(?![a-zA-Z0-9])", line)
+            if m:
+                return normalize_version(m.group(1))
+            m = re.search(r"(?i)(?<![a-zA-Z0-9])(?:update|version|ver|build)[.:=\-_\s]*[vV]?(\d+)(?![a-zA-Z0-9])", line)
+            if m:
+                return normalize_version(m.group(1))
+
+        # Second pass: look for any vX.Y pattern
+        for line in lines:
+            m = re.search(r"(?i)(?<![a-zA-Z0-9])[vV](\d+(?:[.\-]\d+)+)(?![a-zA-Z0-9])", line)
+            if m:
+                return normalize_version(m.group(0))
+
+        # Third pass: look for isolated version numbers in context
+        for line in lines:
+            for m in re.finditer(r"(?i)(?<![a-zA-Z0-9])(\d+(?:[.\-]\d+)+)(?![a-zA-Z0-9])", line):
+                candidate = m.group(1)
+                if len(candidate) == 4 and candidate.isdigit():
+                    val_int = int(candidate)
+                    if 1900 <= val_int <= 2100:
+                        continue
+                if candidate in ("1080", "2160", "4320", "8640", "720", "576", "480"):
+                    continue
+                if any(w in line.lower() for w in ("version", "ver", "build", "v.", "v ")):
+                    return normalize_version(candidate)
+    except Exception:
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# File-list resolution
+# ---------------------------------------------------------------------------
+
+
+def resolve_game_filelist(
+    meta: dict[str, Any],
+    videoloc: str,
+) -> tuple[str, list[str], str, str]:
+    """Scan *videoloc* for game files and update *meta* in-place.
+    Prioritizes .exe, then .iso, then compressed archives (.rar, .zip, .7z, etc.),
+    and falls back to the largest file.
+    """
+    filelist: list[str] = []
+    if os.path.isdir(videoloc):
+        for root, _, files in os.walk(videoloc):
+            for file in files:
+                filelist.append(os.path.abspath(os.path.join(root, file)))
+        filelist = sorted(filelist)
+        if not filelist:
+            console.print("[bold red]No game files found!")
+            sys.exit(1)
+
+        exe_files = [f for f in filelist if f.lower().endswith(".exe")]
+        iso_files = [f for f in filelist if f.lower().endswith(".iso")]
+        archive_exts = (".rar", ".zip", ".7z", ".tar", ".gz")
+        archive_files = [f for f in filelist if f.lower().endswith(archive_exts)]
+
+        if exe_files:
+            videopath = sorted(exe_files, key=os.path.getsize, reverse=True)[0]
+        elif iso_files:
+            videopath = sorted(iso_files, key=os.path.getsize, reverse=True)[0]
+        elif archive_files:
+            videopath = sorted(archive_files, key=os.path.getsize, reverse=True)[0]
+        else:
+            videopath = sorted(filelist, key=os.path.getsize, reverse=True)[0]
+    else:
+        videopath = videoloc
+        filelist.append(videoloc)
+
+    meta["filelist"] = filelist
+    meta["imdb_id"] = 0
+
+    search_term = os.path.basename(filelist[0]) if filelist else ""
+    search_file_folder = "file"
+    return videopath, filelist, search_term, search_file_folder
+
+
+# ---------------------------------------------------------------------------
+# Metadata gathering
+# ---------------------------------------------------------------------------
+
+
+async def gather_game_prep(
+    meta: dict[str, Any],
+    videopath: str,
+    base_dir: str,
+    config: Optional[dict[str, Any]] = None,
+) -> None:
+    """Query IGDB API for game metadata and populate meta in-place."""
+    meta["category"] = "GAME"
+    meta["search_year"] = ""
+    meta["resolution"] = "Other"
+    meta["hfr"] = False
+    meta["sd"] = 0
+    meta["valid_mi_settings"] = True
+
+    # Version extraction/handling logic
+    path_to_check = meta.get("path") or videopath
+    version = None
+
+    if meta.get("game_version"):
+        version = normalize_version(meta["game_version"])
+        console.print(f"[green]Game version (manual override): {version}[/green]")
+    else:
+        # Attempt to extract from directory name first
+        if path_to_check:
+            search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
+            if search_dir:
+                folder_name = os.path.basename(search_dir)
+                version = extract_version_from_text(folder_name)
+                if version:
+                    console.print(f"[green]Game version extracted from directory name: {version}[/green]")
+
+        # Attempt to extract from .nfo file if not found in directory name
+        if not version:
+            nfo_files = []
+            for f in meta.get("filelist", []):
+                if f.lower().endswith(".nfo"):
+                    nfo_files.append(f)
+            if path_to_check:
+                search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
+                if os.path.isdir(search_dir):
+                    try:
+                        for f in os.listdir(search_dir):
+                            if f.lower().endswith(".nfo"):
+                                abs_f = os.path.abspath(os.path.join(search_dir, f))
+                                if abs_f not in nfo_files:
+                                    nfo_files.append(abs_f)
+                    except Exception:
+                        pass
+
+            for nfo_path in nfo_files:
+                version = extract_version_from_nfo(nfo_path)
+                if version:
+                    console.print(f"[green]Game version extracted from NFO file ({os.path.basename(nfo_path)}): {version}[/green]")
+                    break
+
+    if version:
+        meta["game_version"] = version
+
+    # Check for Twitch/IGDB API credentials
+    client_id = ""
+    client_secret = ""
+    if config and "DEFAULT" in config:
+        client_id = config["DEFAULT"].get("twitch_client_id", "").strip()
+        client_secret = config["DEFAULT"].get("twitch_client_secret", "").strip()
+
+    # Fallback to env variables
+    if not client_id:
+        client_id = os.environ.get("TWITCH_CLIENT_ID", "").strip()
+    if not client_secret:
+        client_secret = os.environ.get("TWITCH_CLIENT_SECRET", "").strip()
+
+    if not client_id or not client_secret:
+        console.print("[bold red]Warning: Twitch Client ID or Secret is not configured. Game metadata search will be skipped.[/bold red]")
+        return
+
+    # Use title in meta (cleaned folder/file name) or extract from videopath
+    title_query = meta.get("title") or meta.get("filename")
+    if not title_query and videopath:
+        title_query = os.path.splitext(os.path.basename(videopath))[0]
+
+    # Clean game release suffixes to get a clean search term for IGDB
+    if title_query:
+        # Remove trailing group if there is a hyphen
+        if "-" in title_query:
+            parts = title_query.split("-")
+            if len(parts) > 1:
+                last_part = parts[-1].strip()
+                if len(last_part) < 15 and " " not in last_part:
+                    title_query = "-".join(parts[:-1])
+
+        # Remove Update/Patch/Build/Version and everything after
+        title_query = re.sub(r"(?i)\b(?:update|patch|build|version)\b.*", "", title_query)
+        # Remove vX.X or vX and everything after
+        title_query = re.sub(r"(?i)\bv\d+.*", "", title_query)
+        title_query = title_query.replace(".", " ").replace("_", " ")
+        title_query = re.sub(r"\s+", " ", title_query).strip()
+
+    if not title_query:
+        console.print("[bold red]Warning: Could not determine game title for metadata search.[/bold red]")
+        return
+
+    # Keep track of manual CLI/correction overrides
+    cli_overrides = {
+        "title": bool(meta.get("title")),
+        "year": "manual_year" in meta and int(meta.get("manual_year") or 0) > 0,
+        "platform": bool(meta.get("manual_platform")),
+    }
+
+    igdb = IGDBAPI(client_id, client_secret, base_dir)
+    selected_game = None
+
+    igdb_manual = meta.get("igdb_manual")
+    steam_manual = meta.get("steam_manual")
+
+    # Auto-detect Steam ID from local NFO files if not manually specified
+    if not steam_manual and not igdb_manual:
+        nfo_files = []
+        # Check files in filelist
+        for f in meta.get("filelist", []):
+            if f.lower().endswith(".nfo"):
+                nfo_files.append(f)
+
+        # Also check the input directory or directory containing the file
+        path_to_check = meta.get("path") or videopath
+        if path_to_check:
+            search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
+            if os.path.isdir(search_dir):
+                try:
+                    for f in os.listdir(search_dir):
+                        if f.lower().endswith(".nfo"):
+                            abs_f = os.path.abspath(os.path.join(search_dir, f))
+                            if abs_f not in nfo_files:
+                                nfo_files.append(abs_f)
+                except Exception:
+                    pass
+
+        # Search for Steam link in found NFO files
+        detected_steam_id = None
+        for nfo_path in nfo_files:
+            try:
+                content = ""
+                try:
+                    async with aiofiles.open(nfo_path, encoding="utf-8") as f:
+                        content = await f.read()
+                except Exception:
+                    async with aiofiles.open(nfo_path, encoding="latin-1") as f:
+                        content = await f.read()
+
+                # Search for Steam App URL/ID
+                match = re.search(r"store\.steampowered\.com/app/(\d+)", content)
+                if match:
+                    detected_steam_id = match.group(1)
+                    console.print(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
+                    break
+            except Exception as e:
+                if meta.get("debug"):
+                    console.print(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
+
+        if detected_steam_id:
+            steam_manual = detected_steam_id
+            meta["steam_manual"] = detected_steam_id
+
+    if igdb_manual:
+        console.print(f"[cyan]Fetching IGDB metadata for ID: {igdb_manual}...[/cyan]")
+        selected_game = await igdb.fetch_game_by_id(igdb_manual)
+        if not selected_game:
+            console.print(f"[yellow]IGDB: No game found with manual ID '{igdb_manual}'. Falling back to search.[/yellow]")
+    elif steam_manual:
+        selected_game = await igdb.fetch_game_by_steam_id(steam_manual)
+        if not selected_game:
+            console.print(f"[yellow]IGDB: No game found with Steam ID '{steam_manual}'. Falling back to search.[/yellow]")
+
+    if not selected_game:
+        results = await igdb.search_game(title_query)
+        if not results:
+            console.print(f"[yellow]IGDB: No games found matching '{title_query}'[/yellow]")
+            return
+
+        # Choose the correct game
+        if len(results) == 1 or meta.get("unattended", False):
+            selected_game = results[0]
+        else:
+            # Prompt user to select
+            choices = []
+            for r in results:
+                release_date = r.get("first_release_date")
+                year = ""
+                if release_date:
+                    year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc).year})"
+
+                platforms = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
+                platforms_str = f" [{', '.join(platforms)}]" if platforms else ""
+
+                choices.append(f"{r.get('name')}{year}{platforms_str}")
+
+            choices.append("Skip - Don't select any match")
+
+            try:
+                choice = cli_ui.ask_choice("Select the correct game from IGDB:", choices=choices)
+                if choice != "Skip - Don't use any of these matches" and choice != "Skip - Don't select any match":
+                    idx = choices.index(choice)
+                    selected_game = results[idx]
+            except KeyboardInterrupt:
+                console.print("[yellow]Selection cancelled. Skipping IGDB metadata.[/yellow]")
+                return
+
+    if not selected_game:
+        console.print("[yellow]Skipped IGDB metadata selection.[/yellow]")
+        return
+
+    # Cache selected game details
+    await igdb.cache_game_details(selected_game)
+
+    # Populate metadata
+    name = selected_game.get("name")
+    if name and not cli_overrides["title"]:
+        meta["title"] = name
+
+    release_date = selected_game.get("first_release_date")
+    if release_date and not cli_overrides["year"]:
+        year_val = datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc).year
+        meta["year"] = str(year_val)
+        meta["search_year"] = year_val
+
+    # Overview / Storyline
+    summary = selected_game.get("summary")
+    storyline = selected_game.get("storyline")
+    overview = summary or storyline or ""
+    if overview:
+        meta["overview"] = overview
+
+    # Cover image (poster)
+    cover_info = selected_game.get("cover", {})
+    cover_url = cover_info.get("url")
+    if cover_url:
+        if cover_url.startswith("//"):
+            cover_url = "https:" + cover_url
+        cover_url = cover_url.replace("t_thumb", "t_cover_big")
+        meta["poster"] = cover_url
+        meta["cover_path"] = cover_url
+
+        # Download and save cover locally as POSTER.png
+        tmp_dir = os.path.join(base_dir, "tmp", meta["uuid"])
+        os.makedirs(tmp_dir, exist_ok=True)
+        poster_png_path = os.path.join(tmp_dir, "POSTER.png")
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(cover_url)
+                if response.status_code == 200:
+                    img = Image.open(io.BytesIO(response.content))
+                    img.save(poster_png_path, "PNG")
+                    meta["cover_path"] = poster_png_path
+                    console.print("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
+                else:
+                    console.print(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
+        except Exception as e:
+            console.print(f"[yellow]IGDB: Failed to save cover as POSTER.png: {e}[/yellow]")
+
+    # Genres
+    genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
+    if genres:
+        meta["genres"] = ", ".join(genres)
+        meta["keywords"] = ", ".join(genres)
+
+    # Platforms
+    if not cli_overrides["platform"]:
+        raw_platforms = [p.get("name") for p in selected_game.get("platforms", []) if p.get("name")]
+
+        # Map raw platform names to standard uppercase codes
+        def map_to_clean_code(p_name: str) -> str:
+            p_name_norm = p_name.lower()
+            reverse_map = {
+                "playstation 5": "PS5",
+                "playstation 4": "PS4",
+                "playstation 3": "PS3",
+                "playstation 2": "PS2",
+                "playstation": "PS1",
+                "xbox series": "XSX",
+                "xbox series x|s": "XSX",
+                "xbox series x/s": "XSX",
+                "xbox one": "XONE",
+                "xbox 360": "X360",
+                "xbox": "XBOX",
+                "switch": "SWITCH",
+                "nintendo switch": "SWITCH",
+                "3ds": "3DS",
+                "nintendo 3ds": "3DS",
+                "nds": "NDS",
+                "nintendo ds": "NDS",
+                "wii u": "WIIU",
+                "wiiu": "WIIU",
+                "wii": "WII",
+                "pc": "PC",
+                "windows": "PC",
+                "mac": "MAC",
+                "linux": "LINUX",
+            }
+            for key, val in reverse_map.items():
+                if key in p_name_norm or p_name_norm in key:
+                    return val
+            return p_name.upper()
+
+        platforms_mapped = [map_to_clean_code(p) for p in raw_platforms]
+        platforms = list(dict.fromkeys(platforms_mapped))
+
+        detected_platform = None
+        if raw_platforms:
+
+            PLATFORM_MAPPING = {
+                "playstation 5": ["ps5", "playstation 5", "playstation5"],
+                "playstation 4": ["ps4", "playstation 4", "playstation4"],
+                "playstation 3": ["ps3", "playstation 3", "playstation3"],
+                "playstation 2": ["ps2", "playstation 2", "playstation2"],
+                "playstation": ["ps1", "psx", "playstation 1", "playstation1"],
+                "xbox series x|s": ["xsx", "xbox series", "xboxseries"],
+                "xbox series x/s": ["xsx", "xbox series", "xboxseries"],
+                "xbox one": ["xone", "xbox one", "xboxone"],
+                "xbox 360": ["x360", "xbox 360", "xbox360"],
+                "xbox": ["xbox"],
+                "nintendo switch": ["nsw", "switch", "nintendo switch", "nintendoswitch"],
+                "nintendo 3ds": ["3ds", "nintendo 3ds"],
+                "nintendo ds": ["nds", "nintendo ds"],
+                "wii u": ["wii u", "wiiu"],
+                "wii": ["wii"],
+                "pc (microsoft windows)": ["pc", "windows", "win", "osx", "mac", "linux"],
+                "mac": ["mac", "macos", "osx"],
+                "linux": ["linux"],
+            }
+            path_to_check = meta.get("path") or videopath or ""
+            basename = os.path.basename(path_to_check).lower()
+            normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
+            for idx, p_name in enumerate(raw_platforms):
+                p_name_norm = p_name.lower()
+                aliases = []
+                for map_key, map_aliases in PLATFORM_MAPPING.items():
+                    if map_key in p_name_norm or p_name_norm in map_key:
+                        aliases.extend(map_aliases)
+                aliases.append(p_name_norm)
+                aliases = list(dict.fromkeys(aliases))
+                for alias in aliases:
+                    if re.search(rf"\b{re.escape(alias)}\b", normalized_basename):
+                        detected_platform = platforms_mapped[idx]
+                        break
+                if detected_platform:
+                    break
+        if detected_platform:
+            meta["platform"] = detected_platform
+            console.print(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
+        elif len(platforms) == 1:
+            meta["platform"] = platforms[0]
+            console.print(f"[green]Game platform set to: {platforms[0]}[/green]")
+
+    # Companies
+    developers = []
+    publishers = []
+    for comp_info in selected_game.get("involved_companies", []):
+        company = comp_info.get("company", {})
+        comp_name = company.get("name")
+        if comp_name:
+            if comp_info.get("developer"):
+                developers.append(comp_name)
+            if comp_info.get("publisher"):
+                publishers.append(comp_name)
+
+    if developers:
+        meta["developer"] = ", ".join(developers)
+    if publishers:
+        meta["publisher"] = ", ".join(publishers)
+
+    # Extract Steam URL
+    steam_url = None
+    # 1. Check websites (Type 13 = Steam)
+    for web in selected_game.get("websites", []):
+        if web.get("type") == 13:
+            steam_url = web.get("url")
+            break
+    # 2. Check external_games (Source 1 = Steam)
+    if not steam_url:
+        for ext in selected_game.get("external_games", []):
+            if ext.get("external_game_source") == 1:
+                steam_url = ext.get("url")
+                if not steam_url and ext.get("uid"):
+                    steam_url = f"https://store.steampowered.com/app/{ext.get('uid')}"
+                break
+    if steam_url:
+        meta["steam_url"] = steam_url
+
+    # Extract Languages
+    languages = {}
+    for support in selected_game.get("language_supports", []):
+        lang_name = support.get("language", {}).get("name")
+        support_type = support.get("language_support_type", {}).get("name")
+        if lang_name and support_type:
+            if lang_name not in languages:
+                languages[lang_name] = []
+            if support_type not in languages[lang_name]:
+                languages[lang_name].append(support_type)
+    if languages:
+        meta["languages"] = languages
+
+    # Extract available platforms
+    platforms = []
+    for platform in selected_game.get("platforms", []):
+        platform_name = platform.get("name")
+        if platform_name:
+            platforms.append(platform_name)
+    meta["available_platforms"] = platforms
+
+    # Extract Steam App ID
+    steam_id = None
+    if steam_url:
+        match = re.search(r"/app/(\d+)", steam_url)
+        if match:
+            steam_id = match.group(1)
+
+    # Fetch details from Steam if Steam App ID is present
+    if steam_id:
+        url = "https://store.steampowered.com/api/appdetails"
+        params = {"appids": steam_id}
+        trackers = [t.upper() for t in meta.get("trackers", [])]
+        target_trackers = {"ASC", "BT", "BJS", "CBR", "SAM"}
+        if any(t in target_trackers for t in trackers):
+            params["l"] = "brazilian"
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, params=params)
+                if resp.status_code == 200:
+                    res_data = resp.json()
+                    if res_data and steam_id in res_data and res_data[steam_id].get("success"):
+                        app_data = res_data[steam_id]["data"]
+
+                        # Fetch localized pt-BR description from Steam if target tracker is present
+                        if any(t in target_trackers for t in trackers):
+                            desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
+                            # Strip HTML tags
+                            desc_clean = re.sub(r'<[^>]+>', '', desc).strip()
+                            desc_unescaped = html.unescape(desc_clean)
+                            if desc_unescaped:
+                                meta["localized_overviews"] = {"brazilian": desc_unescaped}
+
+                        # Extract PC system requirements
+                        pc_reqs = app_data.get("pc_requirements", {})
+                        if isinstance(pc_reqs, dict):
+                            minimum = pc_reqs.get("minimum", "")
+                            recommended = pc_reqs.get("recommended", "")
+                            if minimum:
+                                meta["requirements_minimum"] = minimum
+                            if recommended:
+                                meta["requirements_recommended"] = recommended
+        except Exception as e:
+            console.print(f"[yellow]Steam: Error fetching app details: {e}[/yellow]")
+
+    # Extract Screenshots from IGDB
+    igdb_screenshots = selected_game.get("screenshots", [])
+    if igdb_screenshots:
+        image_list = []
+        for screenshot in igdb_screenshots:
+            url = screenshot.get("url")
+            if url:
+                if url.startswith("//"):
+                    url = "https:" + url
+                # IGDB screenshot URLs typically contain 't_thumb'
+                # Convert 't_thumb' to 't_screenshot_med' for img_url, and 't_1080p' for raw/web_url
+                img_url = url.replace("t_thumb", "t_screenshot_med")
+                raw_url = url.replace("t_thumb", "t_1080p")
+                web_url = url.replace("t_thumb", "t_1080p")
+                image_list.append({"img_url": img_url, "raw_url": raw_url, "web_url": web_url})
+        if image_list:
+            meta["image_list"] = image_list
+            import json
+
+            tmp_dir = os.path.join(base_dir, "tmp", meta["uuid"])
+            os.makedirs(tmp_dir, exist_ok=True)
+            image_data_file = os.path.join(tmp_dir, "image_data.json")
+            image_data = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
+            try:
+                with open(image_data_file, "w", encoding="utf-8") as img_file:
+                    json.dump(image_data, img_file, indent=4)
+                console.print(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
+            except Exception as e:
+                console.print(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
+
+    meta["igdb_id"] = selected_game.get("id", 0)
+    console.print(f"[green]IGDB metadata successfully retrieved for game: {meta['title']}[/green]")

@@ -186,6 +186,9 @@ class NameManager:
         elif meta["category"] == "BOOK":
             name = self.extract_book_name(meta)
             potential_missing = []
+        elif meta["category"] == "GAME":
+            name = self.extract_game_name(meta)
+            potential_missing = []
 
         try:
             name = ' '.join(name.split())
@@ -289,6 +292,31 @@ class NameManager:
         base_name = " ".join(cleaned_parts)
         base_name = " ".join(base_name.split())
 
+        return base_name
+
+    def extract_game_name(self, meta: Meta) -> str:
+        title = str(meta.get("title", "")).strip()
+        edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+        year = str(meta.get("manual_year") or meta.get("year") or "").strip()
+        platform = str(meta.get("manual_platform") or meta.get("platform") or "").strip()
+        region = str(meta.get("manual_region") or meta.get("region") or "").strip()
+
+        parts = [title]
+        if edition:
+            parts.append(f"[{edition}]")
+        game_version = str(meta.get("game_version") or "").strip()
+        if game_version:
+            parts.append(game_version)
+        if year:
+            parts.append(f"({year})")
+        if platform:
+            parts.append(f"[{platform}]")
+        if region:
+            parts.append(f"[{region}]")
+
+        cleaned_parts = [p for p in parts if p]
+        base_name = " ".join(cleaned_parts)
+        base_name = " ".join(base_name.split())
         return base_name
 
     async def clean_filename(self, name: str) -> str:

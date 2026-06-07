@@ -192,7 +192,7 @@ class LanguagesManager:
 
 
     async def process_desc_language(self, meta: dict[str, Any], tracker: str = "") -> None:
-        if meta.get("category") == "BOOK":
+        if meta.get("category") not in ["MOVIE", "TV"]:
             meta["language_checked"] = True
             meta["audio_languages"] = []
             meta["subtitle_languages"] = []

@@ -341,6 +341,36 @@ class UploadHelper:
                 lines.append(("Duration", str(audiobook_duration_formatted)))
             lines.append(("Poster", str(poster)))
 
+        elif meta["category"] == "GAME":
+            game_subcategory = f"[yellow]{meta['game_subcategory']}[/yellow]"
+            version = meta.get("game_version") or missing_warning
+            developer = meta.get("developer") or missing_warning
+            publisher = meta.get("publisher") or missing_warning
+            platform = meta.get("platform") or missing_warning
+            poster = meta.get("poster") or missing_warning
+            igdb_id = meta.get("igdb_id") or "0"
+            steam_url = meta.get("steam_url")
+            languages = len(meta.get("languages", [])) if meta.get("languages") else missing_warning
+
+            lines.append(("Subcategory", game_subcategory))
+            lines.append(("Version", version))
+            lines.append(("Developer", str(developer)))
+            lines.append(("Publisher", str(publisher)))
+            lines.append(("Platform", str(platform)))
+            lines.append(("Poster", str(poster)))
+            if int(igdb_id) > 0:
+                lines.append(("IGDB", str(igdb_id)))
+            if steam_url:
+                lines.append(("Steam", str(steam_url)))
+            if languages:
+                if isinstance(languages, dict):
+                    lang_summary = ", ".join(f"{lang} ({'/'.join(supports)})" for lang, supports in languages.items())
+                elif isinstance(languages, list):
+                    lang_summary = ", ".join(languages)
+                else:
+                    lang_summary = str(languages)
+                lines.append(("Languages", lang_summary))
+
         if not meta.get('emby', False):
             lines.append(("Overview", f"{meta['overview'][:60]}...."))
             if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('auto_episode_title'):

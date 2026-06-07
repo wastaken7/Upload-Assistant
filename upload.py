@@ -341,6 +341,8 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
         "manual_edition",
         "imdb",
         "tmdb_manual",
+        "igdb_manual",
+        "steam_manual",
         "mal",
         "manual",
         "hdb",
@@ -379,6 +381,12 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
         "manga",
         "magazine",
         "newspaper",
+        "manual_platform",
+        "platform",
+        "game_version",
+        "game_subcategory",
+        "game_system",
+        "game_region",
     ]
     sanitized_saved_meta: dict[str, Any] = {}
     for key, value in saved_meta.items():
@@ -557,6 +565,134 @@ async def _prompt_book_meta(meta: Meta) -> None:
         meta["name_notag"], meta["name"], meta["clean_name"], meta["potential_missing"] = await name_manager.get_name(meta)
 
 
+async def _prompt_game_meta(meta: Meta) -> None:
+    """Prompt the user to fill in missing GAME metadata fields (title, year, platform).
+
+    Runs only in interactive (attended) mode. When any field is filled, the
+    torrent name is rebuilt so the confirmation screen and the per-tracker
+    uploads reflect the new values.
+    """
+    game_required_fields = ["title", "year", "platform", "game_version", "game_subcategory"]
+    game_missing = []
+    for f in game_required_fields:
+        val = meta.get(f)
+        if not val or str(val).strip().lower() in ("", "none", "null") or f == "platform" and "," in str(val):
+            game_missing.append(f)
+    if not game_missing:
+        pass
+    elif meta.get("unattended", False):
+        console.print(
+            f"[yellow]GAME upload: the following required fields are missing: "
+            f"{', '.join(game_missing)}. "
+            f"Re-run with appropriate CLI arguments, "
+            f"or trackers that require them will be skipped.[/yellow]"
+        )
+        return
+    else:
+        console.print(f"[bold yellow]GAME upload: the following fields are required by some trackers: {', '.join(game_missing)}.[/bold yellow]")
+        name_needs_rebuild = False
+        try:
+            for field in game_missing:
+                if field == "year":
+                    while True:
+                        value = (cli_ui.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                        if not value:
+                            break
+                        if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
+                            meta["year"] = value
+                            meta["search_year"] = int(value)
+                            name_needs_rebuild = True
+                            break
+                        else:
+                            console.print("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
+                elif field == "platform":
+                    val = meta.get(field)
+                    if val and "," in str(val):
+                        choices = [p.strip() for p in str(val).split(",") if p.strip()]
+                        choices.append("Enter manually...")
+                        try:
+                            choice = cli_ui.ask_choice("The game is available on multiple platforms. Select the target platform for this upload:", choices=choices)
+                            value = (cli_ui.ask_string("Enter platform (leave blank to skip): ") or "").strip() if choice == "Enter manually..." else choice
+                        except EOFError:
+                            value = ""
+                    else:
+                        value = (cli_ui.ask_string("Enter platform (leave blank to skip): ") or "").strip()
+                    if value:
+                        meta[field] = value
+                        name_needs_rebuild = True
+                elif field == "game_version":
+                    value = (cli_ui.ask_string("Enter game version (e.g., v1.15) (leave blank to skip): ") or "").strip()
+                    if value:
+                        from src.prep_game import normalize_version
+
+                        meta[field] = normalize_version(value)
+                        name_needs_rebuild = True
+
+                elif field == "game_subcategory":
+                    subcategory_choices = ["Full Game", "Full Game + DLC", "DLC", "Update"]
+                    subcategory_values = {"Full Game": "full_game", "Full Game + DLC": "full_game_dlc", "DLC": "dlc", "Update": "update"}
+                    choice = cli_ui.ask_choice(
+                        "Select game subcategory:",
+                        choices=subcategory_choices,
+                    )
+                    meta["game_subcategory"] = subcategory_values.get(choice, "full_game")
+                    name_needs_rebuild = True
+
+                else:
+                    value = (cli_ui.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
+                    if value:
+                        meta[field] = value
+                        name_needs_rebuild = True
+        except EOFError:
+            console.print("[yellow]Input cancelled — continuing with missing game fields.[/yellow]")
+            name_needs_rebuild = False
+
+        # Rebuild the torrent name so the confirmation screen and upload reflect the new values
+        if name_needs_rebuild and not meta.get("emby", False):
+            meta["name_notag"], meta["name"], meta["clean_name"], meta["potential_missing"] = await name_manager.get_name(meta)
+
+    # BJS-specific game metadata prompts
+    trackers = [t.upper() for t in meta.get("trackers", [])]
+    if "BJS" not in trackers or meta.get("unattended", False):
+        return
+
+    try:
+        # Console-specific fields
+        pc_platforms = {"PC", "MAC", "LINUX", "EMULATOR", ""}
+        platform = str(meta.get("platform", "")).upper().strip()
+        is_console = platform not in pc_platforms
+
+        if is_console:
+            # Sistema (FREE/NTSC/PAL)
+            if not meta.get("game_system"):
+                system_choices = ["FREE", "NTSC", "PAL", "Skip"]
+                try:
+                    choice = cli_ui.ask_choice(
+                        "BJS: Select game system (TV standard):",
+                        choices=system_choices,
+                    )
+                    if choice != "Skip":
+                        meta["game_system"] = choice
+                except EOFError:
+                    pass
+
+            # Região (USA/EUR/JPN)
+            if not meta.get("game_region"):
+                region_choices = ["USA", "EUR", "JPN", "Skip"]
+                try:
+                    choice = cli_ui.ask_choice(
+                        "BJS: Select game region:",
+                        choices=region_choices,
+                    )
+                    if choice != "Skip":
+                        meta["game_region"] = choice
+                except EOFError:
+                    pass
+
+    except EOFError:
+        console.print("[yellow]Input cancelled — continuing with current game fields.[/yellow]")
+
+
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
     """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
 
@@ -696,6 +832,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
     # and into get_name (which runs again below if any field was filled in).
     if meta.get("category") == "BOOK" and not meta.get("emby", False):
         await _prompt_book_meta(meta)
+
+    if meta.get("category") == "GAME" and not meta.get("emby", False):
+        await _prompt_game_meta(meta)
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get('trackers', [])
@@ -1098,7 +1237,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 if manual_frames_count > 0:
                     meta['screens'] = manual_frames_count
                 cutoff = int(meta.get('cutoff') or 1)
-                if len(meta.get('image_list', [])) < cutoff and meta.get('skip_imghost_upload', False) is False:
+                if len(meta.get("image_list", [])) < cutoff and meta.get("skip_imghost_upload", False) is False and meta.get("category") != "GAME":
                     # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                     trackers_with_image_host_requirements = {'A4K', 'BHD', 'DC', 'GPW', 'HUNO', 'MTV', 'OE', 'PTP', 'STC', 'TVC'}
 

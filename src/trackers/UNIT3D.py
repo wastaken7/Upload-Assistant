@@ -205,7 +205,7 @@ class UNIT3D:
         }
 
     async def get_mediainfo(self, meta: dict[str, Any]) -> dict[str, str]:
-        if meta.get("bdinfo") is not None:
+        if meta.get("bdinfo") is not None or meta["category"] == "GAME" or meta["category"] == "BOOK" and not meta.get("audiobook", False):
             mediainfo = ""
         else:
             async with aiofiles.open(
@@ -345,8 +345,9 @@ class UNIT3D:
     async def get_mal(self, meta: dict[str, Any]) -> dict[str, str]:
         return {"mal": f"{meta['mal_id']}"}
 
-    async def get_igdb(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"igdb": "0"}
+    async def get_igdb(self, meta: dict[str, Any]) -> dict[str, str]:
+        igdb = meta.get("igdb_id", 0) if meta["category"] == "GAME" else 0
+        return {"igdb": f"{igdb}"}
 
     async def get_stream(self, meta: dict[str, Any]) -> dict[str, str]:
         return {"stream": f"{meta['stream']}"}

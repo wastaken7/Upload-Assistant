@@ -17,6 +17,11 @@ config = {
         # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
         "google_books_api_key": "",
 
+        # Twitch/IGDB API credentials. "" = disabled
+        # You can get them from the Twitch Developer Console (https://dev.twitch.tv/console)
+        "twitch_client_id": "",
+        "twitch_client_secret": "",
+
         # MyAnonamouse (MAM) API key / session cookie (mam_id). "" = disabled
         # You can get it from Preferences > Security > View IP locked session cookie
         "mam_api_key": "",

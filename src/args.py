@@ -94,7 +94,13 @@ class Args:
         parser.add_argument('-comps_index', '--comparison_index', nargs=1, required=False, help="Which of your comparison indexes is the main images (required when comps)", type=int, default=None)
         parser.add_argument('-mf', '--manual_frames', nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
         parser.add_argument(
-            "-c", "--category", nargs=1, required=False, help="Category [movie, tv, fanres, book]", choices=["movie", "tv", "fanres", "book"], dest="manual_category"
+            "-c",
+            "--category",
+            nargs=1,
+            required=False,
+            help="Category [movie, tv, fanres, book, game]",
+            choices=["movie", "tv", "fanres", "book", "game"],
+            dest="manual_category",
         )
         parser.add_argument('-t', '--type', nargs=1, required=False, help="Type [DISC, REMUX, ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP]", choices=['disc', 'remux', 'encode', 'webdl', 'web-dl', 'webrip', 'hdtv', 'dvdrip'], dest="manual_type")
         parser.add_argument('--source', nargs=1, required=False, help="Source [Blu-ray, BluRay, DVD, DVD5, DVD9, HDDVD, WEB, HDTV, UHDTV, LaserDisc, DCP]", choices=['Blu-ray', 'BluRay', 'DVD', 'DVD5', 'DVD9', 'HDDVD', 'WEB', 'HDTV', 'UHDTV', 'LaserDisc', 'DCP'], dest="manual_source")
@@ -105,6 +111,8 @@ class Args:
         parser.add_argument('-tvmaze', '--tvmaze', nargs=1, required=False, help="TVMAZE ID", type=str, dest='tvmaze_manual')
         parser.add_argument('-tvdb', '--tvdb', nargs=1, required=False, help="TVDB ID", type=str, dest='tvdb_manual')
         parser.add_argument("-douban", "--douban", nargs=1, required=False, help="Douban ID (Number only)", type=int, dest="douban_manual", default=0)
+        parser.add_argument("-igdb", "--igdb", nargs=1, required=False, help="IGDB ID", type=str, dest="igdb_manual")
+        parser.add_argument("-steam", "--steam", nargs=1, required=False, help="Steam App ID or URL", type=str, dest="steam_manual")
         parser.add_argument('-g', '--tag', nargs='*', required=False, help="Group Tag", type=str)
         parser.add_argument('-serv', '--service', nargs='*', required=False, help="Streaming Service", type=str)
         parser.add_argument('-dist', '--distributor', nargs='*', required=False, help="Disc Distributor e.g.(Criterion, BFI, etc.)", type=str)
@@ -167,6 +175,36 @@ class Args:
             help="Book/Audiobook publisher (overrides auto-detected value)",
             type=str,
             dest="book_publisher",
+        )
+        parser.add_argument(
+            "-plat",
+            "--platform",
+            "--platforms",
+            nargs=1,
+            required=False,
+            help="Game platform (PC, PS5, PS4, PS3, PS2, Xbox, X360, XOne, XSX, Switch, 3DS, NDS, WiiU, Wii, Mac, Linux)",
+            type=str.lower,
+            choices=["pc", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii", "mac", "linux"],
+            dest="manual_platform",
+        )
+        parser.add_argument(
+            "-gv",
+            "--game-version",
+            nargs=1,
+            required=False,
+            help="Game version (overrides auto-detected value, e.g. 'v1.15')",
+            type=str,
+            dest="game_version",
+        )
+        parser.add_argument(
+            "-gsc",
+            "--game-subcategory",
+            nargs=1,
+            required=False,
+            help="Game subcategory (full_game, full_game_dlc, dlc, update)",
+            type=str.lower,
+            choices=["full_game", "full_game_dlc", "dlc", "update"],
+            dest="game_subcategory",
         )
         parser.add_argument('-mc', '--commentary', dest='manual_commentary', action='store_true', required=False, help="Manually indicate whether commentary tracks are included")
         parser.add_argument('-sfxs', '--sfx-subtitles', dest='sfx_subtitles', action='store_true', required=False, help="Manually indicate whether subtitles with visual enhancements like animations, effects, or backgrounds are included")
@@ -448,6 +486,21 @@ class Args:
                         else:
                             meta['huno'] = value2
 
+                    elif key == "steam_manual":
+                        if value2.startswith("http"):
+                            parsed = urllib.parse.urlparse(value2)
+                            try:
+                                match = re.search(r"/app/(\d+)", parsed.path)
+                                if match:
+                                    meta["steam_manual"] = match.group(1)
+                                else:
+                                    meta["steam_manual"] = value2
+                            except Exception:
+                                console.print("[red]Unable to parse Steam ID from URL. Using raw value.[/red]")
+                                meta["steam_manual"] = value2
+                        else:
+                            meta["steam_manual"] = value2
+
                     else:
                         meta[key] = value2
                 else:
@@ -561,6 +614,9 @@ class Args:
         # used by trackers like CBR when constructing the torrent name for BOOK category.
         self._apply_book_meta_overrides(meta)
 
+        # Apply game metadata overrides: --platform maps to platforms key
+        self._apply_game_meta_overrides(meta)
+
         return meta, parser, before_args
 
     @staticmethod
@@ -621,6 +677,46 @@ class Args:
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
         sanitize_book_language(meta)
+
+    @staticmethod
+    def _apply_game_meta_overrides(meta: dict[str, Any]) -> None:
+        """Normalise CLI game arguments (--platform) into *meta*."""
+        manual_platform_arg = meta.get("manual_platform")
+        if manual_platform_arg not in (None, ""):
+            plat = str(manual_platform_arg).strip().lower()
+            mapping = {
+                "pc": "PC",
+                "ps5": "PS5",
+                "ps4": "PS4",
+                "ps3": "PS3",
+                "ps2": "PS2",
+                "xbox": "Xbox",
+                "x360": "Xbox 360",
+                "xone": "Xbox One",
+                "xsx": "Xbox Series X|S",
+                "switch": "Nintendo Switch",
+                "3ds": "Nintendo 3DS",
+                "nds": "Nintendo DS",
+                "wiiu": "Wii U",
+                "wii": "Wii",
+                "mac": "Mac",
+                "linux": "Linux",
+            }
+            clean_plat = mapping.get(plat, plat)
+            meta["manual_platform"] = clean_plat
+            meta["platform"] = clean_plat
+
+        steam_manual_arg = meta.get("steam_manual")
+        if steam_manual_arg not in (None, ""):
+            meta["steam_manual"] = str(steam_manual_arg).strip()
+
+        game_version_arg = meta.get("game_version")
+        if game_version_arg not in (None, ""):
+            meta["game_version"] = str(game_version_arg).strip()
+
+        game_subcategory_arg = meta.get("game_subcategory")
+        if game_subcategory_arg not in (None, ""):
+            meta["game_subcategory"] = str(game_subcategory_arg).strip().lower()
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:

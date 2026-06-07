@@ -33,7 +33,7 @@ class CBR(UNIT3D):
     async def get_category_id(
         self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False
     ) -> dict[str, str]:
-        category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11", "COMIC_MANGA": "10"}
+        category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11", "COMIC_MANGA": "10", "GAME": "5"}
 
         if mapping_only:
             return category_id
@@ -82,18 +82,33 @@ class CBR(UNIT3D):
             "WAV": "24",
             "AUDIOBOOK": "24",
             "OUTROS": "43",
+            "PC": "46",
+            "PLAYSTATION": "48",
+            "XBOX": "49",
+            "NINTENDO": "50",
         }
 
         if mapping_only:
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
-            return {"type_id": type_id.get(type, "0")}
+
+        resolved_type = type if type else meta.get("type", "")
+        if resolved_type == "GAME" or (meta.get("category") == "GAME" and resolved_type not in type_id):
+            platform = str(meta.get("platform", "")).lower()
+
+            if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
+                resolved_id = "48"
+            elif "xbox" in platform:
+                resolved_id = "49"
+            elif any(word in platform for word in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
+                resolved_id = "50"
+            else:
+                resolved_id = "46"
         else:
-            meta_type = meta.get("type", "")
-            resolved_id = type_id.get(meta_type, "0")
-            return {"type_id": resolved_id}
+            resolved_id = type_id.get(resolved_type, "0")
+
+        return {"type_id": resolved_id}
 
     async def get_resolution_id(
         self, meta: dict[str, Any], resolution: str = "", reverse: bool = False, mapping_only: bool = False
@@ -135,6 +150,29 @@ class CBR(UNIT3D):
             book_language_iso = meta.get("book_language_iso", "")
             if book_language_iso and book_language_iso != "por":
                 cbr_name += f" [{book_language_iso.upper()}]"
+
+        elif category == "GAME":
+            tag = meta.get("tag", "")
+            if tag:
+                tag = tag.lstrip("-")
+            game_has_multiple_languages = len(meta.get("languages", [])) > 1
+            game_lang_has_pt = "PORTUGUESE" in str(meta.get("languages", [])).upper()
+            game_lang_has_eng = "ENGLISH" in str(meta.get("languages", [])).upper()
+
+            if game_has_multiple_languages and game_lang_has_pt:
+                game_lang = "MULTI"
+            elif game_has_multiple_languages and game_lang_has_eng:
+                game_lang = "INGLÊS"
+            else:
+                game_lang = meta.get("language", "").upper()
+
+            game_subcategory = meta["game_subcategory"].lower()
+            update = "Update" if game_subcategory == "update" else ""
+            dlc = "[DLC]" if game_subcategory == "dlc" else "[+DLC]" if game_subcategory == "full_game_dlc" else ""
+            if dlc:
+                dlc = f" {dlc}"
+
+            cbr_name = f"{meta.get('title', '')} {update} {meta.get('game_version', '')} {meta.get('year', '')} - {tag} [{game_lang}]{dlc}"
 
         elif category in ("MOVIE", "TV"):
             cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
@@ -207,7 +245,7 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta.get("category") == "BOOK":
+        if meta.get("category") not in ["MOVIE", "TV"]:
             return True
 
         subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)

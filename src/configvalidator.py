@@ -86,6 +86,8 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "google_books_api_key": (str,),
     "mam_api_key": (str,),
     "mam_id": (str,),
+    "twitch_client_id": (str,),
+    "twitch_client_secret": (str,),
 }
 
 # Valid image hosts

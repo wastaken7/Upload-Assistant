@@ -37,6 +37,8 @@ try:
     from src.is_scene import SceneManager
     from src.languages import languages_manager
     from src.metadata_searching import MetadataSearchingManager
+    from src.prep_game import gather_game_prep as _gather_game_prep_fn
+    from src.prep_game import resolve_game_filelist as _resolve_game_filelist_fn
     from src.radarr import RadarrManager
     from src.region import get_distributor, get_region, get_service
     from src.rehostimages import RehostImagesManager
@@ -136,6 +138,23 @@ class Prep:
         """Delegate to :func:`src.book_prep.gather_book_prep`."""
         await _gather_book_prep_fn(meta, videopath, base_dir, self.config)
 
+    @staticmethod
+    def _resolve_game_filelist(
+        meta: dict[str, Any],
+        videoloc: str,
+    ) -> tuple[str, list[str], str, str]:
+        """Delegate to :func:`src.prep_game.resolve_game_filelist`."""
+        return _resolve_game_filelist_fn(meta, videoloc)
+
+    async def _gather_game_prep(
+        self,
+        meta: dict[str, Any],
+        videopath: str,
+        base_dir: str,
+    ) -> None:
+        """Delegate to :func:`src.prep_game.gather_game_prep`."""
+        await _gather_game_prep_fn(meta, videopath, base_dir, self.config)
+
     async def gather_prep(self, meta: dict[str, Any], mode: str) -> dict[str, Any]:
         # set a timer to check speed
         meta_start_time = time.time()
@@ -211,7 +230,7 @@ class Prep:
                     has_books = False
                     has_audio = False
                     has_video = False
-                    for root, _, files in os.walk(path_to_check):
+                    for _root, _, files in os.walk(path_to_check):
                         for file in files:
                             ext = os.path.splitext(file)[1].lower()
                             if ext in book_extensions:
@@ -232,6 +251,63 @@ class Prep:
                 meta["category"] = "BOOK"
                 if meta.get("debug", False):
                     console.print("[cyan]Auto-detected category: BOOK[/cyan]")
+
+        # Auto-detect GAME category if category/manual_category is not already set and it's not a disc
+        if not meta.get("category") and not meta.get("manual_category") and not meta.get("is_disc"):
+            is_game = False
+            game_extensions = {".exe", ".iso"}
+            video_extensions = {".mkv", ".mp4", ".ts"}
+            game_groups = {"tenoke", "rune", "flt", "plaza", "codex", "skidrow", "prophet", "gog", "darkzer0", "doge", "tinyiso", "razor1911", "outlaws", "alias", "simplex"}
+
+            path_to_check = meta.get("path")
+            if path_to_check and os.path.exists(path_to_check):
+                has_game_ext = False
+                has_video = False
+                has_steam_link = False
+                has_game_group = False
+
+                base_name_lower = os.path.basename(path_to_check).lower()
+                for group in game_groups:
+                    if f"-{group}" in base_name_lower or base_name_lower.endswith(group):
+                        has_game_group = True
+                        break
+
+                if os.path.isdir(path_to_check):
+                    for root, _, files in os.walk(path_to_check):
+                        for file in files:
+                            file_lower = file.lower()
+                            ext = os.path.splitext(file_lower)[1]
+                            if ext in game_extensions:
+                                has_game_ext = True
+                            elif ext in video_extensions:
+                                has_video = True
+                            elif ext == ".nfo":
+                                nfo_path = os.path.join(root, file)
+                                try:
+                                    async with aiofiles.open(nfo_path, encoding="utf-8", errors="ignore") as nf:
+                                        nfo_content = await nf.read()
+                                        if "store.steampowered.com/app/" in nfo_content or "igdb.com" in nfo_content:
+                                            has_steam_link = True
+                                except Exception:
+                                    try:
+                                        async with aiofiles.open(nfo_path, encoding="latin-1", errors="ignore") as nf:
+                                            nfo_content = await nf.read()
+                                            if "store.steampowered.com/app/" in nfo_content or "igdb.com" in nfo_content:
+                                                has_steam_link = True
+                                    except Exception:
+                                        pass
+                else:
+                    ext = os.path.splitext(base_name_lower)[1]
+                    if ext in game_extensions:
+                        has_game_ext = True
+
+                if has_steam_link or ((has_game_ext or has_game_group) and not has_video):
+                    is_game = True
+
+            if is_game:
+                meta["category"] = "GAME"
+                if meta.get("debug", False):
+                    console.print("[cyan]Auto-detected category: GAME[/cyan]")
 
         if meta['is_disc'] == "BDMV":
             video, meta['scene'], meta['imdb_id'] = await self.scene_manager.is_scene(meta['path'], meta, meta.get('imdb_id', 0))
@@ -389,6 +465,9 @@ class Prep:
             if meta.get("category") == "BOOK" or str(meta.get("manual_category") or "").upper() == "BOOK":
                 videopath, filelist, search_term, search_file_folder = self._resolve_book_filelist(meta, videoloc)
                 video = videopath
+            elif meta.get("category") == "GAME" or str(meta.get("manual_category") or "").upper() == "GAME":
+                videopath, filelist, search_term, search_file_folder = self._resolve_game_filelist(meta, videoloc)
+                video = videopath
             else:
                 videopath, meta["filelist"] = await video_manager.get_video(videoloc, meta.get("mode", "discord"), meta.get("sorted_filelist", False), meta.get("debug", False))
                 filelist = cast(list[str], meta.get("filelist") or [])
@@ -472,6 +551,9 @@ class Prep:
             try:
                 if meta.get("category") == "BOOK" or str(meta.get("manual_category") or "").upper() == "BOOK":
                     await self._gather_book_prep(meta, videopath, base_dir)
+                elif meta.get("category") == "GAME" or str(meta.get("manual_category") or "").upper() == "GAME":
+                    meta["filename"] = filename
+                    await self._gather_game_prep(meta, videopath, base_dir)
                 elif not meta.get("emby", False):
                     # rely only on guessit for search_year for tv matching
                     try:
@@ -570,7 +652,7 @@ class Prep:
                 raise Exception("Conformance errors found in mediainfo")
 
         meta['valid_mi'] = True
-        if not meta["is_disc"] and not meta.get("emby", False) and meta.get("category") != "BOOK":
+        if not meta["is_disc"] and not meta.get("emby", False) and meta.get("category") not in ("BOOK", "GAME"):
             try:
                 valid_mi = validate_mediainfo(meta, debug=meta['debug'])
             except NoAudioMediaError as e:
@@ -855,6 +937,8 @@ class Prep:
             meta["type"] = os.path.splitext(video)[1].lstrip(".").upper()
             if meta["type"] in ("CBR", "CBZ"):
                 meta["comic"] = True
+        elif meta.get("category") == "GAME":
+            meta["type"] = "GAME"
         else:
             meta["type"] = await video_manager.get_type(video, meta["scene"], meta["is_disc"], meta)
 
@@ -865,7 +949,7 @@ class Prep:
         mi_data: dict[str, Any] = mi or {}
 
         # Run a check against mediainfo to see if it has tmdb/imdb
-        if (meta.get("tmdb_id") == 0 or meta.get("imdb_id") == 0) and not meta.get("emby", False) and meta.get("category") != "BOOK":
+        if (meta.get("tmdb_id") == 0 or meta.get("imdb_id") == 0) and not meta.get("emby", False) and meta.get("category") not in ("BOOK", "GAME"):
             meta['category'], meta['tmdb_id'], meta['imdb_id'], meta['tvdb_id'] = await self.tmdb_manager.get_tmdb_imdb_from_mediainfo(
                 mi_data, meta
             )
@@ -881,7 +965,7 @@ class Prep:
         debug = bool(meta.get('emby_debug', False) or meta['debug'])
 
         # run a search to find tmdb and imdb ids if we don't have them
-        if int(meta.get("tmdb_id") or 0) == 0 and int(meta.get("imdb_id") or 0) == 0 and meta.get("category") != "BOOK":
+        if int(meta.get("tmdb_id") or 0) == 0 and int(meta.get("imdb_id") or 0) == 0 and meta.get("category") not in ("BOOK", "GAME"):
             if meta.get('category') == "TV":
                 year = meta.get('manual_year', '') or meta.get('search_year', '') or meta.get('year', '')
             elif meta.get('emby_debug', False):
@@ -924,7 +1008,7 @@ class Prep:
             meta['no_ids'] = True
 
         # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
-        if int(meta.get("imdb_id") or 0) != 0 and int(meta.get("tmdb_id") or 0) == 0 and meta.get("category") != "BOOK":
+        if int(meta.get("imdb_id") or 0) != 0 and int(meta.get("tmdb_id") or 0) == 0 and meta.get("category") not in ("BOOK", "GAME"):
             imdb_id_value = _to_int(meta.get('imdb_id'))
             tvdb_id_value = _to_int(meta.get('tvdb_id'))
             search_year_value = _normalize_search_year(meta.get('search_year'))
@@ -982,7 +1066,7 @@ class Prep:
             meta['imdb_info'] = None
 
         # Get IMDb ID if not set
-        if meta.get("imdb_id") == 0 and meta.get("category") != "BOOK":
+        if meta.get("imdb_id") == 0 and meta.get("category") not in ("BOOK", "GAME"):
             try:
                 search_year_value = _normalize_search_year(meta.get('search_year'))
                 meta['imdb_id'] = await imdb_manager.search_imdb(
@@ -1002,7 +1086,7 @@ class Prep:
                 raise Exception(f"Error searching IMDb: {e}") from e
 
         # user might have skipped tmdb earlier, lets double check
-        if meta.get("imdb_id") != 0 and meta.get("tmdb_id") == 0 and meta.get("category") != "BOOK":
+        if meta.get("imdb_id") != 0 and meta.get("tmdb_id") == 0 and meta.get("category") not in ("BOOK", "GAME"):
             console.print("[yellow]No TMDB ID found, attempting to fetch from IMDb...[/yellow]")
             imdb_id_value = _to_int(meta.get('imdb_id'))
             tvdb_id_value = _to_int(meta.get('tvdb_id'))
@@ -1024,12 +1108,12 @@ class Prep:
             meta['no_ids'] = filename_search
 
         tmdb_id_value = _to_int(meta.get('tmdb_id'))
-        if tmdb_id_value != 0 and meta.get("category") != "BOOK":
+        if tmdb_id_value != 0 and meta.get("category") not in ("BOOK", "GAME"):
             await self.tmdb_manager.set_tmdb_metadata(meta, filename)
 
         # Ensure IMDb info is retrieved if it wasn't already fetched
         imdb_id_value = _to_int(meta.get('imdb_id'))
-        if meta.get("imdb_info", None) is None and imdb_id_value != 0 and meta.get("category") != "BOOK":
+        if meta.get("imdb_info", None) is None and imdb_id_value != 0 and meta.get("category") not in ("BOOK", "GAME"):
             imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.get('manual_language'), debug=meta.get('debug', False))
             meta['imdb_info'] = imdb_info
 
@@ -1090,7 +1174,7 @@ class Prep:
                         console.print(f"[yellow]Identified as TV Movie based on IMDb type: {is_tv_movie}[/yellow]")
                     meta['tv_movie'] = True
 
-        if (meta["category"] == "TV" or meta.get("tv_movie", False)) and meta.get("category") != "BOOK":
+        if (meta["category"] == "TV" or meta.get("tv_movie", False)) and meta.get("category") not in ("BOOK", "GAME"):
             both_ids_searched = False
             search_year_value = _normalize_search_year(meta.get('search_year'))
             if meta.get('tvmaze_id', 0) == 0 and meta.get('tvdb_id', 0) == 0:
@@ -1391,6 +1475,36 @@ class Prep:
                 meta["type"] = os.path.splitext(videopath)[1].lstrip(".").upper()
             if meta.get("type", "").upper() in ("CBR", "CBZ"):
                 meta["comic"] = True
+            meta["uhd"] = ""
+            meta["hdr"] = ""
+            meta["distributor"] = ""
+            meta["region"] = ""
+            meta["video_codec"] = ""
+            meta["video_encode"] = ""
+            meta["has_encode_settings"] = False
+            meta["bit_depth"] = "0"
+            meta["edition"] = ""
+            meta["repack"] = ""
+            meta["webdv"] = False
+
+            if not meta.get("title"):
+                meta["title"] = ""
+            if not meta.get("year"):
+                meta["year"] = ""
+            if not meta.get("overview"):
+                meta["overview"] = ""
+            if not meta.get("genres"):
+                meta["genres"] = ""
+        elif meta.get("category") == "GAME":
+            meta["container"] = os.path.splitext(videopath)[1].lstrip(".").lower()
+            meta["audio"] = ""
+            meta["channels"] = ""
+            meta["has_commentary"] = False
+            meta["3D"] = ""
+            if not meta.get("source"):
+                meta["source"] = ""
+            if not meta.get("type"):
+                meta["type"] = "GAME"
             meta["uhd"] = ""
             meta["hdr"] = ""
             meta["distributor"] = ""

@@ -225,7 +225,7 @@ class TorrentCreator:
                 if is_subs and meta.get("subtitle_files"):
                     creation_filelist.extend(meta["subtitle_files"])
 
-                if meta.get("category") == "BOOK":
+                if meta.get("category") in ("BOOK", "GAME"):
                     include = []
                     exclude = []
                 elif meta["keep_folder"]:
@@ -316,7 +316,7 @@ class TorrentCreator:
                         if meta.get('mkbrr_threads') != '0':
                             cmd.extend(["--workers", str(meta['mkbrr_threads'])])
 
-                        if not meta.get("is_disc", False) and meta.get("category") != "BOOK":
+                        if not meta.get("is_disc", False) and meta.get("category") not in ("BOOK", "GAME"):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
 
@@ -407,7 +407,7 @@ class TorrentCreator:
 
                 # Fallback to CustomTorrent if mkbrr is not used
                 custom_include = include or []
-                if is_subs and not custom_include and not meta["is_disc"] and meta.get("category") != "BOOK":
+                if is_subs and not custom_include and not meta["is_disc"] and meta.get("category") not in ("BOOK", "GAME"):
                     custom_include = ["*.mkv", "*.mp4", "*.ts", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.idx"]
                 torrent = CustomTorrent(
                     meta=meta,

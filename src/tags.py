@@ -39,7 +39,7 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
         if os.path.isdir(video):
             # If video is a directory, use the directory name as basename
             basename_stripped = os.path.basename(os.path.normpath(video))
-        elif (meta.get('tv_pack', False) or meta.get('keep_folder', False)) and not season_pack_check:
+        elif (meta.get("tv_pack", False) or meta.get("keep_folder", False) or meta.get("category") in ("BOOK", "GAME")) and not season_pack_check:
             basename_stripped = meta['uuid']
         else:
             # If video is a file, use the filename without extension
