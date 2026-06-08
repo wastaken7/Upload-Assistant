@@ -185,7 +185,7 @@ async def gather_game_prep(
             if search_dir:
                 folder_name = os.path.basename(search_dir)
                 version = extract_version_from_text(folder_name)
-                if version:
+                if version and meta["debug"]:
                     console.print(f"[green]Game version extracted from directory name: {version}[/green]")
 
         # Attempt to extract from .nfo file if not found in directory name
@@ -309,7 +309,8 @@ async def gather_game_prep(
                 match = re.search(r"store\.steampowered\.com/app/(\d+)", content)
                 if match:
                     detected_steam_id = match.group(1)
-                    console.print(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
+                    if meta["debug"]:
+                        console.print(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
                     break
             except Exception as e:
                 if meta.get("debug"):
@@ -517,7 +518,8 @@ async def gather_game_prep(
             console.print(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
         elif len(platforms) == 1:
             meta["platform"] = platforms[0]
-            console.print(f"[green]Game platform set to: {platforms[0]}[/green]")
+            if meta["debug"]:
+                console.print(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
     developers = []
@@ -644,11 +646,13 @@ async def gather_game_prep(
             image_data_file = os.path.join(tmp_dir, "image_data.json")
             image_data = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
             try:
-                with open(image_data_file, "w", encoding="utf-8") as img_file:
-                    json.dump(image_data, img_file, indent=4)
-                console.print(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
+                async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:
+                    await img_file.write(json.dumps(image_data, indent=4))
+                if meta["debug"]:
+                    console.print(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
             except Exception as e:
                 console.print(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
     meta["igdb_id"] = selected_game.get("id", 0)
-    console.print(f"[green]IGDB metadata successfully retrieved for game: {meta['title']}[/green]")
+    if meta["debug"]:
+        console.print(f"[green]IGDB metadata successfully retrieved for game: {meta['title']}[/green]")

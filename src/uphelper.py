@@ -422,10 +422,12 @@ class UploadHelper:
             tag = tag[1:]
         region = meta.get("region") or missing_warning
         distributor = meta.get("distributor") or missing_warning
+        edition = meta.get("edition", "")
 
         lines.append(("Resolution", str(resolution)))
         lines.append(("Source", str(source)))
         lines.append(("Type", str(type_)))
+        lines.append(("Edition", str(edition)))
 
         if meta.get("category") != "BOOK":
             lines.append(("Group Tag", str(tag)))
