@@ -296,7 +296,7 @@ class GPW:
         desc_parts.append(tonemapped_header)
 
         # Signature
-        desc_parts.append(f"[align=right][url=https://github.com/Audionut/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/align]")
+        desc_parts.append(f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/align]")
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())
 

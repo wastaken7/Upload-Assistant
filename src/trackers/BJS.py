@@ -4,7 +4,6 @@ import json
 import os
 import platform
 import re
-import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -21,6 +20,7 @@ from langcodes.tag_parser import LanguageTagError
 from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
@@ -84,6 +84,11 @@ class BJS:
                         "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
                     )
                     return False
+
+            if meta.get("scene", False) and meta.get("container", "") in ("rar", "zip", "7z", "tar", "gz"):
+                console.print(f"{self.tracker}: [red]Skipping upload: Scene games must be unpacked (Rule 5.4.1.1).[/red]")
+                return False
+
             return True
 
         subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
@@ -340,106 +345,6 @@ class BJS:
 
         return "Outro"
 
-    def get_game_tags(self, meta: Meta) -> str:
-        """Map IGDB genres/keywords to BJS game-specific genre tags."""
-        valid_tags: set[str] = {
-            "ação",
-            "adulto",
-            "arcade",
-            "aventura",
-            "cartas",
-            "casual",
-            "classico",
-            "corrida",
-            "educativo",
-            "esportes",
-            "estrategia",
-            "fps",
-            "indie",
-            "luta",
-            "mmo",
-            "moba",
-            "musical",
-            "plataforma",
-            "puzzle",
-            "rpg",
-            "rts",
-            "rv",
-            "sandbox",
-            "simulacao",
-            "sobrevivencia",
-            "tabuleiro",
-            "terror",
-            "tps",
-            "outros",
-        }
-
-        # Map from IGDB English genre names to BJS Portuguese tags
-        genre_map: dict[str, str] = {
-            "action": "ação",
-            "adventure": "aventura",
-            "arcade": "arcade",
-            "card": "cartas",
-            "casual": "casual",
-            "classic": "classico",
-            "racing": "corrida",
-            "driving": "corrida",
-            "educational": "educativo",
-            "sport": "esportes",
-            "sports": "esportes",
-            "strategy": "estrategia",
-            "shooter": "fps",
-            "fighting": "luta",
-            "mmo": "mmo",
-            "moba": "moba",
-            "music": "musical",
-            "rhythm": "musical",
-            "platform": "plataforma",
-            "platformer": "plataforma",
-            "puzzle": "puzzle",
-            "rpg": "rpg",
-            "role-playing": "rpg",
-            "role-playing (rpg)": "rpg",
-            "real time strategy": "rts",
-            "real time strategy (rts)": "rts",
-            "rts": "rts",
-            "vr": "rv",
-            "virtual reality": "rv",
-            "sandbox": "sandbox",
-            "simulation": "simulacao",
-            "simulator": "simulacao",
-            "survival": "sobrevivencia",
-            "board": "tabuleiro",
-            "board game": "tabuleiro",
-            "horror": "terror",
-            "hack and slash": "ação",
-            "hack and slash/beat 'em up": "ação",
-            "tactical": "estrategia",
-            "turn-based strategy": "estrategia",
-            "turn-based strategy (tbs)": "estrategia",
-            "indie": "indie",
-            "point-and-click": "aventura",
-            "visual novel": "aventura",
-        }
-
-        genres_str = meta.get("genres", "") or meta.get("keywords", "")
-        if not genres_str:
-            return "outros"
-
-        genre_list = [g.strip() for g in str(genres_str).split(",") if g.strip()]
-
-        matched_tags: list[str] = []
-        for genre in genre_list:
-            genre_lower = genre.lower()
-            mapped = genre_map.get(genre_lower)
-            if mapped and mapped not in matched_tags:
-                matched_tags.append(mapped)
-
-        if not matched_tags:
-            return "outros"
-
-        return ", ".join(matched_tags)
-
     async def build_game_description(self, meta: Meta) -> tuple[str, str]:
         """Build the game description for BJS.
 
@@ -465,7 +370,7 @@ class BJS:
 
         # Signature
         fichatecnica_parts.append(
-            f"[align=center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]"
+            f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]"
         )
 
         fichatecnica = "\n\n".join(part for part in fichatecnica_parts if part.strip())
@@ -723,7 +628,7 @@ class BJS:
                 desc_parts.append(f"[center]{spectrograms_block}[/center]")
 
         # Signature
-        desc_parts.append(f"[align=center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]")
+        desc_parts.append(f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
@@ -807,25 +712,36 @@ class BJS:
 
         return br_rating or us_rating or ""
 
-    async def get_tags(self) -> str:
-        tags = ""
+    async def get_tags(self, meta: Meta) -> str:
+        """Map genres from meta['genres'] or TMDB to BJS Portuguese tags."""
+        matched_tags: list[str] = []
 
-        genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
-        genre_names: list[str] = []
+        # Try to get genres from meta['genres'] first (from IGDB/Steam for games, or other sources)
+        genres_str = meta.get("genres", "") or meta.get("keywords", "")
+        if genres_str:
+            genre_list = [g.strip() for g in str(genres_str).split(",") if g.strip()]
+            for genre in genre_list:
+                genre_lower = genre.lower()
+                mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
+                if mapped and mapped not in matched_tags:
+                    matched_tags.append(mapped)
 
-        for g in genres_data:
-            name: str = g.get("name", "")
-            if name.strip():
-                genre_names.append(name)
+        if meta["category"] in ("TV", "MOVIE") and not matched_tags:
+            genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
+            for g in genres_data:
+                name: str = g.get("name", "").lower()
+                if name.strip():
+                    mapped = ENG_TO_PTBR_GENRE_MAP.get(name)
+                    if mapped and mapped not in matched_tags:
+                        matched_tags.append(mapped)
 
-            if genre_names:
-                tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
+        # If we have matched tags, return them
+        if matched_tags:
+            return ", ".join(matched_tags)
 
-        if not tags:
-            tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-            tags = (tags_raw or "").strip()
-
-        return tags
+        # Final fallback: ask user
+        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        return (tags_raw or "").strip()
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
@@ -1629,7 +1545,7 @@ class BJS:
                 "title": meta.get("title", ""),
                 "plataforma": self.get_game_platform(meta),
                 "idioma": self.get_game_language(meta),
-                "tags": self.get_game_tags(meta),
+                "tags": await self.get_tags(meta),
                 "adulto": self.get_adulto(meta),
                 "release_desc": release_desc,
                 "fichatecnica": await self.build_description(meta),
@@ -1684,7 +1600,7 @@ class BJS:
                 "resolucaoh": height,
                 "resolucaow": width,
                 "sinopse": await self.get_overview(),
-                "tags": await self.get_tags(),
+                "tags": await self.get_tags(meta),
                 "tipolegenda": await self.get_subtitle(meta),
                 "title": original_title,
                 "titulobrasileiro": brazilian_title,

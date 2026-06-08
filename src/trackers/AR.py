@@ -260,9 +260,7 @@ class AR:
         if meta.get('debug', False):
             console.print(f"[blue]{search_url}")
 
-        headers = {
-            "User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
-        }
+        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
@@ -314,9 +312,7 @@ class AR:
         if not cookie_jar:
             return None
 
-        headers = {
-            "User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"
-        }
+        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:

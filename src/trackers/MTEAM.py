@@ -298,7 +298,7 @@ class MTEAM:
                     desc_parts.append(screenshots_block)
 
         # Signature
-        desc_parts.append(f"[{meta['ua_signature']}](https://github.com/Audionut/Upload-Assistant)")
+        desc_parts.append(f"[{meta['ua_signature']}](https://github.com/wastaken7/Upload-Assistant)")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 

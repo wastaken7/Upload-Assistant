@@ -45,6 +45,14 @@ class SceneManager:
             base = match.group(1)
             is_all_lowercase = base.islower()
 
+        # For games uploaded from a folder, prefer the release folder name
+        # instead of a split archive part or generic installer name.
+        if meta.get("category") == "GAME" and meta.get("isdir", False):
+            folder_name = os.path.basename(str(meta.get("path", "")))
+            if folder_name:
+                base = folder_name
+                is_all_lowercase = base.islower()
+
         quoted_base = urllib.parse.quote(base)
 
         # Define cache directories
