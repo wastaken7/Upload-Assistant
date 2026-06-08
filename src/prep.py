@@ -255,7 +255,7 @@ class Prep:
         # Auto-detect GAME category if category/manual_category is not already set and it's not a disc
         if not meta.get("category") and not meta.get("manual_category") and not meta.get("is_disc"):
             is_game = False
-            game_extensions = {".exe", ".iso"}
+            game_extensions = {".exe", ".iso", ".rar"}
             video_extensions = {".mkv", ".mp4", ".ts"}
             game_groups = {"tenoke", "rune", "flt", "plaza", "codex", "skidrow", "prophet", "gog", "darkzer0", "doge", "tinyiso", "razor1911", "outlaws", "alias", "simplex"}
 
