@@ -35,7 +35,7 @@ class SAM(UNIT3D):
             "TV": "2",
             "ANIME": "3",
             "CURSOS": "4",
-            "GAMES": "5",
+            "GAME": "5",
             "LIVROS": "6",
             "HQS_E_MANGAS": "7",
             "AUDIOBOOK": "8",
@@ -80,6 +80,13 @@ class SAM(UNIT3D):
             "MP3": "67",
             "FLAC": "78",
             "OTHER": "68",
+            "PC": "50",
+            "EMULADORES_E_ROMS": "51",
+            "PLAYSTATION": "52",
+            "XBOX": "53",
+            "NINTENDO": "54",
+            "MOBILE": "55",
+            "OUTRO": "76",
         }
         if mapping_only:
             return type_id
@@ -90,9 +97,25 @@ class SAM(UNIT3D):
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
-        val = type_id.get(resolved_type, "0")
-        if meta.get("category") == "BOOK" and val == "0":
-            val = "68"
+        if resolved_type == "GAME" or (meta.get("category") == "GAME" and resolved_type not in type_id):
+            platform = str(meta.get("platform", "")).lower()
+
+            if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
+                val = "52"
+            elif "xbox" in platform:
+                val = "53"
+            elif any(word in platform for word in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
+                val = "54"
+            elif any(word in platform for word in ["android", "ios", "mobile"]):
+                val = "55"
+            elif any(word in platform for word in ["emulador", "rom", "emulator"]):
+                val = "51"
+            else:
+                val = "50"  # PC
+        else:
+            val = type_id.get(resolved_type, "0")
+            if meta.get("category") == "BOOK" and val == "0":
+                val = "68"
 
         return {"type_id": val}
 

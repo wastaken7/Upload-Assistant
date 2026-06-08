@@ -295,28 +295,66 @@ class NameManager:
         return base_name
 
     def extract_game_name(self, meta: Meta) -> str:
+        """Build a game release name losely based on the SCENE 2021_GAMEiSO ruleset."""
         title = str(meta.get("title", "")).strip()
         edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
         year = str(meta.get("manual_year") or meta.get("year") or "").strip()
-        platform = str(meta.get("manual_platform") or meta.get("platform") or "").strip()
-        region = str(meta.get("manual_region") or meta.get("region") or "").strip()
-
-        parts = [title]
-        if edition:
-            parts.append(f"[{edition}]")
+        platform = str(meta.get("manual_platform") or meta.get("platform") or "").strip().upper()
         game_version = str(meta.get("game_version") or "").strip()
-        if game_version:
-            parts.append(game_version)
-        if year:
-            parts.append(f"({year})")
-        if platform:
-            parts.append(f"[{platform}]")
-        if region:
-            parts.append(f"[{region}]")
+        repack = str(meta.get("repack") or "").strip().upper()
 
-        cleaned_parts = [p for p in parts if p]
-        base_name = " ".join(cleaned_parts)
-        base_name = " ".join(base_name.split())
+        #  language / MULTI tag
+        languages: dict[str, Any] = meta.get("languages") or {}
+        lang_names: list[str] = [k for k in languages if k]
+        lang_count = len(lang_names)
+
+        # Detect "multi" in the original source directory/file name
+        source_path = str(meta.get("path") or meta.get("uuid") or "")
+        source_basename = os.path.basename(source_path).lower()
+        source_has_multi = "multi" in source_basename
+
+        lang_tag = ""
+        if lang_count > 1 and source_has_multi:
+            # MULTI<N> — only when the source name explicitly declares MULTI
+            lang_tag = f"MULTI{lang_count}"
+        elif lang_count == 1:
+            single = lang_names[0].upper()
+            # Scene only tags non-English single-language releases
+            if single not in ("ENGLISH", "ENG", "EN"):
+                lang_tag = single
+
+        # build ordered token list
+        tokens: list[str] = [title]
+
+        # Edition (e.g. "Definitive Edition", "GOTY")
+        if edition:
+            tokens.append(edition)
+
+        # Version / Update tag  →  "Update v1.2.3"
+        if game_version:
+            # Normalise: ensure leading 'v'
+            ver = game_version if game_version.lower().startswith("v") else f"v{game_version}"
+            tokens.append(ver)
+
+        # Year - scene rarely includes year in the dirname, but keep it if present
+        if year:
+            tokens.append(year)
+
+        # Language tag (MULTI<N> or LANGUAGE)
+        if lang_tag:
+            tokens.append(lang_tag)
+
+        # Platform tag - only for non-PC releases (PC is implicit for GAMEiSO)
+        if platform and platform not in ("PC", "WINDOWS", "WIN"):
+            tokens.append(platform)
+
+        # REPACK / PROPER / etc.
+        if repack:
+            tokens.append(repack)
+
+        base_name = " ".join(t for t in tokens if t)
+        # Final safety: collapse any double spaces
+        base_name = re.sub(r"\.{2,}", " ", base_name)
         return base_name
 
     async def clean_filename(self, name: str) -> str:

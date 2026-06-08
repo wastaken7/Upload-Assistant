@@ -308,8 +308,8 @@ class UploadHelper:
             lines.append("[bold red]DEBUG: True - Will not actually upload![/bold red]")
             lines.append(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
         lines.append("")
-        lines.append(("Category", str(meta["category"])))
         lines.append(("Title", f"{meta['title']} ({meta['year']})"))
+        lines.append(("Category", str(meta["category"])))
 
         # BOOK
         if meta["category"] == "BOOK":
@@ -342,7 +342,15 @@ class UploadHelper:
             lines.append(("Poster", str(poster)))
 
         elif meta["category"] == "GAME":
-            game_subcategory = f"[yellow]{meta['game_subcategory']}[/yellow]"
+            notes = meta.get("description_link", "") or meta.get("description_file", "") or ""
+            if notes:
+                # don't leak links or file paths
+                notes = notes[:16] if notes.startswith("http") else f"./{os.path.basename(notes)}"
+            if meta.get("platform", "") == "PC":
+                notes = notes if notes else "[yellow][italic]Installation instructions missing. Use -df or -dp to add them.[/italic][/yellow]"
+
+            game_subcategory_str = {"full_game": "Full Game", "full_game_dlc": "Full Game + DLC", "dlc": "DLC", "update": "Update"}.get(meta["game_subcategory"], "Unknown")
+            game_subcategory = f"[italic]{meta['game_subcategory']}[/italic] ({game_subcategory_str})"
             version = meta.get("game_version") or missing_warning
             developer = meta.get("developer") or missing_warning
             publisher = meta.get("publisher") or missing_warning
@@ -354,6 +362,8 @@ class UploadHelper:
 
             lines.append(("Subcategory", game_subcategory))
             lines.append(("Version", version))
+            if notes:
+                lines.append(("Notes", notes))
             lines.append(("Developer", str(developer)))
             lines.append(("Publisher", str(publisher)))
             lines.append(("Platform", str(platform)))
@@ -470,7 +480,6 @@ class UploadHelper:
                 if kf_confirm != 'y':
                     console.print("[bold red]Aborting...[/bold red]")
                     exit()
-
             if not meta.get('emby', False):
                 console.print(f"[bold]Base Name:[/bold] {meta['name']}\n", soft_wrap=True, highlight=False)
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'

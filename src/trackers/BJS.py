@@ -76,7 +76,8 @@ class BJS:
             pc_platforms = {"PC", "MAC", "LINUX"}
             platform = str(meta.get("platform", "")).upper().strip()
             if platform in pc_platforms:
-                has_install_notes = bool(str(meta.get("description_file", "")).strip() or str(meta.get("description_link", "")).strip())
+                builder = DescriptionBuilder(self.tracker, self.config)
+                has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
                     console.print(
                         f"{self.tracker}: [red]Installation notes are required for PC game uploads. "

@@ -629,12 +629,9 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         name_needs_rebuild = True
 
                 elif field == "game_subcategory":
-                    subcategory_choices = ["Full Game", "Full Game + DLC", "DLC", "Update"]
+                    subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC)", "update (Update)"]
                     subcategory_values = {"Full Game": "full_game", "Full Game + DLC": "full_game_dlc", "DLC": "dlc", "Update": "update"}
-                    choice = cli_ui.ask_choice(
-                        "Select game subcategory:",
-                        choices=subcategory_choices,
-                    )
+                    choice = cli_ui.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta["game_subcategory"] = subcategory_values.get(choice, "full_game")
                     name_needs_rebuild = True
 
@@ -835,6 +832,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
     if meta.get("category") == "GAME" and not meta.get("emby", False):
         await _prompt_game_meta(meta)
+
+    meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get('trackers', [])
@@ -1578,8 +1577,6 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
         if int(meta.get('randomized', 0)) >= 1 and not meta['mkbrr']:
             TorrentCreator.create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
-
-        meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
             await f.write(json.dumps(meta, indent=4))
