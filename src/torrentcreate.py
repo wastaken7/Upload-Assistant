@@ -418,8 +418,8 @@ class TorrentCreator:
                     exclude_globs=exclude or [],
                     include_globs=custom_include,
                     creation_date=datetime.now(timezone.utc),
-                    comment="Created by Upload Assistant",
-                    created_by="Upload Assistant",
+                    comment="Shared with Upload-Assistant (fork)",
+                    created_by="Upload-Assistant (fork)",
                     piece_size=piece_size,
                 )
 
@@ -490,8 +490,8 @@ class TorrentCreator:
         if os.path.exists(torrentpath):
             base_torrent = Torrent.read(torrentpath)
             base_torrent.trackers = ['https://fake.tracker']
-            base_torrent.comment = "Created by Upload Assistant"
-            base_torrent.created_by = "Created by Upload Assistant"
+            base_torrent.comment = "Shared with Upload-Assistant (fork)"
+            base_torrent.created_by = "Shared with Upload-Assistant (fork)"
             info_dict = base_torrent.metainfo['info']
             valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
 

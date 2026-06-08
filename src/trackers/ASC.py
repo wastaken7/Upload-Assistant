@@ -486,7 +486,9 @@ class ASC:
         if custom_description_header:
             description_parts.append(custom_description_header + "\n")
 
-        description_parts.append(f"\n[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+        description_parts.append(
+            f"\n[center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]"
+        )
 
         final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
@@ -663,7 +665,7 @@ class ASC:
         if custom_description_header:
             description_parts.append(custom_description_header + '\n')
 
-        description_parts.append(f"[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+        description_parts.append(f"[center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
 
         final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, 'w', encoding='utf-8') as descfile:
@@ -724,29 +726,7 @@ class ASC:
         if tag:
             tag = tag.lstrip("-")
 
-        languages = meta.get("languages", {})
-        lang_list = list(languages.keys()) if isinstance(languages, dict) else []
-        lang_lower = [ln.lower() for ln in lang_list]
-
-        has_pt = any("portuguese" in ln or "português" in ln for ln in lang_lower)
-        has_en = any("english" in ln for ln in lang_lower)
-
-        if len(lang_list) > 1 and has_pt:
-            game_lang = "MULTI"
-        elif len(lang_list) > 1 and has_en:
-            game_lang = "INGLÊS"
-        elif lang_list:
-            game_lang = lang_list[0].upper()
-        else:
-            game_lang = ""
-
-        game_subcategory = str(meta.get("game_subcategory", "")).lower()
-        update = "Update" if game_subcategory == "update" else ""
-        dlc = "[DLC]" if game_subcategory == "dlc" else "[+DLC]" if game_subcategory == "full_game_dlc" else ""
-        if dlc:
-            dlc = f" {dlc}"
-
-        name = f"{meta.get('title', '')} {update} {meta.get('game_version', '')} {meta.get('year', '')} - {tag} [{game_lang}]{dlc}"
+        name = f"{meta.get('title', '')} - [{tag}]"
         return re.sub(r"\s{2,}", " ", name).strip()
 
     def get_game_type(self, meta: dict[str, Any]) -> str:
@@ -857,7 +837,7 @@ class ASC:
             desc_parts.append(game_section)
 
         desc_parts.append(await builder.get_user_description(meta))
-        desc_parts.append(f"[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+        desc_parts.append(f"[center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
 
         final_description = "\n\n".join(part for part in desc_parts if part.strip())
 

@@ -232,9 +232,7 @@ class SPD:
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
         # Signature
-        desc_parts.append(
-            f"[url=https://github.com/Audionut/Upload-Assistant]{meta.get('ua_signature', '')}[/url]"
-        )
+        desc_parts.append(f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.get('ua_signature', '')}[/url]")
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())
 

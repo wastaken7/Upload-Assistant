@@ -273,7 +273,7 @@ class FF:
                 desc_parts.append(f"[center]{spectrograms_block}[/center]")
 
         # Signature
-        desc_parts.append(f"[url=https://github.com/Audionut/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]")
+        desc_parts.append(f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]")
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())
 

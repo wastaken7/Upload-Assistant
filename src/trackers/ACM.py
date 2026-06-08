@@ -399,7 +399,7 @@ class ACM:
                     await descfile.write(f'[url={web_url}][img=350]{img_url}[/img][/url]')
                 await descfile.write('\n[/center]')
 
-            await descfile.write(f"\n[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]")
+            await descfile.write(f"\n[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]")
 
         async with aiofiles.open(output_path, encoding='utf-8') as f:
             final_desc: str = await f.read()

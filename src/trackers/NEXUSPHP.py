@@ -368,7 +368,7 @@ class NEXUSPHP:
                     desc_parts.append(screenshots_block)
 
         # Signature
-        desc_parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]")
+        desc_parts.append(f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
