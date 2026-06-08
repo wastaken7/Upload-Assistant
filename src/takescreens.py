@@ -21,6 +21,7 @@ import ffmpeg
 import psutil
 from pymediainfo import MediaInfo
 
+from data import config as data_config
 from src.cleanup import cleanup_manager
 from src.console import console
 
@@ -1164,7 +1165,16 @@ async def generate_ebook_screenshots(
 
     import fitz  # PyMuPDF
     from PIL import Image
-    from rarfile import RarFile
+
+    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
+    if unrar_path:
+        import rarfile as _rarfile
+
+        os.environ["UNRAR_TOOL"] = unrar_path
+        _rarfile.CURRENT_SETUP = None
+        from rarfile import RarFile
+    else:
+        from rarfile import RarFile
 
     try:
         fitz.TOOLS.mupdf_display_errors(False)

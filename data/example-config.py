@@ -162,6 +162,11 @@ config = {
         # 6 is a good balance between compression and speed
         "ffmpeg_compression": "6",
 
+        # Optional path to the unRAR executable for CBR/CBZ extraction.
+        # Leave blank to use the system PATH.
+        # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
+        "unrar_path": "",
+
         # Tonemap screenshots with the following settings (doesn't apply when using libplacebo)
         # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
         "algorithm": "mobius",
