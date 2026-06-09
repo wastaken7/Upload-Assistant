@@ -929,6 +929,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         audio_prompted = False
         for tracker in [
             "AITHER",
+            "ACM",
             "ASC",
             "BJS",
             "BT",
