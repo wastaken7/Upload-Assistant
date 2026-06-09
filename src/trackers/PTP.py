@@ -1580,11 +1580,11 @@ class PTP:
             elif isinstance(cover, str):
                 cover = None
             while cover is None:
-                cover_input = str(cli_ui.ask_string("No Poster was found. Please input a link to a poster: \n", default="") or "").strip()
+                cover_input = str(cli_ui.ask_string("No Cover was found. Please input a link to a cover: \n", default="") or "").strip()
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-                    console.print("[red]Poster URL must end with .jpg, .jpeg, .png, or .webp")
+                    console.print("[red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
                     continue
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
             new_data = {

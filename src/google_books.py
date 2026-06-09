@@ -28,7 +28,7 @@ class GoogleBooksManager:
 
         metadata: dict[str, Any] = {}
 
-        # Poster URL (Google Books cover image)
+        # Cover URL (Google Books cover image)
         if volume_id and volume_info.get("imageLinks"):
             metadata["poster"] = f"https://books.google.com/books/content?id={volume_id}&printsec=frontcover&img=1"
 

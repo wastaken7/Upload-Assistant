@@ -361,7 +361,7 @@ class AR:
         imdb_info = cast(dict[str, Any], meta.get('imdb_info') or {})
         cover = meta.get('poster') or imdb_info.get("cover", None)
         while cover is None and not meta.get("unattended", False):
-            cover = Prompt.ask("No Poster was found. Please input a link to a poster:", default="")
+            cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
                 console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None

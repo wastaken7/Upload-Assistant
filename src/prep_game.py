@@ -171,6 +171,15 @@ async def gather_game_prep(
     meta["sd"] = 0
     meta["valid_mi_settings"] = True
 
+    # Check console game status
+    platform = meta.get("platform")
+    if platform:
+        platform_lower = str(platform).lower()
+        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
+        meta["console_game"] = any(word in platform_lower for word in console_words)
+    else:
+        meta["console_game"] = False
+
     # Version extraction/handling logic
     path_to_check = meta.get("path") or videopath
     version = None
@@ -656,5 +665,15 @@ async def gather_game_prep(
                 console.print(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
     meta["igdb_id"] = selected_game.get("id", 0)
+
+    # Re-evaluate console_game in case platform was updated/detected
+    platform = meta.get("platform")
+    if platform:
+        platform_lower = str(platform).lower()
+        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
+        meta["console_game"] = any(word in platform_lower for word in console_words)
+    else:
+        meta["console_game"] = False
+
     if meta["debug"]:
         console.print(f"[green]IGDB metadata successfully retrieved for game: {meta['title']}[/green]")

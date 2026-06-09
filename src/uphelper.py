@@ -339,7 +339,7 @@ class UploadHelper:
             if meta.get("audiobook"):
                 lines.append(("Narrator", str(narrator)))
                 lines.append(("Duration", str(audiobook_duration_formatted)))
-            lines.append(("Poster", str(poster)))
+            lines.append(("Cover", str(poster)))
 
         elif meta["category"] == "GAME":
             notes = meta.get("description_link", "") or meta.get("description_file", "") or ""
@@ -367,7 +367,7 @@ class UploadHelper:
             lines.append(("Developer", str(developer)))
             lines.append(("Publisher", str(publisher)))
             lines.append(("Platform", str(platform)))
-            lines.append(("Poster", str(poster)))
+            lines.append(("Cover", str(poster)))
             if int(igdb_id) > 0:
                 lines.append(("IGDB", str(igdb_id)))
             if steam_url:

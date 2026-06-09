@@ -184,7 +184,7 @@ class NEXUSPHP:
 
         desc_parts: list[str] = []
 
-        # Poster
+        # Cover
         poster_path = data.get("poster_path")
         if poster_path:
             desc_parts.append(f"[img]https://image.tmdb.org/t/p/w500{poster_path}[/img]")

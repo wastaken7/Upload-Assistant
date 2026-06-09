@@ -588,6 +588,9 @@ class DescriptionBuilder:
 
     def _build_game_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True) -> str:
         """Build the beautiful BBCode layout for GAME-category uploads."""
+        if meta["category"] != "GAME":
+            return ""
+
         game_parts: list[str] = []
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"

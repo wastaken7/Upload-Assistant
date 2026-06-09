@@ -297,34 +297,35 @@ class DC:
         Mod also mentioned that metadata-based titles are acceptable.
         https://digitalcore.club/forum/6/topic/2810/clarification-needed-p2p-non-scene-torrent-naming-conventions
         """
+        tracker_name = meta["uuid"]
         scene_name = meta.get("scene_name") or ""
 
         use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
         if use_metadata_name:
             clean_name = meta.get("clean_name") or ""
-            dc_name = scene_name if scene_name else clean_name
+            tracker_name = scene_name if scene_name else clean_name
             # T1)  Acceptable characters are as follows:
             #         ABCDEFGHIJKLMNOPQRSTUVWXYZ
             #         abcdefghijklmnopqrstuvwxyz
             #         0123456789 . -
             # https://scenerules.org/html/2014_BLURAY.html
-            dc_name = dc_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
-            dc_name = unicodedata.normalize("NFD", dc_name)
-            dc_name = "".join(c for c in dc_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
-            dc_name = dc_name.replace("!", "")
+            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
+            tracker_name = unicodedata.normalize("NFD", tracker_name)
+            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
+            tracker_name = tracker_name.replace("!", "")
             if scene_name:
-                dc_name += " [UNRAR]"
+                tracker_name += " [UNRAR]"
 
         else:
             if scene_name:
-                dc_name = f"{scene_name} [UNRAR]"
+                tracker_name = f"{scene_name} [UNRAR]"
             else:
-                dc_name = meta["uuid"]
-                base, ext = os.path.splitext(dc_name)
+                tracker_name = meta["uuid"]
+                base, ext = os.path.splitext(tracker_name)
                 if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
-                    dc_name = base
+                    tracker_name = base
 
-        return dc_name
+        return tracker_name
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {

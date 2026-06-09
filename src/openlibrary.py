@@ -94,7 +94,7 @@ class OpenLibraryManager:
                         desc = desc_val.get("value", "") if isinstance(desc_val, dict) else str(desc_val)
                         metadata["overview"] = re.sub(r"<[^>]+>", "", desc).strip()
 
-                    # Cover/Poster
+                    # Cover
                     covers = data.get("covers")
                     if covers and isinstance(covers, list) and covers[0] > 0:
                         metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"

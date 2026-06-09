@@ -955,6 +955,8 @@ config = {
             # Select the upload channel, if you don't know what this is, leave it empty.
             # You can also set this manually using the args -ch or --channel, without '@'. Example: @spd -> '-ch spd'.
             "channel": "",
+            # If True, the script will use the metadata-based title instead of the folder/file name.
+            "use_metadata_name": False,
         },
         "STC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

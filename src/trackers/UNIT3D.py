@@ -37,11 +37,14 @@ class UNIT3D:
         self.api_key = raw_api_key.strip() if isinstance(raw_api_key, str) else ""
 
         # Default URLs - should be overridden by subclasses
+        self.base_url = ""
+        self.pending_url = ""
         self.search_url = ""
         self.upload_url = ""
         pass
 
-    async def get_additional_checks(self, _meta: dict[str, Any]) -> bool:
+    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+        _meta = meta
         should_continue = True
         return should_continue
 
@@ -53,7 +56,7 @@ class UNIT3D:
         # Ensure tracker_status keys exist before any potential writes
         meta.setdefault("tracker_status", {})
         meta["tracker_status"].setdefault(self.tracker, {})
-        category_id = str((await self.get_category_id(meta))["category_id"])
+        category_id = (await self.get_category_id(meta))["category_id"]
 
         if not self.api_key:
             if not meta["debug"]:
@@ -83,7 +86,7 @@ class UNIT3D:
 
             if self.tracker not in ["OTW"]:
                 resolutions = await self.get_resolution_id(meta)
-                resolution_id = str(resolutions["resolution_id"])
+                resolution_id = resolutions["resolution_id"]
                 if resolution_id in ["3", "4"]:
                     # Convert params to list of tuples to support duplicate keys
                     params_list = list(params_dict.items())
@@ -93,7 +96,7 @@ class UNIT3D:
                     params_dict["resolutions[]"] = resolution_id
 
             if self.tracker not in ["SP", "STC"]:
-                type_id = str((await self.get_type_id(meta))["type_id"])
+                type_id = (await self.get_type_id(meta))["type_id"]
                 if params_list is not None:
                     params_list.append(("types[]", type_id))
                 else:
@@ -296,7 +299,7 @@ class UNIT3D:
         anonymous = "0" if meta["anon"] == 0 and not self.tracker_config.get("anon", False) else "1"
         return {"anonymous": anonymous}
 
-    async def get_additional_data(self, _meta: dict[str, Any]) -> dict[str, str]:
+    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, str]:
         # Used to add additional data if needed
         """
         data = {
@@ -304,6 +307,7 @@ class UNIT3D:
             'draft': await self.get_flag(meta, 'draft'),
         }
         """
+        _meta = meta
         data: dict[str, str] = {}
 
         return data
@@ -385,7 +389,8 @@ class UNIT3D:
 
         return data
 
-    async def get_featured(self, _meta: dict[str, Any]) -> dict[str, str]:
+    async def get_featured(self, meta: dict[str, Any]) -> dict[str, str]:
+        _meta = meta
         return {"featured": "0"}
 
     async def get_free(self, meta: dict[str, Any]) -> dict[str, str]:
@@ -395,10 +400,12 @@ class UNIT3D:
 
         return {"free": free}
 
-    async def get_doubleup(self, _meta: dict[str, Any]) -> dict[str, str]:
+    async def get_doubleup(self, meta: dict[str, Any]) -> dict[str, str]:
+        _meta = meta
         return {"doubleup": "0"}
 
-    async def get_sticky(self, _meta: dict[str, Any]) -> dict[str, str]:
+    async def get_sticky(self, meta: dict[str, Any]) -> dict[str, str]:
+        _meta = meta
         return {"sticky": "0"}
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, str]:
