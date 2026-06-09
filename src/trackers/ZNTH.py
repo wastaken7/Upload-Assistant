@@ -1,7 +1,4 @@
-import re
 from typing import Any
-
-import cli_ui
 
 from src.console import console
 from src.trackers.COMMON import COMMON
@@ -35,20 +32,7 @@ class ZNTH(UNIT3D):
                 console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
                 return False
 
-        if meta["category"] in ("TV", "MOVIES"):
-            genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-            adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai"]
-            if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-                if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                    console.print(f"[bold red]Porn/xxx is not allowed at {self.tracker}.")
-                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                        pass
-                    else:
-                        return False
-                else:
-                    return False
-
-        return True
+        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         category = meta.get("category", "")

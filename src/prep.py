@@ -198,6 +198,7 @@ class Prep:
         meta["anime"] = False
         meta["not_anime"] = False
         meta["subtitle_files"] = cast(list[str], [])
+        meta["adult_media"] = False
 
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid') is None:
@@ -1414,6 +1415,7 @@ class Prep:
                     unique_genres.append(genre)
 
             meta['combined_genres'] = ', '.join(unique_genres) if unique_genres else ''
+            meta["adult_media"] = self.check_adult_media(meta)
 
         # Process group tag for all categories (TV, MOVIE, BOOK, etc.)
         if meta.get("tag", None) is None:
@@ -1532,6 +1534,13 @@ class Prep:
             console.print(f"Metadata processed in {meta_finish_time - meta_start_time:.2f} seconds")
 
         return meta
+
+    def check_adult_media(self, meta) -> bool:
+        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
+        if meta.get("tmdb_adult_media", False):
+            return True
+        searchable = ", ".join(part for part in (meta.get("keywords", ""), meta.get("combined_genres", "")) if part)
+        return any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", searchable, re.IGNORECASE) for keyword in adult_keywords)
 
     async def get_cat(self, _video: str, meta: dict[str, Any]) -> Optional[str]:
         if meta.get('manual_category'):
