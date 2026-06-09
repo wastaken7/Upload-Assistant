@@ -74,7 +74,6 @@ Many thanks to all who have contributed.
 | DesiTorrents | DT |
 | DigitalCore | DC |
 | Emuwarez | EMUW |
-| FearNoPeer | FNP |
 | FileList | FL |
 | Friki | FRIKI |
 | FunFile | FF |
