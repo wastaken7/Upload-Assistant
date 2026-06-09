@@ -333,7 +333,7 @@ class DescriptionBuilder:
 
     async def get_mediainfo_section(self, meta: dict[str, Any]) -> str:
         """Returns the mediainfo section, using a cache file if available."""
-        if meta.get("is_disc") == "BDMV":
+        if meta.get("is_disc") == "BDMV" or meta["category"] in ("GAME", "BOOK"):
             return ""
 
         if self.tracker_config.get("full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)) or meta.get("is_disc"):
@@ -671,6 +671,9 @@ class DescriptionBuilder:
                 clean_rec = re.sub(r"^\[b\](Recommended|Recomendado):\[/b\]\s*", "", clean_rec, flags=re.IGNORECASE)
 
             if table:
+                clean_min = clean_min or "-"
+                clean_rec = clean_rec or "-"
+
                 table_lines = ["[table]"]
                 table_lines.append(f"[tr][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
                 table_lines.append(f"[tr][td]{clean_min}[/td][td]{clean_rec}[/td][/tr]")
@@ -691,9 +694,13 @@ class DescriptionBuilder:
             if table:
                 table_rows = []
                 table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
+
                 for lang, support in sorted(languages.items()):
-                    support_str = ", ".join(support)
+                    lang = (lang or "").strip() or "-"
+                    support_str = ", ".join(support).strip() or "-"
+
                     table_rows.append(f"[tr][td]{lang}[/td][td]{support_str}[/td][/tr]")
+
                 table_text = "\n".join(table_rows)
                 spoiler_str = f"{header}{str_official_supported_languages}{header_end}\n[table]\n{table_text}\n[/table]\n"
                 game_parts.append(spoiler_str)

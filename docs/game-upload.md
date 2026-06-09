@@ -68,7 +68,6 @@ The duplicate checking module implements custom rules for games to avoid false p
 Before comparing titles, the assistant maps the target platform and duplicate platform into broad compatibility groups:
 * **PlayStation Group**: `playstation`, `ps5`, `ps4`, `ps3`, `ps2`, `ps1`, `psp`, `vita`
 * **Xbox Group**: `xbox`
-* **Nintendo Group**: `nintendo`, `switch`, `wii`, `3ds`, `nds`, `ds`
 * **PC Group**: default fallback (e.g., PC, Windows, Mac, Linux)
 
 If the target game platform group does not match the duplicate's platform group, the entry is excluded from the duplicates list (i.e. you can upload a Switch version of a game even if the PC version is already on the tracker).

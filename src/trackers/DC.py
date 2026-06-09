@@ -29,12 +29,14 @@ class DC:
         self.session = httpx.AsyncClient(headers={'X-API-KEY': self.api_key}, timeout=30.0)
 
     async def mediainfo(self, meta: Meta) -> str:
-        if meta.get('is_disc') == 'BDMV':
-            mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'])
-        else:
-            mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-            async with aiofiles.open(mi_path, encoding='utf-8') as f:
-                mediainfo = await f.read()
+        mediainfo = ""
+        if meta["category"] in ("TV", "MOVIE"):
+            if meta.get("is_disc") == "BDMV":
+                mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
+            else:
+                mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
+                async with aiofiles.open(mi_path, encoding="utf-8") as f:
+                    mediainfo = await f.read()
 
         return mediainfo
 
@@ -100,6 +102,12 @@ class DC:
                 book_parts.append(f"\n[b][u]Synopsis[/u][/b]\n{overview}")
 
             desc_parts.append("\n".join(book_parts))
+
+        # Game
+        if meta.get("category") == "GAME":
+            game_section = builder._build_game_desc_section(meta)
+            if game_section:
+                desc_parts.append(game_section)
 
         # NFO
         nfo_content = meta.get('description_nfo_content')
@@ -210,6 +218,15 @@ class DC:
                 return 44
             return 28
 
+        if category == "GAME":
+            platform = meta["platform"]
+            if platform == "PC":
+                return 25
+            elif platform == "MAC":
+                return 27
+            else:
+                return 26  # Console
+
         if sd == 1:
             if category == 'MOVIE':
                 return 2
@@ -226,16 +243,17 @@ class DC:
     async def search_existing(self, meta: Meta, _) -> list[dict[str, Any]]:
         imdb_id = meta.get('imdb_info', {}).get('imdbID')
         category_id = self.get_category_id(meta)
-        if not imdb_id:
-            console.print(f'[bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]')
-            return []
 
-        search_params = {'searchText': imdb_id}
+        search_params = {"search": meta["title"]}
+        if imdb_id:
+            search_params = {"searchText": imdb_id}
+
         search_results: list[Any] = []
         dupes: list[dict[str, Any]] = []
         try:
             response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
             response.raise_for_status()
+            console.print(response.text)
 
             if response.text and response.text != '[]':
                 json_data = response.json()
@@ -250,10 +268,14 @@ class DC:
                         torrent_id = each_dict.get('id')
                         size = each_dict.get('size')
                         torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
+                        numfiles = each_dict.get("numfiles", "")
                         dupe_entry: dict[str, Any] = {
-                            'name': name,
-                            'size': size,
-                            'link': torrent_link
+                            "id": torrent_id,
+                            "download": f"{self.api_base_url}/download/{torrent_id}",
+                            "file_count": numfiles,
+                            "name": name,
+                            "size": size,
+                            "link": torrent_link,
                         }
                         dupes.append(dupe_entry)
 

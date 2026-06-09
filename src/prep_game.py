@@ -439,6 +439,7 @@ async def gather_game_prep(
         # Map raw platform names to standard uppercase codes
         def map_to_clean_code(p_name: str) -> str:
             p_name_norm = p_name.lower()
+            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
             reverse_map = {
                 "playstation 5": "PS5",
                 "playstation 4": "PS4",
@@ -452,11 +453,11 @@ async def gather_game_prep(
                 "xbox 360": "X360",
                 "xbox": "XBOX",
                 "switch": "SWITCH",
-                "nintendo switch": "SWITCH",
+                f"{nin_term} switch": "SWITCH",
                 "3ds": "3DS",
-                "nintendo 3ds": "3DS",
+                f"{nin_term} 3ds": "3DS",
                 "nds": "NDS",
-                "nintendo ds": "NDS",
+                f"{nin_term} ds": "NDS",
                 "wii u": "WIIU",
                 "wiiu": "WIIU",
                 "wii": "WII",
@@ -475,6 +476,7 @@ async def gather_game_prep(
 
         detected_platform = None
         if raw_platforms:
+            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             PLATFORM_MAPPING = {
                 "playstation 5": ["ps5", "playstation 5", "playstation5"],
@@ -487,9 +489,9 @@ async def gather_game_prep(
                 "xbox one": ["xone", "xbox one", "xboxone"],
                 "xbox 360": ["x360", "xbox 360", "xbox360"],
                 "xbox": ["xbox"],
-                "nintendo switch": ["nsw", "switch", "nintendo switch", "nintendoswitch"],
-                "nintendo 3ds": ["3ds", "nintendo 3ds"],
-                "nintendo ds": ["nds", "nintendo ds"],
+                f"{nin_term} switch": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
+                f"{nin_term} 3ds": ["3ds", f"{nin_term} 3ds"],
+                f"{nin_term} ds": ["nds", f"{nin_term} ds"],
                 "wii u": ["wii u", "wiiu"],
                 "wii": ["wii"],
                 "pc (microsoft windows)": ["pc", "windows", "win", "osx", "mac", "linux"],

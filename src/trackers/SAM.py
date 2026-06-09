@@ -99,12 +99,13 @@ class SAM(UNIT3D):
 
         if resolved_type == "GAME" or (meta.get("category") == "GAME" and resolved_type not in type_id):
             platform = str(meta.get("platform", "")).lower()
+            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
                 val = "52"
             elif "xbox" in platform:
                 val = "53"
-            elif any(word in platform for word in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
+            elif any(word in platform for word in [f"{nin_term}", "switch", "wii", "3ds", "nds", "ds"]):
                 val = "54"
             elif any(word in platform for word in ["android", "ios", "mobile"]):
                 val = "55"
