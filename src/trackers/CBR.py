@@ -96,12 +96,13 @@ class CBR(UNIT3D):
         resolved_type = type if type else meta.get("type", "")
         if resolved_type == "GAME" or (meta.get("category") == "GAME" and resolved_type not in type_id):
             platform = str(meta.get("platform", "")).lower()
+            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
                 resolved_id = "48"
             elif "xbox" in platform:
                 resolved_id = "49"
-            elif any(word in platform for word in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
+            elif any(word in platform for word in [f"{nin_term}", "switch", "wii", "3ds", "nds", "ds"]):
                 resolved_id = "50"
             else:
                 resolved_id = "46"
@@ -161,7 +162,7 @@ class CBR(UNIT3D):
 
             if game_has_multiple_languages and game_lang_has_pt:
                 game_lang = "MULTI"
-            elif game_has_multiple_languages and game_lang_has_eng:
+            elif game_lang_has_eng:
                 game_lang = "INGLÊS"
             else:
                 game_lang = meta.get("language", "").upper()

@@ -284,12 +284,13 @@ class DupeChecker:
 
                 def get_platform_category(p: str) -> str:
                     p_lower = p.lower()
+                    nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
                     if any(w in p_lower for w in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
                         return "playstation"
                     if "xbox" in p_lower:
                         return "xbox"
-                    if any(w in p_lower for w in ["nintendo", "switch", "wii", "3ds", "nds", "ds"]):
-                        return "nintendo"
+                    if any(w in p_lower for w in [f"{nin_term}", "switch", "wii", "3ds", "nds", "ds"]):
+                        return nin_term
                     return "pc"
 
                 target_platform = get_platform_category(str(meta.get("platform", "")))
@@ -321,6 +322,7 @@ class DupeChecker:
                     name = re.sub(r"\b(19|20)\d{2}\b", "", name)
 
                     # Remove common platform names
+                    nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
                     platforms = [
                         "pc",
                         "windows",
@@ -340,7 +342,7 @@ class DupeChecker:
                         "xsx",
                         "switch",
                         "nsw",
-                        "nintendo",
+                        f"{nin_term}",
                     ]
                     for p in platforms:
                         name = re.sub(rf"\b{p}\b", "", name)

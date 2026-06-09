@@ -79,6 +79,7 @@ class TL:
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []
+        category = meta["category"]
         process_screenshot = not self.tracker_config.get("img_rehost", True) or self.tracker_config.get("api_upload", True)
 
         # Custom Header
@@ -100,7 +101,7 @@ class TL:
             desc_parts.append(f'[center]{episode_overview}[/center]')
 
         # Book details
-        if meta.get("category") == "BOOK":
+        if category == "BOOK":
             book_parts = []
             author = meta.get("author")
             narrator = meta.get("narrator")
@@ -133,6 +134,12 @@ class TL:
 
             if book_block_parts:
                 desc_parts.append("\n\n".join(book_block_parts))
+
+        # Game
+        if category == "GAME":
+            game_section = builder._build_game_desc_section(meta, header_size=1)
+            if game_section:
+                desc_parts.append(game_section)
 
         # File information
         desc_parts.append(await builder.get_mediainfo_section(meta))
@@ -228,70 +235,118 @@ class TL:
         return description
 
     def get_category(self, meta: Meta) -> int:
-        categories = {
-            "Anime": 34,
-            "Movie4K": 47,
-            "MovieBluray": 13,
-            "MovieBlurayRip": 14,
-            "MovieCam": 8,
-            "MovieTS": 9,
-            "MovieDocumentary": 29,
-            "MovieDvd": 12,
-            "MovieDvdRip": 11,
-            "MovieForeign": 36,
-            "MovieHdRip": 43,
-            "MovieWebrip": 37,
-            "TvBoxsets": 27,
-            "TvEpisodes": 26,
-            "TvEpisodesHd": 32,
-            "TvForeign": 44,
-            "Ebook": 45,
-            "Comics": 46,
-        }
+        anime = 34
 
-        if meta.get('anime', 0):
-            return categories['Anime']
+        movie_4k = 47
+        movie_bluray = 13
+        movie_bluray_rip = 14
+        _movie_cam = 8
+        _movie_ts = 9
+        movie_documentary = 29
+        movie_dvd = 12
+        movie_dvd_rip = 11
+        movie_foreign = 36
+        movie_hd_rip = 43
+        movie_webrip = 37
 
-        category = str(meta.get('category', ''))
-        if category == 'MOVIE':
-            if str(meta.get('original_language', '')) != 'en':
-                return categories['MovieForeign']
-            elif 'Documentary' in str(meta.get('genres', '')):
-                return categories['MovieDocumentary']
-            elif str(meta.get('resolution', '')) == '2160p':
-                return categories['Movie4K']
-            elif str(meta.get('is_disc', '')) in ('BDMV', 'HDDVD') or (
-                str(meta.get('type', '')) == 'REMUX' and str(meta.get('source', '')) in ('BluRay', 'HDDVD')
+        tv_boxsets = 27
+        tv_episodes = 26
+        tv_episodes_hd = 32
+        tv_foreign = 44
+
+        ebook = 45
+        comics = 46
+
+        games_pc = 17
+        games_xbox = 18
+        games_xbox360 = 19
+        games_ps2 = 20
+        games_ps3 = 21
+        games_psp = 22
+        games_wii = 28
+        games_nds = 30
+        games_ps4 = 39
+        games_xboxone = 40
+        games_mac = 42
+        games_switch = 48
+        games_ps5 = 49
+
+        if meta.get("anime", 0):
+            return anime
+
+        category = str(meta.get("category", ""))
+
+        if category == "MOVIE":
+            if str(meta.get("original_language", "")) != "en":
+                return movie_foreign
+            elif "Documentary" in str(meta.get("genres", "")):
+                return movie_documentary
+            elif str(meta.get("resolution", "")) == "2160p":
+                return movie_4k
+            elif str(meta.get("is_disc", "")) in ("BDMV", "HDDVD") or (str(meta.get("type", "")) == "REMUX" and str(meta.get("source", "")) in ("BluRay", "HDDVD")):
+                return movie_bluray
+            elif str(meta.get("type", "")) == "ENCODE" and str(meta.get("source", "")) in (
+                "BluRay",
+                "HDDVD",
             ):
-                return categories['MovieBluray']
-            elif str(meta.get('type', '')) == 'ENCODE' and str(meta.get('source', '')) in ('BluRay', 'HDDVD'):
-                return categories['MovieBlurayRip']
-            elif str(meta.get('is_disc', '')) == 'DVD' or (
-                str(meta.get('type', '')) == 'REMUX' and 'DVD' in str(meta.get('source', ''))
-            ):
-                return categories['MovieDvd']
-            elif (str(meta.get('type', '')) == 'ENCODE' and 'DVD' in str(meta.get('source', ''))) or str(meta.get('type', '')) == 'DVDRIP':
-                return categories['MovieDvdRip']
-            elif 'WEB' in str(meta.get('type', '')):
-                return categories['MovieWebrip']
-            elif str(meta.get('type', '')) == 'HDTV':
-                return categories['MovieHdRip']
-        elif category == 'TV':
-            if str(meta.get('original_language', '')) != 'en':
-                return categories['TvForeign']
-            elif meta.get('tv_pack', 0):
-                return categories['TvBoxsets']
-            elif meta.get('sd'):
-                return categories['TvEpisodes']
+                return movie_bluray_rip
+            elif str(meta.get("is_disc", "")) == "DVD" or (str(meta.get("type", "")) == "REMUX" and "DVD" in str(meta.get("source", ""))):
+                return movie_dvd
+            elif (str(meta.get("type", "")) == "ENCODE" and "DVD" in str(meta.get("source", ""))) or str(meta.get("type", "")) == "DVDRIP":
+                return movie_dvd_rip
+            elif "WEB" in str(meta.get("type", "")):
+                return movie_webrip
+            elif str(meta.get("type", "")) == "HDTV":
+                return movie_hd_rip
+
+        elif category == "TV":
+            if str(meta.get("original_language", "")) != "en":
+                return tv_foreign
+            elif meta.get("tv_pack", 0):
+                return tv_boxsets
+            elif meta.get("sd"):
+                return tv_episodes
             else:
-                return categories['TvEpisodesHd']
+                return tv_episodes_hd
+
         elif category == "BOOK":
             if meta.get("comic", False) or meta.get("manga", False):
-                return categories["Comics"]
-            else:
-                return categories["Ebook"]
+                return comics
+            return ebook
 
-        raise NotImplementedError('Failed to determine TL category!')
+        elif category == "GAME":
+            plat = str(meta.get("platform", "")).lower()
+
+            if plat == "x360":  # noqa: SIM116
+                return games_xbox360
+            elif plat == "xone":
+                return games_xboxone
+            elif plat == "xbox":
+                return games_xbox
+            elif plat == "pc":
+                return games_pc
+            elif plat == "ps5":
+                return games_ps5
+            elif plat == "ps4":
+                return games_ps4
+            elif plat == "ps3":
+                return games_ps3
+            elif plat == "ps2":
+                return games_ps2
+            elif plat == "psp":
+                return games_psp
+            elif plat == "wii":
+                return games_wii
+            elif plat == "nds":
+                return games_nds
+            elif plat == "switch":
+                return games_switch
+            elif plat == "mac":
+                return games_mac
+
+            return games_pc
+
+        return 0
 
     def get_screens(self, meta: Meta) -> list[str]:
         images = cast(list[dict[str, Any]], meta.get("menu_images", [])) + cast(list[dict[str, Any]], meta.get("image_list", []) + meta.get("spectrograms_images", []))
@@ -351,7 +406,7 @@ class TL:
             param = f"{cat_id}/query/{search_name} {year} {resolution}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
-        elif meta["category"] == "BOOK":
+        elif meta["category"] in ("BOOK", "GAME"):
             param = f"{cat_id}/query/{search_name}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
@@ -443,7 +498,7 @@ class TL:
                 tracker_status[self.tracker]['status_message'] = 'data error: ' + response.text
 
             if response.text.isnumeric():
-                torrent_id = str(response.text)
+                torrent_id = response.text
                 tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
                 tracker_status.setdefault(self.tracker, {})
                 tracker_status[self.tracker]['status_message'] = 'Torrent uploaded successfully.'
@@ -520,35 +575,16 @@ class TL:
                     meta['tracker_status'][self.tracker]['status_message'] = 'Torrent uploaded successfully.'
                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
 
-                    await self.edit_post_upload(meta)
-
                     await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
                     return True
 
                 else:
-                    meta['tracker_status'][self.tracker]['status_message'] = 'data error - Upload failed: No success redirect found.'
+                    meta["tracker_status"][self.tracker]["status_message"] = "data error - Upload failed: No success redirect found."
                     failure_path = await self.common.save_html_file(meta, self.tracker, response.text, "Failed_Upload")
                     console.print(f"{self.tracker}: Failed upload. The HTML response saved to {failure_path}")
                     return False
 
             except httpx.RequestError as e:
-                status_message = f'data error - {str(e)}'
+                status_message = f"data error - {str(e)}"
 
-            meta['tracker_status'][self.tracker]['status_message'] = status_message
-
-    async def edit_post_upload(self, meta):
-        data = {
-            "torrentID": meta["tracker_status"][self.tracker]["torrent_id"],
-            "name": await self.get_name(meta),
-            "category": self.get_category(meta),
-            "uploaderComments": "",
-        }
-
-        try:
-            response = await self.session.post("https://www.torrentleech.org/torrents/torrent/edit", data=data, timeout=30)
-            if not response.status_code == 302:
-                console.print("TL: Failed to edit torrent.")
-        except Exception as e:
-            console.print(f"TL: Failed to edit torrent: {str(e)}")
-
-        return
+            meta["tracker_status"][self.tracker]["status_message"] = status_message

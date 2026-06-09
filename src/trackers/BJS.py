@@ -370,7 +370,7 @@ class BJS:
 
         # Signature
         fichatecnica_parts.append(
-            f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]"
+            f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta['ua_name']} {meta['current_version']}[/url][/align]"
         )
 
         fichatecnica = "\n\n".join(part for part in fichatecnica_parts if part.strip())
@@ -628,7 +628,7 @@ class BJS:
                 desc_parts.append(f"[center]{spectrograms_block}[/center]")
 
         # Signature
-        desc_parts.append(f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]")
+        desc_parts.append(f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta['ua_name']} {meta['current_version']}[/url][/align]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
@@ -959,7 +959,13 @@ class BJS:
                             names.append(str(BJS.database_title).strip())
 
                         for n in names:
-                            dupe_entry = {"name": n, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                            dupe_entry = {
+                                "name": n,
+                                "size": size,
+                                "link": link,
+                                "download": f"{self.torrent_download_url}{torrent_id}",
+                                "id": torrent_id,
+                            }
                             if self.has_extension(n):
                                 dupe_entry["files"] = [n]
                             if category == "BOOK":
