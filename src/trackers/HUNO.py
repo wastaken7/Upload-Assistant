@@ -208,11 +208,15 @@ class HUNO(UNIT3D):
             "type_id": (await self.get_type_id(meta))["type_id"],
             "tmdb": meta.get("tmdb"),
             "anonymous": 1 if meta.get("anon", False) else 0,
+            "imdb": meta.get("imdb_id", 0),
         }
 
         internal = await self.get_internal(meta)
         if internal == 1:
             data["internal"] = 1
+
+        data["edition"] = meta.get("edition", "")
+        data["repack"] = meta.get("repack", "")
 
         if meta.get("is_disc"):
             region = meta.get("region")
@@ -225,10 +229,18 @@ class HUNO(UNIT3D):
         if meta["category"] == "TV":
             season_int = meta.get("season_int")
             episode_int = meta.get("episode_int")
+            tvdb = meta.get("tvdb_id", 0)
+            mal_id = meta.get("mal_id", 0)
+
             if season_int:
                 data["season_number"] = int(season_int)
             if episode_int:
                 data["episode_number"] = int(episode_int)
+            if tvdb:
+                data["tvdb"] = tvdb
+            if mal_id:
+                data["mal"] = mal_id
+            data["season_pack"] = meta.get("tv_pack", 0)
 
         return data
 
