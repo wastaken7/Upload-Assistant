@@ -91,6 +91,7 @@ from src.trackers.ULCX import ULCX
 from src.trackers.UTP import UTP
 from src.trackers.YOINK import YOINK
 from src.trackers.YUS import YUS
+from src.trackers.ZNTH import ZNTH
 
 JsonDict = dict[str, Any]
 Meta = dict[str, Any]
@@ -1349,7 +1350,7 @@ tracker_class_map: dict[str, type[Any]] = {
     'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IS': IS, 'LAJIDUI': LAJIDUI, 'LCD': LCD, 'LDU': LDU, 'LPT': LPT, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTEAM': MTEAM,'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PTCAFE': PTCAFE, 'PT': PT, 'PTFANS': PTFANS, 'PTGTK': PTGTK, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RPT': RPT,'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
-    'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS,
+    'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS, 'ZNTH': ZNTH,
     'IPT': IPT,
 }  # fmt: off
 

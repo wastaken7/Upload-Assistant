@@ -494,7 +494,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
     uploads reflect the new values.
     """
     book_required_fields = ["title", "author", "year", "book_language"]
-    if meta.get("audiobook", False) and "CBR" in meta.get("trackers", []):
+    if meta.get("audiobook", False) and "CBR" in meta.get("trackers", []) or "ZNTH" in meta.get("trackers", []):
         book_required_fields.append("narrator")
     book_missing = []
     for f in book_required_fields:

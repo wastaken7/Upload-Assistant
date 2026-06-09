@@ -107,8 +107,6 @@ class TrackerStatusManager:
                     from src.book_prep import is_valid_book_language
 
                     book_required_fields = ["title", "author", "year", "book_language"]
-                    if local_meta.get("audiobook", False) and tracker_name == "CBR":
-                        book_required_fields.append("narrator")
                     book_missing = []
                     for f in book_required_fields:
                         val = local_meta.get(f)

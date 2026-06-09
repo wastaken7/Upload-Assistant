@@ -50,46 +50,89 @@ Many thanks to all who have contributed.
 
 ## Supported Sites:
 
-|Name|Acronym|Name|Acronym|
-|-|:-:|-|:-:|
-Aither|AITHER|Luminarr|LUME
-Alpharatio|AR|MoreThanTV|MTV
-Amigos-Share|ASC|M-Team|MTEAM
-Anthelion|ANT|Nebulance|NBL
-AsianCinema|ACM|OldToonsWorld|OTW
-Aura4K|A4K|OnlyEncodes+|OE
-AvistaZ|AZ|PassThePopcorn|PTP
-Beyond-HD|BHD|PolishTorrent|PTT
-BitHDTV|BHDTV|Portugas|PT
-Blutopia|BLU|PrivateHD|PHD
-BrasilJapão-Share|BJS|PT GTK|PTGTK
-BrasilTracker|BT|ptcafe|PTCAFE
-CapybaraBR|CBR|PTerClub|PTER
-Cinematik|TIK|PTFans|PTFANS
-CinemaZ|CZ|PTSKIT|PTS
-DarkPeers|DP|Racing4Everyone|R4E
-DesiTorrents|DT|RailgunPT|RPT
-DigitalCore|DC|Rastastugan|RAS
-Emuwarez|EMUW|ReelFLiX|RF
-FearNoPeer|FNP|RetroFlix|RTF
-FileList|FL|Samaritano|SAM
-Friki|FRIKI|seedpool|SP
-FunFile|FF|ShareIsland|SHRI
-GreatPosterWall|GPW|SkipTheCommerials|STC
-hawke-uno|HUNO|SpeedApp|SPD
-HDBits|HDB|Swarmazon|SN
-HD-Space|HDS|The Leach Zone|TLZ
-HD-Torrents|HDT|TheOldSchool|TOS
-HomieHelpDesk|HHD|Torrenteros|TTR
-ImmortalSeed|IS|TorrentHR|THR
-InfinityHD|IHD|TorrentLeech|TL
-ItaTorrents|ITT|ToTheGlory|TTG
-lajidui|LAJIDUI|TVChaosUK|TVC
-LastDigitalUnderground|LDU|ULCX|ULCX
-Lat-Team|LT|UTOPIA|UTP
-Locadora|LCD|YOiNKED|YOINK
-LongPT|LPT|YUSCENE|YUS
-LST|LST||
+<details>
+<summary><strong>Click to view Supported Sites</strong></summary>
+
+| Site | Acronym |
+|------|----------|
+| Aither | AITHER |
+| Alpharatio | AR |
+| Amigos-Share | ASC |
+| Anthelion | ANT |
+| AsianCinema | ACM |
+| Aura4K | A4K |
+| AvistaZ | AZ |
+| Beyond-HD | BHD |
+| BitHDTV | BHDTV |
+| Blutopia | BLU |
+| BrasilJapão-Share | BJS |
+| BrasilTracker | BT |
+| CapybaraBR | CBR |
+| Cinematik | TIK |
+| CinemaZ | CZ |
+| DarkPeers | DP |
+| DesiTorrents | DT |
+| DigitalCore | DC |
+| Emuwarez | EMUW |
+| FearNoPeer | FNP |
+| FileList | FL |
+| Friki | FRIKI |
+| FunFile | FF |
+| GreatPosterWall | GPW |
+| hawke-uno | HUNO |
+| HDBits | HDB |
+| HD-Space | HDS |
+| HD-Torrents | HDT |
+| HomieHelpDesk | HHD |
+| ImmortalSeed | IS |
+| InfinityHD | IHD |
+| ItaTorrents | ITT |
+| lajidui | LAJIDUI |
+| LastDigitalUnderground | LDU |
+| Lat-Team | LT |
+| Locadora | LCD |
+| LongPT | LPT |
+| LST | LST |
+| Luminarr | LUME |
+| MoreThanTV | MTV |
+| M-Team | MTEAM |
+| Nebulance | NBL |
+| OldToonsWorld | OTW |
+| OnlyEncodes+ | OE |
+| PassThePopcorn | PTP |
+| PolishTorrent | PTT |
+| Portugas | PT |
+| PrivateHD | PHD |
+| PT GTK | PTGTK |
+| ptcafe | PTCAFE |
+| PTerClub | PTER |
+| PTFans | PTFANS |
+| PTSKIT | PTS |
+| Racing4Everyone | R4E |
+| RailgunPT | RPT |
+| Rastastugan | RAS |
+| ReelFLiX | RF |
+| RetroFlix | RTF |
+| Samaritano | SAM |
+| seedpool | SP |
+| ShareIsland | SHRI |
+| SkipTheCommerials | STC |
+| SpeedApp | SPD |
+| Swarmazon | SN |
+| The Leach Zone | TLZ |
+| TheOldSchool | TOS |
+| Torrenteros | TTR |
+| TorrentHR | THR |
+| TorrentLeech | TL |
+| ToTheGlory | TTG |
+| TVChaosUK | TVC |
+| ULCX | ULCX |
+| UTOPIA | UTP |
+| YOiNKED | YOINK |
+| YUSCENE | YUS |
+| Zenith | ZNTH |
+
+</details>
 
 ## **Setup:**
    - **REQUIRES AT LEAST PYTHON 3.9 AND PIP3**

@@ -2,6 +2,7 @@
 import re
 from typing import Any
 
+from src.console import console
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -246,13 +247,17 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta.get("category") not in ["MOVIE", "TV"]:
-            return True
+        if meta["category"] == "BOOK" and bool(meta.get("audiobook")) and not meta.get("narrator", ""):
+            console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
+            return False
 
-        subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-        if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
-            proceed = await self.common.prompt_user_for_confirmation(
-                f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-            )
-            return proceed
-        return subtitles
+        if meta.get("category") in ["MOVIE", "TV"]:
+            subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+            if not subtitles and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))):
+                proceed = await self.common.prompt_user_for_confirmation(
+                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
+                )
+                return proceed
+            return subtitles
+
+        return True
