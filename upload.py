@@ -517,7 +517,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
         )
         return
 
-    console.print(f"[bold yellow]BOOK upload: the following fields are required by some trackers: {', '.join(book_missing)}.[/bold yellow]")
+    console.print("\n[bold yellow]The following fields are required:[/bold yellow]")
     name_needs_rebuild = False
     try:
         for field in book_missing:
@@ -589,7 +589,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
         )
         return
     else:
-        console.print(f"[bold yellow]GAME upload: the following fields are required by some trackers: {', '.join(game_missing)}.[/bold yellow]")
+        console.print("\n[bold yellow]The following fields are required:[/bold yellow]")
         name_needs_rebuild = False
         try:
             for field in game_missing:
@@ -606,22 +606,20 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         else:
                             console.print("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
                 elif field == "platform":
-                    val = meta.get(field)
-                    if val and "," in str(val):
-                        choices = [p.strip() for p in str(val).split(",") if p.strip()]
-                        choices.append("Enter manually...")
-                        try:
-                            choice = cli_ui.ask_choice("The game is available on multiple platforms. Select the target platform for this upload:", choices=choices)
-                            value = (cli_ui.ask_string("Enter platform (leave blank to skip): ") or "").strip() if choice == "Enter manually..." else choice
-                        except EOFError:
-                            value = ""
-                    else:
-                        value = (cli_ui.ask_string("Enter platform (leave blank to skip): ") or "").strip()
+                    try:
+                        value = cli_ui.ask_choice(
+                            "Select target platform: (can be manually set with -plat / --platform)",
+                            choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
+                            sort=False,
+                        )
+                    except EOFError:
+                        value = ""
+
                     if value:
                         meta[field] = value
                         name_needs_rebuild = True
                 elif field == "game_version":
-                    value = (cli_ui.ask_string("Enter game version (e.g., v1.15) (leave blank to skip): ") or "").strip()
+                    value = (cli_ui.ask_string("Enter game version (e.g., 1.15) (leave blank to skip): ") or "").strip()
                     if value:
                         from src.prep_game import normalize_version
 
@@ -629,7 +627,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         name_needs_rebuild = True
 
                 elif field == "game_subcategory":
-                    subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC)", "update (Update)"]
+                    subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC only)", "update (Update only)"]
                     subcategory_values = {"Full Game": "full_game", "Full Game + DLC": "full_game_dlc", "DLC": "dlc", "Update": "update"}
                     choice = cli_ui.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta["game_subcategory"] = subcategory_values.get(choice, "full_game")
@@ -1676,7 +1674,7 @@ def extract_changelog(content: str, to_version: str) -> Optional[str]:
 
 async def update_notification(base_dir: str) -> Optional[str]:
     version_file = os.path.join(base_dir, 'data', 'version.py')
-    remote_version_url = 'https://raw.githubusercontent.com/Audionut/Upload-Assistant/master/data/version.py'
+    remote_version_url = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/master/data/version.py"
 
     notice = config['DEFAULT'].get('update_notification', True)
     verbose = config['DEFAULT'].get('verbose_notification', False)
@@ -1693,8 +1691,8 @@ async def update_notification(base_dir: str) -> Optional[str]:
         return local_version
 
     if version.parse(remote_version) > version.parse(local_version):
-        console.print(f"[red][NOTICE] [green]Update available: v[/green][yellow]{remote_version}")
-        console.print(f"[red][NOTICE] [green]Current version: v[/green][yellow]{local_version}")
+        console.print(f"[red][NOTICE] [green]Update available: [/green][yellow]{remote_version}")
+        console.print(f"[red][NOTICE] [green]Current version: [/green][yellow]{local_version}")
         asyncio.create_task(asyncio.sleep(1))
         if verbose and remote_content:
             changelog = extract_changelog(remote_content, remote_version)

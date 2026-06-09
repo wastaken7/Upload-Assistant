@@ -123,7 +123,12 @@ class DP(UNIT3D):
         return {'name': dp_name}
 
     async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        category_id = {"MOVIE": "1", "TV": "2", "BOOK": "8"}
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "BOOK": "8",
+            "GAME": "4",
+        }
         if mapping_only:
             return category_id
         elif reverse:
@@ -147,29 +152,41 @@ class DP(UNIT3D):
             "AUDIOBOOK": "15",
             "COMIC": "17",
             "EBOOK": "18",
+            "PC": "9",
+            "LINUX": "14",
+            "MAC": "11",
+            "CONSOLE": "10",
         }
         if mapping_only:
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
-            t_upper = type.upper()
-            if t_upper in ("CBR", "CBZ"):
-                t_upper = "COMIC"
-            elif t_upper in ("EPUB", "PDF", "MOBI", "AZW3", "KFX"):
-                t_upper = "EBOOK"
-            elif t_upper in ("MP3", "M4B", "FLAC", "AAC", "M4A", "OGG", "WAV"):
-                t_upper = "AUDIOBOOK"
-            return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
-        else:
-            meta_type = meta.get("type", "").upper()
-            if meta.get("category") == "BOOK":
-                if meta.get("audiobook", False):
-                    meta_type = "AUDIOBOOK"
-                elif meta.get("comic", False) or meta_type in ("CBR", "CBZ"):
-                    meta_type = "COMIC"
-                else:
-                    meta_type = "EBOOK"
-            resolved_id = type_id.get(meta_type, "0")
-            return {"type_id": resolved_id}
+
+        meta_type = meta.get("type", "").upper()
+
+        # Book
+        if meta["category"] == "BOOK":
+            if type:
+                t_upper = type.upper()
+                if t_upper in ("CBR", "CBZ"):
+                    t_upper = "COMIC"
+                elif t_upper in ("EPUB", "PDF", "MOBI", "AZW3", "KFX"):
+                    t_upper = "EBOOK"
+                elif t_upper in ("MP3", "M4B", "FLAC", "AAC", "M4A", "OGG", "WAV"):
+                    t_upper = "AUDIOBOOK"
+                return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
+            else:
+                if meta.get("category") == "BOOK":
+                    if meta.get("audiobook", False):
+                        meta_type = "AUDIOBOOK"
+                    elif meta.get("comic", False) or meta_type in ("CBR", "CBZ"):
+                        meta_type = "COMIC"
+                    else:
+                        meta_type = "EBOOK"
+
+        if meta["category"] == "GAME":
+            meta_type = "CONSOLE" if meta.get("console_game", False) else str(meta.get("platform", "")).upper()
+
+        resolved_id = type_id.get(meta_type, "0")
+        return {"type_id": resolved_id}
 

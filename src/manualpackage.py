@@ -53,20 +53,20 @@ class ManualPackageManager:
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.get(meta['poster'])
                     if response.status_code == 200:
-                        console.print("[bold yellow]Rehosting Poster")
+                        console.print("[bold yellow]Rehosting Cover")
                         await asyncio.to_thread(Path(poster_img).write_bytes, response.content)
                         if not meta.get('skip_imghost_upload', False):
                             poster, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
                             poster = poster[0]
-                            await generic.write(f"TMDB Poster: {poster.get('raw_url', poster.get('img_url'))}\n")
+                            await generic.write(f"TMDB Cover: {poster.get('raw_url', poster.get('img_url'))}\n")
                             meta['rehosted_poster'] = poster.get('raw_url', poster.get('img_url'))
                         meta_text = json.dumps(meta, indent=4)
                         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w') as metafile:
                             await metafile.write(meta_text)
                     else:
-                        console.print("[bold yellow]Poster could not be retrieved")
+                        console.print("[bold yellow]Cover could not be retrieved")
             elif os.path.exists(poster_img) and meta.get('rehosted_poster') is not None:
-                await generic.write(f"TMDB Poster: {meta.get('rehosted_poster')}\n")
+                await generic.write(f"TMDB Cover: {meta.get('rehosted_poster')}\n")
             if len(meta['image_list']) > 0:
                 await generic.write("\nImage Webpage:\n")
                 for each in meta['image_list']:

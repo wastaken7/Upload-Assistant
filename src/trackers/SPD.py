@@ -12,7 +12,7 @@ import httpx
 from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console
-from src.get_desc import DescriptionBuilder
+from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 
 from .COMMON import COMMON
@@ -89,22 +89,28 @@ class SPD:
         # BOOK/EBOOK category
         if category == "BOOK":
             return "6"
+
+        # Game
+        if category == "GAME":
+            if meta.get("console_game", False):
+                return "52"
+            return "11"
+
         return None
 
     async def get_file_info(self, meta: Meta) -> tuple[Optional[str], Optional[str]]:
         base_path = f"{meta['base_dir']}/tmp/{meta['uuid']}"
-
-        if meta.get('bdinfo'):
+        if meta.get("bdinfo"):
             async with aiofiles.open(
                 f"{base_path}/BD_SUMMARY_00.txt",
-                encoding='utf-8',
+                encoding="utf-8",
             ) as bd_file:
                 bd_info = await bd_file.read()
             return None, bd_info
         else:
             async with aiofiles.open(
                 f"{base_path}/MEDIAINFO_CLEANPATH.txt",
-                encoding='utf-8',
+                encoding="utf-8",
             ) as mi_file:
                 media_info = await mi_file.read()
             return media_info, None
@@ -207,7 +213,7 @@ class SPD:
 
         user_description = await builder.get_user_description(meta)
         title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
-        if user_description or episode_overview:  # Avoid unnecessary descriptions
+        if user_description or episode_overview or meta["category"] in ("BOOK", "GAME"):  # Avoid unnecessary descriptions
             # Custom Header
             desc_parts.append(await builder.get_custom_header())
 
@@ -250,14 +256,28 @@ class SPD:
         return description
 
     async def edit_name(self, meta: Meta) -> str:
-        torrent_name = str(meta.get('name', ''))
+        tracker_name = meta["uuid"]
+        scene_name = meta.get("scene_name") or ""
 
-        name = torrent_name.replace(':', ' -')
-        name = unicodedata.normalize("NFKD", name)
-        name = name.encode("ascii", "ignore").decode("ascii")
-        name = re.sub(r'[\\/*?"<>|]', '', name)
+        use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
+        if use_metadata_name:
+            clean_name = meta.get("clean_name") or ""
+            tracker_name = scene_name if scene_name else clean_name
+            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
+            tracker_name = unicodedata.normalize("NFD", tracker_name)
+            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
+            tracker_name = tracker_name.replace("!", "")
 
-        return re.sub(r"\s{2,}", " ", name)
+        else:
+            if scene_name:
+                tracker_name = scene_name
+            else:
+                tracker_name = meta["uuid"]
+                base, ext = os.path.splitext(tracker_name)
+                if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
+                    tracker_name = base
+
+        return tracker_name
 
     async def encode_to_base64(self, file_path: str) -> str:
         async with aiofiles.open(file_path, 'rb') as binary_file:
@@ -275,23 +295,42 @@ class SPD:
 
         return None
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
-        media_info, bd_info = await self.get_file_info(meta)
+    def get_requirements(self, meta: Meta) -> str:
+        requirements_minimum = html_to_bbcode(meta.get("requirements_minimum", ""))
+        requirements_recommended = html_to_bbcode(meta.get("requirements_recommended", ""))
+        requirements = ""
 
+        if requirements_minimum:
+            requirements += requirements_minimum
+        if requirements_recommended:
+            requirements += f"\n{requirements_recommended}"
+
+        requirements = re.sub(r"\[.+?\]", "", requirements)
+
+        return requirements
+
+    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'bdInfo': bd_info,
-            'coverPhotoUrl': str(meta.get('backdrop', '')),
-            'description': str(meta.get('genres', '')),
-            'media_info': media_info,
-            'name': await self.edit_name(meta),
-            'nfo': await self.get_nfo(meta),
-            'plot': str(meta.get('overview_meta', '') or meta.get('overview', '')),
-            'poster': str(meta.get('poster', '')),
-            'technicalDetails': await self.edit_desc(meta),
-            'screenshots': await self.get_screenshots(meta),
-            'type': await self.get_cat_id(meta),
-            'url': str(cast(dict[str, Any], meta.get('imdb_info', {})).get('imdb_url', '')),
+            "coverPhotoUrl": str(meta.get("backdrop", "")),
+            "description": str(meta.get("genres", "")),
+            "name": await self.edit_name(meta),
+            "nfo": await self.get_nfo(meta),
+            "poster": str(meta.get("poster", "")),
+            "technicalDetails": await self.edit_desc(meta),
+            "screenshots": await self.get_screenshots(meta),
+            "type": await self.get_cat_id(meta),
         }
+        if meta["category"] in ("MOVIE", "TV"):
+            media_info, bd_info = await self.get_file_info(meta)
+            data["plot"] = (str(meta.get("overview_meta", "") or meta.get("overview", "")),)
+            data["bdInfo"] = bd_info
+            data["media_info"] = media_info
+            data["url"] = str(cast(dict[str, Any], meta.get("imdb_info", {})).get("imdb_url", ""))
+
+        elif meta["category"] == "GAME" and meta.get("console_game", False) is False:
+            requirements = self.get_requirements(meta)
+            if requirements:
+                data["systemRequirements"] = requirements
 
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
         torrent_filename = await self.common.get_torrent_filename(meta, tracker_config)

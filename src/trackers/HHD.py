@@ -45,7 +45,7 @@ class HHD(UNIT3D):
             "TV": "2",
             "ANIME": "3",
             "MUSIC": "4",
-            "GAMES": "5",
+            "GAME": "5",
             "APPS": "6",
             "BOOKS": "7",
             "AUDIOBOOK": "8",
@@ -101,7 +101,7 @@ class HHD(UNIT3D):
             "CBZ": "22",
             "CBR": "22",
             "OTHER": "23",
-            "GAME": "24",
+            "PC": "25",
             "WINDOWS": "25",
             "MAC": "26",
             "LINUX": "27",
@@ -118,6 +118,9 @@ class HHD(UNIT3D):
 
         if meta.get("category") == "BOOK" and resolved_type not in type_id:
             resolved_type = "OTHER"
+
+        if meta["category"] == "GAME":
+            resolved_type = "CONSOLE" if meta.get("console_game", False) else str(meta.get("platform", "")).upper()
 
         return {"type_id": type_id.get(resolved_type, "0")}
 

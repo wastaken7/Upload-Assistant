@@ -97,7 +97,7 @@ class MyAnonamouseManager:
                 metadata["keywords"] = ", ".join(cleaned_words)
         """
 
-        # Poster / Cover
+        # Cover
         mam_id = item.get("id")
         poster_type = item.get("poster_type")
         if mam_id and poster_type:

@@ -223,10 +223,10 @@ class TIK(UNIT3D):
         # Check if either poster.jpg or poster.png already exists
         if os.path.exists(poster_jpg_path):
             poster_path = poster_jpg_path
-            console.print("[green]Poster already exists as poster.jpg, skipping download.[/green]")
+            console.print("[green]Cover already exists as poster.jpg, skipping download.[/green]")
         elif os.path.exists(poster_png_path):
             poster_path = poster_png_path
-            console.print("[green]Poster already exists as poster.png, skipping download.[/green]")
+            console.print("[green]Cover already exists as poster.png, skipping download.[/green]")
         else:
             # No poster file exists, download the poster image
             poster_path = poster_jpg_path  # Default to saving as poster.jpg
@@ -235,7 +235,7 @@ class TIK(UNIT3D):
                 if parsed_url.scheme not in ('http', 'https'):
                     raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
                 urllib.request.urlretrieve(poster_url, poster_path)  # nosec B310
-                console.print(f"[green]Poster downloaded to {poster_path}[/green]")
+                console.print(f"[green]Cover downloaded to {poster_path}[/green]")
             except Exception as e:
                 console.print(f"[red]Error downloading poster: {e}[/red]")
 
@@ -252,7 +252,7 @@ class TIK(UNIT3D):
             except Exception as e:
                 console.print(f"[red]Error uploading poster: {e}[/red]")
         else:
-            console.print("[red]Poster file not found, cannot upload.[/red]")
+            console.print("[red]Cover file not found, cannot upload.[/red]")
 
         # Generate the description text
         desc_text: list[str] = []

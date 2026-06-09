@@ -55,3 +55,87 @@ class RAS(UNIT3D):
                 meta['logo'] = logo_path
 
         return {'description': await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
+
+    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "AUDIOBOOK": "7",
+            "BOOK": "8",
+            "GAME": "5",
+        }
+        if mapping_only:
+            return category_id
+        elif reverse:
+            return {v: k for k, v in category_id.items()}
+        elif category:
+            return {"category_id": category_id.get(category, "0")}
+        else:
+            meta_category = meta.get("category", "")
+            if meta.get("audiobook", False):
+                meta_category = "AUDIOBOOK"
+            resolved_id = category_id.get(meta_category, "0")
+            return {"category_id": resolved_id}
+
+    async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            # Video
+            "DISC": "1",
+            "REMUX": "2",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "CAM": "13",
+            # Audio
+            "FLAC": "7",
+            "MP3": "8",
+            "M4A": "14",
+            "M4B": "20",
+            # Game platforms / types
+            "MAC": "9",
+            "WINDOWS": "10",
+            "CONSOLE": "11",
+            "LINUX": "18",
+            # Book formats
+            "EPUB": "15",
+            "PDF": "16",
+            "MOBI": "17",
+            "STL": "21",
+            # Other
+            "OTHER": "19",
+        }
+        if mapping_only:
+            return type_id
+        elif reverse:
+            return {v: k for k, v in type_id.items()}
+        elif type:
+            resolved_type = type.upper().strip()
+            return {"type_id": type_id.get(resolved_type, "0")}
+        else:
+            category = meta.get("category", "")
+            meta_type = meta.get("type", "")
+            if isinstance(meta_type, str):
+                meta_type = meta_type.upper().strip().lstrip(".")
+
+            resolved_id = type_id.get(meta_type, "0")
+
+            if category == "GAME":
+                platform = str(meta.get("platform", "")).lower()
+                if "mac" in platform:
+                    resolved_id = "9"
+                elif "linux" in platform:
+                    resolved_id = "18"
+                elif any(word in platform for word in ["windows", "pc"]):
+                    resolved_id = "10"
+                elif meta.get("console_game", False):
+                    resolved_id = "11"
+                elif meta_type in type_id:
+                    resolved_id = type_id[meta_type]
+                else:
+                    resolved_id = "19"
+            elif category in ("BOOK", "AUDIOBOOK") and resolved_id == "0":
+                resolved_id = "19"
+
+            return {"type_id": resolved_id}
