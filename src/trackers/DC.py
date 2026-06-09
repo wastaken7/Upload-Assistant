@@ -253,7 +253,6 @@ class DC:
         try:
             response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
             response.raise_for_status()
-            console.print(response.text)
 
             if response.text and response.text != '[]':
                 json_data = response.json()

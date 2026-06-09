@@ -611,3 +611,4 @@ class UploadHelper:
             console.print("[bold yellow]Potentially missing information:[/bold yellow]")
             for each in missing:
                 cli_ui.info(each)
+                print()

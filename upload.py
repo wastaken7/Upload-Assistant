@@ -189,7 +189,7 @@ if _is_webui_arg and not os.path.exists(_config_path):
 
 Meta: TypeAlias = dict[str, Any]
 
-from src.book_prep import sanitize_book_language
+from src.book_prep import sanitize_book_language  # noqa: E402
 from src.prep import Prep  # noqa: E402
 
 # Enable ANSI colors on Windows
@@ -1931,7 +1931,7 @@ async def do_the_thing(base_dir: str) -> None:
         for queue_item in queue_list:
             total_files = len(queue_list)
             bot = None
-            current_item_path = ""
+            current_item_path: str = ""
             tmp_path = ""
             try:
                 meta = base_meta.copy()
@@ -1940,7 +1940,7 @@ async def do_the_thing(base_dir: str) -> None:
                     # Extract path and metadata from site upload queue item
                     queue_item_mapping = cast(Mapping[str, Any], queue_item)
                     path = await QueueManager.process_site_upload_item(queue_item_mapping, meta)
-                    current_item_path = path  # Store for logging
+                    current_item_path = cast(str, path)  # Store for logging
                 elif meta.get("args_line_queue") and isinstance(queue_item, dict) and "args" in queue_item:
                     # Extract path and arguments from custom args queue item
                     args_list = queue_item["args"]
@@ -1960,12 +1960,12 @@ async def do_the_thing(base_dir: str) -> None:
                             if option_strings and not any(arg == opt or arg.startswith(opt + "=") for opt in option_strings for arg in args_list):
                                 meta[key] = val
 
-                    path = meta.get("path")
-                    current_item_path = queue_item.get("line") or path
+                    path = cast(str, meta.get("path") or "")
+                    current_item_path = cast(str, queue_item.get("line") or path or "")
                 else:
                     # Regular queue processing
                     path = queue_item if isinstance(queue_item, str) else str(queue_item)
-                    current_item_path = path
+                    current_item_path = cast(str, path)
 
                 meta['path'] = path
                 meta['uuid'] = None
@@ -2081,7 +2081,7 @@ async def do_the_thing(base_dir: str) -> None:
                                 await save_processed_file(log_file, current_item_path)
 
             else:
-                meta = cast(Meta, meta)
+                meta = meta
                 console.print()
                 console.print("[yellow]Processing uploads to trackers.....")
                 if meta.get('were_trumping', False):
