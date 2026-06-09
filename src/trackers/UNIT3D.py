@@ -468,7 +468,7 @@ class UNIT3D:
                 nfo_bytes = await f.read()
             files["nfo"] = ("nfo_file.nfo", nfo_bytes, "text/plain")
 
-        if meta["category"] not in ("MOVIE", "TV"):
+        if meta["category"] not in ("MOVIE", "TV", "GAME"):
             cover_path = meta.get("cover_path")
             if cover_path and os.path.exists(cover_path):
                 try:
