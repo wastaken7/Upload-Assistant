@@ -558,9 +558,7 @@ class QbittorrentClientMixin:
             path = os.path.dirname(path)
         else:
             isdir = os.path.isdir(path)
-            if meta.get('category') == 'BOOK' and isdir:
-                path = os.path.dirname(path)
-            elif len(filelist) != 1 or not isdir:
+            if meta.get("category") == "BOOK" and isdir or len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
         # Get the appropriate source path
@@ -1874,6 +1872,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "ulcx": ["https://upload.cx"],
         "yoink": ["yoinked.org"],
         "yus": ["https://yu-scene.net"],
+        "znth": ["https://znth.cx"],
     }
     found_ids: set[str] = set()
     for tracker in tracker_urls:
