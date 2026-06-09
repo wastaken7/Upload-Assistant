@@ -220,12 +220,17 @@ class TRACKER_SETUP:
 
         return file_path
 
-    async def write_banned_groups_to_file(self, file_path: str, json_data: list[JsonDict], debug: bool = False) -> None:
+    async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any], debug: bool = False) -> None:
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            # Extract 'name' values from the list
-            names: list[str] = [str(item['name']) for item in json_data if 'name' in item]
+            # Extract group names from either object payloads or plain string payloads.
+            names: list[str] = []
+            for item in json_data:
+                if isinstance(item, dict) and "name" in item:
+                    names.append(str(item["name"]))
+                elif isinstance(item, str):
+                    names.append(item)
             names_csv = ', '.join(names)
             file_content = {
                 "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -336,7 +341,7 @@ class TRACKER_SETUP:
         if 'taoe' in group_tags:
             group_tags = 'taoe'
 
-        if tracker.upper() in ("AITHER", "LST", "LUME", "SPD"):
+        if tracker.upper() in ("AITHER", "LST", "LUME", "SPD", "ZNTH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 console.print(f"[bold red]No banned groups found for '{tracker}'.")
@@ -1356,7 +1361,7 @@ tracker_class_map: dict[str, type[Any]] = {
 
 api_trackers = {
     'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'DP', 'DT', 'EMUW', 'FNP', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
-    'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TOS', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS'
+    'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TOS', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS', 'ZNTH'
 }  # fmt: off
 
 other_api_trackers = {

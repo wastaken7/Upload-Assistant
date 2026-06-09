@@ -1,4 +1,7 @@
+import re
 from typing import Any
+
+import cli_ui
 
 from src.console import console
 from src.trackers.COMMON import COMMON
@@ -10,24 +13,18 @@ Config = dict[str, Any]
 
 class ZNTH(UNIT3D):
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='ZNTH')
+        super().__init__(config, tracker_name="ZNTH")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'ZNTH'
-        self.base_url = 'https://znth.cx'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [
-            "4K4U", "Alcaide_Kira", "AROMA", "aXXo", "BRrip", "CM8", "CrEwSaDe", "d3g", "DNL", "EVO",
-            "FaNGDiNG0", "FGT", "FRDS", "GalaxyTV", "HD2DVD", "HDTime", "Hi10", "ION10", "iPlanet",
-            "KiNGDOM", "LAMA", "MeGusta", "mHD", "mSD", "NhaNc3", "nHD", "nikt0", "nSD", "OFT",
-            "PRODJi", "RARBG", "SANTi", "SPDVD", "STUTTERSHIT", "Telly", "TGx", "TSP", "TSPxL",
-            "WAF", "x0r", "YIFY", "YTS"
-        ]
-        pass
+        self.tracker = "ZNTH"
+        self.base_url = "https://znth.cx"
+        self.id_url = f"{self.base_url}/api/torrents/"
+        self.upload_url = f"{self.base_url}/api/torrents/upload"
+        self.requests_url = f"{self.base_url}/api/requests/filter"
+        self.search_url = f"{self.base_url}/api/torrents/filter"
+        self.torrent_url = f"{self.base_url}/torrents/"
+        self.banned_url = f"{self.base_url}/api/bannedReleaseGroups"
+        self.banned_groups: list[str] = []
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         if meta["category"] == "BOOK":
@@ -37,6 +34,19 @@ class ZNTH(UNIT3D):
             if bool(meta.get("audiobook", False)) and not meta.get("narrator", ""):
                 console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
                 return False
+
+        if meta["category"] in ("TV", "MOVIES"):
+            genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+            adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai"]
+            if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+                if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+                    console.print(f"[bold red]Porn/xxx is not allowed at {self.tracker}.")
+                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        pass
+                    else:
+                        return False
+                else:
+                    return False
 
         return True
 
@@ -69,7 +79,7 @@ class ZNTH(UNIT3D):
                     ext = format_val.upper()
                     source = "SCAN" if ext == "PDF" else "RETAiL"
 
-            is_retail = (source in ("RETAIL", "RETAiL") or "retail" in str(meta.get("uuid", "")).lower())
+            is_retail = source in ("RETAIL", "RETAiL") or "retail" in str(meta.get("uuid", "")).lower()
 
             if audiobook:
                 # AudioBook Naming
@@ -120,8 +130,8 @@ class ZNTH(UNIT3D):
                             edition = f"{edition} Edition"
 
                 isbn_val = str(meta.get("isbn") or "").strip()
-                is_scan = (source == "SCAN" or "scan" in str(meta.get("uuid", "")).lower() or "scan" in str(meta.get("title", "")).lower())
-                is_ocr = (bool(meta.get("ocr")) or "ocr" in str(meta.get("uuid", "")).lower() or "ocr" in str(meta.get("title", "")).lower())
+                is_scan = source == "SCAN" or "scan" in str(meta.get("uuid", "")).lower() or "scan" in str(meta.get("title", "")).lower()
+                is_ocr = bool(meta.get("ocr")) or "ocr" in str(meta.get("uuid", "")).lower() or "ocr" in str(meta.get("title", "")).lower()
 
                 parts = []
                 if author:
@@ -149,6 +159,16 @@ class ZNTH(UNIT3D):
                 base_name = " ".join(base_name.split())
                 znth_name = f"{base_name}-{tag}" if tag else base_name
 
+            return {"name": znth_name}
+
+        elif category in ("TV", "MOVIE"):
+            znth_name = meta["name"]
+            if meta["category"] == "TV" and meta.get("episode_title", "") != "":
+                znth_name = znth_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
+            imdb_year = str(meta.get("imdb_info", {}).get("year", ""))
+            year = str(meta.get("year", ""))
+            if meta.get("category") != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
+                znth_name = znth_name.replace(f"{year}", imdb_year, 1)
             return {"name": znth_name}
 
         else:
