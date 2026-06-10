@@ -881,7 +881,7 @@ async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
         return False
 
 
-async def extract_embedded_cover_from_audiobook(meta: dict[str, Any], dest_path: str) -> bool:
+async def extract_embedded_cover_from_audiobook(meta: dict[str, Any], dest_path: str, confirmed_only: bool = False) -> bool:
     import mutagen
 
     def _extract():
@@ -909,19 +909,40 @@ async def extract_embedded_cover_from_audiobook(meta: dict[str, Any], dest_path:
 
                 # 1. FLAC / OGG pictures
                 if hasattr(audio, "pictures") and audio.pictures:
-                    pic = audio.pictures[0]
-                    with open(dest_path, "wb") as f:
-                        f.write(pic.data)
-                    return True
+                    pic = None
+                    if confirmed_only:
+                        for p in audio.pictures:
+                            if getattr(p, "type", None) == 3:
+                                pic = p
+                                break
+                    else:
+                        pic = audio.pictures[0]
+
+                    if pic is not None:
+                        with open(dest_path, "wb") as f:
+                            f.write(pic.data)
+                        return True
 
                 # 2. MP3 ID3 APIC
                 if audio.tags:
+                    apic_to_use = None
                     for key in audio.tags.keys():
                         if key.startswith("APIC"):
                             apic = audio.tags[key]
-                            with open(dest_path, "wb") as f:
-                                f.write(apic.data)
-                            return True
+                            if getattr(apic, "type", None) == 3:
+                                apic_to_use = apic
+                                break
+
+                    if not apic_to_use and not confirmed_only:
+                        for key in audio.tags.keys():
+                            if key.startswith("APIC"):
+                                apic_to_use = audio.tags[key]
+                                break
+
+                    if apic_to_use is not None:
+                        with open(dest_path, "wb") as f:
+                            f.write(apic_to_use.data)
+                        return True
 
                 # 3. MP4 / M4A / M4B
                 if "covr" in audio:
@@ -987,7 +1008,7 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
     return False
 
 
-async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
+async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: bool = False) -> bool:
     def _extract():
         if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
             return False
@@ -1112,15 +1133,18 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                                 if cover_zip_path:
                                     break
 
+                if confirmed_only and not cover_zip_path:
+                    return False
+
                 # 4. Any image item with "cover" in its ID or href
-                if not cover_zip_path:
+                if not cover_zip_path and not confirmed_only:
                     for item_id, item in manifest_items.items():
                         if is_image_item(item["href"], item["media-type"]) and ("cover" in item_id.lower() or "cover" in item["href"].lower()):
                             cover_zip_path = resolve_path(opf_dir, item["href"])
                             break
 
                 # 5. Search zip entries for names containing "cover" and ending with image extensions
-                if not cover_zip_path:
+                if not cover_zip_path and not confirmed_only:
                     for name in z.namelist():
                         base = os.path.basename(name).lower()
                         if "cover" in base and base.endswith((".jpg", ".jpeg", ".png", ".webp", ".svg")):
@@ -1128,7 +1152,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str) -> bool:
                             break
 
                 # 6. First image item in manifest
-                if not cover_zip_path:
+                if not cover_zip_path and not confirmed_only:
                     for item_id, item in manifest_items.items():
                         if is_image_item(item["href"], item["media-type"]):
                             cover_zip_path = resolve_path(opf_dir, item["href"])
@@ -1210,7 +1234,22 @@ async def generate_ebook_screenshots(
         if local_found:
             meta["cover_path"] = cover_path
         else:
-            downloaded_poster = await download_poster_from_meta(meta, cover_path)
+            # Try confirmed extraction first for epub to skip API download
+            extracted_confirmed = False
+            if extension == "epub":
+                try:
+                    extracted_confirmed = await extract_epub_cover(path, cover_path, confirmed_only=True)
+                    if extracted_confirmed:
+                        meta["cover_path"] = cover_path
+                        downloaded_poster = True
+                        if meta.get("debug", False):
+                            console.print("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
+                except Exception as e:
+                    if meta.get("debug", False):
+                        console.print(f"[yellow]Warning: EPUB confirmed cover extraction failed: {e}[/yellow]")
+
+            if not extracted_confirmed:
+                downloaded_poster = await download_poster_from_meta(meta, cover_path)
 
     if extension in ["cbr", "cbz"]:
         temp_extract = os.path.join(output_dir, "temp_compressed_extract")
@@ -1293,7 +1332,7 @@ async def generate_ebook_screenshots(
         try:
             if extension == "epub" and not local_found and not downloaded_poster:
                 try:
-                    epub_cover_extracted = await extract_epub_cover(path, cover_path)
+                    epub_cover_extracted = await extract_epub_cover(path, cover_path, confirmed_only=False)
                     if epub_cover_extracted:
                         downloaded_poster = True
                         meta["cover_path"] = cover_path
@@ -1371,11 +1410,20 @@ async def screenshots(
             if local_found:
                 meta["cover_path"] = cover_path
             else:
-                extracted_found = await extract_embedded_cover_from_audiobook(meta, cover_path)
-                if extracted_found:
+                # 1. Try to extract confirmed cover
+                extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, cover_path, confirmed_only=True)
+                if extracted_confirmed:
                     meta["cover_path"] = cover_path
+                    if meta.get("debug", False):
+                        console.print("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
                 else:
-                    await download_poster_from_meta(meta, cover_path)
+                    # 2. Try download via API
+                    downloaded_poster = await download_poster_from_meta(meta, cover_path)
+                    if not downloaded_poster:
+                        # 3. Fallback to any unconfirmed embedded cover
+                        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, cover_path, confirmed_only=False)
+                        if extracted_unconfirmed:
+                            meta["cover_path"] = cover_path
             return []
         return await generate_ebook_screenshots(path, filename, folder_id, base_dir, meta, num_screens if num_screens > 0 else meta["screens"])
 
