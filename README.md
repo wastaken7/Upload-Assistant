@@ -1,52 +1,42 @@
-### NOTE:
-- This project is in development freeze. Only critical bugs will be addressed moving forward.
-- More details on the future of Upload Assistant will be available at a later date.
-- Thanks to all who have contributed to this project, to everyone who has used Upload Assistant and everyone who has shared this project for the benefit of others.
-- A special thankyou to all of the site staffers who have shown great patience and understanding, during the development of Upload Assistant. Each and everyone one of you, who fixed issues, and quietly addressed those same issues with me. I can't emphasize enough how that has allowed me to focus entirely on fixing the issues code side, and the boost to motivation that it gave.
-- To those of you who I will not name, working in tandem to bring new features to the ecosystem, you rock.
-- Specifically, to everyone at Aither. You're unwavering support has been truly appreciated.
-- Last but certainly not least, a huge thanks to @wastaken7, who contributed greatly to the success of Upload Assistant. Not only did wasteken7 being a whole suite of new site support, but he persistently maintained all of those sites. The sheer amount of refactoring work on the codebase, to increase the ease of development cannot be overstated.
-- Upload Assistant is not dead. I look forward to sharing a new chapter in the future.
-
-
-[![Create and publish a Docker image](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/docker-image.yml)
-[![Python Code Analysis](https://github.com/Audionut/Upload-Assistant/actions/workflows/python-code-analysis.yml/badge.svg?branch=master)](https://github.com/Audionut/Upload-Assistant/actions/workflows/python-code-analysis.yml)
-[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/downloads/)
-[![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-[![Security: Safety](https://img.shields.io/badge/security-safety-green.svg)](https://github.com/pyupio/safety)
-[![Lint: Ruff](https://img.shields.io/badge/lint-ruff-4B8BBE.svg?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
-[![Type Checker: Pyright](https://img.shields.io/badge/type%20checker-pyright-2D7FF9.svg?logo=python&logoColor=white)](https://github.com/microsoft/pyright)
-
-Discord support https://discord.gg/QHHAZu7e2A
-
 # Upload Assistant
 
 > [!IMPORTANT]
 > **This is a modified version of the Upload Assistant project and is not affiliated with or endorsed by Audionut.**
 
-A simple tool to take the work out of uploading.
+## Fork Features & Differences from Upstream (Audionut/Upload-Assistant)
 
-This project is a fork of the original work of L4G https://github.com/L4GSP1KE/Upload-Assistant
-Immense thanks to him for establishing this project. Without his (and supporters) time and effort, this fork would not be a thing.
-Many thanks to all who have contributed.
+This branch introduces new media categories and automation features not present in the upstream Audionut repository:
 
-## What It Can Do:
-  - Generates and Parses MediaInfo/BDInfo.
-  - Generates and Uploads screenshots. HDR tonemapping if config.
-  - Uses srrdb to fix scene names used at sites.
-  - Can grab descriptions from PTP/BLU/Aither/LST/OE/BHD (with config option automatically on filename match, or using arg).
-  - Can strip and use existing screenshots from descriptions to skip screenshot generation and uploading.
-  - Obtains TMDb/IMDb/MAL/TVDB/TVMAZE identifiers.
-  - Converts absolute to season episode numbering for Anime. Non-Anime support with TVDB credentials
-  - Generates custom .torrents without useless top level folders/nfos.
-  - Can re-use existing torrents instead of hashing new.
-  - Can automagically search qBitTorrent version 5+ clients for matching existing torrent.
-  - Includes support for [qui](https://github.com/autobrr/qui)
-  - Generates proper name for your upload using Mediainfo/BDInfo and TMDb/IMDb conforming to site rules.
-  - Checks for existing releases already on site.
-  - Adds to your client with fast resume, seeding instantly (rtorrent/qbittorrent/deluge/watch folder).
-  - ALL WITH MINIMAL INPUT!
-  - Currently works with .mkv/.mp4/Blu-ray/DVD/HD-DVDs.
+### 1. New Media Category Support
+* **Ebook & Audiobook (`BOOK` Category)**:
+  * **Automatic Type Detection**: Classifies uploads into Ebooks (PDF, EPUB, MOBI), Comics/Manga (CBR, CBZ), Newspapers, or Audiobooks.
+  * **Local Metadata Extraction**: Reads metadata from OPF files in EPUB/MOBI, `ComicInfo.xml` in CBR/CBZ, parses tags via Mutagen for audiobooks, and uses PyMuPDF (`fitz`) with checksum-validated regex to extract ISBNs from PDFs.
+  * **API Integrations**: Queries **MyAnonamouse (MAM) API**, **Google Books API**, and **OpenLibrary API** for automated metadata lookup.
+  * **Artwork & Screenshot Generation**: Renders gallery screenshots from PDF/EPUB pages, extracts cover artwork, and auto-generates `POSTER.png`.
+  * **Smart Duplicate Checking**: Custom rules distinguishing formats (e.g., EPUB vs PDF) and audiobooks vs ebooks, with tracker-specific overrides.
+* **Video Game (`GAME` Category)**:
+  * **Game Directory Parsing**: Priority scans for executables (`.exe`), disc images (`.iso`), or archives (`.rar`, `.zip`, etc.) in the upload path.
+  * **IGDB & Steam Metadata API**: Queries Twitch/IGDB API for storyline, ratings, involved companies, release year, genre mapping, and downloads cover images. Fetches PC system requirements via Steam Store API.
+  * **Platform Detection**: Identifies systems (PC, PS5, Switch, Xbox Series X|S, etc.) and enforces platform-group duplicate checks (so Switch uploads aren't blocked by PC dupes).
+  * **Platform-specific Prompts**: Attended prompts for console TV standard (NTSC/PAL) and region codes (USA/EUR/JPN) for trackers like BJS.
+
+### 2. Audio Stream Spectrogram Generation
+* **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs or Blu-ray BDInfo using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`.
+* **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
+* **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).
+
+### 3. qBittorrent Bandwidth Control
+* **Traffic Control**: Prevents overloading your connection during uploads using `-qbcon` / `--qbit-bw-control`.
+* **Dynamic Wait**: Pauses uploading if your active client upload speed exceeds a threshold (`qbit_bandwidth_threshold` KB/s) and resumes once it stays below the limit for a set time (`qbit_bandwidth_time` seconds).
+* **Safe Rechecking**: Performs a second duplicate check after the bandwidth wait to ensure a duplicate wasn't posted while the client was waiting.
+
+### 4. Argument-Embedded Text Queue
+* **Custom Parameter Queues**: When running batch uploads with a `.txt` queue file, each line is treated as an independent execution command.
+* **shlex-Split Parsing**: Allows specifying unique CLI arguments (e.g., different IMDB IDs, tags, or tracker targets) for each file/folder on its respective line.
+* **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
+
+### 5. Extended Tracker Support
+* **Added Trackers**: Zenith (ZNTH), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT), Rastastugan (RAS), DarkPeers (DP), IPTorrents (IPT).
 
 ## Supported Sites:
 
