@@ -947,7 +947,11 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
     poster_url = meta.get("poster")
     if not poster_url:
         return False
-    if os.path.exists(cover_path) and os.path.getsize(cover_path) >= 20480:
+
+    min_size = 20480
+    if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
+        min_size = 10240
+    if os.path.exists(cover_path) and os.path.getsize(cover_path) >= min_size:
         meta["cover_path"] = cover_path
         return True
     try:
@@ -967,8 +971,10 @@ async def download_poster_from_meta(meta: dict[str, Any], cover_path: str) -> bo
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(poster_url, cookies=cookies, headers=headers)
             if response.status_code == 200:
-                if len(response.content) < 20480:
-                    console.print(f"[yellow]Warning: Downloaded poster from {poster_url} is too small ({len(response.content)} bytes < 20 KB) and will be ignored.[/yellow]")
+                if len(response.content) < min_size:
+                    console.print(
+                        f"[yellow]Warning: Downloaded poster from {poster_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
+                    )
                     return False
                 await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
                 meta["cover_path"] = cover_path

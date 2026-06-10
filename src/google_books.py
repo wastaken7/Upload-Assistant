@@ -25,12 +25,13 @@ class GoogleBooksManager:
         volume = data["items"][0]
         volume_id = volume.get("id")
         volume_info = volume.get("volumeInfo", {})
+        image_link = volume_info.get("imageLinks", {}).get("thumbnail", "")
 
         metadata: dict[str, Any] = {}
 
         # Cover URL (Google Books cover image)
-        if volume_id and volume_info.get("imageLinks"):
-            metadata["poster"] = f"https://books.google.com/books/content?id={volume_id}&printsec=frontcover&img=1"
+        if volume_id and image_link:
+            metadata["poster"] = image_link
 
         # Title & Subtitle
         title = volume_info.get("title")
