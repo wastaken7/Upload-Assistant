@@ -15,7 +15,7 @@ from pymediainfo import MediaInfo
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.get_desc import DescriptionBuilder, html_to_bbcode
+from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -434,35 +434,11 @@ class ASC:
 
         description_parts.append("[/center]")
 
-        # Technical details
-        details = []
-        if author:
-            details.append(f"[b]Autor:[/b] {author}")
-        if meta.get("narrator"):
-            details.append(f"[b]Narrador:[/b] {meta['narrator']}")
-        if meta.get("publisher"):
-            details.append(f"[b]Editora:[/b] {meta['publisher']}")
-        if meta.get("isbn"):
-            details.append(f"[b]ISBN:[/b] {meta['isbn']}")
-        if meta.get("asin"):
-            details.append(f"[b]ASIN:[/b] {meta['asin']}")
-        if meta.get("year"):
-            details.append(f"[b]Ano de Lançamento:[/b] {meta['year']}")
-        if meta.get("audiobook", False):
-            duration = meta.get("audiobook_duration_formatted")
-            if duration:
-                details.append(f"[b]Duração:[/b] {duration}")
-
-        if details:
-            description_parts.append("[b][size=3]Ficha Técnica[/size][/b]\n")
-            description_parts.append("\n".join(details))
-            description_parts.append("")
-
-        # Overview
-        overview = html_to_bbcode(str(meta.get("overview", "")))
-        if overview:
-            description_parts.append("\n[b][size=3]Sinopse[/size][/b]")
-            description_parts.append(overview)
+        # Book details using DescriptionBuilder
+        builder = DescriptionBuilder(self.tracker, self.config)
+        book_section = builder._build_book_desc_section(meta, header_size=3, table=False)
+        if book_section:
+            description_parts.append(book_section)
             description_parts.append("")
 
         # External DESCRIPTION.txt

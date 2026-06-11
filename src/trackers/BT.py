@@ -1229,43 +1229,8 @@ class BT:
 
     def build_book_desc(self, meta: dict[str, Any]) -> str:
         """Build the BBCode table for BOOK-category uploads."""
-        book_parts: list[str] = [""]
-        narrator = meta.get("narrator")
-        publisher = meta.get("publisher")
-        isbn = meta.get("isbn")
-        overview = meta.get("overview")
-
-        if overview:
-            overview = html_to_bbcode(str(overview))
-            overview = re.sub(r"<[^>]+>", "", overview).strip()
-
-        if narrator:
-            book_parts.append(f"[b]Narrador:[/b] {narrator}")
-        if publisher:
-            book_parts.append(f"[b]Editora:[/b] {publisher}")
-        if isbn:
-            book_parts.append(f"[b]ISBN:[/b] {isbn}")
-        asin = meta.get("asin")
-        if asin:
-            book_parts.append(f"[b]ASIN:[/b] {asin}")
-        if meta.get("audiobook", False):
-            audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
-            if audiobook_duration_formatted:
-                book_parts.append(f"[b]Duração:[/b] {audiobook_duration_formatted}")
-
-        final_book_parts: list[str] = []
-
-        if book_parts:
-            final_book_parts.append("[b][size=3]DETALHES TÉCNICOS[/size][/b]")
-            final_book_parts.append("\n".join(book_parts))
-
-        if overview:
-            final_book_parts.append(f"\n[b][size=3]VISÃO GERAL[/size][/b]\n\n{overview}")
-
-        if not (book_parts or overview):
-            return ""
-
-        return "\n".join(final_book_parts)
+        builder = DescriptionBuilder(self.tracker, self.config)
+        return builder._build_book_desc_section(meta, header_size=3, table=False)
 
     async def get_book_cover(self, meta: dict[str, Any]) -> str:
         covers = meta.get("covers")

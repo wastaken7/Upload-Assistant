@@ -10,7 +10,7 @@ import httpx
 from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console
-from src.get_desc import DescriptionBuilder, html_to_bbcode
+from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
@@ -105,41 +105,9 @@ class TL:
 
         # Book details
         if category == "BOOK":
-            book_parts = []
-            author = meta.get("author")
-            narrator = meta.get("narrator")
-            publisher = meta.get("publisher")
-            isbn = meta.get("isbn")
-            asin = meta.get("asin")
-            overview = meta.get("overview")
-
-            if author:
-                book_parts.append(f"[b]Author:[/b] {author}")
-            if narrator:
-                book_parts.append(f"[b]Narrator:[/b] {narrator}")
-            if publisher:
-                book_parts.append(f"[b]Publisher:[/b] {publisher}")
-            if isbn:
-                book_parts.append(f"[b]ISBN:[/b] {isbn}")
-            if asin:
-                book_parts.append(f"[b]ASIN:[/b] {asin}")
-            if meta.get("audiobook", False):
-                audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
-                if audiobook_duration_formatted:
-                    book_parts.append(f"[b]Duration:[/b] {audiobook_duration_formatted}")
-
-            book_block_parts = []
-            if book_parts:
-                book_block_parts.append("[b]TECHNICAL DETAILS[/b]\n" + "\n".join(book_parts))
-
-            if overview:
-                clean_overview = html_to_bbcode(str(overview))
-                clean_overview = re.sub(r"<[^>]+>", "", clean_overview).strip()
-                if clean_overview:
-                    book_block_parts.append(f"[b]OVERVIEW[/b]\n[i]{clean_overview}[/i]")
-
-            if book_block_parts:
-                desc_parts.append("\n\n".join(book_block_parts))
+            book_section = builder._build_book_desc_section(meta, header_size=-1, table=False)
+            if book_section:
+                desc_parts.append(book_section)
 
         # Game
         if category == "GAME":

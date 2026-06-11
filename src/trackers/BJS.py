@@ -21,7 +21,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
-from src.get_desc import DescriptionBuilder, html_to_bbcode
+from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -647,43 +647,8 @@ class BJS:
 
     def build_book_desc(self, meta: Meta) -> str:
         """Build the BBCode table for BOOK-category uploads."""
-        book_parts: list[str] = [""]
-        narrator = meta.get("narrator")
-        publisher = meta.get("publisher")
-        isbn = meta.get("isbn")
-        overview = meta.get("overview")
-
-        if overview:
-            overview = html_to_bbcode(str(overview))
-            overview = re.sub(r"<[^>]+>", "", overview).strip()
-
-        if narrator:
-            book_parts.append(f"[b]Narrador:[/b] {narrator}")
-        if publisher:
-            book_parts.append(f"[b]Editora:[/b] {publisher}")
-        if isbn:
-            book_parts.append(f"[b]ISBN:[/b] {isbn}")
-        asin = meta.get("asin")
-        if asin:
-            book_parts.append(f"[b]ASIN:[/b] {asin}")
-        if meta.get("audiobook", False):
-            audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
-            if audiobook_duration_formatted:
-                book_parts.append(f"[b]Duração:[/b] {audiobook_duration_formatted}")
-
-        final_book_parts: list[str] = []
-
-        if book_parts:
-            final_book_parts.append("[b][size=3]DETALHES TÉCNICOS[/size][/b]")
-            final_book_parts.append("\n".join(book_parts))
-
-        if overview:
-            final_book_parts.append(f"\n[b][size=3]VISÃO GERAL[/size][/b]\n\n{overview}")
-
-        if not (book_parts or overview):
-            return ""
-
-        return "\n".join(final_book_parts)
+        builder = DescriptionBuilder(self.tracker, self.config)
+        return builder._build_book_desc_section(meta, header_size=3, table=False)
 
     def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get("videos", {})).get("results", [])

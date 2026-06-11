@@ -8,7 +8,7 @@ import httpx
 
 from cogs.redaction import Redaction
 from src.console import console
-from src.get_desc import DescriptionBuilder, html_to_bbcode
+from src.get_desc import DescriptionBuilder
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
@@ -73,36 +73,9 @@ class DC:
             if cover_url:
                 book_parts.append(f"[center][img]{cover_url}[/img][/center]")
 
-            details = []
-            if author:
-                details.append(f"• [b]Author:[/b] {author}")
-            narrator = meta.get("narrator")
-            if narrator:
-                details.append(f"• [b]Narrator:[/b] {narrator}")
-            publisher = meta.get("publisher")
-            if publisher:
-                details.append(f"• [b]Publisher:[/b] {publisher}")
-            isbn = meta.get("isbn")
-            if isbn:
-                details.append(f"• [b]ISBN:[/b] {isbn}")
-            asin = meta.get("asin")
-            if asin:
-                details.append(f"• [b]ASIN:[/b] {asin}")
-            year = meta.get("year")
-            if year:
-                details.append(f"• [b]Release Year:[/b] {year}")
-
-            if meta.get("audiobook", False):
-                duration = meta.get("audiobook_duration_formatted")
-                if duration:
-                    details.append(f"• [b]Duration:[/b] {duration}")
-
-            if details:
-                book_parts.append("\n[b][u]Technical Info[/u][/b]\n" + "\n".join(details))
-
-            overview = html_to_bbcode(str(meta.get("overview", "")))
-            if overview:
-                book_parts.append(f"\n[b][u]Synopsis[/u][/b]\n{overview}")
+            book_section = builder._build_book_desc_section(meta, table=False, underline=True, bullet="•")
+            if book_section:
+                book_parts.append(f"\n{book_section}")
 
             desc_parts.append("\n".join(book_parts))
 

@@ -536,17 +536,9 @@ class DescriptionBuilder:
             console.print(f"[yellow]Warning: Error getting audio spectrogram section: {str(e)}[/yellow]")
         return ""
 
-    @staticmethod
-    def _build_book_desc_section(meta: dict[str, Any]) -> str:
-        """Build the BBCode table for BOOK-category uploads.
-
-        Assembles a ``[table]`` block containing a *TECHNICAL DETAILS* section
-        (author, narrator, publisher, ISBN) and an *OVERVIEW* section when the
-        relevant fields are present in *meta*.
-
-        Returns an empty string when there is nothing to render.
-        """
-        book_parts: list[str] = [""]
+    def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
+        """Build the BBCode table or list for BOOK-category uploads."""
+        book_parts: list[str] = []
         author = meta.get("author")
         narrator = meta.get("narrator")
         publisher = meta.get("publisher")
@@ -554,43 +546,83 @@ class DescriptionBuilder:
         asin = meta.get("asin")
         overview = meta.get("overview")
         edition = meta.get("edition")
+        year = meta.get("year")
+
+        use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
+
+        str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
+        str_overview = "Overview" if not use_pt_br else "Visão Geral"
+        str_author = "Author" if not use_pt_br else "Autor"
+        str_narrator = "Narrator" if not use_pt_br else "Narrador"
+        str_publisher = "Publisher" if not use_pt_br else "Editora"
+        str_isbn = "ISBN"
+        str_asin = "ASIN"
+        str_edition = "Edition" if not use_pt_br else "Edição"
+        str_year = "Release Year" if not use_pt_br else "Ano de Lançamento"
+        str_duration = "Duration" if not use_pt_br else "Duração"
 
         if overview:
             overview = html_to_bbcode(str(overview))
             overview = re.sub(r"<[^>]+>", "", overview).strip()
 
+        prefix = f"{bullet} " if bullet else ""
+
         if author:
-            book_parts.append(f"[b]Author:[/b] {author}")
+            book_parts.append(f"{prefix}[b]{str_author}:[/b] {author}")
         if narrator:
-            book_parts.append(f"[b]Narrator:[/b] {narrator}")
+            book_parts.append(f"{prefix}[b]{str_narrator}:[/b] {narrator}")
         if publisher:
-            book_parts.append(f"[b]Publisher:[/b] {publisher}")
+            book_parts.append(f"{prefix}[b]{str_publisher}:[/b] {publisher}")
         if isbn:
-            book_parts.append(f"[b]ISBN:[/b] {isbn}")
+            book_parts.append(f"{prefix}[b]{str_isbn}:[/b] {isbn}")
         if asin:
-            book_parts.append(f"[b]ASIN:[/b] {asin}")
+            book_parts.append(f"{prefix}[b]{str_asin}:[/b] {asin}")
         if edition:
-            book_parts.append(f"[b]Edition:[/b] {edition}")
+            book_parts.append(f"{prefix}[b]{str_edition}:[/b] {edition}")
+        if year:
+            book_parts.append(f"{prefix}[b]{str_year}:[/b] {year}")
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:
-                book_parts.append(f"[b]Duration:[/b] {audiobook_duration_formatted}")
-
-        final_book_parts: list[str] = []
-
-        if book_parts:
-            final_book_parts.append("[tr][td][b][size=4]TECHNICAL DETAILS[/size][/b][/td][/tr][tr][td]")
-            final_book_parts.append("\n".join(book_parts))
-            final_book_parts.append("[/td][/tr]")
-
-        if overview:
-            final_book_parts.append(f"[tr][td][b][size=4]OVERVIEW[/size][/b][/td][/tr][tr][td][i]{overview}[/i][/td][/tr]")
+                book_parts.append(f"{prefix}[b]{str_duration}:[/b] {audiobook_duration_formatted}")
 
         if not (book_parts or overview):
             return ""
 
-        book_p = "\n".join(final_book_parts)
-        return "[table]\n" + book_p + "\n[/table]"
+        if table:
+            final_book_parts: list[str] = []
+            if book_parts:
+                header_size_val = header_size if header_size else 4
+                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_technical_details.upper()}[/size][/b][/td][/tr][tr][td]")
+                final_book_parts.append("\n".join(book_parts))
+                final_book_parts.append("[/td][/tr]")
+
+            if overview:
+                header_size_val = header_size if header_size else 4
+                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td][i]{overview}[/i][/td][/tr]")
+
+            book_p = "\n".join(final_book_parts)
+            return "[table]\n" + book_p + "\n[/table]"
+        else:
+            final_book_parts = []
+            if underline:
+                header = "[b][u]"
+                header_end = "[/u][/b]\n"
+            elif header_size == -1:
+                header = "[b]"
+                header_end = "[/b]\n"
+            else:
+                header = "[h2]" if not header_size else f"[size={header_size}][b]"
+                header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+
+            if book_parts:
+                final_book_parts.append(f"{header}{str_technical_details.upper() if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
+
+            if overview:
+                overview_content = f"[i]{overview}[/i]" if self.tracker == "TL" else overview
+                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview_content}")
+
+            return "\n\n".join(final_book_parts)
 
     def _build_game_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True) -> str:
         """Build the beautiful BBCode layout for GAME-category uploads."""
