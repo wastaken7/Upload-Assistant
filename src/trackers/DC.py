@@ -85,6 +85,9 @@ class DC:
             isbn = meta.get("isbn")
             if isbn:
                 details.append(f"• [b]ISBN:[/b] {isbn}")
+            asin = meta.get("asin")
+            if asin:
+                details.append(f"• [b]ASIN:[/b] {asin}")
             year = meta.get("year")
             if year:
                 details.append(f"• [b]Release Year:[/b] {year}")

@@ -1245,6 +1245,9 @@ class BT:
             book_parts.append(f"[b]Editora:[/b] {publisher}")
         if isbn:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
+        asin = meta.get("asin")
+        if asin:
+            book_parts.append(f"[b]ASIN:[/b] {asin}")
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:

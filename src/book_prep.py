@@ -173,6 +173,7 @@ async def gather_book_prep(
         "author": bool(meta.get("book_author")),
         "publisher": bool(meta.get("book_publisher")),
         "isbn": bool(meta.get("book_isbn")),
+        "asin": bool(meta.get("book_asin")),
         "book_language": bool(meta.get("book_language")),
         "year": "manual_year" in meta and int(meta.get("manual_year") or 0) > 0,
         "keywords": bool(meta.get("keywords")),
@@ -294,8 +295,17 @@ async def gather_book_prep(
 
                 # 5. ISBN
                 isbn_val = general_track.get("ISBN") or general_track.get("isbn")
+                if not isbn_val and isinstance(general_track.get("extra"), dict):
+                    isbn_val = general_track["extra"].get("ISBN") or general_track["extra"].get("isbn")
                 if isbn_val and str(isbn_val).strip() and not isinstance(isbn_val, dict) and not meta.get("isbn"):
                     meta["isbn"] = str(isbn_val).strip()
+
+                # 5b. ASIN
+                asin_val = general_track.get("ASIN") or general_track.get("asin")
+                if not asin_val and isinstance(general_track.get("extra"), dict):
+                    asin_val = general_track["extra"].get("ASIN") or general_track["extra"].get("asin")
+                if asin_val and str(asin_val).strip() and not isinstance(asin_val, dict) and not meta.get("asin"):
+                    meta["asin"] = str(asin_val).strip()
 
                 # 6. Overview/Comment
                 comment = general_track.get("Comment") or general_track.get("comment")
@@ -422,6 +432,7 @@ async def gather_book_prep(
                             or (key == "author" and cli_overrides["author"])
                             or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
+                            or (key == "asin" and cli_overrides["asin"])
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
                             or (key == "keywords" and cli_overrides["keywords"])
@@ -457,6 +468,7 @@ async def gather_book_prep(
                             or (key == "author" and cli_overrides["author"])
                             or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
+                            or (key == "asin" and cli_overrides["asin"])
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
                             or (key == "keywords" and cli_overrides["keywords"])
@@ -505,6 +517,7 @@ async def gather_book_prep(
                     or (key == "author" and cli_overrides["author"])
                     or (key == "publisher" and cli_overrides["publisher"])
                     or (key == "isbn" and cli_overrides["isbn"])
+                    or (key == "asin" and cli_overrides["asin"])
                     or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                     or (key in ("year", "search_year") and cli_overrides["year"])
                     or (key == "keywords" and cli_overrides["keywords"])

@@ -551,6 +551,7 @@ class DescriptionBuilder:
         narrator = meta.get("narrator")
         publisher = meta.get("publisher")
         isbn = meta.get("isbn")
+        asin = meta.get("asin")
         overview = meta.get("overview")
 
         if overview:
@@ -565,6 +566,8 @@ class DescriptionBuilder:
             book_parts.append(f"[b]Publisher:[/b] {publisher}")
         if isbn:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
+        if asin:
+            book_parts.append(f"[b]ASIN:[/b] {asin}")
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:

@@ -29,7 +29,7 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 2. **CBR/CBZ**: Automatically parses the internal `ComicInfo.xml` metadata file (case-insensitively located) to extract `title` (from `<Series>` or `<Title>`), `author` (from `<Writer>` or `<Penciller>`), `publisher` (from `<Publisher>`), `year` (from `<Year>`), `book_language` (from `<LanguageISO>`), `overview` (from `<Summary>`), and `genres`/`keywords` (from `<Genre>`, normalized to space-separated commas).
 3. **MOBI**: Extracts the internal OPF file using the `mobi` library to extract `title`, `author`, `language`, `year`, `isbn`, `overview` (with HTML stripped), and `publisher`.
 4. **PDF**: Scans the first 30 pages and the last 30 pages using **PyMuPDF** (`fitz`). It searches for ISBN strings using regular expressions and validates them mathematically using ISBN-10 and ISBN-13 checksum algorithms to avoid false matches.
-5. **MediaInfo**: Standard container tags (e.g., `Album`, `Performer`, `Composer`, `Publisher`, `Genre`, `ISBN`, `Comment`, `Description`) are preserved during the extraction phase for audiobooks and ebook files.
+5. **MediaInfo**: Standard container tags (e.g., `Album`, `Performer`, `Composer`, `Publisher`, `Genre`, `ISBN`, `ASIN`, `Comment`, `Description`) are preserved during the extraction phase for audiobooks and ebook files.
 
 ### B. API Metadata Integrations
 - **MyAnonamouse (MAM)**: If the files being uploaded correspond to an active torrent in your local client containing `myanonamouse.net` in trackers, the assistant extracts the torrent ID (`MID=(\d+)`) from the client comments. It then queries the MAM API using your configured `mam_api_key` / `mam_id` to retrieve details like title, authors, narrators, description, ISBN, language, and cover image URL.
@@ -87,6 +87,7 @@ You can override auto-detected values using the following command-line flags:
 | `-btitle` | `--book-title` | Overrides the book title |
 | `-author` | `--author` | Overrides the book author |
 | `-isbn` | `--isbn` | Overrides the ISBN number |
+| `-asin` | `--asin` | Overrides the ASIN number |
 | `-blang` | `--book-language` | Overrides the book language (e.g. English, Portuguese) |
 | `-openlib` | `--openlibrary` | Specifies the OpenLibrary Work ID (e.g. `OL45883W`). Accepts a full OpenLibrary URL or just the ID. |
 | `-comic` | `--comic` | Identifies the book upload as a Comic |
