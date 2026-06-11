@@ -221,7 +221,7 @@ class NameManager:
 
         # Edition/Issue logic
         edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
-        if edition and not any(x in edition.lower() for x in ["edition", "ed.", "ed"]):
+        if edition and not any(x in edition.lower() for x in ["edition", "ed.", "ed"]) and not audiobook:
             edition = f"{edition} Edition"
 
         volume = str(meta.get("manual_season") or meta.get("season") or "").strip()
@@ -271,7 +271,7 @@ class NameManager:
         parts = []
 
         if audiobook:
-            parts.extend([author, title, year, lang_display, "AUDIOBOOK"])
+            parts.extend([author, title, edition, year, lang_display, "AUDIOBOOK"])
         elif comic:
             vol_str = f"Vol {volume}" if volume else ""
             no_str = f"No {issue}" if issue else ""

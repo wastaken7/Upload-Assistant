@@ -553,6 +553,7 @@ class DescriptionBuilder:
         isbn = meta.get("isbn")
         asin = meta.get("asin")
         overview = meta.get("overview")
+        edition = meta.get("edition")
 
         if overview:
             overview = html_to_bbcode(str(overview))
@@ -568,6 +569,8 @@ class DescriptionBuilder:
             book_parts.append(f"[b]ISBN:[/b] {isbn}")
         if asin:
             book_parts.append(f"[b]ASIN:[/b] {asin}")
+        if edition:
+            book_parts.append(f"[b]Edition:[/b] {edition}")
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             if audiobook_duration_formatted:

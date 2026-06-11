@@ -310,6 +310,7 @@ class UploadHelper:
         lines.append("")
         lines.append(("Title", f"{meta['title']} ({meta['year']})"))
         lines.append(("Category", str(meta["category"])))
+        edition = meta.get("edition")
 
         # BOOK
         if meta["category"] == "BOOK":
@@ -426,6 +427,7 @@ class UploadHelper:
         distributor = meta.get("distributor") or missing_warning
         edition = meta.get("edition", "")
 
+        lines.append(("Edition", str(edition)))
         lines.append(("Resolution", str(resolution)))
         lines.append(("Source", str(source)))
         lines.append(("Type", str(type_)))

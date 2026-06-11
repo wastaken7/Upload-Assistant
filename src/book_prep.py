@@ -259,7 +259,6 @@ async def gather_book_prep(
     else:
         pass  # meta["mediainfo"] already populated from a previous run
 
-    # Parse MediaInfo metadata as local fallback first
     if meta.get("mediainfo"):
         try:
             tracks = meta["mediainfo"].get("media", {}).get("track", [])
@@ -268,11 +267,31 @@ async def gather_book_prep(
                 # 1. Title/Album
                 album = general_track.get("Album") or general_track.get("album")
                 track_name = general_track.get("Track_name") or general_track.get("track_name")
+
+                # Detect if the audiobook is Unabridged or Abridged from file metadata
+                detected_edition = None
+                for val in (album, track_name):
+                    if val and not isinstance(val, dict):
+                        match = re.search(r'\b(unabridged|abridged)\b', str(val), re.IGNORECASE)
+                        if match:
+                            detected_edition = match.group(1).capitalize()
+                            break
+                if detected_edition and not meta.get("edition"):
+                    meta["edition"] = detected_edition
+
                 if not meta.get("title"):
                     if album and str(album).strip() and not isinstance(album, dict):
                         meta["title"] = str(album).strip()
                     elif track_name and str(track_name).strip() and not isinstance(track_name, dict):
                         meta["title"] = str(track_name).strip()
+
+                # Clean the edition from the title if it's not a CLI override
+                if not cli_overrides["title"] and meta.get("title"):
+                    original_title = meta["title"]
+                    cleaned_title = re.sub(r'\s*[\(\[\{-]?\s*\b(unabridged|abridged)\b\s*[\)\]\}]?\s*', ' ', original_title, flags=re.IGNORECASE)
+                    cleaned_title = re.sub(r'\s+', ' ', cleaned_title).strip()
+                    cleaned_title = cleaned_title.strip('-').strip()
+                    meta["title"] = cleaned_title
 
                 # 2. Author
                 performer = general_track.get("Performer") or general_track.get("performer")
