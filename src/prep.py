@@ -1376,7 +1376,8 @@ class Prep:
             meta["video_encode"] = ""
             meta["has_encode_settings"] = False
             meta["bit_depth"] = "0"
-            meta["edition"] = ""
+            if not meta.get("edition"):
+                meta["edition"] = str(meta.get("manual_edition") or "").strip()
             meta["repack"] = ""
             meta["webdv"] = False
 
