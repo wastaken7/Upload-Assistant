@@ -317,6 +317,7 @@ class UploadHelper:
             publisher = meta.get("publisher") or ""  # not essential
             book_language = meta.get("book_language") or missing_warning
             isbn = meta.get("isbn") or ""  # not essential
+            asin = meta.get("asin") or ""  # not essential
             narrator = meta.get("narrator") or missing_warning
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
             poster = meta.get("poster") or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
@@ -332,6 +333,7 @@ class UploadHelper:
             lines.append(("Publisher", str(publisher)))
             lines.append(("Language", str(book_language)))
             lines.append(("ISBN", str(isbn)))
+            lines.append(("ASIN", str(asin)))
             lines.append(("Comic", format_value(comic)))
             lines.append(("Manga", format_value(manga)))
             lines.append(("Magazine", format_value(magazine)))

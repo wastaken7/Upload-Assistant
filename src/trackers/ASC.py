@@ -441,6 +441,8 @@ class ASC:
             details.append(f"[b]Editora:[/b] {meta['publisher']}")
         if meta.get("isbn"):
             details.append(f"[b]ISBN:[/b] {meta['isbn']}")
+        if meta.get("asin"):
+            details.append(f"[b]ASIN:[/b] {meta['asin']}")
         if meta.get("year"):
             details.append(f"[b]Ano de Lançamento:[/b] {meta['year']}")
         if meta.get("audiobook", False):

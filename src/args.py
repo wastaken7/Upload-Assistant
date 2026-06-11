@@ -150,6 +150,15 @@ class Args:
             dest="book_isbn",
         )
         parser.add_argument(
+            "-asin",
+            "--asin",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook ASIN (overrides auto-detected value)",
+            type=str,
+            dest="book_asin",
+        )
+        parser.add_argument(
             "-openlib",
             "--openlibrary",
             nargs=1,
@@ -578,6 +587,10 @@ class Args:
         book_isbn_arg = meta.get("book_isbn")
         if book_isbn_arg not in (None, ""):
             meta["isbn"] = str(book_isbn_arg).strip()
+
+        book_asin_arg = meta.get("book_asin")
+        if book_asin_arg not in (None, ""):
+            meta["asin"] = str(book_asin_arg).strip()
 
         openlibrary_arg = meta.get("openlibrary")
         if openlibrary_arg not in (None, ""):

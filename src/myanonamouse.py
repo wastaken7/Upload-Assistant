@@ -74,6 +74,13 @@ class MyAnonamouseManager:
             if cleaned_isbn:
                 metadata["isbn"] = cleaned_isbn
 
+        # ASIN
+        asin = item.get("asin") or item.get("ASIN")
+        if asin:
+            cleaned_asin = str(asin).strip()
+            if cleaned_asin:
+                metadata["asin"] = cleaned_asin
+
         # Language
         lang = item.get("lang_code")
         if lang:
