@@ -25,8 +25,8 @@ class ZNTH(UNIT3D):
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         if meta["category"] == "BOOK":
-            if not meta.get("isbn", ""):
-                console.print(f"{self.tracker}: [bold red]ISBN is required for books. Skipping upload...[/bold red]")
+            if not meta.get("isbn", "") and not meta.get("asin", ""):
+                console.print(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
                 return False
             if bool(meta.get("audiobook", False)) and not meta.get("narrator", ""):
                 console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
@@ -76,7 +76,7 @@ class ZNTH(UNIT3D):
                     if bitrate:
                         bitrate_val = f"{bitrate}kbps"
 
-                isbn_val = str(meta.get("isbn") or "").strip()
+                book_id = meta.get("isbn", "") or meta.get("asin", "")
 
                 parts = []
                 if author:
@@ -91,8 +91,8 @@ class ZNTH(UNIT3D):
                     parts.append(format_val)
                 if bitrate_val:
                     parts.append(bitrate_val)
-                if isbn_val:
-                    parts.append(isbn_val)
+                if book_id:
+                    parts.append(book_id)
                 if is_retail:
                     parts.append("Retail")
 
