@@ -36,7 +36,7 @@ This branch introduces new media categories and automation features not present 
 * **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
 
 ### 5. Extended Tracker Support
-* **Added Trackers**: Zenith (ZNTH), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT), Rastastugan (RAS), DarkPeers (DP), IPTorrents (IPT).
+* **Added Trackers**: Zenith (ZNTH), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT).
 
 ## Supported Sites:
 
