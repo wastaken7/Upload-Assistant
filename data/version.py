@@ -1,4 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+__version__ = "v1.2"
+
+"""
+Changelog for version v1.2 (2026-06-12):
+
+## What's Changed
+* Added filtering of translator names from audiobook/book metadata authors.
+* Added ASIN (Amazon Standard Identification Number) to title for the Zenith (ZNTH) tracker.
+"""
+
 __version__ = "v1.1"
 
 """
