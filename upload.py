@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import signal
 import sys
@@ -188,7 +189,7 @@ if _is_webui_arg and not os.path.exists(_config_path):
 
 Meta: TypeAlias = dict[str, Any]
 
-from src.book_prep import sanitize_book_language
+from src.book_prep import sanitize_book_author, sanitize_book_language  # noqa: E402
 from src.prep import Prep  # noqa: E402
 
 # Enable ANSI colors on Windows
@@ -333,7 +334,9 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
         'hdb', 'ptp', 'blu', 'no_season', 'no_aka', 'no_year', 'no_dub', 'no_tag', 'no_seed', 'client', 'description_link', 'description_file', 'desc', 'draft',
         'modq', 'region', 'freeleech', 'personalrelease', 'unattended', 'manual_season', 'manual_episode', 'torrent_creation', 'qbit_tag', 'qbit_cat',
         'skip_imghost_upload', 'imghost', 'manual_source', 'webdv', 'hardcoded-subs', 'dual_audio', 'manual_type', 'tvmaze_manual', "comic", "manga", "magazine", "newspaper",
-    ]
+        'title', 'book_title', 'author', 'book_author', 'book_publisher', 'book_language', 'book_language_iso', 'book_isbn', 'isbn', 'book_asin', 'asin',
+        'openlibrary', 'narrator', 'audiobook_duration', 'audiobook_duration_formatted', 'audiobook_bitrate', 'keywords', 'year', 'manual_year'
+    ]  # fmt: off
     sanitized_saved_meta: dict[str, Any] = {}
     for key, value in saved_meta.items():
         clean_key = key.strip().strip("'").strip('"')
@@ -348,6 +351,7 @@ async def merge_meta(meta: Meta, saved_meta: Meta) -> dict[str, Any]:
             sanitized_saved_meta[clean_key] = value
     meta.update(sanitized_saved_meta)
     sanitize_book_language(meta)
+    sanitize_book_author(meta)
     return sanitized_saved_meta
 
 
@@ -504,6 +508,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
         name_needs_rebuild = False
 
     sanitize_book_language(meta)
+    sanitize_book_author(meta)
 
     # Rebuild the torrent name so the confirmation screen and upload reflect the new values
     if name_needs_rebuild and not meta.get("emby", False):
@@ -677,18 +682,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             continue
 
         try:
-            editargs = tuple(editargs_str.split())
-        except AttributeError:
+            editargs = tuple(shlex.split(editargs_str))
+        except Exception:
             console.print("[red]Bad input detected[/red]")
             confirm = False
             continue
         # Tracks multiple edits
         editargs_tracking = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
-        meta, _help, _before_args = cast(
-            tuple[Meta, Any, Any],
-            parser.parse(list(' '.join(sys.argv[1:]).split(' ')) + list(editargs_tracking), meta)
-        )
+        meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(sys.argv[1:]) + list(editargs_tracking), meta))
         if not meta.get('trackers'):
             meta['trackers'] = previous_trackers
         if isinstance(meta.get('trackers'), str):
@@ -1552,10 +1554,10 @@ async def do_the_thing(base_dir: str) -> None:
         # If cleanup is the only operation, use a dummy path to satisfy the parser
         if cleanup_only:
             args_list = sys.argv[1:] + ['dummy_path']
-            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(' '.join(args_list).split(' ')), meta))
+            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(args_list, meta))
             meta['path'] = None  # Clear the dummy path after parsing
         else:
-            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(' '.join(sys.argv[1:]).split(' ')), meta))
+            meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(sys.argv[1:], meta))
 
         # Start web UI if requested (exclusive mode - doesn't continue with uploads)
         if meta.get('webui'):
