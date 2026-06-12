@@ -570,6 +570,7 @@ async def gather_book_prep(
 
     detect_newspaper(meta)
     sanitize_book_language(meta)
+    sanitize_book_author(meta)
 
 
 def detect_newspaper(meta: dict[str, Any]) -> None:
@@ -696,3 +697,88 @@ async def get_audiobook_bitrate(filelist: list[str]) -> Optional[int]:
     avg_bps = sum(valid_bitrates) / len(valid_bitrates)
     avg_kbps = int(avg_bps / 1000) if avg_bps >= 1000 else int(avg_bps)
     return avg_kbps
+
+
+def sanitize_book_author(meta: dict[str, Any]) -> None:
+    """Validate and sanitize author in meta by detecting and removing translators."""
+    author = meta.get("author")
+    if not author:
+        # Check if book_author is present and copy it if needed
+        book_author = meta.get("book_author")
+        if book_author:
+            author = book_author
+        else:
+            meta["author"] = ""
+            return
+
+    cleaned_author = clean_translator_from_author(str(author))
+    meta["author"] = cleaned_author
+
+
+def clean_translator_from_author(author: str) -> str:
+    """Detect if a name is a translator and remove it from the author field."""
+    if not author:
+        return author
+
+    # If it contains underscores and no spaces, e.g. "Rosa_Montero_Mariana_Sanchez_tradutor"
+    # we normalize underscores to spaces for processing.
+    has_underscores = "_" in author and " " not in author
+    normalized = author.replace("_", " ") if has_underscores else author
+
+    # Translator keywords (case-insensitive)
+    keywords = [
+        r"tradutor\w*",  # tradutor, tradutora, tradutores, tradutoras
+        r"translator\w*",  # translator, translators
+        r"traduzido\b",  # traduzido, traduzida
+        r"trad\b\.?",  # trad, trad.
+        r"trans\b\.?",  # trans, trans.
+        r"tradu[cç]ao\b",  # tradução, traducao
+        r"translated\b",  # translated
+    ]
+    pattern_keywords = "(?:" + "|".join(keywords) + ")"
+
+    # Pattern 1: [Name] followed by translator keyword (e.g. "Mariana Sanchez (tradutor)" or "Mariana Sanchez - tradutor")
+    # Limit to matching at most 2 capitalized words to prevent greedily matching the author name if no delimiter is present.
+    pattern1 = (
+        r"\b([A-Z][A-Za-zÀ-ÿ]+(?:\s+(?:de|da|do|dos|das|e))\s+[A-Z][A-Za-zÀ-ÿ]+|"  # 2 words with particle
+        r"[A-Z][A-Za-zÀ-ÿ]+(?:\s+[A-Z][A-Za-zÀ-ÿ]+)?)"  # 1 or 2 capitalized words
+        r"\s*(?:\(|\[|-|\s_)*" + pattern_keywords + r"\)?\]?"
+    )
+
+    # Pattern 2: Translator keyword followed by [Name] (e.g. "translated by John Doe" or "traduzido por John Doe")
+    pattern2 = (
+        r"\b(?:translated\s+by|traduzido\s+por|tradutor\w*|translator\w*|tradu[cç]ao)\s*:?\s*"
+        r"([A-Z][A-Za-zÀ-ÿ]+(?:\s+[A-Z][A-Za-zÀ-ÿ]+)*)"
+    )
+
+    # Apply pattern 1
+    normalized, count1 = re.subn(pattern1, "", normalized, flags=re.IGNORECASE)
+
+    # Apply pattern 2
+    normalized, count2 = re.subn(pattern2, "", normalized, flags=re.IGNORECASE)
+
+    # If neither pattern matched but a bare keyword is present, fallback to word-based stripping
+    if count1 == 0 and count2 == 0:
+        match = re.search(r"\b" + pattern_keywords + r"\b", normalized, re.IGNORECASE)
+        if match:
+            before_keyword = normalized[: match.start()].strip()
+            before_keyword = before_keyword.rstrip(" _-,;([/")
+            words = before_keyword.split()
+            normalized = " ".join(words[:-2]) if len(words) > 2 else ""
+
+    # Clean up delimiters and extra whitespace left behind (anchored to start/end of the string)
+    normalized = re.sub(r"\s*[,;/&]+\s*$", "", normalized)
+    normalized = re.sub(r"^\s*[,;/&]+\s*", "", normalized)
+    normalized = re.sub(r"\b(?:and|e)\b\s*$", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^\s*\b(?:and|e)\b\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\s*-\s*$", "", normalized)
+    normalized = re.sub(r"^\s*-\s*", "", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    # Remove any empty brackets/parentheses left behind
+    normalized = re.sub(r"\(\s*\)|\[\s*\]", "", normalized).strip()
+
+    if has_underscores:
+        normalized = normalized.replace(" ", "_")
+
+    return normalized

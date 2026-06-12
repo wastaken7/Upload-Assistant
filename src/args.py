@@ -8,7 +8,7 @@ import urllib.parse
 from collections.abc import Sequence
 from typing import Any, Optional, cast
 
-from src.book_prep import detect_newspaper, sanitize_book_language
+from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import console
 
 
@@ -690,6 +690,7 @@ class Args:
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
         sanitize_book_language(meta)
+        sanitize_book_author(meta)
 
     @staticmethod
     def _apply_game_meta_overrides(meta: dict[str, Any]) -> None:
