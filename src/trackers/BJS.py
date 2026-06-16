@@ -196,7 +196,7 @@ class BJS:
 
         if category == "BOOK":
             if meta.get("audiobook"):
-                if container in ["aac", "ac3", "dff", "dsf", "flac", "m4a", "mp3", "ogg", "wav", "wma"]:
+                if container in ["aac", "ac3", "dff", "dsf", "flac", "m4a", "m4b", "mp3", "ogg", "wav", "wma"]:
                     return container.upper()
                 return "Outro"
             if container == "pdf":
