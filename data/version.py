@@ -1,4 +1,13 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+__version__ = "v1.3"
+
+"""
+Changelog for version v1.3 (2026-06-16):
+
+## What's Changed
+* trackers(BJS): Added `m4b` file extension support.
+"""
+
 __version__ = "v1.2"
 
 """
