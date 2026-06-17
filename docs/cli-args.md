@@ -226,6 +226,11 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 
 - `-ch`, `--channel ID_OR_TAG`: SPD: Channel id number or tag (without `@`).
 
+## Usenet uploading
+
+- `-u`, `--usenet`: Trigger Usenet upload.
+- `--usenet-subject SUBJECT`: Custom subject line for the Usenet post.
+
 ## Unattended (hidden)
 
 These are suppressed from help output:

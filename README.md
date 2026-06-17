@@ -168,6 +168,7 @@ This branch introduces new media categories and automation features not present 
   Args are OPTIONAL and ALWAYS follow path, for a list of acceptable args, pass `--help`.
   Path works best in quotes.
   - CLI arguments: [docs/cli-args.md](docs/cli-args.md)
+  - Usenet uploading: [docs/usenet.md](docs/usenet.md)
 
 ## **Docker Usage:**
   Visit our wonderful [docker usage](docs/docker-wiki-full.md)
