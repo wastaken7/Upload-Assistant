@@ -1,4 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+
+__version__ = "v1.4"
+
+"""
+Changelog for version v1.4 (2026-06-17):
+
+## What's Changed
+* Usenet pipeline added.
+"""
+
 __version__ = "v1.3"
 
 """
