@@ -295,6 +295,8 @@ class Args:
         parser.add_argument("-excl", "--exclusive", nargs=1, required=False, help="Set exclusive flag on all supported trackers", dest="exclusive")
         parser.add_argument('-as', '--audio-spectrogram', action='store_true', required=False, help="Generate and upload audio spectrograms", dest="audio_spectrogram", default=None)
         parser.add_argument('-ast', '--audio-spectrogram-tracks', nargs=1, required=False, help="Select which audio tracks/streams to generate spectrograms for (comma-separated indexes or 'all')", type=str, dest="audio_spectrogram_tracks", default=None)
+        parser.add_argument('-u', '--usenet', action='store_true', required=False, help="Upload files to Usenet (NNTP)")
+        parser.add_argument('--usenet-subject', nargs=1, required=False, help="Custom subject line for Usenet post", type=str, dest="usenet_subject", default=None)
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)

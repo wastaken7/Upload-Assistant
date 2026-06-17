@@ -1470,23 +1470,25 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
         # 1. Reuse existing torrent from client if possible
         reuse_torrent = None
-        if meta.get("rehash", False) is False and not meta["base_torrent_created"] and not meta["we_checked_them_all"]:
-            reuse_torrent = await client.find_existing_torrent(meta)
-            if reuse_torrent is not None:
-                await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta["base_dir"], meta["uuid"])
+        is_usenet_only = all(t in ("USENET", "MANUAL") for t in meta.get("trackers", []))
+        if not is_usenet_only:
+            if meta.get("rehash", False) is False and not meta["base_torrent_created"] and not meta["we_checked_them_all"]:
+                reuse_torrent = await client.find_existing_torrent(meta)
+                if reuse_torrent is not None:
+                    await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta["base_dir"], meta["uuid"])
 
-        # 2. Re-create base torrents if rehash is True
-        if meta.get("rehash", False) is True and meta["nohash"] is False:
-            await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE")
-            if has_local_subs:
-                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
-
-        # 3. Otherwise generate if missing
-        else:
-            if not os.path.exists(torrent_path) and meta["nohash"] is False:
+            # 2. Re-create base torrents if rehash is True
+            if meta.get("rehash", False) is True and meta["nohash"] is False:
                 await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE")
-            if has_local_subs and not os.path.exists(subs_torrent_path) and meta["nohash"] is False:
-                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
+                if has_local_subs:
+                    await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
+
+            # 3. Otherwise generate if missing
+            else:
+                if not os.path.exists(torrent_path) and meta["nohash"] is False:
+                    await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE")
+                if has_local_subs and not os.path.exists(subs_torrent_path) and meta["nohash"] is False:
+                    await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_SUBS")
 
         if meta["nohash"]:
             meta["client"] = "none"
@@ -1525,7 +1527,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                         meta['we_are_uploading'] = False
                         return
 
-        if int(meta.get('randomized', 0)) >= 1 and not meta['mkbrr']:
+        if int(meta.get("randomized", 0)) >= 1 and not meta["mkbrr"] and not is_usenet_only:
             TorrentCreator.create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
@@ -2096,16 +2098,35 @@ async def do_the_thing(base_dir: str) -> None:
                 if successful_trackers < skip_uploading_int and not meta['debug']:
                     console.print(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
                 else:
-                    await process_trackers(
-                        meta,
-                        config,
-                        client,
-                        console,
-                        list(api_trackers),
-                        tracker_class_map,
-                        list(http_trackers),
-                        list(other_api_trackers),
-                    )
+                    trackers_upper = [str(t).upper() for t in meta.get("trackers", [])]
+                    if "USENET" in trackers_upper or "CURUPIRA" in trackers_upper or meta.get("usenet", False):
+                        from src.usenetcreate import prepare_and_upload_usenet
+
+                        try:
+                            nzb_path = await prepare_and_upload_usenet(meta, config)
+                            if nzb_path:
+                                meta['nzb_path'] = nzb_path
+                                console.print("[bold green]Usenet upload completed successfully!")
+                            else:
+                                console.print("[bold red]Usenet upload failed.[/bold red]")
+                        except Exception as e:
+                            console.print(f"[bold red]Error in Usenet upload pipeline: {e}[/bold red]")
+                            import traceback
+
+                            console.print(traceback.format_exc())
+
+                    has_torrent_trackers = any(t not in ("USENET", "MANUAL") for t in trackers_upper)
+                    if has_torrent_trackers:
+                        await process_trackers(
+                            meta,
+                            config,
+                            client,
+                            console,
+                            list(api_trackers),
+                            tracker_class_map,
+                            list(http_trackers),
+                            list(other_api_trackers),
+                        )
                     if use_discord and bot:
                         await DiscordNotifier.send_upload_status_notification(config, bot, meta)
 

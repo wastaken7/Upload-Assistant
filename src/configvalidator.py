@@ -9,7 +9,7 @@ from typing import Any, Optional, cast
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
 
 # Optional top-level sections
-OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "DISCORD"]
+OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "DISCORD", "USENET"]
 
 # Required keys in DEFAULT section (critical for operation)
 REQUIRED_DEFAULT_KEYS: dict[str, type] = {
@@ -223,6 +223,35 @@ def validate_config(
         discord_errors, discord_warnings = _validate_discord_section(_as_dict(config_dict.get("DISCORD")))
         errors.extend(discord_errors)
         warnings.extend(discord_warnings)
+
+    # Determine if Usenet is active (either because USENET is a target tracker, a Usenet tracker class is active, or enabled in config)
+    trackers_upper = [str(t).upper() for t in active_trackers] if active_trackers else []
+    is_usenet_tracker_active = False
+    try:
+        from src.trackersetup import tracker_class_map
+
+        for t in trackers_upper:
+            if t in tracker_class_map:
+                try:
+                    tracker_instance = tracker_class_map[t](config_dict)
+                    if getattr(tracker_instance, "is_usenet", False):
+                        is_usenet_tracker_active = True
+                        break
+                except Exception:
+                    pass
+    except Exception:
+        if "CURUPIRA" in trackers_upper:
+            is_usenet_tracker_active = True
+
+    if "USENET" in config_dict:
+        usenet_cfg = _as_dict(config_dict.get("USENET"))
+        is_usenet_active = "USENET" in trackers_upper or is_usenet_tracker_active or usenet_cfg.get("enabled", False)
+        usenet_errors, usenet_warnings = _validate_usenet_section(usenet_cfg, is_usenet_active)
+        errors.extend(usenet_errors)
+        warnings.extend(usenet_warnings)
+    else:
+        if "USENET" in trackers_upper or is_usenet_tracker_active:
+            errors.append("Missing required config section: 'USENET' (required for Usenet uploads)")
 
     # Cross-reference validation for torrent client configuration
     default_section = _as_dict(config_dict.get("DEFAULT"))
@@ -573,6 +602,62 @@ def _validate_discord_section(discord: dict[str, Any]) -> tuple[list[str], list[
                 key="discord_channel_id",
                 section="DISCORD"
             ))
+
+    return errors, warnings
+
+
+def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = False) -> tuple[list[str], list[ConfigValidationWarning]]:
+    """Validate the USENET config section."""
+    errors: list[str] = []
+    warnings: list[ConfigValidationWarning] = []
+
+    # Check required fields for Usenet upload
+    if is_usenet_active:
+        required_keys = ["host", "port", "username", "password", "newsgroups"]
+        for key in required_keys:
+            val = usenet.get(key)
+            if not val or (isinstance(val, str) and not val.strip()):
+                errors.append(f"[USENET] is active but '{key}' is empty or not configured")
+
+    # Validate types of known keys
+    usenet_key_types = {
+        "enabled": (bool,),
+        "host": (str,),
+        "port": (str, int),
+        "username": (str,),
+        "password": (str,),
+        "ssl": (bool,),
+        "connections": (str, int),
+        "newsgroups": (str,),
+        "poster": (str,),
+        "random_poster": (bool,),
+        "rar_volume_size": (str,),
+        "par2_percentage": (str, int),
+        "obscure_subject": (bool,),
+        "nyuu_path": (str,),
+        "par2_path": (str,),
+        "7z_path": (str,),
+        "nzb_output_dir": (str,),
+        "usenet_tmp_dir": (str,),
+    }
+
+    for key, expected_types in usenet_key_types.items():
+        if key in usenet and usenet[key] is not None:
+            value = usenet[key]
+            if not isinstance(value, expected_types):
+                warnings.append(
+                    ConfigValidationWarning(f"Expected type {' or '.join(t.__name__ for t in expected_types)}, got {type(value).__name__}", key=key, section="USENET")
+                )
+
+    # Validate numeric string values
+    for key in ["port", "connections", "par2_percentage"]:
+        if key in usenet:
+            value = usenet[key]
+            if isinstance(value, str) and value.strip():
+                try:
+                    int(value)
+                except ValueError:
+                    warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as integer", key=key, section="USENET"))
 
     return errors, warnings
 

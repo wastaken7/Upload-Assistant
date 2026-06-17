@@ -209,7 +209,8 @@ async def process_trackers(
 
                 status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
-                    await client.add_to_client(meta, tracker_class.tracker)
+                    if not getattr(tracker_class, 'is_usenet', False):
+                        await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
                     print_tracker_result(tracker, tracker_class, status, False)
@@ -248,7 +249,8 @@ async def process_trackers(
 
                 status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
-                    await client.add_to_client(meta, tracker_class.tracker)
+                    if not getattr(tracker_class, 'is_usenet', False):
+                        await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
                     print_tracker_result(tracker, tracker_class, status, False)
@@ -286,7 +288,8 @@ async def process_trackers(
 
                 status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
-                    await client.add_to_client(meta, tracker_class.tracker)
+                    if not getattr(tracker_class, 'is_usenet', False):
+                        await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
                     print_tracker_result(tracker, tracker_class, status, False)

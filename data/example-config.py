@@ -394,7 +394,7 @@ config = {
     "TRACKERS": {
         # Which trackers do you want to upload to?
 
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CZ, DC, DP, DT, EMUW, FF, FL,
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CURUPIRA, CZ, DC, DP, DT, EMUW, FF, FL,
         # FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MTEAM, MTV, NBL, OE,
         # OTW, PHD, PT, PTCAFE, PTER, PTFANS, PTGTK, PTP, PTS, PTT, R4E, RAS, RF, RPT, RTF, SAM, SHRI, SN, SP, SPD, STC, THR,
         # TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS, ZNTH
@@ -532,6 +532,13 @@ config = {
             "tag_for_custom_release": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
+        },
+        "CURUPIRA": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Your API Key, obtained from Perfil -> API Key
+            "api_key": "",
+            "anon": True,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1210,6 +1217,36 @@ config = {
             # /Path/To/Watch/Folder
             "watch_folder": "",
         },
+    },
+    "USENET": {
+        # Set to True to enable Usenet uploading
+        "enabled": False,
+        # Usenet NNTP host, port, credentials
+        "host": "",
+        "port": "443",
+        "username": "",
+        "password": "",
+        "ssl": True,
+        "connections": "20",
+        "newsgroups": "alt.binaries.boneless",
+        # Custom poster name/email. E.g. "Uploader <upload@assistant.org>"
+        "poster": "Uploader <upload@assistant.org>",
+        # If True, poster will be randomized for anonymity/obfuscation
+        "random_poster": True,
+        # Volume size for 7z splitting (e.g. "100M", "50M", or "auto" for dynamic sizing)
+        "rar_volume_size": "auto",
+        # Percentage of parity recovery blocks for PAR2 (e.g. "10")
+        "par2_percentage": "10",
+        # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns
+        "obscure_subject": True,
+        # Paths to binaries (defaults to looking in PATH)
+        "nyuu_path": "nyuu",
+        "par2_path": "par2",
+        "7z_path": "7z",
+        # Where to output generated NZB files (if empty, saves to tmp directory)
+        "nzb_output_dir": "",
+        # Temporary directory for Usenet uploads where compressed volumes are stored (if empty, saves to tmp directory)
+        "usenet_tmp_dir": "",
     },
     "DISCORD": {
         # Set to True to enable Discord bot functionality

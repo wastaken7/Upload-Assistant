@@ -55,7 +55,7 @@ class TrackerStatusManager:
             if local_meta['name'].endswith('DUPE?'):
                 local_meta['name'] = local_meta['name'].replace(' DUPE?', '')
 
-            if tracker_name == "MANUAL":
+            if tracker_name in ("MANUAL", "USENET"):
                 local_tracker_status['upload'] = True
                 successful_trackers += 1
 

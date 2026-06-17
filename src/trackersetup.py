@@ -28,6 +28,7 @@ from src.trackers.BLU import BLU
 from src.trackers.BT import BT
 from src.trackers.CBR import CBR
 from src.trackers.COMMON import COMMON
+from src.trackers.CURUPIRA import CURUPIRA
 from src.trackers.CZ import CZ
 from src.trackers.DC import DC
 from src.trackers.DP import DP
@@ -121,7 +122,7 @@ class TRACKER_SETUP:
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
 
-        valid_trackers = [t for t in trackers if t in tracker_class_map or t == "MANUAL"]
+        valid_trackers = [t for t in trackers if t in tracker_class_map or t in ("MANUAL", "USENET")]
         removed_trackers = set(trackers) - set(valid_trackers)
 
         for tracker in removed_trackers:
@@ -1349,6 +1350,7 @@ class TRACKER_SETUP:
 
 tracker_class_map: dict[str, type[Any]] = {
     'A4K': A4K, 'ACM': ACM, 'AITHER': AITHER, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'CBR': CBR,
+    'CURUPIRA': CURUPIRA,
     'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IS': IS, 'LAJIDUI': LAJIDUI, 'LCD': LCD, 'LDU': LDU, 'LPT': LPT, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTEAM': MTEAM,'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PTCAFE': PTCAFE, 'PT': PT, 'PTFANS': PTFANS, 'PTGTK': PTGTK, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RPT': RPT,'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
@@ -1357,7 +1359,7 @@ tracker_class_map: dict[str, type[Any]] = {
 }  # fmt: off
 
 api_trackers = {
-    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'DP', 'DT', 'EMUW', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
+    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'CURUPIRA', 'DP', 'DT', 'EMUW', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
     'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TOS', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS', 'ZNTH'
 }  # fmt: off
 
