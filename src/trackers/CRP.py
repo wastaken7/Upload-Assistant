@@ -29,6 +29,7 @@ class CRP:
             console.print(f"{self.tracker}: [red]Skipping due to missing API Key.[/red]")
             meta["skipping"] = f"{self.tracker}"
             return []
+        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
     async def get_additional_checks(self) -> bool:

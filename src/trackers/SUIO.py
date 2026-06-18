@@ -60,6 +60,7 @@ class SUIO:
             console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or unlock_key.[/red]")
             meta["skipping"] = f"{self.tracker}"
             return []
+        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
     async def get_additional_checks(self) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
