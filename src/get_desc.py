@@ -538,30 +538,31 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        book_parts: list[str] = []
-        author = meta.get("author")
-        book_translator = meta.get("book_translator")
-        narrator = meta.get("narrator")
-        publisher = meta.get("publisher")
-        isbn = meta.get("isbn")
         asin = meta.get("asin")
-        overview = meta.get("overview")
+        author = meta.get("author")
+        book_parts: list[str] = []
+        book_translator = meta.get("book_translator")
         edition = meta.get("edition")
+        isbn = meta.get("isbn")
+        narrator = meta.get("narrator")
+        overview = meta.get("overview")
+        publisher = meta.get("publisher")
         year = meta.get("year")
 
         use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
 
-        str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
-        str_overview = "Overview" if not use_pt_br else "Visão Geral"
-        str_author = "Author" if not use_pt_br else "Autor"
-        str_book_translator = "Translator" if not use_pt_br else "Tradutor"
-        str_narrator = "Narrator" if not use_pt_br else "Narrador"
-        str_publisher = "Publisher" if not use_pt_br else "Editora"
-        str_isbn = "ISBN"
         str_asin = "ASIN"
-        str_edition = "Edition" if not use_pt_br else "Edição"
-        str_year = "Release Year" if not use_pt_br else "Ano de Lançamento"
+        str_author = "Author" if not use_pt_br else "Autor"
+        str_avg_bitrate = "Average Bitrate" if not use_pt_br else "Bitrate Médio"
+        str_book_translator = "Translator" if not use_pt_br else "Tradutor"
         str_duration = "Duration" if not use_pt_br else "Duração"
+        str_edition = "Edition" if not use_pt_br else "Edição"
+        str_isbn = "ISBN"
+        str_narrator = "Narrator" if not use_pt_br else "Narrador"
+        str_overview = "Overview" if not use_pt_br else "Visão Geral"
+        str_publisher = "Publisher" if not use_pt_br else "Editora"
+        str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
+        str_year = "Release Year" if not use_pt_br else "Ano de Lançamento"
 
         if overview:
             overview = html_to_bbcode(str(overview))
@@ -587,8 +588,11 @@ class DescriptionBuilder:
             book_parts.append(f"{prefix}[b]{str_year}:[/b] {year}")
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
+            avg_bitrate = meta.get("audiobook_bitrate")
             if audiobook_duration_formatted:
                 book_parts.append(f"{prefix}[b]{str_duration}:[/b] {audiobook_duration_formatted}")
+            if avg_bitrate:
+                book_parts.append(f"{prefix}[b]{str_avg_bitrate}:[/b] {avg_bitrate} kbps")
 
         if not (book_parts or overview):
             return ""
