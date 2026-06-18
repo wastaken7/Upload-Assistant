@@ -208,7 +208,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_par2_with_progress(cmd: list[str], debug: bool = False) -> None:
+async def run_par2_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
     """Execute par2 c with real-time percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -225,10 +225,11 @@ async def run_par2_with_progress(cmd: list[str], debug: bool = False) -> None:
     redacted_str = " ".join(redacted_cmd)
 
     if debug:
-        console.print(f"[cyan]Running command: {redacted_str}[/cyan]")
+        cwd_str = f" in {cwd}" if cwd else ""
+        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
-        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
         last_percent = 0
@@ -271,7 +272,7 @@ async def run_par2_with_progress(cmd: list[str], debug: bool = False) -> None:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_nyuu_with_progress(cmd: list[str], debug: bool = False) -> None:
+async def run_nyuu_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
     """Execute nyuu upload with real-time speed, ETA, and percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -288,10 +289,11 @@ async def run_nyuu_with_progress(cmd: list[str], debug: bool = False) -> None:
     redacted_str = " ".join(redacted_cmd)
 
     if debug:
-        console.print(f"[cyan]Running command: {redacted_str}[/cyan]")
+        cwd_str = f" in {cwd}" if cwd else ""
+        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
-        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
         last_percent = 0
@@ -368,7 +370,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     # Determine paths and names
     base_dir = meta["base_dir"]
     input_path = meta["path"]
-    uuid = meta["uuid"]
+    import hashlib
+
+    # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
+    clean_uuid = "".join(c for c in meta["uuid"] if c.isalnum() or c in "._-")[:30]
+    uuid_hash = hashlib.md5(meta["uuid"].encode("utf-8")).hexdigest()[:8]
+    uuid = f"{clean_uuid}_{uuid_hash}" if clean_uuid else uuid_hash
     name = meta.get("name") or os.path.basename(input_path)
 
     # Sanitize name for filenames
@@ -508,15 +515,17 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     if target_files:
         console.print("[cyan]Generating PAR2 parity files...[/cyan]")
-        par2_file = os.path.join(usenet_dir, f"{safe_name}.par2")
-        cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + target_files
+        par2_file = f"{safe_name}.par2"
+        relative_target_files = [os.path.basename(f) for f in target_files]
+        cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
         if is_debug and not path_par2:
             console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
             # Create a mock par2 file
-            async with aiofiles.open(par2_file, "wb") as f:
+            mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
+            async with aiofiles.open(mock_par2, "wb") as f:
                 await f.write(b"mock par2 content")
         else:
-            await run_par2_with_progress(cmd_par2, debug=is_debug)
+            await run_par2_with_progress(cmd_par2, cwd=usenet_dir, debug=is_debug)
 
     # 4. Generate Poster / From
     poster = usenet_cfg.get("poster", "Uploader <upload@assistant.org>")
@@ -575,7 +584,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     for f in await aiofiles.os.listdir(usenet_dir):
         file_path = os.path.join(usenet_dir, f)
         if await aiofiles.ospath.isfile(file_path):
-            all_upload_files.append(file_path)
+            all_upload_files.append(f)
     cmd_nyuu.extend(all_upload_files)
 
     console.print(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP...[/yellow]")
@@ -593,7 +602,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
             await f.write(mock_nzb_content)
     else:
-        await run_nyuu_with_progress(cmd_nyuu, debug=is_debug)
+        await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir, debug=is_debug)
 
     # 7. Cleanup compressed volumes after successful upload
     try:
