@@ -803,7 +803,9 @@ config = {
             "anon": False,
         },
         "SUIO": {
-            # Paste the tracker's Rule 1 here verbatim to unlock this tracker.
+            # Secret Usenet Indexer
+            # Please do not share, discuss or mention this indexer's real name in issues or pull requests; nor should you ask what it is.
+            # Paste the indexer's Rule 1 here verbatim to unlock it. Found at https://[REDACTED]/rules
             "unlock_key": "",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
