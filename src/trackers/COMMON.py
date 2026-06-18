@@ -1451,3 +1451,73 @@ class COMMON:
                 return False
 
         return True
+
+    def portuguese_title_capitalization(self, title: str) -> str:
+        """Capitalizes a Portuguese title."""
+        lowercase_words = {
+            # Articles
+            "a", "o", "as", "os", "um", "uma", "uns", "umas",
+            # Prepositions
+            "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+            "por", "pelo", "pela", "pelos", "pelas", "para", "com", "sob", "sobre", "sem",
+            # Conjunctions
+            "e", "ou", "mas", "nem", "que", "se"
+        }  # fmt: off
+
+        # Split by separators (like :, -, (, ), [, ]) so each segment is capitalized independently
+        parts = re.split(r"([:\-\(\)\[\]])", title)
+
+        formatted_parts = []
+        for part in parts:
+            if not part:
+                formatted_parts.append("")
+                continue
+            if re.match(r"^[:\-\(\)\[\]]$", part):
+                formatted_parts.append(part)
+                continue
+
+            # For this text segment, split into words and spaces
+            tokens = re.split(r"(\s+)", part)
+            formatted_tokens = []
+            word_count = 0
+
+            for token in tokens:
+                if not token:
+                    formatted_tokens.append("")
+                    continue
+                if token.isspace():
+                    formatted_tokens.append(token)
+                    continue
+
+                # This is a word token
+                # Extract core word (ignoring punctuation at start/end)
+                prefix_match = re.match(r"^[^\w]+", token)
+                prefix = prefix_match.group(0) if prefix_match else ""
+
+                suffix_match = re.search(r"[^\w]+$", token)
+                suffix = suffix_match.group(0) if suffix_match else ""
+
+                core = token[len(prefix) : len(token) - len(suffix)] if suffix else token[len(prefix) :]
+
+                if not core:
+                    # No alphanumeric chars, keep as is
+                    formatted_tokens.append(token)
+                    word_count += 1
+                    continue
+
+                clean_core = core.lower()
+
+                if word_count == 0:
+                    # First word in the segment
+                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
+                elif clean_core in lowercase_words:
+                    capitalized_core = clean_core
+                else:
+                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
+
+                formatted_tokens.append(prefix + capitalized_core + suffix)
+                word_count += 1
+
+            formatted_parts.append("".join(formatted_tokens))
+
+        return "".join(formatted_parts)

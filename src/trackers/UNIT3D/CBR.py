@@ -147,10 +147,11 @@ class CBR(UNIT3D):
         name = str(meta["name"])
 
         if category == "BOOK":
+            book_title = self.common.portuguese_title_capitalization(meta["title"])
             if meta.get("audiobook", False):
-                cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}] [AUDIOBOOK]"
+                cbr_name = f"{book_title} - {meta.get('author', '')} [{meta.get('year', '')}] [AUDIOBOOK]"
             else:
-                cbr_name = f"{meta.get('title', '')} - {meta.get('author', '')} [{meta.get('year', '')}]"
+                cbr_name = f"{book_title} - {meta.get('author', '')} [{meta.get('year', '')}]"
             book_language_iso = meta.get("book_language_iso", "")
             if book_language_iso and book_language_iso != "por":
                 cbr_name += f" [{book_language_iso.upper()}]"

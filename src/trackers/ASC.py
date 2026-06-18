@@ -379,7 +379,7 @@ class ASC:
     async def get_title(self, meta: dict[str, Any]) -> str:
         if meta.get("category") == "BOOK":
             author = meta.get("author", "").strip()
-            title = meta.get("title", "").strip()
+            title = self.common.portuguese_title_capitalization(meta["title"])
             return f"{author} - {title}"
 
         if meta.get("category") == "GAME":

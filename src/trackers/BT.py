@@ -1078,6 +1078,7 @@ class BT:
             magazine = bool(meta.get("magazine", False))
             comic = bool(meta.get("comic", False))
 
+            data["title"] = self.common.portuguese_title_capitalization(meta["title"])
             data.update({
                 "idioma_ori": resolved_lang,
                 "format": resolved_format,

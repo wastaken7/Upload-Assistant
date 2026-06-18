@@ -601,7 +601,9 @@ class BJS:
                 desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
 
         if category == "BOOK":
-            desc_parts.append(self.build_book_desc(meta))
+            book_section = builder._build_book_desc_section(meta, header_size=3, table=False)
+            if book_section:
+                desc_parts.append(book_section)
 
         if category == "GAME":
             game_section = builder._build_game_desc_section(meta, header_size=3)
@@ -645,11 +647,6 @@ class BJS:
             await description_file.write(description)
 
         return description
-
-    def build_book_desc(self, meta: Meta) -> str:
-        """Build the BBCode table for BOOK-category uploads."""
-        builder = DescriptionBuilder(self.tracker, self.config)
-        return builder._build_book_desc_section(meta, header_size=3, table=False)
 
     def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get("videos", {})).get("results", [])
@@ -740,81 +737,12 @@ class BJS:
 
         return original_title
 
-    def format_book_title(self, meta: Meta) -> str:
-        lowercase_words = {
-            # Articles
-            "a", "o", "as", "os", "um", "uma", "uns", "umas",
-            # Prepositions
-            "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
-            "por", "pelo", "pela", "pelos", "pelas", "para", "com", "sob", "sobre", "sem",
-            # Conjunctions
-            "e", "ou", "mas", "nem", "que", "se"
-        }  # fmt: off
-
-        # Split by separators (like :, -, (, ), [, ]) so each segment is capitalized independently
-        parts = re.split(r"([:\-\(\)\[\]])", meta["title"])
-
-        formatted_parts = []
-        for part in parts:
-            if not part:
-                formatted_parts.append("")
-                continue
-            if re.match(r"^[:\-\(\)\[\]]$", part):
-                formatted_parts.append(part)
-                continue
-
-            # For this text segment, split into words and spaces
-            tokens = re.split(r"(\s+)", part)
-            formatted_tokens = []
-            word_count = 0
-
-            for token in tokens:
-                if not token:
-                    formatted_tokens.append("")
-                    continue
-                if token.isspace():
-                    formatted_tokens.append(token)
-                    continue
-
-                # This is a word token
-                # Extract core word (ignoring punctuation at start/end)
-                prefix_match = re.match(r"^[^\w]+", token)
-                prefix = prefix_match.group(0) if prefix_match else ""
-
-                suffix_match = re.search(r"[^\w]+$", token)
-                suffix = suffix_match.group(0) if suffix_match else ""
-
-                core = token[len(prefix) : len(token) - len(suffix)] if suffix else token[len(prefix) :]
-
-                if not core:
-                    # No alphanumeric chars, keep as is
-                    formatted_tokens.append(token)
-                    word_count += 1
-                    continue
-
-                clean_core = core.lower()
-
-                if word_count == 0:
-                    # First word in the segment
-                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
-                elif clean_core in lowercase_words:
-                    capitalized_core = clean_core
-                else:
-                    capitalized_core = core[0].upper() + core[1:] if len(core) > 0 else core
-
-                formatted_tokens.append(prefix + capitalized_core + suffix)
-                word_count += 1
-
-            formatted_parts.append("".join(formatted_tokens))
-
-        return "".join(formatted_parts)
-
     async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
         category = meta["category"]
         title = meta["title"]
         if category == "BOOK" and meta.get("title"):
-            title = self.format_book_title(meta)
+            title = self.common.portuguese_title_capitalization(meta["title"])
         should_continue = await self.get_additional_checks(meta)
         search_url = f"{self.base_url}/torrents.php"
         if not should_continue:
@@ -1401,7 +1329,7 @@ class BJS:
         results: list[dict[str, str]] = []
         title = meta["title"]
         if meta.get("category") == "BOOK":
-            title = self.format_book_title(meta)
+            title = self.common.portuguese_title_capitalization(meta["title"])
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.get("search_requests", False):
             return results
         else:
@@ -1499,7 +1427,7 @@ class BJS:
         if category == "BOOK":
             b_lang = meta.get("book_language_iso")
             data.update({
-                "title": self.format_book_title(meta),
+                "title": self.common.portuguese_title_capitalization(meta["title"]),
                 "diretor": meta["author"],
                 "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
                 "release_desc": await self.build_description(meta),
