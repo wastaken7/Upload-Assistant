@@ -21,6 +21,8 @@ class BHDTV:
         Upload
     """
 
+    supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.tracker = 'BHDTV'

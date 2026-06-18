@@ -19,6 +19,8 @@ Config = dict[str, Any]
 
 
 class IS:
+    supported_categories = ('TV', 'MOVIE', 'BOOK')
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)

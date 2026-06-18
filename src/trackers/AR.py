@@ -20,6 +20,7 @@ from src.trackers.COMMON import COMMON
 
 
 class AR:
+    supported_categories = ("TV", "MOVIE")
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.cookie_validator = CookieValidator(config)

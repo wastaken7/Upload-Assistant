@@ -1,5 +1,15 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v1.5"
+
+"""
+Changelog for version v1.5 (2026-06-17):
+
+## What's Changed
+* Added support for Usenet and Indexer posting.
+* Updated README and Documentation for Usenet & Indexer Posting.
+"""
+
 __version__ = "v1.4"
 
 """

@@ -30,6 +30,7 @@ Meta = dict[str, Any]
 Config = dict[str, Any]
 
 class BJS:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""

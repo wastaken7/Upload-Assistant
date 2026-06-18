@@ -1,0 +1,104 @@
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+from typing import Any
+
+from src.console import console
+from src.languages import languages_manager
+from src.trackers.COMMON import COMMON
+from src.trackers.UNIT3D import UNIT3D
+
+
+class AITHER(UNIT3D):
+    supported_categories = ("TV", "MOVIE")
+    def __init__(self, config: dict[str, Any]):
+        super().__init__(config, tracker_name='AITHER')
+        self.config = config
+        self.common = COMMON(config)
+        self.tracker = 'AITHER'
+        self.base_url = 'https://aither.cc'
+        self.banned_url = f'{self.base_url}/api/blacklists/releasegroups'
+        self.claims_url = f'{self.base_url}/api/internals/claim'
+        self.id_url = f'{self.base_url}/api/torrents/'
+        self.upload_url = f'{self.base_url}/api/torrents/upload'
+        self.search_url = f'{self.base_url}/api/torrents/filter'
+        self.torrent_url = f'{self.base_url}/torrents/'
+        self.requests_url = f'{self.base_url}/api/requests/filter'
+        self.trumping_url = f'{self.base_url}/api/trumping-reports/filter'
+        self.banned_groups: list[str] = []
+
+    async def get_additional_checks(self, meta: dict[str, Any]):
+        should_continue = True
+
+        if meta['is_disc'] not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
+            meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True, original_required=True
+        ):
+            return False
+
+        if meta['valid_mi'] is False:
+            console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            return False
+
+        return should_continue
+
+    async def get_additional_data(self, meta: dict[str, Any]):
+        hdr_value = str(meta.get('hdr') or '')
+        has_hdr10p = 'HDR10+' in hdr_value
+
+        data = {
+            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        }
+        if "DV" in hdr_value:
+            data['dv'] = 1
+        if has_hdr10p:
+            data['hdr10p'] = 1
+        elif not has_hdr10p and any(flag in hdr_value for flag in ['HDR', 'HLG']):
+            data['hdr'] = 1
+
+        return data
+
+    async def get_name(self, meta: dict[str, Any]):
+        aither_name: str = meta["name"]
+        resolution: str = meta.get("resolution", "")
+        video_codec: str = meta.get("video_codec", "")
+        video_encode: str = meta.get("video_encode", "")
+        name_type: str = meta.get("type", "")
+        source: str = meta.get("source", "")
+        alt_title = meta.get("aka", "") if not meta.get("no_aka", False) else ""
+
+        year = str(meta.get("year", ""))
+        if meta["category"] == "TV":
+            year = str(meta["year"]) if meta["search_year"] != "" else ""
+        manual_year_value = str(meta.get("manual_year", ""))
+        if manual_year_value and int(manual_year_value) > 0:
+            year = manual_year_value
+        if meta.get("no_year", False):
+            year = ""
+
+        if not meta.get('language_checked', False):
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        audio_languages: list[str] = meta['audio_languages']
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper()
+            if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+                if year:
+                    aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
+            elif meta.get('is_disc') != "BDMV":
+                aither_name = aither_name.replace(meta['resolution'], f"{foreign_lang} {meta['resolution']}", 1)
+
+        if name_type == "DVDRIP":
+            source = "DVDRip"
+            aither_name = aither_name.replace(f"{meta['source']} ", "", 1)
+            aither_name = aither_name.replace(f"{meta['video_encode']}", "", 1)
+            aither_name = aither_name.replace(f"{source}", f"{resolution} {source}", 1)
+            aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+
+        elif meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            aither_name = aither_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
+            aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
+
+        if meta.get('trump_reason') == 'exact_match':
+            aither_name = aither_name + " - TRUMP"
+
+        if alt_title:
+            aither_name = aither_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
+
+        return {'name': aither_name}

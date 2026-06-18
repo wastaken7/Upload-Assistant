@@ -15,6 +15,8 @@ from src.trackers.COMMON import COMMON
 Meta = dict[str, Any]
 Config = dict[str, Any]
 class DC:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
@@ -297,7 +299,25 @@ class DC:
             else:
                 tracker_name = meta["uuid"]
                 base, ext = os.path.splitext(tracker_name)
-                if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
+                if ext.lower() in {
+                    ".mkv",
+                    ".mp4",
+                    ".avi",
+                    ".ts",
+                    ".nzb",
+                    ".mp3",
+                    ".m4b",
+                    ".flac",
+                    ".aac",
+                    ".m4a",
+                    ".ogg",
+                    ".wav",
+                    ".pdf",
+                    ".epub",
+                    ".mobi",
+                    ".cbz",
+                    ".cbr",
+                }:
                     tracker_name = base
 
         return tracker_name

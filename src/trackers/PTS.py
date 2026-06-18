@@ -18,6 +18,7 @@ Config = dict[str, Any]
 
 
 class PTS:
+    supported_categories = ("TV", "MOVIE")
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)

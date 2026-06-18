@@ -540,6 +540,7 @@ class DescriptionBuilder:
         """Build the BBCode table or list for BOOK-category uploads."""
         book_parts: list[str] = []
         author = meta.get("author")
+        book_translator = meta.get("book_translator")
         narrator = meta.get("narrator")
         publisher = meta.get("publisher")
         isbn = meta.get("isbn")
@@ -553,6 +554,7 @@ class DescriptionBuilder:
         str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
         str_overview = "Overview" if not use_pt_br else "Visão Geral"
         str_author = "Author" if not use_pt_br else "Autor"
+        str_book_translator = "Translator" if not use_pt_br else "Tradutor"
         str_narrator = "Narrator" if not use_pt_br else "Narrador"
         str_publisher = "Publisher" if not use_pt_br else "Editora"
         str_isbn = "ISBN"
@@ -569,6 +571,8 @@ class DescriptionBuilder:
 
         if author:
             book_parts.append(f"{prefix}[b]{str_author}:[/b] {author}")
+        if book_translator:
+            book_parts.append(f"{prefix}[b]{str_book_translator}:[/b] {book_translator}")
         if narrator:
             book_parts.append(f"{prefix}[b]{str_narrator}:[/b] {narrator}")
         if publisher:

@@ -34,6 +34,7 @@ class TrackerStatusManager:
         successful_trackers = 0
         client: Any = Clients(config=self.config)
         tracker_setup: Any = TRACKER_SETUP(config=self.config)
+        tracker_setup.filter_unsupported_trackers(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
         if any(tracker in meta["trackers"] for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):

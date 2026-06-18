@@ -22,6 +22,7 @@ from src.trackers.COMMON import COMMON
 
 
 class GPW:
+    supported_categories = ("MOVIE",)
     group_id: str = ""
 
     def __init__(self, config: dict[str, Any]) -> None:

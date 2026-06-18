@@ -240,7 +240,7 @@ def validate_config(
                 except Exception:
                     pass
     except Exception:
-        if "CURUPIRA" in trackers_upper:
+        if "CRP" in trackers_upper or "SUIO" in trackers_upper:
             is_usenet_tracker_active = True
 
     if "USENET" in config_dict:
@@ -519,7 +519,7 @@ def _validate_trackers_section(
                 )
 
         # Check boolean fields are actually booleans (must be real bool, not string)
-        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles"]
+        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
         for field in bool_fields:
             if field in tracker_config_dict:
                 value = tracker_config_dict[field]

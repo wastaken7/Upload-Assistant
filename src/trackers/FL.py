@@ -19,6 +19,7 @@ from src.trackers.COMMON import COMMON
 
 
 class FL:
+    supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config

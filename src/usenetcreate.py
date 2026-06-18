@@ -387,7 +387,22 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     if not safe_nzb_name:
         safe_nzb_name = safe_name
 
-    # Determine tmp base directory
+    # Determine NZB output directory (falls back to default tmp dir if empty)
+    nzb_output_dir = usenet_cfg.get("nzb_output_dir")
+    if not nzb_output_dir:
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+
+    try:
+        os.makedirs(nzb_output_dir, exist_ok=True)
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+        try:
+            os.makedirs(nzb_output_dir, exist_ok=True)
+        except Exception:
+            pass
+
+    # Determine tmp base directory for staging (falls back to default tmp dir if empty)
     usenet_tmp_dir = usenet_cfg.get("usenet_tmp_dir")
     if usenet_tmp_dir:
         try:
@@ -395,16 +410,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             tmp_base = usenet_tmp_dir
         except Exception as e:
             console.print(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-            tmp_base = os.path.join(base_dir, "tmp")
+            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
     else:
-        tmp_base = os.path.join(base_dir, "tmp")
+        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
 
     # Check if a valid NZB file already exists to skip the upload process
+    final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")
     nzb_file = os.path.join(tmp_base, uuid, f"{safe_nzb_name}.nzb")
-    nzb_output_dir = usenet_cfg.get("nzb_output_dir")
-    final_nzb_path = None
-    if nzb_output_dir and await aiofiles.ospath.exists(nzb_output_dir):
-        final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")
 
     for path_to_check in [final_nzb_path, nzb_file]:
         if path_to_check and await is_valid_nzb(path_to_check):
@@ -594,24 +606,22 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     except Exception as e:
         console.print(f"[yellow]Warning: Could not clean up temporary Usenet folder '{usenet_dir}' ({e})[/yellow]")
 
-    # 8. Relocate NZB output if requested
-    nzb_output_dir = usenet_cfg.get("nzb_output_dir")
-    if nzb_output_dir and await aiofiles.ospath.exists(nzb_output_dir):
-        final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")
-        await asyncio.to_thread(shutil.move, nzb_file, final_nzb_path)
-
-        # Clean up empty parent uuid folder
-        uuid_dir = os.path.join(tmp_base, uuid)
+    # 8. Relocate NZB output
+    if await aiofiles.ospath.exists(nzb_file):
         try:
-            if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not os.listdir(uuid_dir):
-                await asyncio.to_thread(os.rmdir, uuid_dir)
-        except Exception:
-            pass
+            await asyncio.to_thread(shutil.move, nzb_file, final_nzb_path)
+            if is_debug:
+                console.print(f"[bold green]NZB file saved to: {final_nzb_path}[/bold green]")
+        except Exception as e:
+            console.print(f"[red]Error moving NZB file to final destination: {e}[/red]")
+            final_nzb_path = nzb_file
 
-        if is_debug:
-            console.print(f"[bold green]NZB file saved to: {final_nzb_path}[/bold green]")
-        return final_nzb_path
-    else:
-        if is_debug:
-            console.print(f"[bold green]NZB file saved to: {nzb_file}[/bold green]")
-        return nzb_file
+    # Clean up empty parent uuid folder
+    uuid_dir = os.path.join(tmp_base, uuid)
+    try:
+        if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not os.listdir(uuid_dir):
+            await asyncio.to_thread(os.rmdir, uuid_dir)
+    except Exception:
+        pass
+
+    return final_nzb_path

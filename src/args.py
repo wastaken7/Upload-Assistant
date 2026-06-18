@@ -141,6 +141,15 @@ class Args:
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
         parser.add_argument("--newspaper", "-newspaper", action="store_true", required=False, help="Identify the book upload as a Newspaper", dest="newspaper", default=False)
         parser.add_argument(
+            "-btra",
+            "--book-translator",
+            nargs=1,
+            required=False,
+            help="Book/Audiobook translator",
+            type=str,
+            dest="book_translator",
+        )
+        parser.add_argument(
             "-blang",
             "--book-language",
             nargs=1,
@@ -664,6 +673,10 @@ class Args:
         if book_publisher_arg not in (None, ""):
             meta["publisher"] = str(book_publisher_arg).strip()
 
+        book_translator_arg = meta.get("book_translator")
+        if book_translator_arg not in (None, ""):
+            meta["book_translator"] = str(book_translator_arg).strip()
+
         book_language_arg = meta.get("book_language")
         if book_language_arg not in (None, ""):
             raw_lang = str(book_language_arg).strip()
@@ -688,6 +701,11 @@ class Args:
             except Exception:
                 meta["book_language"] = raw_lang.title()
                 meta["book_language_iso"] = ""
+
+        manual_year_arg = meta.get("manual_year")
+        if manual_year_arg not in (None, "", 0, "0"):
+            meta["year"] = str(manual_year_arg).strip()
+            meta["search_year"] = int(manual_year_arg)
 
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
@@ -733,6 +751,11 @@ class Args:
         game_subcategory_arg = meta.get("game_subcategory")
         if game_subcategory_arg not in (None, ""):
             meta["game_subcategory"] = str(game_subcategory_arg).strip().lower()
+
+        manual_year_arg = meta.get("manual_year")
+        if manual_year_arg not in (None, "", 0, "0"):
+            meta["year"] = str(manual_year_arg).strip()
+            meta["search_year"] = int(manual_year_arg)
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:

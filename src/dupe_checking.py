@@ -8,7 +8,7 @@ from typing_extensions import TypeAlias
 
 from cogs.redaction import Redaction
 from src.console import console
-from src.trackers.HUNO import HUNO
+from src.trackers.UNIT3D.HUNO import HUNO
 
 Meta: TypeAlias = MutableMapping[str, Any]
 

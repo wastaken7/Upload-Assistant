@@ -394,7 +394,7 @@ config = {
     "TRACKERS": {
         # Which trackers do you want to upload to?
 
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CURUPIRA, CZ, DC, DP, DT, EMUW, FF, FL,
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CRP, SUIO, CZ, DC, DP, DT, EMUW, FF, FL,
         # FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MTEAM, MTV, NBL, OE,
         # OTW, PHD, PT, PTCAFE, PTER, PTFANS, PTGTK, PTP, PTS, PTT, R4E, RAS, RF, RPT, RTF, SAM, SHRI, SN, SP, SPD, STC, THR,
         # TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS, ZNTH
@@ -533,7 +533,7 @@ config = {
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
-        "CURUPIRA": {
+        "CRP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your API Key, obtained from Perfil -> API Key
@@ -557,7 +557,7 @@ config = {
             # You can find your api key at Settings -> Security -> API Key -> Generate API Key
             "api_key": "",
             "anon": False,
-            # If True, the script will use the metadata-based title instead of the folder/file name.
+            # If True, the script will use the metadata-based title instead of the directory/file name.
             "use_metadata_name": False,
         },
         "DP": {
@@ -801,6 +801,26 @@ config = {
             "useAPI": False,
             "api_key": "",
             "anon": False,
+        },
+        "SUIO": {
+            # Paste the tracker's Rule 1 here verbatim to unlock this tracker.
+            "unlock_key": "",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Your Username
+            "username": "",
+            # Your API Key
+            "api_key": "",
+            "anon": True,
+            # If True, the script will use the metadata-based title instead of the directory/file name.
+            "use_metadata_name": False,
+            # If False, the indexer will decide (uses ID "0").
+            # If True, the script will resolve the audio language ID:
+            #   - 1 language: uses the ID for that language.
+            #   - 2 languages: uses the ID for the language different from the original language.
+            #   - 3 or more languages: uses the ID for "multi" ("9").
+            #   - No languages: uses "0" (Auto).
+            "resolve_language": True,
         },
         "OTW": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

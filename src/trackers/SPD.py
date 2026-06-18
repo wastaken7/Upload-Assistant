@@ -22,6 +22,8 @@ Config = dict[str, Any]
 
 
 class SPD:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+
     def __init__(self, config: Config) -> None:
         self.url = "https://speedapp.io"
         self.config: Config = config

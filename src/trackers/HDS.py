@@ -19,6 +19,7 @@ Config = dict[str, Any]
 
 
 class HDS:
+    supported_categories = ("TV", "MOVIE")
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)

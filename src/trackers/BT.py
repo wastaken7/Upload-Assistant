@@ -27,6 +27,7 @@ from src.trackers.COMMON import COMMON
 
 
 class BT:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     secret_token: str = ''
 
     def __init__(self, config: dict[str, Any]) -> None:

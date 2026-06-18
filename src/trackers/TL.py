@@ -18,6 +18,8 @@ Config = dict[str, Any]
 
 
 class TL:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)

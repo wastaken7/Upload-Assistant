@@ -22,6 +22,8 @@ from src.trackers.COMMON import COMMON
 
 
 class ASC:
+    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.tmdb_manager = TmdbManager(config)
@@ -400,7 +402,7 @@ class ASC:
 
             return f"{base_name}"
 
-    async def get_book_cover(self, meta: dict[str, Any]) -> str:
+    def get_book_cover(self, meta: dict[str, Any]) -> str:
         covers = meta.get("covers")
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
@@ -427,7 +429,7 @@ class ASC:
         description_parts.append("")
 
         # Cover
-        cover_url = await self.get_book_cover(meta)
+        cover_url = self.get_book_cover(meta)
         if cover_url:
             description_parts.append(await self.format_image(cover_url))
             description_parts.append("")
@@ -1211,7 +1213,7 @@ class ASC:
             }
             idioma_val = lang_code_map.get(book_lang, "6")
 
-            cover_url = await self.get_book_cover(meta)
+            cover_url = self.get_book_cover(meta)
 
             data.update({
                 "capa": cover_url,

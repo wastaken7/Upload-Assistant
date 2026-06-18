@@ -24,6 +24,8 @@ class MTEAM:
     Upload Rules: https://wiki.m-team.cc/zh-tw/upload-rules
     """
 
+    supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)

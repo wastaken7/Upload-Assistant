@@ -22,6 +22,7 @@ Config = dict[str, Any]
 
 
 class PTER:
+    supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

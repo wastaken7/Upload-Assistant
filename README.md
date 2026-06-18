@@ -38,10 +38,16 @@ This branch introduces new media categories and automation features not present 
 ### 5. Extended Tracker Support
 * **Added Trackers**: Zenith (ZNTH), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT).
 
+### 6. Usenet & Indexer Posting
+* **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
+* **Anonymity & Privacy**: Generates randomized poster details and obfuscates post subject lines to protect privacy.
+* **Indexer Integration**: Automatically uploads the generated `.nzb` file to configured Usenet indexers.
+
+
 ## Supported Sites:
 
 <details>
-<summary><strong>Click to view Supported Sites</strong></summary>
+<summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
 | Site | Acronym |
 |------|----------|
@@ -120,6 +126,15 @@ This branch introduces new media categories and automation features not present 
 | YOiNKED | YOINK |
 | YUSCENE | YUS |
 | Zenith | ZNTH |
+
+</details>
+
+<details>
+<summary><strong>Click to view Supported Usenet Indexers</strong></summary>
+
+| Site | Acronym |
+|------|----------|
+| Curupira | CRP |
 
 </details>
 

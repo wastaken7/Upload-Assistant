@@ -16,6 +16,8 @@ Config = dict[str, Any]
 
 
 class NBL:
+    supported_categories = ('TV',)
+
     """
     Edit for Tracker:
         Edit BASE.torrent with announce and source

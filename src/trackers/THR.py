@@ -24,6 +24,7 @@ Config = dict[str, Any]
 
 
 class THR:
+    supported_categories = ("TV", "MOVIE")
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.tracker = 'THR'

@@ -105,7 +105,7 @@ python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -u
 ```
 *(or specify `USENET` directly as the target tracker)*:
 ```bash
-python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -t USENET
+python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -tk USENET
 ```
 
 ### Upload to Usenet with a Custom Subject
@@ -116,5 +116,5 @@ python upload.py "/path/to/Folder_Name" -u --usenet-subject "My.Custom.Post.Subj
 ### Upload to both Usenet and Torrent Trackers
 You can combine torrent tracker uploads and Usenet posting in a single run:
 ```bash
-python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -t BLU,BHD -u
+python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -tk BLU,CRP
 ```

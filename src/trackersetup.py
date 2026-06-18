@@ -14,84 +14,85 @@ import httpx
 
 from src.cleanup import cleanup_manager
 from src.console import console
-from src.trackers.A4K import A4K
-from src.trackers.ACM import ACM
-from src.trackers.AITHER import AITHER
 from src.trackers.ANT import ANT
 from src.trackers.AR import AR
 from src.trackers.ASC import ASC
-from src.trackers.AZ import AZ
+from src.trackers.AVISTAZ.AZ import AZ
+from src.trackers.AVISTAZ.CZ import CZ
+from src.trackers.AVISTAZ.PHD import PHD
 from src.trackers.BHD import BHD
 from src.trackers.BHDTV import BHDTV
 from src.trackers.BJS import BJS
-from src.trackers.BLU import BLU
 from src.trackers.BT import BT
-from src.trackers.CBR import CBR
 from src.trackers.COMMON import COMMON
-from src.trackers.CURUPIRA import CURUPIRA
-from src.trackers.CZ import CZ
+from src.trackers.CRP import CRP
 from src.trackers.DC import DC
-from src.trackers.DP import DP
-from src.trackers.DT import DT
-from src.trackers.EMUW import EMUW
 from src.trackers.FF import FF
 from src.trackers.FL import FL
-from src.trackers.FRIKI import FRIKI
 from src.trackers.GPW import GPW
 from src.trackers.HDB import HDB
 from src.trackers.HDS import HDS
 from src.trackers.HDT import HDT
-from src.trackers.HHD import HHD
-from src.trackers.HUNO import HUNO
-from src.trackers.IHD import IHD
 from src.trackers.IPT import IPT
 from src.trackers.IS import IS
-from src.trackers.ITT import ITT
-from src.trackers.LAJIDUI import LAJIDUI
-from src.trackers.LCD import LCD
-from src.trackers.LDU import LDU
-from src.trackers.LPT import LPT
-from src.trackers.LST import LST
-from src.trackers.LT import LT
-from src.trackers.LUME import LUME
 from src.trackers.MTEAM import MTEAM
 from src.trackers.MTV import MTV
 from src.trackers.NBL import NBL
-from src.trackers.OE import OE
-from src.trackers.OTW import OTW
-from src.trackers.PHD import PHD
-from src.trackers.PT import PT
-from src.trackers.PTCAFE import PTCAFE
+from src.trackers.NEXUSPHP.LAJIDUI import LAJIDUI
+from src.trackers.NEXUSPHP.LPT import LPT
+from src.trackers.NEXUSPHP.PTCAFE import PTCAFE
+from src.trackers.NEXUSPHP.PTFANS import PTFANS
+from src.trackers.NEXUSPHP.PTGTK import PTGTK
+from src.trackers.NEXUSPHP.RPT import RPT
 from src.trackers.PTER import PTER
-from src.trackers.PTFANS import PTFANS
-from src.trackers.PTGTK import PTGTK
 from src.trackers.PTP import PTP
 from src.trackers.PTS import PTS
-from src.trackers.PTT import PTT
-from src.trackers.R4E import R4E
-from src.trackers.RAS import RAS
-from src.trackers.RF import RF
-from src.trackers.RPT import RPT
 from src.trackers.RTF import RTF
-from src.trackers.SAM import SAM
-from src.trackers.SHRI import SHRI
 from src.trackers.SN import SN
-from src.trackers.SP import SP
 from src.trackers.SPD import SPD
-from src.trackers.STC import STC
+from src.trackers.SUIO import SUIO
 from src.trackers.THR import THR
-from src.trackers.TIK import TIK
 from src.trackers.TL import TL
-from src.trackers.TLZ import TLZ
-from src.trackers.TOS import TOS
 from src.trackers.TTG import TTG
-from src.trackers.TTR import TTR
 from src.trackers.TVC import TVC
-from src.trackers.ULCX import ULCX
-from src.trackers.UTP import UTP
-from src.trackers.YOINK import YOINK
-from src.trackers.YUS import YUS
-from src.trackers.ZNTH import ZNTH
+from src.trackers.UNIT3D.A4K import A4K
+from src.trackers.UNIT3D.ACM import ACM
+from src.trackers.UNIT3D.AITHER import AITHER
+from src.trackers.UNIT3D.BLU import BLU
+from src.trackers.UNIT3D.CBR import CBR
+from src.trackers.UNIT3D.DP import DP
+from src.trackers.UNIT3D.DT import DT
+from src.trackers.UNIT3D.EMUW import EMUW
+from src.trackers.UNIT3D.FRIKI import FRIKI
+from src.trackers.UNIT3D.HHD import HHD
+from src.trackers.UNIT3D.HUNO import HUNO
+from src.trackers.UNIT3D.IHD import IHD
+from src.trackers.UNIT3D.ITT import ITT
+from src.trackers.UNIT3D.LCD import LCD
+from src.trackers.UNIT3D.LDU import LDU
+from src.trackers.UNIT3D.LST import LST
+from src.trackers.UNIT3D.LT import LT
+from src.trackers.UNIT3D.LUME import LUME
+from src.trackers.UNIT3D.OE import OE
+from src.trackers.UNIT3D.OTW import OTW
+from src.trackers.UNIT3D.PT import PT
+from src.trackers.UNIT3D.PTT import PTT
+from src.trackers.UNIT3D.R4E import R4E
+from src.trackers.UNIT3D.RAS import RAS
+from src.trackers.UNIT3D.RF import RF
+from src.trackers.UNIT3D.SAM import SAM
+from src.trackers.UNIT3D.SHRI import SHRI
+from src.trackers.UNIT3D.SP import SP
+from src.trackers.UNIT3D.STC import STC
+from src.trackers.UNIT3D.TIK import TIK
+from src.trackers.UNIT3D.TLZ import TLZ
+from src.trackers.UNIT3D.TOS import TOS
+from src.trackers.UNIT3D.TTR import TTR
+from src.trackers.UNIT3D.ULCX import ULCX
+from src.trackers.UNIT3D.UTP import UTP
+from src.trackers.UNIT3D.YOINK import YOINK
+from src.trackers.UNIT3D.YUS import YUS
+from src.trackers.UNIT3D.ZNTH import ZNTH
 
 JsonDict = dict[str, Any]
 Meta = dict[str, Any]
@@ -107,6 +108,39 @@ class TRACKER_SETUP:
             return None
         return tracker_class(self.config)
 
+    def filter_unsupported_trackers(self, meta: Meta) -> None:
+        category = meta.get("category")
+        if not category:
+            return
+
+        trackers = meta.get("trackers", [])
+        if not trackers:
+            return
+
+        supported_trackers = []
+        for tracker_name in trackers:
+            tracker_class = tracker_class_map.get(tracker_name.upper())
+            if not tracker_class:
+                supported_trackers.append(tracker_name)
+                continue
+
+            supported_cats = getattr(tracker_class, "supported_categories", None)
+            if supported_cats is None:
+                console.print(f"[bold red]Error: Tracker '{tracker_name}' does not have 'supported_categories' defined. Removing from queue.[/bold red]")
+                meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
+                meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
+                continue
+
+            # Case-insensitive comparison
+            if category.upper() in [c.upper() for c in supported_cats]:
+                supported_trackers.append(tracker_name)
+            else:
+                console.print(f"[bold red]Alert: Tracker '{tracker_name}' does not support category '{category}'. Removing from queue.[/bold red]")
+                meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
+                meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
+
+        meta["trackers"] = supported_trackers
+
     def trackers_enabled(self, meta: Meta) -> list[str]:
         trackers_value = meta['trackers'] if meta.get('trackers') is not None else self.config['TRACKERS']['default_trackers']
 
@@ -118,6 +152,11 @@ class TRACKER_SETUP:
             trackers_list = []
 
         trackers = [str(s).strip().upper() for s in trackers_list]
+        meta["trackers"] = trackers
+
+        self.filter_unsupported_trackers(meta)
+
+        trackers = meta["trackers"]
 
         if meta.get('manual', False):
             trackers.insert(0, "MANUAL")
@@ -1350,7 +1389,8 @@ class TRACKER_SETUP:
 
 tracker_class_map: dict[str, type[Any]] = {
     'A4K': A4K, 'ACM': ACM, 'AITHER': AITHER, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'CBR': CBR,
-    'CURUPIRA': CURUPIRA,
+    'CRP': CRP,
+    'SUIO': SUIO,
     'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IS': IS, 'LAJIDUI': LAJIDUI, 'LCD': LCD, 'LDU': LDU, 'LPT': LPT, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTEAM': MTEAM,'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PTCAFE': PTCAFE, 'PT': PT, 'PTFANS': PTFANS, 'PTGTK': PTGTK, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RPT': RPT,'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
@@ -1359,7 +1399,7 @@ tracker_class_map: dict[str, type[Any]] = {
 }  # fmt: off
 
 api_trackers = {
-    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'CURUPIRA', 'DP', 'DT', 'EMUW', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
+    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'CRP', 'SUIO', 'DP', 'DT', 'EMUW', 'FRIKI', 'HHD', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
     'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TOS', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS', 'ZNTH'
 }  # fmt: off
 

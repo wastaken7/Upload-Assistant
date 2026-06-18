@@ -315,6 +315,7 @@ class UploadHelper:
         # BOOK
         if meta["category"] == "BOOK":
             author = meta.get("author") or missing_warning
+            book_translator = meta.get("book_translator") or ""
             publisher = meta.get("publisher") or ""  # not essential
             book_language = meta.get("book_language") or missing_warning
             isbn = meta.get("isbn") or ""  # not essential
@@ -331,6 +332,8 @@ class UploadHelper:
                 return "[green]True[/green]" if value else "[purple]False[/purple]"
 
             lines.append(("Author", str(author)))
+            if book_translator:
+                lines.append(("Translator", str(book_translator)))
             lines.append(("Publisher", str(publisher)))
             lines.append(("Language", str(book_language)))
             lines.append(("ISBN", str(isbn)))

@@ -264,8 +264,20 @@ class CookieValidator:
                         await self.handle_validation_failure(meta, tracker, text)
                         return False
                     # Dynamically set a class attribute to store the token
+                    module_name = f'src.trackers.{tracker}'
+                    for sub in ["", "UNIT3D", "AVISTAZ", "NEXUSPHP"]:
+                        sub_path = f"{sub}." if sub else ""
+                        try:
+                            target = f'src.trackers.{sub_path}{tracker}'
+                            importlib.import_module(target)
+                            module_name = target
+                            break
+                        except ModuleNotFoundError as e:
+                            if e.name == f'src.trackers.{sub_path}{tracker}':
+                                continue
+                            raise
                     cls = getattr(
-                        importlib.import_module(f'src.trackers.{tracker}'),
+                        importlib.import_module(module_name),
                         tracker
                     )
                     cls.secret_token = str(match.group(1))

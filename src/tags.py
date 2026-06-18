@@ -47,6 +47,35 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             name, ext = os.path.splitext(basename_no_path)
             # If the extension contains a hyphen, it's not a real extension
             basename_stripped = basename_no_path if ext and '-' in ext else name
+        # Strip common file extensions if present (e.g. from directories or custom uuid paths)
+        known_extensions = {
+            ".mkv",
+            ".mp4",
+            ".ts",
+            ".avi",
+            ".divx",
+            ".m2ts",
+            ".pdf",
+            ".epub",
+            ".mobi",
+            ".cbz",
+            ".cbr",
+            ".mp3",
+            ".m4b",
+            ".flac",
+            ".aac",
+            ".m4a",
+            ".ogg",
+            ".wav",
+            ".zip",
+            ".rar",
+            ".tar",
+            ".7z",
+        }
+        name, ext = os.path.splitext(basename_stripped)
+        if ext.lower() in known_extensions:
+            basename_stripped = name
+
         non_anime_match = re.search(r'(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()

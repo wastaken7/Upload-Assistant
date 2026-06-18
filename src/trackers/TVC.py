@@ -24,6 +24,7 @@ Config = dict[str, Any]
 
 
 class TVC:
+    supported_categories = ("TV", "MOVIE")
     # Constants for the class
     DEFAULT_LOGO_SIZE = '300'
     SCREENSHOT_THUMB_SIZE = '350'

@@ -879,12 +879,13 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
         audio_prompted = False
         for tracker in [
-            "AITHER",
             "ACM",
+            "AITHER",
             "ASC",
             "BJS",
             "BT",
             "CBR",
+            "CRP",
             "DP",
             "FF",
             "GPW",
@@ -902,6 +903,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             "SAM",
             "SHRI",
             "SPD",
+            "SUIO",
             "TTR",
             "TVC",
             "ULCX",
@@ -2099,7 +2101,7 @@ async def do_the_thing(base_dir: str) -> None:
                     console.print(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
                 else:
                     trackers_upper = [str(t).upper() for t in meta.get("trackers", [])]
-                    if "USENET" in trackers_upper or "CURUPIRA" in trackers_upper or meta.get("usenet", False):
+                    if "USENET" in trackers_upper or "CRP" in trackers_upper or "SUIO" in trackers_upper or meta.get("usenet", False):
                         from src.usenetcreate import prepare_and_upload_usenet
 
                         try:

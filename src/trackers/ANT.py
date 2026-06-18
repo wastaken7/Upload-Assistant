@@ -21,6 +21,8 @@ Config = dict[str, Any]
 
 
 class ANT:
+    supported_categories = ('MOVIE',)
+
     def __init__(self, config: Config):
         self.tracker = 'ANT'
         self.config = config
