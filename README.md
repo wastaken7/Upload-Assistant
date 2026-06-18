@@ -135,6 +135,7 @@ This branch introduces new media categories and automation features not present 
 | Site | Acronym |
 |------|----------|
 | Curupira | CRP |
+| DrunkenSlug | DS |
 
 </details>
 

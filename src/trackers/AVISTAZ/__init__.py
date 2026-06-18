@@ -814,7 +814,7 @@ class AZTrackerBase:
         meta['tracker_status'][self.tracker]['status_message'] = status_message
         return {}
 
-    def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         # https://avistaz.to/guides/how-to-properly-titlename-a-torrent
         # https://cinemaz.to/guides/how-to-properly-titlename-a-torrent
         # https://privatehd.to/rules/upload-rules
@@ -986,7 +986,7 @@ class AZTrackerBase:
             "_token": self.az_class.secret_token,
             "torrent_id": "",
             "type_id": self.get_cat_id(meta["category"]),
-            "file_name": self.edit_name(meta),
+            "file_name": await self.get_name(meta),
             "anon_upload": "",
             "description": await self.edit_desc(meta),
             "qqfile": "",

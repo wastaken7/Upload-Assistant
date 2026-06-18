@@ -240,7 +240,7 @@ def validate_config(
                 except Exception:
                     pass
     except Exception:
-        if "CRP" in trackers_upper or "SUIO" in trackers_upper:
+        if "CRP" in trackers_upper or "SUIO" in trackers_upper or "DS" in trackers_upper:
             is_usenet_tracker_active = True
 
     if "USENET" in config_dict:

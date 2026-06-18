@@ -294,7 +294,7 @@ class IS:
             nfo_filename = f"{meta.get('scene_name', meta['uuid'])}.nfo"
             return {'nfofile': (nfo_filename, nfo_bytes, "application/octet-stream")}
 
-    def get_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         scene_name = meta.get('scene_name')
         if scene_name:
             return str(scene_name)
@@ -331,7 +331,7 @@ class IS:
             "UseNFOasDescr": "no",
             "message": message,
             "category": await self.get_category_id(meta),
-            "subject": self.get_name(meta),
+            "subject": await self.get_name(meta),
             "nothingtopost": "1",
             "t_image_url": cover,
             "submit": "Upload Torrent",
