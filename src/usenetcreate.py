@@ -19,28 +19,22 @@ Meta = dict[str, Any]
 
 
 def generate_random_poster() -> str:
-    """Generate a realistic random poster name and email for Usenet anonymity."""
-    first_names = [
-        "alpha", "beta", "gamma", "delta", "epsilon", "omega", "zeta", "eta",
-        "theta", "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron",
-        "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi"
-    ]
-    last_names = [
-        "post", "upload", "share", "news", "net", "bin", "nntp", "user",
-        "agent", "peer", "node", "seed", "stream", "pack", "dist"
-    ]
-    domains = [
-        "anon.org", "usenet.net", "nntp.org", "binaries.com", "privacy.net",
-        "obfuscated.com", "newsgroup.co", "sslpost.org", "nntp2.net"
-    ]
+    """Generate a fully random poster name and email for Usenet anonymity."""
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    digits = "0123456789"
 
-    first = random.choice(first_names)
-    last = random.choice(last_names)
-    num = random.randint(100, 999)
-    email_user = f"{first}{num}"
-    domain = random.choice(domains)
+    first_len = random.randint(5, 10)
+    last_len = random.randint(5, 10)
+    user_len = random.randint(6, 12)
+    domain_len = random.randint(5, 10)
 
-    return f"{first.capitalize()} {last.capitalize()} <{email_user}@{domain}>"
+    first = "".join(random.choice(letters) for _ in range(first_len))
+    last = "".join(random.choice(letters) for _ in range(last_len))
+    email_user = "".join(random.choice(letters + digits) for _ in range(user_len))
+    domain = "".join(random.choice(letters) for _ in range(domain_len))
+    tld = random.choice(["com", "net", "org", "info", "biz", "xyz", "io"])
+
+    return f"{first.capitalize()} {last.capitalize()} <{email_user}@{domain}.{tld}>"
 
 
 def get_path_size(path: str) -> int:
@@ -104,11 +98,7 @@ async def run_command_with_logging(cmd: list[str], description: str, debug: bool
     if debug:
         console.print(f"[cyan]Running command: {redacted_str}[/cyan]")
     try:
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
@@ -592,11 +582,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         console.print(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
         # Write a mock/dummy NZB file (valid XML structure containing a comment)
         mock_nzb_content = (
-            "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n"
-            "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" \"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
-            "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+            '<?xml version="1.0" encoding="utf-8" ?>\n'
+            '<!DOCTYPE nzb PUBLIC "-//newzBin//DTD NZB 1.1//EN" "http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd">\n'
+            '<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">\n'
             "  <!-- Mock NZB file generated in debug/simulation mode -->\n"
-            "  <meta type=\"title\">Mock Upload</meta>\n"
+            '  <meta type="title">Mock Upload</meta>\n'
             "</nzb>\n"
         )
         async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
