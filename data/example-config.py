@@ -1269,6 +1269,9 @@ config = {
         "poster": "Uploader <upload@assistant.org>",
         # If True, poster will be randomized for anonymity/obfuscation
         "random_poster": True,
+        # Set to True to skip 7z archiving entirely and post files directly.
+        # Useful with pesto, which handles obfuscation and PAR2 natively.
+        "skip_archive": False,
         # Volume size for 7z splitting (e.g. "100M", "50M", or "auto" for dynamic sizing)
         "rar_volume_size": "auto",
         # Password for 7z archive. Can be a fixed string or "random" to generate a unique random password.
@@ -1278,9 +1281,13 @@ config = {
         "par2_percentage": "10",
         # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns
         "obscure_subject": True,
+        # Uploader backend: "nyuu" (default) or "pesto"
+        # pesto handles PAR2 and NZB password injection internally
+        "usenet_uploader": "nyuu",
         # Paths to binaries (defaults to looking in PATH)
         "nyuu_path": "nyuu",
         "par2_path": "par2",
+        "pesto_path": "pesto",
         "7z_path": "7z",
         # Where to output generated NZB files (if empty, saves to tmp directory)
         "nzb_output_dir": "",

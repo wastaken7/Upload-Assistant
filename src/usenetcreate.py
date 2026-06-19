@@ -1,5 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import json
 import math
 import os
 import random
@@ -327,6 +328,87 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: Optional[str] = None, debu
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
+async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
+    """Execute pesto upload consuming its JSON event stream for progress reporting."""
+    redacted_cmd = []
+    skip_next = False
+    for i, arg in enumerate(cmd):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in ("-p", "-u", "--auth-password", "--username") and i + 1 < len(cmd):
+            redacted_cmd.append(arg)
+            redacted_cmd.append("********")
+            skip_next = True
+        else:
+            redacted_cmd.append(arg)
+    redacted_str = " ".join(redacted_cmd)
+
+    if debug:
+        cwd_str = f" in {cwd}" if cwd else ""
+        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+
+        last_percent = 0
+        stderr_accum = []
+
+        async def drain_stderr():
+            while True:
+                line = await process.stderr.readline()
+                if not line:
+                    break
+                stderr_accum.append(line.decode(errors="replace"))
+
+        stderr_task = asyncio.create_task(drain_stderr())
+
+        while True:
+            line_bytes = await process.stdout.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode(errors="replace").strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+                etype = event.get("type")
+                if etype == "segment_done":
+                    pct = float(event.get("progress_pct", 0))
+                    last_percent = int(pct)
+                    cli_ui.info_progress(f"Posting to Usenet... {pct:.1f}%", last_percent, 100)
+                elif etype == "status":
+                    text = event.get("text", "").strip()
+                    if text and debug:
+                        console.print(f"[cyan]{text}[/cyan]")
+                elif etype == "failed":
+                    desc = event.get("description", "unknown failure")
+                    console.print(f"[red]Pesto segment failed: {desc}[/red]")
+            except json.JSONDecodeError:
+                pass
+
+        await stderr_task
+        await process.wait()
+
+        if process.returncode != 0:
+            console.print(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
+            stderr_str = "".join(stderr_accum)
+            if stderr_str:
+                console.print(f"[red]STDERR:[/red]\n{stderr_str}")
+            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+
+        if last_percent < 100:
+            cli_ui.info_progress("Posting to Usenet... 100.0%", 100, 100)
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
+
+
 async def is_valid_nzb(path: str) -> bool:
     """Check if an NZB file exists, is non-empty, and ends with proper XML/NZB closing tag."""
     if not await aiofiles.ospath.isfile(path):
@@ -395,7 +477,7 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
 
 async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optional[str]:
     """
-    Prepare files (7z + PAR2) and upload them to Usenet via Nyuu.
+    Prepare files (7z + PAR2) and upload them to Usenet via nyuu or pesto.
     Returns the absolute path to the generated NZB file if successful.
     """
     usenet_cfg = config.get("USENET", {})
@@ -440,16 +522,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         else:
             console.print("[cyan]Obfuscating archive filenames for security.[/cyan]")
 
-    # Determine the directory/folder being processed for the NZB file name
-    folder_name = os.path.basename(input_path) if os.path.isdir(input_path) else os.path.basename(os.path.dirname(input_path))
-
-    if folder_name:
-        safe_nzb_name = "".join(c for c in folder_name if c.isalnum() or c in "._- ")
-        safe_nzb_name = safe_nzb_name.replace(" ", ".")
-    else:
+    # NZB filename: prefer meta name (already properly constructed by UA).
+    # For directories, fall back to the directory basename only when meta name is absent.
+    if safe_name:
         safe_nzb_name = safe_name
-
-    if not safe_nzb_name:
+    elif os.path.isdir(input_path):
+        folder_name = os.path.basename(input_path)
+        safe_nzb_name = "".join(c for c in folder_name if c.isalnum() or c in "._- ").replace(" ", ".") or safe_name
+    else:
         safe_nzb_name = safe_name
 
     # Determine NZB output directory (falls back to default tmp dir if empty)
@@ -492,9 +572,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     await aiofiles.os.makedirs(usenet_dir, exist_ok=True)
 
     is_debug = meta.get("debug", False)
+    uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
+    use_pesto = uploader == "pesto"
+
     path_7z: Optional[str] = None
     path_par2: Optional[str] = None
     path_nyuu: Optional[str] = None
+    path_pesto: Optional[str] = None
 
     # 1. Resolve Binaries
     try:
@@ -506,98 +590,127 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             console.print(f"[bold red]Configuration Error: {e}[/bold red]")
             return None
 
-    try:
-        path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"))
-    except FileNotFoundError as e:
-        if is_debug:
-            console.print(f"[yellow]Warning: {e} Using simulation mode for par2.[/yellow]")
-        else:
-            console.print(f"[bold red]Configuration Error: {e}[/bold red]")
-            return None
+    if use_pesto:
+        try:
+            path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"))
+        except FileNotFoundError as e:
+            if is_debug:
+                console.print(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
+            else:
+                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                return None
+    else:
+        try:
+            path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"))
+        except FileNotFoundError as e:
+            if is_debug:
+                console.print(f"[yellow]Warning: {e} Using simulation mode for par2.[/yellow]")
+            else:
+                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                return None
 
-    try:
-        path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"))
-    except FileNotFoundError as e:
-        if is_debug:
-            console.print(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
-        else:
-            console.print(f"[bold red]Configuration Error: {e}[/bold red]")
-            return None
+        try:
+            path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"))
+        except FileNotFoundError as e:
+            if is_debug:
+                console.print(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
+            else:
+                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                return None
 
     # 2. Archive and Split with 7z (mx=0 to store without compression)
+    skip_archive = usenet_cfg.get("skip_archive", False)
     volume_size = usenet_cfg.get("rar_volume_size")
     total_size = await asyncio.to_thread(get_path_size, input_path)
-    if volume_size and volume_size.lower() == "auto":
-        volume_size = get_dynamic_volume_size(total_size)
-        if is_debug:
-            console.print(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
+
+    if skip_archive:
+        # Skip 7z entirely — copy files/dir contents straight to usenet_dir
+        console.print("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
+        if await aiofiles.ospath.isdir(input_path):
+            for entry in await aiofiles.os.listdir(input_path):
+                src = os.path.join(input_path, entry)
+                dst = os.path.join(usenet_dir, entry)
+                if os.path.isfile(src):
+                    if is_debug and not await aiofiles.ospath.exists(src):
+                        async with aiofiles.open(dst, "wb") as f:
+                            await f.write(b"mock file content")
+                    else:
+                        await asyncio.to_thread(shutil.copy2, src, dst)
         else:
-            console.print(f"[cyan]Dynamic volume size chosen: {volume_size.upper()}[/cyan]")
-
-    archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
-
-    if await aiofiles.ospath.isdir(input_path) or volume_size or archive_password:
-        cmd_7z = [path_7z or "7z", "a", "-mx=0"]
-        if volume_size:
-            # E.g. -v100m
-            cmd_7z.append(f"-v{volume_size.lower()}")
-        if archive_password:
-            # Add password and encrypt header (filenames inside archive)
-            cmd_7z.extend([f"-p{archive_password}", "-mhe=on"])
-        cmd_7z.extend([archive_out, input_path])
-
-        if is_debug and not path_7z:
-            console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_7z)}[/yellow]")
-            # Create a mock 7z file so PAR2 step has a target file
-            mock_7z = f"{archive_out}.001" if volume_size else archive_out
-            async with aiofiles.open(mock_7z, "wb") as f:
-                await f.write(b"mock 7z volume content")
-        else:
-            await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size, debug=is_debug)
+            dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
+            if is_debug and not await aiofiles.ospath.exists(input_path):
+                async with aiofiles.open(dest_file, "wb") as f:
+                    await f.write(b"mock single file content")
+            else:
+                await asyncio.to_thread(shutil.copy2, input_path, dest_file)
     else:
-        # Single file and no volume size -> just copy/link to usenet dir
-        console.print("[cyan]Copying single file for upload...[/cyan]")
-        dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
-        if is_debug and not await aiofiles.ospath.exists(input_path):
-            console.print(f"[yellow][DEBUG SIMULATION] Input path '{input_path}' doesn't exist, writing dummy file to '{dest_file}'[/yellow]")
-            async with aiofiles.open(dest_file, "wb") as f:
-                await f.write(b"mock single file content")
-        else:
-            await asyncio.to_thread(shutil.copy, input_path, dest_file)
+        if volume_size and volume_size.lower() == "auto":
+            volume_size = get_dynamic_volume_size(total_size)
+            if is_debug:
+                console.print(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
+            else:
+                console.print(f"[cyan]Dynamic volume size chosen: {volume_size.upper()}[/cyan]")
 
-    # 3. Create PAR2 Recovery Files
+        archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
+
+        if await aiofiles.ospath.isdir(input_path) or volume_size or archive_password:
+            cmd_7z = [path_7z or "7z", "a", "-mx=0"]
+            if volume_size:
+                cmd_7z.append(f"-v{volume_size.lower()}")
+            if archive_password:
+                cmd_7z.extend([f"-p{archive_password}", "-mhe=on"])
+            cmd_7z.extend([archive_out, input_path])
+
+            if is_debug and not path_7z:
+                console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_7z)}[/yellow]")
+                mock_7z = f"{archive_out}.001" if volume_size else archive_out
+                async with aiofiles.open(mock_7z, "wb") as f:
+                    await f.write(b"mock 7z volume content")
+            else:
+                await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size, debug=is_debug)
+        else:
+            console.print("[cyan]Copying single file for upload...[/cyan]")
+            dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
+            if is_debug and not await aiofiles.ospath.exists(input_path):
+                console.print(f"[yellow][DEBUG SIMULATION] Input path '{input_path}' doesn't exist, writing dummy file to '{dest_file}'[/yellow]")
+                async with aiofiles.open(dest_file, "wb") as f:
+                    await f.write(b"mock single file content")
+            else:
+                await asyncio.to_thread(shutil.copy, input_path, dest_file)
+
     par2_percentage = usenet_cfg.get("par2_percentage", "10")
-    # Identify files in the usenet directory to parity-protect
-    target_files = []
-    for f in await aiofiles.os.listdir(usenet_dir):
-        file_path = os.path.join(usenet_dir, f)
-        if await aiofiles.ospath.isfile(file_path) and not f.endswith(".par2"):
-            target_files.append(file_path)
 
-    if target_files:
-        console.print("[cyan]Generating PAR2 parity files...[/cyan]")
-        par2_file = f"{archive_name}.par2"
-        relative_target_files = [os.path.basename(f) for f in target_files]
-        cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
-        if is_debug and not path_par2:
-            console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
-            # Create a mock par2 file
-            mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
-            async with aiofiles.open(mock_par2, "wb") as f:
-                await f.write(b"mock par2 content")
-        else:
-            await run_par2_with_progress(cmd_par2, cwd=usenet_dir, debug=is_debug)
+    # 3. PAR2 — only when using nyuu (pesto handles PAR2 internally)
+    if not use_pesto:
+        target_files = []
+        for f in await aiofiles.os.listdir(usenet_dir):
+            file_path = os.path.join(usenet_dir, f)
+            if await aiofiles.ospath.isfile(file_path) and not f.endswith(".par2"):
+                target_files.append(file_path)
 
-    # 4. Generate Poster / From
+        if target_files:
+            console.print("[cyan]Generating PAR2 parity files...[/cyan]")
+            par2_file = f"{archive_name}.par2"
+            relative_target_files = [os.path.basename(f) for f in target_files]
+            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
+            if is_debug and not path_par2:
+                console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
+                mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
+                async with aiofiles.open(mock_par2, "wb") as f:
+                    await f.write(b"mock par2 content")
+            else:
+                await run_par2_with_progress(cmd_par2, cwd=usenet_dir, debug=is_debug)
+
+    # 4. Poster / From header
+    random_poster = usenet_cfg.get("random_poster", True)
     poster = usenet_cfg.get("poster", "Uploader <upload@assistant.org>")
-    if usenet_cfg.get("random_poster", True):
+    if random_poster:
         poster = generate_random_poster()
-        # Clean up output: just display the name rather than full email unless debugging
         display_name = poster.split("<")[0].strip()
         if is_debug:
             console.print(f"[cyan]Generated anonymous poster: {display_name}[/cyan]")
 
-    # 5. Generate Subject Line
+    # 5. Subject line
     obscure_subject = usenet_cfg.get("obscure_subject", True)
     custom_subject = meta.get("usenet_subject")
 
@@ -612,66 +725,98 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     else:
         subject = name
 
-    # 6. Perform Upload using Nyuu
+    # 6. Collect files to upload
     nzb_file = os.path.join(tmp_base, uuid, f"{safe_nzb_name}.nzb")
 
-    cmd_nyuu = [
-        path_nyuu or "nyuu",
-        "-h",
-        usenet_cfg.get("host"),
-        "-P",
-        str(usenet_cfg.get("port", 563)),
-        "-u",
-        usenet_cfg.get("username"),
-        "-p",
-        usenet_cfg.get("password"),
-        "-n",
-        str(usenet_cfg.get("connections", 20)),
-        "-g",
-        usenet_cfg.get("newsgroups"),
-        "-f",
-        poster,
-        "-s",
-        subject,
-        "-o",
-        nzb_file,
-    ]
-
-    if usenet_cfg.get("ssl", True):
-        cmd_nyuu.append("-S")
-
-    # Add all files in the Usenet directory as targets to upload
     all_upload_files = []
     for f in await aiofiles.os.listdir(usenet_dir):
         file_path = os.path.join(usenet_dir, f)
         if await aiofiles.ospath.isfile(file_path):
             all_upload_files.append(f)
-    cmd_nyuu.extend(all_upload_files)
 
-    console.print(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP...[/yellow]")
-    if is_debug:
-        console.print(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
-        # Write a mock/dummy NZB file (valid XML structure containing a comment)
-        mock_nzb_content = (
-            '<?xml version="1.0" encoding="utf-8" ?>\n'
-            '<!DOCTYPE nzb PUBLIC "-//newzBin//DTD NZB 1.1//EN" "http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd">\n'
-            '<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">\n'
-            "  <!-- Mock NZB file generated in debug/simulation mode -->\n"
-            '  <meta type="title">Mock Upload</meta>\n'
-            "</nzb>\n"
-        )
-        async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
-            await f.write(mock_nzb_content)
-    else:
-        await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir, debug=is_debug)
+    console.print(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
-    # Inject password into NZB metadata if archive password is set
-    if archive_password and await aiofiles.ospath.exists(nzb_file):
+    # Build mock NZB content used in debug/simulation mode
+    mock_nzb_password_tag = f'  <meta type="password">{archive_password}</meta>\n' if archive_password else ""
+    mock_nzb_content = (
+        '<?xml version="1.0" encoding="utf-8" ?>\n'
+        '<!DOCTYPE nzb PUBLIC "-//newzBin//DTD NZB 1.1//EN" "http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd">\n'
+        '<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">\n'
+        "  <!-- Mock NZB file generated in debug/simulation mode -->\n"
+        f"  <head>\n{mock_nzb_password_tag}  </head>\n"
+        '  <meta type="title">Mock Upload</meta>\n'
+        "</nzb>\n"
+    )
+
+    if use_pesto:
+        # 6a. Upload via pesto
+        cmd_pesto = [
+            path_pesto or "pesto",
+            "-h", usenet_cfg.get("host"),
+            "-P", str(usenet_cfg.get("port", 563)),
+            "-u", usenet_cfg.get("username"),
+            "-p", usenet_cfg.get("password"),
+            "-n", str(usenet_cfg.get("connections", 20)),
+            "-g", usenet_cfg.get("newsgroups"),
+            "--out", nzb_file,
+            "--par2", str(par2_percentage),
+            "--output-format", "json",
+        ]
+
+        if not usenet_cfg.get("ssl", True):
+            cmd_pesto.append("--no-ssl")
+
+        if not random_poster:
+            cmd_pesto.extend(["-f", poster])
+
+        if obscure_subject and not custom_subject:
+            cmd_pesto.append("--obfuscate=full")
+
+        if archive_password:
+            cmd_pesto.extend(["--nzb-password", archive_password])
+
+        cmd_pesto.extend(all_upload_files)
+
         if is_debug:
-            console.print(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
+            console.print(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {' '.join(cmd_pesto)}[/yellow]")
+            async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
+                await f.write(mock_nzb_content)
         else:
-            console.print("[cyan]Injecting password into NZB metadata...[/cyan]")
-        await inject_nzb_password(nzb_file, archive_password)
+            await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir, debug=is_debug)
+    else:
+        # 6b. Upload via nyuu
+        cmd_nyuu = [
+            path_nyuu or "nyuu",
+            "-h", usenet_cfg.get("host"),
+            "-P", str(usenet_cfg.get("port", 563)),
+            "-u", usenet_cfg.get("username"),
+            "-p", usenet_cfg.get("password"),
+            "-n", str(usenet_cfg.get("connections", 20)),
+            "-g", usenet_cfg.get("newsgroups"),
+            "-f", poster,
+            "-s", subject,
+            "-o", nzb_file,
+        ]
+
+        if usenet_cfg.get("ssl", True):
+            cmd_nyuu.append("-S")
+
+        cmd_nyuu.extend(all_upload_files)
+
+        if is_debug:
+            console.print(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
+            async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
+                await f.write(mock_nzb_content)
+        else:
+            await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir, debug=is_debug)
+
+        # nyuu doesn't inject the password into the NZB — do it manually
+        if archive_password and await aiofiles.ospath.exists(nzb_file):
+            if is_debug:
+                console.print(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
+            else:
+                console.print("[cyan]Injecting password into NZB metadata...[/cyan]")
+            await inject_nzb_password(nzb_file, archive_password)
 
     # 7. Cleanup compressed volumes after successful upload
     try:
