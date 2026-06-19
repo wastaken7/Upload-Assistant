@@ -7,6 +7,7 @@ import aiofiles
 import httpx
 
 from src.console import console
+from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -17,6 +18,7 @@ class DS:
 
     def __init__(self, config: Config) -> None:
         self.config = config
+        self.common = COMMON(config)
         self.tracker = "DS"
         self.is_usenet = True
         self.upload_url = "https://nzbs.drunkenslug.com/upload.php"
@@ -34,7 +36,8 @@ class DS:
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
         nzb_path = meta.get('nzb_path')
-        if not nzb_path or not os.path.exists(nzb_path):
+        if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
         nzb_name = os.path.basename(nzb_path)

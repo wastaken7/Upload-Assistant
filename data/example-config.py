@@ -1257,6 +1257,9 @@ config = {
         "random_poster": True,
         # Volume size for 7z splitting (e.g. "100M", "50M", or "auto" for dynamic sizing)
         "rar_volume_size": "auto",
+        # Password for 7z archive. Can be a fixed string or "random" to generate a unique random password.
+        # Leave empty or set to None to disable archive encryption.
+        "archive_password": "random",
         # Percentage of parity recovery blocks for PAR2 (e.g. "10")
         "par2_percentage": "10",
         # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns

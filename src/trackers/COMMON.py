@@ -22,6 +22,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
+from src.usenetcreate import verify_nzb_has_password
 
 Meta = dict[str, Any]
 
@@ -1521,3 +1522,15 @@ class COMMON:
             formatted_parts.append("".join(formatted_tokens))
 
         return "".join(formatted_parts)
+
+    async def check_nzb_file(self, tracker: str, meta: Meta) -> bool:
+        nzb_path = meta.get("nzb_path")
+        if not nzb_path or not os.path.exists(nzb_path):
+            console.print(f"{tracker}: [red]Error: The NZB file is missing. Aborting upload...[/red]")
+            return False
+
+        usenet_cfg = self.config.get("USENET", {})
+        if usenet_cfg.get("archive_password") and not await verify_nzb_has_password(nzb_path):
+            console.print(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
+            return False
+        return True

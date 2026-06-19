@@ -20,15 +20,19 @@ When Usenet uploading is triggered, Upload Assistant executes the following sequ
 
 1. **Binary Check**: Validates that `7z`, `par2`, and `nyuu` are installed and executable.
 2. **Archiving / Splitting**:
-   - If the input is a directory or if a volume size is defined, it runs `7z` with store-only compression (`-mx=0` to save CPU resources) to archive/split the files.
-   - If the input is a single file and no volume size is specified, it bypasses the archiving step and copies/links the file directly.
+   - If the input is a directory, if a volume size is defined, or if `archive_password` is enabled, it runs `7z` with store-only compression (`-mx=0` to save CPU resources) to archive/split the files.
+   - If `archive_password` is configured, it adds `-p{password}` and `-mhe=on` to encrypt the archive and its headers (hiding file names inside the archive).
+   - If the input is a single file and no volume size/password is specified, it bypasses the archiving step and copies/links the file directly.
 3. **Parity File Generation**: Runs `par2` to generate recovery blocks protecting all target files. The redundancy level is controlled by configuration.
-4. **Anonymity Enhancements**:
+4. **Anonymity & Security Enhancements**:
+   - **Obfuscated Filenames**: If `archive_password` is active, the generated `.7z` volumes and `.par2` files are named using a random 32-character hexadecimal string to keep files completely anonymous on Usenet.
    - **Poster/From Header**: Generates a randomized realistic poster name and email (e.g., `Delta Seed <delta456@anon.org>`) to keep uploads anonymous.
    - **Obfuscated Subject**: Generates a random 32-character hexadecimal string as the Usenet post subject line to protect the privacy of the post.
 5. **Posting**: Uploads all prepared files (volumes and parity files) to the specified newsgroup using `nyuu` via NNTP.
-6. **Cleanup**: Automatically deletes the temporary 7z volumes and PAR2 files from the disk upon successful upload.
-7. **NZB Relocation**: Moves the resulting `.nzb` file to your configured output directory.
+6. **NZB Password Injection**: If `archive_password` is enabled, the password is automatically injected inside the `<head>` tag of the generated `.nzb` file using `<meta type="password">your_password</meta>`. This allows downloader clients (like SABnzbd) to automatically decrypt the files.
+7. **Indexer Safeguard Validation**: Before uploading the NZB to each configured indexer, the script verifies that the NZB has the password metadata tag if encryption is active. If the tag is missing, the upload is aborted for safety.
+8. **Cleanup**: Automatically deletes the temporary 7z volumes and PAR2 files from the disk upon successful upload.
+9. **NZB Relocation**: Moves the resulting `.nzb` file to your configured output directory.
 
 ---
 
@@ -60,8 +64,10 @@ config = {
         "poster": "Uploader <up@anon.org>", # Custom poster to use if random_poster is False
         "obscure_subject": True,         # Use a randomized hex string for the post subject (default: True)
 
-        # Archiving & Parity
+        # Archiving & Parity & Encryption
         "rar_volume_size": "auto",       # Volume size (e.g. "100m", "500m", "1g", or "auto" for dynamic sizing)
+        "archive_password": "random",    # Password for 7z archive. "random" (default/recommended) generates a unique random password,
+                                         # a specific string (e.g. "mypass") uses a static password, and None/"" disables encryption.
         "par2_percentage": 10,           # PAR2 redundancy percentage (default: 10)
 
         # Binary Paths (Optional if available in system PATH)

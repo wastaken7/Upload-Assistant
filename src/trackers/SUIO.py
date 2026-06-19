@@ -14,35 +14,39 @@ from fontTools import unicodedata
 from PIL import Image
 
 from src.console import console
+from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
 # These tokens are encrypted with Fernet (AES-128-CBC + HMAC-SHA256).
 # The key is derived from the tracker's Rule 1 via SHA-256.
 # Without the correct unlock_key in config, these URLs cannot be resolved.
-_UPLOAD_TOKEN = (
-    "gAAAAABqM-uO38HcEbdHI076WRQ6C1HkvOh37B-1vg0w7FXwzZZ5JocQcSjGfzwMcLEdjrzy"
-    "sT7JHSazIVYkzQniaJrvTOQVEoVSO2719UmS6jSbd5ohRVZG1vhAcSMfY05kXWWAYCZy"
-)
-_TORRENT_TOKEN = (
-    "gAAAAABqM-uOIBRUsDVelUGFjJ5wBVA-wWuXingF6VooGFEJJzIeookyF-WwlA7s9BstEst7"
-    "MfRS8CbHrn0KS2TMXG9uUfSn-H1iOKXAtg9VHijJENRMJxuAD9g1FjD6wGqsyA27GW9M"
-)
+_UPLOAD_TOKEN = "gAAAAABqM-uO38HcEbdHI076WRQ6C1HkvOh37B-1vg0w7FXwzZZ5JocQcSjGfzwMcLEdjrzysT7JHSazIVYkzQniaJrvTOQVEoVSO2719UmS6jSbd5ohRVZG1vhAcSMfY05kXWWAYCZy"
+_TORRENT_TOKEN = "gAAAAABqM-uOIBRUsDVelUGFjJ5wBVA-wWuXingF6VooGFEJJzIeookyF-WwlA7s9BstEst7MfRS8CbHrn0KS2TMXG9uUfSn-H1iOKXAtg9VHijJENRMJxuAD9g1FjD6wGqsyA27GW9M"
+
+
 def _derive_key(unlock_key: str) -> bytes:
     """Derive a Fernet-compatible key from the unlock_key string."""
     return base64.urlsafe_b64encode(hashlib.sha256(unlock_key.encode()).digest())
+
+
 def _decrypt_token(token: str, key: bytes) -> Optional[str]:
     """Attempt to decrypt a Fernet token; return None on failure."""
     try:
         from cryptography.fernet import Fernet
+
         f = Fernet(key)
         return f.decrypt(token.encode()).decode()
     except Exception:
         return None
+
+
 class SUIO:
-    supported_categories = ('MOVIE', 'TV', 'XXX', 'GAME', 'MUSIC', 'BOOK')
+    supported_categories = ("MOVIE", "TV", "XXX", "GAME", "MUSIC", "BOOK")
+
     def __init__(self, config: Config) -> None:
         self.config = config
+        self.common = COMMON(config)
         self.tracker = "SUIO"
         self.is_usenet = True
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
@@ -55,6 +59,7 @@ class SUIO:
             self.upload_url = None
             self.torrent_url = None
         self.banned_groups: list[str] = []
+
     async def search_existing(self, meta: Meta, _disctype: str) -> list[Any]:
         if not await self.get_additional_checks():
             console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or unlock_key.[/red]")
@@ -62,11 +67,13 @@ class SUIO:
             return []
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
+
     async def get_additional_checks(self) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         api_key = tracker_cfg.get("api_key", "").strip()
         username = tracker_cfg.get("username", "").strip()
         return bool(api_key and username and self.upload_url and self.torrent_url)
+
     def get_category_id(self, meta: Meta) -> str:
         category = meta.get("category", "").upper()
         resolution = str(meta.get("resolution", "")).lower()
@@ -117,6 +124,7 @@ class SUIO:
                 return "29"  # Other: Audiobook
             return "9"  # Other: E-Books
         return "video"  # fallback
+
     def _map_single_language_to_id(self, lang: str) -> str:
         lang = lang.lower().strip()
         if "english" in lang or "eng" in lang or lang == "en":
@@ -148,6 +156,7 @@ class SUIO:
             return "10"
         console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"
+
     def _is_same_language(self, lang_str: str, orig_code: Optional[str]) -> bool:
         if not orig_code:
             return False
@@ -157,6 +166,7 @@ class SUIO:
             return True
         try:
             import langcodes
+
             orig_name = langcodes.Language.get(orig_code).display_name().lower()
             if orig_name in lang_str or lang_str in orig_name:
                 return True
@@ -182,6 +192,7 @@ class SUIO:
                 if val in lang_str or lang_str in val:
                     return True
         return False
+
     def get_language_id(self, meta: Meta) -> str:
         resolve_language = self.config.get("TRACKERS", {}).get(self.tracker, {}).get("resolve_language", True)
         if not resolve_language:
@@ -203,10 +214,12 @@ class SUIO:
             return "9"  # Multi
         console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"  # Auto
+
     async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
         nzb_path = meta.get("nzb_path")
-        if not nzb_path or not os.path.exists(nzb_path):
+        if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
             return None
+
         # Prepare multipart/form-data
         async with aiofiles.open(nzb_path, "rb") as f:
             nzb_content = await f.read()
@@ -259,6 +272,7 @@ class SUIO:
                         cover_content = await f.read()
                     filename = os.path.basename(cover_path)
                 else:
+
                     def _convert_to_jpg(path: str) -> bytes:
                         with Image.open(path) as img:
                             if img.mode in ("RGBA", "LA"):
@@ -271,10 +285,12 @@ class SUIO:
                             buf = io.BytesIO()
                             img.save(buf, format="JPEG", quality=95)
                             return buf.getvalue()
+
                     cover_content = await asyncio.to_thread(_convert_to_jpg, cover_path)
                     filename = os.path.splitext(os.path.basename(cover_path))[0] + ".jpg"
                 files["cover"] = (filename, cover_content, "image/jpeg")
         return files
+
     async def edit_name(self, meta: Meta) -> str:
         tracker_name = meta.get("uuid", "")
         scene_name = meta.get("scene_name") or ""
@@ -318,6 +334,7 @@ class SUIO:
                 }:
                     tracker_name = base
         return tracker_name
+
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         data = {
             "rlsname": await self.edit_name(meta),
@@ -327,19 +344,22 @@ class SUIO:
             "tag": "0",
         }
         return data
+
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         if not self.upload_url:
             console.print(f"[red]{self.tracker}: Unlock key missing or incorrect. Cannot upload.[/red]")
             meta["tracker_status"][self.tracker]["status_message"] = "data error: unlock_key missing or incorrect"
             return False
+
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         username = tracker_cfg.get("username", "").strip()
         api_key = tracker_cfg.get("api_key", "").strip()
+
         files = await self._prepare_files(meta)
         if not files:
-            console.print(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file not found"
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
             return False
+
         data = await self._prepare_data(meta)
         if meta.get("debug", False):
             console.print(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")

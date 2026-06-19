@@ -347,6 +347,52 @@ async def is_valid_nzb(path: str) -> bool:
         return False
 
 
+async def inject_nzb_password(nzb_path: str, password: str) -> None:
+    """Inject <meta type="password">password</meta> into the NZB's <head> section."""
+    if not await aiofiles.ospath.exists(nzb_path):
+        return
+    try:
+        async with aiofiles.open(nzb_path, encoding="utf-8", errors="ignore") as f:
+            content = await f.read()
+
+        head_match = re.search(r"<head\b[^>]*>", content, re.IGNORECASE)
+        if head_match:
+            idx = head_match.end()
+            new_content = content[:idx] + f'\n    <meta type="password">{password}</meta>' + content[idx:]
+        else:
+            nzb_match = re.search(r"<nzb\b[^>]*>", content, re.IGNORECASE)
+            if nzb_match:
+                idx = nzb_match.end()
+                inserted = f'\n  <head>\n    <meta type="password">{password}</meta>\n  </head>'
+                new_content = content[:idx] + inserted + content[idx:]
+            else:
+                return
+
+        async with aiofiles.open(nzb_path, "w", encoding="utf-8") as f:
+            await f.write(new_content)
+    except Exception as e:
+        console.print(f"[red]Error injecting password into NZB file: {e}[/red]")
+
+
+async def verify_nzb_has_password(nzb_path: str) -> bool:
+    """Verify that the NZB file contains a password tag inside the head section."""
+    if not await aiofiles.ospath.isfile(nzb_path):
+        return False
+    try:
+        # Read the first 4096 bytes (the head section is always at the beginning)
+        async with aiofiles.open(nzb_path, encoding="utf-8", errors="ignore") as f:
+            header_sample = await f.read(4096)
+
+        head_match = re.search(r"<head\b[^>]*>(.*?)</head>", header_sample, re.IGNORECASE | re.DOTALL)
+        if head_match:
+            head_content = head_match.group(1)
+            if re.search(r'<meta\s+type=["\']password["\']', head_content, re.IGNORECASE):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optional[str]:
     """
     Prepare files (7z + PAR2) and upload them to Usenet via Nyuu.
@@ -356,6 +402,19 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     if not usenet_cfg:
         console.print("[red]Error: USENET section is missing from configuration.[/red]")
         return None
+
+    # Handle Usenet archive encryption/password
+    archive_password = usenet_cfg.get("archive_password")
+    if archive_password:
+        if str(archive_password).lower() == "random":
+            archive_password = secrets.token_urlsafe(16)
+            if meta.get("debug", False):
+                console.print(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
+            else:
+                console.print("[cyan]Generated unique random password for Usenet archive encryption.[/cyan]")
+        else:
+            console.print("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
+        meta["archive_password"] = archive_password
 
     # Determine paths and names
     base_dir = meta["base_dir"]
@@ -371,6 +430,15 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     # Sanitize name for filenames
     safe_name = "".join(c for c in name if c.isalnum() or c in "._- ")
     safe_name = safe_name.replace(" ", ".")
+
+    # Determine obfuscated archive name if password protection is enabled
+    archive_name = safe_name
+    if archive_password:
+        archive_name = secrets.token_hex(16)
+        if meta.get("debug", False):
+            console.print(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
+        else:
+            console.print("[cyan]Obfuscating archive filenames for security.[/cyan]")
 
     # Determine the directory/folder being processed for the NZB file name
     folder_name = os.path.basename(input_path) if os.path.isdir(input_path) else os.path.basename(os.path.dirname(input_path))
@@ -466,13 +534,16 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         else:
             console.print(f"[cyan]Dynamic volume size chosen: {volume_size.upper()}[/cyan]")
 
-    archive_out = os.path.join(usenet_dir, f"{safe_name}.7z")
+    archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
 
-    if await aiofiles.ospath.isdir(input_path) or volume_size:
+    if await aiofiles.ospath.isdir(input_path) or volume_size or archive_password:
         cmd_7z = [path_7z or "7z", "a", "-mx=0"]
         if volume_size:
             # E.g. -v100m
             cmd_7z.append(f"-v{volume_size.lower()}")
+        if archive_password:
+            # Add password and encrypt header (filenames inside archive)
+            cmd_7z.extend([f"-p{archive_password}", "-mhe=on"])
         cmd_7z.extend([archive_out, input_path])
 
         if is_debug and not path_7z:
@@ -482,7 +553,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             async with aiofiles.open(mock_7z, "wb") as f:
                 await f.write(b"mock 7z volume content")
         else:
-            await run_7z_with_progress(cmd_7z, usenet_dir, safe_name, volume_size, total_size, debug=is_debug)
+            await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size, debug=is_debug)
     else:
         # Single file and no volume size -> just copy/link to usenet dir
         console.print("[cyan]Copying single file for upload...[/cyan]")
@@ -505,7 +576,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     if target_files:
         console.print("[cyan]Generating PAR2 parity files...[/cyan]")
-        par2_file = f"{safe_name}.par2"
+        par2_file = f"{archive_name}.par2"
         relative_target_files = [os.path.basename(f) for f in target_files]
         cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
         if is_debug and not path_par2:
@@ -593,6 +664,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             await f.write(mock_nzb_content)
     else:
         await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir, debug=is_debug)
+
+    # Inject password into NZB metadata if archive password is set
+    if archive_password and await aiofiles.ospath.exists(nzb_file):
+        if is_debug:
+            console.print(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
+        else:
+            console.print("[cyan]Injecting password into NZB metadata...[/cyan]")
+        await inject_nzb_password(nzb_file, archive_password)
 
     # 7. Cleanup compressed volumes after successful upload
     try:

@@ -9,6 +9,7 @@ import httpx
 import langcodes
 
 from src.console import console
+from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -18,6 +19,7 @@ class CRP:
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     def __init__(self, config: Config) -> None:
         self.config = config
+        self.common = COMMON(config)
         self.tracker = "CRP"
         self.is_usenet = True
         self.upload_url = 'https://curupira.cc/v1/releases'
@@ -105,8 +107,9 @@ class CRP:
 
     async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
         nzb_path = meta.get('nzb_path')
-        if not nzb_path or not os.path.exists(nzb_path):
-            return None
+
+        if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
+            return
 
         # Prepare multipart/form-data
         async with aiofiles.open(nzb_path, 'rb') as f:
@@ -222,6 +225,10 @@ class CRP:
         return data
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+        if not await self.common.check_nzb_file(self.tracker, meta):
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
+            return False
+
         tracker_cfg = self.config.get('TRACKERS', {}).get(self.tracker, {})
         api_key = tracker_cfg.get('api_key', '').strip()
 
