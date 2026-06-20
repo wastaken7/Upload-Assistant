@@ -851,6 +851,13 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[pre]{bd_info}[/pre]")
+            elif self.tracker == "PTS":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(mediainfo_sec)
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
             elif self.tracker == "HDT":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
@@ -992,7 +999,7 @@ class DescriptionBuilder:
                     signature = f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/align]"
                 elif self.tracker == "HDS":
                     signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{script_signature}[/size][/url][/center]"
-                elif self.tracker == "HDT":
+                elif self.tracker in ("HDT", "PTS"):
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/right]"
                 else:
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
@@ -1956,6 +1963,27 @@ class DescriptionBuilder:
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
+
+        if tracker == "PTS":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = description.replace("[sup]", "").replace("[/sup]", "")
+            description = description.replace("[sub]", "").replace("[/sub]", "")
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = re.sub(r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]", r"", description, flags=re.DOTALL)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = re.sub(r'\n{3,}', '\n\n', description)
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:
