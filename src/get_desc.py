@@ -889,6 +889,9 @@ class DescriptionBuilder:
             if game_section:
                 desc_parts.append(game_section)
 
+        if meta.get("mteam_description", ""):
+            desc_parts.append(meta.get("mteam_description", ""))
+
         # Description that may come from API requests
         if description:
             meta_description_value = meta.get("description", "")
