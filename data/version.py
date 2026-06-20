@@ -1,5 +1,18 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v1.6"
+
+"""
+Changelog for version v1.6 (2026-06-20):
+
+## What's Changed
+* Usenet: Added archive encryption, obfuscation, and NZB password injection support.
+* Usenet: Added fully random poster name and email generation.
+* Usenet: Fixed 260-character path limit on Windows with PAR2.
+* Trackers: Refactored title formatting and cleaned up redundant type casts (ASC, BJS, BT).
+* Repository links updated in README.
+"""
+
 __version__ = "v1.5"
 
 """
