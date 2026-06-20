@@ -259,7 +259,7 @@ class DescriptionBuilder:
             if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
 
-            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT"):
+            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT", "SPD"):
                 logo_resize_url = str(meta.get("tmdb_logo", ""))
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -516,8 +516,9 @@ class DescriptionBuilder:
                 if isinstance(spec_img, dict):
                     web_url = spec_img.get("web_url")
                     raw_url = spec_img.get("raw_url")
+                    img_url = spec_img.get("img_url", raw_url) or ""
                     if web_url and raw_url:
-                        desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                        desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             desc_parts.append("\n")
             desc_parts.append("[/center]\n")
@@ -528,7 +529,10 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker in ("BJS", "BT", "ASC"):
+        if self.tracker == "TL":
+            table = False
+            header_size = -1
+        elif self.tracker in ("BJS", "BT", "ASC"):
             table = False
             if not header_size:
                 header_size = 3
@@ -633,7 +637,9 @@ class DescriptionBuilder:
 
         game_parts: list[str] = []
 
-        if self.tracker in ("BJS", "BT") and not header_size:
+        if self.tracker == "TL" and not header_size:
+            header_size = 1
+        elif self.tracker in ("BJS", "BT") and not header_size:
             header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
@@ -879,6 +885,13 @@ class DescriptionBuilder:
                     and "vob_mi" in meta["discs"][0]
                 ):
                     desc_parts.append(f"[mediainfo]{meta['discs'][0]['vob_mi']}[/mediainfo]\n\n")
+            elif self.tracker == "TL":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(mediainfo_sec)
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
             else:
                 pass
 
@@ -957,6 +970,8 @@ class DescriptionBuilder:
             if isinstance(nfo_content, str) and nfo_content:
                 if self.tracker == "DC":
                     desc_parts.append(f"[nfo]{nfo_content}[/nfo]")
+                elif self.tracker == "TL":
+                    desc_parts.append(f"<div style='display: flex; justify-content: center;'><div style='background-color: #000000; color: #ffffff;'>{nfo_content}</div></div>")
                 else:
                     desc_parts.append(f"[pre]{nfo_content}[/pre]")
 
@@ -993,6 +1008,8 @@ class DescriptionBuilder:
                     script_signature = f"Compartilhado com {meta['ua_name']} {meta['current_version']}"
                 if self.tracker == "DC":
                     signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]{script_signature}[/url][/center]"
+                elif self.tracker == "TL":
+                    signature = f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{script_signature}</a></div>"""
                 elif self.tracker == "FF":
                     signature = f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{script_signature}[/size][/center][/url]"
                 elif self.tracker == "GPW":
@@ -1785,6 +1802,8 @@ class DescriptionBuilder:
 
         if self.tracker == "HDT":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
+        elif self.tracker == "TL":
+            return f'<a href="{web_url}"><img src="{img_url}" style="max-width: {thumb_size}px;"></a>  '
         elif self.tracker == "FF":
             return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
         elif self.tracker == "GPW":
@@ -1984,6 +2003,25 @@ class DescriptionBuilder:
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
             description = re.sub(r'\n{3,}', '\n\n', description)
+
+        if tracker == "SPD":
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
+            description = description.replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "").replace("[*]", "• ")
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_list(description)
+
+        if tracker == "TL":
+            description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
+            description = re.sub(r"\[\*\]", "\n[*]", description, flags=re.IGNORECASE)
+            description = re.sub(r"\[c\](.*?)\[/c\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)
+            description = re.sub(r"\[hr\]", "---", description, flags=re.IGNORECASE)
+            description = re.sub(r'\[img=[\d"x]+\]', "[img]", description, flags=re.IGNORECASE)
+            description = description.replace("[*] ", "• ").replace("[*]", "• ").replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "")
+            description = bbcode.remove_list(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = re.sub(r"\n{3,}", "\n\n", description)
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:

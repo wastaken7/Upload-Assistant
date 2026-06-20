@@ -8,7 +8,6 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
-from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
@@ -83,126 +82,27 @@ class TL:
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
-        category = meta["category"]
         process_screenshot = not self.tracker_config.get("img_rehost", True) or self.tracker_config.get("api_upload", True)
-
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        # Logo
-        logo, logo_size = await builder.get_logo_section(meta)
-        if logo and logo_size:
-            desc_parts.append(f"""<center><img src="{logo}" style="max-width: {logo_size}px;"></center>""")
-
-        # TV
-        title, episode_overview = await builder.get_tv_info(meta)
-        if episode_overview:
-            desc_parts.append(f"[center]{title}[/center]")
-            desc_parts.append(f'[center]{episode_overview}[/center]')
-
-        # Book details
-        if category == "BOOK":
-            book_section = builder._build_book_desc_section(meta, header_size=-1, table=False)
-            if book_section:
-                desc_parts.append(book_section)
-
-        # Game
-        if category == "GAME":
-            game_section = builder._build_game_desc_section(meta, header_size=1)
-            if game_section:
-                desc_parts.append(game_section)
-
-        # File information
-        desc_parts.append(await builder.get_mediainfo_section(meta))
-        desc_parts.append(await builder.get_bdinfo_section(meta))
-
-        # NFO
-        if meta.get('description_nfo_content', ''):
-            desc_parts.append(f"<div style='display: flex; justify-content: center;'><div style='background-color: #000000; color: #ffffff;'>{meta.get('description_nfo_content')}</div></div>")
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Menus Screenshots
-        if process_screenshot:
-            # Disc menus screenshots header
-            menu_images = cast(list[dict[str, Any]], meta.get("menu_images", []))
-            if menu_images:
-                desc_parts.append(await builder.menu_screenshot_header(meta))
-
-                # Disc menus screenshots
-                menu_screenshots_block = ""
-                for i, image in enumerate(menu_images):
-                    menu_img_url = image.get("img_url")
-                    menu_web_url = image.get("web_url")
-                    if menu_img_url and menu_web_url:
-                        menu_screenshots_block += f"""<a href="{menu_web_url}"><img src="{menu_img_url}" style="max-width: 350px;"></a>  """
-                    if (i + 1) % 2 == 0:
-                        menu_screenshots_block += "<br><br>"
-                if menu_screenshots_block:
-                    desc_parts.append("<center>" + menu_screenshots_block + "</center>")
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Screenshots Section
-        if process_screenshot:
-            images = cast(list[dict[str, Any]], meta.get("image_list", []))
-            if images:
-                # Screenshot Header
-                desc_parts.append(await builder.screenshot_header())
-                # Screenshots
-                screenshots_block = ""
-                for i, image in enumerate(images):
-                    img_url = image.get("img_url")
-                    web_url = image.get("web_url")
-                    if img_url and web_url:
-                        screenshots_block += (
-                            f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
-                        )
-                    if (i + 1) % 2 == 0:
-                        screenshots_block += "<br><br>"
-                if screenshots_block:
-                    desc_parts.append("<center>" + screenshots_block + "</center>")
-
-            # Audio Spectrograms
-            audio_spectrograms = cast(list[dict[str, Any]], meta.get("spectrograms_images", []))
-            if audio_spectrograms:
-                desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
-
-                spectrograms_block = ""
-                for i, image in enumerate(audio_spectrograms):
-                    img_url = image.get("img_url", image.get("raw_url"))
-                    web_url = image.get("web_url")
-                    if img_url and web_url:
-                        spectrograms_block += f"""<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  """
-                    if (i + 1) % 2 == 0:
-                        spectrograms_block += "<br><br>"
-                if spectrograms_block:
-                    desc_parts.append("<center>" + spectrograms_block + "</center>")
-
-        # Signature
-        desc_parts.append(
-            f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{meta.get("ua_signature", "")}</a></div>"""
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=process_screenshot,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=True,
+            menu_screenshots=process_screenshot,
+            nfo=True,
+            screenshots=process_screenshot,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
         )
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
-        description = re.sub(r'\[\*\]', '\n[*]', description, flags=re.IGNORECASE)
-        description = re.sub(r'\[c\](.*?)\[/c\]', r'[code]\1[/code]', description, flags=re.IGNORECASE | re.DOTALL)
-        description = re.sub(r'\[hr\]', '---', description, flags=re.IGNORECASE)
-        description = re.sub(r'\[img=[\d"x]+\]', '[img]', description, flags=re.IGNORECASE)
-        description = description.replace("[*] ", "• ").replace("[*]", "• ").replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "")
-        description = bbcode.remove_list(description)
-        description = bbcode.convert_comparison_to_centered(description, 1000)
-        description = bbcode.remove_spoiler(description)
-        description = re.sub(r'\n{3,}', '\n\n', description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
-            await description_file.write(description)
 
         return description
 
