@@ -926,6 +926,9 @@ class DescriptionBuilder:
         if meta.get("mteam_description", ""):
             desc_parts.append(meta.get("mteam_description", ""))
 
+        if meta.get("nexusphp_description", ""):
+            desc_parts.append(meta.get("nexusphp_description", ""))
+
         # Description that may come from API requests
         if description:
             meta_description_value = meta.get("description", "")
@@ -1800,7 +1803,10 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self.config["DEFAULT"].get("thumbnail_size", "350")
 
-        if self.tracker == "HDT":
+        nexusphp_trackers = {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"}
+        if self.tracker in nexusphp_trackers:
+            return f"[img]{raw_url}[/img]"
+        elif self.tracker == "HDT":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
         elif self.tracker == "TL":
             return f'<a href="{web_url}"><img src="{img_url}" style="max-width: {thumb_size}px;"></a>  '
