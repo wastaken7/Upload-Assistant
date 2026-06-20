@@ -3,13 +3,12 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Union, cast
+from typing import Any, Union
 
 import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -44,59 +43,26 @@ class IS:
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
-
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        # TV
-        title, episode_overview = await builder.get_tv_info(meta)
-        if episode_overview:
-            desc_parts.append(f'Title: {title}')
-            desc_parts.append(f'Overview: {episode_overview}')
-
-        # File information
-        mediainfo = await builder.get_mediainfo_section(meta)
-        if mediainfo:
-            desc_parts.append(f'{mediainfo}')
-
-        bdinfo = await builder.get_bdinfo_section(meta)
-        if bdinfo:
-            desc_parts.append(f'{bdinfo}')
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Screenshots
-        images_value = meta.get('image_list', [])
-        images: list[dict[str, Any]] = []
-        if isinstance(images_value, list):
-            images_list = cast(list[Any], images_value)
-            images.extend(
-                [
-                    cast(dict[str, Any], item)
-                    for item in images_list
-                    if isinstance(item, dict)
-                ]
-            )
-        if images:
-            screenshots_block = ''
-            for image in images:
-                raw_url = str(image.get('raw_url', ''))
-                if raw_url:
-                    screenshots_block += f"{raw_url}\n"
-            desc_parts.append('Screenshots:\n' + screenshots_block)
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=False,
+            mediainfo=True,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+        )
 
         return description
 

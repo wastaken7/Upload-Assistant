@@ -844,7 +844,7 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
-            elif self.tracker in ("FF", "HDS", "IPT"):
+            elif self.tracker in ("FF", "HDS", "IPT", "IS"):
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
