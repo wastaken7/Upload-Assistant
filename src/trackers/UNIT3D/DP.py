@@ -4,7 +4,6 @@ from typing import Any, cast
 import cli_ui
 
 from src.console import console
-from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
@@ -63,30 +62,6 @@ class DP(UNIT3D):
             return False
 
         return should_continue
-
-    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        if meta.get('logo', "") == "":
-            TMDB_API_KEY = self.config['DEFAULT'].get('tmdb_api')
-            TMDB_BASE_URL = "https://api.themoviedb.org/3"
-            tmdb_id_raw = meta.get('tmdb')
-            tmdb_id = int(tmdb_id_raw) if isinstance(tmdb_id_raw, (int, str)) and str(tmdb_id_raw).isdigit() else 0
-            category = str(meta.get('category', ''))
-            debug = bool(meta.get('debug'))
-            logo_languages = ['da', 'sv', 'no', 'fi', 'is', 'en']
-            tmdb_api_key = str(TMDB_API_KEY) if TMDB_API_KEY else ''
-            if tmdb_id and category:
-                logo_path = await self.tmdb_manager.get_logo(
-                    tmdb_id,
-                    category,
-                    debug,
-                    logo_languages=logo_languages,
-                    TMDB_API_KEY=tmdb_api_key,
-                    TMDB_BASE_URL=TMDB_BASE_URL,
-                )
-                if logo_path:
-                    meta['logo'] = logo_path
-
-        return {'description': await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data = {

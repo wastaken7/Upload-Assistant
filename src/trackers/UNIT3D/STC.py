@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import cli_ui
 
@@ -91,13 +91,9 @@ class STC(UNIT3D):
         )
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
-        image_list = meta['STC_images_key'] if 'STC_images_key' in meta else meta.get('image_list', [])
-        image_list = cast(list[Any], image_list)
-
         return {
-            'description': await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
+            "description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
                 meta,
-                image_list=image_list,
                 approved_image_hosts=self.approved_image_hosts,
             )
         }

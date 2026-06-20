@@ -18,6 +18,7 @@ from src.console import console
 from src.languages import languages_manager
 from src.takescreens import TakeScreensManager
 from src.trackers.COMMON import COMMON
+from src.trackersetup import api_trackers as unit3d_trackers
 from src.uploadscreens import UploadScreensManager
 
 
@@ -256,6 +257,15 @@ class DescriptionBuilder:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
         try:
+            if self.tracker in ("BJS", "ANT", "GPW"):
+                logo_resize_url = str(meta.get("tmdb_logo", ""))
+                if logo_resize_url:
+                    if logo_resize_url.endswith(".svg"):
+                        logo_resize_url = logo_resize_url.replace(".svg", ".png")
+                    logo = f"https://image.tmdb.org/t/p/w300/{logo_resize_url}"
+                    logo_size = "300"
+                    return logo, logo_size
+
             if not self.tracker_config.get(
                 "add_logo", self.config["DEFAULT"].get("add_logo", False)
             ):
@@ -276,6 +286,14 @@ class DescriptionBuilder:
         image: str = ""
         overview: str = ""
         try:
+            if self.tracker == "BJS":
+                episode_tmdb_data = meta.get("episode_tmdb_data", {})
+                title = episode_tmdb_data.get("name", "")
+                still_path = episode_tmdb_data.get("still_path", "")
+                image = f"https://image.tmdb.org/t/p/w300{still_path}" if still_path else ""
+                overview = episode_tmdb_data.get("overview", "")
+                return title, image, overview
+
             if (
                 not self.tracker_config.get(
                     "episode_overview", self.config["DEFAULT"].get("episode_overview", False)
@@ -538,6 +556,11 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
+        if self.tracker == "BJS":
+            table = False
+            if not header_size:
+                header_size = 3
+
         asin = meta.get("asin")
         author = meta.get("author")
         book_parts: list[str] = []
@@ -607,7 +630,7 @@ class DescriptionBuilder:
 
             if overview:
                 header_size_val = header_size if header_size else 4
-                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td][i]{overview}[/i][/td][/tr]")
+                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td]{overview}[/td][/tr]")
 
             book_p = "\n".join(final_book_parts)
             return "[table]\n" + book_p + "\n[/table]"
@@ -627,8 +650,7 @@ class DescriptionBuilder:
                 final_book_parts.append(f"{header}{str_technical_details.upper() if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
 
             if overview:
-                overview_content = f"[i]{overview}[/i]" if self.tracker == "TL" else overview
-                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview_content}")
+                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview}")
 
             return "\n\n".join(final_book_parts)
 
@@ -638,6 +660,10 @@ class DescriptionBuilder:
             return ""
 
         game_parts: list[str] = []
+
+        if self.tracker == "BJS":
+            if not header_size:
+                header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
@@ -764,15 +790,33 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
-    async def unit3d_edit_desc(
+    async def edit_desc(
         self,
         meta: dict[str, Any],
-        signature: str = "",
-        comparison: bool = False,
         desc_header: str = "",
-        image_list: Union[list[dict[str, str]], None] = None,
         approved_image_hosts: Union[list[str], None] = None,
+        # Section controls
+        audio_spectrogram: bool = True,
+        bluray: bool = True,
+        book: bool = True,
+        custom_header: bool = True,
+        custom_signature: bool = True,
+        description: bool = True,
+        game: bool = True,
+        languages: bool = True,
+        logo: bool = True,
+        mediainfo: bool = False,
+        menu_screenshots: bool = True,
+        screenshots: bool = True,
+        signature: str = "",
+        tonemapped_header: bool = True,
+        tv_info: bool = True,
+        ua_signature: bool = True,
+        user_description: bool = True,
     ) -> str:
+        image_list = meta[f"{self.tracker}_images_key"] if f"{self.tracker}_images_key" in meta else meta.get("image_list", [])
+        image_list = cast(list[Any], image_list)
+
         if image_list is None:
             image_list = []
         if approved_image_hosts is None:
@@ -781,7 +825,7 @@ class DescriptionBuilder:
             images = image_list
             multi_screens = 0
         else:
-            images = meta["image_list"]
+            images = meta.get("image_list", [])
             multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
         if meta.get("sorted_filelist"):
             multi_screens = 0
@@ -789,148 +833,175 @@ class DescriptionBuilder:
         desc_parts: list[str] = []
 
         # Custom Header
-        if not desc_header:
-            desc_header = await self.get_custom_header()
-        if desc_header:
-            desc_parts.append(desc_header + "\n")
+        if custom_header:
+            if not desc_header:
+                desc_header = await self.get_custom_header()
+            if desc_header:
+                desc_parts.append(desc_header + "\n")
 
         # Language
-        try:
-            if not meta.get("language_checked", False):
-                await languages_manager.process_desc_language(meta, self.tracker)
-            if meta.get("audio_languages") and meta.get("write_audio_languages"):
-                desc_parts.append(f"[code]Audio Language/s: {', '.join(meta['audio_languages'])}[/code]")
+        if languages:
+            try:
+                if not meta.get("language_checked", False):
+                    await languages_manager.process_desc_language(meta, self.tracker)
+                if meta.get("audio_languages") and meta.get("write_audio_languages"):
+                    desc_parts.append(f"[code]Audio Language/s: {', '.join(meta['audio_languages'])}[/code]")
 
-            if meta["subtitle_languages"] and meta["write_subtitle_languages"]:
-                desc_parts.append(
-                    f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
-            if meta["subtitle_languages"] and meta["write_hc_languages"]:
-                desc_parts.append(
-                    f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
-        except Exception as e:
-            console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
+                if meta["subtitle_languages"] and meta["write_subtitle_languages"]:
+                    desc_parts.append(f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
+                if meta["subtitle_languages"] and meta["write_hc_languages"]:
+                    desc_parts.append(f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
 
         # Logo
-        logo, logo_size = await self.get_logo_section(meta)
-        if logo and logo_size:
-            desc_parts.append(f"[center][img={logo_size}]{logo}[/img][/center]\n")
+        if logo:
+            logo_url, logo_size = await self.get_logo_section(meta)
+            if logo_url and logo_size:
+                desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
+
+        # Mediainfo / BDInfo section for trackers like BJS
+        if mediainfo:
+            if self.tracker == "BJS":
+                if meta.get("is_disc", "") == "DVD":
+                    desc_parts.append(f"[hide=DVD MediaInfo][pre]{await self.get_mediainfo_section(meta)}[/pre][/hide]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
+            else:
+                pass
 
         # Blu-ray
-        release_url, cover_images = await self.get_bluray_section(meta)
-        if release_url:
-            desc_parts.append(f"[center]{release_url}[/center]")
-        if cover_images:
-            desc_parts.append(f"[center]{cover_images}[/center]\n")
+        if bluray:
+            release_url, cover_images = await self.get_bluray_section(meta)
+            if release_url:
+                desc_parts.append(f"[center]{release_url}[/center]")
+            if cover_images:
+                desc_parts.append(f"[center]{cover_images}[/center]\n")
 
         # TV
-        title, _, episode_overview = await self.get_tv_info(meta)
-        if episode_overview:
-            if self.tracker == "HUNO":
-                if title:
-                    desc_parts.append(f"[center]{title}[/center]\n")
-                desc_parts.append(f"[center]{episode_overview}[/center]\n")
-            else:
-                if title:
-                    desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
-                desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
+        if tv_info:
+            title, image, episode_overview = await self.get_tv_info(meta)
+            if episode_overview:
+                if self.tracker == "BJS":
+                    if title:
+                        desc_parts.append(f"[center]{title}[/center]\n")
+                    if image:
+                        desc_parts.append(f"[center][img]{image}[/img][/center]\n")
+                    desc_parts.append(f"[center]{episode_overview}[/center]\n")
+                elif self.tracker == "HUNO":
+                    if title:
+                        desc_parts.append(f"[center]{title}[/center]\n")
+                    desc_parts.append(f"[center]{episode_overview}[/center]\n")
+                else:
+                    if title:
+                        desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
+                    desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
 
         # Book details
-        if meta.get("category") == "BOOK":
+        if book and meta.get("category") == "BOOK":
             book_section = self._build_book_desc_section(meta)
             if book_section:
                 desc_parts.append(book_section)
 
         # Game details
-        if meta.get("category") == "GAME":
+        if game and meta.get("category") == "GAME":
             game_section = self._build_game_desc_section(meta)
             if game_section:
                 desc_parts.append(game_section)
 
         # Description that may come from API requests
-        meta_description_value = meta.get("description", "")
-        if isinstance(meta_description_value, str):
-            meta_description = meta_description_value
-        elif meta_description_value is None:
-            meta_description = ""
-        else:
-            meta_description = str(meta_description_value)
-        # Add FraMeSToR NFO to Aither
-        if self.tracker == "AITHER" and "framestor" in meta and meta["framestor"]:
-            nfo_content = meta.get("description_nfo_content", "")
-            if nfo_content:
-                aither_framestor_nfo = f"[code]{nfo_content}[/code]"
-                aither_framestor_nfo = aither_framestor_nfo.replace(
-                    "https://i.imgur.com/e9o0zpQ.png",
-                    "https://beyondhd.co/images/2017/11/30/c5802892418ee2046efba17166f0cad9.png",
-                )
-                images = []
-                desc_parts.append(aither_framestor_nfo)
+        if description:
+            meta_description_value = meta.get("description", "")
+            if isinstance(meta_description_value, str):
+                meta_description = meta_description_value
+            elif meta_description_value is None:
+                meta_description = ""
             else:
-                # Remove NFO from description
-                meta_description = re.sub(
-                    r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]",
-                    "",
-                    meta_description,
-                    flags=re.DOTALL,
-                )
-                if meta_description:
-                    desc_parts.append(meta_description)
-        elif meta_description:
-            desc_parts.append(meta_description)
+                meta_description = str(meta_description_value)
+            # Add FraMeSToR NFO to Aither
+            if self.tracker == "AITHER" and "framestor" in meta and meta["framestor"]:
+                nfo_content = meta.get("description_nfo_content", "")
+                if nfo_content:
+                    aither_framestor_nfo = f"[code]{nfo_content}[/code]"
+                    aither_framestor_nfo = aither_framestor_nfo.replace(
+                        "https://i.imgur.com/e9o0zpQ.png",
+                        "https://beyondhd.co/images/2017/11/30/c5802892418ee2046efba17166f0cad9.png",
+                    )
+                    images = []
+                    desc_parts.append(aither_framestor_nfo)
+                else:
+                    # Remove NFO from description
+                    meta_description = re.sub(
+                        r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]",
+                        "",
+                        meta_description,
+                        flags=re.DOTALL,
+                    )
+                    if meta_description:
+                        desc_parts.append(meta_description)
+            elif meta_description:
+                desc_parts.append(meta_description)
 
         # Description from file/pastebin link
-        desc_parts.append(await self.get_user_description(meta))
+        if user_description:
+            desc_parts.append(await self.get_user_description(meta))
 
         # Menu Screenshots
-        desc_parts.append(await self.menu_section(meta))
+        if menu_screenshots:
+            desc_parts.append(await self.menu_section(meta))
 
         # Tonemapped Header
-        desc_parts.append(await self.get_tonemapped_header(meta))
+        if tonemapped_header:
+            desc_parts.append(await self.get_tonemapped_header(meta))
 
         # Discs and Screenshots
-        discs_and_screenshots = await self._handle_discs_and_screenshots(
-            meta, approved_image_hosts, images, multi_screens
-        )
-        desc_parts.append(discs_and_screenshots)
+        if screenshots:
+            discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens)
+            desc_parts.append(discs_and_screenshots)
 
         # Audio Spectrograms
-        desc_parts.append(await self.get_audio_spectrogram_section(meta))
+        if audio_spectrogram:
+            desc_parts.append(await self.get_audio_spectrogram_section(meta))
 
         # Custom Signature
-        desc_parts.append(await self.get_custom_signature())
+        if custom_signature:
+            desc_parts.append(await self.get_custom_signature())
 
         # UA Signature
-        if not signature:
-            signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
-            if self.tracker == "HUNO":
-                signature = signature.replace("[size=4]", "[size=8]")
-        desc_parts.append(signature)
+        if ua_signature:
+            if not signature:
+                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.get('ua_signature', '')}[/size][/url][/right]"
+                if self.tracker == "HUNO":
+                    signature = signature.replace("[size=4]", "[size=8]")
+            desc_parts.append(signature)
 
-        description: str = "\n".join(
-            part for part in desc_parts
-            if str(part).strip()
-        )
+        description_str: str = "\n".join(part for part in desc_parts if str(part).strip())
 
         # Formatting
-        bbcode = BBCODE()
-        description = bbcode.convert_hide_to_spoiler(description)
-        description = description.replace("[user]", "").replace("[/user]", "")
-        description = description.replace("[hr]", "").replace("[/hr]", "")
-        description = description.replace("[ul]", "").replace("[/ul]", "")
-        description = description.replace("[ol]", "").replace("[/ol]", "")
-        description = bbcode.remove_extra_lines(description)
-        if comparison is False:
-            description = bbcode.convert_comparison_to_collapse(description, 1000)
+        description_str = self.tracker_specific_formats(self.tracker, description_str)
 
-        if meta['debug']:
+        if meta.get("debug", False):
             desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
             console.print(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
-                await description_file.write(description)
+                await description_file.write(description_str)
 
-        return description
+        return description_str
+
+    async def unit3d_edit_desc(
+        self,
+        meta: dict[str, Any],
+        signature: str = "",
+        desc_header: str = "",
+        approved_image_hosts: Union[list[str], None] = None,
+    ) -> str:
+        return await self.edit_desc(
+            meta,
+            signature=signature,
+            desc_header=desc_header,
+            approved_image_hosts=approved_image_hosts,
+        )
 
     async def _check_saved_pack_image_links(self, meta: dict[str, Any], approved_image_hosts: list[str]) -> dict[str, Any]:
         pack_images_file = os.path.join(meta["base_dir"], "tmp", meta["uuid"], "pack_image_links.json")
@@ -1658,3 +1729,22 @@ class DescriptionBuilder:
             console.print(f"[yellow]Warning: Error processing disc menu section: {str(e)}[/yellow]")
 
         return menu_image_section
+
+    def tracker_specific_formats(self, tracker: str, description: str) -> str:
+        bbcode = BBCODE()
+        if tracker == "BJS":
+            description = bbcode.convert_named_spoiler_to_named_hide(description)
+            description = bbcode.convert_spoiler_to_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_list(description)
+
+        if tracker in unit3d_trackers:
+            description = bbcode.convert_hide_to_spoiler(description)
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.convert_comparison_to_collapse(description, 1000)
+
+        return bbcode.remove_extra_lines(description)

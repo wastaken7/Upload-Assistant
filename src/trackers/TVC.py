@@ -532,7 +532,7 @@ class TVC:
 
         # build description and capture return instead of reopening file
         descfile_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], f"[{self.tracker}]DESCRIPTION.txt")
-        desc = await self.unit3d_edit_desc(meta, self.tracker, self.signature, image_list)
+        desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
         if not desc:
             console.print(f"[yellow]Warning: DESCRIPTION.txt file not found at {descfile_path}")
@@ -866,7 +866,7 @@ class TVC:
 
         return dupes
 
-    async def unit3d_edit_desc(
+    async def edit_desc(
         self,
         meta: Meta,
         tracker: str,
