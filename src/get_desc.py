@@ -858,6 +858,20 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[left][font=consolas]{bd_info}[/font][/left]")
+            elif self.tracker == "MTV":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[mediainfo]{mediainfo_sec}[/mediainfo]\n\n")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[mediainfo]{bd_info}[/mediainfo]\n\n")
+                if (
+                    meta.get("is_disc") == "DVD"
+                    and isinstance(meta.get("discs"), list)
+                    and len(meta["discs"]) > 0
+                    and "vob_mi" in meta["discs"][0]
+                ):
+                    desc_parts.append(f"[mediainfo]{meta['discs'][0]['vob_mi']}[/mediainfo]\n\n")
             else:
                 pass
 
@@ -923,7 +937,12 @@ class DescriptionBuilder:
                     if meta_description:
                         desc_parts.append(meta_description)
             elif meta_description:
-                desc_parts.append(meta_description)
+                if self.tracker == "MTV":
+                    meta_description = re.sub(r'\[/?quote\]', '', meta_description, flags=re.IGNORECASE).strip()
+                    if meta_description:
+                        desc_parts.append(f"[spoiler=Notes]{meta_description}[/spoiler]")
+                else:
+                    desc_parts.append(meta_description)
 
         # NFO details
         if nfo:
@@ -1768,6 +1787,8 @@ class DescriptionBuilder:
                 return f"[url={web_url}][img]{img_url}[/img][/url]\n"
             else:
                 return f"[url={web_url}][img]{img_url}[/img][/url] "
+        elif self.tracker == "MTV":
+            return f"[url={raw_url}][img={thumb_size}]{img_url}[/img][/url] "
         else:
             return f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
 

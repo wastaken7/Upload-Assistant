@@ -14,6 +14,7 @@ import pyotp
 from defusedxml import ElementTree as ET
 
 from src.console import console
+from src.get_desc import DescriptionBuilder
 from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -219,50 +220,31 @@ class MTV:
             return True  # Debug mode - simulated success
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding='utf-8') as f:
-            base = await f.read()
+        builder = DescriptionBuilder(self.tracker, self.config)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=False,
+            book=False,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=False,
+            languages=False,
+            logo=True,
+            mediainfo=True,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+        )
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as desc:
-            if meta['bdinfo'] is not None:
-                mi_dump = None
-                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", encoding='utf-8') as f:
-                    bd_dump = await f.read()
-            else:
-                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", encoding='utf-8') as f:
-                    mi_dump = (await f.read()).strip()
-                bd_dump = None
-
-            if bd_dump:
-                await desc.write("[mediainfo]" + bd_dump + "[/mediainfo]\n\n")
-            elif mi_dump:
-                await desc.write("[mediainfo]" + mi_dump + "[/mediainfo]\n\n")
-
-            if (
-                meta.get('is_disc') == "DVD" and
-                isinstance(meta.get('discs'), list) and
-                len(meta['discs']) > 0 and
-                'vob_mi' in meta['discs'][0]
-            ):
-                await desc.write("[mediainfo]" + meta['discs'][0]['vob_mi'] + "[/mediainfo]\n\n")
-            try:
-                if meta.get('tonemapped', False) and self.config['DEFAULT'].get('tonemapped_header', None):
-                    if meta.get("debug", False):
-                        console.print("[green]Adding tonemapped header to description")
-                    tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
-                    await desc.write(tonemapped_header)
-                    await desc.write("\n\n")
-            except Exception as e:
-                console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
-            images = meta[f'{self.tracker}_images_key'] if f'{self.tracker}_images_key' in meta else meta['image_list']
-            if len(images) > 0:
-                for image in images:
-                    raw_url = image['raw_url']
-                    img_url = image['img_url']
-                    await desc.write(f"[url={raw_url}][img=250]{img_url}[/img][/url]")
-
-            base = re.sub(r'\[/?quote\]', '', base, flags=re.IGNORECASE).strip()
-            if base != "":
-                await desc.write(f"\n\n[spoiler=Notes]{base}[/spoiler]")
+        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
+            await f.write(description)
 
         return
 
