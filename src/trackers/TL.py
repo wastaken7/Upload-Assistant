@@ -96,13 +96,9 @@ class TL:
             desc_parts.append(f"""<center><img src="{logo}" style="max-width: {logo_size}px;"></center>""")
 
         # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta)
+        title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
-            desc_parts.append(f'[center]{title}[/center]')
-
-            if episode_image:
-                desc_parts.append(f"[center]<img src='{episode_image}' style='max-width: 350px;'></a>[/center]")
-
+            desc_parts.append(f"[center]{title}[/center]")
             desc_parts.append(f'[center]{episode_overview}[/center]')
 
         # Book details

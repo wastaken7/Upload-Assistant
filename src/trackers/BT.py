@@ -17,7 +17,6 @@ import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -164,6 +163,7 @@ class BT:
 
         self.main_tmdb_data = main_ptbr_data or {}
         self.episode_tmdb_data = episode_ptbr_data or {}
+        meta["episode_tmdb_data"] = self.episode_tmdb_data
 
         return
 
@@ -581,90 +581,28 @@ class BT:
 
     async def get_description(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
+        # Set episode_tmdb_data on meta for general_description_generator to pick it up
+        meta["episode_tmdb_data"] = self.episode_tmdb_data
 
-        # Custom Header
-        custom_header = await builder.get_custom_header()
-        desc_parts.append(custom_header)
-
-        if meta.get("category") == "BOOK":
-            custom_header = await builder.get_custom_header()
-            if custom_header:
-                desc_parts.append(custom_header)
-
-            book_desc = self.build_book_desc(meta)
-            if book_desc:
-                desc_parts.append(book_desc)
-
-            user_desc = await builder.get_user_description(meta)
-            if user_desc:
-                desc_parts.append(user_desc)
-
-            audiobook = bool(meta.get("audiobook", False))
-            magazine = bool(meta.get("magazine", False))
-            comic = bool(meta.get("comic", False))
-
-            if audiobook or not (magazine or comic):  # audiobook or eBook
-                audio_spectrograms = meta.get("spectrograms_images", [])
-                if audio_spectrograms:
-                    spectrograms_header = self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
-                    spectrograms_block = ""
-                    for image in audio_spectrograms:
-                        web_url = image.get("web_url")
-                        img_url = image.get("img_url")
-                        if isinstance(web_url, str) and isinstance(img_url, str) and web_url and img_url:
-                            spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url] "
-                    if spectrograms_block:
-                        desc_parts.append(f"\n\n{spectrograms_header}\n[center]{spectrograms_block}[/center]")
-
-        # Game
-        game_section = builder._build_game_desc_section(meta, header_size=3)
-        if game_section:
-            desc_parts.append(game_section)
-
-        # Logo
-        logo_resize_url = meta.get("tmdb_logo", "")
-        if logo_resize_url:
-            desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
-
-        # TV
-        title_value = self.episode_tmdb_data.get("name")
-        title = title_value if isinstance(title_value, str) else ""
-
-        episode_image_value = self.episode_tmdb_data.get("still_path")
-        episode_image = episode_image_value if isinstance(episode_image_value, str) else ""
-
-        episode_overview_value = self.episode_tmdb_data.get("overview")
-        episode_overview = episode_overview_value if isinstance(episode_overview_value, str) else ""
-
-        if episode_overview:
-            desc_parts.append(f"[center]{title}[/center]")
-
-            if episode_image:
-                desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300{episode_image}[/img][/center]")
-
-            desc_parts.append(f"[center]{episode_overview}[/center]")
-
-        # User description
-        user_description = await builder.get_user_description(meta)
-        desc_parts.append(user_description)
-
-        # Tonemapped Header
-        tonemapped_header = await builder.get_tonemapped_header(meta)
-        desc_parts.append(tonemapped_header)
-
-        # Signature
-        desc_parts.append(f"[center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta['ua_name']} {meta['current_version']}[/url][/center]")
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = bbcode.remove_img_resize(description)
-        description = bbcode.remove_list(description)
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=False,
+            book=True,
+            custom_header=True,
+            custom_signature=False,
+            description=False,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=False,
+            screenshots=False,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+        )
 
         return description
 

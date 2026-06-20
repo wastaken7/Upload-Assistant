@@ -214,7 +214,7 @@ class SPD:
         desc_parts: list[str] = []
 
         user_description = await builder.get_user_description(meta)
-        title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
+        title, episode_overview = await builder.get_tv_info(meta)
         if user_description or episode_overview or meta["category"] in ("BOOK", "GAME"):  # Avoid unnecessary descriptions
             # Custom Header
             desc_parts.append(await builder.get_custom_header())
@@ -226,11 +226,7 @@ class SPD:
 
             # TV
             if episode_overview:
-                desc_parts.append(f'[center]{title}[/center]')
-
-                if episode_image:
-                    desc_parts.append(f"[center][img]{episode_image}[/img][/center]")
-
+                desc_parts.append(f"[center]{title}[/center]")
                 desc_parts.append(f'[center]{episode_overview}[/center]')
 
             # User description

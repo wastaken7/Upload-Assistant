@@ -257,7 +257,10 @@ class DescriptionBuilder:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
         try:
-            if self.tracker in ("BJS", "ANT", "GPW"):
+            if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
+                return logo, logo_size
+
+            if self.tracker in ("BJS", "ANT", "GPW", "BT"):
                 logo_resize_url = str(meta.get("tmdb_logo", ""))
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -265,11 +268,6 @@ class DescriptionBuilder:
                     logo = f"https://image.tmdb.org/t/p/w300/{logo_resize_url}"
                     logo_size = "300"
                     return logo, logo_size
-
-            if not self.tracker_config.get(
-                "add_logo", self.config["DEFAULT"].get("add_logo", False)
-            ):
-                return logo, logo_size
 
             logo = meta.get("logo", "")
             logo_size = self.config["DEFAULT"].get("logo_size", "300")
@@ -281,26 +279,18 @@ class DescriptionBuilder:
 
         return logo, logo_size
 
-    async def get_tv_info(self, meta: dict[str, Any], resize: bool = False) -> tuple[str, str, str]:
+    async def get_tv_info(self, meta: dict[str, Any]) -> tuple[str, str]:
         title: str = ""
-        image: str = ""
         overview: str = ""
         try:
-            if self.tracker == "BJS":
+            if not self.tracker_config.get("episode_overview", self.config["DEFAULT"].get("episode_overview", False)) or meta["category"] != "TV":
+                return title, overview
+
+            if self.tracker in ("BJS", "BT"):
                 episode_tmdb_data = meta.get("episode_tmdb_data", {})
                 title = episode_tmdb_data.get("name", "")
-                still_path = episode_tmdb_data.get("still_path", "")
-                image = f"https://image.tmdb.org/t/p/w300{still_path}" if still_path else ""
                 overview = episode_tmdb_data.get("overview", "")
-                return title, image, overview
-
-            if (
-                not self.tracker_config.get(
-                    "episode_overview", self.config["DEFAULT"].get("episode_overview", False)
-                )
-                or meta["category"] != "TV"
-            ):
-                return title, image, overview
+                return title, overview
 
             tvmaze_episode_data = meta.get("tvmaze_episode_data", {})
 
@@ -314,24 +304,7 @@ class DescriptionBuilder:
                 overview = html_to_bbcode(overview)
 
             episode_name = tvmaze_episode_data.get("episode_name", "")
-            episode_title = meta.get("auto_episode_title") or (
-                episode_name
-                if (
-                    not episode_name.lower().startswith("episode")
-                    and "tba" not in episode_name.lower()
-                )
-                else ""
-            )
-
-            image = ""
-            if meta.get("tv_pack", False):
-                image = tvmaze_episode_data.get("series_image", "")
-                if resize:
-                    image = tvmaze_episode_data.get("series_image_medium", "")
-            else:
-                image = tvmaze_episode_data.get("image", "")
-                if resize:
-                    image = tvmaze_episode_data.get("image_medium", "")
+            episode_title = meta.get("auto_episode_title") or (episode_name if (not episode_name.lower().startswith("episode") and "tba" not in episode_name.lower()) else "")
 
             title = ""
             if season_name:
@@ -347,7 +320,7 @@ class DescriptionBuilder:
         except Exception as e:
             console.print(f"[yellow]Warning: Error getting TV info: {str(e)}[/yellow]")
 
-        return title, image, overview
+        return title, overview
 
     async def get_mediainfo_section(self, meta: dict[str, Any]) -> str:
         """Returns the mediainfo section, using a cache file if available."""
@@ -556,7 +529,7 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker == "BJS":
+        if self.tracker in ("BJS", "BT", "ASC"):
             table = False
             if not header_size:
                 header_size = 3
@@ -661,9 +634,8 @@ class DescriptionBuilder:
 
         game_parts: list[str] = []
 
-        if self.tracker == "BJS":
-            if not header_size:
-                header_size = 3
+        if self.tracker in ("BJS", "BT") and not header_size:
+            header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
@@ -790,7 +762,7 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
-    async def edit_desc(
+    async def general_description_generator(
         self,
         meta: dict[str, Any],
         desc_header: str = "",
@@ -881,22 +853,11 @@ class DescriptionBuilder:
 
         # TV
         if tv_info:
-            title, image, episode_overview = await self.get_tv_info(meta)
+            title, episode_overview = await self.get_tv_info(meta)
             if episode_overview:
-                if self.tracker == "BJS":
-                    if title:
-                        desc_parts.append(f"[center]{title}[/center]\n")
-                    if image:
-                        desc_parts.append(f"[center][img]{image}[/img][/center]\n")
-                    desc_parts.append(f"[center]{episode_overview}[/center]\n")
-                elif self.tracker == "HUNO":
-                    if title:
-                        desc_parts.append(f"[center]{title}[/center]\n")
-                    desc_parts.append(f"[center]{episode_overview}[/center]\n")
-                else:
-                    if title:
-                        desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
-                    desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
+                if title:
+                    desc_parts.append(f"[center]{title}[/center]\n")
+                desc_parts.append(f"[center]{episode_overview}[/center]\n")
 
         # Book details
         if book and meta.get("category") == "BOOK":
@@ -971,7 +932,10 @@ class DescriptionBuilder:
         # UA Signature
         if ua_signature:
             if not signature:
-                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.get('ua_signature', '')}[/size][/url][/right]"
+                script_signature = meta.get("ua_signature", "")
+                if self.tracker in ("ASC", "BJS", "BT", "CBR", "LCD"):
+                    script_signature = f"Compartilhado com {meta['ua_name']} {meta['current_version']}"
+                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
                 if self.tracker == "HUNO":
                     signature = signature.replace("[size=4]", "[size=8]")
             desc_parts.append(signature)
@@ -996,7 +960,7 @@ class DescriptionBuilder:
         desc_header: str = "",
         approved_image_hosts: Union[list[str], None] = None,
     ) -> str:
-        return await self.edit_desc(
+        return await self.general_description_generator(
             meta,
             signature=signature,
             desc_header=desc_header,
@@ -1732,12 +1696,24 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
+        if tracker == "BT":
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.remove_list(description)
+
         if tracker == "BJS":
             description = bbcode.convert_named_spoiler_to_named_hide(description)
             description = bbcode.convert_spoiler_to_hide(description)
             description = bbcode.remove_img_resize(description)
             description = bbcode.convert_to_align(description)
             description = bbcode.remove_list(description)
+
+        if tracker == "ANT":
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_list(description)
+            description = description.replace("•", "-").replace("’", "'").replace("–", "-")
 
         if tracker in unit3d_trackers:
             description = bbcode.convert_hide_to_spoiler(description)

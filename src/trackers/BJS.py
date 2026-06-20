@@ -138,7 +138,6 @@ class BJS:
 
         self.main_tmdb_data = main_ptbr_data or {}
         self.episode_tmdb_data = episode_ptbr_data or {}
-        meta["episode_tmdb_data"] = self.episode_tmdb_data
 
         return
 
@@ -519,11 +518,9 @@ class BJS:
 
     async def build_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        ua_name = meta.get("ua_name", "Upload Assistant")
-        current_version = meta.get("current_version", "")
-        signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {ua_name} {current_version}[/url][/center]"
+        meta["episode_tmdb_data"] = self.episode_tmdb_data
 
-        description = await builder.edit_desc(
+        description = await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -537,7 +534,6 @@ class BJS:
             mediainfo=True,
             menu_screenshots=False,
             screenshots=False,
-            signature=signature,
             tonemapped_header=True,
             tv_info=True,
             ua_signature=True,

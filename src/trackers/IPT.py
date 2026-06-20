@@ -121,10 +121,9 @@ class IPT:
         desc_parts.append(await builder.get_custom_header())
 
         # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
+        title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
             desc_parts.append(f"[center]{title}[/center]")
-
             desc_parts.append(f"[center]{episode_overview}[/center]")
 
         # File information

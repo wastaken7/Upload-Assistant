@@ -10,7 +10,6 @@ import aiofiles
 import cli_ui
 import httpx
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.torrentcreate import TorrentCreator
@@ -340,69 +339,28 @@ class ANT:
 
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
+        user_desc = await builder.get_user_description(meta)
+        has_user_desc = bool(user_desc.strip())
 
-        # Avoid unnecessary descriptions, adding only the logo if there is a user description
-        user_desc: str = await builder.get_user_description(meta)
-        if user_desc:
-            # Custom Header
-            desc_parts.append(await builder.get_custom_header())
-
-            # Logo
-            logo_resize_url = str(meta.get("tmdb_logo", ""))
-            if logo_resize_url:
-                if logo_resize_url.endswith(".svg"):
-                    logo_resize_url = logo_resize_url.replace(".svg", ".png")
-                desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/align]")
-
-        if user_desc:
-            # User description
-            desc_parts.append(user_desc)
-
-        # Disc menus screenshots
-        menu_images = meta.get("menu_images", [])
-        if menu_images:
-            desc_parts.append(await builder.menu_screenshot_header(meta))
-
-            # Disc menus screenshots
-            menu_screenshots_block = ""
-            for image in menu_images:
-                menu_raw_url = image.get("raw_url")
-                if menu_raw_url:
-                    menu_screenshots_block += f"[img]{menu_raw_url}[/img] "
-            if menu_screenshots_block:
-                desc_parts.append(f"[align=center]{menu_screenshots_block}[/align]")
-
-        # Audio Spectrograms
-        audio_spectrograms = meta.get("spectrograms_images", [])
-        if audio_spectrograms:
-            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[align=center][b]Audio Spectrogram[/b][/align]"))
-
-            spectrograms_block = ""
-            for image in audio_spectrograms:
-                raw_url = image.get("raw_url")
-                if raw_url:
-                    spectrograms_block += f"[img]{raw_url}[/img] "
-            if spectrograms_block:
-                desc_parts.append(f"[align=center]{spectrograms_block}[/align]")
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = bbcode.convert_to_align(description)
-        description = bbcode.remove_img_resize(description)
-        description = bbcode.remove_sup(description)
-        description = bbcode.remove_sub(description)
-        description = bbcode.remove_list(description)
-        description = description.replace('•', '-').replace('’', "'").replace('–', '-')
-        description = bbcode.remove_extra_lines(description)
-        description = description.strip()
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=False,
+            book=False,
+            custom_header=has_user_desc,
+            custom_signature=False,
+            description=False,
+            game=False,
+            languages=False,
+            logo=has_user_desc,
+            mediainfo=False,
+            menu_screenshots=True,
+            screenshots=False,
+            tonemapped_header=True,
+            tv_info=False,
+            ua_signature=False,
+            user_description=has_user_desc,
+        )
 
         return description
 

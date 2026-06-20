@@ -51,7 +51,7 @@ class DC:
         desc_parts.append(custom_header)
 
         # TV
-        title, _episode_image, episode_overview = await builder.get_tv_info(meta)
+        title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
             desc_parts.append(f'[center]{title}[/center]')
             desc_parts.append(f'[center]{episode_overview}[/center]')

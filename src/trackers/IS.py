@@ -50,7 +50,7 @@ class IS:
         desc_parts.append(await builder.get_custom_header())
 
         # TV
-        title, _, episode_overview = await builder.get_tv_info(meta, resize=True)
+        title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
             desc_parts.append(f'Title: {title}')
             desc_parts.append(f'Overview: {episode_overview}')

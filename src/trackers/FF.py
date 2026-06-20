@@ -191,13 +191,9 @@ class FF:
             desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
 
         # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta)
+        title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
-            desc_parts.append(f'[center]{title}[/center]')
-
-            if episode_image:
-                desc_parts.append(f'[center]<a href="{episode_image}" target="_blank"><img src="{episode_image}" width="220"></a>[/center]')
-
+            desc_parts.append(f"[center]{title}[/center]")
             desc_parts.append(f'[center]{episode_overview}[/center]')
 
         # File information
