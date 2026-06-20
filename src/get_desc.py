@@ -256,10 +256,17 @@ class DescriptionBuilder:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
         try:
-            if not self.tracker_config.get(
-                "add_logo", self.config["DEFAULT"].get("add_logo", False)
-            ):
+            if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
+
+            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT", "SPD"):
+                logo_resize_url = str(meta.get("tmdb_logo", ""))
+                if logo_resize_url:
+                    if logo_resize_url.endswith(".svg"):
+                        logo_resize_url = logo_resize_url.replace(".svg", ".png")
+                    logo = f"https://image.tmdb.org/t/p/w300/{logo_resize_url}"
+                    logo_size = "300"
+                    return logo, logo_size
 
             logo = meta.get("logo", "")
             logo_size = self.config["DEFAULT"].get("logo_size", "300")
@@ -271,18 +278,18 @@ class DescriptionBuilder:
 
         return logo, logo_size
 
-    async def get_tv_info(self, meta: dict[str, Any], resize: bool = False) -> tuple[str, str, str]:
+    async def get_tv_info(self, meta: dict[str, Any]) -> tuple[str, str]:
         title: str = ""
-        image: str = ""
         overview: str = ""
         try:
-            if (
-                not self.tracker_config.get(
-                    "episode_overview", self.config["DEFAULT"].get("episode_overview", False)
-                )
-                or meta["category"] != "TV"
-            ):
-                return title, image, overview
+            if not self.tracker_config.get("episode_overview", self.config["DEFAULT"].get("episode_overview", False)) or meta["category"] != "TV":
+                return title, overview
+
+            if self.tracker in ("BJS", "BT"):
+                episode_tmdb_data = meta.get("episode_tmdb_data", {})
+                title = episode_tmdb_data.get("name", "")
+                overview = episode_tmdb_data.get("overview", "")
+                return title, overview
 
             tvmaze_episode_data = meta.get("tvmaze_episode_data", {})
 
@@ -296,24 +303,7 @@ class DescriptionBuilder:
                 overview = html_to_bbcode(overview)
 
             episode_name = tvmaze_episode_data.get("episode_name", "")
-            episode_title = meta.get("auto_episode_title") or (
-                episode_name
-                if (
-                    not episode_name.lower().startswith("episode")
-                    and "tba" not in episode_name.lower()
-                )
-                else ""
-            )
-
-            image = ""
-            if meta.get("tv_pack", False):
-                image = tvmaze_episode_data.get("series_image", "")
-                if resize:
-                    image = tvmaze_episode_data.get("series_image_medium", "")
-            else:
-                image = tvmaze_episode_data.get("image", "")
-                if resize:
-                    image = tvmaze_episode_data.get("image_medium", "")
+            episode_title = meta.get("auto_episode_title") or (episode_name if (not episode_name.lower().startswith("episode") and "tba" not in episode_name.lower()) else "")
 
             title = ""
             if season_name:
@@ -329,7 +319,7 @@ class DescriptionBuilder:
         except Exception as e:
             console.print(f"[yellow]Warning: Error getting TV info: {str(e)}[/yellow]")
 
-        return title, image, overview
+        return title, overview
 
     async def get_mediainfo_section(self, meta: dict[str, Any]) -> str:
         """Returns the mediainfo section, using a cache file if available."""
@@ -340,7 +330,7 @@ class DescriptionBuilder:
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
-                    return str(await mi.read())
+                    return await mi.read()
 
         cache_file_dir = os.path.join(meta["base_dir"], "tmp", meta["uuid"])
         cache_file_path = os.path.join(cache_file_dir, "MEDIAINFO_SHORT.txt")
@@ -351,7 +341,7 @@ class DescriptionBuilder:
         if file_exists and file_size > 0:
             try:
                 async with aiofiles.open(cache_file_path, encoding="utf-8") as f:
-                    media_info_content = str(await f.read())
+                    media_info_content = await f.read()
                 return media_info_content
             except Exception:
                 pass
@@ -370,7 +360,7 @@ class DescriptionBuilder:
                     full=False,
                     mediainfo_options={"inform": f"file://{mi_template}"},
                 )
-                media_info_content = str(media_info_result)
+                media_info_content = media_info_result
 
                 if media_info_content:
                     media_info_content = media_info_content.replace("\r\n", "\n")
@@ -387,13 +377,13 @@ class DescriptionBuilder:
                 cleanpath_exists = await self.common.path_exists(mi_file_path)
                 if cleanpath_exists:
                     async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                        return str(await f.read())
+                        return await f.read()
 
         else:
             cleanpath_exists = await self.common.path_exists(mi_file_path)
             if cleanpath_exists:
                 async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                    tech_info = str(await f.read())
+                    tech_info = await f.read()
                     return tech_info
 
         return ""
@@ -526,8 +516,9 @@ class DescriptionBuilder:
                 if isinstance(spec_img, dict):
                     web_url = spec_img.get("web_url")
                     raw_url = spec_img.get("raw_url")
+                    img_url = spec_img.get("img_url", raw_url) or ""
                     if web_url and raw_url:
-                        desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                        desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             desc_parts.append("\n")
             desc_parts.append("[/center]\n")
@@ -538,6 +529,14 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: dict[str, Any], header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
+        if self.tracker == "TL":
+            table = False
+            header_size = -1
+        elif self.tracker in ("BJS", "BT", "ASC"):
+            table = False
+            if not header_size:
+                header_size = 3
+
         asin = meta.get("asin")
         author = meta.get("author")
         book_parts: list[str] = []
@@ -607,7 +606,7 @@ class DescriptionBuilder:
 
             if overview:
                 header_size_val = header_size if header_size else 4
-                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td][i]{overview}[/i][/td][/tr]")
+                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td]{overview}[/td][/tr]")
 
             book_p = "\n".join(final_book_parts)
             return "[table]\n" + book_p + "\n[/table]"
@@ -627,8 +626,7 @@ class DescriptionBuilder:
                 final_book_parts.append(f"{header}{str_technical_details.upper() if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
 
             if overview:
-                overview_content = f"[i]{overview}[/i]" if self.tracker == "TL" else overview
-                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview_content}")
+                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview}")
 
             return "\n\n".join(final_book_parts)
 
@@ -638,6 +636,11 @@ class DescriptionBuilder:
             return ""
 
         game_parts: list[str] = []
+
+        if self.tracker == "TL" and not header_size:
+            header_size = 1
+        elif self.tracker in ("BJS", "BT") and not header_size:
+            header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
@@ -764,15 +767,34 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
-    async def unit3d_edit_desc(
+    async def general_description_generator(
         self,
         meta: dict[str, Any],
-        signature: str = "",
-        comparison: bool = False,
-        desc_header: str = "",
-        image_list: Union[list[dict[str, str]], None] = None,
+        # Section controls
+        audio_spectrogram: bool,
+        bluray: bool,
+        book: bool,
+        custom_header: bool,
+        custom_signature: bool,
+        description: bool,
+        game: bool,
+        languages: bool,
+        logo: bool,
+        mediainfo: bool,
+        menu_screenshots: bool,
+        nfo: bool,
+        screenshots: bool,
+        tonemapped_header: bool,
+        tv_info: bool,
+        ua_signature: bool,
+        user_description: bool,
         approved_image_hosts: Union[list[str], None] = None,
+        signature: str = "",
+        desc_header: str = "",
     ) -> str:
+        image_list = meta[f"{self.tracker}_images_key"] if f"{self.tracker}_images_key" in meta else meta.get("image_list", [])
+        image_list = cast(list[Any], image_list)
+
         if image_list is None:
             image_list = []
         if approved_image_hosts is None:
@@ -781,7 +803,7 @@ class DescriptionBuilder:
             images = image_list
             multi_screens = 0
         else:
-            images = meta["image_list"]
+            images = meta.get("image_list", [])
             multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
         if meta.get("sorted_filelist"):
             multi_screens = 0
@@ -789,148 +811,248 @@ class DescriptionBuilder:
         desc_parts: list[str] = []
 
         # Custom Header
-        if not desc_header:
-            desc_header = await self.get_custom_header()
-        if desc_header:
-            desc_parts.append(desc_header + "\n")
+        if custom_header:
+            if not desc_header:
+                desc_header = await self.get_custom_header()
+            if desc_header:
+                desc_parts.append(desc_header + "\n")
 
         # Language
-        try:
-            if not meta.get("language_checked", False):
-                await languages_manager.process_desc_language(meta, self.tracker)
-            if meta.get("audio_languages") and meta.get("write_audio_languages"):
-                desc_parts.append(f"[code]Audio Language/s: {', '.join(meta['audio_languages'])}[/code]")
+        if languages:
+            try:
+                if not meta.get("language_checked", False):
+                    await languages_manager.process_desc_language(meta, self.tracker)
+                if meta.get("audio_languages") and meta.get("write_audio_languages"):
+                    desc_parts.append(f"[code]Audio Language/s: {', '.join(meta['audio_languages'])}[/code]")
 
-            if meta["subtitle_languages"] and meta["write_subtitle_languages"]:
-                desc_parts.append(
-                    f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
-            if meta["subtitle_languages"] and meta["write_hc_languages"]:
-                desc_parts.append(
-                    f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
-        except Exception as e:
-            console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
+                if meta["subtitle_languages"] and meta["write_subtitle_languages"]:
+                    desc_parts.append(f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
+                if meta["subtitle_languages"] and meta["write_hc_languages"]:
+                    desc_parts.append(f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
 
         # Logo
-        logo, logo_size = await self.get_logo_section(meta)
-        if logo and logo_size:
-            desc_parts.append(f"[center][img={logo_size}]{logo}[/img][/center]\n")
+        if logo:
+            logo_url, logo_size = await self.get_logo_section(meta)
+            if logo_url and logo_size:
+                desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
+
+        # Mediainfo / BDInfo section for trackers like BJS
+        if mediainfo:
+            if self.tracker == "BJS":
+                if meta.get("is_disc", "") == "DVD":
+                    desc_parts.append(f"[hide=DVD MediaInfo][pre]{await self.get_mediainfo_section(meta)}[/pre][/hide]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
+            elif self.tracker == "DC":
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
+            elif self.tracker in ("FF", "HDS", "IPT", "IS"):
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[pre]{bd_info}[/pre]")
+            elif self.tracker == "PTS":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(mediainfo_sec)
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
+            elif self.tracker == "HDT":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[left][font=consolas]{mediainfo_sec}[/font][/left]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[left][font=consolas]{bd_info}[/font][/left]")
+            elif self.tracker == "MTV":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[mediainfo]{mediainfo_sec}[/mediainfo]\n\n")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[mediainfo]{bd_info}[/mediainfo]\n\n")
+                if (
+                    meta.get("is_disc") == "DVD"
+                    and isinstance(meta.get("discs"), list)
+                    and len(meta["discs"]) > 0
+                    and "vob_mi" in meta["discs"][0]
+                ):
+                    desc_parts.append(f"[mediainfo]{meta['discs'][0]['vob_mi']}[/mediainfo]\n\n")
+            elif self.tracker == "TL":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(mediainfo_sec)
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
+            else:
+                pass
 
         # Blu-ray
-        release_url, cover_images = await self.get_bluray_section(meta)
-        if release_url:
-            desc_parts.append(f"[center]{release_url}[/center]")
-        if cover_images:
-            desc_parts.append(f"[center]{cover_images}[/center]\n")
+        if bluray:
+            release_url, cover_images = await self.get_bluray_section(meta)
+            if release_url:
+                desc_parts.append(f"[center]{release_url}[/center]")
+            if cover_images:
+                desc_parts.append(f"[center]{cover_images}[/center]\n")
 
         # TV
-        title, _, episode_overview = await self.get_tv_info(meta)
-        if episode_overview:
-            if self.tracker == "HUNO":
+        if tv_info:
+            title, episode_overview = await self.get_tv_info(meta)
+            if episode_overview:
                 if title:
                     desc_parts.append(f"[center]{title}[/center]\n")
                 desc_parts.append(f"[center]{episode_overview}[/center]\n")
-            else:
-                if title:
-                    desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
-                desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
 
         # Book details
-        if meta.get("category") == "BOOK":
+        if book and meta.get("category") == "BOOK":
             book_section = self._build_book_desc_section(meta)
             if book_section:
                 desc_parts.append(book_section)
 
         # Game details
-        if meta.get("category") == "GAME":
+        if game and meta.get("category") == "GAME":
             game_section = self._build_game_desc_section(meta)
             if game_section:
                 desc_parts.append(game_section)
 
+        if self.tracker == "MTEAM" and meta.get("mteam_description", ""):
+            desc_parts.append(meta.get("mteam_description", ""))
+
+        if self.tracker in {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"} and meta.get("nexusphp_description", ""):
+            desc_parts.append(meta.get("nexusphp_description", ""))
+
         # Description that may come from API requests
-        meta_description_value = meta.get("description", "")
-        if isinstance(meta_description_value, str):
-            meta_description = meta_description_value
-        elif meta_description_value is None:
-            meta_description = ""
-        else:
-            meta_description = str(meta_description_value)
-        # Add FraMeSToR NFO to Aither
-        if self.tracker == "AITHER" and "framestor" in meta and meta["framestor"]:
-            nfo_content = meta.get("description_nfo_content", "")
-            if nfo_content:
-                aither_framestor_nfo = f"[code]{nfo_content}[/code]"
-                aither_framestor_nfo = aither_framestor_nfo.replace(
-                    "https://i.imgur.com/e9o0zpQ.png",
-                    "https://beyondhd.co/images/2017/11/30/c5802892418ee2046efba17166f0cad9.png",
-                )
-                images = []
-                desc_parts.append(aither_framestor_nfo)
+        if description:
+            meta_description_value = meta.get("description", "")
+            if isinstance(meta_description_value, str):
+                meta_description = meta_description_value
+            elif meta_description_value is None:
+                meta_description = ""
             else:
-                # Remove NFO from description
-                meta_description = re.sub(
-                    r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]",
-                    "",
-                    meta_description,
-                    flags=re.DOTALL,
-                )
-                if meta_description:
+                meta_description = str(meta_description_value)
+            # Add FraMeSToR NFO to Aither
+            if self.tracker == "AITHER" and "framestor" in meta and meta["framestor"]:
+                nfo_content = meta.get("description_nfo_content", "")
+                if nfo_content:
+                    aither_framestor_nfo = f"[code]{nfo_content}[/code]"
+                    aither_framestor_nfo = aither_framestor_nfo.replace(
+                        "https://i.imgur.com/e9o0zpQ.png",
+                        "https://beyondhd.co/images/2017/11/30/c5802892418ee2046efba17166f0cad9.png",
+                    )
+                    images = []
+                    desc_parts.append(aither_framestor_nfo)
+                else:
+                    # Remove NFO from description
+                    meta_description = re.sub(
+                        r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]",
+                        "",
+                        meta_description,
+                        flags=re.DOTALL,
+                    )
+                    if meta_description:
+                        desc_parts.append(meta_description)
+            elif meta_description:
+                if self.tracker == "MTV":
+                    meta_description = re.sub(r'\[/?quote\]', '', meta_description, flags=re.IGNORECASE).strip()
+                    if meta_description:
+                        desc_parts.append(f"[spoiler=Notes]{meta_description}[/spoiler]")
+                else:
                     desc_parts.append(meta_description)
-        elif meta_description:
-            desc_parts.append(meta_description)
+
+        # NFO details
+        if nfo:
+            nfo_content = meta.get("description_nfo_content")
+            if isinstance(nfo_content, str) and nfo_content:
+                if self.tracker == "DC":
+                    desc_parts.append(f"[nfo]{nfo_content}[/nfo]")
+                elif self.tracker == "TL":
+                    desc_parts.append(f"<div style='display: flex; justify-content: center;'><div style='background-color: #000000; color: #ffffff;'>{nfo_content}</div></div>")
+                else:
+                    desc_parts.append(f"[pre]{nfo_content}[/pre]")
 
         # Description from file/pastebin link
-        desc_parts.append(await self.get_user_description(meta))
+        if user_description:
+            desc_parts.append(await self.get_user_description(meta))
 
         # Menu Screenshots
-        desc_parts.append(await self.menu_section(meta))
+        if menu_screenshots:
+            desc_parts.append(await self.menu_section(meta))
 
         # Tonemapped Header
-        desc_parts.append(await self.get_tonemapped_header(meta))
+        if tonemapped_header:
+            desc_parts.append(await self.get_tonemapped_header(meta))
 
         # Discs and Screenshots
-        discs_and_screenshots = await self._handle_discs_and_screenshots(
-            meta, approved_image_hosts, images, multi_screens
-        )
-        desc_parts.append(discs_and_screenshots)
+        if screenshots:
+            discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens)
+            desc_parts.append(discs_and_screenshots)
 
         # Audio Spectrograms
-        desc_parts.append(await self.get_audio_spectrogram_section(meta))
+        if audio_spectrogram:
+            desc_parts.append(await self.get_audio_spectrogram_section(meta))
 
         # Custom Signature
-        desc_parts.append(await self.get_custom_signature())
+        if custom_signature:
+            desc_parts.append(await self.get_custom_signature())
 
         # UA Signature
-        if not signature:
-            signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
-            if self.tracker == "HUNO":
-                signature = signature.replace("[size=4]", "[size=8]")
-        desc_parts.append(signature)
+        if ua_signature:
+            if not signature:
+                script_signature = meta.get("ua_signature", "")
+                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
+            desc_parts.append(signature)
 
-        description: str = "\n".join(
-            part for part in desc_parts
-            if str(part).strip()
-        )
+        description_str: str = "\n".join(part for part in desc_parts if part.strip())
 
         # Formatting
-        bbcode = BBCODE()
-        description = bbcode.convert_hide_to_spoiler(description)
-        description = description.replace("[user]", "").replace("[/user]", "")
-        description = description.replace("[hr]", "").replace("[/hr]", "")
-        description = description.replace("[ul]", "").replace("[/ul]", "")
-        description = description.replace("[ol]", "").replace("[/ol]", "")
-        description = bbcode.remove_extra_lines(description)
-        if comparison is False:
-            description = bbcode.convert_comparison_to_collapse(description, 1000)
+        description_str = self.tracker_specific_formats(self.tracker, description_str)
 
-        if meta['debug']:
+        if meta.get("debug", False):
             desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
             console.print(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
-                await description_file.write(description)
+                await description_file.write(description_str)
 
-        return description
+        return description_str
+
+    async def unit3d_edit_desc(
+        self,
+        meta: dict[str, Any],
+        signature: str = "",
+        desc_header: str = "",
+        approved_image_hosts: Union[list[str], None] = None,
+    ) -> str:
+        return await self.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            signature=signature,
+            desc_header=desc_header,
+            approved_image_hosts=approved_image_hosts,
+        )
 
     async def _check_saved_pack_image_links(self, meta: dict[str, Any], approved_image_hosts: list[str]) -> dict[str, Any]:
         pack_images_file = os.path.join(meta["base_dir"], "tmp", meta["uuid"], "pack_image_links.json")
@@ -1036,7 +1158,7 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta.get("screens", 6))])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                desc_parts.append(self.format_screenshot(web_url, raw_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1057,9 +1179,8 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                img_url = images[img_index].get("img_url", raw_url)
+                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1113,8 +1234,8 @@ class DescriptionBuilder:
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
-                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
-                                desc_parts.append(image_str)
+                                img_url = img.get("img_url", raw_url)
+                                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                             desc_parts.append("[/center]\n\n")
                         else:
                             desc_parts.append("[center]\n\n")
@@ -1174,8 +1295,8 @@ class DescriptionBuilder:
                                 for img in uploaded_images:
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
-                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
-                                    desc_parts.append(image_str)
+                                    img_url = img.get("img_url", raw_url) or ""
+                                    desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                                 desc_parts.append("[/center]\n\n")
 
                             meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
@@ -1220,8 +1341,8 @@ class DescriptionBuilder:
                     for img_index in range(len(images[: int(meta["screens"])])):
                         web_url = images[img_index]["web_url"]
                         raw_url = images[img_index]["raw_url"]
-                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                        desc_parts.append(image_str)
+                        img_url = images[img_index].get("img_url", raw_url)
+                        desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             desc_parts.append("\n")
                     desc_parts.append("[/center]\n\n")
@@ -1279,8 +1400,8 @@ class DescriptionBuilder:
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
-                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                                desc_parts.append(image_str)
+                                img_url = img.get("img_url", raw_url)
+                                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                             desc_parts.append("[/center]\n\n")
                         else:
                             # Increment retry_count for tracking but use unique disc keys for each disc
@@ -1373,8 +1494,8 @@ class DescriptionBuilder:
                                 for img in uploaded_images:
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
-                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                                    desc_parts.append(image_str)
+                                    img_url = img.get("img_url", raw_url) or ""
+                                    desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                                 desc_parts.append("[/center]\n\n")
 
                             # Save the updated meta to `meta.json` after upload
@@ -1421,9 +1542,8 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                img_url = images[img_index].get("img_url", raw_url)
+                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1558,7 +1678,7 @@ class DescriptionBuilder:
                         mi_dump = MediaInfo.parse(
                             file, output="STRING", full=False, mediainfo_options={"inform_version": "1"}
                         )
-                        parsed_mediainfo = self.parser.parse_mediainfo(str(mi_dump))
+                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
                         desc_parts.append(
                             f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n"
@@ -1585,7 +1705,8 @@ class DescriptionBuilder:
                         for img_index in range(len(images)):
                             web_url = images[img_index]["web_url"]
                             raw_url = images[img_index]["raw_url"]
-                            image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
+                            img_url = images[img_index].get("img_url", raw_url)
+                            image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                             desc_parts.append(image_str)
                             char_count += len(image_str)
                             if screensPerRow and (img_index + 1) % screensPerRow == 0:
@@ -1598,7 +1719,8 @@ class DescriptionBuilder:
                     for img in meta[new_images_key]:
                         web_url = img["web_url"]
                         raw_url = img["raw_url"]
-                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
+                        img_url = img.get("img_url", raw_url)
+                        image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                         desc_parts.append(image_str)
                         char_count += len(image_str)
                     desc_parts.append("[/center]\n\n")
@@ -1645,11 +1767,10 @@ class DescriptionBuilder:
                     for img_index, image in enumerate(menu_images):
                         web_url = image.get("web_url")
                         raw_url = image.get("raw_url")
+                        img_url = image.get("img_url", raw_url)
                         if not web_url or not raw_url:
                             continue
-                        menu_parts.append(
-                            f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                        )
+                        menu_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             menu_parts.append("\n")
                     menu_parts.append("[/center]\n\n")
@@ -1658,3 +1779,246 @@ class DescriptionBuilder:
             console.print(f"[yellow]Warning: Error processing disc menu section: {str(e)}[/yellow]")
 
         return menu_image_section
+
+    def format_screenshot(self, web_url: str, raw_url: str, img_url: str = "", thumb_size: Union[str, int] = "") -> str:
+        if not img_url:
+            img_url = raw_url
+        if not thumb_size:
+            thumb_size = self.config["DEFAULT"].get("thumbnail_size", "350")
+
+        nexusphp_trackers = {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"}
+        if self.tracker in nexusphp_trackers:
+            return f"[img]{raw_url}[/img]"
+        elif self.tracker == "HDT":
+            return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
+        elif self.tracker == "TL":
+            return f'<a href="{web_url}"><img src="{img_url}" style="max-width: {thumb_size}px;"></a>  '
+        elif self.tracker == "FF":
+            return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
+        elif self.tracker == "GPW":
+            return f"[img]{raw_url}[/img] "
+        elif self.tracker in ("HDS", "IPT"):
+            if "imgbox" not in web_url:
+                return f"[url={web_url}][img]{img_url}[/img][/url]\n"
+            else:
+                return f"[url={web_url}][img]{img_url}[/img][/url] "
+        elif self.tracker == "MTV":
+            return f"[url={raw_url}][img={thumb_size}]{img_url}[/img][/url] "
+        else:
+            return f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
+
+    def tracker_specific_formats(self, tracker: str, description: str) -> str:
+        bbcode = BBCODE()
+        if tracker == "BT":
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.remove_list(description)
+
+        if tracker == "BJS":
+            description = bbcode.convert_named_spoiler_to_named_hide(description)
+            description = bbcode.convert_spoiler_to_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_list(description)
+
+        if tracker == "ANT":
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_list(description)
+            description = description.replace("•", "-").replace("’", "'").replace("–", "-")
+
+        if tracker == "DC":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[*] ", "• ").replace("[*]", "• ")
+            description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
+            description = bbcode.remove_list(description)
+            description = description.strip()
+
+        if tracker == "FF":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = description.replace("•", "-").replace("“", '"').replace("”", '"')
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+
+            # [url][img=000]...[/img][/url]
+            description = re.sub(
+                r"\[url=(?P<href>[^\]]+)\]\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]\[/url\]",
+                r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="\g<width>"></a>',
+                description,
+                flags=re.IGNORECASE
+            )
+
+            # [url][img]...[/img][/url]
+            description = re.sub(
+                r"\[url=(?P<href>[^\]]+)\]\[img\](?P<src>[^\[]+)\[/img\]\[/url\]",
+                r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="220"></a>',
+                description,
+                flags=re.IGNORECASE
+            )
+
+            # [img=200]...[/img] (no [url])
+            description = re.sub(
+                r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]",
+                r'<img src="\g<src>" width="\g<width>">',
+                description,
+                flags=re.IGNORECASE
+            )
+
+        if tracker == "GPW":
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_list(description)
+            description = re.sub(r"\[url=[^\]]+\]\[img(?:=[^\]]+)?\]([^\[]+)\[/img\]\[/url\]", r"[img]\1[/img]", description, flags=re.IGNORECASE)
+
+        if tracker == "HDS":
+            description = description.replace('[user]', '').replace('[/user]', '')
+            description = description.replace('[align=left]', '').replace('[/align]', '')
+            description = description.replace('[right]', '').replace('[/right]', '')
+            description = description.replace('[align=right]', '').replace('[/align]', '')
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace('[alert]', '').replace('[/alert]', '')
+            description = description.replace('[note]', '').replace('[/note]', '')
+            description = description.replace('[hr]', '').replace('[/hr]', '')
+            description = description.replace('[h1]', '[u][b]').replace('[/h1]', '[/b][/u]')
+            description = description.replace('[h2]', '[u][b]').replace('[/h2]', '[/b][/u]')
+            description = description.replace('[h3]', '[u][b]').replace('[/h3]', '[/b][/u]')
+            description = description.replace('[ul]', '').replace('[/ul]', '')
+            description = description.replace('[ol]', '').replace('[/ol]', '')
+            description = bbcode.remove_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_color(description)
+
+            # Apply custom image line breaks for HDS: if "imgbox" is not in the web_url, place only one image per line.
+            def hds_image_formatter(match) -> str:
+                web_url = match.group(1)
+                raw_url = match.group(2)
+                if "imgbox" not in web_url:
+                    return f"[url={web_url}][img]{raw_url}[/img][/url]\n"
+                else:
+                    return f"[url={web_url}][img]{raw_url}[/img][/url]"
+
+            pattern = r"\[url=([^\]]+)\]\[img(?:=[^\]]*)?\]([^\[]+)\[/img\]\[/url\]\s*"
+            description = re.sub(pattern, hds_image_formatter, description)
+
+        if tracker == "IPT":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.remove_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+
+        if tracker == "HDT":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.convert_spoiler_to_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_list(description)
+
+        if tracker == "PTS":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = description.replace("[sup]", "").replace("[/sup]", "")
+            description = description.replace("[sub]", "").replace("[/sub]", "")
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = re.sub(r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]", r"", description, flags=re.DOTALL)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = re.sub(r'\n{3,}', '\n\n', description)
+
+        if tracker == "SPD":
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
+            description = description.replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "").replace("[*]", "• ")
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_list(description)
+
+        if tracker == "TL":
+            description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
+            description = re.sub(r"\[\*\]", "\n[*]", description, flags=re.IGNORECASE)
+            description = re.sub(r"\[c\](.*?)\[/c\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)
+            description = re.sub(r"\[hr\]", "---", description, flags=re.IGNORECASE)
+            description = re.sub(r'\[img=[\d"x]+\]', "[img]", description, flags=re.IGNORECASE)
+            description = description.replace("[*] ", "• ").replace("[*]", "• ").replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "")
+            description = bbcode.remove_list(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = re.sub(r"\n{3,}", "\n\n", description)
+
+        from src.trackersetup import api_trackers as unit3d_trackers
+        if tracker in unit3d_trackers:
+            description = bbcode.convert_hide_to_spoiler(description)
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.convert_comparison_to_collapse(description, 1000)
+
+        return bbcode.remove_extra_lines(description)

@@ -103,7 +103,7 @@ class ULCX(UNIT3D):
         return data
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
-        desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
+        desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
 
         if meta.get("adult_media", False):
             pattern = r'(\[center\](?:(?!\[/center\]).)*\[/center\])'

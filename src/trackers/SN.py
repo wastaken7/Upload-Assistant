@@ -26,23 +26,15 @@ class SN:
         pass
 
     async def get_type_id(self, type: str) -> str:
-        type_id = {
-            'BluRay': '3',
-            'Web': '1',
-            # boxset is 4
-            # 'NA': '4',
-            'DVD': '2'
-        }.get(type, '0')
+        type_id = {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
         return type_id
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        # await common.unit3d_edit_desc(meta, self.tracker, self.forum_link)
         await self.edit_desc(meta)
         cat_id = ""
         sub_cat_id = ""
-        # cat_id = await self.get_cat_id(meta)
 
         # Anime
         if meta.get('mal_id'):

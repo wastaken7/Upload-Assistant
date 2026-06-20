@@ -10,7 +10,6 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -134,93 +133,27 @@ class HDT:
 
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
-
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        # Logo
-        logo_resize_url = str(meta.get('tmdb_logo', ''))
-        if logo_resize_url:
-            desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
-
-        # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
-        if episode_overview:
-            desc_parts.append(f'[center]{title}[/center]')
-
-            if episode_image:
-                desc_parts.append(f"[center][img]{episode_image}[/img][/center]")
-
-            desc_parts.append(f'[center]{episode_overview}[/center]')
-
-        # File information
-        mediainfo = await builder.get_mediainfo_section(meta)
-        if mediainfo:
-            desc_parts.append(f'[left][font=consolas]{mediainfo}[/font][/left]')
-
-        bdinfo = await builder.get_bdinfo_section(meta)
-        if bdinfo:
-            desc_parts.append(f'[left][font=consolas]{bdinfo}[/font][/left]')
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Screenshot Header
-        desc_parts.append(await builder.screenshot_header())
-
-        # Screenshots
-        images_value = meta.get('image_list', [])
-        images: list[dict[str, Any]] = []
-        if isinstance(images_value, list):
-            images_list = cast(list[Any], images_value)
-            images.extend(
-                [
-                    cast(dict[str, Any], item)
-                    for item in images_list
-                    if isinstance(item, dict)
-                ]
-            )
-        if images:
-            screenshots_block = ''
-            for image in images:
-                raw_url = str(image.get('raw_url', ''))
-                img_url = str(image.get('img_url', ''))
-                if raw_url and img_url:
-                    screenshots_block += f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
-            desc_parts.append('[center]\n' + screenshots_block + '[/center]')
-
-        # Signature
-        desc_parts.append(f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.get('ua_signature', '')}[/size][/url][/right]")
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = description.replace('[user]', '').replace('[/user]', '')
-        description = description.replace('[align=left]', '').replace('[/align]', '')
-        description = description.replace('[align=right]', '').replace('[/align]', '')
-        description = bbcode.remove_sub(description)
-        description = bbcode.remove_sup(description)
-        description = description.replace('[alert]', '').replace('[/alert]', '')
-        description = description.replace('[note]', '').replace('[/note]', '')
-        description = description.replace('[hr]', '').replace('[/hr]', '')
-        description = description.replace('[h1]', '[u][b]').replace('[/h1]', '[/b][/u]')
-        description = description.replace('[h2]', '[u][b]').replace('[/h2]', '[/b][/u]')
-        description = description.replace('[h3]', '[u][b]').replace('[/h3]', '[/b][/u]')
-        description = description.replace('[ul]', '').replace('[/ul]', '')
-        description = description.replace('[ol]', '').replace('[/ol]', '')
-        description = bbcode.convert_spoiler_to_hide(description)
-        description = bbcode.remove_img_resize(description)
-        description = bbcode.convert_comparison_to_centered(description, 1000)
-        description = bbcode.remove_spoiler(description)
-        description = bbcode.remove_list(description)
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=False,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=False,
+            languages=False,
+            logo=True,
+            mediainfo=True,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+        )
 
         return description
 

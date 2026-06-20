@@ -246,63 +246,29 @@ class MTEAM:
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
+        meta["mteam_description"] = await self.mteam_standard_desc(meta)
 
-        # Custom Header
-        custom_header = await builder.get_custom_header()
-        desc_parts.append(custom_header)
-
-        # M-Team Standard Description
-        desc_parts.append(await self.mteam_standard_desc(meta))
-
-        # User description
-        user_description = await builder.get_user_description(meta)
-        desc_parts.append(user_description)
-
-        # Disc menus screenshots header
-        menu_images_value = meta.get("menu_images", [])
-        menu_images: list[dict[str, Any]] = []
-        if isinstance(menu_images_value, list):
-            menu_images_list = cast(list[Any], menu_images_value)
-            menu_images.extend([cast(dict[str, Any], item) for item in menu_images_list if isinstance(item, dict)])
-        if menu_images:
-            desc_parts.append(await builder.menu_screenshot_header(meta))
-
-            # Disc menus screenshots
-            menu_screenshots_block = ""
-            for image in menu_images:
-                menu_raw_url = image.get("raw_url")
-                if menu_raw_url:
-                    menu_screenshots_block += f"![]({menu_raw_url})"
-            if menu_screenshots_block:
-                desc_parts.append(menu_screenshots_block)
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Screenshot Header
-        images_value = meta.get("image_list", [])
-        images: list[dict[str, Any]] = []
-        if isinstance(images_value, list):
-            images_list = cast(list[Any], images_value)
-            images.extend([cast(dict[str, Any], item) for item in images_list if isinstance(item, dict)])
-        if images:
-            desc_parts.append(await builder.screenshot_header())
-
-            # Screenshots
-            if images:
-                screenshots_block = ""
-                for image in images:
-                    raw_url = image.get("raw_url")
-                    if raw_url:
-                        screenshots_block += f"![]({raw_url})"
-                if screenshots_block:
-                    desc_parts.append(screenshots_block)
-
-        # Signature
-        desc_parts.append(f"[{meta['ua_signature']}](https://github.com/wastaken7/Upload-Assistant)")
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=False,
+            ua_signature=True,
+            user_description=True,
+            signature=f"[{meta['ua_signature']}](https://github.com/wastaken7/Upload-Assistant)",
+        )
 
         from src.bbcode import BBCODE
 
@@ -310,6 +276,7 @@ class MTEAM:
         description = description.strip()
         description = description.replace("[*] ", "• ").replace("[*]", "• ")
         description = self.bbcode_to_markdown(description)
+        description = description.replace("[center]", "").replace("[/center]", "")
         description = bbcode.remove_extra_lines(description)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:

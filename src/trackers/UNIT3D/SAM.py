@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, Optional
 
+from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.CBR import CBR
@@ -135,3 +136,7 @@ class SAM(UNIT3D):
         return await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
         )
+
+    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
+        signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/right]"
+        return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}

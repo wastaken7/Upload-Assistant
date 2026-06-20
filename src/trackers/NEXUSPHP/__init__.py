@@ -230,7 +230,7 @@ class NEXUSPHP:
         if genres:
             desc_parts.append(f"◎类　　别　{' / '.join(genres)}")
 
-        languages = [l.get("name") for l in data.get("spoken_languages", [])]
+        languages = [lang.get("name") for lang in data.get("spoken_languages", [])]
         if languages:
             desc_parts.append(f"◎语　　言　{' / '.join(languages)}")
 
@@ -316,72 +316,29 @@ class NEXUSPHP:
 
     async def get_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
+        meta["nexusphp_description"] = await self.standard_desc(meta)
 
-        # Custom Header
-        custom_header = await builder.get_custom_header()
-        desc_parts.append(custom_header)
-
-        # Standard Description
-        desc_parts.append(await self.standard_desc(meta))
-
-        # User description
-        user_description = await builder.get_user_description(meta)
-        desc_parts.append(user_description)
-
-        # Disc menus screenshots header
-        menu_images_value = meta.get("menu_images", [])
-        menu_images: list[dict[str, Any]] = []
-        if isinstance(menu_images_value, list):
-            menu_images_list = list[Any], menu_images_value
-            menu_images.extend([cast(dict[str, Any], item) for item in menu_images_list if isinstance(item, dict)])
-        if menu_images:
-            desc_parts.append(await builder.menu_screenshot_header(meta))
-
-            # Disc menus screenshots
-            menu_screenshots_block = ""
-            for image in menu_images:
-                menu_raw_url = image.get("raw_url")
-                if menu_raw_url:
-                    menu_screenshots_block += f"[img]{menu_raw_url}[/img]"
-            if menu_screenshots_block:
-                desc_parts.append(menu_screenshots_block)
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Screenshot Header
-        images_value = meta.get("image_list", [])
-        images: list[dict[str, Any]] = []
-        if isinstance(images_value, list):
-            images_list = list[Any], images_value
-            images.extend([cast(dict[str, Any], item) for item in images_list if isinstance(item, dict)])
-        if images:
-            desc_parts.append(await builder.screenshot_header())
-
-            # Screenshots
-            if images:
-                screenshots_block = ""
-                for image in images:
-                    raw_url = image.get("raw_url")
-                    if raw_url:
-                        screenshots_block += f"[img]{raw_url}[/img]"
-                if screenshots_block:
-                    desc_parts.append(screenshots_block)
-
-        # Signature
-        desc_parts.append(f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]")
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
-
-        from src.bbcode import BBCODE
-
-        bbcode = BBCODE()
-        description = description.strip()
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+        )
 
         return description
 

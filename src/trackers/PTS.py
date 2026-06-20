@@ -1,16 +1,13 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import platform
-import re
 from typing import Any, Optional, cast
 
-import aiofiles
 import httpx
 from bs4 import BeautifulSoup
-from pymediainfo import MediaInfo
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
@@ -52,91 +49,28 @@ class PTS:
         return category_map.get(meta['category'])
 
     async def generate_description(self, meta: Meta) -> str:
-        base_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
-        final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-
-        description_parts: list[str] = []
-
-        # MediaInfo/BDInfo
-        tech_info = ""
-        if meta.get('is_disc') != 'BDMV':
-            filelist = cast(list[str], meta.get('filelist', []))
-            video_file = filelist[0] if filelist else ''
-            mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/MEDIAINFO.txt")
-            if os.path.exists(mi_template):
-                try:
-                    media_info = MediaInfo.parse(video_file, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
-                    tech_info = str(media_info)
-                except Exception:
-                    console.print("[bold red]Couldn't find the MediaInfo template[/bold red]")
-                    mi_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-                    if os.path.exists(mi_file_path):
-                        async with aiofiles.open(mi_file_path, encoding='utf-8') as f:
-                            tech_info = await f.read()
-            else:
-                console.print("[bold yellow]Using normal MediaInfo for the description.[/bold yellow]")
-                mi_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-                if os.path.exists(mi_file_path):
-                    async with aiofiles.open(mi_file_path, encoding='utf-8') as f:
-                        tech_info = await f.read()
-        else:
-            bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if os.path.exists(bd_summary_file):
-                async with aiofiles.open(bd_summary_file, encoding='utf-8') as f:
-                    tech_info = await f.read()
-
-        if tech_info:
-            description_parts.append(tech_info)
-
-        if os.path.exists(base_desc_path):
-            async with aiofiles.open(base_desc_path, encoding='utf-8') as f:
-                manual_desc = await f.read()
-            description_parts.append(manual_desc)
-
-        # Screenshots
-        images_value = meta.get(f'{self.tracker}_images_key', meta.get('image_list', []))
-        images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
-        if images:
-            screenshots_block = "[center][b]Screenshots[/b]\n\n"
-            for image in images:
-                img_url = str(image.get('img_url', ''))
-                web_url = str(image.get('web_url', ''))
-                screenshots_block += f"[url={web_url}][img]{img_url}[/img][/url] "
-            screenshots_block += "[/center]"
-            description_parts.append(screenshots_block)
-
-        custom_description_header = str(self.config['DEFAULT'].get('custom_description_header', ''))
-        if custom_description_header:
-            description_parts.append(custom_description_header)
-
-        description_parts.append(f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]")
-
-        final_description = "\n\n".join(filter(None, description_parts))
-        from src.bbcode import BBCODE
-        bbcode = BBCODE()
-        desc = final_description
-        desc = desc.replace("[user]", "").replace("[/user]", "")
-        desc = desc.replace("[align=left]", "").replace("[/align]", "")
-        desc = desc.replace("[right]", "").replace("[/right]", "")
-        desc = desc.replace("[align=right]", "").replace("[/align]", "")
-        desc = desc.replace("[sup]", "").replace("[/sup]", "")
-        desc = desc.replace("[sub]", "").replace("[/sub]", "")
-        desc = desc.replace("[alert]", "").replace("[/alert]", "")
-        desc = desc.replace("[note]", "").replace("[/note]", "")
-        desc = desc.replace("[hr]", "").replace("[/hr]", "")
-        desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-        desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-        desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-        desc = desc.replace("[ul]", "").replace("[/ul]", "")
-        desc = desc.replace("[ol]", "").replace("[/ol]", "")
-        desc = desc.replace("[hide]", "").replace("[/hide]", "")
-        desc = re.sub(r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]", r"", desc, flags=re.DOTALL)
-        desc = bbcode.convert_comparison_to_centered(desc, 1000)
-        desc = bbcode.remove_spoiler(desc)
-        desc = re.sub(r'\n{3,}', '\n\n', desc)
-
-        async with aiofiles.open(final_desc_path, 'w', encoding='utf-8') as f:
-            await f.write(desc)
+        builder = DescriptionBuilder(self.tracker, self.config)
+        desc = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=False,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=False,
+            languages=False,
+            logo=True,
+            mediainfo=True,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+        )
 
         return desc
 

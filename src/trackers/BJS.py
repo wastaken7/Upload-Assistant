@@ -17,7 +17,6 @@ import pycountry
 from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
@@ -29,8 +28,9 @@ from src.trackers.COMMON import COMMON
 Meta = dict[str, Any]
 Config = dict[str, Any]
 
+
 class BJS:
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
@@ -41,7 +41,7 @@ class BJS:
         "zip", "rar", "7z", "tar", "gz", "bz2",
         "iso", "dmg", "pkg", "exe", "bin", "msi", "apk",
         "srt", "ass", "vtt", "sub", "idx"
-    } # fmt: off
+    }  # fmt: off
 
     def has_extension(self, name: str) -> bool:
         _, ext = os.path.splitext(name)
@@ -142,7 +142,7 @@ class BJS:
         return
 
     def get_container(self, meta: Meta) -> str:
-        container: str = meta.get('container', '')
+        container: str = meta.get("container", "")
         category = meta["category"]
 
         if category in ("MOVIE", "TV"):
@@ -175,7 +175,7 @@ class BJS:
         tv = 1
 
         category = meta["category"]
-        if meta.get('anime'):
+        if meta.get("anime"):
             return anime
 
         if category == "BOOK":
@@ -345,54 +345,6 @@ class BJS:
                     return bjs_value
 
         return "Outro"
-
-    async def build_game_description(self, meta: Meta) -> tuple[str, str]:
-        """Build the game description for BJS.
-
-        Returns (release_desc, fichatecnica):
-        - release_desc: overview text only
-        - fichatecnica: full game description using _build_game_desc_section
-        """
-        builder = DescriptionBuilder(self.tracker, self.config)
-
-        # fichatecnica = full game description (technical details, system requirements, etc.)
-        fichatecnica_parts: list[str] = []
-
-        # Custom Header
-        fichatecnica_parts.append(await builder.get_custom_header())
-
-        # Game description section (using the existing _build_game_desc_section)
-        game_section = builder._build_game_desc_section(meta, header_size=3)
-        if game_section:
-            fichatecnica_parts.append(game_section)
-
-        # User description
-        fichatecnica_parts.append(await builder.get_user_description(meta))
-
-        # Signature
-        fichatecnica_parts.append(
-            f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta['ua_name']} {meta['current_version']}[/url][/align]"
-        )
-
-        fichatecnica = "\n\n".join(part for part in fichatecnica_parts if part.strip())
-
-        bbcode = BBCODE()
-        fichatecnica = bbcode.convert_named_spoiler_to_named_hide(fichatecnica)
-        fichatecnica = bbcode.convert_spoiler_to_hide(fichatecnica)
-        fichatecnica = bbcode.remove_img_resize(fichatecnica)
-        fichatecnica = bbcode.convert_to_align(fichatecnica)
-        fichatecnica = bbcode.remove_list(fichatecnica)
-        fichatecnica = bbcode.remove_extra_lines(fichatecnica)
-
-        # release_desc = overview only
-        localized_overviews = meta.get("localized_overviews", {})
-        pt_br_overview = localized_overviews.get("brazilian", "") if isinstance(localized_overviews, dict) else ""
-        release_desc = pt_br_overview or meta.get("overview", "")
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
-            await description_file.write(fichatecnica)
-
-        return release_desc, fichatecnica
 
     def is_console_platform(self, meta: Meta) -> bool:
         """Check if the platform is a console (not PC/Mac/Linux/Emulator)."""
@@ -566,86 +518,29 @@ class BJS:
 
     async def build_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        category = meta["category"]
-        desc_parts: list[str] = []
+        meta["episode_tmdb_data"] = self.episode_tmdb_data
 
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        if category in ("MOVIE", "TV"):
-            # Logo
-            logo_resize_url = str(meta.get("tmdb_logo", ""))
-            if logo_resize_url:
-                if logo_resize_url.endswith(".svg"):
-                    logo_resize_url = logo_resize_url.replace(".svg", ".png")
-                desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/align]")
-
-            # TV
-            title = self.episode_tmdb_data.get("name", "")
-            episode_image = self.episode_tmdb_data.get("still_path", "")
-            episode_overview = self.episode_tmdb_data.get("overview", "")
-
-            if episode_overview:
-                desc_parts.append(f"[align=center]{title}[/align]")
-
-                if episode_image:
-                    desc_parts.append(f"[align=center][img]https://image.tmdb.org/t/p/w300{episode_image}[/img][/align]")
-
-                desc_parts.append(f"[align=center]{episode_overview}[/align]")
-
-            # File information
-            if meta.get("is_disc", "") == "DVD":
-                desc_parts.append(f"[hide=DVD MediaInfo][pre]{await builder.get_mediainfo_section(meta)}[/pre][/hide]")
-
-            bd_info = await builder.get_bdinfo_section(meta)
-            if bd_info:
-                desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
-
-        if category == "BOOK":
-            book_section = builder._build_book_desc_section(meta, header_size=3, table=False)
-            if book_section:
-                desc_parts.append(book_section)
-
-        if category == "GAME":
-            game_section = builder._build_game_desc_section(meta, header_size=3)
-            if game_section:
-                desc_parts.append(game_section)
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Audio Spectrograms
-        audio_spectrograms = meta.get("spectrograms_images", [])
-        if audio_spectrograms:
-            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
-
-            spectrograms_block = ""
-            for image in audio_spectrograms:
-                web_url = image.get("web_url")
-                img_url = image.get("img_url")
-                if isinstance(web_url, str) and isinstance(img_url, str) and web_url and img_url:
-                    spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url] "
-            if spectrograms_block:
-                desc_parts.append(f"[center]{spectrograms_block}[/center]")
-
-        # Signature
-        desc_parts.append(f"[align=center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta['ua_name']} {meta['current_version']}[/url][/align]")
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = bbcode.convert_named_spoiler_to_named_hide(description)
-        description = bbcode.convert_spoiler_to_hide(description)
-        description = bbcode.remove_img_resize(description)
-        description = bbcode.convert_to_align(description)
-        description = bbcode.remove_list(description)
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
-            await description_file.write(description)
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=True,
+            menu_screenshots=False,
+            nfo=False,
+            screenshots=False,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/align]",
+        )
 
         return description
 

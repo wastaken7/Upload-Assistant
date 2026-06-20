@@ -81,10 +81,6 @@ class UTP(UNIT3D):
         """
         from src.get_desc import DescriptionBuilder
 
-        # Transform image URLs in meta directly so all packed content logic works
-        # unit3d_edit_desc uses: web_url for [url=], raw_url for [img]
-        # We want: raw_url (full) for [url=], img_url (medium) for [img]
-
         # Save original values and transform
         original_image_list = meta.get('image_list', [])
         transformed_image_list: list[dict[str, Any]] = [
@@ -115,7 +111,7 @@ class UTP(UNIT3D):
 
         try:
             builder = DescriptionBuilder(self.tracker, self.config)
-            description = await builder.unit3d_edit_desc(meta, comparison=True)
+            description = await builder.unit3d_edit_desc(meta)
         finally:
             # Restore original values even if an error occurs
             meta['image_list'] = original_image_list

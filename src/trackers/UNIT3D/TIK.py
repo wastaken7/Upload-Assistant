@@ -197,7 +197,7 @@ class TIK(UNIT3D):
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         if meta.get('description_link') or meta.get('description_file'):
-            desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
+            desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
 
             console.print(f'Custom Description Link/File Path: {desc}', markup=False)
             return {'description': desc}

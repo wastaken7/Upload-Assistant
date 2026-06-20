@@ -8,7 +8,6 @@ import bencodepy
 import httpx
 from bs4 import BeautifulSoup
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -115,104 +114,26 @@ class IPT:
 
     async def generate_description(self, meta: Meta):
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts = []
-
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        # TV
-        title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
-        if episode_overview:
-            desc_parts.append(f"[center]{title}[/center]")
-
-            desc_parts.append(f"[center]{episode_overview}[/center]")
-
-        # File information
-        mediainfo = await builder.get_mediainfo_section(meta)
-        if mediainfo:
-            desc_parts.append(f"[pre]{mediainfo}[/pre]")
-
-        bdinfo = await builder.get_bdinfo_section(meta)
-        if bdinfo:
-            desc_parts.append(f"[pre]{bdinfo}[/pre]")
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Disc menus screenshots header
-        menu_images = meta.get("menu_images", [])
-        if menu_images:
-            desc_parts.append(await builder.menu_screenshot_header(meta))
-
-            # Disc menus screenshots
-            menu_screenshots_block = ""
-            for image in menu_images:
-                menu_web_url = image.get("web_url")
-                menu_img_url = image.get("img_url")
-                if menu_web_url and menu_img_url:
-                    menu_screenshots_block += f"[url={menu_web_url}][img]{menu_img_url}[/img][/url]"
-                    # HDS cannot resize images. If the image host does not provide small thumbnails(<400px), place only one image per line
-                    if "imgbox" not in menu_web_url:
-                        menu_screenshots_block += "\n"
-            if menu_screenshots_block:
-                desc_parts.append(f"[center]\n{menu_screenshots_block}\n[/center]")
-
-        # Screenshot Header
-        desc_parts.append(await builder.screenshot_header())
-
-        # Screenshots
-        images = meta.get("image_list", [])
-        if images:
-            screenshots_block = ""
-            for image in images:
-                screenshots_block += f"[url={image['web_url']}][img]{image['img_url']}[/img][/url] "
-            desc_parts.append("[center]\n" + screenshots_block + "[/center]")
-
-        # Audio Spectrograms
-        audio_spectrograms = meta.get("spectrograms_images", [])
-        if audio_spectrograms:
-            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
-
-            spectrograms_block = ""
-            for image in audio_spectrograms:
-                web_url = image.get("web_url")
-                img_url = image.get("img_url", image.get("raw_url"))
-                if web_url and img_url:
-                    spectrograms_block += f"[url={web_url}][img]{img_url}[/img][/url]"
-                    if "imgbox" not in web_url:
-                        spectrograms_block += "\n"
-            if spectrograms_block:
-                desc_parts.append(f"[center]\n{spectrograms_block}\n[/center]")
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        description = "\n\n".join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = description.replace("[user]", "").replace("[/user]", "")
-        description = description.replace("[align=left]", "").replace("[/align]", "")
-        description = description.replace("[right]", "").replace("[/right]", "")
-        description = description.replace("[align=right]", "").replace("[/align]", "")
-        description = bbcode.remove_sub(description)
-        description = bbcode.remove_sup(description)
-        description = description.replace("[alert]", "").replace("[/alert]", "")
-        description = description.replace("[note]", "").replace("[/note]", "")
-        description = description.replace("[hr]", "").replace("[/hr]", "")
-        description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-        description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-        description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-        description = description.replace("[ul]", "").replace("[/ul]", "")
-        description = description.replace("[ol]", "").replace("[/ol]", "")
-        description = bbcode.remove_hide(description)
-        description = bbcode.remove_img_resize(description)
-        description = bbcode.convert_comparison_to_centered(description, 1000)
-        description = bbcode.remove_spoiler(description)
-        description = bbcode.remove_extra_lines(description)
-
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
-            await description_file.write(description)
-
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=False,
+            mediainfo=True,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+        )
         return description
 
     async def search_existing(self, meta: Meta, _disctype):
@@ -491,7 +412,7 @@ class IPT:
             id_pattern=r"download\.php/(\d+)/",
         )
 
-        if upload and self.config["TRACKERS"][self.tracker]["force_data"]:
+        if upload and self.config["TRACKERS"][self.tracker]["force_data"] and not meta["debug"]:
             await self.edit_post_upload(meta)
 
         return upload

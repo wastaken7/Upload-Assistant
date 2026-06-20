@@ -203,11 +203,7 @@ class UNIT3D:
         return {"name": meta["name"]}
 
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        return {
-            "description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
-                meta, comparison=True
-            )
-        }
+        return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_mediainfo(self, meta: dict[str, Any]) -> dict[str, str]:
         if meta.get("bdinfo") is not None or meta["category"] == "GAME" or meta["category"] == "BOOK" and not meta.get("audiobook", False):
