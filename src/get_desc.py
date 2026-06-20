@@ -259,7 +259,7 @@ class DescriptionBuilder:
             if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
 
-            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF"):
+            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS"):
                 logo_resize_url = str(meta.get("tmdb_logo", ""))
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -843,7 +843,7 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
-            elif self.tracker == "FF":
+            elif self.tracker in ("FF", "HDS"):
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
@@ -960,6 +960,8 @@ class DescriptionBuilder:
                     signature = f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{script_signature}[/size][/center][/url]"
                 elif self.tracker == "GPW":
                     signature = f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/align]"
+                elif self.tracker == "HDS":
+                    signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{script_signature}[/size][/url][/center]"
                 else:
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
                     if self.tracker == "HUNO":
@@ -1811,6 +1813,39 @@ class DescriptionBuilder:
             description = bbcode.convert_to_align(description)
             description = bbcode.remove_list(description)
             description = re.sub(r"\[url=[^\]]+\]\[img(?:=[^\]]+)?\]([^\[]+)\[/img\]\[/url\]", r"[img]\1[/img]", description, flags=re.IGNORECASE)
+
+        if tracker == "HDS":
+            description = description.replace('[user]', '').replace('[/user]', '')
+            description = description.replace('[align=left]', '').replace('[/align]', '')
+            description = description.replace('[right]', '').replace('[/right]', '')
+            description = description.replace('[align=right]', '').replace('[/align]', '')
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace('[alert]', '').replace('[/alert]', '')
+            description = description.replace('[note]', '').replace('[/note]', '')
+            description = description.replace('[hr]', '').replace('[/hr]', '')
+            description = description.replace('[h1]', '[u][b]').replace('[/h1]', '[/b][/u]')
+            description = description.replace('[h2]', '[u][b]').replace('[/h2]', '[/b][/u]')
+            description = description.replace('[h3]', '[u][b]').replace('[/h3]', '[/b][/u]')
+            description = description.replace('[ul]', '').replace('[/ul]', '')
+            description = description.replace('[ol]', '').replace('[/ol]', '')
+            description = bbcode.remove_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_color(description)
+
+            # Apply custom image line breaks for HDS: if "imgbox" is not in the web_url, place only one image per line.
+            def hds_image_formatter(match) -> str:
+                web_url = match.group(1)
+                raw_url = match.group(2)
+                if "imgbox" not in web_url:
+                    return f"[url={web_url}][img]{raw_url}[/img][/url]\n"
+                else:
+                    return f"[url={web_url}][img]{raw_url}[/img][/url]"
+
+            pattern = r"\[url=([^\]]+)\]\[img(?:=[^\]]*)?\]([^\[]+)\[/img\]\[/url\]\s*"
+            description = re.sub(pattern, hds_image_formatter, description)
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:
