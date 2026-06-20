@@ -18,7 +18,6 @@ from src.console import console
 from src.languages import languages_manager
 from src.takescreens import TakeScreensManager
 from src.trackers.COMMON import COMMON
-from src.trackersetup import api_trackers as unit3d_trackers
 from src.uploadscreens import UploadScreensManager
 
 
@@ -779,6 +778,7 @@ class DescriptionBuilder:
         logo: bool = True,
         mediainfo: bool = False,
         menu_screenshots: bool = True,
+        nfo: bool = False,
         screenshots: bool = True,
         signature: str = "",
         tonemapped_header: bool = True,
@@ -840,6 +840,10 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
+            elif self.tracker == "DC":
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(bd_info)
             else:
                 pass
 
@@ -904,6 +908,15 @@ class DescriptionBuilder:
             elif meta_description:
                 desc_parts.append(meta_description)
 
+        # NFO details
+        if nfo:
+            nfo_content = meta.get("description_nfo_content")
+            if isinstance(nfo_content, str) and nfo_content:
+                if self.tracker == "DC":
+                    desc_parts.append(f"[nfo]{nfo_content}[/nfo]")
+                else:
+                    desc_parts.append(f"[pre]{nfo_content}[/pre]")
+
         # Description from file/pastebin link
         if user_description:
             desc_parts.append(await self.get_user_description(meta))
@@ -935,9 +948,12 @@ class DescriptionBuilder:
                 script_signature = meta.get("ua_signature", "")
                 if self.tracker in ("ASC", "BJS", "BT", "CBR", "LCD"):
                     script_signature = f"Compartilhado com {meta['ua_name']} {meta['current_version']}"
-                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
-                if self.tracker == "HUNO":
-                    signature = signature.replace("[size=4]", "[size=8]")
+                if self.tracker == "DC":
+                    signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]{script_signature}[/url][/center]"
+                else:
+                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
+                    if self.tracker == "HUNO":
+                        signature = signature.replace("[size=4]", "[size=8]")
             desc_parts.append(signature)
 
         description_str: str = "\n".join(part for part in desc_parts if str(part).strip())
@@ -1715,6 +1731,28 @@ class DescriptionBuilder:
             description = bbcode.remove_list(description)
             description = description.replace("•", "-").replace("’", "'").replace("–", "-")
 
+        if tracker == "DC":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[*] ", "• ").replace("[*]", "• ")
+            description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_list(description)
+            description = description.strip()
+
+        from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:
             description = bbcode.convert_hide_to_spoiler(description)
             description = description.replace("[user]", "").replace("[/user]", "")
