@@ -844,7 +844,7 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
-            elif self.tracker in ("FF", "HDS"):
+            elif self.tracker in ("FF", "HDS", "IPT"):
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
@@ -1760,7 +1760,7 @@ class DescriptionBuilder:
             return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
         elif self.tracker == "GPW":
             return f"[img]{raw_url}[/img] "
-        elif self.tracker == "HDS":
+        elif self.tracker in ("HDS", "IPT"):
             if "imgbox" not in web_url:
                 return f"[url={web_url}][img]{img_url}[/img][/url]\n"
             else:
@@ -1892,6 +1892,26 @@ class DescriptionBuilder:
 
             pattern = r"\[url=([^\]]+)\]\[img(?:=[^\]]*)?\]([^\[]+)\[/img\]\[/url\]\s*"
             description = re.sub(pattern, hds_image_formatter, description)
+
+        if tracker == "IPT":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.remove_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
 
         if tracker == "HDT":
             description = description.replace("[user]", "").replace("[/user]", "")
