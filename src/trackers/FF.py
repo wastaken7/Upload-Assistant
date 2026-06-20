@@ -3,14 +3,12 @@ import asyncio
 import glob
 import os
 import platform
-import re
 from typing import Any, Optional, Union, cast
 
 import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -179,151 +177,61 @@ class FF:
                 return []
 
     async def generate_description(self, meta: dict[str, Any]) -> str:
-        builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
+        def transform_images(images: list[Any]) -> list[dict[str, Any]]:
+            return [
+                {
+                    "web_url": img.get("web_url", ""),
+                    "raw_url": img.get("img_url", img.get("raw_url", "")),
+                    "img_url": img.get("img_url", img.get("raw_url", "")),
+                }
+                for img in images
+                if isinstance(img, dict)
+            ]
 
-        # Custom Header
-        desc_parts.append(await builder.get_custom_header())
-
-        # Logo
-        logo_resize_url = meta.get('tmdb_logo', '')
-        if logo_resize_url:
-            desc_parts.append(f"[center][img]https://image.tmdb.org/t/p/w300/{logo_resize_url}[/img][/center]")
-
-        # TV
-        title, episode_overview = await builder.get_tv_info(meta)
-        if episode_overview:
-            desc_parts.append(f"[center]{title}[/center]")
-            desc_parts.append(f'[center]{episode_overview}[/center]')
-
-        # File information
-        mediainfo = await builder.get_mediainfo_section(meta)
-        if mediainfo:
-            desc_parts.append(f'[pre]{mediainfo}[/pre]')
-
-        bdinfo = await builder.get_bdinfo_section(meta)
-        if bdinfo:
-            desc_parts.append(f'[pre]{bdinfo}[/pre]')
-
-        # User description
-        desc_parts.append(await builder.get_user_description(meta))
-
-        # Disc menus screenshots header
-        desc_parts.append(await builder.menu_screenshot_header(meta))
-
-        # Disc menus screenshots
-        menu_images = meta.get("menu_images", [])
-        if isinstance(menu_images, list) and menu_images:
-            menu_screenshots_block = ""
-            menu_images_list = cast(list[Any], menu_images)
-            for image in menu_images_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                menu_img_url = image_dict.get("img_url")
-                menu_web_url = image_dict.get("web_url")
-                if isinstance(menu_img_url, str) and isinstance(menu_web_url, str) and menu_img_url and menu_web_url:
-                    menu_screenshots_block += f'<a href="{menu_web_url}" target="_blank"><img src="{menu_img_url}" width="220"></a> '
-            if menu_screenshots_block:
-                desc_parts.append(f"[center]{menu_screenshots_block}[/center]")
-
-        # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
-
-        # Screenshot Header
-        images = meta.get("image_list", [])
-        if isinstance(images, list) and images:
-            desc_parts.append(await builder.screenshot_header())
-
-            # Screenshots
-            screenshots_block = ""
-            images_list = cast(list[Any], images)
-            for image in images_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                img_url = image_dict.get("img_url")
-                web_url = image_dict.get("web_url")
-                if isinstance(img_url, str) and isinstance(web_url, str) and img_url and web_url:
-                    screenshots_block += (
-                        f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="220"></a> '
-                    )
-            if screenshots_block:
-                desc_parts.append(f"[center]{screenshots_block}[/center]")
-
-        # Audio Spectrograms
-        audio_spectrograms = meta.get("spectrograms_images", [])
-        if isinstance(audio_spectrograms, list) and audio_spectrograms:
-            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
-
-            spectrograms_block = ""
-            audio_spectrograms_list = cast(list[Any], audio_spectrograms)
-            for image in audio_spectrograms_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                img_url = image_dict.get("img_url", image_dict.get("raw_url"))
-                web_url = image_dict.get("web_url")
-                if isinstance(img_url, str) and isinstance(web_url, str) and img_url and web_url:
-                    spectrograms_block += f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="220"></a> '
-            if spectrograms_block:
-                desc_parts.append(f"[center]{spectrograms_block}[/center]")
-
-        # Signature
-        desc_parts.append(f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]")
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = description.replace("[user]", "").replace("[/user]", "")
-        description = description.replace("[align=left]", "").replace("[/align]", "")
-        description = description.replace("[right]", "").replace("[/right]", "")
-        description = description.replace("[align=right]", "").replace("[/align]", "")
-        description = bbcode.remove_sub(description)
-        description = bbcode.remove_sup(description)
-        description = description.replace("[alert]", "").replace("[/alert]", "")
-        description = description.replace("[note]", "").replace("[/note]", "")
-        description = description.replace("[hr]", "").replace("[/hr]", "")
-        description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-        description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-        description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-        description = description.replace("[ul]", "").replace("[/ul]", "")
-        description = description.replace("[ol]", "").replace("[/ol]", "")
-        description = description.replace("[hide]", "").replace("[/hide]", "")
-        description = description.replace("•", "-").replace("“", '"').replace("”", '"')
-        description = bbcode.convert_comparison_to_centered(description, 1000)
-        description = bbcode.remove_spoiler(description)
-
-        # [url][img=000]...[/img][/url]
-        description = re.sub(
-            r"\[url=(?P<href>[^\]]+)\]\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]\[/url\]",
-            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="\g<width>"></a>',
-            description,
-            flags=re.IGNORECASE
+        image_keys = (
+            "image_list",
+            "menu_images",
+            "spectrograms_images",
         )
 
-        # [url][img]...[/img][/url]
-        description = re.sub(
-            r"\[url=(?P<href>[^\]]+)\]\[img\](?P<src>[^\[]+)\[/img\]\[/url\]",
-            r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="220"></a>',
-            description,
-            flags=re.IGNORECASE
-        )
+        original_values = {key: meta.get(key, []) for key in image_keys}
 
-        # [img=200]...[/img] (no [url])
-        description = re.sub(
-            r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]",
-            r'<img src="\g<src>" width="\g<width>">',
-            description,
-            flags=re.IGNORECASE
-        )
+        original_new_images: dict[str, Any] = {}
 
-        description = bbcode.remove_extra_lines(description)
+        for key in image_keys:
+            meta[key] = transform_images(meta.get(key, []))
 
-        async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8'
-        ) as description_file:
-            await description_file.write(description)
+        for key in (k for k in meta if k.startswith("new_images_")):
+            original_new_images[key] = meta[key]
+            meta[key] = transform_images(meta[key])
+
+        try:
+            builder = DescriptionBuilder(self.tracker, self.config)
+            description = await builder.general_description_generator(
+                meta,
+                audio_spectrogram=True,
+                bluray=False,
+                book=False,
+                custom_header=True,
+                custom_signature=False,
+                description=True,
+                game=False,
+                languages=False,
+                logo=True,
+                mediainfo=True,
+                menu_screenshots=True,
+                screenshots=True,
+                tonemapped_header=True,
+                tv_info=True,
+                ua_signature=True,
+                user_description=True,
+            )
+        finally:
+            for key, value in original_values.items():
+                meta[key] = value
+
+            for key, value in original_new_images.items():
+                meta[key] = value
 
         return description
 

@@ -259,7 +259,7 @@ class DescriptionBuilder:
             if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
 
-            if self.tracker in ("BJS", "ANT", "GPW", "BT"):
+            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF"):
                 logo_resize_url = str(meta.get("tmdb_logo", ""))
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -844,6 +844,13 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
+            elif self.tracker == "FF":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[pre]{bd_info}[/pre]")
             else:
                 pass
 
@@ -950,6 +957,8 @@ class DescriptionBuilder:
                     script_signature = f"Compartilhado com {meta['ua_name']} {meta['current_version']}"
                 if self.tracker == "DC":
                     signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]{script_signature}[/url][/center]"
+                elif self.tracker == "FF":
+                    signature = f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{script_signature}[/size][/center][/url]"
                 else:
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
                     if self.tracker == "HUNO":
@@ -1748,9 +1757,52 @@ class DescriptionBuilder:
             description = description.replace("[ol]", "").replace("[/ol]", "")
             description = description.replace("[*] ", "• ").replace("[*]", "• ")
             description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
-            description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_list(description)
             description = description.strip()
+
+        if tracker == "FF":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[right]", "").replace("[/right]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = description.replace("•", "-").replace("“", '"').replace("”", '"')
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+
+            # [url][img=000]...[/img][/url]
+            description = re.sub(
+                r"\[url=(?P<href>[^\]]+)\]\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]\[/url\]",
+                r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="\g<width>"></a>',
+                description,
+                flags=re.IGNORECASE
+            )
+
+            # [url][img]...[/img][/url]
+            description = re.sub(
+                r"\[url=(?P<href>[^\]]+)\]\[img\](?P<src>[^\[]+)\[/img\]\[/url\]",
+                r'<a href="\g<href>" target="_blank"><img src="\g<src>" width="220"></a>',
+                description,
+                flags=re.IGNORECASE
+            )
+
+            # [img=200]...[/img] (no [url])
+            description = re.sub(
+                r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]",
+                r'<img src="\g<src>" width="\g<width>">',
+                description,
+                flags=re.IGNORECASE
+            )
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:
