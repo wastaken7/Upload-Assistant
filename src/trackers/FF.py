@@ -197,6 +197,7 @@ class FF:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            signature=f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]",
         )
         return description
 

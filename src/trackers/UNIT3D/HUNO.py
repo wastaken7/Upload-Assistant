@@ -137,7 +137,11 @@ class HUNO(UNIT3D):
         )
 
     async def get_description(self, meta: dict[str, Any]) -> None:
-        desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, approved_image_hosts=self.approved_image_hosts)
+        desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
+            meta,
+            approved_image_hosts=self.approved_image_hosts,
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=8]{meta['ua_signature']}[/size][/url][/right]",
+        )
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
             await f.write(desc)
 

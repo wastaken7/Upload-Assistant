@@ -102,6 +102,7 @@ class TL:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            signature=f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{meta["ua_signature"]}</a></div>""",
         )
 
         return description

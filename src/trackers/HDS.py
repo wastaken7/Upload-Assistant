@@ -63,6 +63,7 @@ class HDS:
                 tv_info=True,
                 ua_signature=True,
                 user_description=True,
+                signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta['ua_signature']}[/size][/url][/center]",
             )
         except Exception as e:
             console.print(f"Error generating description: {e}")

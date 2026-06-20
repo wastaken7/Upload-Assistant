@@ -412,7 +412,7 @@ class IPT:
             id_pattern=r"download\.php/(\d+)/",
         )
 
-        if upload and self.config["TRACKERS"][self.tracker]["force_data"]:
+        if upload and self.config["TRACKERS"][self.tracker]["force_data"] and not meta["debug"]:
             await self.edit_post_upload(meta)
 
         return upload

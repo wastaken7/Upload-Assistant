@@ -330,7 +330,7 @@ class DescriptionBuilder:
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
-                    return str(await mi.read())
+                    return await mi.read()
 
         cache_file_dir = os.path.join(meta["base_dir"], "tmp", meta["uuid"])
         cache_file_path = os.path.join(cache_file_dir, "MEDIAINFO_SHORT.txt")
@@ -341,7 +341,7 @@ class DescriptionBuilder:
         if file_exists and file_size > 0:
             try:
                 async with aiofiles.open(cache_file_path, encoding="utf-8") as f:
-                    media_info_content = str(await f.read())
+                    media_info_content = await f.read()
                 return media_info_content
             except Exception:
                 pass
@@ -360,7 +360,7 @@ class DescriptionBuilder:
                     full=False,
                     mediainfo_options={"inform": f"file://{mi_template}"},
                 )
-                media_info_content = str(media_info_result)
+                media_info_content = media_info_result
 
                 if media_info_content:
                     media_info_content = media_info_content.replace("\r\n", "\n")
@@ -377,13 +377,13 @@ class DescriptionBuilder:
                 cleanpath_exists = await self.common.path_exists(mi_file_path)
                 if cleanpath_exists:
                     async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                        return str(await f.read())
+                        return await f.read()
 
         else:
             cleanpath_exists = await self.common.path_exists(mi_file_path)
             if cleanpath_exists:
                 async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                    tech_info = str(await f.read())
+                    tech_info = await f.read()
                     return tech_info
 
         return ""
@@ -923,10 +923,10 @@ class DescriptionBuilder:
             if game_section:
                 desc_parts.append(game_section)
 
-        if meta.get("mteam_description", ""):
+        if self.tracker == "MTEAM" and meta.get("mteam_description", ""):
             desc_parts.append(meta.get("mteam_description", ""))
 
-        if meta.get("nexusphp_description", ""):
+        if self.tracker in {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"} and meta.get("nexusphp_description", ""):
             desc_parts.append(meta.get("nexusphp_description", ""))
 
         # Description that may come from API requests
@@ -1007,27 +1007,10 @@ class DescriptionBuilder:
         if ua_signature:
             if not signature:
                 script_signature = meta.get("ua_signature", "")
-                if self.tracker in ("ASC", "BJS", "BT", "CBR", "LCD"):
-                    script_signature = f"Compartilhado com {meta['ua_name']} {meta['current_version']}"
-                if self.tracker == "DC":
-                    signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]{script_signature}[/url][/center]"
-                elif self.tracker == "TL":
-                    signature = f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{script_signature}</a></div>"""
-                elif self.tracker == "FF":
-                    signature = f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{script_signature}[/size][/center][/url]"
-                elif self.tracker == "GPW":
-                    signature = f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/align]"
-                elif self.tracker == "HDS":
-                    signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{script_signature}[/size][/url][/center]"
-                elif self.tracker in ("HDT", "PTS"):
-                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/right]"
-                else:
-                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
-                    if self.tracker == "HUNO":
-                        signature = signature.replace("[size=4]", "[size=8]")
+                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
             desc_parts.append(signature)
 
-        description_str: str = "\n".join(part for part in desc_parts if str(part).strip())
+        description_str: str = "\n".join(part for part in desc_parts if part.strip())
 
         # Formatting
         description_str = self.tracker_specific_formats(self.tracker, description_str)
@@ -1695,7 +1678,7 @@ class DescriptionBuilder:
                         mi_dump = MediaInfo.parse(
                             file, output="STRING", full=False, mediainfo_options={"inform_version": "1"}
                         )
-                        parsed_mediainfo = self.parser.parse_mediainfo(str(mi_dump))
+                        parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
                         desc_parts.append(
                             f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n"

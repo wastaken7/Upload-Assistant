@@ -152,6 +152,7 @@ class HDT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
         )
 
         return description

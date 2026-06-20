@@ -233,6 +233,7 @@ class GPW:
             tv_info=False,
             ua_signature=True,
             user_description=True,
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/align]",
         )
         return description
 

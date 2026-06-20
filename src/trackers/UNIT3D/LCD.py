@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 import aiofiles
 
+from src.get_desc import DescriptionBuilder
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -90,6 +91,10 @@ class LCD(UNIT3D):
                 mediainfo = await f.read()
 
         return {'mediainfo': mediainfo}
+
+    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
+        signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/right]"
+        return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}
 
     async def get_category_id(
         self,

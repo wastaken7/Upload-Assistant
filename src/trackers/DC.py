@@ -64,6 +64,7 @@ class DC:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta['ua_signature']}[/url][/center]",
         )
 
         return description
