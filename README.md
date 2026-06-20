@@ -146,9 +146,9 @@ This branch introduces new media categories and automation features not present 
       - On linux systems, get it from your favorite package manager
       - If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](https://github.com/Audionut/Upload-Assistant/wiki/ffmpeg---max-workers-issues)
    - Get the source:
-      - Clone the repo to your system `git clone https://github.com/Audionut/Upload-Assistant.git`
+      - Clone the repo to your system `git clone https://github.com/wastaken7/Upload-Assistant.git`
       - Fetch all of the release tags `git fetch --all --tags`
-      - Check out the specifc release: see [releases](https://github.com/Audionut/Upload-Assistant/releases)
+      - Check out the specifc release: see [releases](https://github.com/wastaken7/Upload-Assistant/releases)
       - `git checkout tags/tagname` where `tagname` is the release name, eg `v5.0.0`
       - or download a zip of the source from the releases page and create/overwrite a local copy.
    - Install necessary python modules `pip3 install --user -U -r requirements.txt`
