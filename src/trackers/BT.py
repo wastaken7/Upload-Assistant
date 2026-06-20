@@ -418,7 +418,7 @@ class BT:
             return langcodes.Language.make(lang_code).display_name('pt').capitalize()
 
         except LanguageTagError:
-            return str(lang_code)
+            return lang_code
 
     async def get_audio(self, meta: dict[str, Any]) -> str:
         if not meta.get('language_checked', False):
@@ -427,7 +427,7 @@ class BT:
         raw_audio_languages = meta.get('audio_languages')
         audio_languages_raw: list[Any] = []
         if isinstance(raw_audio_languages, list):
-            audio_languages_raw = cast(list[Any], raw_audio_languages)
+            audio_languages_raw = raw_audio_languages
         audio_languages: set[str] = set()
         for lang in audio_languages_raw:
             if isinstance(lang, str):
@@ -458,7 +458,7 @@ class BT:
         raw_subtitle_languages = meta.get('subtitle_languages')
         subtitle_languages_raw: list[Any] = []
         if isinstance(raw_subtitle_languages, list):
-            subtitle_languages_raw = cast(list[Any], raw_subtitle_languages)
+            subtitle_languages_raw = raw_subtitle_languages
         found_language_strings = [lang for lang in subtitle_languages_raw if isinstance(lang, str)]
 
         subtitle_ids: set[str] = set()
@@ -573,8 +573,11 @@ class BT:
     async def get_title(self, meta: dict[str, Any]) -> str:
         title_value = self.main_tmdb_data.get('name') or self.main_tmdb_data.get('title') or ''
         title = title_value if isinstance(title_value, str) else ''
+        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
 
-        return title if title and title != meta.get('title') else ''
+        if title and title != meta.get("title") and (not original_name_title or title.lower() != original_name_title.lower()):
+            return title
+        return ""
 
     async def get_description(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -672,7 +675,7 @@ class BT:
             videos_dict = cast(dict[str, Any], videos)
             results = videos_dict.get('results')
             if isinstance(results, list):
-                results_list = cast(list[Any], results)
+                results_list = results
                 video_results.extend(
                     [cast(dict[str, Any], result) for result in results_list if isinstance(result, dict)]
                 )
@@ -703,7 +706,7 @@ class BT:
             genres = self.main_tmdb_data.get("genres")
             if isinstance(genres, list):
                 genre_names: list[str] = []
-                genres_list_raw = cast(list[Any], genres)
+                genres_list_raw = genres
                 genres_list: list[dict[str, Any]] = [cast(dict[str, Any], genre) for genre in genres_list_raw if isinstance(genre, dict)]
                 for genre in genres_list:
                     name = genre.get("name")
@@ -811,7 +814,7 @@ class BT:
                             if isinstance(class_attr, str):
                                 class_list = [class_attr]
                             elif isinstance(class_attr, list):
-                                class_list = [str(value) for value in class_attr]
+                                class_list = list(class_attr)
                             if "colhead_dark" in class_list:
                                 continue
                             cell = r.find("td")
@@ -973,17 +976,17 @@ class BT:
 
         combined_images: list[dict[str, Any]] = []
         if isinstance(menu_images, list):
-            menu_images_list = cast(list[Any], menu_images)
+            menu_images_list = menu_images
             combined_images.extend(
                 [cast(dict[str, Any], img) for img in menu_images_list if isinstance(img, dict)]
             )
         if isinstance(image_list, list):
-            image_list_items = cast(list[Any], image_list)
+            image_list_items = image_list
             combined_images.extend(
                 [cast(dict[str, Any], img) for img in image_list_items if isinstance(img, dict)]
             )
         if isinstance(spectrograms_images, list):
-            spectrograms_images_list = cast(list[Any], spectrograms_images)
+            spectrograms_images_list = spectrograms_images
             combined_images.extend([cast(dict[str, Any], img) for img in spectrograms_images_list if isinstance(img, dict)])
 
         urls: list[str] = []
@@ -1006,7 +1009,7 @@ class BT:
         tmdb_directors = meta.get('tmdb_directors')
         tmdb_directors_list: list[Any] = []
         if isinstance(tmdb_directors, list):
-            tmdb_directors_list = cast(list[Any], tmdb_directors)
+            tmdb_directors_list = tmdb_directors
         director_entries.extend([name for name in tmdb_directors_list if isinstance(name, str)])
 
         if director_entries:

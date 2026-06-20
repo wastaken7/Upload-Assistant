@@ -387,17 +387,18 @@ class ASC:
 
         name = meta['title']
         base_name = name
+        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
 
         if meta['category'] == 'TV':
             tv_title_ptbr = self.main_tmdb_data.get('name')
-            if tv_title_ptbr and tv_title_ptbr.lower() != name.lower():
+            if tv_title_ptbr and tv_title_ptbr.lower() != name.lower() and (not original_name_title or tv_title_ptbr.lower() != original_name_title.lower()):
                 base_name = f"{tv_title_ptbr} ({name})"
 
             return f"{base_name} - {meta.get('season', '')}{meta.get('episode', '')}"
 
         else:
             movie_title_ptbr = self.main_tmdb_data.get('title')
-            if movie_title_ptbr and movie_title_ptbr.lower() != name.lower():
+            if movie_title_ptbr and movie_title_ptbr.lower() != name.lower() and (not original_name_title or movie_title_ptbr.lower() != original_name_title.lower()):
                 base_name = f"{movie_title_ptbr} ({name})"
 
             return f"{base_name}"
@@ -981,7 +982,7 @@ class ASC:
             return 'N/A'
         def _try_format(fmt: str) -> Optional[str]:
             try:
-                return datetime.strptime(str(date_str), fmt).replace(tzinfo=timezone.utc).strftime('%d/%m/%Y')
+                return datetime.strptime(date_str, fmt).replace(tzinfo=timezone.utc).strftime("%d/%m/%Y")
             except (ValueError, TypeError):
                 return None
 
@@ -989,7 +990,7 @@ class ASC:
             formatted = _try_format(fmt)
             if formatted:
                 return formatted
-        return str(date_str)
+        return date_str
 
     async def media_info(self, meta: dict[str, Any]) -> Optional[str]:
         if meta.get('is_disc') == 'BDMV':
@@ -1008,7 +1009,7 @@ class ASC:
                     full=False,
                     mediainfo_options={'inform': f'file://{template_path}'}
                 )
-                return str(mi_output).replace('\r', '')
+                return mi_output.replace("\r", "")
 
         return None
 

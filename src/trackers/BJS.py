@@ -557,8 +557,9 @@ class BJS:
         if BJS.database_title:
             original_title = BJS.database_title
 
+        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title")
         tmdb_title = self.main_tmdb_data.get("name") or self.main_tmdb_data.get("title")
-        if tmdb_title and tmdb_title != meta.get("title"):
+        if tmdb_title and tmdb_title != meta.get("title") and (not original_name_title or original_name_title != tmdb_title):
             brazilian_title = tmdb_title
 
         return original_title, brazilian_title
@@ -849,11 +850,11 @@ class BJS:
                                             row_type = fmt
                                             break
 
-                        names = []
+                        names: list[Any] = []
                         if name:
                             names.append(name)
                         if category in ("BOOK", "GAME") and BJS.database_title:
-                            names.append(str(BJS.database_title).strip())
+                            names.append(BJS.database_title.strip())
 
                         for n in names:
                             dupe_entry = {
@@ -928,7 +929,7 @@ class BJS:
                         if data_name:
                             names.append(str(data_name).strip())
                         if site_name:
-                            names.append(str(site_name).strip())
+                            names.append(site_name.strip())
                     else:
                         name = data_name or site_name
                         if name:
