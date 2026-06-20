@@ -259,7 +259,7 @@ class DescriptionBuilder:
             if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
 
-            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS"):
+            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT"):
                 logo_resize_url = str(meta.get("tmdb_logo", ""))
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -784,6 +784,7 @@ class DescriptionBuilder:
         user_description: bool,
         approved_image_hosts: Union[list[str], None] = None,
         signature: str = "",
+        desc_header: str = "",
     ) -> str:
         image_list = meta[f"{self.tracker}_images_key"] if f"{self.tracker}_images_key" in meta else meta.get("image_list", [])
         image_list = cast(list[Any], image_list)
@@ -850,6 +851,13 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[pre]{bd_info}[/pre]")
+            elif self.tracker == "HDT":
+                mediainfo_sec = await self.get_mediainfo_section(meta)
+                if mediainfo_sec:
+                    desc_parts.append(f"[left][font=consolas]{mediainfo_sec}[/font][/left]")
+                bd_info = await self.get_bdinfo_section(meta)
+                if bd_info:
+                    desc_parts.append(f"[left][font=consolas]{bd_info}[/font][/left]")
             else:
                 pass
 
@@ -962,6 +970,8 @@ class DescriptionBuilder:
                     signature = f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/align]"
                 elif self.tracker == "HDS":
                     signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{script_signature}[/size][/url][/center]"
+                elif self.tracker == "HDT":
+                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/right]"
                 else:
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
                     if self.tracker == "HUNO":
@@ -990,6 +1000,23 @@ class DescriptionBuilder:
     ) -> str:
         return await self.general_description_generator(
             meta,
+            audio_spectrogram=True,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
             signature=signature,
             desc_header=desc_header,
             approved_image_hosts=approved_image_hosts,
@@ -1099,7 +1126,7 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta.get("screens", 6))])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
+                desc_parts.append(self.format_screenshot(web_url, raw_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1120,9 +1147,8 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                img_url = images[img_index].get("img_url", raw_url)
+                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1176,8 +1202,8 @@ class DescriptionBuilder:
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
-                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
-                                desc_parts.append(image_str)
+                                img_url = img.get("img_url", raw_url)
+                                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                             desc_parts.append("[/center]\n\n")
                         else:
                             desc_parts.append("[center]\n\n")
@@ -1237,8 +1263,8 @@ class DescriptionBuilder:
                                 for img in uploaded_images:
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
-                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
-                                    desc_parts.append(image_str)
+                                    img_url = img.get("img_url", raw_url) or ""
+                                    desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                                 desc_parts.append("[/center]\n\n")
 
                             meta_filename = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
@@ -1283,8 +1309,8 @@ class DescriptionBuilder:
                     for img_index in range(len(images[: int(meta["screens"])])):
                         web_url = images[img_index]["web_url"]
                         raw_url = images[img_index]["raw_url"]
-                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                        desc_parts.append(image_str)
+                        img_url = images[img_index].get("img_url", raw_url)
+                        desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             desc_parts.append("\n")
                     desc_parts.append("[/center]\n\n")
@@ -1342,8 +1368,8 @@ class DescriptionBuilder:
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
-                                image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                                desc_parts.append(image_str)
+                                img_url = img.get("img_url", raw_url)
+                                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                             desc_parts.append("[/center]\n\n")
                         else:
                             # Increment retry_count for tracking but use unique disc keys for each disc
@@ -1436,8 +1462,8 @@ class DescriptionBuilder:
                                 for img in uploaded_images:
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
-                                    image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url]"
-                                    desc_parts.append(image_str)
+                                    img_url = img.get("img_url", raw_url) or ""
+                                    desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
                                 desc_parts.append("[/center]\n\n")
 
                             # Save the updated meta to `meta.json` after upload
@@ -1484,9 +1510,8 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                img_url = images[img_index].get("img_url", raw_url)
+                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1648,7 +1673,8 @@ class DescriptionBuilder:
                         for img_index in range(len(images)):
                             web_url = images[img_index]["web_url"]
                             raw_url = images[img_index]["raw_url"]
-                            image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
+                            img_url = images[img_index].get("img_url", raw_url)
+                            image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                             desc_parts.append(image_str)
                             char_count += len(image_str)
                             if screensPerRow and (img_index + 1) % screensPerRow == 0:
@@ -1661,7 +1687,8 @@ class DescriptionBuilder:
                     for img in meta[new_images_key]:
                         web_url = img["web_url"]
                         raw_url = img["raw_url"]
-                        image_str = f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
+                        img_url = img.get("img_url", raw_url)
+                        image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                         desc_parts.append(image_str)
                         char_count += len(image_str)
                     desc_parts.append("[/center]\n\n")
@@ -1708,11 +1735,10 @@ class DescriptionBuilder:
                     for img_index, image in enumerate(menu_images):
                         web_url = image.get("web_url")
                         raw_url = image.get("raw_url")
+                        img_url = image.get("img_url", raw_url)
                         if not web_url or not raw_url:
                             continue
-                        menu_parts.append(
-                            f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                        )
+                        menu_parts.append(self.format_screenshot(web_url, raw_url, img_url))
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             menu_parts.append("\n")
                     menu_parts.append("[/center]\n\n")
@@ -1721,6 +1747,26 @@ class DescriptionBuilder:
             console.print(f"[yellow]Warning: Error processing disc menu section: {str(e)}[/yellow]")
 
         return menu_image_section
+
+    def format_screenshot(self, web_url: str, raw_url: str, img_url: str = "", thumb_size: Union[str, int] = "") -> str:
+        if not img_url:
+            img_url = raw_url
+        if not thumb_size:
+            thumb_size = self.config["DEFAULT"].get("thumbnail_size", "350")
+
+        if self.tracker == "HDT":
+            return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
+        elif self.tracker == "FF":
+            return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
+        elif self.tracker == "GPW":
+            return f"[img]{raw_url}[/img] "
+        elif self.tracker == "HDS":
+            if "imgbox" not in web_url:
+                return f"[url={web_url}][img]{img_url}[/img][/url]\n"
+            else:
+                return f"[url={web_url}][img]{img_url}[/img][/url] "
+        else:
+            return f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
@@ -1846,6 +1892,26 @@ class DescriptionBuilder:
 
             pattern = r"\[url=([^\]]+)\]\[img(?:=[^\]]*)?\]([^\[]+)\[/img\]\[/url\]\s*"
             description = re.sub(pattern, hds_image_formatter, description)
+
+        if tracker == "HDT":
+            description = description.replace("[user]", "").replace("[/user]", "")
+            description = description.replace("[align=left]", "").replace("[/align]", "")
+            description = description.replace("[align=right]", "").replace("[/align]", "")
+            description = bbcode.remove_sub(description)
+            description = bbcode.remove_sup(description)
+            description = description.replace("[alert]", "").replace("[/alert]", "")
+            description = description.replace("[note]", "").replace("[/note]", "")
+            description = description.replace("[hr]", "").replace("[/hr]", "")
+            description = description.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            description = description.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            description = description.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            description = description.replace("[ul]", "").replace("[/ul]", "")
+            description = description.replace("[ol]", "").replace("[/ol]", "")
+            description = bbcode.convert_spoiler_to_hide(description)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_spoiler(description)
+            description = bbcode.remove_list(description)
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:

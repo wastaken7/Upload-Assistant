@@ -42,33 +42,6 @@ class HDS:
         return False
 
     async def generate_description(self, meta: Meta) -> str:
-        def transform_images(images: list[Any]) -> list[dict[str, Any]]:
-            return [
-                {
-                    "web_url": img.get("web_url", ""),
-                    "raw_url": img.get("img_url", img.get("raw_url", "")),
-                    "img_url": img.get("img_url", img.get("raw_url", "")),
-                }
-                for img in images
-                if isinstance(img, dict)
-            ]
-
-        image_keys = (
-            "image_list",
-            "menu_images",
-            "spectrograms_images",
-        )
-
-        original_values = {key: meta.get(key, []) for key in image_keys}
-        original_new_images: dict[str, Any] = {}
-
-        for key in image_keys:
-            meta[key] = transform_images(meta.get(key, []))
-
-        for key in (k for k in meta if k.startswith("new_images_")):
-            original_new_images[key] = meta[key]
-            meta[key] = transform_images(meta[key])
-
         try:
             builder = DescriptionBuilder(self.tracker, self.config)
             description = await builder.general_description_generator(
@@ -91,12 +64,9 @@ class HDS:
                 ua_signature=True,
                 user_description=True,
             )
-        finally:
-            for key, value in original_values.items():
-                meta[key] = value
-
-            for key, value in original_new_images.items():
-                meta[key] = value
+        except Exception as e:
+            console.print(f"Error generating description: {e}")
+            description = ""
 
         return description
 
