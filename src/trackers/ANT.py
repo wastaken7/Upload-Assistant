@@ -355,6 +355,7 @@ class ANT:
             logo=has_user_desc,
             mediainfo=False,
             menu_screenshots=True,
+            nfo=False,
             screenshots=False,
             tonemapped_header=True,
             tv_info=False,

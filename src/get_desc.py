@@ -764,27 +764,26 @@ class DescriptionBuilder:
     async def general_description_generator(
         self,
         meta: dict[str, Any],
-        desc_header: str = "",
-        approved_image_hosts: Union[list[str], None] = None,
         # Section controls
-        audio_spectrogram: bool = True,
-        bluray: bool = True,
-        book: bool = True,
-        custom_header: bool = True,
-        custom_signature: bool = True,
-        description: bool = True,
-        game: bool = True,
-        languages: bool = True,
-        logo: bool = True,
-        mediainfo: bool = False,
-        menu_screenshots: bool = True,
-        nfo: bool = False,
-        screenshots: bool = True,
+        audio_spectrogram: bool,
+        bluray: bool,
+        book: bool,
+        custom_header: bool,
+        custom_signature: bool,
+        description: bool,
+        game: bool,
+        languages: bool,
+        logo: bool,
+        mediainfo: bool,
+        menu_screenshots: bool,
+        nfo: bool,
+        screenshots: bool,
+        tonemapped_header: bool,
+        tv_info: bool,
+        ua_signature: bool,
+        user_description: bool,
+        approved_image_hosts: Union[list[str], None] = None,
         signature: str = "",
-        tonemapped_header: bool = True,
-        tv_info: bool = True,
-        ua_signature: bool = True,
-        user_description: bool = True,
     ) -> str:
         image_list = meta[f"{self.tracker}_images_key"] if f"{self.tracker}_images_key" in meta else meta.get("image_list", [])
         image_list = cast(list[Any], image_list)
@@ -959,6 +958,8 @@ class DescriptionBuilder:
                     signature = f"[center][url=https://github.com/wastaken7/Upload-Assistant]{script_signature}[/url][/center]"
                 elif self.tracker == "FF":
                     signature = f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{script_signature}[/size][/center][/url]"
+                elif self.tracker == "GPW":
+                    signature = f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{script_signature}[/size][/url][/align]"
                 else:
                     signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
                     if self.tracker == "HUNO":
@@ -1803,6 +1804,13 @@ class DescriptionBuilder:
                 description,
                 flags=re.IGNORECASE
             )
+
+        if tracker == "GPW":
+            description = bbcode.remove_sup(description)
+            description = bbcode.remove_sub(description)
+            description = bbcode.convert_to_align(description)
+            description = bbcode.remove_list(description)
+            description = re.sub(r"\[url=[^\]]+\]\[img(?:=[^\]]+)?\]([^\[]+)\[/img\]\[/url\]", r"[img]\1[/img]", description, flags=re.IGNORECASE)
 
         from src.trackersetup import api_trackers as unit3d_trackers
         if tracker in unit3d_trackers:

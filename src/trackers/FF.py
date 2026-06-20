@@ -220,6 +220,7 @@ class FF:
                 logo=True,
                 mediainfo=True,
                 menu_screenshots=True,
+                nfo=False,
                 screenshots=True,
                 tonemapped_header=True,
                 tv_info=True,

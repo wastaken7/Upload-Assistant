@@ -12,7 +12,6 @@ import httpx
 from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
-from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -215,105 +214,26 @@ class GPW:
 
     async def get_release_desc(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc_parts: list[str] = []
-
-        # Custom Header
-        custom_header = await builder.get_custom_header()
-        desc_parts.append(custom_header)
-
-        # Logo
-        logo, logo_size = await builder.get_logo_section(meta)
-        if logo and logo_size:
-            if logo.endswith(".svg"):
-                logo = logo.replace(".svg", ".png")
-            desc_parts.append(f'[center][img={logo_size}]{logo}[/img][/center]')
-
-        # NFO
-        nfo_content = meta.get('description_nfo_content')
-        if isinstance(nfo_content, str) and nfo_content:
-            desc_parts.append(f"[pre]{nfo_content}[/pre]")
-
-        # User description
-        user_description = await builder.get_user_description(meta)
-        desc_parts.append(user_description)
-
-        # Disc menus screenshots header
-        menu_header = await builder.menu_screenshot_header(meta)
-        desc_parts.append(menu_header)
-
-        # Disc menus screenshots
-        menu_key = f'{self.tracker}_menu_images_key'
-        menu_images_value = meta.get(menu_key) if menu_key in meta else meta.get('menu_images', [])
-        if isinstance(menu_images_value, list) and menu_images_value:
-            menu_screenshots_block = ''
-            menu_images_list = cast(list[Any], menu_images_value)
-            for image in menu_images_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                raw_url = image_dict.get('raw_url')
-                if isinstance(raw_url, str) and raw_url:
-                    menu_screenshots_block += f"[img]{raw_url}[/img]\n"
-            desc_parts.append('[center]\n' + menu_screenshots_block + '[/center]')
-
-        # Screenshot Header
-        screenshot_header = await builder.screenshot_header()
-        desc_parts.append(screenshot_header)
-
-        # Screenshots
-        images_key = f'{self.tracker}_images_key'
-        images_value = meta.get(images_key) if images_key in meta else meta.get('image_list', [])
-        if isinstance(images_value, list) and images_value:
-            screenshots_block = ''
-            images_list = cast(list[Any], images_value)
-            for image in images_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                raw_url = image_dict.get('raw_url')
-                if isinstance(raw_url, str) and raw_url:
-                    screenshots_block += f"[img]{raw_url}[/img]\n"
-            desc_parts.append('[center]\n' + screenshots_block + '[/center]')
-
-        # Audio Spectrograms
-        audio_spectrograms_key = f"{self.tracker}_audio_spectrograms_key"
-        audio_spectrograms_value = meta.get(audio_spectrograms_key) if audio_spectrograms_key in meta else meta.get("spectrograms_images", [])
-        if isinstance(audio_spectrograms_value, list) and audio_spectrograms_value:
-            desc_parts.append(self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]"))
-
-            spectrograms_block = ""
-            audio_spectrograms_list = cast(list[Any], audio_spectrograms_value)
-            for image in audio_spectrograms_list:
-                if not isinstance(image, dict):
-                    continue
-                image_dict = cast(dict[str, Any], image)
-                raw_url = image_dict.get("raw_url")
-                if isinstance(raw_url, str) and raw_url:
-                    spectrograms_block += f"[img]{raw_url}[/img]\n"
-            desc_parts.append("[center]\n" + spectrograms_block + "[/center]")
-
-        # Tonemapped Header
-        tonemapped_header = await builder.get_tonemapped_header(meta)
-        desc_parts.append(tonemapped_header)
-
-        # Signature
-        desc_parts.append(f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/align]")
-
-        description = '\n\n'.join(part for part in desc_parts if part.strip())
-
-        bbcode = BBCODE()
-        description = bbcode.remove_sup(description)
-        description = bbcode.remove_sub(description)
-        description = bbcode.convert_to_align(description)
-        description = bbcode.remove_list(description)
-        description = bbcode.remove_extra_lines(description)
-
-        if meta["debug"]:
-            desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-            console.print(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
-            async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
-                await description_file.write(description)
-
+        description = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=True,
+            bluray=False,
+            book=False,
+            custom_header=True,
+            custom_signature=False,
+            description=True,
+            game=False,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=True,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=False,
+            ua_signature=True,
+            user_description=True,
+        )
         return description
 
     def get_trailer(self, meta: dict[str, Any]) -> str:

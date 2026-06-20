@@ -533,6 +533,7 @@ class BJS:
             logo=True,
             mediainfo=True,
             menu_screenshots=False,
+            nfo=False,
             screenshots=False,
             tonemapped_header=True,
             tv_info=True,
