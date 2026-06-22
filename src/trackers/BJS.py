@@ -942,13 +942,13 @@ class BJS:
     def get_audiobook_bitrate(self, meta: dict[str, Any]) -> str:
         """
         Extracts the audiobook bitrate from metadata, finds the closest option
-        from [128, 192, 256, 320] within a threshold, otherwise returns 'Outro'.
+        from [64, 128, 192, 256, 320] within a threshold, otherwise returns 'Outro'.
         """
         avg_bitrate = meta.get("audiobook_bitrate")
         if avg_bitrate is None:
             return "Outro"
 
-        options = [128, 192, 256, 320]
+        options = [64, 128, 192, 256, 320]
 
         # Find option with the minimum absolute difference
         closest_option = min(options, key=lambda opt: abs(opt - avg_bitrate))

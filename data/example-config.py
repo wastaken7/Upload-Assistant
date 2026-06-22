@@ -803,10 +803,11 @@ config = {
             "anon": False,
         },
         "SUIO": {
-            # Secret Usenet Indexer
+            # Secret Usenet Indexer: o[redacted]nzbs
             # Please do not share, discuss or mention this indexer's real name in issues or pull requests; nor should you ask what it is.
-            # Paste the indexer's Rule 1 here verbatim to unlock it. Found at https://[REDACTED]/rules
-            "unlock_key": "",
+            # Paste the indexer's base url below (e.g., https://indexer.com)
+            # Upload will only proceed if the domain matches the allowed one, protecting your credentials.
+            "base_url": "",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your Username

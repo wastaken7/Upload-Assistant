@@ -1,12 +1,12 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import base64
 import glob
 import hashlib
 import io
 import os
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import aiofiles
 import httpx
@@ -18,28 +18,6 @@ from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
-# These tokens are encrypted with Fernet (AES-128-CBC + HMAC-SHA256).
-# The key is derived from the tracker's Rule 1 via SHA-256.
-# Without the correct unlock_key in config, these URLs cannot be resolved.
-_UPLOAD_TOKEN = "gAAAAABqM-uO38HcEbdHI076WRQ6C1HkvOh37B-1vg0w7FXwzZZ5JocQcSjGfzwMcLEdjrzysT7JHSazIVYkzQniaJrvTOQVEoVSO2719UmS6jSbd5ohRVZG1vhAcSMfY05kXWWAYCZy"
-_TORRENT_TOKEN = "gAAAAABqM-uOIBRUsDVelUGFjJ5wBVA-wWuXingF6VooGFEJJzIeookyF-WwlA7s9BstEst7MfRS8CbHrn0KS2TMXG9uUfSn-H1iOKXAtg9VHijJENRMJxuAD9g1FjD6wGqsyA27GW9M"
-
-
-def _derive_key(unlock_key: str) -> bytes:
-    """Derive a Fernet-compatible key from the unlock_key string."""
-    return base64.urlsafe_b64encode(hashlib.sha256(unlock_key.encode()).digest())
-
-
-def _decrypt_token(token: str, key: bytes) -> Optional[str]:
-    """Attempt to decrypt a Fernet token; return None on failure."""
-    try:
-        from cryptography.fernet import Fernet
-
-        f = Fernet(key)
-        return f.decrypt(token.encode()).decode()
-    except Exception:
-        return None
-
 
 class SUIO:
     supported_categories = ("MOVIE", "TV", "XXX", "GAME", "MUSIC", "BOOK")
@@ -50,11 +28,26 @@ class SUIO:
         self.tracker = "SUIO"
         self.is_usenet = True
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
-        unlock_key = tracker_cfg.get("unlock_key", "").strip()
-        if unlock_key:
-            derived = _derive_key(unlock_key)
-            self.upload_url = _decrypt_token(_UPLOAD_TOKEN, derived)
-            self.torrent_url = _decrypt_token(_TORRENT_TOKEN, derived)
+        base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
+        if base_url:
+            # Verify the domain matches the expected indexer domain hash to prevent credentials leak
+            url_to_parse = base_url if base_url.startswith(("http://", "https://")) else "https://" + base_url
+            try:
+                hostname = urlparse(url_to_parse).netloc.lower().split(":")[0]
+                parts = hostname.split(".")
+                main_domain = ".".join(parts[-2:]) if len(parts) >= 2 else hostname
+                domain_hash = hashlib.sha256(main_domain.encode("utf-8")).hexdigest()
+                # SHA-256 hash of the allowed indexer domain
+                if domain_hash == "a0fcf409be81cbcec4e212cb69331960e5d709449c0e9cad40e36369d8da8f3c":
+                    self.upload_url = f"{base_url}/api-upload"
+                    self.torrent_url = f"{base_url}/details.php?id="
+                else:
+                    self.upload_url = None
+                    self.torrent_url = None
+                    console.print(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
+            except Exception:
+                self.upload_url = None
+                self.torrent_url = None
         else:
             self.upload_url = None
             self.torrent_url = None
@@ -62,7 +55,7 @@ class SUIO:
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[Any]:
         if not await self.get_additional_checks():
-            console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or unlock_key.[/red]")
+            console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
             meta["skipping"] = f"{self.tracker}"
             return []
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
@@ -347,8 +340,8 @@ class SUIO:
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         if not self.upload_url:
-            console.print(f"[red]{self.tracker}: Unlock key missing or incorrect. Cannot upload.[/red]")
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: unlock_key missing or incorrect"
+            console.print(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: base_url missing"
             return False
 
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
