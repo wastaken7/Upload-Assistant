@@ -752,7 +752,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         # 6a. Upload via pesto
         cmd_pesto = [
             path_pesto or "pesto",
-            "-h", usenet_cfg.get("host"),
+            "-s", usenet_cfg.get("host"),
             "-P", str(usenet_cfg.get("port", 563)),
             "-u", usenet_cfg.get("username"),
             "-p", usenet_cfg.get("password"),
