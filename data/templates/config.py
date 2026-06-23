@@ -149,6 +149,10 @@ config = {
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
 
+        # Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8)
+        # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
+        "embed_dupe_links": True,
+
         # How many trackers need to pass successfull checking to continue with the upload process
         # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
         # If less than the number of trackers pass the checking, exit immediately.

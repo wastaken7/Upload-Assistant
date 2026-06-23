@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional, Union, cast
 
 import aiofiles
 import cli_ui
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
@@ -32,7 +33,10 @@ class UploadHelper:
                 name = str(entry.get('name', ''))
                 link = entry.get('link')
                 if isinstance(link, str) and link:
-                    return f"{name} - {link}"
+                    if self.default_config.get("embed_dupe_links", True):
+                        return f"[link={link}]{escape(name)}[/link]"
+                    else:
+                        return f"{name} - {link}"
                 return name
             return str(entry)
 
@@ -168,7 +172,13 @@ class UploadHelper:
                             # Display only the matched season pack info from dupe_checking
                             season_pack_name = meta.get('season_pack_name', '')
                             season_pack_link = meta.get('season_pack_link')
-                            season_pack_text = f"{season_pack_name} - {season_pack_link}" if season_pack_link else season_pack_name
+                            if season_pack_link:
+                                if self.default_config.get("embed_dupe_links", False):
+                                    season_pack_text = f"[link={season_pack_link}]{escape(season_pack_name)}[/link]"
+                                else:
+                                    season_pack_text = f"{season_pack_name} - {season_pack_link}"
+                            else:
+                                season_pack_text = season_pack_name
                             console.print(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
                             console.print("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
                             console.print()

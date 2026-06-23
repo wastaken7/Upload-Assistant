@@ -45,6 +45,10 @@ config = {
         # Set true to suppress config warnings on startup
         "suppress_warnings": False,
 
+        # Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8)
+        # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
+        "embed_dupe_links": True,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,

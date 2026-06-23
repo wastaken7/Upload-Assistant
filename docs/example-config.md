@@ -151,6 +151,7 @@ Implementation notes:
 
 ### UX / safety toggles
 - `sfx_on_prompt` (bool): Play a bell sound effect when asking for confirmation.
+- `embed_dupe_links` (bool): Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8). Set false to display the full raw URLs.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
 - `keep_images` (bool): If false, do not pull images from tracker descriptions.
