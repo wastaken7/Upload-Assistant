@@ -153,6 +153,18 @@ class UploadHelper:
                 return f"{name}{size_diff_str}"
             return str(entry)
 
+        def _format_dupes_list(entries: list[Union[DupeEntry, str]]) -> str:
+            seen = set()
+            formatted = []
+            for entry in entries:
+                if isinstance(entry, dict) and entry.get("link"):
+                    link = entry.get("link")
+                    if link in seen:
+                        continue
+                    seen.add(link)
+                formatted.append(_format_dupe(entry))
+            return "\n".join(formatted)
+
         dupes_list: list[Union[DupeEntry, str]] = dupes
         upload: bool = False
         meta['were_trumping'] = False
@@ -190,7 +202,7 @@ class UploadHelper:
                     if isinstance(entry, dict) and entry.get('trumpable')
                 ]
                 if trumpable_dupes:
-                    trumpable_text = "\n".join(_format_dupe(d) for d in trumpable_dupes)
+                    trumpable_text = _format_dupes_list(trumpable_dupes)
                     console.print("[bold red]Trumpable found![/bold red]")
                 elif meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f'{tracker_name}_matched_episode_ids', []))
@@ -219,7 +231,7 @@ class UploadHelper:
                         console.print(f"[yellow]Note: No release found with matching tag '{meta.get('tag')}'. Selected release may be from a different group.[/yellow]")
 
             if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not meta.get('ask_dupe', False):
-                dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
+                dupe_text = _format_dupes_list(dupes_list)
 
                 if trumpable_text and (meta.get('trumpable_id') or (meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []))):
                     console.print(f"[bold cyan]{trumpable_text}[/bold cyan]")
@@ -280,7 +292,7 @@ class UploadHelper:
                             sys.exit(1)
                     elif dupes_list:
                         # Rebuild dupe_text in case dupes was filtered after trump decline
-                        dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
+                        dupe_text = _format_dupes_list(dupes_list)
                         if meta.get('season_pack_exists', False):
                             # Display only the matched season pack info from dupe_checking
                             season_pack_name = meta.get('season_pack_name', '')
