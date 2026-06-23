@@ -49,6 +49,9 @@ config = {
         # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
         "embed_dupe_links": True,
 
+        # Set true to show size difference between duplicate and the upload in duplicate checks
+        "show_dupe_size_diff": True,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,

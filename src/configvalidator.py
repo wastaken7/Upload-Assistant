@@ -56,6 +56,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "skip_auto_torrent": (bool,),
     "sfx_on_prompt": (bool,),
     "embed_dupe_links": (bool,),
+    "show_dupe_size_diff": (bool,),
     "tracker_pass_checks": (str, int),
     "use_largest_playlist": (bool,),
     "keep_images": (bool,),

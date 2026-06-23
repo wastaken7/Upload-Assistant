@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import os
+import re
 import sys
 from collections.abc import Mapping
 from difflib import SequenceMatcher
@@ -19,6 +20,103 @@ from src.trackersetup import tracker_class_map
 Meta = dict[str, Any]
 DupeEntry = dict[str, Any]
 
+
+def parse_size_to_bytes(size_str: Any) -> Optional[int]:
+    if size_str is None:
+        return None
+    if isinstance(size_str, (int, float)):
+        return int(size_str)
+
+    # It must be a string. Clean it up.
+    s = str(size_str).strip()
+    if not s:
+        return None
+
+    # Try converting directly to int in case it's pure bytes (like UNIT3D)
+    if s.isdigit():
+        return int(s)
+
+    try:
+        # Normalize commas/dots
+        if "," in s:
+            if "." in s:
+                # e.g., 1,024.50 MB -> comma is thousands separator
+                s = s.replace(",", "")
+            else:
+                # No dot, only comma. E.g., 1,024 MB or 1,544 TiB or 389,61 MiB
+                match_comma = re.search(r",(\d+)\s*[a-zA-Z]*$", s)
+                if match_comma:
+                    digits_after = match_comma.group(1)
+                    if len(digits_after) == 3:
+                        # Ambiguous: could be thousands (1,024 MB) or decimal (1,544 TiB)
+                        match_unit = re.search(r"([a-zA-Z]+)$", s)
+                        unit = match_unit.group(1).lower() if match_unit else ""
+                        if unit in ("tb", "tib", "pb", "pib"):
+                            # A large unit like TiB/TB indicates a decimal fraction (e.g., 1.544 TiB)
+                            s = s.replace(",", ".")
+                        else:
+                            # For B, KB, MB, GB, etc., it is a thousands separator (e.g., 1,024 MB)
+                            s = s.replace(",", "")
+                    else:
+                        # 1, 2, or 4+ digits after comma -> decimal separator
+                        s = s.replace(",", ".")
+
+        match = re.match(r"^([\d.]+)\s*([a-zA-Z]+)$", s)
+        if not match:
+            return int(float(s))
+
+        value_str, unit = match.groups()
+        value = float(value_str)
+        unit = unit.lower()
+
+        units_map = {
+            "b": 1,
+            "kb": 1024,
+            "kib": 1024,
+            "mb": 1024**2,
+            "mib": 1024**2,
+            "gb": 1024**3,
+            "gib": 1024**3,
+            "tb": 1024**4,
+            "tib": 1024**4,
+        }
+
+        if unit in units_map:
+            return int(value * units_map[unit])
+        return int(value)
+    except Exception:
+        return None
+
+
+def hsl_to_rgb(h: float, s: float, l: float) -> tuple[int, int, int]:
+    # h in [0, 360], s in [0, 1], l in [0, 1]
+    c = (1.0 - abs(2.0 * l - 1.0)) * s
+    x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
+    m = l - c / 2.0
+    if 0 <= h < 60:
+        r, g, b = c, x, 0.0
+    elif 60 <= h < 120:
+        r, g, b = x, c, 0.0
+    elif 120 <= h < 180:
+        r, g, b = 0.0, c, x
+    elif 180 <= h < 240:
+        r, g, b = 0.0, x, c
+    elif 240 <= h < 300:
+        r, g, b = x, 0.0, c
+    else:
+        r, g, b = c, 0.0, x
+    return int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
+
+
+def get_color_for_diff(p: float) -> str:
+    # Interpolate Hue from 120 (green) to 0 (red) for p in [0.0, 0.5]
+    # saturation = 0.9, lightness = 0.6
+    x = max(0.0, min(1.0, 1.0 - p / 0.5))
+    h = 120.0 * (1.0 - x)
+    r, g, b = hsl_to_rgb(h, 0.9, 0.6)
+    return f"{r:02x}{g:02x}{b:02x}"
+
+
 class UploadHelper:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -32,12 +130,27 @@ class UploadHelper:
             if isinstance(entry, dict):
                 name = str(entry.get('name', ''))
                 link = entry.get('link')
+
+                size_diff_str = ""
+                if self.default_config.get("show_dupe_size_diff", True):
+                    upload_size = meta.get("source_size")
+                    dupe_size_raw = entry.get("size")
+                    dupe_size = parse_size_to_bytes(dupe_size_raw)
+                    if upload_size and dupe_size:
+                        diff_bytes = dupe_size - upload_size
+                        diff_mb = int(round(diff_bytes / (1024 * 1024)))
+                        diff_pct = int(round((diff_bytes / upload_size) * 100))
+
+                        p = abs(diff_pct) / 100.0
+                        color_hex = get_color_for_diff(p)
+                        size_diff_str = f" - [#{color_hex}][{diff_mb:+d} MB / {diff_pct:+d}%][/]"
+
                 if isinstance(link, str) and link:
                     if self.default_config.get("embed_dupe_links", True):
-                        return f"[link={link}]{escape(name)}[/link]"
+                        return f"[link={link}]{escape(name)}[/link]{size_diff_str}"
                     else:
-                        return f"{name} - {link}"
-                return name
+                        return f"{name} - {link}{size_diff_str}"
+                return f"{name}{size_diff_str}"
             return str(entry)
 
         dupes_list: list[Union[DupeEntry, str]] = dupes
