@@ -43,9 +43,7 @@ class AZTrackerBase:
         self.source_flag: str = tracker_config.get('source_flag') or ''
         self.torrent_url: str = f'{self.base_url}/torrent/' if self.base_url else ''
 
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
-        }, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=60.0)
         self.media_code = ''
         self.upload_url_step2 = ''
 

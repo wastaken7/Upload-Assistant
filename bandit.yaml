@@ -1,4 +1,4 @@
-# Bandit Security Configuration for Upload Assistant
+# Bandit Security Configuration for Upload-Assistant
 #
 # SECURITY IMPLEMENTATION STATUS:
 # - tmp directory security: Implemented at application level with 0o700 permissions

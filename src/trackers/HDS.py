@@ -29,9 +29,7 @@ class HDS:
         self.base_url = 'https://hd-space.org'
         self.torrent_url = f'{self.base_url}/index.php?page=torrent-details&id='
         self.requests_url = f'{self.base_url}/index.php?page=viewrequests'
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
-        }, timeout=30)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30)
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

@@ -537,7 +537,7 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
         has_audio = any(track.get("@type", "") == "Audio" for track in tracks)
 
         if not has_audio:
-            raise NoAudioMediaError("Upload Assistant does not support no audio media.")
+            raise NoAudioMediaError(f"{meta['ua_name']} does not support no audio media.")
 
         for track in tracks:
             track_type = track.get("@type", "")

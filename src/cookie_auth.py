@@ -110,7 +110,7 @@ class CookieValidator:
         base_url = 'https://alpharatio.cc'
         login_url = f'{base_url}/login.php'
 
-        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, follow_redirects=True) as client:
@@ -230,7 +230,7 @@ class CookieValidator:
         if not cookie_jar:
             return False
 
-        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=20.0, cookies=cookie_jar) as session:
@@ -534,7 +534,7 @@ class CookieAuthUploader:
         if additional_files:
             files.update(additional_files)
 
-        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         if meta.get("debug", False):
             self.upload_debug(tracker, data)

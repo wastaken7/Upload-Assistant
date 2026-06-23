@@ -69,20 +69,19 @@ class RTF:
         imdb_url_value = meta.get('imdb_info', {}).get('imdb_url', '')
         imdb_url = str(imdb_url_value) if imdb_url_value else ''
         json_data = {
-            'name': meta['name'],
+            "name": meta["name"],
             # description does not work for some reason
-            # 'description' : meta['overview'] + "\n\n" + desc + "\n\n" + "Uploaded by L4G Upload Assistant",
-            'description': "",
+            "description": "",
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
-            'mediaInfo': re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump or "") if bd_dump is None else f"{bd_dump}",
+            "mediaInfo": re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump or "") if bd_dump is None else f"{bd_dump}",
             "nfo": "",
             "url": f"{imdb_url}/" if imdb_url else "",
             # auto pulled from IMDB
             "descr": "",
             "poster": meta["poster"] if meta["poster"] is not None else "",
-            "type": "401" if meta['category'] == 'MOVIE'else "402",
+            "type": "401" if meta["category"] == "MOVIE" else "402",
             "screenshots": screenshots,
-            'isAnonymous': self.config['TRACKERS'][self.tracker]["anon"],
+            "isAnonymous": self.config["TRACKERS"][self.tracker]["anon"],
         }
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb') as binary_file:

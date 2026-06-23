@@ -900,7 +900,7 @@ def generate_config_file(config_data: ConfigDict, existing_path: Optional[Path] 
 
 
 if __name__ == "__main__":
-    console.print("\nUpload Assistant Configuration Generator", markup=False)
+    console.print("\nUpload-Assistant Configuration Generator", markup=False)
     console.print("========================================", markup=False)
 
     # Get example configuration structure first

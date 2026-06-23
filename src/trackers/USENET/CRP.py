@@ -263,7 +263,7 @@ class CRP:
                     files=files,
                     data=data,
                     params=params,
-                    headers={'User-Agent': f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+                    headers={"User-Agent": f"Upload-Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"},
                 )
 
             if response.status_code not in (200, 201):

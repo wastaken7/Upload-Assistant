@@ -2,7 +2,7 @@
   "name": "upload-assistant-webui",
   "private": true,
   "version": "1.0.0",
-  "description": "Web UI frontend tooling for Upload Assistant",
+  "description": "Web UI frontend tooling for Upload-Assistant",
   "scripts": {
     "lint:react": "eslint . --ext .js,.jsx --ignore-pattern .eslintrc.js"
   },

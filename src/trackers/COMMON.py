@@ -180,7 +180,7 @@ class COMMON:
             if 'created by' in new_torrent.metainfo:
                 created_by = str(new_torrent.metainfo['created by'])
                 if "mkbrr" in created_by.lower():
-                    new_torrent.metainfo['created by'] = f"{created_by} using Upload Assistant"
+                    new_torrent.metainfo["created by"] = f"{created_by} using {meta['ua_name']} {meta.get('current_version', '')}"
             # setting comment as blank as if BASE.torrent is manually created then it can result in private info such as download link being exposed.
             new_torrent.metainfo['comment'] = ''
             entropy_value = meta.get('entropy')

@@ -374,7 +374,7 @@ class SUIO:
                     files=files,
                     data=data,
                     params=params,
-                    headers={"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"},
+                    headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"},
                     follow_redirects=True,
                 )
             final_url = str(response.url)

@@ -43,9 +43,7 @@ class BT:
         self.auth_token: Optional[str] = None
         self.main_tmdb_data: dict[str, Any] = {}
         self.episode_tmdb_data: dict[str, Any] = {}
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f'Upload Assistant ({platform.system()} {platform.release()})'
-        }, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
         target_site_ids = {
             'arabic': '22', 'bulgarian': '29', 'chinese': '14', 'croatian': '23',

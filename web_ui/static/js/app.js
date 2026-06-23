@@ -313,13 +313,13 @@ function AudionutsUAGUI() {
   const API_BASE = window.location.origin + '/api';
   // Derive an application base path from the API base so links work under subpath deployments
   const APP_BASE = API_BASE.replace(/\/api$/, '');
-  
+
   const [directories, setDirectories] = useState([
     { name: 'data', type: 'folder', path: '/data', children: [] },
     { name: 'torrent_storage_dir', type: 'folder', path: '/torrent_storage_dir', children: [] },
     { name: 'Upload-Assistant', type: 'folder', path: '/Upload-Assistant', children: [] }
   ]);
-  
+
   const [selectedPath, setSelectedPath] = useState('');
   const [, setSelectedName] = useState('');
   const [customArgs, setCustomArgs] = useState('');
@@ -334,11 +334,11 @@ function AudionutsUAGUI() {
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [argSearchFilter, setArgSearchFilter] = useState('');
   const [collapsedSections, setCollapsedSections] = useState(new Set());
-  
+
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activePanel, setActivePanel] = useState('main'); // 'main' | 'files' | 'args'
-  
+
   // File Browser search states
   const [fileBrowserSearch, setFileBrowserSearch] = useState('');
   const [fileBrowserSearchResults, setFileBrowserSearchResults] = useState(null);
@@ -348,7 +348,7 @@ function AudionutsUAGUI() {
 
   // Folder loading states
   const [loadingFolders, setLoadingFolders] = useState(new Set());
-  
+
   // Description file/link states
   const [descDirectories, setDescDirectories] = useState([]);
   const [descExpandedFolders, setDescExpandedFolders] = useState(new Set());
@@ -357,16 +357,16 @@ function AudionutsUAGUI() {
   const [descFileError, setDescFileError] = useState('');
   const [descBrowserCollapsed, setDescBrowserCollapsed] = useState(false);
   const [descLinkFocused, setDescLinkFocused] = useState(false);
-  
+
   const richOutputRef = useRef(null);
   const lastFullHashRef = useRef('');
   const inputRef = useRef(null);
   const sseAbortControllerRef = useRef(null);
-  
+
   // Detect if --descfile or --desclink is present in arguments
   const hasDescFile = customArgs.includes('--descfile');
   const hasDescLink = customArgs.includes('--desclink');
-  
+
   // URL validation helper - accepts any HTTP/HTTPS URL (server fetches and parses any URL)
   const isValidUrl = (string) => {
     try {
@@ -376,39 +376,39 @@ function AudionutsUAGUI() {
       return false;
     }
   };
-  
+
   // Path validation helper - checks if string looks like a valid file path
   const isValidDescFilePath = (path) => {
     if (!path || path.trim() === '') return { valid: false, error: '' };
-    
+
     const trimmed = path.trim();
-    
+
     // Check for valid description file extensions
     const validExtensions = ['.txt', '.nfo', '.md'];
     const hasValidExt = validExtensions.some(ext => trimmed.toLowerCase().endsWith(ext));
-    
+
     // Check if it looks like a path (has separators or starts with drive letter/root)
     const hasPathSeparator = trimmed.includes('/') || trimmed.includes('\\');
     const startsWithRoot = /^[a-zA-Z]:/.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('\\');
     const looksLikePath = hasPathSeparator || startsWithRoot;
-    
+
     if (!looksLikePath) {
-      return { 
-        valid: false, 
-        error: 'Path should be a full file path (e.g., /path/to/desc.txt or C:\\path\\desc.txt)' 
+      return {
+        valid: false,
+        error: 'Path should be a full file path (e.g., /path/to/desc.txt or C:\\path\\desc.txt)'
       };
     }
-    
+
     if (!hasValidExt) {
-      return { 
-        valid: false, 
-        error: 'File should have a valid extension (.txt, .nfo, or .md)' 
+      return {
+        valid: false,
+        error: 'File should have a valid extension (.txt, .nfo, or .md)'
       };
     }
-    
+
     return { valid: true, error: '' };
   };
-  
+
   // Extract value from argument string (e.g., --descfile "path" or --desclink "url")
   // Supports both space-separated (--arg "value") and equals-separated (--arg="value") formats
   const extractArgValue = (args, argName) => {
@@ -421,7 +421,7 @@ function AudionutsUAGUI() {
       if (val.startsWith('--')) return '';
       return val.trim();
     }
-    
+
     // Then try space-separated format: --argname "value" or --argname 'value' or --argname value
     const spaceRegex = new RegExp(`${argName}\\s+(?:"([^"]+)"|'([^']+)'|([^\\s-][^\\s]*|(?!--)[^\\s]+))`, 'i');
     const spaceMatch = args.match(spaceRegex);
@@ -433,7 +433,7 @@ function AudionutsUAGUI() {
     }
     return '';
   };
-  
+
   // Update argument value in string
   // Supports both space-separated (--arg "value") and equals-separated (--arg="value") formats
   const updateArgValue = (args, argName, value) => {
@@ -441,11 +441,11 @@ function AudionutsUAGUI() {
     if (!args.includes(argName)) {
       return args;
     }
-    
+
     // Check which format is being used
     const hasEqualsFormat = new RegExp(`${argName}=`, 'i').test(args);
     const hasSpaceValue = new RegExp(`${argName}\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, 'i').test(args);
-    
+
     // If value is empty, remove the value but keep the flag
     if (!value) {
       if (hasEqualsFormat) {
@@ -457,10 +457,10 @@ function AudionutsUAGUI() {
       }
       return args;
     }
-    
+
     // Quote the value if it contains spaces
     const quotedValue = value.includes(' ') ? `"${value}"` : `"${value}"`;
-    
+
     if (hasEqualsFormat) {
       // Replace equals-format value: --arg="value" or --arg='value' or --arg=value
       return args.replace(new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, 'i'), `$1=${quotedValue}`);
@@ -472,11 +472,11 @@ function AudionutsUAGUI() {
       return args.replace(new RegExp(`(${argName})(\\s|$)`, 'i'), `$1 ${quotedValue}$2`);
     }
   };
-  
+
   // Get current values from args
   const descFilePath = extractArgValue(customArgs, '--descfile');
   const descLinkUrl = extractArgValue(customArgs, '--desclink');
-  
+
   // Validate desclink URL when it changes
   useEffect(() => {
     if (hasDescLink && descLinkUrl) {
@@ -489,7 +489,7 @@ function AudionutsUAGUI() {
       setDescLinkError('');
     }
   }, [descLinkUrl, hasDescLink]);
-  
+
   // Validate descfile path when it changes and auto-collapse when valid
   useEffect(() => {
     if (hasDescFile && descFilePath) {
@@ -503,7 +503,7 @@ function AudionutsUAGUI() {
       setDescFileError('');
     }
   }, [descFilePath, hasDescFile]);
-  
+
   // Reset description browser when argument is removed
   useEffect(() => {
     if (!hasDescFile) {
@@ -516,12 +516,12 @@ function AudionutsUAGUI() {
       setDescLinkError('');
     }
   }, [hasDescFile, hasDescLink]);
-  
+
   // Update descfile in args
   const updateDescFile = (path) => {
     setCustomArgs(prev => updateArgValue(prev, '--descfile', path));
   };
-  
+
   // Update desclink in args
   const updateDescLink = (url) => {
     setCustomArgs(prev => updateArgValue(prev, '--desclink', url));
@@ -581,8 +581,8 @@ function AudionutsUAGUI() {
 
   // Initial welcome message in the rich output area
   useEffect(() => {
-    appendSystemMessage('Upload Assistant Interactive Output');
-    appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
+    appendSystemMessage('Upload-Assistant Interactive Output');
+    appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
   }, []);
 
   const loadBrowseRoots = async () => {
@@ -598,7 +598,7 @@ function AudionutsUAGUI() {
       console.error('Failed to load browse roots:', error);
     }
   };
-  
+
   // Load description file browser roots
   const loadDescBrowseRoots = async () => {
     try {
@@ -613,13 +613,13 @@ function AudionutsUAGUI() {
       console.error('Failed to load desc browse roots:', error);
     }
   };
-  
+
   // Load description folder contents
   const loadDescFolderContents = async (path) => {
     try {
       const response = await apiFetch(`${API_BASE}/browse?path=${encodeURIComponent(path)}&filter=desc`);
       const data = await response.json();
-      
+
       if (data.success && data.items) {
         updateDescDirectoryTree(path, data.items);
       }
@@ -627,7 +627,7 @@ function AudionutsUAGUI() {
       console.error('Failed to load desc folder:', error);
     }
   };
-  
+
   // Update description directory tree
   const updateDescDirectoryTree = (path, items) => {
     const updateTree = (nodes) => {
@@ -640,10 +640,10 @@ function AudionutsUAGUI() {
         return node;
       });
     };
-    
+
     setDescDirectories((prev) => updateTree(prev));
   };
-  
+
   // Toggle description folder
   const toggleDescFolder = async (path) => {
     const newExpanded = new Set(descExpandedFolders);
@@ -654,7 +654,7 @@ function AudionutsUAGUI() {
     } else {
       newExpanded.add(path);
       setDescExpandedFolders(newExpanded);
-      
+
       // Show loading indicator while fetching
       setDescLoadingFolders(prev => new Set(prev).add(path));
       try {
@@ -668,7 +668,7 @@ function AudionutsUAGUI() {
       }
     }
   };
-  
+
   // Load desc roots when --descfile is added
   useEffect(() => {
     if (hasDescFile && descDirectories.length === 0) {
@@ -731,14 +731,14 @@ function AudionutsUAGUI() {
 
   const toggleFolder = async (path) => {
     const newExpanded = new Set(expandedFolders);
-    
+
     if (newExpanded.has(path)) {
       newExpanded.delete(path);
       setExpandedFolders(newExpanded);
     } else {
       newExpanded.add(path);
       setExpandedFolders(newExpanded);
-      
+
       // Show loading indicator while fetching
       setLoadingFolders(prev => new Set(prev).add(path));
       try {
@@ -757,7 +757,7 @@ function AudionutsUAGUI() {
     try {
       const response = await apiFetch(`${API_BASE}/browse?path=${encodeURIComponent(path)}`);
       const data = await response.json();
-      
+
       if (data.success && data.items) {
         updateDirectoryTree(path, data.items);
       }
@@ -777,7 +777,7 @@ function AudionutsUAGUI() {
         return node;
       });
     };
-    
+
     setDirectories((prev) => updateTree(prev));
   };
 
@@ -877,9 +877,9 @@ function AudionutsUAGUI() {
         <div key={idx}>
           <div
             className={`flex items-center gap-2 px-3 ${isMobile ? 'py-3' : 'py-2'} cursor-pointer transition-colors ${
-              selectedPath === item.path 
-                ? isDarkMode 
-                  ? 'bg-purple-900 border-l-4 border-purple-500' 
+              selectedPath === item.path
+                ? isDarkMode
+                  ? 'bg-purple-900 border-l-4 border-purple-500'
                   : 'bg-blue-100 border-l-4 border-blue-500'
                 : isDarkMode
                   ? 'hover:bg-gray-700'
@@ -919,7 +919,7 @@ function AudionutsUAGUI() {
       );
     });
   };
-  
+
   // Render description file tree
   const renderDescFileTree = (items, level = 0) => {
     return items.map((item, idx) => {
@@ -928,9 +928,9 @@ function AudionutsUAGUI() {
         <div key={idx}>
           <div
             className={`flex items-center gap-2 px-3 ${isMobile ? 'py-3' : 'py-2'} cursor-pointer transition-colors ${
-              descFilePath === item.path 
-                ? isDarkMode 
-                  ? 'bg-green-900 border-l-4 border-green-500' 
+              descFilePath === item.path
+                ? isDarkMode
+                  ? 'bg-green-900 border-l-4 border-green-500'
                   : 'bg-green-100 border-l-4 border-green-500'
                 : isDarkMode
                   ? 'hover:bg-gray-700'
@@ -976,7 +976,7 @@ function AudionutsUAGUI() {
       appendSystemMessage('✗ Please select a file or folder first', 'error');
       return;
     }
-    
+
     // Validate --descfile: must have a valid description file path
     if (hasDescFile) {
       if (!descFilePath) {
@@ -989,7 +989,7 @@ function AudionutsUAGUI() {
         return;
       }
     }
-    
+
     // Validate --desclink: must have a valid URL
     if (hasDescLink) {
       if (!descLinkUrl) {
@@ -1169,8 +1169,8 @@ function AudionutsUAGUI() {
     const container = richOutputRef.current;
     if (container) {
       container.innerHTML = '';
-      appendSystemMessage('Upload Assistant Interactive Output');
-      appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
+      appendSystemMessage('Upload-Assistant Interactive Output');
+      appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
     }
   };
 
@@ -1310,7 +1310,7 @@ function AudionutsUAGUI() {
         <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <h1 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
             <UploadIcon />
-            Upload Assistant
+            Upload-Assistant
           </h1>
           <div className="flex items-center gap-2">
             <a
@@ -1740,7 +1740,7 @@ function AudionutsUAGUI() {
   return (
     <div className={`flex h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} overflow-hidden`}>
       {/* Left Sidebar - Resizable */}
-      <div 
+      <div
         className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r flex flex-col`}
         style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '600px' }}
       >
@@ -1797,11 +1797,11 @@ function AudionutsUAGUI() {
             renderFileTree(directories)
           )}
         </div>
-        
+
         {/* Description File Browser - shown when --descfile is in args */}
         {hasDescFile && (
           <>
-            <div 
+            <div
               className={`p-4 border-t ${!descBrowserCollapsed ? 'border-b' : ''} ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50'} ${descBrowserCollapsed ? 'cursor-pointer' : ''}`}
               onClick={descBrowserCollapsed ? () => setDescBrowserCollapsed(false) : undefined}
             >
@@ -1904,7 +1904,7 @@ function AudionutsUAGUI() {
               <div className="flex items-center gap-3">
                 <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
                   <UploadIcon />
-                  Upload Assistant Web UI
+                  Upload-Assistant Web UI
                 </h1>
                 <a
                   href={`${APP_BASE}/logout`}
@@ -1913,7 +1913,7 @@ function AudionutsUAGUI() {
                   Logout
                 </a>
               </div>
-              
+
               {/* Controls */}
               <div className="flex items-center gap-3">
                 <a
@@ -1957,14 +1957,14 @@ function AudionutsUAGUI() {
                 onChange={(e) => setCustomArgs(e.target.value)}
                 placeholder="--tmdb movie/12345 --trackers ptp,aither,ulcx --no-edition --no-tag"
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                  isDarkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900'
                 }`}
                 disabled={isExecuting}
               />
             </div>
-            
+
             {/* Description Link URL Input - shown when --desclink is in args */}
             {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
             {hasDescLink && (!descLinkUrl || descLinkFocused || descLinkError) && (
@@ -1983,10 +1983,10 @@ function AudionutsUAGUI() {
                   onBlur={() => setDescLinkFocused(false)}
                   placeholder="https://pastebin.com/abc123"
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                    descLinkError 
-                      ? 'border-red-500 focus:ring-red-500' 
-                      : isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    descLinkError
+                      ? 'border-red-500 focus:ring-red-500'
+                      : isDarkMode
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                         : 'bg-white border-gray-300 text-gray-900'
                   }`}
                   disabled={isExecuting}
@@ -1999,11 +1999,11 @@ function AudionutsUAGUI() {
                 )}
               </div>
             )}
-            
+
             {/* Description File Status - only show on error or when no file selected */}
             {hasDescFile && (descFileError || !descFilePath) && (
               <div className={`p-3 rounded-lg ${
-                descFileError 
+                descFileError
                   ? isDarkMode ? 'bg-red-900 border border-red-700' : 'bg-red-50 border border-red-200'
                   : isDarkMode ? 'bg-yellow-900 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
               }`}>
@@ -2018,12 +2018,12 @@ function AudionutsUAGUI() {
                     )}
                   </svg>
                   <span className={`text-sm font-medium ${
-                    descFileError 
+                    descFileError
                       ? isDarkMode ? 'text-red-300' : 'text-red-700'
                       : isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
                   }`}>
-                    {descFileError 
-                      ? 'Invalid description file path' 
+                    {descFileError
+                      ? 'Invalid description file path'
                       : 'Select a description file from the left panel or enter a path'}
                   </span>
                 </div>
@@ -2053,8 +2053,8 @@ function AudionutsUAGUI() {
               <button
                 onClick={clearTerminal}
                 className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                  isExecuting 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
+                  isExecuting
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-gray-600 hover:bg-gray-700 text-white'
                 }`}
                 title={isExecuting ? 'Kill process and clear terminal' : 'Clear terminal'}
@@ -2123,7 +2123,7 @@ function AudionutsUAGUI() {
             Arguments
           </h2>
         </div>
-        
+
         {/* Search and Collapse Controls */}
         <div className={`p-3 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} space-y-2`}>
           {/* Search Input */}
@@ -2137,8 +2137,8 @@ function AudionutsUAGUI() {
               onChange={(e) => setArgSearchFilter(e.target.value)}
               placeholder="Search arguments..."
               className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
               }`}
             />
@@ -2153,14 +2153,14 @@ function AudionutsUAGUI() {
               </button>
             )}
           </div>
-          
+
           {/* Collapse/Expand All Buttons */}
           <div className="flex gap-2">
             <button
               onClick={collapseAllSections}
               className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                   : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -2170,8 +2170,8 @@ function AudionutsUAGUI() {
             <button
               onClick={expandAllSections}
               className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                   : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -2180,7 +2180,7 @@ function AudionutsUAGUI() {
             </button>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filteredCategories.length === 0 ? (
             <div className={`text-center py-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -2193,8 +2193,8 @@ function AudionutsUAGUI() {
                 <button
                   onClick={() => toggleSectionCollapse(cat.title)}
                   className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
-                    isDarkMode 
-                      ? 'hover:bg-gray-700' 
+                    isDarkMode
+                      ? 'hover:bg-gray-700'
                       : 'hover:bg-gray-50'
                   } ${collapsedSections.has(cat.title) ? 'rounded-b-lg' : ''}`}
                 >
@@ -2213,7 +2213,7 @@ function AudionutsUAGUI() {
                     )}
                   </div>
                 </button>
-                
+
                 {/* Collapsible Section Content */}
                 {!collapsedSections.has(cat.title) && (
                   <div className={`px-3 pb-3 pt-2 ${isDarkMode ? 'border-t border-gray-700' : 'border-t border-gray-200'}`}>

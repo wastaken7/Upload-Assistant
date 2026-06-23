@@ -1716,10 +1716,10 @@ async def do_the_thing(base_dir: str) -> None:
         else:
             break
 
-    meta['ua_name'] = 'Upload Assistant'
+    meta["ua_name"] = "Upload-Assistant"
     meta['current_version'] = await update_notification(base_dir)
 
-    signature = "Shared with Upload-Assistant (fork)"
+    signature = f"Shared with {meta['ua_name']} (fork)"
     if meta.get('current_version', ''):
         signature += f" {meta['current_version']}"
     meta['ua_signature'] = signature

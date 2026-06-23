@@ -37,9 +37,7 @@ class ASC:
         self.torrent_url = 'https://cliente.amigos-share.club/torrents-details.php?id='
         self.requests_url = f'{self.base_url}/pedidos.php'
         self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f'Upload Assistant ({platform.system()} {platform.release()})'
-        }, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
         self.main_tmdb_data: dict[str, Any] = {}
         self.season_tmdb_data: dict[str, Any] = {}

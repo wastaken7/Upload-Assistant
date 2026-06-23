@@ -1327,13 +1327,13 @@ class TRACKER_SETUP:
             trumping_torrent_id: Optional[str] = None
 
         if meta.get('tv_pack'):
-            message = "Upload Assistant season pack trump"
+            message = f"{meta['ua_name']} season pack trump"
         elif meta.get('trump_reason') == 'exact_match':
-            message = "Upload Assistant exact filename trump"
+            message = f"{meta['ua_name']} exact filename trump"
         elif meta.get('trump_reason') == 'trumpable_release':
-            message = "Upload Assistant trumpable release trump"
+            message = f"{meta['ua_name']} trumpable release trump"
         else:
-            message = "Upload Assistant is trumping this torrent for reasons Audionut has not correctly caught. User selected yes at a prompt."
+            message = f"{meta['ua_name']} is trumping this torrent for reasons {meta['ua_name']} has not correctly caught. User selected yes at a prompt."
 
         if tracker != 'LST':
             payload: JsonDict = {

@@ -239,9 +239,9 @@ class ANT:
                 if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
                     data.update({'screenshots': '\n'.join([x['raw_url'] for x in meta['image_list']][:4])})
                     if not meta['ant_user_tags']:
-                        data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant"})
+                        data.update({"flagchangereason": f"Adult with screens uploaded with {meta['ua_name']}"})
                     else:
-                        data.update({'flagchangereason': "Adult with screens uploaded with Upload Assistant. User to add tags manually."})
+                        data.update({"flagchangereason": f"Adult with screens uploaded with {meta['ua_name']}. User to add tags manually."})
                 else:
                     data.update({'screenshots': ''})  # No screenshots for adult content
             else:
@@ -251,9 +251,7 @@ class ANT:
             if meta['ant_user_tags']:
                 data.update({'flagchangereason': "User prompted to add tags manually"})
 
-        headers = {
-            'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
-        }
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"}
 
         try:
             if not meta['debug']:
@@ -396,7 +394,7 @@ class ANT:
 
         headers = {
             "X-API-Key": api_key.strip(),
-            'User-Agent': f'Upload Assistant/2.4 ({platform.system()} {platform.release()})'
+            "User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
         }
 
         try:

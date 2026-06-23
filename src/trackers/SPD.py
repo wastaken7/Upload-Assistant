@@ -33,11 +33,14 @@ class SPD:
         self.banned_groups = []
         self.banned_url = 'https://speedapp.io/api/torrent/release-group/blacklist'
         api_key = str(self.config['TRACKERS'][self.tracker]['api_key'])
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': "Upload Assistant",
-            'accept': 'application/json',
-            'Authorization': api_key,
-        }, timeout=30.0)
+        self.session = httpx.AsyncClient(
+            headers={
+                "User-Agent": "Upload-Assistant",
+                "accept": "application/json",
+                "Authorization": api_key,
+            },
+            timeout=30.0,
+        )
 
     async def get_cat_id(self, meta: Meta) -> Optional[str]:
         if not meta.get('language_checked', False):

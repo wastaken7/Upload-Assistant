@@ -28,9 +28,7 @@ class FF:
         self.torrent_url = f"{self.base_url}/details.php?id="
         self.requests_url = f"{self.base_url}/requests.php"
         self.auth_token = None
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
-        }, timeout=30.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30.0)
 
     async def validate_credentials(self, meta: dict[str, Any]) -> bool:
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")

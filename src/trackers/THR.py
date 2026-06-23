@@ -90,9 +90,7 @@ class THR:
             'url': f"{imdb_info.get('imdb_url', '')}/",
             'tube': str(meta.get('youtube', '')),
         }
-        headers = {
-            'User-Agent': f'Upload Assistant/2.3 ({platform.system()} {platform.release()})'
-        }
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"}
         # If pronfo fails, put mediainfo into THR parser
         if str(meta.get('is_disc', '')) != 'BDMV':
             files['nfo'] = ("MEDIAINFO.txt", mi_file)
@@ -105,7 +103,7 @@ class THR:
             await asyncio.sleep(0.5)
             response: Optional[httpx.Response] = None
             try:
-                cookies = await self.login()
+                cookies = await self.login(meta)
 
                 if cookies:
                     console.print("[green]Using authenticated session for upload")
@@ -383,7 +381,7 @@ class THR:
             return dupes
 
         try:
-            cookies = await self.login()
+            cookies = await self.login(meta)
 
             client_args: dict[str, Any] = {'timeout': 10.0, 'follow_redirects': True}
             if cookies:
@@ -525,7 +523,7 @@ class THR:
 
         return page_dupes, has_next_page, next_page_number
 
-    async def login(self) -> Optional[dict[str, Any]]:
+    async def login(self, meta) -> Optional[dict[str, Any]]:
         console.print("[yellow]Logging in to THR...")
         url = 'https://www.torrenthr.org/takelogin.php'
 
@@ -539,8 +537,8 @@ class THR:
             'ssl': 'yes'
         }
         headers = {
-            'User-Agent': f'Upload Assistant/2.2 ({platform.system()} {platform.release()})',
-            'Referer': 'https://www.torrenthr.org/login.php'
+            "User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
+            "Referer": "https://www.torrenthr.org/login.php",
         }
 
         async with httpx.AsyncClient(follow_redirects=True) as session:

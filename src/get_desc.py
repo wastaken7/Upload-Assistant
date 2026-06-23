@@ -533,13 +533,16 @@ class DescriptionBuilder:
             table = False
             header_size = -1
         elif self.tracker in ("BJS", "BT", "ASC"):
-            table = False
             if not header_size:
                 header_size = 3
+            if self.tracker == "ASC":
+                table = False
+
+        header = "[h2]" if not header_size else f"[size={header_size}][b]"
+        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
 
         asin = meta.get("asin")
         author = meta.get("author")
-        book_parts: list[str] = []
         book_translator = meta.get("book_translator")
         edition = meta.get("edition")
         isbn = meta.get("isbn")
@@ -567,50 +570,62 @@ class DescriptionBuilder:
             overview = html_to_bbcode(str(overview))
             overview = re.sub(r"<[^>]+>", "", overview).strip()
 
-        prefix = f"{bullet} " if bullet else ""
-
+        # Collect key-value pairs
+        fields = []
         if author:
-            book_parts.append(f"{prefix}[b]{str_author}:[/b] {author}")
+            fields.append((str_author, author))
         if book_translator:
-            book_parts.append(f"{prefix}[b]{str_book_translator}:[/b] {book_translator}")
+            fields.append((str_book_translator, book_translator))
         if narrator:
-            book_parts.append(f"{prefix}[b]{str_narrator}:[/b] {narrator}")
+            fields.append((str_narrator, narrator))
         if publisher:
-            book_parts.append(f"{prefix}[b]{str_publisher}:[/b] {publisher}")
+            fields.append((str_publisher, publisher))
         if isbn:
-            book_parts.append(f"{prefix}[b]{str_isbn}:[/b] {isbn}")
+            fields.append((str_isbn, isbn))
         if asin:
-            book_parts.append(f"{prefix}[b]{str_asin}:[/b] {asin}")
+            fields.append((str_asin, asin))
         if edition:
-            book_parts.append(f"{prefix}[b]{str_edition}:[/b] {edition}")
+            fields.append((str_edition, edition))
         if year:
-            book_parts.append(f"{prefix}[b]{str_year}:[/b] {year}")
+            fields.append((str_year, year))
         if meta.get("audiobook", False):
             audiobook_duration_formatted = meta.get("audiobook_duration_formatted")
             avg_bitrate = meta.get("audiobook_bitrate")
             if audiobook_duration_formatted:
-                book_parts.append(f"{prefix}[b]{str_duration}:[/b] {audiobook_duration_formatted}")
+                fields.append((str_duration, audiobook_duration_formatted))
             if avg_bitrate:
-                book_parts.append(f"{prefix}[b]{str_avg_bitrate}:[/b] {avg_bitrate} kbps")
+                fields.append((str_avg_bitrate, f"{avg_bitrate} kbps"))
 
-        if not (book_parts or overview):
+        if not (fields or overview):
             return ""
 
         if table:
             final_book_parts: list[str] = []
-            if book_parts:
-                header_size_val = header_size if header_size else 4
-                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_technical_details.upper()}[/size][/b][/td][/tr][tr][td]")
-                final_book_parts.append("\n".join(book_parts))
-                final_book_parts.append("[/td][/tr]")
+            if underline:
+                header = "[b][u]"
+                header_end = "[/u][/b]\n"
+            elif header_size == -1:
+                header = "[b]"
+                header_end = "[/b]\n"
+
+            if fields:
+                final_book_parts.append(f"{header}{str_technical_details if not underline else str_technical_details}{header_end}")
+                table_lines = ["[table]"]
+                for label, val in fields:
+                    table_lines.append(f"[tr][td][b]{label}[/b][/td][td]{val}[/td][/tr]")
+                table_lines.append("[/table]")
+                final_book_parts.append("\n".join(table_lines))
 
             if overview:
-                header_size_val = header_size if header_size else 4
-                final_book_parts.append(f"[tr][td][b][size={header_size_val}]{str_overview.upper()}[/size][/b][/td][/tr][tr][td]{overview}[/td][/tr]")
+                final_book_parts.append(f"{header}{str_overview if not underline else str_overview}{header_end}\n{overview}")
 
-            book_p = "\n".join(final_book_parts)
-            return "[table]\n" + book_p + "\n[/table]"
+            return "\n\n".join(part for part in final_book_parts if part.strip())
         else:
+            book_parts = []
+            prefix = f"{bullet} " if bullet else ""
+            for label, val in fields:
+                book_parts.append(f"{prefix}[b]{label}:[/b] {val}")
+
             final_book_parts = []
             if underline:
                 header = "[b][u]"
@@ -623,10 +638,10 @@ class DescriptionBuilder:
                 header_end = "[/h2]" if not header_size else "[/b][/size]\n"
 
             if book_parts:
-                final_book_parts.append(f"{header}{str_technical_details.upper() if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
+                final_book_parts.append(f"{header}{str_technical_details if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
 
             if overview:
-                final_book_parts.append(f"{header}{str_overview.upper() if not underline else str_overview}{header_end}{overview}")
+                final_book_parts.append(f"{header}{str_overview if not underline else str_overview}{header_end}{overview}")
 
             return "\n\n".join(final_book_parts)
 

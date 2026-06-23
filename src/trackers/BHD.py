@@ -129,9 +129,7 @@ class BHD:
             data['edition'] = edition
         if len(tags) > 0:
             data['tags'] = ','.join(tags)
-        headers = {
-            'User-Agent': f'Upload Assistant/2.3 ({platform.system()} {platform.release()})'
-        }
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"}
 
         url = self.upload_url + str(self.tracker_config.get('api_key', '')).strip()
         details_link: Union[str, None] = None

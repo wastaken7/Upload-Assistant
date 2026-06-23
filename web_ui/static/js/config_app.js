@@ -2856,8 +2856,16 @@ function ConfigApp() {
       <header className={headerClass}>
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className={`${titleClass} text-lg md:text-2xl`}>Upload Assistant Config</h1>
-            <button type="button" onClick={handleLogout} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700">Logout</button>
+            <h1 className={`${titleClass} text-lg md:text-2xl`}>
+              Upload-Assistant Config
+            </h1>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap">
             <button
@@ -2866,10 +2874,17 @@ function ConfigApp() {
               onClick={saveAllChanges}
               disabled={saveDisabled}
             >
-              {isSaving ? 'Saving...' : 'Save Config'}
+              {isSaving ? "Saving..." : "Save Config"}
             </button>
-            <a href="/" className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-700 text-white hover:bg-gray-600">Back to Upload</a>
-            <span className="text-sm">{isDarkMode ? '🌙 Dark' : '☀️ Light'}</span>
+            <a
+              href="/"
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-700 text-white hover:bg-gray-600"
+            >
+              Back to Upload
+            </a>
+            <span className="text-sm">
+              {isDarkMode ? "🌙 Dark" : "☀️ Light"}
+            </span>
             <button
               className={themeToggleClass}
               type="button"
@@ -2886,11 +2901,15 @@ function ConfigApp() {
         <div className="max-w-6xl mx-auto px-4 py-6">
           {/* Always show loading/error area until content loads - prevents empty screen on first run */}
           {(status.text || sections.length === 0) && (
-            <div className={`min-h-[120px] flex flex-col justify-center ${status.text ? 'mb-6' : ''}`}>
+            <div
+              className={`min-h-[120px] flex flex-col justify-center ${status.text ? "mb-6" : ""}`}
+            >
               {status.text && (
-                <div className={`${statusClass} ${statusTypeClass} mb-3`}>{status.text}</div>
+                <div className={`${statusClass} ${statusTypeClass} mb-3`}>
+                  {status.text}
+                </div>
               )}
-              {status.type === 'error' && (
+              {status.type === "error" && (
                 <button
                   type="button"
                   onClick={() => loadConfigOptions(true)}
@@ -2899,9 +2918,12 @@ function ConfigApp() {
                   Retry
                 </button>
               )}
-              {status.type === 'info' && status.text && (
-                <div className={`text-sm mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  If this takes too long, check your connection or try refreshing.
+              {status.type === "info" && status.text && (
+                <div
+                  className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  If this takes too long, check your connection or try
+                  refreshing.
                 </div>
               )}
             </div>
@@ -2911,40 +2933,45 @@ function ConfigApp() {
             <div className="space-y-6">
               {/* Config load warning banner */}
               {configWarning && (
-                <div className={`rounded-lg border px-4 py-3 text-sm ${
-                  isDarkMode
-                    ? 'bg-yellow-900/40 border-yellow-700 text-yellow-200'
-                    : 'bg-yellow-50 border-yellow-300 text-yellow-800'
-                }`}>
-                  <span className="font-semibold">Warning: </span>{configWarning}
+                <div
+                  className={`rounded-lg border px-4 py-3 text-sm ${
+                    isDarkMode
+                      ? "bg-yellow-900/40 border-yellow-700 text-yellow-200"
+                      : "bg-yellow-50 border-yellow-300 text-yellow-800"
+                  }`}
+                >
+                  <span className="font-semibold">Warning: </span>
+                  {configWarning}
                 </div>
               )}
               {/* Tab Navigation */}
-              <div className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              <div
+                className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+              >
                 <button
-                  onClick={() => setActiveTab('security')}
+                  onClick={() => setActiveTab("security")}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                    activeTab === 'security'
+                    activeTab === "security"
                       ? isDarkMode
-                        ? 'bg-gray-700 text-white'
-                        : 'bg-white text-gray-900 shadow-sm'
+                        ? "bg-gray-700 text-white"
+                        : "bg-white text-gray-900 shadow-sm"
                       : isDarkMode
-                        ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                        ? "text-gray-400 hover:text-white hover:bg-gray-700"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
                   }`}
                 >
                   Security
                 </button>
                 <button
-                  onClick={() => setActiveTab('access-log')}
+                  onClick={() => setActiveTab("access-log")}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                    activeTab === 'access-log'
+                    activeTab === "access-log"
                       ? isDarkMode
-                        ? 'bg-gray-700 text-white'
-                        : 'bg-white text-gray-900 shadow-sm'
+                        ? "bg-gray-700 text-white"
+                        : "bg-white text-gray-900 shadow-sm"
                       : isDarkMode
-                        ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                        ? "text-gray-400 hover:text-white hover:bg-gray-700"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
                   }`}
                 >
                   Access Log
@@ -2965,11 +2992,11 @@ function ConfigApp() {
                       className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                         isActive
                           ? isDarkMode
-                            ? 'bg-gray-700 text-white'
-                            : 'bg-white text-gray-900 shadow-sm'
+                            ? "bg-gray-700 text-white"
+                            : "bg-white text-gray-900 shadow-sm"
                           : isDarkMode
-                            ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                            ? "text-gray-400 hover:text-white hover:bg-gray-700"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
                       }`}
                     >
                       {section.section}
@@ -2980,8 +3007,12 @@ function ConfigApp() {
 
               {/* Tab Content */}
               <div className="space-y-4">
-                {activeTab === 'security' && <SecurityTab isDarkMode={isDarkMode} />}
-                {activeTab === 'access-log' && <AccessLogTab isDarkMode={isDarkMode} />}
+                {activeTab === "security" && (
+                  <SecurityTab isDarkMode={isDarkMode} />
+                )}
+                {activeTab === "access-log" && (
+                  <AccessLogTab isDarkMode={isDarkMode} />
+                )}
                 {sections.map((section) => {
                   const sectionId = section.section.toLowerCase();
                   if (activeTab !== sectionId) return null;
@@ -2993,7 +3024,9 @@ function ConfigApp() {
                     <div key={sectionId} className="space-y-4">
                       {/* Sub-tab Navigation */}
                       {hasSubTabs && (
-                        <div className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                        <div
+                          className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                        >
                           {subTabs.map((subTab) => {
                             const isActive = activeSubTab === subTab.id;
                             return (
@@ -3003,11 +3036,11 @@ function ConfigApp() {
                                 className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                                   isActive
                                     ? isDarkMode
-                                      ? 'bg-gray-600 text-white'
-                                      : 'bg-white text-gray-900 shadow-sm'
+                                      ? "bg-gray-600 text-white"
+                                      : "bg-white text-gray-900 shadow-sm"
                                     : isDarkMode
-                                      ? 'text-gray-400 hover:text-white hover:bg-gray-600'
-                                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-300'
+                                      ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-300"
                                 }`}
                               >
                                 {subTab.label}
@@ -3019,19 +3052,41 @@ function ConfigApp() {
 
                       {/* Content */}
                       <ItemList
-                        items={hasSubTabs ? section.items.filter((item) => {
-                          if (section.section === 'TORRENT_CLIENTS') {
-                            const clientTypeItem = item.children && item.children.find(c => c.key === 'torrent_client');
-                            return clientTypeItem && clientTypeItem.value === activeSubTab;
-                          }
-                          if (item.subsection && typeof item.subsection === 'string') {
-                            return formatDisplayLabel(item.subsection).toLowerCase().replace(/\s+/g, '-') === activeSubTab;
-                          }
-                          if (item.subsection === true) {
-                            return formatDisplayLabel(item.key).toLowerCase().replace(/\s+/g, '-') === activeSubTab;
-                          }
-                          return false;
-                        }) : section.items}
+                        items={
+                          hasSubTabs
+                            ? section.items.filter((item) => {
+                                if (section.section === "TORRENT_CLIENTS") {
+                                  const clientTypeItem =
+                                    item.children &&
+                                    item.children.find(
+                                      (c) => c.key === "torrent_client",
+                                    );
+                                  return (
+                                    clientTypeItem &&
+                                    clientTypeItem.value === activeSubTab
+                                  );
+                                }
+                                if (
+                                  item.subsection &&
+                                  typeof item.subsection === "string"
+                                ) {
+                                  return (
+                                    formatDisplayLabel(item.subsection)
+                                      .toLowerCase()
+                                      .replace(/\s+/g, "-") === activeSubTab
+                                  );
+                                }
+                                if (item.subsection === true) {
+                                  return (
+                                    formatDisplayLabel(item.key)
+                                      .toLowerCase()
+                                      .replace(/\s+/g, "-") === activeSubTab
+                                  );
+                                }
+                                return false;
+                              })
+                            : section.items
+                        }
                         pathParts={[section.section]}
                         depth={0}
                         isDarkMode={isDarkMode}

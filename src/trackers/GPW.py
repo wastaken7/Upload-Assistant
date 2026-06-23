@@ -359,7 +359,9 @@ class GPW:
             found_items: list[dict[str, Any]] = []
 
             try:
-                async with httpx.AsyncClient(cookies=cookies, timeout=30, headers={'User-Agent': 'Upload Assistant/2.3'}) as client:
+                async with httpx.AsyncClient(
+                    cookies=cookies, timeout=30, headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+                ) as client:
                     response = await client.get(search_url)
                     response.raise_for_status()
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -917,7 +919,9 @@ class GPW:
                     cookies = await self.load_cookies(meta)
 
                 request_cookies = cookies if use_cookies and cookies else None
-                async with httpx.AsyncClient(timeout=15, cookies=request_cookies, headers={'User-Agent': 'Upload Assistant/2.3'}) as client:
+                async with httpx.AsyncClient(
+                    timeout=15, cookies=request_cookies, headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+                ) as client:
                     if method == "post":
                         response = await client.post(url, data=params)
                     else:

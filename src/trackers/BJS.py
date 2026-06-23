@@ -61,7 +61,7 @@ class BJS:
         self.torrent_download_url = f"{self.base_url}/torrents.php?action=download&id="
         self.requests_url = f"{self.base_url}/requests.php?"
         self.auth_token = None
-        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
         self.main_tmdb_data: dict[str, Any] = {}
         self.episode_tmdb_data: dict[str, Any] = {}
         self.semaphore = asyncio.Semaphore(1)
@@ -539,7 +539,7 @@ class BJS:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=2]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/align]",
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/align]",
         )
 
         return description

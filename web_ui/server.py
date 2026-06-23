@@ -2109,7 +2109,7 @@ def config_page():
 @limiter.limit("70 per hour", key_func=get_remote_address)
 def health():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "success": True, "message": "Upload Assistant Web UI is running"})
+    return jsonify({"status": "healthy", "success": True, "message": "Upload-Assistant Web UI is running"})
 
 
 @app.route("/api/csrf_token")
@@ -2298,7 +2298,7 @@ def twofa_setup():
     # Generate secret and provisioning URI using pyotp
     secret = pyotp.random_base32()
     try:
-        uri = pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name="Upload Assistant")
+        uri = pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name="Upload-Assistant")
     except Exception:
         uri = ""
     # Generate one-time recovery codes and store temporarily in session

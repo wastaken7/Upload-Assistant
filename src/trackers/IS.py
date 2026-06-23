@@ -29,9 +29,7 @@ class IS:
         self.banned_groups = ['']
         self.base_url = 'https://immortalseed.me'
         self.torrent_url = 'https://immortalseed.me/details.php?hash='
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
-        }, timeout=30)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30)
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

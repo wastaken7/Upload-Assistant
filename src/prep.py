@@ -658,7 +658,7 @@ class Prep:
                 valid_mi = validate_mediainfo(meta, debug=meta['debug'])
             except NoAudioMediaError as e:
                 console.print(f"[red]MediaInfo validation failed: {str(e)}[/red]")
-                raise NoAudioMediaError(f"Upload Assistant does not support no audio media. Details: {str(e)}") from e
+                raise NoAudioMediaError(f"{meta['ua_name']} does not support no audio media. Details: {str(e)}") from e
             except Exception as e:
                 console.print(f"[red]MediaInfo validation failed: {str(e)}[/red]")
                 raise

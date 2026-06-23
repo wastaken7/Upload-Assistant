@@ -41,7 +41,7 @@ class NEXUSPHP:
         self.torrent_url = ""
         self.upload_url = ""
 
-        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def load_localized_data(self, meta: dict[str, Any]) -> None:
         localized_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"

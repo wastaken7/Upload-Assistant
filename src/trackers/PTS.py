@@ -28,9 +28,7 @@ class PTS:
         self.torrent_url = "https://www.ptskit.org/details.php?id="
         self.announce = str(self.config['TRACKERS'][self.tracker]['announce_url'])
         self.auth_token: Optional[str] = None
-        self.session = httpx.AsyncClient(headers={
-            'User-Agent': f"Upload Assistant/2.3 ({platform.system()} {platform.release()})"
-        }, timeout=60.0)
+        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

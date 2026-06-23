@@ -2,7 +2,6 @@
 import asyncio
 import json
 import os
-import platform
 import re
 import urllib.parse
 from typing import Any, Optional, cast
@@ -36,8 +35,7 @@ class AR:
         self.upload_url = f'{self.base_url}/upload.php'
         self.search_url = f'{self.base_url}/torrents.php'
         self.test_url = f'{self.base_url}/torrents.php'
-        self.torrent_url = f'{self.base_url}/torrents.php?id='
-        self.user_agent = f'Upload Assistant/2.3 ({platform.system()} {platform.release()})'
+        self.torrent_url = f"{self.base_url}/torrents.php?id="
         self.banned_groups = []
 
     async def get_type(self, meta: dict[str, Any]) -> str:
@@ -259,7 +257,7 @@ class AR:
         if meta.get('debug', False):
             console.print(f"[blue]{search_url}")
 
-        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
@@ -311,7 +309,7 @@ class AR:
         if not cookie_jar:
             return None
 
-        headers = {"User-Agent": f"Upload Assistant {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
