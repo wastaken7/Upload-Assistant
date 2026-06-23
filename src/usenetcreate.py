@@ -70,13 +70,44 @@ def get_dynamic_volume_size(total_bytes: int) -> str:
         return "1g"
 
 
-async def check_binary(binary_name: str, config_path: Optional[str] = None) -> str:
+async def check_binary(binary_name: str, config_path: Optional[str] = None, meta: Optional[Meta] = None, path_7z: Optional[str] = None) -> str:
     """Ensure binary exists, returning the resolved path or raising FileNotFoundError."""
     path = config_path or binary_name
     resolved = shutil.which(path)
-    if not resolved:
-        raise FileNotFoundError(f"Binary '{path}' not found in PATH or config. Please install it.")
-    return resolved
+    if resolved:
+        return resolved
+
+    # If the binary is not found, attempt to download it automatically if meta is provided
+    if meta and meta.get("base_dir"):
+        base_dir = meta["base_dir"]
+        debug = meta.get("debug", False)
+        try:
+            if binary_name == "7z":
+                from bin.get_7z import SevenZipBinaryManager
+
+                console.print("[yellow]Binary '7z' not found. Attempting to download automatically...[/yellow]")
+                return await SevenZipBinaryManager.ensure_7z_binary(base_dir, debug)
+            elif binary_name == "nyuu":
+                from bin.get_nyuu import NyuuBinaryManager
+
+                console.print("[yellow]Binary 'nyuu' not found. Attempting to download automatically...[/yellow]")
+                return await NyuuBinaryManager.ensure_nyuu_binary(base_dir, debug, path_7z=path_7z)
+            elif binary_name == "par2":
+                from bin.get_par2 import Par2BinaryManager
+
+                console.print("[yellow]Binary 'par2' not found. Attempting to download automatically...[/yellow]")
+                return await Par2BinaryManager.ensure_par2_binary(base_dir, debug)
+            elif binary_name == "pesto":
+                from bin.get_pesto import PestoBinaryManager
+
+                console.print("[yellow]Binary 'pesto' not found. Attempting to download automatically...[/yellow]")
+                return await PestoBinaryManager.ensure_pesto_binary(base_dir, debug)
+        except Exception as e:
+            if debug:
+                console.print(f"[yellow]Automatic download of '{binary_name}' failed: {e}[/yellow]")
+
+    raise FileNotFoundError(f"Binary '{path}' not found in PATH or config. Please install it.")
+
 
 
 async def run_command_with_logging(cmd: list[str], description: str, debug: bool = False) -> None:
@@ -582,7 +613,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     # 1. Resolve Binaries
     try:
-        path_7z = await check_binary("7z", usenet_cfg.get("7z_path"))
+        path_7z = await check_binary("7z", usenet_cfg.get("7z_path"), meta=meta)
     except FileNotFoundError as e:
         if is_debug:
             console.print(f"[yellow]Warning: {e} Using simulation mode for 7z.[/yellow]")
@@ -592,7 +623,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     if use_pesto:
         try:
-            path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"))
+            path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"), meta=meta)
         except FileNotFoundError as e:
             if is_debug:
                 console.print(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
@@ -601,7 +632,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
                 return None
     else:
         try:
-            path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"))
+            path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"), meta=meta)
         except FileNotFoundError as e:
             if is_debug:
                 console.print(f"[yellow]Warning: {e} Using simulation mode for par2.[/yellow]")
@@ -610,7 +641,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
                 return None
 
         try:
-            path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"))
+            path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"), meta=meta, path_7z=path_7z)
         except FileNotFoundError as e:
             if is_debug:
                 console.print(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")

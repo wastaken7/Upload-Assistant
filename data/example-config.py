@@ -1284,10 +1284,14 @@ config = {
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
         "usenet_uploader": "nyuu",
-        # Paths to binaries (defaults to looking in PATH)
+        # Paths to binaries (defaults to looking in PATH, downloaded automatically if not found)
+        # Available at: https://github.com/animetosho/nyuu
         "nyuu_path": "nyuu",
+        # Available at: https://github.com/animetosho/par2cmdline-turbo
         "par2_path": "par2",
+        # Available at: https://github.com/franzopl/pesto
         "pesto_path": "pesto",
+        # Available at: https://www.7-zip.org/
         "7z_path": "7z",
         # Where to output generated NZB files (if empty, saves to tmp directory)
         "nzb_output_dir": "",

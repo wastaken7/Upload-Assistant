@@ -198,6 +198,13 @@ This branch introduces new media categories and automation features not present 
 
 Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
 
+Features automated binary managers for:
+- [nyuu](https://github.com/animetosho/nyuu)
+- [par2cmdline-turbo](https://github.com/animetosho/par2cmdline-turbo)
+- [pesto](https://github.com/franzopl/pesto)
+- [7-Zip](https://www.7-zip.org/)
+
+
 <p>
   <a href="https://github.com/autobrr/mkbrr"><img src="https://github.com/autobrr/mkbrr/blob/main/.github/assets/mkbrr-dark.png?raw=true" alt="mkbrr" height="40px;"></a>&nbsp;&nbsp;
   <a href="https://github.com/autobrr/qui"><img src="https://github.com/autobrr/qui/blob/develop/documentation/static/img/qui.png?raw=true" alt="qui" height="40px;"></a>&nbsp;&nbsp;

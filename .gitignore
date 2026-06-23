@@ -14,6 +14,10 @@ docker-compose.yml
 Dockerfile
 bin/mkbrr/*
 bin/bdinfo/*
+bin/7z/*
+bin/nyuu/*
+bin/par2/*
+bin/pesto/*
 *.mkv
 .vscode/
 __pycache__/
