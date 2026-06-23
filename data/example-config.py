@@ -568,6 +568,12 @@ config = {
             # Send uploads to DP modq for staff approval
             "modq": False,
         },
+        "DS": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Provide the DrunkenSlug upload page URL here, it ends with /upload_form
+            "upload_url": "",
+        },
         "DT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",

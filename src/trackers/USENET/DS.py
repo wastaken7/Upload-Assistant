@@ -21,7 +21,7 @@ class DS:
         self.common = COMMON(config)
         self.tracker = "DS"
         self.is_usenet = True
-        self.upload_url = "https://nzbs.drunkenslug.com/upload.php"
+        self.upload_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("upload_url", "").replace("/upload_form", "/upload.php")).strip()
         self.torrent_url = "https://drunkenslug.com/search/"
         self.banned_groups = []
 
@@ -35,6 +35,10 @@ class DS:
         return meta["uuid"]
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
+        if not self.upload_url:
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
+            return False
+
         nzb_path = meta.get('nzb_path')
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"

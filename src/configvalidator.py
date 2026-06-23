@@ -482,6 +482,11 @@ def _validate_trackers_section(
             section="TRACKERS"
         ))
 
+    # Ensure active trackers have their configs and required keys
+    for active_t in active_set:
+        if active_t == "DS" and active_t not in [t.upper() for t in trackers]:
+            errors.append("Missing config section for active tracker: 'DS' under 'TRACKERS'")
+
     # Validate individual tracker configs
     for tracker_name, tracker_config in trackers.items():
         if tracker_name == "default_trackers":
@@ -517,6 +522,12 @@ def _validate_trackers_section(
                     f"[TRACKERS][{tracker_name}] announce_url contains placeholder "
                     f"(e.g., <PASSKEY>) - replace with actual value"
                 )
+
+        # Check DS specific config
+        if tracker_name.upper() == "DS" and is_active:
+            upload_url = tracker_config_dict.get("upload_url", "")
+            if not upload_url or (isinstance(upload_url, str) and not upload_url.strip()):
+                errors.append("[TRACKERS][DS] upload_url is required when DS is active")
 
         # Check boolean fields are actually booleans (must be real bool, not string)
         bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]

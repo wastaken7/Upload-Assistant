@@ -25,9 +25,7 @@ from src.trackers.BHDTV import BHDTV
 from src.trackers.BJS import BJS
 from src.trackers.BT import BT
 from src.trackers.COMMON import COMMON
-from src.trackers.CRP import CRP
 from src.trackers.DC import DC
-from src.trackers.DS import DS
 from src.trackers.FF import FF
 from src.trackers.FL import FL
 from src.trackers.GPW import GPW
@@ -51,7 +49,6 @@ from src.trackers.PTS import PTS
 from src.trackers.RTF import RTF
 from src.trackers.SN import SN
 from src.trackers.SPD import SPD
-from src.trackers.SUIO import SUIO
 from src.trackers.THR import THR
 from src.trackers.TL import TL
 from src.trackers.TTG import TTG
@@ -94,6 +91,9 @@ from src.trackers.UNIT3D.UTP import UTP
 from src.trackers.UNIT3D.YOINK import YOINK
 from src.trackers.UNIT3D.YUS import YUS
 from src.trackers.UNIT3D.ZNTH import ZNTH
+from src.trackers.USENET.CRP import CRP
+from src.trackers.USENET.DS import DS
+from src.trackers.USENET.SUIO import SUIO
 
 JsonDict = dict[str, Any]
 Meta = dict[str, Any]
