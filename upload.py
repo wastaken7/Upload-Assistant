@@ -2101,34 +2101,82 @@ async def do_the_thing(base_dir: str) -> None:
                     console.print(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
                 else:
                     trackers_upper = [str(t).upper() for t in meta.get("trackers", [])]
-                    if "USENET" in trackers_upper or "CRP" in trackers_upper or "SUIO" in trackers_upper or "DS" in trackers_upper or meta.get("usenet", False):
-                        from src.usenetcreate import prepare_and_upload_usenet
+                    # Partition trackers into torrent trackers and Usenet indexers
+                    torrent_trackers = []
+                    usenet_trackers = []
+                    for tracker in meta.get("trackers", []):
+                        t_upper = str(tracker).upper().strip()
+                        if t_upper == "USENET":
+                            continue
+                        if t_upper in tracker_class_map:
+                            try:
+                                tracker_inst = tracker_class_map[t_upper](config=config)
+                                if getattr(tracker_inst, "is_usenet", False):
+                                    usenet_trackers.append(tracker)
+                                    continue
+                            except Exception:
+                                pass
+                        torrent_trackers.append(tracker)
 
-                        try:
-                            nzb_path = await prepare_and_upload_usenet(meta, config)
-                            if nzb_path:
-                                meta['nzb_path'] = nzb_path
-                                console.print("[bold green]Usenet upload completed successfully!")
-                            else:
-                                console.print("[bold red]Usenet upload failed.[/bold red]")
-                        except Exception as e:
-                            console.print(f"[bold red]Error in Usenet upload pipeline: {e}[/bold red]")
-                            import traceback
+                    need_usenet_post = "USENET" in trackers_upper or len(usenet_trackers) > 0 or meta.get("usenet", False)
 
-                            console.print(traceback.format_exc())
+                    async def upload_usenet_flow(meta: Meta, usenet_trackers: list[str], need_usenet_post: bool) -> None:
+                        if need_usenet_post:
+                            from src.usenetcreate import prepare_and_upload_usenet
 
-                    has_torrent_trackers = any(t not in ("USENET", "MANUAL") for t in trackers_upper)
-                    if has_torrent_trackers:
-                        await process_trackers(
-                            meta,
-                            config,
-                            client,
-                            console,
-                            list(api_trackers),
-                            tracker_class_map,
-                            list(http_trackers),
-                            list(other_api_trackers),
-                        )
+                            try:
+                                nzb_path = await prepare_and_upload_usenet(meta, config)
+                                if nzb_path:
+                                    meta["nzb_path"] = nzb_path
+                                    console.print("[bold green]Usenet upload completed successfully!")
+                                    if usenet_trackers:
+                                        meta_usenet = meta.copy()
+                                        meta_usenet["trackers"] = usenet_trackers
+                                        console.print(f"[yellow]Processing uploads to Usenet indexers: {', '.join(usenet_trackers)}.....")
+                                        await process_trackers(
+                                            meta_usenet,
+                                            config,
+                                            client,
+                                            console,
+                                            list(api_trackers),
+                                            tracker_class_map,
+                                            list(http_trackers),
+                                            list(other_api_trackers),
+                                        )
+                                else:
+                                    console.print("[bold red]Usenet upload failed.[/bold red]")
+                                    for t in usenet_trackers:
+                                        meta["tracker_status"].setdefault(t, {})["status_message"] = "data error: Usenet upload failed, NZB missing"
+                                        meta["tracker_status"][t]["upload"] = False
+                            except Exception as e:
+                                console.print(f"[bold red]Error in Usenet upload pipeline: {e}[/bold red]")
+                                import traceback
+
+                                console.print(traceback.format_exc())
+                                for t in usenet_trackers:
+                                    meta["tracker_status"].setdefault(t, {})["status_message"] = f"data error: Usenet upload failed: {e}"
+                                    meta["tracker_status"][t]["upload"] = False
+
+                    async def upload_torrent_flow(meta: Meta, torrent_trackers: list[str]) -> None:
+                        if torrent_trackers:
+                            meta_torrent = meta.copy()
+                            meta_torrent["trackers"] = torrent_trackers
+                            console.print(f"[yellow]Processing uploads to torrent trackers: {', '.join(torrent_trackers)}.....")
+                            await process_trackers(
+                                meta_torrent,
+                                config,
+                                client,
+                                console,
+                                list(api_trackers),
+                                tracker_class_map,
+                                list(http_trackers),
+                                list(other_api_trackers),
+                            )
+
+                    await asyncio.gather(
+                        upload_usenet_flow(meta, usenet_trackers, need_usenet_post),
+                        upload_torrent_flow(meta, torrent_trackers),
+                    )
                     if use_discord and bot:
                         await DiscordNotifier.send_upload_status_notification(config, bot, meta)
 
