@@ -1,5 +1,18 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v1.7"
+
+"""
+Changelog for version v1.7 (2026-06-23):
+
+## What's Changed
+* Metadata & Trackers: Centralized description generation, simplified tracker logic using new `basename_no_ext` metadata, and refactored book description and signature size settings (BT, BJS).
+* Usenet: Added pesto uploader support, skip_archive mode, automatic binary downloads (nyuu, par2cmdline-turbo, pesto, 7-Zip), and refactored indexers.
+* SUIO Tracker: Replaced encryption with base_url validation.
+* Bitrate Option: Added 64kbps option for BJS bitrate.
+* Dupe Check: Added deduplication in `dupe_check`, display of duplicate size differences, and embedded links for duplicates search.
+"""
+
 __version__ = "v1.6"
 
 """
