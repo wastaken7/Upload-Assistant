@@ -6,6 +6,7 @@ import platform
 import re
 import ssl
 import subprocess
+import time
 import traceback
 import urllib.parse
 from collections.abc import Awaitable
@@ -1013,6 +1014,7 @@ class QbittorrentClientMixin:
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path: str, meta: dict[str, Any]) -> list[dict[str, Any]]:
+        start_time = time.time()
         if meta.get('debug'):
             console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
@@ -1052,6 +1054,8 @@ class QbittorrentClientMixin:
             if not clients_to_search:
                 if meta.get('debug'):
                     console.print("[yellow]No clients configured for searching")
+                    end_time = time.time()
+                    console.print(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
                 return []
 
             all_matching_torrents: list[dict[str, Any]] = []
@@ -1106,8 +1110,23 @@ class QbittorrentClientMixin:
                     seen_hashes.add(torrent['hash'])
                     unique_torrents.append(torrent)
 
-            if meta['debug'] and len(all_matching_torrents) != len(unique_torrents):
-                console.print(f"[cyan]Deduplicated {len(all_matching_torrents)} torrents to {len(unique_torrents)} unique torrents")
+            end_time = time.time()
+            duration = end_time - start_time
+            if duration > 3:
+                # Check if any searched client already has qui_proxy_url configured
+                using_proxy = False
+                for client_name in clients_to_search:
+                    client_config = self.config.get("TORRENT_CLIENTS", {}).get(client_name)
+                    if client_config and isinstance(client_config, dict) and str(client_config.get("qui_proxy_url", "")).strip():
+                        using_proxy = True
+                        break
+                if not using_proxy:
+                    console.print(f"[yellow]qBittorrent search took {duration:.1f} seconds. For faster searches, consider configuring 'qui_proxy_url' in your config.[/yellow]")
+
+            if meta["debug"]:
+                if len(all_matching_torrents) != len(unique_torrents):
+                    console.print(f"[cyan]Deduplicated {len(all_matching_torrents)} torrents to {len(unique_torrents)} unique torrents")
+                console.print(f"Searching qBittorrent client data processed in {duration:.2f} seconds")
 
             return unique_torrents
 
@@ -1117,6 +1136,8 @@ class QbittorrentClientMixin:
             console.print(f"[bold red]Error finding torrents: {str(e)}")
             if meta['debug']:
                 console.print(traceback.format_exc())
+                end_time = time.time()
+                console.print(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
             return []
 
     def _build_proxy_search_url(self, qbt_proxy_url: str, search_term: str, qui_filters: dict[str, list[str]]) -> str:
