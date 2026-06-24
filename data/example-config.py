@@ -413,7 +413,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to Aura4K modq for staff approval
             "modq": False,
         },
@@ -422,7 +422,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "AITHER": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -430,7 +430,7 @@ config = {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to Aither modq for staff approval
             "modq": False,
         },
@@ -439,7 +439,7 @@ config = {
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "https://anthelion.me/announce/customannounceurl",
-            "anon": False,
+            "anon": True,
         },
         "AR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -471,7 +471,7 @@ config = {
             # for AZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/AZ.txt
             "announce_url": "https://tracker.avistaz.to/<PASSKEY>/announce",
-            "anon": False,
+            "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
@@ -486,7 +486,7 @@ config = {
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
             # Send uploads to BHD drafts
             "draft_default": False,
-            "anon": False,
+            "anon": True,
         },
         "BHDTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -495,7 +495,7 @@ config = {
             "announce_url": "https://trackerr.bit-hdtv.com/announce",
             # passkey found under https://www.bit-hdtv.com/my.php
             "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
-            "anon": False,
+            "anon": True,
         },
         "BJS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -503,7 +503,7 @@ config = {
             # for BJS to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BJS.txt
             "announce_url": "https://tracker.bj-share.info:2053/<PASSKEY>/announce",
-            "anon": False,
+            "anon": True,
             # Set to False if during an anonymous upload you want your release group to be hidden
             "show_group_if_anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
@@ -515,14 +515,14 @@ config = {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "BT": {
             "link_dir_name": "",
             # for BT to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BT.txt
             "announce_url": "https://t.brasiltracker.org/<PASSKEY>/announce",
-            "anon": False,
+            "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
@@ -530,7 +530,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to CBR modq for staff approval
             "modq": False,
             # The tag that identifies you or your group when modifying an existing release.
@@ -553,7 +553,7 @@ config = {
             # for CZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/CZ.txt
             "announce_url": "https://tracker.cinemaz.to/<PASSKEY>/announce",
-            "anon": False,
+            "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
@@ -563,7 +563,7 @@ config = {
             "link_dir_name": "",
             # You can find your api key at Settings -> Security -> API Key -> Generate API Key
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # If True, the script will use the metadata-based title instead of the directory/file name.
             "use_metadata_name": False,
         },
@@ -571,7 +571,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to DP modq for staff approval
             "modq": False,
         },
@@ -585,13 +585,13 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "EMUW": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Use Spanish title instead of English title, if available
             "use_spanish_title": False,
         },
@@ -613,7 +613,7 @@ config = {
             "username": "",
             "passkey": "",
             "uploader_name": "https://filelist.io/Custom_Announce_URL",
-            "anon": False,
+            "anon": True,
         },
         "FRIKI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -651,7 +651,7 @@ config = {
             # for HDS to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/HDS.txt
             "announce_url": "http://hd-space.pw/announce.php?pid=<PASSKEY>",
-            "anon": False,
+            "anon": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
         },
@@ -669,7 +669,7 @@ config = {
             #   - https://hd-torrents.me/
             #   - https://hdts.ru/
             "url": "https://hd-torrents.me/",
-            "anon": False,
+            "anon": True,
             "announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
@@ -678,7 +678,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "HUNO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -687,7 +687,7 @@ config = {
             "api_key": "",
             # You can find your announce URL at https://hawke.uno/upload
             "announce_url": "https://hawke.uno/announce/<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "IPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -705,7 +705,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "IS": {
             # for IS to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -713,13 +713,13 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "announce_url": "https://immortalseed.me/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "ITT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "LAJIDUI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -727,13 +727,13 @@ config = {
             # for LAJIDUI to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/LAJIDUI.txt
             "announce_url": "https://pt.lajidui.top/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "LCD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
@@ -741,7 +741,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "LPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -749,7 +749,7 @@ config = {
             # for LPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/LPT.txt
             "announce_url": "https://longpt.org/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "LST": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -757,7 +757,7 @@ config = {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to LST modq for staff approval
             "modq": False,
             # Send uploads to LST drafts
@@ -767,7 +767,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to LT modq for staff approval
             "modq": False,
         },
@@ -775,7 +775,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to LUME modq for staff approval
             "modq": False,
         },
@@ -783,7 +783,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             "base_url": "kp.m-team.cc"
         },
         "MTV": {
@@ -813,7 +813,7 @@ config = {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "SUIO": {
             # Secret Usenet Indexer: o[redacted]nzbs
@@ -828,8 +828,6 @@ config = {
             # Your API Key
             "api_key": "",
             "anon": True,
-            # If True, the script will use the metadata-based title instead of the directory/file name.
-            "use_metadata_name": False,
             # If False, the indexer will decide (uses ID "0").
             # If True, the script will resolve the audio language ID:
             #   - 1 language: uses the ID for that language.
@@ -844,7 +842,7 @@ config = {
             "api_key": "",
             # Send uploads to OTW modq for staff approval
             "modq": False,
-            "anon": False,
+            "anon": True,
         },
         "PHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -852,7 +850,7 @@ config = {
             # for PHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/PHD.txt
             "announce_url": "https://tracker.privatehd.to/<PASSKEY>/announce",
-            "anon": False,
+            "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
@@ -861,7 +859,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "PTCAFE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -869,7 +867,7 @@ config = {
             # for PTCAFE to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTCAFE.txt
             "announce_url": "https://tracker.ptcafe.club/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "PTER": {  # Does not appear to be working at all
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -887,7 +885,7 @@ config = {
             # for PTFANS to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTFANS.txt
             "announce_url": "https://ptfans.cc/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "PTGTK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -895,7 +893,7 @@ config = {
             # for PTGTK to work you need to export cookies from https://pt.gtkpw.xyz using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTGTK.txt
             "announce_url": "https://t.myaltbox.com/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "PTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -920,26 +918,26 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "R4E": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
-            "anon": False,
+            "anon": True,
         },
         "RAS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "RF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "RPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -947,7 +945,7 @@ config = {
             # for RPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/RPT.txt
             "announce_url": "https://bilibili.download/announce.php?passkey=<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "RTF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -963,7 +961,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # The tag that identifies you or your group when modifying an existing release.
             # If set, the script will try to preserve the original group's name.
             # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
@@ -975,7 +973,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Use Italian title instead of English title, if available
             "use_italian_title": False,
         },
@@ -1005,7 +1003,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "THR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1017,13 +1015,13 @@ config = {
             "pronfo_api_key": "",
             "pronfo_theme": "pronfo theme code",
             "pronfo_rapi_id": "pronfo remote api id",
-            "anon": False,
+            "anon": True,
         },
         "TIK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "TL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1034,7 +1032,7 @@ config = {
             "api_upload": True,
             # You can find your passkey at your profile (https://www.torrentleech.org/profile/[YourUserName]/view) -> Torrent Passkey
             "passkey": "",
-            "anon": False,
+            "anon": True,
             # Rehost images to the TL image host. Does not work with the API upload method.
             # Keep in mind that screenshots are only anonymous if you enable the "Anonymous Gallery Uploads" option in your profile settings.
             "img_rehost": True,
@@ -1045,7 +1043,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "TOS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1054,7 +1052,7 @@ config = {
             "api_key": "",
             # Mon profil > Réglages > Passkey
             "announce_url": "https://theoldschool.cc/announce/PasskeyHere",
-            "anon": False,
+            "anon": True,
             # Upload with Exclusive flag (team of staff only)
             "exclusive": False,
         },
@@ -1067,13 +1065,13 @@ config = {
             "login_answer": "",
             "user_id": "",
             "announce_url": "https://totheglory.im/announce/",
-            "anon": False,
+            "anon": True,
         },
         "TTR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send to modq for staff approval
             "modq": False,
         },
@@ -1084,7 +1082,7 @@ config = {
             "image_count": 2,
             "api_key": "",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
-            "anon": False,
+            "anon": True,
         },
         "ULCX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1092,7 +1090,7 @@ config = {
             # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
             "useAPI": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Send to modq for staff approval
             "modq": False,
         },
@@ -1100,25 +1098,25 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "YOINK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "YUS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "ZNTH": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "anon": False,
+            "anon": True,
         },
         "MANUAL": {
             # Replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se

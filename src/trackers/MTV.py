@@ -264,17 +264,10 @@ class MTV:
         return description
 
     async def edit_name(self, meta: Meta) -> str:
-        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         prefix_index = -1
         if meta['scene'] is True:
             scene_name = str(meta.get('scene_name', ''))
-            if scene_name:
-                mtv_name = scene_name
-            else:
-                mtv_name = str(meta.get('uuid', ''))
-                base, ext = os.path.splitext(mtv_name)
-                if ext.lower() in KNOWN_EXTENSIONS:
-                    mtv_name = base
+            mtv_name = scene_name or str(meta.get("basename_no_ext", ""))
         else:
             mtv_name = str(meta.get('name', ''))
             prefix_removed = False
@@ -301,7 +294,7 @@ class MTV:
 
             if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE') and "DD" in audio_str:
                 mtv_name = mtv_name.replace(audio_str, audio_str.replace(' ', '', 1))
-            if 'DD+' in meta.get('audio', '') and 'DDP' in meta['uuid']:
+            if "DD+" in meta.get("audio", "") and "DDP" in meta.get("basename_no_ext", ""):
                 mtv_name = mtv_name.replace('DD+', 'DDP')
 
         source_value = str(meta.get('source', ''))

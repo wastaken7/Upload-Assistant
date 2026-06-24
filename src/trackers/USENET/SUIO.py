@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 import aiofiles
 import httpx
-from fontTools import unicodedata
 from PIL import Image
 
 from src.console import console
@@ -284,53 +283,12 @@ class SUIO:
                 files["cover"] = (filename, cover_content, "image/jpeg")
         return files
 
-    async def edit_name(self, meta: Meta) -> str:
-        tracker_name = meta.get("uuid", "")
-        scene_name = meta.get("scene_name") or ""
-        use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
-        if use_metadata_name:
-            clean_name = meta.get("clean_name") or ""
-            tracker_name = scene_name if scene_name else clean_name
-            # T1)  Acceptable characters are as follows:
-            #         ABCDEFGHIJKLMNOPQRSTUVWXYZ
-            #         abcdefghijklmnopqrstuvwxyz
-            #         0123456789 . -
-            # https://scenerules.org/html/2014_BLURAY.html
-            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P").replace("!", "")
-            tracker_name = unicodedata.normalize("NFD", tracker_name)
-            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
-            tracker_name = tracker_name.replace(" ", ".")
-        else:
-            if scene_name:
-                tracker_name = scene_name
-            else:
-                tracker_name = meta["uuid"]
-                base, ext = os.path.splitext(tracker_name)
-                if ext.lower() in {
-                    ".mkv",
-                    ".mp4",
-                    ".avi",
-                    ".ts",
-                    ".nzb",
-                    ".mp3",
-                    ".m4b",
-                    ".flac",
-                    ".aac",
-                    ".m4a",
-                    ".ogg",
-                    ".wav",
-                    ".pdf",
-                    ".epub",
-                    ".mobi",
-                    ".cbz",
-                    ".cbr",
-                }:
-                    tracker_name = base
-        return tracker_name
+    async def get_name(self, meta: Meta) -> str:
+        return meta.get("scene_name", "") or meta["basename_no_ext"]
 
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         data = {
-            "rlsname": await self.edit_name(meta),
+            "rlsname": await self.get_name(meta),
             "catid": self.get_category_id(meta),
             "upload": "Post NZB",
             "language": self.get_language_id(meta),

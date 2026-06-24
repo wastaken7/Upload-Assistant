@@ -1,6 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
-import os
 from typing import Any
 
 import aiofiles
@@ -32,7 +31,7 @@ class DS:
         return []
 
     async def get_name(self, meta: Meta) -> str:
-        return meta["uuid"]
+        return meta.get("scene_name", "") or meta["basename_no_ext"]
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
         if not self.upload_url:
@@ -44,7 +43,7 @@ class DS:
             meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
-        nzb_name = os.path.basename(nzb_path)
+        nzb_name = f"{await self.get_name(meta)}.nzb"
 
         async with aiofiles.open(nzb_path, 'rb') as f:
             nzb_content = await f.read()

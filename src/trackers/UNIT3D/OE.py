@@ -169,7 +169,7 @@ class OE(UNIT3D):
                 foreign_lang = str(audio_languages[0]).upper()
                 oe_name = oe_name.replace(f"{resolution}", f"{foreign_lang} {resolution}", 1)
 
-        uuid_value = str(meta.get('uuid', ''))
+        uuid_value = str(meta.get("basename_no_ext", ""))
         scale = "DS4K" if "DS4K" in uuid_value.upper() else "RM4K" if "RM4K" in uuid_value.upper() else ""
         if name_type in ["ENCODE", "WEBDL", "WEBRIP"] and scale != "":
             oe_name = oe_name.replace(f"{resolution}", f"{scale}", 1)

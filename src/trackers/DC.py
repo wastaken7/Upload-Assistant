@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import unicodedata
 from typing import Any, Optional, cast
 
@@ -135,7 +134,7 @@ class DC:
             if response.text and response.text != '[]':
                 json_data = response.json()
                 if isinstance(json_data, list):
-                    search_results = cast(list[Any], json_data)
+                    search_results = json_data
                 for each in search_results:
                     if not isinstance(each, dict):
                         continue
@@ -174,7 +173,7 @@ class DC:
         Mod also mentioned that metadata-based titles are acceptable.
         https://digitalcore.club/forum/6/topic/2810/clarification-needed-p2p-non-scene-torrent-naming-conventions
         """
-        tracker_name = meta["uuid"]
+        tracker_name = meta["basename_no_ext"]
         scene_name = meta.get("scene_name") or ""
 
         use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
@@ -194,31 +193,7 @@ class DC:
                 tracker_name += " [UNRAR]"
 
         else:
-            if scene_name:
-                tracker_name = f"{scene_name} [UNRAR]"
-            else:
-                tracker_name = meta["uuid"]
-                base, ext = os.path.splitext(tracker_name)
-                if ext.lower() in {
-                    ".mkv",
-                    ".mp4",
-                    ".avi",
-                    ".ts",
-                    ".nzb",
-                    ".mp3",
-                    ".m4b",
-                    ".flac",
-                    ".aac",
-                    ".m4a",
-                    ".ogg",
-                    ".wav",
-                    ".pdf",
-                    ".epub",
-                    ".mobi",
-                    ".cbz",
-                    ".cbr",
-                }:
-                    tracker_name = base
+            tracker_name = f"{scene_name} [UNRAR]" if scene_name else meta["basename_no_ext"]
 
         return tracker_name
 

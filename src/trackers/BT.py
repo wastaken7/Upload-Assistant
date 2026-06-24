@@ -1052,7 +1052,7 @@ class BT:
 
                     months_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                     months_en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-                    text_to_search = (meta.get("title", "") + " " + meta.get("uuid", "")).lower()
+                    text_to_search = (meta.get("title", "") + " " + meta.get("basename_no_ext", "")).lower()
                     found_month = ""
                     for m_pt, m_en in zip(months_pt, months_en):
                         if m_pt.lower() in text_to_search or m_en.lower() in text_to_search:

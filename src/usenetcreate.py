@@ -538,7 +538,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     clean_uuid = "".join(c for c in meta["uuid"] if c.isalnum() or c in "._-")[:30]
     uuid_hash = hashlib.md5(meta["uuid"].encode("utf-8")).hexdigest()[:8]
     uuid = f"{clean_uuid}_{uuid_hash}" if clean_uuid else uuid_hash
-    name = meta.get("name") or os.path.basename(input_path)
+    name = meta["basename_no_ext"]
 
     # Sanitize name for filenames
     safe_name = "".join(c for c in name if c.isalnum() or c in "._- ")

@@ -54,7 +54,7 @@ class ZNTH(UNIT3D):
                 source = manual_source
 
             if source not in ("RETAIL", "SCAN", "HYBRID"):
-                filename_lower = (str(meta.get("uuid", "")) + " " + str(meta.get("title", ""))).lower()
+                filename_lower = (str(meta.get("basename_no_ext", "")) + " " + str(meta.get("title", ""))).lower()
                 if "scan" in filename_lower:
                     source = "SCAN"
                 elif "hybrid" in filename_lower:
@@ -65,7 +65,7 @@ class ZNTH(UNIT3D):
                     ext = format_val.upper()
                     source = "SCAN" if ext == "PDF" else "RETAiL"
 
-            is_retail = source in ("RETAIL", "RETAiL") or "retail" in str(meta.get("uuid", "")).lower()
+            is_retail = source in ("RETAIL", "RETAiL") or "retail" in str(meta.get("basename_no_ext", "")).lower()
 
             if audiobook:
                 # AudioBook Naming
@@ -116,8 +116,8 @@ class ZNTH(UNIT3D):
                             edition = f"{edition} Edition"
 
                 isbn_val = str(meta.get("isbn") or "").strip()
-                is_scan = source == "SCAN" or "scan" in str(meta.get("uuid", "")).lower() or "scan" in str(meta.get("title", "")).lower()
-                is_ocr = bool(meta.get("ocr")) or "ocr" in str(meta.get("uuid", "")).lower() or "ocr" in str(meta.get("title", "")).lower()
+                is_scan = source == "SCAN" or "scan" in str(meta.get("basename_no_ext", "")).lower() or "scan" in str(meta.get("title", "")).lower()
+                is_ocr = bool(meta.get("ocr")) or "ocr" in str(meta.get("basename_no_ext", "")).lower() or "ocr" in str(meta.get("title", "")).lower()
 
                 parts = []
                 if author:

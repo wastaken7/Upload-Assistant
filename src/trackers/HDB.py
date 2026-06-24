@@ -370,8 +370,8 @@ class HDB:
                 aka_clean = meta['aka'].replace('AKA ', '').strip()
                 if aka_clean:
                     search_terms.append(aka_clean)
-            if meta.get('uuid'):
-                search_terms.append(meta['uuid'])
+            if meta.get('basename_no_ext'):
+                search_terms.append(meta['basename_no_ext'])
 
         # We have ids
         if not search_terms:
@@ -916,7 +916,7 @@ class HDB:
                             break
 
                 if not bd_summary:
-                    bd_summary = meta.get('uuid', '')
+                    bd_summary = meta.get('basename_no_ext', '')
 
                 if bd_summary:
                     data = {

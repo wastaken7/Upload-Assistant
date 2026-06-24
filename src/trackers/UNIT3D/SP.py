@@ -91,12 +91,12 @@ class SP(UNIT3D):
         KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         if bool(meta.get('scene')):
             scene_name = str(meta.get('scene_name', ''))
-            name = scene_name if scene_name != "" else str(meta.get('uuid', '')).replace(" ", ".")
+            name = scene_name if scene_name != "" else str(meta.get("basename_no_ext", "")).replace(" ", ".")
         elif bool(meta.get('is_disc')):
             name = str(meta.get('name', '')).replace(" ", ".")
         else:
             base_name = str(meta.get('name', '')).replace(" ", ".")
-            uuid_name = str(meta.get('uuid', '')).replace(" ", ".")
+            uuid_name = str(meta.get("basename_no_ext", "")).replace(" ", ".")
             name = base_name if int(meta.get('mal_id', 0) or 0) != 0 else uuid_name
         base, ext = os.path.splitext(name)
         if ext.lower() in KNOWN_EXTENSIONS:

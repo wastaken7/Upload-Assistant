@@ -102,9 +102,9 @@ class FL:
             imdb_year = str(imdb_info_dict.get('year', meta.get('year', '')))
             if meta_year and meta.get('year') != imdb_info_dict.get('year', meta.get('year')):
                 fl_name = fl_name.replace(meta_year, imdb_year)
-        if 'DD+' in audio and 'DDP' in str(meta.get('uuid', '')):
+        if "DD+" in audio and "DDP" in str(meta.get("basename_no_ext", "")):
             fl_name = fl_name.replace('DD+', 'DDP')
-        if 'Atmos' in audio and 'Atmos' not in str(meta.get('uuid', '')):
+        if "Atmos" in audio and "Atmos" not in str(meta.get("basename_no_ext", "")):
             fl_name = fl_name.replace('Atmos', '')
 
         fl_name = fl_name.replace('BluRay REMUX', 'Remux').replace('BluRay Remux', 'Remux').replace('Bluray Remux', 'Remux')
@@ -159,14 +159,7 @@ class FL:
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
-        if meta.get('anime', True) is True and meta.get('tag', '') == '-SubsPlease':
-            torrentFileName = str(fl_name)
-        else:
-            if meta.get('isdir', False) is False:
-                torrent_uuid = str(meta.get('uuid', ''))
-                torrentFileName = os.path.splitext(torrent_uuid)[0]
-            else:
-                torrentFileName = str(meta.get('uuid', ''))
+        torrentFileName = str(fl_name) if meta.get("anime", True) is True and meta.get("tag", "") == "-SubsPlease" else str(meta.get("basename_no_ext", ""))
 
         # Download new .torrent from site
         desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"

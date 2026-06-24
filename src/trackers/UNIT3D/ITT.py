@@ -30,7 +30,7 @@ class ITT(UNIT3D):
     async def get_type_name(self, meta: Meta) -> Optional[str]:
         type_name: Optional[str] = None
 
-        uuid_string = meta.get('uuid', '')
+        uuid_string = meta.get("basename_no_ext", "")
         if uuid_string:
             lower_uuid = uuid_string.lower()
 

@@ -72,7 +72,7 @@ class TOS(UNIT3D):
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         is_scene = meta.get("scene", False)
-        base_name: str = str(meta.get("scene_name") if is_scene else meta.get("uuid"))
+        base_name: str = str(meta.get("scene_name") if is_scene else meta.get("basename_no_ext"))
 
         if is_scene is False:
             replacements = {

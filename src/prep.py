@@ -203,6 +203,10 @@ class Prep:
         folder_id = os.path.basename(meta['path'])
         if meta.get('uuid') is None:
             meta['uuid'] = folder_id
+        if meta.get("isdir", False):
+            meta["basename_no_ext"] = folder_id
+        else:
+            meta["basename_no_ext"] = os.path.splitext(folder_id)[0]
         if not os.path.exists(f"{base_dir}/tmp/{meta['uuid']}"):
             os.makedirs(f"{base_dir}/tmp/{meta['uuid']}", mode=0o700, exist_ok=True)
 

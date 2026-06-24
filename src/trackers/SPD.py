@@ -239,7 +239,7 @@ class SPD:
         return description
 
     async def edit_name(self, meta: Meta) -> str:
-        tracker_name = meta["uuid"]
+        tracker_name = meta["basename_no_ext"]
         scene_name = meta.get("scene_name") or ""
 
         use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
@@ -252,13 +252,7 @@ class SPD:
             tracker_name = tracker_name.replace("!", "")
 
         else:
-            if scene_name:
-                tracker_name = scene_name
-            else:
-                tracker_name = meta["uuid"]
-                base, ext = os.path.splitext(tracker_name)
-                if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
-                    tracker_name = base
+            tracker_name = scene_name or meta["basename_no_ext"]
 
         return tracker_name
 

@@ -363,13 +363,7 @@ class FF:
 
     async def edit_name(self, meta: dict[str, Any]) -> str:
         if meta.get("scene", False):
-            if meta.get("scene_name", ""):
-                ff_name = str(meta.get("scene_name"))
-            else:
-                ff_name = str(meta["uuid"])
-                base, ext = os.path.splitext(ff_name)
-                if ext.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
-                    ff_name = base.replace(" ", ".")
+            ff_name = str(meta.get("scene_name")) if meta.get("scene_name", "") else str(meta["basename_no_ext"]).replace(" ", ".")
         else:
             ff_name = meta.get("clean_name", "").replace(" ", ".")
 

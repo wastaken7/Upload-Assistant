@@ -28,7 +28,7 @@ class LCD(UNIT3D):
         pass
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name_value = meta.get('name', '') if meta.get('is_disc', '') == 'BDMV' else meta.get('uuid', '')
+        name_value = meta.get("name", "") if meta.get("is_disc", "") == "BDMV" else meta.get("basename_no_ext", "")
         name = str(name_value)
 
         replacements = {
