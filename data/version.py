@@ -1,5 +1,16 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v1.8"
+
+"""
+Changelog for version v1.8 (2026-06-24):
+
+## What's Changed
+* feat: automatic `-personalrelease` detection based on group tags.
+* fix: ensure that a torrent is not created for a folder when there is only one file.
+* feat: make Usenet posting and torrent tracker uploads concurrent by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/32
+"""
+
 __version__ = "v1.7"
 
 """
