@@ -108,6 +108,9 @@ config = {
         # set true to use argument overrides from data/templates/user-args.json
         "user_overrides": False,
 
+        # Automatically set --personalrelease to True if the detected release group matches any of these tags (case-insensitive)
+        "personal_release_groups": [],
+
         # If there is no region/distributor ids specified, we can use existing torrents to check
         # This will use data from matching torrents in qBitTorrent/RuTorrent to find matching site ids
         # and then try and find region/distributor ids from those sites
@@ -502,6 +505,7 @@ config = {
             "link_dir_name": "",
             # for BJS to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BJS.txt
+            # Two-factor authentication must be enabled in your profile settings; otherwise, your cookies will expire fairly quickly
             "announce_url": "https://tracker.bj-share.info:2053/<PASSKEY>/announce",
             "anon": True,
             # Set to False if during an anonymous upload you want your release group to be hidden
