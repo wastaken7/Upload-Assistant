@@ -1147,6 +1147,8 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # API Key authentication (stateless, qBittorrent v5.2.0+). When set, qbit_user and qbit_pass are ignored.
+            "qbit_api_key": "",
             # List of trackers to activate "super-seed" (or "initial seeding") mode when adding the torrent.
             # https://www.bittorrent.org/beps/bep_0016.html
             # Super-seed mode is NOT recommended for general use.

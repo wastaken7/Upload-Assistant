@@ -46,7 +46,11 @@ class Wait:
             return None  # No traditional client needed for proxy
         else:
             # Use traditional qbittorrent API client
-            required_keys = ['qbit_url', 'qbit_port', 'qbit_user', 'qbit_pass']
+            if "qbit_api_key" in client and client["qbit_api_key"]:
+                required_keys = ["qbit_url", "qbit_port", "qbit_api_key"]
+            else:
+                required_keys = ["qbit_url", "qbit_port", "qbit_user", "qbit_pass"]
+
             missing_keys = [key for key in required_keys if key not in client]
             if missing_keys:
                 raise ValueError(f"Missing required qBittorrent config keys: {', '.join(missing_keys)}")
@@ -64,24 +68,29 @@ class Wait:
                 port = None
             else:
                 port = str(port_value)
-            username_value = client.get('qbit_user')
-            password_value = client.get('qbit_pass')
-            username = str(username_value) if username_value is not None else None
-            password = str(password_value) if password_value is not None else None
 
-            qbt_client = qbittorrentapi.Client(
-                host=host,
-                port=port,
-                username=username,
-                password=password,
-                VERIFY_WEBUI_CERTIFICATE=verify_cert
-            )
+            if "qbit_api_key" in client and client["qbit_api_key"]:
+                api_key_value = client.get("qbit_api_key")
+                api_key = str(api_key_value) if api_key_value is not None else None
+                qbt_client = qbittorrentapi.Client(host=host, port=port, api_key=api_key, VERIFY_WEBUI_CERTIFICATE=verify_cert)
+                try:
+                    qbt_client.app_version()
+                    return qbt_client
+                except Exception as e:
+                    raise RuntimeError(f"qBittorrent API Key verification failed: {e}") from e
+            else:
+                username_value = client.get("qbit_user")
+                password_value = client.get("qbit_pass")
+                username = str(username_value) if username_value is not None else None
+                password = str(password_value) if password_value is not None else None
 
-            try:
-                qbt_client.auth_log_in()
-                return qbt_client
-            except qbittorrentapi.LoginFailed as e:
-                raise RuntimeError(f"qBittorrent login failed: {e}") from e
+                qbt_client = qbittorrentapi.Client(host=host, port=port, username=username, password=password, VERIFY_WEBUI_CERTIFICATE=verify_cert)
+
+                try:
+                    qbt_client.auth_log_in()
+                    return qbt_client
+                except qbittorrentapi.LoginFailed as e:
+                    raise RuntimeError(f"qBittorrent login failed: {e}") from e
 
     async def wait_for_completion(self, infohash: str, check_interval: int = 3) -> None:
         if not self.proxy_url and not self.qbt_client:

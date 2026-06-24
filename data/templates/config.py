@@ -253,6 +253,7 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            "qbit_api_key": "",
         }
     }
 }

@@ -450,20 +450,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             else:
                                 # Reuse or create qbt_client if needed
                                 if qbt_client is None:
-                                    qbt_client = qbittorrentapi.Client(
-                                        host=client['qbit_url'],
-                                        port=client['qbit_port'],
-                                        username=client['qbit_user'],
-                                        password=client['qbit_pass'],
-                                        VERIFY_WEBUI_CERTIFICATE=client.get('VERIFY_WEBUI_CERTIFICATE', True)
-                                    )
-                                    try:
-                                        await self.retry_qbt_operation(
-                                            lambda: asyncio.to_thread(qbt_client.auth_log_in),
-                                            "qBittorrent login"
-                                        )
-                                    except (asyncio.TimeoutError, qbittorrentapi.LoginFailed, qbittorrentapi.APIConnectionError) as e:
-                                        console.print(f"[bold red]Failed to connect to qBittorrent for export: {e}")
+                                    qbt_client = await self.init_qbittorrent_client(client)
+                                    if qbt_client is None:
+                                        console.print("[bold red]Failed to connect to qBittorrent for export.")
                                         found_hash = None
 
                                 if found_hash:  # Only proceed if we still have a hash

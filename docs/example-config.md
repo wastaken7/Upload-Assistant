@@ -290,6 +290,7 @@ Typical keys:
 - `enable_search` (bool): Search client for existing torrents to reuse hashes. NOTE: independant of auto_torrent_searching
 - `qbit_url` / `qbit_port` (str): Web UI host/port.
 - `qbit_user` / `qbit_pass` (str): Credentials.
+- `qbit_api_key` (str): Optional. API Key to authenticate using stateless API Key authentication (qBittorrent v5.2.0+). When set, `qbit_user` and `qbit_pass` are ignored.
 - `super_seed_trackers` (list[str]): Trackers to enable super-seeding on.
 - `use_tracker_as_tag` (bool): Tag torrents with tracker acronym.
 - `qbit_tag` / `qbit_cat` (str): Tag/category for uploaded torrents.

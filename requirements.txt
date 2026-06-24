@@ -41,7 +41,7 @@ pyimgbox==1.0.7
 pymediainfo==7.0.1
 PyMuPDF==1.27.2.3
 pyotp==2.9.0
-qbittorrent-api==2026.5.0
+qbittorrent-api==2026.6.0
 rarfile==4.2
 regex==2025.11.3
 requests==2.32.5
