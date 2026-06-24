@@ -226,6 +226,8 @@ class TorrentCreator:
                     creation_filelist.extend(meta["subtitle_files"])
 
                 if meta.get("category") in ("BOOK", "GAME"):
+                    if meta.get("isdir") and len(meta.get("filelist", [])) == 1 and not meta.get("keep_folder", False):
+                        path = meta["filelist"][0]
                     include = []
                     exclude = []
                 elif meta["keep_folder"]:

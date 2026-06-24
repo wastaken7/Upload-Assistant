@@ -558,7 +558,7 @@ class QbittorrentClientMixin:
             path = os.path.dirname(path)
         else:
             isdir = os.path.isdir(path)
-            if meta.get("category") == "BOOK" and isdir or len(filelist) != 1 or not isdir:
+            if len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
         # Get the appropriate source path

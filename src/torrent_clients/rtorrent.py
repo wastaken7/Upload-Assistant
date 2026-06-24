@@ -288,9 +288,7 @@ class RtorrentClientMixin:
             modified_fr = True
             if meta.get('debug', False):
                 console.print(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
-        if meta.get('category') == 'BOOK' and isdir:
-            path = os.path.dirname(path)
-        elif isdir is False:
+        if meta.get("category") in ("BOOK", "GAME") and len(filelist) > 1 and isdir or isdir is False:
             path = os.path.dirname(path)
         if meta.get('debug', False):
             console.print(f"[cyan]Final path for rTorrent: {path}")
