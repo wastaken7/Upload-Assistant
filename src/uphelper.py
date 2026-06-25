@@ -428,11 +428,11 @@ class UploadHelper:
 
             if warnings:
                 console.print()
-                console.print("\n\n".join(warnings), soft_wrap=True)
+                console.print("\n\n".join(warnings))
 
             if results:
                 console.print()
-                console.print("\n".join(results), soft_wrap=True)
+                console.print("\n".join(results))
                 console.print()
 
     async def get_confirmation(self, meta: Meta) -> bool:
@@ -603,7 +603,7 @@ class UploadHelper:
             else:
                 formatted_lines.append(item)
 
-        console.print("\n".join(formatted_lines), soft_wrap=True, highlight=False)
+        console.print("\n".join(formatted_lines), highlight=False)
 
         if meta.get('unattended', False) and not meta.get('unattended_confirm', False) and not meta.get('emby_debug', False):
             if meta['debug'] is True:
@@ -625,7 +625,7 @@ class UploadHelper:
                     console.print("[bold red]Aborting...[/bold red]")
                     exit()
             if not meta.get('emby', False):
-                console.print(f"[bold]Base Name:[/bold] {meta['name']}\n", soft_wrap=True, highlight=False)
+                console.print(f"[bold]Base Name:[/bold] {meta['name']}\n", highlight=False)
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
             elif not meta.get('emby_debug', False):
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'

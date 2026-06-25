@@ -292,7 +292,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         return torrent_path if isinstance(torrent_path, str) else None
                 else:
                     # Got a path - this means we found a torrent with ideal piece size
-                    console.print(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
+                    if meta['debug']:
+                        console.print(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
                     return result
 
         if prefer_small_pieces and best_match:
@@ -478,7 +479,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             console.print("[cyan]DEBUG: Skipping found_hash due to unexpected error[/cyan]")
                             found_hash = None
                     else:
-                        console.print(f"[cyan]DEBUG: .torrent file already exists at {found_torrent_path}[/cyan]")
+                        if meta['debug']:
+                            console.print(f"[cyan]DEBUG: .torrent file already exists at {found_torrent_path}[/cyan]")
 
                 # Only validate if we still have a hash (export succeeded or file already existed)
                 resolved_path = ""
@@ -496,7 +498,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     piece_in_mib = int(piece_size) / 1024 / 1024
 
                     if not prefer_small_pieces:
-                        console.print(f"[green]Found a valid torrent from client search with piece size {piece_in_mib} MiB: [bold yellow]{found_hash}")
+                        if meta['debug']:
+                            console.print(f"[green]Found a valid torrent from client search with piece size {piece_in_mib} MiB: [bold yellow]{found_hash}")
                         return resolved_path
 
                     # Track best match for small pieces

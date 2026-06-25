@@ -51,4 +51,4 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
 # Create a shared Console instance used throughout the project.
 # Force terminal mode so that when other processes import `src.console.console`
 # they will emit ANSI color codes to stdout even when not attached to a real TTY.
-console = Console(force_terminal=True)
+console = Console(force_terminal=True, soft_wrap=True)

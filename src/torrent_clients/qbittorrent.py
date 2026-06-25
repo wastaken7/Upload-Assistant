@@ -89,7 +89,7 @@ class QbittorrentClientMixin:
                 if qbt_session is None:
                     raise RuntimeError("qbt_session should not be None")
                 async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties",
-                                           params={'hash': info_hash_v1}) as response:
+                                           params={'hash': info_hash_v1}, timeout=aiohttp.ClientTimeout(total=14.0)) as response:
                     if response.status == 200:
                         torrent_properties = await response.json()
                         if meta['debug']:
@@ -316,7 +316,8 @@ class QbittorrentClientMixin:
         mtv_config_value = trackers_config.get('MTV', {})
         mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
         prefer_small_pieces = bool(mtv_config.get('prefer_mtv_torrent', False))
-        console.print("[green]Searching qBittorrent for an existing .torrent")
+        if meta['debug']:
+            console.print("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get('torrent_storage_dir')
         extracted_torrent_dir = os.path.join(meta.get('base_dir', ''), "tmp", meta.get('uuid', ''))
@@ -449,12 +450,15 @@ class QbittorrentClientMixin:
 
                 matching_torrents.append({'hash': torrent.hash, 'name': torrent.name})
 
-            console.print(f"[cyan]DEBUG: Checked {torrent_count} total torrents in qBittorrent[/cyan]")
+            if meta['debug']:
+                console.print(f"[cyan]DEBUG: Checked {torrent_count} total torrents in qBittorrent[/cyan]")
             if not matching_torrents:
-                console.print("[yellow]No matching torrents found in qBittorrent.")
+                if meta['debug']:
+                    console.print("[yellow]No matching torrents found in qBittorrent.")
                 return None
 
-            console.print(f"[green]Total Matching Torrents: {len(matching_torrents)}")
+            if meta['debug']:
+                console.print(f"[green]Total Matching Torrents: {len(matching_torrents)}")
 
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
@@ -550,7 +554,8 @@ class QbittorrentClientMixin:
                             continue
                     else:
                         # If `prefer_small_pieces` is False, return first valid torrent
-                        console.print(f"[green]Returning first valid torrent: {torrent_hash}")
+                        if meta['debug']:
+                            console.print(f"[green]Returning first valid torrent: {torrent_hash}")
                         return torrent_hash
                 else:
                     if meta['debug']:
