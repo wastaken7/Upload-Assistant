@@ -169,7 +169,23 @@ class COMMON:
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
             for each in list(new_torrent.metainfo):
-                if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
+                if each not in (
+                    "announce",
+                    "comment",
+                    "creation date",
+                    "created by",
+                    "encoding",
+                    "info",
+                    "imdb",
+                    "tmdb",
+                    "tvdb",
+                    "tvmaze",
+                    "mal",
+                    "douban",
+                    "igdb",
+                    "asin",
+                    "isbn",
+                ):
                     new_torrent.metainfo.pop(each, None)  # type: ignore
             if announce_url:
                 new_torrent.metainfo['announce'] = announce_url
@@ -181,6 +197,35 @@ class COMMON:
                 created_by = str(new_torrent.metainfo['created by'])
                 if "mkbrr" in created_by.lower():
                     new_torrent.metainfo["created by"] = f"{created_by} using {meta['ua_name']} {meta.get('current_version', '')}"
+            # Inject metadata IDs as top-level fields
+            id_keys_map = {
+                "imdb_id": "imdb",
+                "tmdb_id": "tmdb",
+                "tvdb_id": "tvdb",
+                "tvmaze_id": "tvmaze",
+                "mal_id": "mal",
+                "douban_id": "douban",
+                "igdb_id": "igdb",
+                "asin": "asin",
+                "isbn": "isbn",
+            }
+            for meta_key, torrent_key in id_keys_map.items():
+                val = meta.get(meta_key)
+                if val is not None and val != 0 and val != "":
+                    if meta_key == "tmdb_id":
+                        cat = str(meta.get("category", "")).upper()
+                        if cat in ("TV", "MOVIE"):
+                            new_torrent.metainfo[torrent_key] = f"{cat.lower()}/{val}"
+                        else:
+                            new_torrent.metainfo[torrent_key] = int(val)
+                    elif meta_key in ["imdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id"]:
+                        try:
+                            new_torrent.metainfo[torrent_key] = int(val)
+                        except (ValueError, TypeError):
+                            new_torrent.metainfo[torrent_key] = str(val)
+                    else:
+                        new_torrent.metainfo[torrent_key] = str(val)
+
             # setting comment as blank as if BASE.torrent is manually created then it can result in private info such as download link being exposed.
             new_torrent.metainfo['comment'] = ''
             entropy_value = meta.get('entropy')

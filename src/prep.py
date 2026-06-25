@@ -740,6 +740,103 @@ class Prep:
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.get('skip_trackers', False) and not meta.get('edit', False):
             await client.get_pathed_torrents(meta['path'], meta)
 
+        # Try to extract metadata from matching client torrent or a local torrent file
+        if (
+            not any(meta.get(id_type) for id_type in ["imdb_id", "tmdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id", "asin", "isbn"])
+            and not meta.get("skip_trackers", False)
+            and not meta.get("edit", False)
+        ):
+            reuse_torrent = await client.find_existing_torrent(meta)
+
+            # Check local files if not found in client
+            if not reuse_torrent:
+                search_dir = meta["path"] if meta["isdir"] else os.path.dirname(meta["path"])
+                if search_dir and os.path.exists(search_dir):
+                    torrent_files = [os.path.join(search_dir, f) for f in os.listdir(search_dir) if f.lower().endswith(".torrent")]
+                    default_torrent_client = self.config["DEFAULT"].get("default_torrent_client")
+                    client_config = self.config.get("TORRENT_CLIENTS", {}).get(default_torrent_client, {}) if default_torrent_client else {}
+                    for torrent_path in torrent_files:
+                        try:
+                            valid, _ = await client.is_valid_torrent(meta, torrent_path, "", "local", client_config)
+                            if valid:
+                                reuse_torrent = torrent_path
+                                break
+                        except Exception as e:
+                            if meta.get("debug"):
+                                console.print(f"[yellow]Failed to validate local torrent {torrent_path}: {e}[/yellow]")
+
+            if reuse_torrent and os.path.exists(reuse_torrent):
+                try:
+                    from torf import Torrent
+
+                    torrent_data = Torrent.read(reuse_torrent)
+                    extracted = False
+                    id_keys_map = {
+                        "imdb": "imdb_id",
+                        "tmdb": "tmdb_id",
+                        "tvdb": "tvdb_id",
+                        "tvmaze": "tvmaze_id",
+                        "mal": "mal_id",
+                        "douban": "douban_id",
+                        "igdb": "igdb_id",
+                        "asin": "asin",
+                        "isbn": "isbn",
+                    }
+                    for torrent_key, meta_key in id_keys_map.items():
+                        val = cast(Any, torrent_data.metainfo.get(torrent_key))
+                        if val is not None and val != 0 and val != "":
+                            if torrent_key == "tmdb":
+                                if isinstance(val, str) and "/" in val and ("tv" in val.lower() or "movie" in val.lower()):
+                                    parts = val.split("/")
+                                    meta["category"] = parts[0].upper()
+                                    try:
+                                        meta["tmdb_id"] = int(parts[1])
+                                        extracted = True
+                                    except (ValueError, TypeError):
+                                        pass
+                                else:
+                                    try:
+                                        meta["tmdb_id"] = int(val)
+                                        extracted = True
+                                    except (ValueError, TypeError):
+                                        pass
+                            elif torrent_key in ["isbn", "asin"]:
+                                meta[meta_key] = str(val)
+                                meta["category"] = "BOOK"
+                                extracted = True
+                            elif torrent_key == "igdb":
+                                try:
+                                    meta["igdb_id"] = int(val)
+                                    meta["category"] = "GAME"
+                                    extracted = True
+                                except (ValueError, TypeError):
+                                    pass
+                            elif torrent_key == "imdb":
+                                val_str = str(val).strip()
+                                if val_str.lower().startswith("tt"):
+                                    val_str = val_str[2:]
+                                try:
+                                    meta["imdb_id"] = int(val_str)
+                                    extracted = True
+                                except (ValueError, TypeError):
+                                    pass
+                            elif torrent_key in ["tvdb", "tvmaze", "mal", "douban"]:
+                                try:
+                                    meta[meta_key] = int(val)
+                                    extracted = True
+                                except (ValueError, TypeError):
+                                    pass
+                            else:
+                                meta[meta_key] = str(val)
+                                extracted = True
+                            if extracted and meta.get("debug"):
+                                console.print(f"[green]Extracted {meta_key} from torrent: {val}[/green]")
+                    if extracted:
+                        console.print("[green]Successfully extracted metadata IDs from matching torrent file.[/green]")
+                except Exception as e:
+                    if meta.get("debug"):
+                        console.print(f"[yellow]Failed to extract metadata from existing torrent: {e}[/yellow]")
+
         if meta['debug']:
             pathed_time_end = time.time()
             console.print(f"Pathed torrent data processed in {pathed_time_end - pathed_time_start:.2f} seconds")
@@ -753,9 +850,13 @@ class Prep:
 
         # Set tmdb_id
         try:
-            meta['tmdb_id'] = int(meta['tmdb_manual'])
+            if meta.get("tmdb_manual"):
+                meta["tmdb_id"] = int(meta["tmdb_manual"])
+            elif not meta.get("tmdb_id"):
+                meta["tmdb_id"] = 0
         except (ValueError, TypeError):
-            meta['tmdb_id'] = 0
+            if not meta.get("tmdb_id"):
+                meta["tmdb_id"] = 0
 
         # Set imdb_id with proper handling for 'tt' prefix
         try:
@@ -773,20 +874,32 @@ class Prep:
 
         # Set mal_id
         try:
-            meta['mal_id'] = int(meta['mal_manual'])
+            if meta.get("mal_manual"):
+                meta["mal_id"] = int(meta["mal_manual"])
+            elif not meta.get("mal_id"):
+                meta["mal_id"] = 0
         except (ValueError, TypeError):
-            meta['mal_id'] = 0
+            if not meta.get("mal_id"):
+                meta["mal_id"] = 0
 
         # Set tvdb_id
         try:
-            meta['tvdb_id'] = int(meta['tvdb_manual'])
+            if meta.get("tvdb_manual"):
+                meta["tvdb_id"] = int(meta["tvdb_manual"])
+            elif not meta.get("tvdb_id"):
+                meta["tvdb_id"] = 0
         except (ValueError, TypeError):
-            meta['tvdb_id'] = 0
+            if not meta.get("tvdb_id"):
+                meta["tvdb_id"] = 0
 
         try:
-            meta['tvmaze_id'] = int(meta['tvmaze_manual'])
+            if meta.get("tvmaze_manual"):
+                meta["tvmaze_id"] = int(meta["tvmaze_manual"])
+            elif not meta.get("tvmaze_id"):
+                meta["tvmaze_id"] = 0
         except (ValueError, TypeError):
-            meta['tvmaze_id'] = 0
+            if not meta.get("tvmaze_id"):
+                meta["tvmaze_id"] = 0
 
         if not meta.get('category'):
             meta['category'] = await self.get_cat(video, meta)

@@ -928,12 +928,11 @@ class QbittorrentClientMixin:
         if not cross:
             try:
                 if proxy_url:
-                    if meta['debug']:
-                        console.print("[yellow]No qui proxy resume support....")
-                    # async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume",
-                    #                            data={'hashes': torrent.infohash}) as response:
-                    #    if response.status != 200:
-                    #        console.print(f"[yellow]Failed to resume torrent via proxy: {response.status}")
+                    if qbt_session is None:
+                        raise RuntimeError("qbt_session cannot be None")
+                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash}) as response:
+                        if response.status != 200:
+                            console.print(f"[yellow]Failed to resume torrent via proxy: {response.status}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
