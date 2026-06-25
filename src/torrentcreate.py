@@ -381,6 +381,7 @@ class TorrentCreator:
                             console.print("[bold red]mkbrr did not create a torrent file!")
                             raise FileNotFoundError(f"Expected torrent file {output_path} was not created")
                         else:
+                            cls.inject_torrent_metadata(meta, output_path)
                             return output_path
 
                     except subprocess.CalledProcessError as e:
@@ -420,8 +421,8 @@ class TorrentCreator:
                     exclude_globs=exclude or [],
                     include_globs=custom_include,
                     creation_date=datetime.now(timezone.utc),
-                    comment="Shared with Upload-Assistant (fork)",
-                    created_by="Upload-Assistant (fork)",
+                    comment=f"{meta['ua_name']} (fork)",
+                    created_by=f"{meta['ua_name']} (fork)",
                     piece_size=piece_size,
                 )
 
@@ -438,6 +439,7 @@ class TorrentCreator:
 
                 torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"
                 torrent_file_size = os.path.getsize(torrent_file_path) / 1024
+                cls.inject_torrent_metadata(meta, torrent_file_path)
                 if meta['debug']:
                     console.print()
                     console.print(f"[bold green]torrent created in {formatted_time}")
@@ -447,6 +449,51 @@ class TorrentCreator:
                 cls._create_torrent_inflight -= 1
                 if meta.get('debug', False):
                     console.print(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
+
+    @staticmethod
+    def inject_torrent_metadata(meta: Mapping[str, Any], torrent_path: str) -> None:
+        """Inject metadata IDs (imdb, tmdb, etc.) as top-level fields inside the torrent file."""
+        if not os.path.exists(torrent_path):
+            return
+        try:
+            torrent = Torrent.read(torrent_path)
+            modified = False
+            id_keys_map = {
+                "imdb_id": "imdb",
+                "tmdb_id": "tmdb",
+                "tvdb_id": "tvdb",
+                "tvmaze_id": "tvmaze",
+                "mal_id": "mal",
+                "douban_id": "douban",
+                "igdb_id": "igdb",
+                "asin": "asin",
+                "isbn": "isbn",
+            }
+            for meta_key, torrent_key in id_keys_map.items():
+                val = meta.get(meta_key)
+                if val is not None and val != 0 and val != "":
+                    if meta_key == "tmdb_id":
+                        cat = str(meta.get("category", "")).upper()
+                        if cat in ("TV", "MOVIE"):
+                            torrent.metainfo[torrent_key] = f"{cat.lower()}/{val}"
+                        else:
+                            torrent.metainfo[torrent_key] = int(val)
+                    elif meta_key in ["imdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id"]:
+                        try:
+                            torrent.metainfo[torrent_key] = int(val)
+                        except (ValueError, TypeError):
+                            torrent.metainfo[torrent_key] = str(val)
+                    else:
+                        torrent.metainfo[torrent_key] = str(val)
+                    modified = True
+            if modified:
+                torrent.write(torrent_path, overwrite=True)
+                if meta.get("debug"):
+                    console.print(
+                        f"[green]Successfully injected top-level metadata into torrent: {[k for k in id_keys_map.values() if k in torrent.metainfo]}[/green]"
+                    )
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not inject metadata into torrent: {e}[/yellow]")
 
     @staticmethod
     def torf_cb(torrent: Torrent, _filepath: str, pieces_done: int, pieces_total: int) -> None:
@@ -492,8 +539,8 @@ class TorrentCreator:
         if os.path.exists(torrentpath):
             base_torrent = Torrent.read(torrentpath)
             base_torrent.trackers = ['https://fake.tracker']
-            base_torrent.comment = "Shared with Upload-Assistant (fork)"
-            base_torrent.created_by = "Shared with Upload-Assistant (fork)"
+            base_torrent.comment = "Upload-Assistant (fork)"
+            base_torrent.created_by = "Upload-Assistant (fork)"
             info_dict = base_torrent.metainfo['info']
             valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
 
@@ -508,7 +555,23 @@ class TorrentCreator:
                 if each not in valid_keys:
                     info_dict.pop(each, None)  # type: ignore
             for each in list(base_torrent.metainfo):
-                if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
+                if each not in (
+                    "announce",
+                    "comment",
+                    "creation date",
+                    "created by",
+                    "encoding",
+                    "info",
+                    "imdb",
+                    "tmdb",
+                    "tvdb",
+                    "tvmaze",
+                    "mal",
+                    "douban",
+                    "igdb",
+                    "asin",
+                    "isbn",
+                ):
                     base_torrent.metainfo.pop(each, None)  # type: ignore
             base_torrent.source = 'L4G'
             base_torrent.private = True
