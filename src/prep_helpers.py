@@ -502,6 +502,13 @@ async def process_media_files(prep_instance: Any, meta: dict[str, Any], videoloc
             console.print(f"[red]Error processing Mediainfo: {e}[/red]")
             raise Exception(f"Error processing Mediainfo: {e}") from e
 
+    filename = str(filename)
+    untouched_filename = str(untouched_filename)
+    if " AKA " in filename.replace(".", " "):
+        filename = filename.split("AKA")[0]
+    meta["filename"] = filename
+    meta["bdinfo"] = bdinfo
+
     return filename, untouched_filename, videopath, search_term, search_file_folder, mi, video
 
 
