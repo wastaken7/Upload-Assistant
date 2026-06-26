@@ -584,7 +584,7 @@ class BT:
 
         description = await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
+            audio_spectrogram=False,
             bluray=False,
             book=True,
             custom_header=True,

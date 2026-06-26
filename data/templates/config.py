@@ -82,7 +82,7 @@ config = {
         "desat": "10.0",
 
         # Add this header above screenshots in description when screens have been tonemapped (in bbcode)
-        "tonemapped_header": "",
+        "tonemapped_header": "[center]Screenshots have been adapted for SDR viewing, for reference only.[/center]",
 
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing

@@ -75,6 +75,8 @@ Order matters: `img_host_1` is primary, later hosts are fallbacks.
 - `seedpool_cdn_api` (str): Seedpool CDN API key.
 
 ### Description extras
+Detailed documentation on how description layout settings work and affect description building can be found in [description-builder.md](https://github.com/wastaken7/Upload-Assistant/blob/master/docs/description-builder.md).
+
 - `add_logo` (bool): Add a TMDb logo image at the top of the description.
 - `logo_size` (str): Logo size (example default: `"300"`).
 - `logo_language` (str): ISO 639-1 language code for logo selection (fallback to English).
@@ -154,8 +156,9 @@ Implementation notes:
 - `embed_dupe_links` (bool): Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8). Set false to display the full raw URLs.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
-- `keep_images` (bool): If false, do not pull images from tracker descriptions.
+- `keep_images` (bool): If false, do not pull images/screenshots from other tracker descriptions. If true, images are downloaded, validated for resolution, and used directly (if hosted on an approved host) or automatically rehosted to your configured image host.
 - `skip_tracker_descriptions` (bool): Only grab IDs from trackers (skip description parsing).
+
 
 Implementation notes:
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).

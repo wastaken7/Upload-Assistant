@@ -228,12 +228,52 @@ class DescriptionBuilder:
         self.tracker_config: dict[str, Any] = cast(dict[str, Any], tracker_cfg) if isinstance(tracker_cfg, dict) else {}
         self.parser = self.common.parser
 
+    def _get_bool_config(self, key: str, default: bool = False) -> bool:
+        """Helper to get a boolean config value safely. Falls back to DEFAULT or default if invalid/empty."""
+        val = self.tracker_config.get(key)
+        if val is None or val == "":
+            val = self.config["DEFAULT"].get(key, default)
+
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            val_lower = val.lower().strip()
+            if val_lower in ("true", "1", "yes", "on"):
+                return True
+            if val_lower in ("false", "0", "no", "off", ""):
+                return False
+        try:
+            return bool(int(val))
+        except (ValueError, TypeError):
+            return default
+
+    def _get_int_config(self, key: str, default: Any = 0) -> int:
+        """Helper to get an integer config value safely. Falls back to DEFAULT or default if invalid/empty."""
+        val = self.tracker_config.get(key)
+        if val is None or val == "":
+            val = self.config["DEFAULT"].get(key, default)
+
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            try:
+                return int(default)
+            except (ValueError, TypeError):
+                return 0
+
+    def _get_str_config(self, key: str, default: str = "") -> str:
+        """Helper to get a string config value safely. Empty string is returned if it is a valid override."""
+        if key in self.tracker_config:
+            val = self.tracker_config[key]
+            if val is not None:
+                return str(val)
+        val = self.config["DEFAULT"].get(key, default)
+        return str(val) if val is not None else default
+
     async def get_custom_header(self) -> str:
         """Returns a custom header if configured."""
         try:
-            custom_description_header = str(self.tracker_config.get(
-                "custom_description_header", self.config["DEFAULT"].get("custom_description_header", "")
-            ))
+            custom_description_header = self._get_str_config("custom_description_header", "")
             if custom_description_header:
                 return custom_description_header
         except Exception as e:
@@ -243,9 +283,7 @@ class DescriptionBuilder:
 
     async def get_tonemapped_header(self, meta: dict[str, Any]) -> str:
         try:
-            tonemapped_description_header = str(self.tracker_config.get(
-                "tonemapped_header", self.config["DEFAULT"].get("tonemapped_header", "")
-            ))
+            tonemapped_description_header = self._get_str_config("tonemapped_header", "")
             if tonemapped_description_header and meta.get("tonemapped", False):
                 return tonemapped_description_header
         except Exception as e:
@@ -256,7 +294,7 @@ class DescriptionBuilder:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
         try:
-            if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
+            if not self._get_bool_config("add_logo", False):
                 return logo, logo_size
 
             if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT", "SPD"):
@@ -269,7 +307,7 @@ class DescriptionBuilder:
                     return logo, logo_size
 
             logo = meta.get("logo", "")
-            logo_size = self.config["DEFAULT"].get("logo_size", "300")
+            logo_size = str(self._get_int_config("logo_size", 300))
 
             if logo:
                 return logo, logo_size
@@ -282,7 +320,7 @@ class DescriptionBuilder:
         title: str = ""
         overview: str = ""
         try:
-            if not self.tracker_config.get("episode_overview", self.config["DEFAULT"].get("episode_overview", False)) or meta["category"] != "TV":
+            if not self._get_bool_config("episode_overview", False) or meta["category"] != "TV":
                 return title, overview
 
             if self.tracker in ("BJS", "BT"):
@@ -326,7 +364,7 @@ class DescriptionBuilder:
         if meta.get("is_disc") == "BDMV" or meta["category"] in ("GAME", "BOOK"):
             return ""
 
-        if self.tracker_config.get("full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)) or meta.get("is_disc"):
+        if self._get_bool_config("full_mediainfo", False) or meta.get("is_disc"):
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
@@ -407,11 +445,9 @@ class DescriptionBuilder:
     async def screenshot_header(self) -> str:
         """Returns the screenshot header if applicable."""
         try:
-            screenheader = self.tracker_config.get(
-                "screenshot_header", self.config["DEFAULT"].get("screenshot_header", None)
-            )
+            screenheader = self._get_str_config("screenshot_header", "")
             if screenheader:
-                return str(screenheader)
+                return screenheader
         except Exception as e:
             console.print(f"[yellow]Warning: Error getting screenshot header: {str(e)}[/yellow]")
 
@@ -421,11 +457,9 @@ class DescriptionBuilder:
         """Returns the screenshot header for menus if applicable."""
         try:
             if meta.get("is_disc", "") and meta.get('menu_images', []):
-                disc_menu_header = self.tracker_config.get(
-                    "disc_menu_header", self.config["DEFAULT"].get("disc_menu_header", None)
-                )
+                disc_menu_header = self._get_str_config("disc_menu_header", "")
                 if disc_menu_header:
-                    return str(disc_menu_header)
+                    return disc_menu_header
         except Exception as e:
             console.print(f"[yellow]Warning: Error getting menus screenshot header: {str(e)}[/yellow]")
 
@@ -450,10 +484,7 @@ class DescriptionBuilder:
     async def get_custom_signature(self) -> str:
         custom_signature: str = ""
         try:
-            raw_signature = self.tracker_config.get(
-                "custom_signature", self.config["DEFAULT"].get("custom_signature", "")
-            )
-            custom_signature = raw_signature or ""
+            custom_signature = self._get_str_config("custom_signature", "")
         except Exception as e:
             console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
 
@@ -465,8 +496,8 @@ class DescriptionBuilder:
         cover_images: str = ""
 
         try:
-            cover_size = int(self.config["DEFAULT"].get("bluray_image_size", "250"))
-            bluray_link = self.config["DEFAULT"].get("add_bluray_link", False)
+            cover_size = self._get_int_config("bluray_image_size", 250)
+            bluray_link = self._get_bool_config("add_bluray_link", False)
 
             if meta.get("is_disc") in ["BDMV", "DVD"] and bluray_link and meta.get("release_url", ""):
                 release_url = meta["release_url"]
@@ -479,7 +510,8 @@ class DescriptionBuilder:
                 except Exception:
                     cover_data = None
 
-            if meta.get("is_disc") in ["BDMV", "DVD"] and self.config["DEFAULT"].get("use_bluray_images", False) and cover_data:
+            use_bluray_images = self._get_bool_config("use_bluray_images", False)
+            if meta.get("is_disc") in ["BDMV", "DVD"] and use_bluray_images and cover_data:
                 for img_data in cover_data:
                     web_url = img_data.get("web_url", "")
                     raw_url = img_data.get("raw_url", "")
@@ -502,16 +534,18 @@ class DescriptionBuilder:
     async def get_audio_spectrogram_section(self, meta: dict[str, Any]) -> str:
         """Returns the audio spectrogram section if applicable."""
         try:
-            add_spec = meta.get("audio_spectrogram") or meta.get("audio_spectrogram_tracks") or self.config["DEFAULT"].get("add_audio_spectrogram", False)
+            add_audio_spectrogram = self._get_bool_config("add_audio_spectrogram", False)
+            add_spec = meta.get("audio_spectrogram") or meta.get("audio_spectrogram_tracks") or add_audio_spectrogram
             if not add_spec:
                 return ""
 
             spectrograms_images = meta.get("spectrograms_images", [])
             if not spectrograms_images:
                 return ""
-            desc_parts: list[str] = [self.config["DEFAULT"].get("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")]
+            audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
+            desc_parts: list[str] = [audio_spectrogram_header] if audio_spectrogram_header is not None else []
             desc_parts.append("\n[center]")
-            screensPerRow = self.config["DEFAULT"].get("screensPerRow", 2)
+            screensPerRow = await self.get_screens_per_row()
             for img_index, spec_img in enumerate(spectrograms_images):
                 if isinstance(spec_img, dict):
                     web_url = spec_img.get("web_url")
@@ -819,7 +853,7 @@ class DescriptionBuilder:
             multi_screens = 0
         else:
             images = meta.get("image_list", [])
-            multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
+            multi_screens = self._get_int_config("multiScreens", 2)
         if meta.get("sorted_filelist"):
             multi_screens = 0
 
@@ -1157,10 +1191,10 @@ class DescriptionBuilder:
         # Check for saved pack_image_links.json file
         pack_images_data = await self._check_saved_pack_image_links(meta, approved_image_hosts)
 
-        char_limit = int(self.config["DEFAULT"].get("charLimit", 14000))
-        file_limit = int(self.config["DEFAULT"].get("fileLimit", 5))
-        thumb_size = int(self.config["DEFAULT"].get("pack_thumb_size", "300"))
-        process_limit = int(self.config["DEFAULT"].get("processLimit", 10))
+        char_limit = self._get_int_config("charLimit", 14000)
+        file_limit = self._get_int_config("fileLimit", 5)
+        thumb_size = self._get_int_config("pack_thumb_size", 300)
+        process_limit = self._get_int_config("processLimit", 10)
 
         screensPerRow = await self.get_screens_per_row()
 
@@ -1757,9 +1791,9 @@ class DescriptionBuilder:
     async def get_screens_per_row(self) -> int:
         try:
             # If screensPerRow is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
-            screensPerRow = int(self.config["DEFAULT"].get("screens_per_row", 2))
+            screensPerRow = self._get_int_config("screens_per_row", 2)
             if self.tracker == "HUNO":
-                width = int(self.config["DEFAULT"].get("thumbnail_size", "350"))
+                width = self._get_int_config("thumbnail_size", 350)
                 # Adjust screensPerRow to keep total width below 1100
                 while screensPerRow * width > 1100 and screensPerRow > 1:
                     screensPerRow -= 1
@@ -1799,7 +1833,7 @@ class DescriptionBuilder:
         if not img_url:
             img_url = raw_url
         if not thumb_size:
-            thumb_size = self.config["DEFAULT"].get("thumbnail_size", "350")
+            thumb_size = self._get_int_config("thumbnail_size", 350)
 
         nexusphp_trackers = {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"}
         if self.tracker in nexusphp_trackers:
