@@ -934,13 +934,13 @@ class QbittorrentClientMixin:
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session cannot be None")
-                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash}) as response:
+                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/start", data={"hashes": torrent.infohash}) as response:
                         if response.status == 404:
                             if meta.get("debug"):
-                                console.print("[cyan]Resume endpoint returned 404, trying start endpoint (qBittorrent v5.0.0+)...")
-                            async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/start", data={"hashes": torrent.infohash}) as start_response:
-                                if start_response.status != 200:
-                                    console.print(f"[yellow]Failed to resume torrent via proxy (start): {start_response.status}")
+                                console.print("[cyan]Start endpoint returned 404, trying legacy resume endpoint (pre-v5.0.0)...")
+                            async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash}) as resume_response:
+                                if resume_response.status != 200:
+                                    console.print(f"[yellow]Failed to resume torrent via proxy (resume): {resume_response.status}")
                         elif response.status != 200:
                             console.print(f"[yellow]Failed to resume torrent via proxy: {response.status}")
                 else:
