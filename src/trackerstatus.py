@@ -50,7 +50,6 @@ class TrackerStatusManager:
             nonlocal successful_trackers
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
             local_tracker_status = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False, 'other': False}
-            disctype = local_meta.get('disctype', None)
             we_already_asked = False
 
             if local_meta['name'].endswith('DUPE?'):
@@ -138,7 +137,7 @@ class TrackerStatusManager:
                     local_tracker_status['skipped'] = bool(claimed)
 
                     if tracker_name not in {"PTP"} and not local_tracker_status['skipped']:
-                        dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta, disctype))
+                        dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta))
                         # set trackers here so that they are not double checked later with cross seeding
                         async with meta_lock:
                             meta.setdefault('dupe_checked_trackers', []).append(tracker_name)
@@ -149,7 +148,7 @@ class TrackerStatusManager:
                         groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
                         async with meta_lock:
                             meta['ptp_groupID'] = groupID
-                        dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta), disctype))
+                        dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
                     else:
                         dupes = []
 

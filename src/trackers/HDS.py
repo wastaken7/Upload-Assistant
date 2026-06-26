@@ -69,7 +69,7 @@ class HDS:
 
         return description
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Union[str, None]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
         dupes: list[dict[str, Union[str, None]]] = []
 
         if str(meta.get("resolution", "")) not in ["2160p", "1080p", "1080i", "720p"]:
@@ -304,7 +304,7 @@ class HDS:
             return {'nfo': (os.path.basename(nfo_path), nfo_bytes, "application/octet-stream")}
         return {}
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

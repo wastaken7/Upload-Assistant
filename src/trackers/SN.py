@@ -29,7 +29,7 @@ class SN:
         type_id = {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
         return type_id
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -184,7 +184,7 @@ class SN:
             await desc.write("".join(parts))
         return
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[str]:
+    async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
         api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
         params: dict[str, str] = {

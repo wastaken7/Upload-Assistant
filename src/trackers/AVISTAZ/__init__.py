@@ -215,7 +215,7 @@ class AZTrackerBase:
             )
         return False
 
-    async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         duplicates: list[dict[str, str]] = []
 
         if self.config['TRACKERS'][self.tracker].get('check_for_rules', True):
@@ -1048,7 +1048,7 @@ class AZTrackerBase:
 
         return False
 
-    async def upload(self, meta: Meta, _) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
         status_message = ''
 

@@ -52,7 +52,7 @@ class SUIO:
             self.torrent_url = None
         self.banned_groups: list[str] = []
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[Any]:
+    async def search_existing(self, meta: Meta) -> list[Any]:
         if not await self.get_additional_checks():
             console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
             meta["skipping"] = f"{self.tracker}"
@@ -296,7 +296,7 @@ class SUIO:
         }
         return data
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         if not self.upload_url:
             console.print(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
             meta["tracker_status"][self.tracker]["status_message"] = "data error: base_url missing"

@@ -231,7 +231,7 @@ class TL:
 
         return tl_name
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         should_continue = await self.get_additional_checks(meta)
         if not should_continue:
@@ -317,7 +317,7 @@ class TL:
 
         return results
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if self.api_upload:

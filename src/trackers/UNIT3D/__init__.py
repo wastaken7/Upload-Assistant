@@ -50,7 +50,7 @@ class UNIT3D:
         should_continue = True
         return should_continue
 
-    async def search_existing(self, meta: dict[str, Any], _: Any) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         params_list: Optional[ParamsList] = None
         category = meta.get("category")
@@ -487,7 +487,7 @@ class UNIT3D:
 
         return files
 
-    async def upload(self, meta: dict[str, Any], _: Any) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         data = await self.get_data(meta)
         torrent_filename = await self.common.get_torrent_filename(meta, self.tracker_config)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent"

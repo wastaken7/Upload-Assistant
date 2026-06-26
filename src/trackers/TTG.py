@@ -114,7 +114,7 @@ class TTG:
             # 60 = TV Shows
         return type_id
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -211,7 +211,7 @@ class TTG:
                 console.print("\n\n")
                 raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[str]:
+    async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
         cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.json")
         if not os.path.exists(cookiefile):

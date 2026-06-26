@@ -363,7 +363,7 @@ class MTEAM:
 
         return should_continue
 
-    async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
         should_continue = await self.get_additional_checks(meta)
@@ -564,7 +564,7 @@ class MTEAM:
 
         return data
 
-    async def upload(self, meta: Meta, _) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
         response = None
 

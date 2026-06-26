@@ -170,7 +170,7 @@ class ANT:
 
         return antType
 
-    async def upload(self, meta: Meta, _) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         torrent_filename = "BASE"
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
         torrent_file_size_kib = os.path.getsize(torrent_path) / 1024
@@ -363,7 +363,7 @@ class ANT:
 
         return description
 
-    async def search_existing(self, meta: Meta, _) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         if meta.get('category') == "TV":
             if not meta['unattended']:

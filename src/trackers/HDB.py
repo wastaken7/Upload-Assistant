@@ -223,7 +223,7 @@ class HDB:
 
         return hdb_name
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)
         await self.edit_desc(meta)
         hdb_name = await self.edit_name(meta)
@@ -339,7 +339,7 @@ class HDB:
                 console.print(up.text)
                 raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
         url = "https://hdbits.org/api/torrents"

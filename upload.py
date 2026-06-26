@@ -1721,9 +1721,10 @@ async def do_the_thing(base_dir: str) -> None:
     meta["ua_name"] = "Upload-Assistant"
     meta['current_version'] = await update_notification(base_dir)
 
-    signature = f"Shared with {meta['ua_name']} (fork)"
+    signature = f"Shared with {meta['ua_name']}"
     if meta.get('current_version', ''):
         signature += f" {meta['current_version']}"
+    signature += " (fork)"
     meta['ua_signature'] = signature
     meta['base_dir'] = base_dir
 
@@ -2409,11 +2410,10 @@ async def process_cross_seeds(meta: Meta) -> None:
         async def check_tracker_for_dupes(tracker: str) -> None:
             try:
                 tracker_class = tracker_class_map[tracker](config=config)
-                disctype = meta.get('disctype', '')
 
                 # Search for existing torrents
                 if tracker != "PTP":
-                    dupes = await tracker_class.search_existing(meta, disctype)
+                    dupes = await tracker_class.search_existing(meta)
                 else:
                     ptp = PTP(config=config)
                     group_id = meta.get('ptp_groupID')
@@ -2422,7 +2422,7 @@ async def process_cross_seeds(meta: Meta) -> None:
                         meta['ptp_groupID'] = group_id
                     if group_id is None:
                         return
-                    dupes = await ptp.search_existing(group_id, meta, disctype)
+                    dupes = await ptp.search_existing(group_id, meta)
 
                 if dupes:
                     dupes = await dupe_checker.filter_dupes(dupes, meta, tracker)

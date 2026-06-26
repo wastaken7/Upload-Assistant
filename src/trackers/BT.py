@@ -660,7 +660,7 @@ class BT:
 
         return tags
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         is_book = meta.get("category") == "BOOK"
         is_game = meta.get("category") == "GAME"
@@ -1240,7 +1240,7 @@ class BT:
                 pass
         return ""
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False

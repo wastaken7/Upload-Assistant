@@ -461,7 +461,7 @@ class EMUW(UNIT3D):
         }
         return resolution_map.get(resolution, '10')
 
-    async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
         """Search for duplicate torrents using cloudscraper for Cloudflare bypass.
 
         Follows UNIT3D base logic:

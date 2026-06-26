@@ -155,7 +155,7 @@ class HDT:
 
         return description
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Optional[str]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
         if str(meta.get('resolution', '')) not in ['2160p', '1080p', '1080i', '720p']:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
             meta['skipping'] = f'{self.tracker}'
@@ -284,7 +284,7 @@ class HDT:
             return {'nfos': (os.path.basename(nfo_path), nfo_bytes, "application/octet-stream")}
         return {}
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

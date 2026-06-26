@@ -406,7 +406,7 @@ class PTP:
 
         return tags
 
-    async def search_existing(self, groupID: Union[int, str], meta: dict[str, Any], _disctype: str) -> list[str]:
+    async def search_existing(self, groupID: Union[int, str], meta: dict[str, Any]) -> list[str]:
         # Map resolutions to SD / HD / UHD
         quality = None
         if meta.get('sd', 0) == 1:  # 1 is SD
@@ -1621,7 +1621,7 @@ class PTP:
 
         return url, data
 
-    async def upload(self, meta: dict[str, Any], url: str, data: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any], url: str, data: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
         base_piece_mb = int(meta.get('base_torrent_piece_mb', 0) or 0)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"

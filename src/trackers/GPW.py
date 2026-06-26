@@ -302,7 +302,7 @@ class GPW:
 
         return True
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
 
         if not self.get_additional_checks(meta):
@@ -1044,7 +1044,7 @@ class GPW:
         else:
             return "Other"
 
-    async def fetch_data(self, meta: dict[str, Any], _disctype: str) -> dict[str, Any]:
+    async def fetch_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         await self.load_localized_data(meta)
         await self.get_groupid(meta)
         remaster_title = self.get_remaster_title(meta)
@@ -1115,9 +1115,9 @@ class GPW:
 
         return data
 
-    async def upload(self, meta: dict[str, Any], disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        data = await self.fetch_data(meta, disctype)
+        data = await self.fetch_data(meta)
 
         if not meta.get('debug', False):
             response_data = ''

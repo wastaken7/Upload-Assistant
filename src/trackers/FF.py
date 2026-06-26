@@ -82,7 +82,7 @@ class FF:
         else:
             console.print(f"{self.tracker}: Login failed. Status code: {response.status_code}", markup=False)
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[str]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[str]:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return []
@@ -518,7 +518,7 @@ class FF:
 
         return data
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False

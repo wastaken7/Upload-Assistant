@@ -64,7 +64,7 @@ class IS:
 
         return description
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Union[str, None]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:
@@ -310,7 +310,7 @@ class IS:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

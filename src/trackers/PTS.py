@@ -72,7 +72,7 @@ class PTS:
 
         return desc
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> Optional[list[str]]:
+    async def search_existing(self, meta: Meta) -> Optional[list[str]]:
         mandarin = await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=['mandarin', 'chinese'], check_audio=True, check_subtitle=True
         )
@@ -128,7 +128,7 @@ class PTS:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies = cast(Any, cookies)
         data = await self.get_data(meta)

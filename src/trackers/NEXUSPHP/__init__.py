@@ -75,7 +75,7 @@ class NEXUSPHP:
 
         return
 
-    async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         if not self.announce_url:
             console.print(f"[red]Announce URL is not set for {self.tracker}[/red]", markup=True)
             meta["skipping"] = self.tracker
@@ -443,7 +443,7 @@ class NEXUSPHP:
 
         return data
 
-    async def upload(self, meta: Meta, _) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

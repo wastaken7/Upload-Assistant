@@ -27,7 +27,7 @@ class CRP:
         self.torrent_url = "https://curupira.cc/releases/"
         self.banned_groups = []
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[Any]:
+    async def search_existing(self, meta: Meta) -> list[Any]:
         if not await self.get_additional_checks():
             console.print(f"{self.tracker}: [red]Skipping due to missing API Key.[/red]")
             meta["skipping"] = f"{self.tracker}"
@@ -227,7 +227,7 @@ class CRP:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         if not await self.common.check_nzb_file(self.tracker, meta):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
             return False

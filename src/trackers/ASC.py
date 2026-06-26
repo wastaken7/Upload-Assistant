@@ -828,7 +828,7 @@ class ASC:
 
         return final_description
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, str]]:
         found_items: list[dict[str, str]] = []
         if meta.get("category") == "BOOK" and meta.get("source_size", 0) <= 1024 * 1024:
             console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
@@ -1292,7 +1292,7 @@ class ASC:
 
         return data
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         if meta.get("category") == "BOOK" and meta.get("source_size", 0) <= 1024 * 1024:
             console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False

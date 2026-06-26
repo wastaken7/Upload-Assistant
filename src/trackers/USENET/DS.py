@@ -24,7 +24,7 @@ class DS:
         self.torrent_url = "https://drunkenslug.com/search/"
         self.banned_groups = []
 
-    async def search_existing(self, _meta: Meta, _disctype: str) -> list[Any]:
+    async def search_existing(self, _meta: Meta) -> list[Any]:
         console.print(
             f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]"
         )
@@ -33,7 +33,7 @@ class DS:
     async def get_name(self, meta: Meta) -> str:
         return meta.get("scene_name", "") or meta["basename_no_ext"]
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         if not self.upload_url:
             meta["tracker_status"][self.tracker]["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
             return False

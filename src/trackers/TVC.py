@@ -483,7 +483,7 @@ class TVC:
         )
         return
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)
 
         raw_images = meta.get('TVC_images_key', meta.get('image_list', []))
@@ -850,7 +850,7 @@ class TVC:
 
         return {}
 
-    async def search_existing(self, meta: Meta, _disctype: Optional[str] = None) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
         dupes: list[dict[str, Any]] = []
 

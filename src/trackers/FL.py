@@ -136,7 +136,7 @@ class FL:
 
         return {}
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -231,7 +231,7 @@ class FL:
                 console.print(up.text)
                 raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[str]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[str]:
         dupes: list[str] = []
         cookiefile_json = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.json")
         cookiefile_pkl = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")

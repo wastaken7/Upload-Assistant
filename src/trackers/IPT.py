@@ -133,10 +133,11 @@ class IPT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/center][/url][/right]",
         )
         return description
 
-    async def search_existing(self, meta: Meta, _disctype):
+    async def search_existing(self, meta: Meta):
         dupes = []
         cat_id = 72 if meta["category"] == "MOVIE" else 73 if meta["category"] == "TV" else 0
         if not cat_id:
@@ -390,7 +391,7 @@ class IPT:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

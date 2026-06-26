@@ -117,7 +117,7 @@ class DC:
             return category_map[category].get(resolution)
         return None
 
-    async def search_existing(self, meta: Meta, _) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         imdb_id = meta.get('imdb_info', {}).get('imdbID')
         category_id = self.get_category_id(meta)
 
@@ -245,7 +245,7 @@ class DC:
 
         return data
 
-    async def upload(self, meta: Meta, _) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
         torrent_title = await self.edit_name(meta)
         response = None

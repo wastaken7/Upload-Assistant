@@ -633,7 +633,7 @@ class BJS:
 
         return original_title
 
-    async def search_existing(self, meta: Meta, _) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
         category = meta["category"]
         title = meta["title"]
@@ -1596,7 +1596,7 @@ class BJS:
 
         return ""
 
-    async def upload(self, meta: Meta, _):
+    async def upload(self, meta: Meta):
         data = await self.get_data(meta)
 
         issue = self.check_data(meta, data)

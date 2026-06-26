@@ -34,7 +34,7 @@ class THR:
         self.banned_groups = [""]
         pass
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
@@ -360,9 +360,7 @@ class THR:
             #         full_mi = mi_file.read()
             #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
             #         mi_file.close()
-        desc_parts.append(
-            f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.get('ua_signature', '')}[/url][/size][/align]"
-        )
+        desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta['ua_signature']}[/url][/size][/align]")
         async with aiofiles.open(
             f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt",
             'w',
@@ -371,7 +369,7 @@ class THR:
             await desc.write("".join(desc_parts))
         return pronfo
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[str]:
+    async def search_existing(self, meta: Meta) -> list[str]:
         imdb_id = str(meta.get('imdb', ''))
         base_search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes: list[str] = []

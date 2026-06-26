@@ -84,17 +84,20 @@ class R4E(UNIT3D):
         _ = meta
         return {}
 
-    async def get_featured(self, _meta: Meta) -> dict[str, str]:
+    async def get_featured(self, meta: Meta) -> dict[str, str]:
+        _ = meta
         return {}
 
     async def get_free(self, meta: Meta) -> dict[str, str]:
         _ = meta
         return {}
 
-    async def get_doubleup(self, _meta: Meta) -> dict[str, str]:
+    async def get_doubleup(self, meta: Meta) -> dict[str, str]:
+        _ = meta
         return {}
 
-    async def get_sticky(self, _meta: Meta) -> dict[str, str]:
+    async def get_sticky(self, meta: Meta) -> dict[str, str]:
+        _ = meta
         return {}
 
     async def get_resolution_id(
@@ -107,7 +110,7 @@ class R4E(UNIT3D):
         _ = (meta, resolution, reverse, mapping_only)
         return {}
 
-    async def search_existing(self, meta: Meta, _: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         url = "https://racing4everyone.eu/api/torrents/filter"
         params: dict[str, Any] = {

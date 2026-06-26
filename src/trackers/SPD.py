@@ -125,7 +125,7 @@ class SPD:
         )
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         search_url = 'https://speedapp.io/api/torrent'
 
@@ -233,7 +233,7 @@ class SPD:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.get('ua_signature', '')}[/url]",
+            signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta['ua_signature']}[/url]",
         )
 
         return description
@@ -319,7 +319,7 @@ class SPD:
 
         return data
 
-    async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> Optional[bool]:
         data = await self.fetch_data(meta)
         tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
         tracker_status.setdefault(self.tracker, {})

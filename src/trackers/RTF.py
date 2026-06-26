@@ -40,7 +40,7 @@ class RTF:
         self.banned_groups: list[str] = []
         pass
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         """Upload a torrent to RetroFlix tracker.
 
         Args:
@@ -186,7 +186,7 @@ class RTF:
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
         """Search for existing torrents on RetroFlix tracker.
 
         Validates content eligibility (age requirements, no adult content) and searches

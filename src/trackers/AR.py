@@ -236,7 +236,7 @@ class AR:
         path = filelist[0] if filelist else str(meta.get('path') or "")
         return os.path.basename(path)
 
-    async def search_existing(self, meta: dict[str, Any], _disctype: str) -> list[dict[str, str]]:
+    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if not cookie_jar:
@@ -337,7 +337,7 @@ class AR:
 
         return None
 
-    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         """Upload torrent to AR using centralized cookie_upload."""
         # Prepare the data for the upload
         common = COMMON(config=self.config)

@@ -52,7 +52,7 @@ class NBL:
         # Leave this in so manual works
         return
 
-    async def upload(self, meta: Meta, _disctype: str) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if meta['bdinfo'] is not None:
@@ -109,7 +109,7 @@ class NBL:
             meta['tracker_status'][self.tracker]['status_message'] = f"data error: Upload failed: {e}"
             return False
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> Union[list[dict[str, Any]], bool]:
+    async def search_existing(self, meta: Meta) -> Union[list[dict[str, Any]], bool]:
         if meta['category'] != 'TV':
             if meta['tvmaze_id'] != 0:
                 if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):

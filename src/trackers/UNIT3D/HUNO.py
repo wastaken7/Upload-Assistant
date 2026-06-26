@@ -270,7 +270,7 @@ class HUNO(UNIT3D):
 
         return files
 
-    async def upload(self, meta: dict[str, Any], _: str = "") -> bool:
+    async def upload(self, meta: dict[str, Any]) -> bool:
         data = await self.get_data(meta)
 
         # Initialize tracker status
