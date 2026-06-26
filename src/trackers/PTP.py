@@ -225,7 +225,7 @@ class PTP:
         bbcode = BBCODE()
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
-        if not meta.get('only_id'):
+        if not meta.get('skip_tracker_descriptions'):
             console.print("[bold green]Successfully grabbed description from PTP")
             console.print(f"Description after cleaning:\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
 

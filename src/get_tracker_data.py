@@ -100,7 +100,7 @@ class TrackerDataManager:
         search_term: Optional[str] = None,
         search_file_folder: Optional[str] = None,
         cat: Optional[str] = None,
-        only_id: bool = False,
+        skip_tracker_descriptions: bool = False,
     ) -> dict[str, Any]:
         found_match = False
         base_dir = meta['base_dir']
@@ -214,7 +214,7 @@ class TrackerDataManager:
                 else:
                     meta['trackers'] = []
 
-                async def process_tracker(tracker_name: str, meta: dict[str, Any], only_id: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: dict[str, Any], skip_tracker_descriptions: bool) -> dict[str, Any]:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -229,7 +229,7 @@ class TrackerDataManager:
                             meta,
                             search_term_value,
                             search_file_folder_value,
-                            only_id,
+                            skip_tracker_descriptions,
                         )
                         if match:
                             found_match = True
@@ -341,7 +341,7 @@ class TrackerDataManager:
                                 meta['matched_tracker'] = "ANT"
                         await self.save_tracker_timestamp("ANT", base_dir=base_dir)
                     else:
-                        meta = await process_tracker(tracker_to_process, meta, only_id)
+                        meta = await process_tracker(tracker_to_process, meta, skip_tracker_descriptions)
 
                     if not found_match:
                         if tracker_to_process in specific_tracker:
@@ -373,14 +373,16 @@ class TrackerDataManager:
 
             else:
                 # Process all trackers with API = true if no specific tracker is set in meta
-                tracker_order = ["PTP", "HDB", "BHD", "BLU", "AITHER", "HUNO", "LST", "OE", "ULCX"]
+                from src.trackersetup import api_trackers
+                other_api = sorted(list(api_trackers - {"BHD"}))
+                tracker_order = ["PTP", "HDB", "BHD"] + other_api
 
                 if cat == "TV" or meta.get('category') == "TV":
                     if meta['debug']:
                         console.print("[yellow]Detected TV content, skipping PTP tracker check")
                     tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
-                async def process_tracker(tracker_name: str, meta: dict[str, Any], only_id: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: dict[str, Any], skip_tracker_descriptions: bool) -> dict[str, Any]:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -395,7 +397,7 @@ class TrackerDataManager:
                             meta,
                             search_term_value,
                             search_file_folder_value,
-                            only_id,
+                            skip_tracker_descriptions,
                         )
                         if match:
                             found_match = True
@@ -412,8 +414,11 @@ class TrackerDataManager:
                 for tracker_name in tracker_order:
                     if not found_match:  # Stop checking once a match is found
                         tracker_config = self.get_tracker_config(tracker_name)
-                        if str(tracker_config.get('useAPI', 'false')).lower() == "true":
-                            meta = await process_tracker(tracker_name, meta, only_id)
+                        use_search = tracker_config.get('use_for_search')
+                        if use_search is None:
+                            use_search = tracker_config.get('useAPI', 'false')
+                        if str(use_search).lower() == "true":
+                            meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
 
                 if not found_match:
                     meta['no_tracker_match'] = True
@@ -433,7 +438,9 @@ class TrackerDataManager:
         common = COMMON(self.config)
 
         # Prioritize trackers in this order
-        tracker_order = ["BLU", "AITHER", "ULCX", "LST", "OE"]
+        from src.trackersetup import api_trackers
+        prioritized = ["BLU", "AITHER", "ULCX", "LST", "OE"]
+        tracker_order = prioritized + sorted(list(api_trackers - set(prioritized) - {"BHD"}))
 
         # Check if we have stored torrent comments
         if meta.get('torrent_comments'):
@@ -452,14 +459,36 @@ class TrackerDataManager:
                 # Check each stored comment for matching tracker URL
                 for comment_data in meta.get('torrent_comments', []):
                     comment = str(comment_data.get('comment', ''))
-                    is_tracker_comment = False
-                    tracker_hosts = {
+                    # Dynamically build tracker hosts
+                    tracker_hosts = {}
+                    for name in api_trackers:
+                        hostname = ""
+                        if name in tracker_class_map:
+                            try:
+                                tracker_instance = tracker_class_map[name](self.config)
+                                base_url = getattr(tracker_instance, 'base_url', '')
+                                if base_url:
+                                    hostname = urlparse(base_url).hostname or ""
+                            except Exception:
+                                pass
+                        if not hostname:
+                            announce_url = self.config.get('TRACKERS', {}).get(name, {}).get('announce_url', '')
+                            if announce_url:
+                                hostname = urlparse(announce_url).hostname or ""
+                        if hostname:
+                            tracker_hosts[name] = hostname.lower()
+
+                    # Fallbacks for safety
+                    for k, v in {
                         "BLU": "blutopia.cc",
                         "AITHER": "aither.cc",
                         "LST": "lst.gg",
                         "OE": "onlyencodes.cc",
                         "ULCX": "upload.cx",
-                    }
+                    }.items():
+                        if k not in tracker_hosts:
+                            tracker_hosts[k] = v
+
                     expected_host = tracker_hosts.get(tracker_name)
                     if expected_host and expected_host in comment:
                         candidate_urls: list[str] = re.findall(r"https?://[^\s\"'<>]+", comment)

@@ -33,8 +33,7 @@ class RtorrentClientMixin:
     async def is_valid_torrent(self, meta: dict[str, Any], torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         raise NotImplementedError
 
-    @staticmethod
-    def _extract_tracker_ids_from_comment(comment: str) -> dict[str, Any]:
+    def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, Any]:
         raise NotImplementedError
 
     @staticmethod

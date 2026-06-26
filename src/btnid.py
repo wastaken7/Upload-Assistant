@@ -90,7 +90,7 @@ class BtnIdManager:
         bhd_api: str,
         bhd_rss_key: str,
         meta: Meta,
-        only_id: bool = False,
+        skip_tracker_descriptions: bool = False,
         info_hash: Optional[str] = None,
         filename: Optional[str] = None,
         foldername: Optional[str] = None,
@@ -190,7 +190,7 @@ class BtnIdManager:
             meta["category"], parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.get("category"))
             tmdb = int(parsed_tmdb_id)
 
-        if only_id and not meta.get('keep_images'):
+        if skip_tracker_descriptions and not meta.get("keep_images"):
             return imdb, tmdb
 
         bbcode = BBCODE()
@@ -200,7 +200,7 @@ class BtnIdManager:
         elif "flux" in name:
             meta["flux"] = True
         description, imagelist = bbcode.clean_bhd_description(description, cast(dict[str, Any], meta))
-        if not only_id:
+        if not skip_tracker_descriptions:
             meta["description"] = description
             meta["image_list"] = imagelist
         elif meta.get('keep_images'):
@@ -242,7 +242,7 @@ async def get_bhd_torrents(
     bhd_api: str,
     bhd_rss_key: str,
     meta: Meta,
-    only_id: bool = False,
+    skip_tracker_descriptions: bool = False,
     info_hash: Optional[str] = None,
     filename: Optional[str] = None,
     foldername: Optional[str] = None,
@@ -252,7 +252,7 @@ async def get_bhd_torrents(
         bhd_api,
         bhd_rss_key,
         meta,
-        only_id=only_id,
+        skip_tracker_descriptions=skip_tracker_descriptions,
         info_hash=info_hash,
         filename=filename,
         foldername=foldername,

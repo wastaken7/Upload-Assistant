@@ -72,14 +72,16 @@ def init_meta(prep_instance: Any, meta: dict[str, Any], mode: str) -> tuple[bool
     client = Clients(config=prep_instance.config)
     meta["skip_auto_torrent"] = meta.get("skip_auto_torrent", False) or prep_instance.config["DEFAULT"].get("skip_auto_torrent", False)
     hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
-    tracker_ids = ["aither", "ulcx", "lst", "blu", "oe", "btn", "bhd", "huno", "hdb", "rf", "otw", "yus", "dp", "sp", "ptp"]
+    from src.trackersetup import api_trackers
+
+    tracker_ids = [t.lower() for t in api_trackers] + ["ptp", "btn", "hdb"]
     use_sonarr = prep_instance.config["DEFAULT"].get("use_sonarr", False)
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta["print_tracker_messages"] = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
     meta["print_tracker_links"] = prep_instance.config["DEFAULT"].get("print_tracker_links", True)
     only_id_val = meta.get("onlyID")
-    only_id = bool(prep_instance.config["DEFAULT"].get("only_id", False) if only_id_val is None else only_id_val)
-    meta["only_id"] = only_id
+    skip_tracker_descriptions = bool(prep_instance.config["DEFAULT"].get("skip_tracker_descriptions", False) if only_id_val is None else only_id_val)
+    meta["skip_tracker_descriptions"] = skip_tracker_descriptions
     meta["keep_images"] = bool(prep_instance.config["DEFAULT"].get("keep_images", True) if not meta.get("keep_images") else True)
     mkbrr_threads = prep_instance.config["DEFAULT"].get("mkbrr_threads", "0")
     meta["mkbrr_threads"] = mkbrr_threads
@@ -109,7 +111,7 @@ def init_meta(prep_instance: Any, meta: dict[str, Any], mode: str) -> tuple[bool
     if meta["debug"]:
         console.print(f"[cyan]ID: {meta['uuid']}")
 
-    return use_sonarr, use_radarr, client, only_id, hash_ids, tracker_ids
+    return use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids
 
 
 async def detect_disc_and_category(prep_instance: Any, meta: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -639,7 +641,7 @@ async def process_trackers_and_torrent(
 
     meta["skip_trackers"] = False
     if meta.get("emby", False):
-        meta["only_id"] = True
+        meta["skip_tracker_descriptions"] = True
         meta["keep_images"] = False
         if meta.get("imdb_id", 0) != 0:
             meta["skip_trackers"] = True
@@ -771,7 +773,7 @@ async def search_metadata(
     search_file_folder: str,
     use_sonarr: bool,
     use_radarr: bool,
-    only_id: bool,
+    skip_tracker_descriptions: bool,
     client: Clients,
     _bdinfo: dict[str, Any],
     mi: Optional[dict[str, Any]],
@@ -900,7 +902,9 @@ async def search_metadata(
 
         if not meta.get("edit", False) and not ids:
             # Reuse information from trackers with fallback
-            await prep_instance.tracker_data_manager.get_tracker_data(videopath, meta, search_term, search_file_folder, meta["category"], only_id=only_id)
+            await prep_instance.tracker_data_manager.get_tracker_data(
+                videopath, meta, search_term, search_file_folder, meta["category"], skip_tracker_descriptions=skip_tracker_descriptions
+            )
 
         if meta.get("category", None) == "TV" and use_sonarr and meta.get("tvdb_id", 0) != 0 and ids is None and not meta.get("matched_tracker", None):
             ids = await prep_instance.sonarr_manager.get_sonarr_data(tvdb_id=meta.get("tvdb_id", 0), debug=meta.get("debug", False))

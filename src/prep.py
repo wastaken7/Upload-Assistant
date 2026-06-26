@@ -106,7 +106,7 @@ class Prep:
         meta_start_time = time.time()
 
         # 1. Init metadata settings
-        use_sonarr, use_radarr, client, only_id, hash_ids, tracker_ids = prep_helpers.init_meta(self, meta, mode)
+        use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids = prep_helpers.init_meta(self, meta, mode)
 
         # 2. Disc and Category Detection
         videoloc, bdinfo = await prep_helpers.detect_disc_and_category(self, meta)
@@ -125,7 +125,7 @@ class Prep:
 
         # 7. Sonarr, Radarr and Metadata Searches
         await prep_helpers.search_metadata(
-            self, meta, filename, untouched_filename, videopath, search_term, search_file_folder, use_sonarr, use_radarr, only_id, client, bdinfo, mi
+            self, meta, filename, untouched_filename, videopath, search_term, search_file_folder, use_sonarr, use_radarr, skip_tracker_descriptions, client, bdinfo, mi
         )
 
         # 8. Set Final Metadata and tags

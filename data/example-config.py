@@ -102,8 +102,10 @@ config = {
         # Set False to skip getting images from tracker descriptions
         "keep_images": True,
 
-        # set true to only grab meta id's from trackers, not descriptions
-        "only_id": False,
+        # Set to True to only import metadata IDs (IMDB, TMDB, TVDB, MAL) from other trackers,
+        # skipping the extraction and import of description/synopsis texts.
+        # Note: Description images are still controlled by the 'keep_images' setting.
+        "skip_tracker_descriptions": False,
 
         # set true to use argument overrides from data/templates/user-args.json
         "user_overrides": False,
@@ -415,6 +417,8 @@ config = {
         "A4K": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to Aura4K modq for staff approval
@@ -424,14 +428,16 @@ config = {
         "ACM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "AITHER": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to Aither modq for staff approval
@@ -482,8 +488,8 @@ config = {
         "BHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "bhd_rss_key": "",
             "announce_url": "https://beyond-hd.me/announce/customannounceurl",
@@ -516,8 +522,8 @@ config = {
         "BLU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -533,6 +539,8 @@ config = {
         "CBR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to CBR modq for staff approval
@@ -574,6 +582,8 @@ config = {
         "DP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to DP modq for staff approval
@@ -588,12 +598,16 @@ config = {
         "DT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "EMUW": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Use Spanish title instead of English title, if available
@@ -622,6 +636,8 @@ config = {
         "FRIKI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
         },
         "GPW": {
@@ -639,8 +655,8 @@ config = {
         "HDB": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             # for HDB you **MUST** have been granted uploading approval via Offers, you've been warned
             # for HDB to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/HDB.txt
@@ -687,7 +703,7 @@ config = {
         "HUNO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            "useAPI": False,
+            "use_for_search": False,
             "api_key": "",
             # You can find your announce URL at https://hawke.uno/upload
             "announce_url": "https://hawke.uno/announce/<PASSKEY>",
@@ -708,6 +724,8 @@ config = {
         "IHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -722,6 +740,8 @@ config = {
         "ITT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -736,6 +756,8 @@ config = {
         "LCD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
@@ -744,6 +766,8 @@ config = {
         "LDU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -758,8 +782,8 @@ config = {
         "LST": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to LST modq for staff approval
@@ -770,6 +794,8 @@ config = {
         "LT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to LT modq for staff approval
@@ -778,6 +804,8 @@ config = {
         "LUME": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send uploads to LUME modq for staff approval
@@ -814,8 +842,8 @@ config = {
         "OE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -843,6 +871,8 @@ config = {
         "OTW": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             # Send uploads to OTW modq for staff approval
             "modq": False,
@@ -862,6 +892,8 @@ config = {
         "PT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -902,8 +934,8 @@ config = {
         "PTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "add_web_source_to_desc": True,
             "ApiUser": "ptp api user",
             "ApiKey": 'ptp api key',
@@ -921,12 +953,16 @@ config = {
         "PTT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "R4E": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
             "anon": True,
@@ -934,12 +970,16 @@ config = {
         "RAS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "RF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -964,6 +1004,8 @@ config = {
         "SAM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # The tag that identifies you or your group when modifying an existing release.
@@ -976,6 +1018,8 @@ config = {
         "SHRI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Use Italian title instead of English title, if available
@@ -990,6 +1034,8 @@ config = {
         "SP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
         },
         "SPD": {
@@ -1006,6 +1052,8 @@ config = {
         "STC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -1024,6 +1072,8 @@ config = {
         "TIK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -1046,6 +1096,8 @@ config = {
         "TLZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
@@ -1053,6 +1105,8 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Mon profil > Réglages > Clé API
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             # Mon profil > Réglages > Passkey
             "announce_url": "https://theoldschool.cc/announce/PasskeyHere",
@@ -1074,6 +1128,8 @@ config = {
         "TTR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send to modq for staff approval
@@ -1091,8 +1147,8 @@ config = {
         "ULCX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # "useAPI": False,  Set to True if using this tracker for automatic ID searching or description parsing
-            "useAPI": False,
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
             # Send to modq for staff approval
@@ -1101,24 +1157,32 @@ config = {
         "UTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "YOINK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "YUS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },
         "ZNTH": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
             "api_key": "",
             "anon": True,
         },

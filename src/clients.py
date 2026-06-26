@@ -23,8 +23,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
-    @staticmethod
-    def _extract_tracker_ids_from_comment(comment: str) -> dict[str, str]:
+    def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
         if not comment:
             return {}
 
@@ -42,52 +41,83 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             return values[0] if values else None
 
         tracker_ids: dict[str, str] = {}
+
+        from src.trackersetup import tracker_class_map
+
+        tracker_hosts: dict[str, str] = {}
+        for tracker_name in set(tracker_class_map.keys()) | {"PTP", "BHD", "BTN", "HDB"}:
+            # Check base_url from class
+            hostname = ""
+            if tracker_name in tracker_class_map:
+                try:
+                    tracker_instance = tracker_class_map[tracker_name](self.config)
+                    base_url = getattr(tracker_instance, "base_url", "")
+                    if base_url:
+                        hostname = urllib.parse.urlparse(base_url).hostname or ""
+                except Exception:
+                    pass
+            # Fallback to announce_url from config
+            if not hostname:
+                announce_url = self.config.get("TRACKERS", {}).get(tracker_name, {}).get("announce_url", "")
+                if announce_url:
+                    hostname = urllib.parse.urlparse(announce_url).hostname or ""
+            # Hardcoded fallbacks if config/class is not loaded yet or not configured
+            if not hostname:
+                hardcoded_hosts = {
+                    "PTP": "passthepopcorn.me",
+                    "AITHER": "aither.cc",
+                    "LST": "lst.gg",
+                    "OE": "onlyencodes.cc",
+                    "BLU": "blutopia.cc",
+                    "ULCX": "upload.cx",
+                    "HDB": "hdbits.org",
+                    "BTN": "broadcasthe.net",
+                    "BHD": "beyond-hd.me",
+                    "HUNO": "hawke.uno",
+                }
+                hostname = hardcoded_hosts.get(tracker_name, "")
+            if hostname:
+                tracker_hosts[tracker_name] = hostname.lower()
+
         urls: list[str] = re.findall(r"https?://[^\s\"'<>]+", comment)
         for url in urls:
             parsed = urllib.parse.urlparse(url)
             host = (parsed.hostname or "").lower()
             path = parsed.path
 
-            if _is_host(host, "passthepopcorn.me"):
+            # Match against tracker_hosts
+            matched_tracker = None
+            for name, domain in tracker_hosts.items():
+                if _is_host(host, domain):
+                    matched_tracker = name
+                    break
+
+            if not matched_tracker:
+                continue
+
+            tracker_key = matched_tracker.lower()
+
+            if matched_tracker == "PTP":
                 ptp_id = _query_id(parsed.query, "torrentid")
                 if ptp_id:
-                    tracker_ids["ptp"] = ptp_id
-            elif _is_host(host, "aither.cc"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["aither"] = tracker_id
-            elif _is_host(host, "lst.gg"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["lst"] = tracker_id
-            elif _is_host(host, "onlyencodes.cc"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["oe"] = tracker_id
-            elif _is_host(host, "blutopia.cc"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["blu"] = tracker_id
-            elif _is_host(host, "upload.cx"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["ulcx"] = tracker_id
-            elif _is_host(host, "hdbits.org"):
+                    tracker_ids[tracker_key] = ptp_id
+            elif matched_tracker == "HDB":
                 hdb_id = _query_id(parsed.query, "id")
                 if hdb_id:
-                    tracker_ids["hdb"] = hdb_id
-            elif _is_host(host, "broadcasthe.net"):
+                    tracker_ids[tracker_key] = hdb_id
+            elif matched_tracker == "BTN":
                 btn_id = _query_id(parsed.query, "id")
                 if btn_id:
-                    tracker_ids["btn"] = btn_id
-            elif _is_host(host, "beyond-hd.me"):
+                    tracker_ids[tracker_key] = btn_id
+            elif matched_tracker == "BHD":
                 match = re.search(r"/details/(\d+)", path)
                 if match:
-                    tracker_ids["bhd"] = match.group(1)
-            elif _is_host(host, "hawke.uno"):
+                    tracker_ids[tracker_key] = match.group(1)
+            else:
+                # UNIT3D style: last path ID
                 tracker_id = _last_path_id(path)
                 if tracker_id:
-                    tracker_ids["huno"] = tracker_id
+                    tracker_ids[tracker_key] = tracker_id
 
         return tracker_ids
 

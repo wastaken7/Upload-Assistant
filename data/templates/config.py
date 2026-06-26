@@ -164,8 +164,10 @@ config = {
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
 
-        # set true to only grab meta id's from trackers, not descriptions and images
-        "only_id": False,
+        # Set to True to only import metadata IDs (IMDB, TMDB, TVDB, MAL) from other trackers,
+        # skipping the extraction and import of description/synopsis texts.
+        # Note: Description images are still controlled by the 'keep_images' setting.
+        "skip_tracker_descriptions": False,
 
         # set true to use mkbrr for torrent creation
         "mkbrr": True,

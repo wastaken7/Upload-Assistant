@@ -773,7 +773,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 search_term = os.path.basename(meta['filelist'][0]) if meta['filelist'] else None
                 search_file_folder = 'file'
             await tracker_data_manager.get_tracker_data(
-                meta['video'], meta, search_term, search_file_folder, meta['category'], only_id=meta['only_id']
+                meta["video"], meta, search_term, search_file_folder, meta["category"], skip_tracker_descriptions=meta["skip_tracker_descriptions"]
             )
 
     # For BOOK category, certain trackers (e.g. CBR) require title, author, year and language.

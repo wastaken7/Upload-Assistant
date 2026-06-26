@@ -155,11 +155,11 @@ Implementation notes:
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
 - `keep_images` (bool): If false, do not pull images from tracker descriptions.
-- `only_id` (bool): Only grab IDs from trackers (skip description parsing).
+- `skip_tracker_descriptions` (bool): Only grab IDs from trackers (skip description parsing).
 
 Implementation notes:
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
-- `only_id` and `keep_images` influence how much another tracker description is scraped/merged. The optons are independent.
+- `skip_tracker_descriptions` and `keep_images` influence how much another tracker description is scraped/merged. The options are independent.
 
 ### Sonarr / Radarr integration
 - `use_sonarr` (bool): Enable Sonarr searching.
@@ -256,7 +256,7 @@ Each tracker acronym (e.g. `"AITHER"`, `"BLU"`) contains a dict of settings.
 
 Common keys you will see:
 - `link_dir_name` (str): Custom folder name used when linking content (instead of the acronym).
-- `useAPI` (bool): Enable tracker API usage for automatic ID searching/description parsing (some trackers only).
+- `use_for_search` (bool): Enable tracker API usage for automatic ID searching/description parsing (some trackers only). (Legacy name: `useAPI`)
 - `api_key` (str): Tracker API key (UNIT3D-style trackers commonly use this).
 - `announce_url` (str): Tracker announce URL (often contains `<PASSKEY>` placeholders).
 - `anon` (bool): Upload anonymously when supported.

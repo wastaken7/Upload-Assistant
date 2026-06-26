@@ -60,7 +60,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "tracker_pass_checks": (str, int),
     "use_largest_playlist": (bool,),
     "keep_images": (bool,),
-    "only_id": (bool,),
+    "skip_tracker_descriptions": (bool,),
     "use_sonarr": (bool,),
     "use_radarr": (bool,),
     "mkbrr": (bool,),
@@ -532,7 +532,7 @@ def _validate_trackers_section(
                 errors.append("[TRACKERS][DS] upload_url is required when DS is active")
 
         # Check boolean fields are actually booleans (must be real bool, not string)
-        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
+        bool_fields = ["anon", "useAPI", "use_for_search", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
         for field in bool_fields:
             if field in tracker_config_dict:
                 value = tracker_config_dict[field]

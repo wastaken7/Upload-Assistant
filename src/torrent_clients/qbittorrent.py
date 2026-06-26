@@ -41,8 +41,7 @@ class _TorrentFileEntry(TypedDict):
 class QbittorrentClientMixin:
     config: dict[str, Any]
 
-    @staticmethod
-    def _extract_tracker_ids_from_comment(comment: str) -> dict[str, str]:
+    def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
         raise NotImplementedError
 
     async def is_valid_torrent(self, meta: dict[str, Any], torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
@@ -160,7 +159,7 @@ class QbittorrentClientMixin:
                     meta.update(tracker_ids)
 
                     if tracker_ids:
-                        for tracker in ['ptp', 'bhd', 'btn', 'huno', 'blu', 'aither', 'ulcx', 'lst', 'oe', 'hdb']:
+                        for tracker in tracker_ids:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1286,25 +1285,57 @@ class QbittorrentClientMixin:
         qbt_proxy_url = ''
         proxy_url = client_config.get('qui_proxy_url', '').strip()
         try:
-            tracker_patterns = {
-                'ptp': {"url": "passthepopcorn.me", "pattern": r'torrentid=(\d+)'},
-                'aither': {"url": "https://aither.cc", "pattern": r'/(\d+)$'},
-                'lst': {"url": "https://lst.gg", "pattern": r'/(\d+)$'},
-                'oe': {"url": "https://onlyencodes.cc", "pattern": r'/(\d+)$'},
-                'blu': {"url": "https://blutopia.cc", "pattern": r'/(\d+)$'},
-                'hdb': {"url": "https://hdbits.org", "pattern": r'id=(\d+)'},
-                'btn': {"url": "https://broadcasthe.net", "pattern": r'id=(\d+)'},
-                'bhd': {"url": "https://beyond-hd.me", "pattern": r'details/(\d+)'},
-                'huno': {"url": "https://hawke.uno", "pattern": r'/(\d+)$'},
-                'ulcx': {"url": "https://upload.cx", "pattern": r'/(\d+)$'},
-                'rf': {"url": "https://reelflix.xyz", "pattern": r'/(\d+)$'},
-                'otw': {"url": "https://oldtoons.world", "pattern": r'/(\d+)$'},
-                'yus': {"url": "https://yu-scene.net", "pattern": r'/(\d+)$'},
-                'dp': {"url": "https://darkpeers.org", "pattern": r'/(\d+)$'},
-                'sp': {"url": "https://seedpool.org", "pattern": r'/(\d+)$'},
-            }
+            from src.trackersetup import tracker_class_map
 
-            tracker_priority = ['aither', 'ulcx', 'lst', 'blu', 'oe', 'btn', 'bhd', 'huno', 'hdb', 'rf', 'otw', 'yus', 'dp', 'sp', 'ptp']
+            tracker_patterns = {}
+            for name in set(tracker_class_map.keys()) | {"PTP", "BHD", "BTN", "HDB"}:
+                # Determine URL
+                url = ""
+                if name in tracker_class_map:
+                    try:
+                        tracker_instance = tracker_class_map[name](self.config)
+                        url = getattr(tracker_instance, "base_url", "")
+                    except Exception:
+                        pass
+                if not url:
+                    url = self.config.get("TRACKERS", {}).get(name, {}).get("announce_url", "")
+                if not url:
+                    # Hardcoded fallback
+                    hardcoded_urls = {
+                        "PTP": "passthepopcorn.me",
+                        "AITHER": "https://aither.cc",
+                        "LST": "https://lst.gg",
+                        "OE": "https://onlyencodes.cc",
+                        "BLU": "https://blutopia.cc",
+                        "ULCX": "https://upload.cx",
+                        "HDB": "https://hdbits.org",
+                        "BTN": "https://broadcasthe.net",
+                        "BHD": "https://beyond-hd.me",
+                        "HUNO": "https://hawke.uno",
+                        "RF": "https://reelflix.xyz",
+                        "OTW": "https://oldtoons.world",
+                        "YUS": "https://yu-scene.net",
+                        "DP": "https://darkpeers.org",
+                        "SP": "https://seedpool.org",
+                    }
+                    url = hardcoded_urls.get(name, "")
+
+                if url:
+                    # Determine pattern
+                    if name == "PTP":
+                        pattern = r"torrentid=(\d+)"
+                    elif name in ("HDB", "BTN"):
+                        pattern = r"id=(\d+)"
+                    elif name == "BHD":
+                        pattern = r"details/(\d+)"
+                    else:
+                        pattern = r"/(\d+)$"
+
+                    tracker_patterns[name.lower()] = {"url": url, "pattern": pattern}
+
+            prioritized = ["aither", "ulcx", "lst", "blu", "oe", "btn", "bhd", "huno", "hdb", "rf", "otw", "yus", "dp", "sp", "ptp"]
+            all_known = sorted(list(tracker_patterns.keys()))
+            tracker_priority = prioritized + [t for t in all_known if t not in prioritized]
 
             if proxy_url:
                 try:

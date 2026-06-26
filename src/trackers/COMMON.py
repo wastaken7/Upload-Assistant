@@ -665,7 +665,7 @@ class COMMON:
         meta: Meta,
         id: Optional[Union[str, int]] = None,
         file_name: Optional[Union[str, list[str]]] = None,
-        only_id: bool = False,
+        skip_tracker_descriptions: bool = False,
     ) -> tuple[
         Optional[int],
         Optional[int],
@@ -790,11 +790,13 @@ class COMMON:
             if description:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
-                if not only_id:
+                if not skip_tracker_descriptions:
                     console.print(f"[green]Successfully grabbed description from {tracker}")
                     console.print(f"Extracted description: {description}", markup=False)
 
-                    if meta.get('unattended') or (meta.get('blu') or meta.get('aither') or meta.get('lst') or meta.get('oe') or meta.get('huno') or meta.get('ulcx')):
+                    from src.trackersetup import api_trackers
+
+                    if meta.get("unattended") or any(meta.get(t.lower()) for t in api_trackers):
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     else:
                         console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
