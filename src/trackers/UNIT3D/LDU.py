@@ -144,7 +144,7 @@ class LDU(UNIT3D):
 
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        ldu_name = str(meta.name)
+        ldu_name = meta.name
         cat_id = (await self.get_category_id(meta))['category_id']
         non_eng = False
         non_eng_audio = False
@@ -154,7 +154,7 @@ class LDU(UNIT3D):
             non_eng = True
         audio_languages_value = meta.audio_languages
         if isinstance(audio_languages_value, list) and audio_languages_value:
-            audio_languages_list = cast(list[Any], audio_languages_value)
+            audio_languages_list = audio_languages_value
             for audio_item in audio_languages_list:
                 audio_language = str(audio_item).strip()
                 if not audio_language:
@@ -173,7 +173,7 @@ class LDU(UNIT3D):
         else:
             subtitle_languages_value = meta.subtitle_languages
             if isinstance(subtitle_languages_value, list) and subtitle_languages_value:
-                subtitle_languages_list = cast(list[Any], subtitle_languages_value)
+                subtitle_languages_list = subtitle_languages_value
                 for subtitle_item in subtitle_languages_list:
                     subtitle_language = str(subtitle_item).strip()
                     if not subtitle_language:

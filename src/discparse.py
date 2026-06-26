@@ -613,7 +613,7 @@ class DiscParse:
                 # If the duration of the new vob set > main set by more than 10%, it's the new main set
                 # This should make it so TV shows pick the first episode
                 vob_set_duration_float = float(vob_set_duration)
-                if (vob_set_duration_float * 1.00) > (float(main_set_duration) * 1.10) or len(main_set) < 1:
+                if (vob_set_duration_float * 1.00) > (main_set_duration * 1.10) or len(main_set) < 1:
                     main_set = vob_set
                     main_set_duration = vob_set_duration_float
 

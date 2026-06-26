@@ -39,10 +39,10 @@ def _style_specs(style: Optional[str]) -> bool:
 
 
 async def search_bluray(meta: Meta) -> Optional[str]:
-    imdb_id_value = int(meta.imdb_id or 0)
+    imdb_id_value = meta.imdb_id or 0
     imdb_id = f"tt{imdb_id_value:07d}"
-    base_dir = str(meta.base_dir)
-    uuid = str(meta.uuid)
+    base_dir = meta.base_dir
+    uuid = meta.uuid
     url = f"https://www.blu-ray.com/search/?quicksearch=1&quicksearch_country=all&quicksearch_keyword={imdb_id}&section=theatrical"
     debug_filename = f"{base_dir}/tmp/{uuid}/debug_bluray_search_{imdb_id}.html"
 
@@ -204,8 +204,8 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         return []
 
     matching_releases: list[Release] = []
-    is_3d = str(meta.three_d).lower() == "yes"
-    resolution = str(meta.resolution).lower()
+    is_3d = meta.three_d.lower() == "yes"
+    resolution = meta.resolution.lower()
     is_4k = '2160p' in resolution or '4k' in resolution
     is_dvd = str(meta.is_disc).upper() == "DVD"
     release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
@@ -221,8 +221,8 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         console.print("[blue]Looking for standard Blu-ray releases[/blue]")
 
     try:
-        base_dir = str(meta.base_dir)
-        uuid = str(meta.uuid)
+        base_dir = meta.base_dir
+        uuid = meta.uuid
         debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_{release_type}.html"
         await asyncio.to_thread(debug_path.write_text, html_content, encoding="utf-8")
         if meta.debug:
@@ -337,7 +337,7 @@ async def extract_product_id(url: str, meta: Meta) -> Optional[str]:
 
 async def get_bluray_releases(meta: Meta) -> list[Release]:
     console.print("[blue]===== Starting blu-ray.com release search =====[/blue]")
-    imdb_id_value = int(meta.imdb_id or 0)
+    imdb_id_value = meta.imdb_id or 0
     console.print(f"[blue]Movie: {(meta.uuid if meta.uuid is not None else 'Unknown')}, IMDB ID: tt{imdb_id_value:07d}[/blue]")
 
     html_content = await search_bluray(meta)
@@ -367,8 +367,8 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         ajax_url = f"https://www.blu-ray.com/products/menu_ajax.php?p={product_id}&c=20&action=showreleasesall"
         console.print(f"[dim]Releases URL: {ajax_url}[/dim]")
 
-        is_3d = str(meta.three_d).lower() == "yes"
-        resolution = str(meta.resolution).lower()
+        is_3d = meta.three_d.lower() == "yes"
+        resolution = meta.resolution.lower()
         is_4k = '2160p' in resolution or '4k' in resolution
         release_type = "4K" if is_4k else "3D" if is_3d else "BD"
         release_debug_filename = f"{meta.base_dir}/tmp/{meta.uuid}/debug_bluray_{release_type}.html"
@@ -533,7 +533,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
             detailed_releases = await process_all_releases(matching_releases, meta)
             return detailed_releases
 
-    imdb_id = int(meta.imdb_id or 0)
+    imdb_id = meta.imdb_id or 0
     release_count = len(matching_releases)
     debug_filename = f"{meta.base_dir}/tmp/{meta.uuid}/bluray_results_tt{imdb_id:07d}_{release_count}releases.json"
 
@@ -743,7 +743,7 @@ async def download_cover_images(meta: Meta) -> bool:
     temp_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
     os.makedirs(temp_dir, exist_ok=True)
 
-    reuploaded_images_path = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid), "covers.json")
+    reuploaded_images_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "covers.json")
     if os.path.exists(reuploaded_images_path):
         try:
             covers_text = await asyncio.to_thread(Path(reuploaded_images_path).read_text, encoding='utf-8')
@@ -860,8 +860,8 @@ def extract_cover_images(html_content: str) -> dict[str, str]:
                 if not img_id_raw or not url_raw:
                     continue
 
-                img_id = str(img_id_raw[0]) if isinstance(img_id_raw, AttributeValueList) else str(img_id_raw)
-                url = str(url_raw[0]) if isinstance(url_raw, AttributeValueList) else str(url_raw)
+                img_id = img_id_raw[0] if isinstance(img_id_raw, AttributeValueList) else str(img_id_raw)
+                url = url_raw[0] if isinstance(url_raw, AttributeValueList) else str(url_raw)
 
                 if "front" in img_id.lower():
                     cover_images["front"] = url
@@ -951,7 +951,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
 
                     try:
                         release_id = release.get('release_id', '0000000')
-                        debug_path = Path(str(meta.base_dir)) / "tmp" / str(meta.uuid) / f"debug_release_{release_id}.html"
+                        debug_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"debug_release_{release_id}.html"
                         await asyncio.to_thread(debug_path.write_text, response_text, encoding="utf-8")
                         if meta.debug:
                             console.print(f"[dim]Saved release page to debug_release_{release_id}.html[/dim]")

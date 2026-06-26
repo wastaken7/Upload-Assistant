@@ -815,7 +815,7 @@ class AZTrackerBase:
         manual_episode_title = meta.manual_episode_title or ""
         daily_episode_title = meta.daily_episode_title or ""
         upload_name: str = (
-            str(meta.name).replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
+            meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
         )
 
         if self.tracker == 'PHD':
@@ -883,7 +883,7 @@ class AZTrackerBase:
         if meta.is_disc == "DVD":
             region = meta.region
             resolution = meta.resolution
-            video_codec = str(meta.video_codec).strip()
+            video_codec = meta.video_codec.strip()
 
             if region:
                 upload_name = upload_name.replace(region, "")
@@ -935,7 +935,7 @@ class AZTrackerBase:
         }
 
         source_type = str(meta.type or "").strip().lower()
-        source = str(meta.source or "").strip().lower()
+        source = meta.source or "".strip().lower()
         is_disc = str(meta.is_disc or "").strip().lower()
 
         html_label = ""

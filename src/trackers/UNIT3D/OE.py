@@ -99,10 +99,10 @@ class OE(UNIT3D):
                             await descfile.write(f"{each['name']}:\n")
                             await descfile.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n\n")
 
-            desc = str(base)
-            desc = str(bbcode.convert_pre_to_code(desc))
-            desc = str(bbcode.convert_hide_to_spoiler(desc))
-            desc = str(bbcode.convert_comparison_to_collapse(desc, 1000))
+            desc = base
+            desc = bbcode.convert_pre_to_code(desc)
+            desc = bbcode.convert_hide_to_spoiler(desc)
+            desc = bbcode.convert_comparison_to_collapse(desc, 1000)
             try:
                 tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
                 if meta.tonemapped and tonemapped_header:
@@ -116,7 +116,7 @@ class OE(UNIT3D):
             images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
             if len(images) > 0:
                 await descfile.write("[center]")
-                for each in range(len(images[: int(meta.screens)])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     raw_url = images[each]['raw_url']
                     await descfile.write(f"[url={web_url}][img=350]{raw_url}[/img][/url]")
@@ -130,20 +130,20 @@ class OE(UNIT3D):
         return {'description': desc}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        oe_name = str(meta.name)
-        resolution = str(meta.resolution)
-        video_encode = str(meta.video_encode)
+        oe_name = meta.name
+        resolution = meta.resolution
+        video_encode = meta.video_encode
         name_type = str(meta.type)
         source = str(meta.source)
-        audio = str(meta.audio)
-        video_codec = str(meta.video_codec)
+        audio = meta.audio
+        video_codec = meta.video_codec
 
         imdb_info = cast(dict[str, Any], meta.imdb_info)
         imdb_name = str(imdb_info.get('title', ""))
         imdb_year = str(imdb_info.get('year', ""))
         imdb_aka = str(imdb_info.get('aka', ""))
-        year = str(meta.year)
-        aka = str(meta.aka)
+        year = meta.year
+        aka = meta.aka
         if imdb_name and imdb_name.strip():
             if aka:
                 oe_name = oe_name.replace(f"{aka} ", "", 1)
@@ -172,12 +172,12 @@ class OE(UNIT3D):
                 foreign_lang = str(audio_languages[0]).upper()
                 oe_name = oe_name.replace(f"{resolution}", f"{foreign_lang} {resolution}", 1)
 
-        uuid_value = str(meta.basename_no_ext)
+        uuid_value = meta.basename_no_ext
         scale = "DS4K" if "DS4K" in uuid_value.upper() else "RM4K" if "RM4K" in uuid_value.upper() else ""
         if name_type in ["ENCODE", "WEBDL", "WEBRIP"] and scale != "":
             oe_name = oe_name.replace(f"{resolution}", f"{scale}", 1)
 
-        tag_value = str(meta.tag)
+        tag_value = meta.tag
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
@@ -195,7 +195,7 @@ class OE(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (reverse, mapping_only)
-        video_codec = str(meta.video_codec if meta.video_codec is not None else "N/A")
+        video_codec = meta.video_codec if meta.video_codec is not None else "N/A"
         type = str(meta.type).upper()
 
         if type == "DVDRIP":

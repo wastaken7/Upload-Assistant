@@ -130,7 +130,7 @@ class QbittorrentClientMixin:
         found = False
 
         folder_id = os.path.basename(meta.path)
-        if meta.uuid is None:
+        if not meta.uuid:
             meta.uuid = folder_id
 
         extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)

@@ -73,7 +73,7 @@ class AccessLogger:
         if lvl == "disabled":
             return False
         # access_denied: only log non-success (failed) attempts
-        return not bool(success)
+        return not success
 
     def log(self, *, endpoint: str, method: str, remote_addr: Optional[str], username: Optional[str], success: bool, status: int, headers: Optional[dict[str, Any]] = None, details: Optional[str] = None) -> None:
         try:
@@ -83,14 +83,14 @@ class AccessLogger:
                 "method": method,
                 "remote_addr": remote_addr,
                 "user": username,
-                "success": bool(success),
-                "status": int(status),
+                "success": success,
+                "status": status,
             }
 
             # Only keep full, unredacted data when the attempt failed due to auth (401/403).
             # For successful attempts and non-auth failures redact sensitive fields.
-            st = int(status)
-            keep_full = (not bool(success)) and st in (401, 403)
+            st = status
+            keep_full = (not success) and st in (401, 403)
             redact = not keep_full
 
             if headers:
@@ -135,7 +135,7 @@ class AccessLogger:
             if details:
                 # Avoid storing obvious secrets in details. If the text appears to
                 # contain a password-like token, redact it even for failed attempts.
-                txt = str(details)
+                txt = details
                 low = txt.lower()
                 if redact or any(tok in low for tok in ("password", "pass=", "pwd=", "token", "authorization")):
                     record["details"] = "<REDACTED>"

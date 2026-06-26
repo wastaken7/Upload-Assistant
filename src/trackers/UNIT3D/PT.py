@@ -57,14 +57,14 @@ class PT(UNIT3D):
             "540p": "11",
             "480p": "8",
             "480i": "9",
-        }.get(str(meta.resolution), "10")
+        }.get(meta.resolution, "10")
         return {'resolution_id': resolution_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = str(meta.name).replace(" ", ".")
+        name = meta.name.replace(" ", ".")
 
         pt_name = name
-        tag_value = str(meta.tag)
+        tag_value = meta.tag
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -79,7 +79,7 @@ class PT(UNIT3D):
         found_portuguese_audio = False
 
         if meta.is_disc == "BDMV":
-            bdinfo = cast(dict[str, Any], meta.bdinfo)
+            bdinfo = meta.bdinfo
             audio_tracks = cast(list[dict[str, Any]], bdinfo.get("audio", []))
             if audio_tracks:
                 for track in audio_tracks:
@@ -91,8 +91,8 @@ class PT(UNIT3D):
         needs_mediainfo_check = (meta.is_disc != "BDMV") or (meta.is_disc == "BDMV" and not found_portuguese_audio)
 
         if needs_mediainfo_check:
-            base_dir = str(meta.base_dir if meta.base_dir is not None else ".")
-            uuid = str(meta.uuid if meta.uuid is not None else "default_uuid")
+            base_dir = meta.base_dir if meta.base_dir is not None else "."
+            uuid = meta.uuid if meta.uuid is not None else "default_uuid"
             media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
 
             try:
@@ -126,7 +126,7 @@ class PT(UNIT3D):
         found_portuguese_subtitle = False
 
         if meta.is_disc == "BDMV":
-            bdinfo = cast(dict[str, Any], meta.bdinfo)
+            bdinfo = meta.bdinfo
             subtitle_tracks = cast(list[Any], bdinfo.get("subtitles", []))
             if subtitle_tracks:
                 found_portuguese_subtitle = False
@@ -138,8 +138,8 @@ class PT(UNIT3D):
         needs_mediainfo_check = (meta.is_disc != "BDMV") or (meta.is_disc == "BDMV" and not found_portuguese_subtitle)
 
         if needs_mediainfo_check:
-            base_dir = str(meta.base_dir if meta.base_dir is not None else ".")
-            uuid = str(meta.uuid if meta.uuid is not None else "default_uuid")
+            base_dir = meta.base_dir if meta.base_dir is not None else "."
+            uuid = meta.uuid if meta.uuid is not None else "default_uuid"
             media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
 
             try:

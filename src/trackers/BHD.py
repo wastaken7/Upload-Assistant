@@ -310,7 +310,7 @@ class BHD:
             images = cast(list[dict[str, Any]], meta.get(f"{self.tracker}_images_key") or meta.image_list or [])
             if len(images) > 0:
                 await desc.write("[align=center]")
-                for each in range(len(images[: int(meta.screens)])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     if (each == len(images) - 1):
@@ -446,12 +446,12 @@ class BHD:
 
     async def get_edition(self, meta: Meta, tags: list[str]) -> tuple[bool, str]:
         custom = False
-        edition = str(meta.edition)
+        edition = meta.edition
         if "Hybrid" in tags:
             edition = edition.replace('Hybrid', '').strip()
         editions = ['collector', 'cirector', 'extended', 'limited', 'special', 'theatrical', 'uncut', 'unrated']
         for each in editions:
-            if each in str(meta.edition):
+            if each in meta.edition:
                 edition = each
             elif edition == "":
                 edition = ""
@@ -493,9 +493,9 @@ class BHD:
         return tags
 
     async def edit_name(self, meta: Meta) -> str:
-        name = str(meta.name or "")
+        name = meta.name or ""
         if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
-            audio = str(meta.audio)
+            audio = meta.audio
             audio = ' '.join(audio.split())
             name = name.replace(audio, f"{meta.video_codec} {audio}")
         name = name.replace("DD+", "DDP")

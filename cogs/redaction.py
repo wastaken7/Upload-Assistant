@@ -117,7 +117,7 @@ class Redaction:
                 for k, v in typed_data.items()
             }
         if isinstance(data, list):
-            typed_list = cast(list[Any], data)
+            typed_list = data
             return [Redaction.redact_private_info(item, keys) for item in typed_list]
         if isinstance(data, str):
             # Try to parse as JSON first

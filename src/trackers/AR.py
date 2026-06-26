@@ -146,10 +146,10 @@ class AR:
         base = re.sub(r'\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]', '', base, flags=re.DOTALL)
         description = ""
         if meta.is_disc == "BDMV":
-            description += heading + str(meta.name) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "BDINFO" + heading_end + "\n"
+            description += heading + meta.name + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "BDINFO" + heading_end + "\n"
         else:
             description += (
-                heading + str(meta.name) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
+                heading + meta.name + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
             )
         discs = cast(list[dict[str, Any]], meta.discs or [])
         if discs:
@@ -187,11 +187,11 @@ class AR:
                     cleaned_mediainfo = await mi_file.read()
                     description += (f"""[code]\n{cleaned_mediainfo}\n[/code]\n\n""")
 
-            description += "\n\n" + subheading + "PLOT" + heading_end + "\n" + str(meta.overview)
+            description += "\n\n" + subheading + "PLOT" + heading_end + "\n" + meta.overview
             if meta.genres:
                 description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta.genres)
 
-            image_list = cast(list[dict[str, Any]], meta.image_list or [])
+            image_list = meta.image_list or []
             if image_list:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 description += "[align=center]"
@@ -204,7 +204,7 @@ class AR:
 
             # adding extra description if passed
             if len(base) > 2:
-                description += "\n\n" + subheading + "Notes" + heading_end + "\n" + str(base)
+                description += "\n\n" + subheading + "Notes" + heading_end + "\n" + base
 
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
             await descfile.write(description)
@@ -250,8 +250,8 @@ class AR:
             return dupes
 
         # Combine title and year
-        title = str(meta.title).strip()
-        year = str(meta.year).strip()
+        title = meta.title.strip()
+        year = meta.year.strip()
         if not title:
             console.print("[red]Title is missing.")
             return dupes
@@ -398,16 +398,16 @@ class AR:
         # must use scene name if scene release
         KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
         if meta.scene:
-            ar_name = str(meta.scene_name or "")
+            ar_name = meta.scene_name or ""
         else:
-            ar_name = str(meta.uuid)
+            ar_name = meta.uuid
             base, ext = os.path.splitext(ar_name)
             if ext.lower() in KNOWN_EXTENSIONS:
                 ar_name = base
             ar_name = ar_name.replace(' ', ".").replace("'", '').replace(':', '').replace("(", '.').replace(")", '.').replace("[", '.').replace("]", '.').replace("{", '.').replace("}", '.')
             ar_name = re.sub(r'\.{2,}', '.', ar_name)
 
-        tag_lower = str(meta.tag).lower()
+        tag_lower = meta.tag.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:

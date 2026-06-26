@@ -123,7 +123,7 @@ class R4E(UNIT3D):
         if meta.category == "TV":
             params["name"] = f"{meta.season}"
         if meta.edition != "":
-            params["name"] = str(params["name"]) + str(meta.edition)
+            params["name"] = str(params["name"]) + meta.edition
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(url=url, params=params)

@@ -113,7 +113,7 @@ async def sanitize_filename(filename: str) -> str:
 
 
 def round_to_even(value: float) -> int:
-    rounded = int(round(value))
+    rounded = round(value)
     if rounded % 2 != 0:
         rounded += 1
     return rounded
@@ -136,7 +136,7 @@ async def disc_screenshots(
     start_time = time.time() if meta.debug else 0.0
     if 'image_list' not in meta:
         meta.image_list = []
-    image_list_entries = cast(list[dict[str, Any]], meta.image_list)
+    image_list_entries = meta.image_list
     existing_images: list[dict[str, Any]] = [
         img
         for img in image_list_entries
@@ -179,7 +179,7 @@ async def disc_screenshots(
             except ValueError:
                 console.print("[red]Error: Unable to parse frame rate from bdinfo['video'][0]['fps']")
 
-    file_path = str(file_path)
+    file_path = file_path
 
     keyframe = 'nokey' if "VC-1" in bdinfo['video'][0]['codec'] or bdinfo['video'][0]['hdr_dv'] != "" else 'none'
     if meta.debug:
@@ -398,7 +398,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
 
         if meta.frame_overlay:
             # Get frame info from pre-collected data if available
-            frame_info = meta.frame_info_map.get(str(ss_time), {})
+            frame_info = meta.frame_info_map.get(ss_time, {})
 
             frame_rate = meta.frame_rate if meta.frame_rate is not None else 24.0
             frame_number = int(float(ss_time) * frame_rate)
@@ -448,7 +448,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
         vf_chain = ",".join(vf_filters)
 
         # Build ffmpeg-python command and run via run_ffmpeg
-        info_command: Any = cast(Any, ffmpeg).input(file, ss=str(ss_time), skip_frame=keyframe).output(
+        info_command: Any = cast(Any, ffmpeg).input(file, ss=ss_time, skip_frame=keyframe).output(
             image_path,
             vframes=1,
             vf=vf_chain,
@@ -482,7 +482,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     screens = meta.screens
     if 'image_list' not in meta:
         meta.image_list = []
-    image_list_entries = cast(list[dict[str, Any]], meta.image_list)
+    image_list_entries = meta.image_list
     existing_images: list[dict[str, Any]] = [
         img
         for img in image_list_entries
@@ -546,7 +546,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         while loops < max_loops:
             try:
                 vob_mi = MediaInfo.parse(f"{meta.discs[disc_num]['path']}/VTS_{main_set[n]}", output="JSON")
-                vob_mi = json.loads(str(vob_mi))
+                vob_mi = json.loads(vob_mi)
 
                 for track in vob_mi.get('media', {}).get('track', []):
                     duration = float(track.get('Duration', 0))
@@ -1058,7 +1058,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
                 def is_image_item(href: str, media_type: str) -> bool:
                     if media_type.startswith("image/"):
                         return True
-                    return bool(href.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg")))
+                    return href.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"))
 
                 def get_image_from_html(html_href: str) -> Optional[str]:
                     try:
@@ -1411,7 +1411,7 @@ async def screenshots(
     if 'image_list' not in meta:
         meta.image_list = []
 
-    image_list_entries = cast(list[dict[str, Any]], meta.image_list)
+    image_list_entries = meta.image_list
     existing_images: list[dict[str, Any]] = [
         img
         for img in image_list_entries
@@ -2257,14 +2257,14 @@ async def check_libplacebo_compatibility(
 
         # Build ffmpeg-python command and run
         if try_libplacebo:
-            info_cmd: Any = cast(Any, ffmpeg).input(path, ss=str(ss_time)).output(
+            info_cmd: Any = cast(Any, ffmpeg).input(path, ss=ss_time).output(
                 test_image_path,
                 vframes=1,
                 pix_fmt='rgb24'
             ).global_args('-y', '-loglevel', 'quiet', '-init_hw_device', 'vulkan', '-filter_complex', ','.join(filter_parts), '-map', output_map)
         else:
             vf_chain = f"zscale=transfer=linear,tonemap=tonemap={algorithm}:desat={desat},zscale=transfer=bt709,format=rgb24"
-            info_cmd: Any = cast(Any, ffmpeg).input(path, ss=str(ss_time)).output(
+            info_cmd: Any = cast(Any, ffmpeg).input(path, ss=ss_time).output(
                 test_image_path,
                 vframes=1,
                 vf=vf_chain,

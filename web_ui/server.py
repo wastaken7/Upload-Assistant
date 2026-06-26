@@ -626,7 +626,7 @@ def _create_api_token(username: str, label: str = "", persist: bool = True, toke
     Optionally accept `token_value` to use an externally-provided token string when persisting.
     """
     store = _load_token_store()
-    token_id = str(token_value) if token_value else secrets.token_urlsafe(96)
+    token_id = token_value if token_value else secrets.token_urlsafe(96)
     # Tokens are non-expiring by default and remain valid until revoked.
     expiry = None
     # Store token metadata (no per-token scopes; tokens are treated as valid/invalid)
@@ -1227,7 +1227,7 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
             "path": path,
             "old_value": _json_safe(_redact_sensitive(old_value)),
             "new_value": _json_safe(_redact_sensitive(new_value)),
-            "success": bool(success),
+            "success": success,
             "error": error,
         }
         with open(audit_path, "a", encoding="utf-8") as af:
@@ -1505,7 +1505,7 @@ def _build_config_items(
     for key in merged_keys:
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
-        key_path = path + [str(key)]
+        key_path = path + [key]
         help_text = comments_map.get("/".join(key_path), [])
         subsection_label = subsection_map.get("/".join(key_path))
         if subsection_label != current_subsection:
@@ -1517,7 +1517,7 @@ def _build_config_items(
             children = _build_config_items(example_value, user_value, comments_map, subsection_map, key_path)
             source: Literal["config", "example"] = "config" if key in user_dict else "example"
             item: ConfigItem = {
-                "key": str(key),
+                "key": key,
                 "source": source,
                 "children": children,
                 "help": help_text,
@@ -1530,7 +1530,7 @@ def _build_config_items(
                 value = example_value
                 source = "example"
             item = {
-                "key": str(key),
+                "key": key,
                 "value": _json_safe(value),
                 "source": source,
                 "help": help_text,
@@ -2463,7 +2463,7 @@ def config_options():
             continue
 
         user_section = (user_config or {}).get(section_name, {})
-        items = _build_config_items(example_section, user_section, comments_map, subsection_map, [str(section_name)])
+        items = _build_config_items(example_section, user_section, comments_map, subsection_map, [section_name])
 
         # Add special client list items to DEFAULT section
         if section_name == "DEFAULT":
@@ -2500,7 +2500,7 @@ def config_options():
             subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SETUP"
             subsection_map["DEFAULT/searching_client_list"] = "CLIENT SETUP"
 
-        sections.append({"section": str(section_name), "items": items})
+        sections.append({"section": section_name, "items": items})
 
         if section_name == "TORRENT_CLIENTS":
             client_types = set()
@@ -3264,7 +3264,7 @@ def execute_command():
                             parsed_args = shlex.split(args)
                             parsed_args = _validate_upload_assistant_args(parsed_args)
 
-                        sys.argv = [str(upload_script), validated_path] + parsed_args
+                        sys.argv = [upload_script, validated_path] + parsed_args
 
                         # Store in active_processes so /api/input can post into the queue
                         cast(Any, active_processes)[session_id] = {
@@ -3497,7 +3497,7 @@ def execute_command():
                         # Ensure the upload_script is the expected script under the repo
                         try:
                             expected_script = os.path.realpath(str(Path(base_dir) / "upload.py"))
-                            script_real = os.path.realpath(str(command[2]))
+                            script_real = os.path.realpath(command[2])
                             if script_real != expected_script:
                                 raise ValueError("Invalid script path")
                         except IndexError as err:

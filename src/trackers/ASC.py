@@ -728,7 +728,7 @@ class ASC:
             "XBOX": "56",
             "XONE": "78",
         }
-        platform = str(meta.platform).upper().strip()
+        platform = meta.platform.upper().strip()
         return platform_map.get(platform, "47")  # Default to PC
 
     def get_game_genre(self, meta: Meta) -> str:
@@ -1181,7 +1181,7 @@ class ASC:
             "takeupload": "yes",
             "name": await self.get_title(meta),
             "descr": description,
-            "ano": str(meta.year),
+            "ano": meta.year,
         }
 
         if meta.category == "BOOK":
@@ -1224,7 +1224,7 @@ class ASC:
                 "type": upload_type,
             })
 
-            image_list = cast(list[dict[str, Any]], meta.image_list or [])
+            image_list = meta.image_list or []
             if len(image_list) > 0:
                 data["screens2"] = image_list[0].get("raw_url") or ""
             if len(image_list) > 1:
@@ -1241,7 +1241,7 @@ class ASC:
             })
 
             # Screenshots
-            image_list = cast(list[dict[str, Any]], meta.image_list or [])
+            image_list = meta.image_list or []
             for i, img in enumerate(image_list[:4]):
                 raw_url = img.get("raw_url", "")
                 if raw_url:
@@ -1282,7 +1282,7 @@ class ASC:
                 })
 
         # Screenshots
-        image_list = cast(list[dict[str, Any]], meta.image_list or [])
+        image_list = meta.image_list or []
         for i, img in enumerate(image_list[:4]):
             data[f'screens{i+1}'] = img.get('raw_url')
 

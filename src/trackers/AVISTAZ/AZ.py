@@ -133,7 +133,7 @@ class AZ(AZTrackerBase):
 
             is_untouched_opus = False
             audio_field = meta.audio
-            if isinstance(audio_field, str) and "opus" in audio_field.lower() and bool(meta.untouched):
+            if isinstance(audio_field, str) and "opus" in audio_field.lower() and meta.untouched:
                 is_untouched_opus = True
 
             audio_tracks: list[dict[str, Any]] = []

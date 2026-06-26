@@ -92,7 +92,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
 
     console.print("[yellow]Generating Audio Spectrograms...[/yellow]")
 
-    output_dir = os.path.join(meta.base_dir, "tmp", str(meta.uuid), "spectrograms")
+    output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid, "spectrograms")
     os.makedirs(output_dir, exist_ok=True)
 
     disc_final_path = ""

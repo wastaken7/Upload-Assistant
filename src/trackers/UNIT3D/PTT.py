@@ -23,9 +23,9 @@ class PTT(UNIT3D):
         self.banned_groups = ['ViP', 'BiRD', 'M@RTiNU$', 'inTGrity', 'CiNEMAET', 'MusicET', 'TeamET', 'R2D2']
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        ptt_name = str(meta.name)
+        ptt_name = meta.name
         imdb_info = cast(dict[str, Any], meta.imdb_info)
         if meta.original_language == "pl" and imdb_info:
-            ptt_name = ptt_name.replace(str(meta.aka), "")
-            ptt_name = ptt_name.replace(str(meta.title), str(imdb_info.get("aka", "")))
+            ptt_name = ptt_name.replace(meta.aka, "")
+            ptt_name = ptt_name.replace(meta.title, str(imdb_info.get("aka", "")))
         return {'name': ptt_name.strip()}

@@ -39,7 +39,7 @@ class TTG:
         self.cookie_validator = CookieValidator(config)
 
     async def edit_name(self, meta: Meta) -> str:
-        ttg_name = str(meta.name)
+        ttg_name = meta.name
 
         remove_list = ['Dubbed', 'Dual-Audio']
         for each in remove_list:
@@ -52,7 +52,7 @@ class TTG:
         type_id = 0
         lang = str(meta.original_language).upper()
         category = str(meta.category)
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         if meta.category == "MOVIE":
             # 51 = DVDRip
             if resolution.startswith("720"):
@@ -137,7 +137,7 @@ class TTG:
         ) as desc_file:
             ttg_desc = await desc_file.read()
         torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
-        filelist = cast(list[Any], meta.filelist)
+        filelist = meta.filelist
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
         if len(filelist) == 1:
@@ -163,14 +163,14 @@ class TTG:
 
         }
         url = "https://totheglory.im/takeupload.php"
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             data["imdb_c"] = f"tt{meta.imdb}"
 
         # Submit
         if meta.debug:
             console.print(url)
             console.print(data)
-            tracker_status = cast(dict[str, Any], meta.tracker_status)
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -183,7 +183,7 @@ class TTG:
                 up = await client.post(url=url, data=data, files=files)
 
             if str(up.url).startswith("https://totheglory.im/details.php?id="):
-                tracker_status = cast(dict[str, Any], meta.tracker_status)
+                tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
                 tracker_status[self.tracker]['status_message'] = str(up.url)
                 id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
@@ -208,13 +208,13 @@ class TTG:
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
-        imdb = f"imdb{meta.imdb}" if int(meta.imdb_id or 0) != 0 else ""
+        imdb = f"imdb{meta.imdb}" if meta.imdb_id or 0 != 0 else ""
         if meta.is_disc == "BDMV":
             res_type = f"{meta.resolution} Blu-ray"
         elif meta.is_disc == "DVD":
             res_type = "DVD"
         else:
-            res_type = str(meta.resolution)
+            res_type = meta.resolution
 
         search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
 
@@ -324,7 +324,7 @@ class TTG:
         common = COMMON(config=self.config)
 
         parts: list[str] = []
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             ptgen = await common.ptgen(meta)
             if ptgen.strip() != '':
                 parts.append(ptgen)
@@ -363,10 +363,10 @@ class TTG:
         desc = desc.replace('[img]', '[img]')
         desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
         parts.append(desc)
-        images = cast(list[dict[str, Any]], meta.image_list)
+        images = meta.image_list
         if images:
             parts.append("[center]")
-            screens = int(meta.screens or 0)
+            screens = meta.screens or 0
             for each in range(len(images[:screens])):
                 web_url = images[each].get('web_url')
                 img_url = images[each].get('img_url')

@@ -44,7 +44,7 @@ class ComparisonManager:
                         raise ValueError("Invalid comparison data format: must be a dict of dicts")
                     saved_comparison_data = cast(ComparisonData, raw_dict)
                 elif isinstance(raw_data, list):
-                    raw_list = cast(list[Any], raw_data)
+                    raw_list = raw_data
                     if not all(isinstance(item, dict) for item in raw_list):
                         raise ValueError("Invalid comparison data format: must be a list of dicts")
                     saved_comparison_data = cast(list[ComparisonGroup], raw_list)
@@ -88,7 +88,7 @@ class ComparisonManager:
                     if found and urls_to_add:
                         if self.meta.debug:
                             console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
-                        image_list = cast(list[dict[str, Any]], self.meta.image_list)
+                        image_list = self.meta.image_list
                         self.meta.image_list = image_list
                         for url_info in urls_to_add:
                             if url_info not in image_list:
@@ -171,7 +171,7 @@ class ComparisonManager:
             if self.meta.debug:
                 console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
 
-            image_list = cast(list[dict[str, Any]], self.meta.image_list)
+            image_list = self.meta.image_list
             self.meta.image_list = image_list
             for url_info in urls_to_add:
                 if url_info not in image_list:

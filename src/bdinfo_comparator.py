@@ -151,7 +151,7 @@ def load_bdinfo_file(meta: Meta) -> tuple[str, str]:
     """
     Reads summary and extended summary files from the temporary metadata directory.
     """
-    base_path = Path(meta.base_dir) / "tmp" / str(meta.uuid)
+    base_path = Path(meta.base_dir) / "tmp" / meta.uuid
 
     def read_file(name: str) -> str:
         file_path = base_path / name

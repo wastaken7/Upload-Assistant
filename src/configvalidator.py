@@ -200,8 +200,8 @@ def validate_config(
             active_trackers = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
         elif isinstance(default_trackers_val, list):
             active_trackers = [
-                str(t).strip().upper()
-                for t in cast(list[Any], default_trackers_val)
+                t.strip().upper()
+                for t in default_trackers_val
                 if isinstance(t, str) and t.strip()
             ]
         else:
@@ -224,7 +224,7 @@ def validate_config(
         warnings.extend(discord_warnings)
 
     # Determine if Usenet is active (either because USENET is a target tracker, a Usenet tracker class is active, or enabled in config)
-    trackers_upper = [str(t).upper() for t in active_trackers] if active_trackers else []
+    trackers_upper = [t.upper() for t in active_trackers] if active_trackers else []
     is_usenet_tracker_active = False
     try:
         from src.trackersetup import tracker_class_map
@@ -270,7 +270,7 @@ def validate_config(
                     injecting_clients = [injecting_list.strip()]
             elif isinstance(injecting_list, list):
                 # List is valid - validate each item
-                for i, item in enumerate(cast(list[Any], injecting_list)):
+                for i, item in enumerate(injecting_list):
                     if item and isinstance(item, str) and item.strip():
                         injecting_clients.append(item.strip())
                     elif item and not isinstance(item, str):
@@ -293,7 +293,7 @@ def validate_config(
         searching_clients: list[str] = []
         if searching_list is not None:
             if isinstance(searching_list, list):
-                for i, item in enumerate(cast(list[Any], searching_list)):
+                for i, item in enumerate(searching_list):
                     if item and isinstance(item, str) and item.strip():
                         searching_clients.append(item.strip())
                     elif item and not isinstance(item, str):
@@ -580,8 +580,8 @@ def _validate_torrent_clients_section(clients: dict[str, Any]) -> tuple[list[str
         local_paths = client_config_dict.get("local_path", [])
         remote_paths = client_config_dict.get("remote_path", [])
         if isinstance(local_paths, list) and isinstance(remote_paths, list):
-            local_paths_list = cast(list[Any], local_paths)
-            remote_paths_list = cast(list[Any], remote_paths)
+            local_paths_list = local_paths
+            remote_paths_list = remote_paths
             if len(local_paths_list) != len(remote_paths_list) and local_paths_list and remote_paths_list:
                 warnings.append(ConfigValidationWarning(
                     f"local_path ({len(local_paths_list)} items) and remote_path ({len(remote_paths_list)} items) should have matching lengths",

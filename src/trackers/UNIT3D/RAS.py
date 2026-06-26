@@ -100,7 +100,7 @@ class RAS(UNIT3D):
             resolved_id = type_id.get(meta_type, "0")
 
             if category == "GAME":
-                platform = str(meta.platform).lower()
+                platform = meta.platform.lower()
                 if "mac" in platform:
                     resolved_id = "9"
                 elif "linux" in platform:

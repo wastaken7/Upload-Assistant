@@ -76,7 +76,7 @@ class FF:
                     include_subdomains = "TRUE" if domain.startswith('.') else "FALSE"
                     path = cookie.path
                     secure = "TRUE" if cookie.secure else "FALSE"
-                    expires = str(int(cookie.expires)) if cookie.expires else "0"
+                    expires = str(cookie.expires) if cookie.expires else "0"
                     name = cookie.name
                     value = cookie.value
                     await f.write(f"{domain}\t{include_subdomains}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n")
@@ -364,7 +364,7 @@ class FF:
             return 'x264'
 
     async def edit_name(self, meta: Meta) -> str:
-        ff_name = (str(meta.scene_name) if meta.scene_name else str(meta.basename_no_ext).replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
+        ff_name = (meta.scene_name if meta.scene_name else meta.basename_no_ext.replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
 
         return ff_name
 
@@ -409,7 +409,7 @@ class FF:
             }
             found_channel = channel_map.get(channels_desc, '0')
 
-            audio_languages_list = cast(list[Any], audio_languages)
+            audio_languages_list = audio_languages
             for lang_str in audio_languages_list:
                 lang_code = lang_map.get(str(lang_str).lower(), '1')
 
@@ -422,7 +422,7 @@ class FF:
             subtitle_format = 'srt'
             subtitle_type = 'sub'
 
-            subtitle_languages_list = cast(list[Any], subtitle_languages)
+            subtitle_languages_list = subtitle_languages
             for lang_str in subtitle_languages_list:
                 lang_code = lang_map.get(str(lang_str).lower(), '1')
 

@@ -175,7 +175,7 @@ async def gather_game_prep(
     # Check console game status
     platform = meta.platform
     if platform:
-        platform_lower = str(platform).lower()
+        platform_lower = platform.lower()
         console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
         meta.console_game = any(word in platform_lower for word in console_words)
     else:
@@ -271,7 +271,7 @@ async def gather_game_prep(
     # Keep track of manual CLI/correction overrides
     cli_overrides = {
         "title": bool(meta.title),
-        "year": "manual_year" in meta and int(meta.manual_year or 0) > 0,
+        "year": "manual_year" in meta and meta.manual_year or 0 > 0,
         "platform": bool(meta.manual_platform),
     }
 
@@ -670,7 +670,7 @@ async def gather_game_prep(
     # Re-evaluate console_game in case platform was updated/detected
     platform = meta.platform
     if platform:
-        platform_lower = str(platform).lower()
+        platform_lower = platform.lower()
         console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
         meta.console_game = any(word in platform_lower for word in console_words)
     else:

@@ -92,7 +92,7 @@ class COMMON:
                 language_code = parsed_lang.language
                 for value in (display_name, language_name, language_code):
                     if value:
-                        value_normalized = self._normalize_language_token(str(value))
+                        value_normalized = self._normalize_language_token(value)
                         if value_normalized:
                             candidates.add(value_normalized)
             except (tag_parser.LanguageTagError, LookupError, AttributeError, ValueError):
@@ -193,7 +193,7 @@ class COMMON:
                 new_torrent.metainfo['announce'] = str(raw_announce).strip() if raw_announce else "https://fake.tracker"
             new_torrent.metainfo['info']['source'] = source_flag
             if 'created by' in new_torrent.metainfo:
-                created_by = str(new_torrent.metainfo['created by'])
+                created_by = new_torrent.metainfo['created by']
                 if "mkbrr" in created_by.lower():
                     new_torrent.metainfo["created by"] = f"{created_by} using {meta.ua_name} {meta.current_version}"
             # Inject metadata IDs as top-level fields
@@ -485,7 +485,7 @@ class COMMON:
             # Reverse lookup: Find region code by ID
             # Convert to int to handle cases where API returns string
             try:
-                region_id = int(region_id)
+                region_id = region_id
             except (ValueError, TypeError):
                 return ""
             for code, id_value in region_map.items():
@@ -525,7 +525,7 @@ class COMMON:
         if reverse:
             # Convert to int to handle cases where API returns string
             try:
-                distributor_id = int(distributor_id)
+                distributor_id = distributor_id
             except (ValueError, TypeError):
                 return ""
             for name, id_value in distributor_map.items():
@@ -570,7 +570,7 @@ class COMMON:
         if not meta.unattended:
             selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
             try:
-                return bool(selection == '' or selection == 'y' or selection == 'yes')
+                return selection == '' or selection == 'y' or selection == 'yes'
             except (KeyboardInterrupt, EOFError):
                 sys.exit(1)
         else:
@@ -578,7 +578,7 @@ class COMMON:
 
     async def prompt_user_for_confirmation(self, message: str) -> bool:
         response = input(f"{message} (Y/n): ").strip().lower()
-        return bool(response == '' or response == 'y')
+        return response == '' or response == 'y'
 
     async def unit3d_region_distributor(self, meta: Meta, tracker: str, torrent_url: str, id: str = "") -> None:
         """Get region and distributor information from API response"""
@@ -860,7 +860,7 @@ class COMMON:
         try:
             async with httpx.AsyncClient() as client:
                 # get douban url
-                if meta.imdb_id is not None and int(meta.imdb_id) != 0:
+                if meta.imdb_id is not None and meta.imdb_id != 0:
                     data["search"] = f"tt{meta.imdb_id}"
                     ptgen_json = await fetch_ptgen(client, url, data)
 

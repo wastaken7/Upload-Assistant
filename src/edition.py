@@ -29,7 +29,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
 
     if meta.category == "MOVIE" and not meta.anime and edition_details and imdb_edition_count > 1 and not manual_edition:
         if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
-            mediainfo = cast(dict[str, Any], meta.mediainfo)
+            mediainfo = meta.mediainfo
             tracks = cast(list[dict[str, Any]], mediainfo.get("media", {}).get("track", []))
             general_track = next((track for track in tracks if track.get("@type") == "General"), None)
 
@@ -51,7 +51,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
 
                         if difference <= leeway_seconds:
                             attributes = edition_info.get("attributes")
-                            attributes_list = cast(list[Any], attributes) if isinstance(attributes, list) else []
+                            attributes_list = attributes if isinstance(attributes, list) else []
                             has_attributes = bool(attributes_list)
                             if meta.debug:
                                 console.print(
@@ -155,7 +155,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
                         if difference <= leeway_seconds:
                             # Store the complete edition info
                             attributes = edition_info.get('attributes')
-                            attributes_list = cast(list[Any], attributes) if isinstance(attributes, list) else []
+                            attributes_list = attributes if isinstance(attributes, list) else []
                             if attributes_list:
                                 edition_name = " ".join(smart_title(str(attr)) for attr in attributes_list)
                             else:
@@ -184,7 +184,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
                                 if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(playlist_matching_editions):
                                     playlist_selected = playlist_matching_editions[int(choice)-1]
                                 elif choice.strip().lower() == 'e':
-                                    playlist_selected = str(playlist_edition)
+                                    playlist_selected = playlist_edition
                                 else:
                                     # Default to the closest match (smallest difference)
                                     playlist_selected = min(playlist_matching_editions, key=lambda x: x['difference'])
@@ -301,7 +301,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
         guess: Any = guessit_fn(video)
 
         tag_value: Any = guess.get('release_group', 'NOGROUP')
-        tag = " ".join(str(t) for t in cast(list[Any], tag_value)) if isinstance(tag_value, list) else str(tag_value)
+        tag = " ".join(str(t) for t in tag_value) if isinstance(tag_value, list) else str(tag_value)
         repack = ""
 
         if bdinfo is not None:
@@ -332,8 +332,8 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
     # Manual edition overrides everything
     if manual_edition:
         if isinstance(manual_edition, list):
-            manual_edition = " ".join(str(e) for e in manual_edition)
-        edition = str(manual_edition)
+            manual_edition = " ".join(e for e in manual_edition)
+        edition = manual_edition
 
     edition = edition.replace(",", " ")
 

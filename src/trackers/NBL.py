@@ -165,7 +165,7 @@ class NBL:
 
         if int(meta.tvmaze_id or 0) != 0:
             params["tvmaze"] = int(meta.tvmaze_id)
-        elif int(meta.imdb_id or 0) != 0:
+        elif meta.imdb_id or 0 != 0:
             params["imdb"] = meta.imdb_id
         else:
             params["series"] = meta.title

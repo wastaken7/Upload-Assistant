@@ -68,7 +68,7 @@ class SUIO:
 
     def get_category_id(self, meta: Meta) -> str:
         category = str(meta.category or "").upper()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}
         if category == "MOVIE":
@@ -98,14 +98,14 @@ class SUIO:
                 return "27"  # XXX: MOVIES-HD
             return "xxx"  # XXX: Auto fallback
         elif category == "GAME":
-            platform = str(meta.platform).upper()
+            platform = meta.platform.upper()
             if "PC" in platform or "WINDOWS" in platform:
                 return "12"  # Games: PC
             elif "MAC" in platform:
                 return "13"  # Games: MAC
             return "14"  # Games: Other
         elif category == "MUSIC":
-            fmt = str(meta.format).upper()
+            fmt = meta.format.upper()
             if "FLAC" in fmt or "LOSSLESS" in fmt:
                 return "22"  # Music: FLAC
             elif "MP3" in fmt:

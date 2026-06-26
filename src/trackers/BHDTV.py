@@ -69,12 +69,12 @@ class BHDTV:
             video = filelist[0] if filelist else str(meta.path or "")
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
             if os.path.exists(mi_template):
-                media_info = str(MediaInfo.parse(video, output="STRING", full=False,
-                                                mediainfo_options={"inform": f"file://{mi_template}"}))
+                media_info = MediaInfo.parse(video, output="STRING", full=False,
+                                                mediainfo_options={"inform": f"file://{mi_template}"})
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),
-            "name": str(meta.name).replace(" ", ".").replace(":.", ".").replace(":", ".").replace("DD+", "DDP"),
+            "name": meta.name.replace(" ", ".").replace(":.", ".").replace(":", ".").replace("DD+", "DDP"),
             "mediainfo": mi_dump if bd_dump is None else bd_dump,
             "cat": cat_id,
             "subcat": sub_cat_id,
@@ -143,7 +143,7 @@ class BHDTV:
         if meta.type == "DISC":
             type_id = "46" if meta.three_d else "2"
         elif meta.type == "REMUX":
-            if str(meta.name).__contains__("265"):
+            if meta.name.__contains__("265"):
                 type_id = '48'
             elif meta.three_d:
                 type_id = '45'
@@ -152,7 +152,7 @@ class BHDTV:
         elif meta.type == "HDTV":
             type_id = '6'
         elif meta.type == "ENCODE":
-            if str(meta.name).__contains__("265"):
+            if meta.name.__contains__("265"):
                 type_id = '43'
             elif meta.three_d:
                 type_id = '44'
@@ -202,7 +202,7 @@ class BHDTV:
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
             base = await base_file.read()
         parts: list[str] = [base.replace("[img=250]", "[img=250x250]")]
-        images = cast(list[dict[str, Any]], meta.image_list or [])
+        images = meta.image_list or []
         if len(images) > 0:
             for each in range(len(images)):
                 web_url = images[each]['web_url']

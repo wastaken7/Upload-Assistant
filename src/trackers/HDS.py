@@ -73,7 +73,7 @@ class HDS:
     async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
         dupes: list[dict[str, Union[str, None]]] = []
 
-        if str(meta.resolution) not in ["2160p", "1080p", "1080i", "720p"]:
+        if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
             meta.skipping = f"{self.tracker}"
             return dupes
@@ -162,13 +162,13 @@ class HDS:
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         category = str(meta.category)
         type_ = str(meta.type)
         is_disc = str(meta.is_disc)
         genres = str(meta.genres).lower()
         keywords = str(meta.keywords).lower()
-        is_anime = bool(meta.anime)
+        is_anime = meta.anime
 
         if is_disc == 'BDMV':
             return 15  # Blu-Ray
@@ -217,7 +217,7 @@ class HDS:
                 self.session.cookies.clear()
                 if cookies is not None:
                     self.session.cookies.update(cookies)
-                query = str(meta.title)
+                query = meta.title
                 search_url = f'{self.base_url}/index.php?'
 
                 params: dict[str, str] = {
@@ -268,7 +268,7 @@ class HDS:
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
             "category": await self.get_category_id(meta),
-            "filename": str(meta.name),
+            "filename": meta.name,
             "genre": str(meta.genres),
             "imdb": str(meta.imdb),
             "info": await self.generate_description(meta),
@@ -276,7 +276,7 @@ class HDS:
             "nuk": "false",
             "req": "false",
             "submit": "Send",
-            "t3d": "true" if "3D" in str(meta.three_d) else "false",
+            "t3d": "true" if "3D" in meta.three_d else "false",
             "user_id": "",
             "youtube_video": str(meta.youtube),
         }
@@ -295,7 +295,7 @@ class HDS:
         return data
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:

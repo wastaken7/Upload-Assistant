@@ -67,7 +67,7 @@ class LAJIDUI(NEXUSPHP):
         if meta.is_disc:
             return iso
 
-        container = str(meta.container).lower()
+        container = meta.container.lower()
 
         if "mp4" in container:
             return mp4
@@ -149,7 +149,7 @@ class LAJIDUI(NEXUSPHP):
         vc1 = 2
         xvid = 3
 
-        codec = str(meta.video_codec).lower()
+        codec = meta.video_codec.lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -167,7 +167,7 @@ class LAJIDUI(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if resolution == "1080p":
             return 1
@@ -185,7 +185,7 @@ class LAJIDUI(NEXUSPHP):
         return 8
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.audio).lower()
+        audio_codec = meta.audio.lower()
 
         if "flac" in audio_codec:
             return 1
@@ -240,7 +240,7 @@ class LAJIDUI(NEXUSPHP):
             "-原创": 3,
         }
 
-        group = str(meta.tag).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:

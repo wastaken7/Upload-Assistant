@@ -84,7 +84,7 @@ class MTV:
     async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/MTV.json")
-        base_piece_mb = int(meta.base_torrent_piece_mb or 0)
+        base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
         if base_piece_mb > 8 and not meta.nohash:
@@ -266,10 +266,10 @@ class MTV:
     async def edit_name(self, meta: Meta) -> str:
         prefix_index = -1
         if meta.scene is True:
-            scene_name = str(meta.scene_name)
-            mtv_name = scene_name or str(meta.basename_no_ext)
+            scene_name = meta.scene_name
+            mtv_name = scene_name or meta.basename_no_ext
         else:
-            mtv_name = str(meta.name)
+            mtv_name = meta.name
             prefix_removed = False
             replacement_prefix = ""
 
@@ -285,7 +285,7 @@ class MTV:
                 replacement_prefix = "DUBBED "
                 mtv_name = mtv_name[:prefix_index] + mtv_name[prefix_index + len("Dubbed "):]
 
-            audio_str = str(meta.audio)
+            audio_str = meta.audio
             if prefix_removed:
                 audio_str = audio_str.replace("Dual-Audio ", "").replace("Dubbed ", "")
 
@@ -307,7 +307,7 @@ class MTV:
         ):
             mtv_name = os.path.splitext(mtv_name)[0]
 
-        tag_value = str(meta.tag)
+        tag_value = meta.tag
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
@@ -403,7 +403,7 @@ class MTV:
         # Streaming Service
         # disney+ should be disneyplus, assume every other service is same.
         # If I'm wrong, then they can either allowing editing tags or service will just get skipped also
-        if str(meta.service_longname) != "":
+        if meta.service_longname != "":
             service_name = meta.service_longname.lower().replace(" ", ".")
             service_name = service_name.replace('+', 'plus')  # Replace '+' with 'plus'
             tags.append(f"{service_name}.source")
@@ -411,7 +411,7 @@ class MTV:
         tags.extend(
             each
             for each in ["remux", "WEB.DL", "WEBRip", "HDTV", "BluRay", "DVD", "HDDVD"]
-            if (each.lower().replace(".", "") in str(meta.type or "").lower()) or (each.lower().replace("-", "") in str(meta.source or ""))
+            if (each.lower().replace(".", "") in str(meta.type or "").lower()) or (each.lower().replace("-", "") in meta.source or "")
         )
         # series tags
         if meta.category == "TV":
@@ -445,7 +445,7 @@ class MTV:
             tags.append('atmos.audio')
 
         # Video tags
-        video_codec = str(meta.video_codec)
+        video_codec = meta.video_codec
         tags.append(video_codec.replace('AVC', 'h264').replace('HEVC', 'h265').replace('-', ''))
 
         # Group Tags
@@ -676,13 +676,13 @@ class MTV:
         keywords_value = meta.keywords
         keywords_list: list[str] = []
         if isinstance(keywords_value, list):
-            keywords_list.extend([str(item) for item in cast(list[Any], keywords_value)])
+            keywords_list.extend([str(item) for item in keywords_value])
         else:
             keywords_list.append(str(keywords_value))
         genres_value = meta.combined_genres
         genres_list: list[str] = []
         if isinstance(genres_value, list):
-            genres_list.extend([str(item) for item in cast(list[Any], genres_value)])
+            genres_list.extend([str(item) for item in genres_value])
         else:
             genres_list.append(str(genres_value))
         keywords_lower = {k.lower() for k in keywords_list if k}

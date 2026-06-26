@@ -220,7 +220,7 @@ class Wait:
             return False
         torrent_comments_list: list[dict[str, Any]] = [
             cast(dict[str, Any], tc)
-            for tc in cast(list[Any], torrent_comments)
+            for tc in torrent_comments
             if isinstance(tc, dict)
         ]
 
@@ -331,9 +331,9 @@ class Wait:
                     if torrent_list_raw is None:
                         raise Exception("qBittorrent returned no torrent info")
                     if isinstance(torrent_list_raw, list):
-                        torrent_candidates = cast(list[Any], torrent_list_raw)
+                        torrent_candidates = torrent_list_raw
                     elif isinstance(torrent_list_raw, tuple):
-                        torrent_candidates = list(cast(tuple[Any, ...], torrent_list_raw))
+                        torrent_candidates = list(torrent_list_raw)
                     else:
                         torrent_candidates = [torrent_list_raw]
                     if not torrent_candidates:
@@ -383,9 +383,9 @@ class Wait:
                 if torrent_list_raw is None:
                     raise Exception("qBittorrent returned no torrent info")
                 if isinstance(torrent_list_raw, list):
-                    torrent_candidates = cast(list[Any], torrent_list_raw)
+                    torrent_candidates = torrent_list_raw
                 elif isinstance(torrent_list_raw, tuple):
-                    torrent_candidates = list(cast(tuple[Any, ...], torrent_list_raw))
+                    torrent_candidates = list(torrent_list_raw)
                 else:
                     torrent_candidates = [torrent_list_raw]
                 if not torrent_candidates:

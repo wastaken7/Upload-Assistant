@@ -118,7 +118,7 @@ class SeasonEpisodeManager:
                             episodes = guess_data.get("episode")
                             if isinstance(episodes, list):
                                 episode = ""
-                                episodes_list = cast(list[Any], episodes)
+                                episodes_list = episodes
                                 for item in episodes_list:
                                     ep = str(item).zfill(2)
                                     episode += f"E{ep}"
@@ -150,7 +150,7 @@ class SeasonEpisodeManager:
                         meta.mal_id = mal_id_value
                     anilist_episodes = _safe_int(anilist_episodes, 0)
                     if meta.tmdb_id == 0:
-                        year = str(parsed.get("anime_year", str(seasonYear)))
+                        year = str(parsed.get("anime_year", seasonYear))
                         guess_title = _guessit_data(str(parsed.get("anime_title", "")), {"excludes": ["country", "language"]}).get("title", "")
                         tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta, meta.category)
                         meta.tmdb_id = tmdb_id_value
@@ -168,7 +168,7 @@ class SeasonEpisodeManager:
                             if not isinstance(episodes, list) and not str(episodes).isnumeric():
                                 episodes = guess_data.get("episode")
                             if isinstance(episodes, list):
-                                episodes_list = cast(list[Any], episodes)
+                                episodes_list = episodes
                                 episode_int = _safe_int(episodes_list[0], 1) if episodes_list else 1
                                 episode = "".join([f"E{str(_safe_int(item, 0)).zfill(2)}" for item in episodes_list])
                             else:
@@ -427,7 +427,7 @@ class SeasonEpisodeManager:
         # Normalize season_int once so all (season, episode) tuples are (int, int)
         raw_season_int = meta.season_int
         try:
-            default_season_num = int(raw_season_int)
+            default_season_num = raw_season_int
         except (TypeError, ValueError):
             default_season_num = 1
 

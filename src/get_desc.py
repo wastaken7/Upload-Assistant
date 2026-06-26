@@ -299,7 +299,7 @@ class DescriptionBuilder:
                 return logo, logo_size
 
             if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT", "SPD"):
-                logo_resize_url = str(meta.tmdb_logo)
+                logo_resize_url = meta.tmdb_logo
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
                         logo_resize_url = logo_resize_url.replace(".svg", ".png")
@@ -469,8 +469,8 @@ class DescriptionBuilder:
     async def get_user_description(self, meta: Meta) -> str:
         """Returns the user-provided description (file or link)"""
         try:
-            description_file_content = str(meta.description_file_content).strip()
-            description_link_content = str(meta.description_link_content).strip()
+            description_file_content = meta.description_file_content.strip()
+            description_link_content = meta.description_link_content.strip()
 
             if description_file_content or description_link_content:
                 if description_file_content:
@@ -602,7 +602,7 @@ class DescriptionBuilder:
         str_year = "Release Year" if not use_pt_br else "Ano de Lançamento"
 
         if overview:
-            overview = html_to_bbcode(str(overview))
+            overview = html_to_bbcode(overview)
             overview = re.sub(r"<[^>]+>", "", overview).strip()
 
         # Collect key-value pairs
@@ -760,14 +760,14 @@ class DescriptionBuilder:
 
             clean_min = ""
             if req_min:
-                clean_min = html_to_bbcode(str(req_min))
+                clean_min = html_to_bbcode(req_min)
                 clean_min = html.unescape(clean_min)
                 clean_min = re.sub(r"<[^>]+>", "", clean_min).strip()
                 clean_min = re.sub(r"^\[b\](Minimum|Mínimo):\[/b\]\s*", "", clean_min, flags=re.IGNORECASE)
 
             clean_rec = ""
             if req_rec:
-                clean_rec = html_to_bbcode(str(req_rec))
+                clean_rec = html_to_bbcode(req_rec)
                 clean_rec = html.unescape(clean_rec)
                 clean_rec = re.sub(r"<[^>]+>", "", clean_rec).strip()
                 clean_rec = re.sub(r"^\[b\](Recommended|Recomendado):\[/b\]\s*", "", clean_rec, flags=re.IGNORECASE)
@@ -1200,7 +1200,7 @@ class DescriptionBuilder:
             if screenheader is not None:
                 desc_parts.append(screenheader + "\n")
             desc_parts.append("[center]")
-            for img_index in range(len(images[: int(meta.screens if meta.screens is not None else 6)])):
+            for img_index in range(len(images[: meta.screens if meta.screens is not None else 6])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
                 desc_parts.append(self.format_screenshot(web_url, raw_url))
@@ -1221,7 +1221,7 @@ class DescriptionBuilder:
             if screenheader is not None:
                 desc_parts.append(screenheader + "\n")
             desc_parts.append("[center]")
-            for img_index in range(len(images[: int(meta.screens)])):
+            for img_index in range(len(images[: meta.screens])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
                 img_url = images[img_index].get("img_url", raw_url)
@@ -1379,7 +1379,7 @@ class DescriptionBuilder:
                         desc_parts.append("[/center]\n\n")
                         desc_parts.append(screenheader + "\n")
                         desc_parts.append("[center]")
-                    for img_index in range(len(images[: int(meta.screens)])):
+                    for img_index in range(len(images[: meta.screens])):
                         web_url = images[img_index]["web_url"]
                         raw_url = images[img_index]["raw_url"]
                         img_url = images[img_index].get("img_url", raw_url)
@@ -1572,7 +1572,7 @@ class DescriptionBuilder:
             if screenheader is not None:
                 desc_parts.append(screenheader + "\n")
             desc_parts.append("[center]")
-            for img_index in range(len(images[: int(meta.screens)])):
+            for img_index in range(len(images[: meta.screens])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
                 img_url = images[img_index].get("img_url", raw_url)

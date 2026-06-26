@@ -87,34 +87,34 @@ class ITT(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         type_name = await self.get_type_name(meta) or ''
-        title = str(meta.title)
-        year = str(meta.year)
-        if int(meta.manual_year or 0) > 0:
+        title = meta.title
+        year = meta.year
+        if meta.manual_year or 0 > 0:
             year = str(meta.manual_year)
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         if resolution == "OTHER":
             resolution = ""
-        audio = str(meta.audio)
+        audio = meta.audio
         season = str(meta.season or "")
-        episode = str(meta.episode or "")
-        repack = str(meta.repack)
-        three_d = str(meta.three_d)
-        tag = str(meta.tag)
+        episode = meta.episode or ""
+        repack = meta.repack
+        three_d = meta.three_d
+        tag = meta.tag
         source = str(meta.source)
-        hdr = str(meta.hdr)
-        video_codec = str(meta.video_codec)
+        hdr = meta.hdr
+        video_codec = meta.video_codec
         region = str(meta.region)
         if meta.is_disc == "BDMV":
-            video_codec = str(meta.video_codec)
+            video_codec = meta.video_codec
             region = str(meta.region)
         elif meta.is_disc == "DVD":
             region = str(meta.region)
-        edition = str(meta.edition)
+        edition = meta.edition
         if 'hybrid' in edition.upper():
             edition = edition.replace('Hybrid', '').strip()
 
         if meta.category == "TV":
-            year = str(meta.year) if meta.search_year != "" else ""
+            year = meta.year if meta.search_year != "" else ""
             if meta.manual_date:
                 season = ''
                 episode = ''
@@ -171,7 +171,7 @@ class ITT(UNIT3D):
         audio_languages_value = meta.audio_languages
         audio_languages: set[str] = set()
         if isinstance(audio_languages_value, list):
-            audio_languages_list = cast(list[Any], audio_languages_value)
+            audio_languages_list = audio_languages_value
             audio_languages = {str(lang) for lang in audio_languages_list}
         if audio_languages:
             dubs = " ".join(lang[:3].upper() for lang in audio_languages)

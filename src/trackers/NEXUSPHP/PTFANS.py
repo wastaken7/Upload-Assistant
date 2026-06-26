@@ -94,8 +94,8 @@ class PTFANS(NEXUSPHP):
         other = 9
         xvid = 7
 
-        codec = str(meta.video_codec).lower()
-        source = str(meta.source or "").lower()
+        codec = meta.video_codec.lower()
+        source = meta.source or "".lower()
         is_bluray_source = "bluray" in source or "blu-ray" in source
 
         if "av1" in codec:
@@ -120,7 +120,7 @@ class PTFANS(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if resolution == "1080p":
             return 1
@@ -145,5 +145,5 @@ class PTFANS(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = str(meta.tag).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)

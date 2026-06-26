@@ -48,31 +48,31 @@ class NameManager:
             if region and 'SKIPPED' not in region:
                 meta.region = region
         type = str(meta.type).upper()
-        title = str(meta.title)
-        alt_title = str(meta.aka)
-        year = str(meta.year)
+        title = meta.title
+        alt_title = meta.aka
+        year = meta.year
         manual_year_value = meta.manual_year
-        if manual_year_value is not None and int(manual_year_value) > 0:
+        if manual_year_value is not None and manual_year_value > 0:
             year = str(manual_year_value)
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         if resolution == "OTHER":
             resolution = ""
-        audio = str(meta.audio)
+        audio = meta.audio
         service = str(meta.service)
         season = str(meta.season)
-        episode = str(meta.episode)
-        part = str(meta.part)
-        repack = str(meta.repack)
-        three_d = str(meta.three_d)
-        tag = str(meta.tag)
+        episode = meta.episode
+        part = meta.part
+        repack = meta.repack
+        three_d = meta.three_d
+        tag = meta.tag
         source = str(meta.source)
         uhd = str(meta.uhd)
-        hdr = str(meta.hdr)
+        hdr = meta.hdr
         hybrid = "Hybrid" if meta.webdv else ""
         if meta.manual_episode_title:
-            episode_title = str(meta.manual_episode_title)
+            episode_title = meta.manual_episode_title
         elif meta.daily_episode_title:
-            episode_title = str(meta.daily_episode_title)
+            episode_title = meta.daily_episode_title
         else:
             episode_title = ""
         video_codec = ""
@@ -80,15 +80,15 @@ class NameManager:
         region = ""
         dvd_size = ""
         if meta.is_disc == "BDMV":  # Disk
-            video_codec = str(meta.video_codec)
+            video_codec = meta.video_codec
             region = str(meta.region or "")
         elif meta.is_disc == "DVD":
             region = str(meta.region or "")
-            dvd_size = str(meta.dvd_size)
+            dvd_size = meta.dvd_size
         else:
-            video_codec = str(meta.video_codec)
-            video_encode = str(meta.video_encode)
-        edition = str(meta.edition)
+            video_codec = meta.video_codec
+            video_encode = meta.video_encode
+        edition = meta.edition
         if 'hybrid' in edition.upper():
             edition = edition.replace('Hybrid', '').strip()
 
@@ -203,16 +203,16 @@ class NameManager:
         return name_notag, name, clean_name, potential_missing
 
     def extract_book_name(self, meta: Meta) -> str:
-        comic = bool(meta.comic)
-        manga = bool(meta.manga)
-        magazine = bool(meta.magazine)
-        newspaper = bool(meta.newspaper)
-        audiobook = bool(meta.audiobook)
+        comic = meta.comic
+        manga = meta.manga
+        magazine = meta.magazine
+        newspaper = meta.newspaper
+        audiobook = meta.audiobook
 
-        author = str(meta.author).strip()
-        publisher = str(meta.publisher).strip()
-        title = str(meta.title).strip()
-        year = str(meta.year).strip()
+        author = meta.author.strip()
+        publisher = meta.publisher.strip()
+        title = meta.title.strip()
+        year = meta.year.strip()
 
         # Edition/Issue logic
         edition = str(meta.manual_edition or meta.edition or "").strip()
@@ -223,19 +223,19 @@ class NameManager:
         issue = str(meta.manual_episode or meta.episode or "").strip()
 
         # Language logic (needed for non-English only)
-        book_language = str(meta.book_language).strip()
-        book_language_iso = str(meta.book_language_iso).strip()
+        book_language = meta.book_language.strip()
+        book_language_iso = meta.book_language_iso.strip()
         lang_display = book_language or book_language_iso
         lang_display = "" if lang_display.lower() in ("english", "eng", "en") else lang_display.upper().replace("I", "i")
 
         # Source logic: RETAiL, SCAN, HYBRiD
-        source = str(meta.source or "").strip().upper()
+        source = meta.source or "".strip().upper()
         manual_source = str(meta.manual_source or "").strip().upper()
         if manual_source in ("RETAIL", "SCAN", "HYBRID"):
             source = manual_source
 
         if source not in ("RETAIL", "SCAN", "HYBRID"):
-            filename_lower = (str(meta.uuid) + " " + str(meta.title)).lower()
+            filename_lower = (meta.uuid + " " + meta.title).lower()
             if "scan" in filename_lower:
                 source = "SCAN"
             elif "hybrid" in filename_lower:
@@ -291,12 +291,12 @@ class NameManager:
 
     def extract_game_name(self, meta: Meta) -> str:
         """Build a game release name losely based on the SCENE 2021_GAMEiSO ruleset."""
-        title = str(meta.title).strip()
+        title = meta.title.strip()
         edition = str(meta.manual_edition or meta.edition or "").strip()
         year = str(meta.manual_year or meta.year or "").strip()
         platform = str(meta.manual_platform or meta.platform or "").strip().upper()
-        game_version = str(meta.game_version or "").strip()
-        repack = str(meta.repack or "").strip().upper()
+        game_version = meta.game_version or "".strip()
+        repack = meta.repack or "".strip().upper()
 
         #  language / MULTI tag
         languages: dict[str, Any] = meta.languages or {}
@@ -410,7 +410,7 @@ class NameManager:
             if year:
                 return title, None, year
 
-        folder_name = os.path.basename(str(meta.uuid)) if meta.uuid else ""
+        folder_name = os.path.basename(meta.uuid) if meta.uuid else ""
         if meta.debug:
             console.print(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
         # lets do some subsplease handling
@@ -590,10 +590,10 @@ class NameManager:
         return text
 
     async def missing_disc_info(self, meta: Meta, active_trackers: Sequence[str]) -> tuple[str, str, list[str]]:
-        distributor_id = await self.common.unit3d_distributor_ids(str(meta.distributor))
+        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
         region_id = await self.common.unit3d_region_ids(str(meta.region))
         region_name = str(meta.region)
-        distributor_name = str(meta.distributor)
+        distributor_name = meta.distributor
         trackers_to_remove: list[str] = []
 
         if meta.is_disc == "BDMV":

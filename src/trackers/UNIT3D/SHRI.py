@@ -111,20 +111,20 @@ class SHRI(UNIT3D):
         source = (
             str(cast(Any, source_value[0])) if source_value else ""
         ) if isinstance(source_value, list) else str(source_value)
-        video_codec = str(meta.video_codec)
-        video_encode = str(meta.video_encode)
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode
 
         # TV specific
         season = str(meta.season or "")
-        episode = str(meta.episode or "")
-        episode_title = str(meta.episode_title or "")
-        part = str(meta.part or "")
+        episode = meta.episode or ""
+        episode_title = meta.episode_title or ""
+        part = meta.part or ""
 
         # Optional fields
-        edition = str(meta.edition or "")
-        hdr = str(meta.hdr or "")
+        edition = meta.edition or ""
+        hdr = meta.hdr or ""
         uhd = str(meta.uhd or "")
-        three_d = str(meta.three_d or "")
+        three_d = meta.three_d or ""
 
         # Clean audio: remove Dual-Audio and trailing language codes
         audio = await self._get_best_italian_audio_format(meta)
@@ -134,7 +134,7 @@ class SHRI(UNIT3D):
         if meta.audio_languages:
             # Normalize all to abbreviated ISO 639-3 codes
             audio_langs_value = meta.audio_languages
-            audio_langs_raw = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
+            audio_langs_raw = audio_langs_value if isinstance(audio_langs_value, list) else []
             audio_langs = [self._get_language_name(str(lang)) for lang in audio_langs_raw]
             audio_langs = [lang for lang in audio_langs if lang]  # Remove empty
             audio_langs = list(dict.fromkeys(audio_langs))  # Dedupe preserving order
@@ -206,11 +206,11 @@ class SHRI(UNIT3D):
 
         else:
             # Fallback: use original name with cleaned audio
-            name = str(meta.name).replace("Dual-Audio", "").strip()
+            name = meta.name.replace("Dual-Audio", "").strip()
 
         # Ensure name is always a string
         if not name:
-            name = str(meta.name if meta.name is not None else "UNKNOWN")
+            name = meta.name if meta.name is not None else "UNKNOWN"
 
         # Cleanup whitespace
         name = self.WHITESPACE_PATTERN.sub(" ", name).strip()
@@ -389,7 +389,7 @@ class SHRI(UNIT3D):
             return True
 
         # Check for MakeMKV + no encoding
-        mediainfo = cast(dict[str, Any], meta.mediainfo)
+        mediainfo = meta.mediainfo
         media = cast(dict[str, Any], mediainfo.get("media", {}))
         mi = cast(list[dict[str, Any]], media.get("track", []))
         if mi:
@@ -429,7 +429,7 @@ class SHRI(UNIT3D):
             return any(tool in tool_string for tool in tools)
 
         try:
-            mi = cast(dict[str, Any], meta.mediainfo)
+            mi = meta.mediainfo
             media = cast(dict[str, Any], mi.get("media", {}))
             tracks = cast(list[dict[str, Any]], media.get("track", []))
             general_track = tracks[0] if len(tracks) > 0 else {}
@@ -440,7 +440,7 @@ class SHRI(UNIT3D):
             source = (
                 [str(s).upper() for s in cast(list[Any], source_value)]
                 if isinstance(source_value, list)
-                else [str(source_value).upper()] if source_value else []
+                else [source_value.upper()] if source_value else []
             )
 
             service = str(meta.service).upper()
@@ -640,7 +640,7 @@ class SHRI(UNIT3D):
         def clean(audio_str: str) -> str:
             return re.sub(r"\s*-[A-Z]{3}(-[A-Z]{3})*$", "", audio_str.replace("Dual-Audio", "").replace("Dubbed", "")).strip()
 
-        bdinfo = cast(dict[str, Any], meta.bdinfo)
+        bdinfo = meta.bdinfo
 
         if bdinfo and bdinfo.get("audio"):
             italian = [t for t in bdinfo["audio"] if t.get("language", "").lower() in ITALIAN_LANGS]
@@ -663,7 +663,7 @@ class SHRI(UNIT3D):
             best = max(italian, key=lambda t: extract_quality(t, False))
             audio_str, _, _ = await self.audio_manager.get_audio_v2({"media": {"track": [tracks[0], best]}}, meta, None)
 
-        return clean(str(audio_str))
+        return clean(audio_str)
 
     async def get_description(self, meta: Meta, is_test: bool = False) -> dict[str, str]:
         """Generate Italian BBCode description for ShareIsland"""
@@ -677,7 +677,7 @@ class SHRI(UNIT3D):
         # Build info line: resolution, source, codec, audio, language
         info_parts: list[str] = []
         if meta.resolution:
-            info_parts.append(str(meta.resolution))
+            info_parts.append(meta.resolution)
 
         source_value: Any = meta.source
         source = (
@@ -688,7 +688,7 @@ class SHRI(UNIT3D):
                 source.replace("Blu-ray", "BluRay").replace("Web", "WEB-DL")
             )
 
-        video_codec = str(meta.video_codec)
+        video_codec = meta.video_codec
         if "HEVC" in video_codec or "H.265" in video_codec:
             info_parts.append("x265")
         elif "AVC" in video_codec or "H.264" in video_codec:
@@ -705,7 +705,7 @@ class SHRI(UNIT3D):
 
         if meta.audio_languages:
             audio_langs_value = meta.audio_languages
-            audio_langs = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
+            audio_langs = audio_langs_value if isinstance(audio_langs_value, list) else []
             langs = [
                 self._get_italian_language_name(self._get_language_code(lang))
                 for lang in audio_langs
@@ -814,7 +814,7 @@ class SHRI(UNIT3D):
     async def _format_screens_italian(self, meta: Meta) -> str:
         """Format up to 6 screenshots in 2-column grid with [img=350]"""
         images_value = meta.image_list
-        images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
+        images = images_value if isinstance(images_value, list) else []
         if not images:
             return "[center]Nessuno screenshot disponibile[/center]"
 
@@ -873,7 +873,7 @@ class SHRI(UNIT3D):
             return fmt_map.get(fmt_raw, (fmt_raw, fmt_raw))
 
         try:
-            mediainfo = cast(dict[str, Any], meta.mediainfo)
+            mediainfo = meta.mediainfo
             media = cast(dict[str, Any], mediainfo.get("media", {}))
             tracks = cast(list[dict[str, Any]], media.get("track", []))
 

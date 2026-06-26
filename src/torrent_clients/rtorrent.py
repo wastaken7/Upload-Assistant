@@ -40,7 +40,7 @@ class RtorrentClientMixin:
     @staticmethod
     def _coerce_str_list(value: Any) -> list[str]:
         if isinstance(value, list):
-            value_list = cast(list[Any], value)
+            value_list = value
             return [str(v) for v in value_list if str(v)]
         return [str(value)] if value is not None else []
 
@@ -374,9 +374,9 @@ class RtorrentClientMixin:
         clients_cfg = cast(dict[str, Any], self.config.get('TORRENT_CLIENTS', {}))
         client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
         torrent_storage_dir_value = client.get('torrent_storage_dir')
-        torrent_storage_dir = str(torrent_storage_dir_value) if isinstance(torrent_storage_dir_value, str) else None
+        torrent_storage_dir = torrent_storage_dir_value if isinstance(torrent_storage_dir_value, str) else None
         info_hash_value = meta.infohash
-        info_hash_v1 = str(info_hash_value) if isinstance(info_hash_value, str) else None
+        info_hash_v1 = info_hash_value if isinstance(info_hash_value, str) else None
 
         if not torrent_storage_dir or not info_hash_v1:
             console.print("[yellow]Missing torrent storage directory or infohash")
@@ -388,7 +388,7 @@ class RtorrentClientMixin:
 
         # Extract folder ID for use in temporary file path
         folder_id = os.path.basename(meta.path)
-        if meta.uuid is None:
+        if not meta.uuid:
             meta.uuid = folder_id
 
         extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
@@ -404,7 +404,7 @@ class RtorrentClientMixin:
 
             if os.path.exists(torrent_storage_dir):
                 for filename in os.listdir(torrent_storage_dir):
-                    filename_str = str(filename)
+                    filename_str = filename
                     if filename_str.lower().endswith(".torrent"):
                         file_hash = os.path.splitext(filename_str)[0]  # Remove .torrent extension
                         if file_hash.upper() == info_hash_v1:
@@ -428,7 +428,7 @@ class RtorrentClientMixin:
 
             torrent_comments_value = meta.torrent_comments
             torrent_comments_list = (
-                cast(list[Any], torrent_comments_value)
+                torrent_comments_value
                 if isinstance(torrent_comments_value, list)
                 else []
             )

@@ -304,7 +304,7 @@ class TVC:
         image_list: list[dict[str, Any]]
     ) -> str:
         """Add screenshots section if requirements are met."""
-        screens_count = int(meta.screens or 0)
+        screens_count = meta.screens or 0
         required_count = self.config['TRACKERS'][self.tracker].get(
             'image_count',
             self.MIN_SCREENSHOTS_REQUIRED
@@ -488,7 +488,7 @@ class TVC:
         raw_images = meta.TVC_images_key if meta.TVC_images_key is not None else meta.get("image_list", [])
         image_list_seq: list[Any]
         if isinstance(raw_images, list):
-            image_list_seq = cast(list[Any], raw_images)
+            image_list_seq = raw_images
         elif isinstance(raw_images, tuple):
             image_list_seq = list(cast(tuple[Any, ...], raw_images))
         else:
@@ -518,7 +518,7 @@ class TVC:
             audio_langs = self.get_audio_languages(mi)
             if audio_langs and "English" not in audio_langs:
                 cat_id = self.tv_type_map["foreign"]
-        resolution_id = await self.get_res_id(bool(meta.tv_pack), str(meta.resolution))
+        resolution_id = await self.get_res_id(meta.tv_pack, meta.resolution)
 
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
@@ -689,7 +689,7 @@ class TVC:
         else:
             console.print("[cyan]TVC Request Data:")
             console.print(data)
-            tracker_status = cast(dict[str, Any], meta.tracker_status)
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -732,7 +732,7 @@ class TVC:
         origin_country = meta.origin_country
         if origin_country:
             if isinstance(origin_country, list):
-                origin_country_list = cast(list[Any], origin_country)
+                origin_country_list = origin_country
                 origin_country_code.extend([str(code) for code in origin_country_list])
             else:
                 origin_country_code.append(str(origin_country))
@@ -978,7 +978,7 @@ class TVC:
         tracks_raw: list[Any] = []
         raw_tracks = media.get("track")
         if isinstance(raw_tracks, list):
-            tracks_raw = cast(list[Any], raw_tracks)
+            tracks_raw = raw_tracks
         tracks = cast(list[dict[str, Any]], tracks_raw)
 
         # Count subtitle tracks

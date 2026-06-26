@@ -50,33 +50,33 @@ class TIK(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         disctype = meta.disctype
-        filelist = cast(list[Any], meta.filelist)
+        filelist = meta.filelist
         basename = os.path.basename(next(iter(filelist), str(meta.path)))
         type_value = str(meta.type)
-        title = str(meta.title).replace("AKA", "/").strip()
-        alt_title = str(meta.aka).replace("AKA", "/").strip()
-        year = str(meta.year)
-        resolution = str(meta.resolution)
+        title = meta.title.replace("AKA", "/").strip()
+        alt_title = meta.aka.replace("AKA", "/").strip()
+        year = meta.year
+        resolution = meta.resolution
         season = str(meta.season)
-        repack = str(meta.repack)
+        repack = meta.repack
         if repack.strip():
             repack = f"[{repack}]"
-        three_d = str(meta.three_d)
+        three_d = meta.three_d
         three_d_tag = f"[{three_d}]" if three_d else ""
-        tag = str(meta.tag).replace("-", "- ")
+        tag = meta.tag.replace("-", "- ")
         if tag == "":
             tag = "- NOGRP"
         source = str(meta.source)
-        hdr = str(meta.hdr)
+        hdr = meta.hdr
         if not hdr.strip():
             hdr = "SDR"
-        video_codec = str(meta.video_codec)
-        video_encode = str(meta.video_encode).replace(".", "")
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode.replace(".", "")
         if 'x265' in basename:
             video_encode = video_encode.replace('H', 'x')
-        dvd_size = str(meta.dvd_size)
+        dvd_size = meta.dvd_size
         search_year = str(meta.search_year)
-        if not str(search_year).strip():
+        if not search_year.strip():
             search_year = year
         meta.category_id = (await self.get_category_id(meta))["category_id"]
 
@@ -104,9 +104,9 @@ class TIK(UNIT3D):
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         category_name = str(meta.category)
-        foreign = bool(meta.foreign)
-        opera = bool(meta.opera)
-        asian = bool(meta.asian)
+        foreign = meta.foreign
+        opera = meta.opera
+        asian = meta.asian
         category_id = {
             'FILM': '1',
             'TV': '2',
@@ -191,7 +191,7 @@ class TIK(UNIT3D):
             "576i": "7",
             "480p": "8",
             "480i": "9",
-        }.get(str(meta.resolution), "10")
+        }.get(meta.resolution, "10")
         return {'resolution_id': resolution_id}
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
@@ -257,7 +257,7 @@ class TIK(UNIT3D):
         # Generate the description text
         desc_text: list[str] = []
 
-        images = cast(list[dict[str, Any]], meta.image_list)
+        images = meta.image_list
 
         if len(images) >= 6:
             image_link_1 = images[0]['raw_url']
@@ -296,11 +296,11 @@ class TIK(UNIT3D):
         # Write technical info section
         desc_text.append("[h3]Technical Info[/h3]\n")
         desc_text.append("[code]\n")
-        bdinfo = cast(dict[str, Any], meta.bdinfo)
+        bdinfo = meta.bdinfo
         if meta.is_disc == "BDMV":
             desc_text.append(f"  Disc Label.........:{bdinfo.get('label', '')}\n")
         imdb_info = cast(dict[str, Any], meta.imdb_info)
-        desc_text.append(f"  IMDb...............: [url]{str(imdb_info.get('imdb_url', ''))}{str(meta.imdb_rating)}[/url]\n")
+        desc_text.append(f"  IMDb...............: [url]{str(imdb_info.get('imdb_url', ''))}{meta.imdb_rating}[/url]\n")
         desc_text.append(f"  Year...............: {meta.year}\n")
         desc_text.append(f"  Country............: {country_name}\n")
         if meta.is_disc == "BDMV":

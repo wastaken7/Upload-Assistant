@@ -40,11 +40,11 @@ class THR:
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         await self.edit_desc(meta)
-        thr_name = unidecode(str(meta.name).replace("DD+", "DDP"))
+        thr_name = unidecode(meta.name.replace("DD+", "DDP"))
 
         # Confirm the correct naming order for THR
         cli_ui.info(f"THR name: {thr_name}")
-        if not bool(meta.unattended):
+        if not meta.unattended:
             thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
             if thr_confirm is not True:
                 thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="") or ""
@@ -99,7 +99,7 @@ class THR:
         if subs:
             payload['subs[]'] = tuple(subs)
 
-        thr_upload_prompt = True if not bool(meta.debug) else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
+        thr_upload_prompt = True if not meta.debug else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
 
         if thr_upload_prompt is True:
             await asyncio.sleep(0.5)
@@ -119,7 +119,7 @@ class THR:
                             console.print(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
-                            tracker_status = cast(dict[str, Any], meta.tracker_status)
+                            tracker_status = meta.tracker_status
                             tracker_status.setdefault(self.tracker, {})
                             tracker_status[self.tracker]['status_message'] = response.url
                             return True
@@ -151,7 +151,7 @@ class THR:
         else:
             console.print("[cyan]THR Request Data:")
             console.print(payload)
-            tracker_status = cast(dict[str, Any], meta.tracker_status)
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -176,7 +176,7 @@ class THR:
                 cat = '4' if sd == 1 else '17'
         elif category == "TV":
             cat = '7' if sd == 1 else '34'
-        elif bool(meta.anime):
+        elif meta.anime:
             cat = '31'
         return cat
 
@@ -194,7 +194,7 @@ class THR:
                     if language in ['hr', 'en', 'bs', 'sr', 'sl'] and language not in sub_langs:
                         sub_langs.append(str(language))
         else:
-            bdinfo = cast(dict[str, Any], meta.bdinfo)
+            bdinfo = meta.bdinfo
             for sub in cast(list[Any], bdinfo.get('subtitles', [])):
                 if sub not in sub_langs:
                     sub_langs.append(str(sub))
@@ -220,9 +220,9 @@ class THR:
             base = await base_file.read()
 
         desc_parts: list[str] = []
-        tag_value = str(meta.tag)
+        tag_value = meta.tag
         tag = "" if tag_value == "" else f" / {tag_value[1:]}"
-        res = str(meta.source) if str(meta.is_disc) == "DVD" else str(meta.resolution)
+        res = str(meta.source) if str(meta.is_disc) == "DVD" else meta.resolution
         desc_parts.append("[quote=Info]")
         name_aka = f"{meta.title} {meta.aka} {meta.year}"
         name_aka = unidecode(name_aka)
@@ -233,14 +233,14 @@ class THR:
         category = str(meta.category)
         desc_parts.append(f"Category: {category}\n")
         desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             imdb_info = cast(dict[str, Any], meta.imdb_info)
             desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")
-        if int(meta.tvdb_id or 0) != 0:
+        if meta.tvdb_id or 0 != 0:
             desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
         if int(meta.tvmaze_id or 0) != 0:
             desc_parts.append(f"TVMaze: https://www.tvmaze.com/shows/{meta.tvmaze_id}\n")
-        if int(meta.mal_id or 0) != 0:
+        if meta.mal_id or 0 != 0:
             desc_parts.append(f"MAL: https://myanimelist.net/anime/{meta.mal_id}\n")
         desc_parts.append("[/quote]")
 
@@ -259,7 +259,7 @@ class THR:
             desc_parts.append("\n\n" + base)
 
         # REHOST IMAGES
-        tmp_dir = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
+        tmp_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         image_patterns: list[str] = ["*.png", ".[!.]*.png"]
         for pattern in image_patterns:
             image_glob.extend(glob.glob(os.path.join(tmp_dir, pattern)))
@@ -353,7 +353,7 @@ class THR:
                     console.print(f"[red]{response}")
                     console.print(response.text)
 
-        screens = int(meta.screens or 0)
+        screens = meta.screens or 0
         desc_parts.extend([f"\n[img]{each}[/img]\n" for each in image_list[:screens]])
             # if pronfo:
         #     with open(os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"), 'r') as mi_file:
@@ -467,7 +467,7 @@ class THR:
                 href_raw = link.get('href')
                 if not href_raw:
                     continue
-                href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else str(href_raw)
+                href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
                 if href.startswith('details.php'):
                     link_count += 1
@@ -475,7 +475,7 @@ class THR:
                     if onmousemove_raw:
                         onmousemove_count += 1
                         try:
-                            onmousemove = ' '.join(onmousemove_raw) if isinstance(onmousemove_raw, AttributeValueList) else str(onmousemove_raw)
+                            onmousemove = ' '.join(onmousemove_raw) if isinstance(onmousemove_raw, AttributeValueList) else onmousemove_raw
                             dupe = onmousemove.split("','/images")[0]
                             dupe = dupe.replace("return overlibImage('", "")
                             page_dupes.append(dupe)
@@ -503,7 +503,7 @@ class THR:
                         href_raw = link.get('href')
                         href = ''
                         if href_raw:
-                            href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else str(href_raw)
+                            href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
                         if meta.debug:
                             console.print(f"[dim]Next page URL: {href}")
@@ -548,8 +548,8 @@ class THR:
                     name_raw = input_tag.get('name')
                     value_raw = input_tag.get('value')
                     if name_raw and value_raw:
-                        name = ' '.join(name_raw) if isinstance(name_raw, AttributeValueList) else str(name_raw)
-                        value = ' '.join(value_raw) if isinstance(value_raw, AttributeValueList) else str(value_raw)
+                        name = ' '.join(name_raw) if isinstance(name_raw, AttributeValueList) else name_raw
+                        value = ' '.join(value_raw) if isinstance(value_raw, AttributeValueList) else value_raw
                         payload[name] = value
 
                 resp = await session.post(url, headers=headers, data=payload)

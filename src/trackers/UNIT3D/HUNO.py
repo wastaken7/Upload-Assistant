@@ -238,9 +238,9 @@ class HUNO(UNIT3D):
             mal_id = meta.mal_id
 
             if season_int:
-                data["season_number"] = int(season_int)
+                data["season_number"] = season_int
             if episode_int:
-                data["episode_number"] = int(episode_int)
+                data["episode_number"] = episode_int
             if tvdb:
                 data["tvdb"] = tvdb
             if mal_id:

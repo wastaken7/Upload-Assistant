@@ -185,7 +185,7 @@ class BtnIdManager:
         raw_tmdb_id = first_result.get("tmdb_id", "")
         if raw_tmdb_id and raw_tmdb_id != "0":
             meta.category, parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.category)
-            tmdb = int(parsed_tmdb_id)
+            tmdb = parsed_tmdb_id
 
         if skip_tracker_descriptions and not meta.keep_images:
             return imdb, tmdb
@@ -204,7 +204,7 @@ class BtnIdManager:
             meta.description = ""
             meta.image_list = imagelist
 
-        if (imdb and int(imdb) != 0) or (tmdb and int(tmdb) != 0):
+        if (imdb and imdb != 0) or (tmdb and tmdb != 0):
             console.print(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
         elif meta.debug:
             console.print(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
@@ -214,7 +214,7 @@ class BtnIdManager:
     @staticmethod
     async def parse_tmdb_id(tmdb_id: str, category: Optional[str]) -> tuple[Optional[str], int]:
         """Parses TMDb ID, ensures correct formatting, and assigns category."""
-        tmdb_id_str = str(tmdb_id).strip().lower()
+        tmdb_id_str = tmdb_id.strip().lower()
 
         if tmdb_id_str.startswith('tv/'):
             tmdb_id_str = tmdb_id_str.split('/')[1].split('-')[0]

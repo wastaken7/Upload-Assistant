@@ -48,7 +48,7 @@ class EMUW(UNIT3D):
             season = f"S{meta.season_int:02d}"
 
         year = meta.year
-        resolution = self._map_resolution(str(meta.resolution))
+        resolution = self._map_resolution(meta.resolution)
         video_format = self._map_format(meta)
         video_codec = self._map_codec(meta)
 
@@ -76,7 +76,7 @@ class EMUW(UNIT3D):
         # Build final name
         name_parts = [
             part
-            for part in [title, season, str(year), resolution, video_format, video_codec, audio_str]
+            for part in [title, season, year, resolution, video_format, video_codec, audio_str]
             if part
         ]
         base_name = ' '.join(name_parts)
@@ -95,7 +95,7 @@ class EMUW(UNIT3D):
         imdb_info_raw = meta.imdb_info
         imdb_info: dict[str, Any] = cast(dict[str, Any], imdb_info_raw) if isinstance(imdb_info_raw, dict) else {}
         akas_raw = imdb_info.get('akas', [])
-        akas: list[Any] = cast(list[Any], akas_raw) if isinstance(akas_raw, list) else []
+        akas: list[Any] = akas_raw if isinstance(akas_raw, list) else []
 
         country_match = None
         language_match = None
@@ -116,7 +116,7 @@ class EMUW(UNIT3D):
         tmdb_id = int(tmdb_id_raw) if isinstance(tmdb_id_raw, (int, str)) and str(tmdb_id_raw).isdigit() else 0
         if not spanish_title and tmdb_id:
             spanish_title = await self.tmdb_manager.get_tmdb_translations(
-                tmdb_id=tmdb_id, category=str(meta.category if meta.category is not None else "MOVIE"), target_language="es", debug=bool(meta.debug)
+                tmdb_id=tmdb_id, category=str(meta.category if meta.category is not None else "MOVIE"), target_language="es", debug=meta.debug
             )
 
         # Use Spanish title if configured
@@ -177,14 +177,14 @@ class EMUW(UNIT3D):
 
         hdr_prefix = ''
         if meta.hdr:
-            hdr = str(meta.hdr)
+            hdr = meta.hdr
             if 'DV' in hdr:
                 hdr_prefix = 'DV '
             if 'HDR' in hdr:
                 hdr_prefix += 'HDR '
 
-        video_codec = str(meta.video_codec)
-        video_encode = str(meta.video_encode)
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode
         codec = codec_map.get(video_codec) or codec_map.get(video_encode, video_codec)
 
         return f"{hdr_prefix}{codec}".strip()
@@ -202,7 +202,7 @@ class EMUW(UNIT3D):
             imdb_lang: Any = imdb_info.get('language')
 
             if isinstance(imdb_lang, list):
-                imdb_lang_list = cast(list[Any], imdb_lang)
+                imdb_lang_list = imdb_lang
                 imdb_lang = imdb_lang_list[0] if imdb_lang_list else ''
 
             if imdb_lang:
@@ -216,7 +216,7 @@ class EMUW(UNIT3D):
                     original_lang = str(imdb_lang).strip()
 
         if original_lang:
-            return self._map_language(str(original_lang))
+            return self._map_language(original_lang)
 
         return None
 
@@ -291,7 +291,7 @@ class EMUW(UNIT3D):
         media_info = meta.mediainfo
         if not isinstance(media_info, dict):
             return []
-        media_info_dict = cast(dict[str, Any], media_info)
+        media_info_dict = media_info
         media = media_info_dict.get('media')
         if not isinstance(media, dict):
             return []
@@ -302,7 +302,7 @@ class EMUW(UNIT3D):
             return []
 
         audio_tracks: list[dict[str, Any]] = []
-        tracks_list = cast(list[Any], tracks)
+        tracks_list = tracks
         for track in tracks_list:
             if isinstance(track, dict):
                 track_dict = cast(dict[str, Any], track)
@@ -324,7 +324,7 @@ class EMUW(UNIT3D):
 
         if not audio_langs and meta.audio_languages:
             audio_languages = meta.audio_languages
-            audio_languages_list: list[Any] = cast(list[Any], audio_languages) if isinstance(audio_languages, list) else []
+            audio_languages_list: list[Any] = audio_languages if isinstance(audio_languages, list) else []
             for lang in audio_languages_list:
                 lang_code = self._map_language(str(lang))
                 if lang_code and lang_code not in audio_langs:
@@ -355,7 +355,7 @@ class EMUW(UNIT3D):
             'vie': 'VIE', 'vi': 'VIE', 'vietnamese': 'VIE',
         }
 
-        lang_lower = str(lang).lower().strip()
+        lang_lower = lang.lower().strip()
         mapped = lang_map.get(lang_lower)
 
         if mapped:
@@ -396,7 +396,7 @@ class EMUW(UNIT3D):
         media_info = meta.mediainfo
         if not isinstance(media_info, dict):
             return False
-        media_info_dict = cast(dict[str, Any], media_info)
+        media_info_dict = media_info
         media = media_info_dict.get('media')
         if not isinstance(media, dict):
             return False
@@ -405,7 +405,7 @@ class EMUW(UNIT3D):
         if not isinstance(tracks, list):
             return False
 
-        tracks_list = cast(list[Any], tracks)
+        tracks_list = tracks
         for track in tracks_list:
             if not isinstance(track, dict):
                 continue
@@ -485,7 +485,7 @@ class EMUW(UNIT3D):
         if meta.category == "TV" and meta.season:
             name = str(meta.season)
 
-        res_id = await self.get_res_id(str(meta.resolution))
+        res_id = await self.get_res_id(meta.resolution)
         type_id = (await self.get_type_id(meta))['type_id']
 
         # Use list of tuples to support duplicate keys (e.g. 1080p + 1080i)
@@ -540,7 +540,7 @@ class EMUW(UNIT3D):
                         data_items_raw = data_dict.get('data')
                         if not isinstance(data_items_raw, list):
                             return dupes
-                        data_items = cast(list[Any], data_items_raw)
+                        data_items = data_items_raw
                         for torrent in data_items:
                             if not isinstance(torrent, dict):
                                 continue
@@ -553,7 +553,7 @@ class EMUW(UNIT3D):
                                 continue
 
                             files_value = attributes_dict.get('files', [])
-                            files_list: list[Any] = cast(list[Any], files_value) if isinstance(files_value, list) else []
+                            files_list: list[Any] = files_value if isinstance(files_value, list) else []
                             file_names: list[str] = []
                             for file in files_list:
                                 if not isinstance(file, dict):

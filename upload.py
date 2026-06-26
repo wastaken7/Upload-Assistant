@@ -1326,6 +1326,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                         gc.collect()
 
                 elif meta.skip_imghost_upload is True and meta.image_list is False:
+                    # pyrefly: ignore [bad-assignment]
                     meta.image_list = []
 
                 # Host book cover if it's a BOOK and save to covers.json
@@ -1990,8 +1991,6 @@ async def do_the_thing(base_dir: str) -> None:
 
             else:
                 meta = meta
-                console.print()
-                console.print("[yellow]Processing uploads to trackers.....")
                 if meta.were_trumping:
                     trump_trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
                     console.print("[yellow]Checking for existing trump reports.....")

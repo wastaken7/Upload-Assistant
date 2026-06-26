@@ -565,7 +565,7 @@ def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
         elif not settings and not unique_id:
             console.print("[yellow]Mediainfo failed validation (no unique ID)[/yellow]")
 
-    return bool(valid_settings) if settings else bool(unique_id)
+    return valid_settings if settings else bool(unique_id)
 
 
 async def get_conformance_error(meta: Meta) -> bool:

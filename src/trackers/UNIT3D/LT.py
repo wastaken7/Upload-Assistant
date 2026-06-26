@@ -59,7 +59,7 @@ class LT(UNIT3D):
         category_id = cat_map.get(resolved_category, "0")
 
         keywords = str(meta.keywords).lower()
-        overview = str(meta.overview).lower()
+        overview = meta.overview.lower()
         genres = str(meta.genres).lower()
         soap_keywords = ['telenovela', 'novela', 'soap', 'culebrón', 'culebron']
         origin_countries_value = meta.origin_country
@@ -129,8 +129,8 @@ class LT(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         if meta.category == "BOOK":
-            author = str(meta.author).strip()
-            title = str(meta.title).strip()
+            author = meta.author.strip()
+            title = meta.title.strip()
             fmt = str(meta.type).strip().upper()
 
             extra_info = []
@@ -152,7 +152,7 @@ class LT(UNIT3D):
                     extra_info.append(edition)
 
             if meta.audiobook:
-                book_lang = str(meta.book_language).lower()
+                book_lang = meta.book_language.lower()
                 if "spain" in book_lang or "castilian" in book_lang or "castellano" in book_lang:
                     extra_info.append("Narración en Castellano")
                 elif "latin" in book_lang or "latino" in book_lang:
@@ -160,7 +160,7 @@ class LT(UNIT3D):
                 elif "portuguese" in book_lang or "português" in book_lang or "portugues" in book_lang:
                     extra_info.append("Narración en Portugués")
                 elif book_lang:
-                    lang_title = str(meta.book_language).title()
+                    lang_title = meta.book_language.title()
                     extra_info.append(f"Narración en {lang_title}")
 
             extra_str = ""
@@ -171,12 +171,12 @@ class LT(UNIT3D):
 
             return {"name": re.sub(r"\s{2,}", " ", lt_name).strip()}
 
-        aka_value = str(meta.aka)
-        lt_name = str(meta.name).replace("Dual-Audio", "").replace("Dubbed", "").replace(aka_value, "")
+        aka_value = meta.aka
+        lt_name = meta.name.replace("Dual-Audio", "").replace("Dubbed", "").replace(aka_value, "")
 
         if meta.type != "DISC":  # DISC don't have mediainfo
             # Check if original language is "es" if true replace title for AKA if available
-            title_value = str(meta.title)
+            title_value = meta.title
             if meta.original_language == "es" and aka_value:
                 lt_name = lt_name.replace(title_value, aka_value.replace('AKA', '')).strip()
             # Check if audio Spanish exists
@@ -228,14 +228,14 @@ class LT(UNIT3D):
 
             if len(audios) > 0:  # If there is at least 1 audio spanish
                 if not has_latino and has_castilian:
-                    tag_value = str(meta.tag)
+                    tag_value = meta.tag
                     lt_name = lt_name.replace(tag_value, f" [CAST]{tag_value}") if tag_value else f"{lt_name} [CAST]"
                 # else: no special tag needed for Latino-only or mixed audio
             # if not audio Spanish exists, add "[SUBS]"
             elif not meta.tag:
                 lt_name = lt_name + " [SUBS]"
             else:
-                tag_value = str(meta.tag)
+                tag_value = meta.tag
                 lt_name = lt_name.replace(tag_value, f" [SUBS]{tag_value}")
 
         return {"name": re.sub(r"\s{2,}", " ", lt_name)}

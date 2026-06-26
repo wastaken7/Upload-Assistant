@@ -46,7 +46,7 @@ class CRP:
             return "5070"
 
         category = str(meta.category or "").upper()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}
@@ -96,7 +96,7 @@ class CRP:
         source = meta.source
         if not source:
             return None
-        source_upper = str(source).upper()
+        source_upper = source.upper()
         if "BLU" in source_upper:
             if meta.is_disc:
                 return "Full Disc"
@@ -107,7 +107,7 @@ class CRP:
             return "HDTV"
         elif "DVD" in source_upper:
             return "DVD"
-        return str(source)
+        return source
 
     async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
         nzb_path = meta.nzb_path
@@ -180,7 +180,7 @@ class CRP:
         # Quality (optional)
         quality = meta.resolution
         if quality and quality.upper() != "OTHER":
-            data["quality"] = str(quality)
+            data["quality"] = quality
 
         # Source (optional)
         source = self.get_source(meta)
@@ -206,7 +206,7 @@ class CRP:
 
         # TMDb id and type (optional)
         tmdb_id = meta.tmdb_id
-        if tmdb_id and str(tmdb_id).isdigit() and int(tmdb_id) > 0:
+        if tmdb_id and str(tmdb_id).isdigit() and tmdb_id > 0:
             data["tmdb_id"] = str(tmdb_id)
             tmdb_type = str(meta.category or "").lower()
             if tmdb_type in ("movie", "tv"):
@@ -214,7 +214,7 @@ class CRP:
 
         # MyAnimeList id (optional)
         mal_id = meta.mal_id
-        if mal_id and str(mal_id).isdigit() and int(mal_id) > 0:
+        if mal_id and str(mal_id).isdigit() and mal_id > 0:
             data["mal_id"] = str(mal_id)
 
         # Anonymous (optional)

@@ -155,7 +155,7 @@ class TL:
                 return movie_foreign
             elif "Documentary" in str(meta.genres):
                 return movie_documentary
-            elif str(meta.resolution) == "2160p":
+            elif meta.resolution == "2160p":
                 return movie_4k
             elif str(meta.is_disc) in ("BDMV", "HDDVD") or (str(meta.type) == "REMUX" and str(meta.source) in ("BluRay", "HDDVD")):
                 return movie_bluray
@@ -189,7 +189,7 @@ class TL:
             return ebook
 
         elif category == "GAME":
-            plat = str(meta.platform).lower()
+            plat = meta.platform.lower()
 
             if plat == "x360":  # noqa: SIM116
                 return games_xbox360
@@ -223,7 +223,7 @@ class TL:
         return 0
 
     def get_screens(self, meta: Meta) -> list[str]:
-        images = cast(list[dict[str, Any]], meta.menu_images) + cast(list[dict[str, Any]], meta.image_list + meta.spectrograms_images)
+        images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
     async def get_name(self, meta):
@@ -247,10 +247,10 @@ class TL:
             return []
         cat_id = self.get_category(meta)
 
-        search_name = str(meta.title)
-        resolution = str(meta.resolution)
-        year = str(meta.year)
-        episode = str(meta.episode)
+        search_name = meta.title
+        resolution = meta.resolution
+        year = meta.year
+        episode = meta.episode
         season = str(meta.season)
         season_episode = f"{season}{episode}" if season or episode else ''
 
@@ -371,13 +371,13 @@ class TL:
             )
 
             if not response.text.isnumeric():
-                tracker_status = cast(dict[str, Any], meta.tracker_status)
+                tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
                 tracker_status[self.tracker]['status_message'] = 'data error: ' + response.text
 
             if response.text.isnumeric():
                 torrent_id = response.text
-                tracker_status = cast(dict[str, Any], meta.tracker_status)
+                tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
                 tracker_status[self.tracker]['status_message'] = 'Torrent uploaded successfully.'
                 tracker_status[self.tracker]['torrent_id'] = torrent_id
@@ -424,7 +424,7 @@ class TL:
             description_content = await f.read()
         login = await self.login(meta)
         if not login:
-            tracker_status = cast(dict[str, Any], meta.tracker_status)
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "data error: Login with cookies failed."
             return None

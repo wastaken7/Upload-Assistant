@@ -111,7 +111,7 @@ class DupeChecker:
                 # Case 3: Dict with files and file_count
                 if 'files' in d:
                     if isinstance(d['files'], list):
-                        entry_files = cast(list[Any], d['files'])
+                        entry_files = d['files']
                         entry['files'] = [str(file) for file in entry_files]
                     elif isinstance(d['files'], str) and d['files']:
                         entry['files'] = [d['files']]
@@ -132,15 +132,15 @@ class DupeChecker:
 
         new_dupes: list[DupeEntry]
 
-        has_repack_in_uuid = "repack" in str(meta.uuid).lower()
+        has_repack_in_uuid = "repack" in meta.uuid.lower()
         video_encode_value = meta.video_encode
-        video_encode = str(video_encode_value) if video_encode_value else ""
+        video_encode = video_encode_value if video_encode_value else ""
         normalized_encoder = await DupeChecker.normalize_filename(video_encode) if video_encode else ""
         video_encode_lower = video_encode.lower()
 
         file_size: Optional[int] = None
         if meta.is_disc != "BDMV":
-            mediainfo = cast(dict[str, Any], meta.mediainfo)
+            mediainfo = meta.mediainfo
             tracks = cast(list[dict[str, Any]], mediainfo.get('media', {}).get('track', []))
             if tracks:
                 file_size = coerce_int(tracks[0].get('FileSize'))
@@ -149,8 +149,8 @@ class DupeChecker:
         target_hdr = await DupeChecker.refine_hdr_terms(cast(Optional[str], meta.hdr))
         target_season = meta.season
         target_episode = meta.episode
-        target_resolution = str(meta.resolution)
-        tag = str(meta.tag).lower().replace("-", " ")
+        target_resolution = meta.resolution
+        tag = meta.tag.lower().replace("-", " ")
         is_dvd = meta.is_disc == "DVD"
         is_dvdrip = meta.type == "DVDRIP"
         web_dl = meta.type == "WEBDL"
@@ -177,13 +177,13 @@ class DupeChecker:
         attribute_checks: list[AttributeCheck] = [
             {
                 "key": "remux",
-                "uuid_flag": "remux" in str(meta.name).lower(),
+                "uuid_flag": "remux" in meta.name.lower(),
                 "condition": lambda each: "remux" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'remux' mismatch: {each}",
             },
             {
                 "key": "uhd",
-                "uuid_flag": "uhd" in str(meta.name).lower(),
+                "uuid_flag": "uhd" in meta.name.lower(),
                 "condition": lambda each: "uhd" in each.lower(),
                 "exclude_msg": lambda each: f"Excluding result due to 'UHD' mismatch: {each}",
             },
@@ -198,7 +198,7 @@ class DupeChecker:
             Determine if an entry should be excluded.
             Returns True if the entry should be excluded, otherwise allowed as dupe.
             """
-            each = str(entry.get('name', ''))
+            each = entry.get('name', '')
             sized = entry.get('size')  # This may come as a string, such as "1.5 GB"
 
             files_value = cast(list[Any], entry.get('files') or [])
@@ -223,7 +223,7 @@ class DupeChecker:
                 # If flags are provided, use them directly for HDR information
                 file_hdr: set[str] = set()
                 for flag in flags:
-                    flag_upper = str(flag).upper()
+                    flag_upper = flag.upper()
                     if flag_upper == 'DV':
                         file_hdr.add('DV')
                     elif flag_upper in ['HDR', 'HDR10', 'HDR10+']:
@@ -276,7 +276,7 @@ class DupeChecker:
                     meta[matched_torrent_id] = entry.get('id')
 
             if meta.category == "GAME":
-                target_title = str(meta.title or meta.name)
+                target_title = meta.title or meta.name
                 if not target_title.strip():
                     await log_exclusion("empty target game title", each)
                     return True
@@ -292,7 +292,7 @@ class DupeChecker:
                         return nin_term
                     return "pc"
 
-                target_platform = get_platform_category(str(meta.platform))
+                target_platform = get_platform_category(meta.platform)
                 dupe_platform = get_platform_category(str(entry.get("type", "")))
                 if target_platform != dupe_platform:
                     await log_exclusion(f"game platform mismatch (expected {target_platform}, got {dupe_platform})", each)
@@ -384,7 +384,7 @@ class DupeChecker:
             if meta.category == "BOOK":
                 import unicodedata
 
-                target_title = str(meta.title or meta.name)
+                target_title = meta.title or meta.name
                 if not target_title.strip():
                     await log_exclusion("empty target book title", each)
                     return True
@@ -436,9 +436,9 @@ class DupeChecker:
                     return True
 
                 # Check format/type compatibility
-                target_is_audiobook = bool(meta.audiobook)
+                target_is_audiobook = meta.audiobook
 
-                dupe_type = str(entry.get("type") or "").lower()
+                dupe_type = entry.get("type") or "".lower()
                 audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg", "aac", "ac3", "wma", "opus"}
                 dupe_is_audiobook = (
                     (dupe_type in audiobook_types)
@@ -566,13 +566,13 @@ class DupeChecker:
                 await log_exclusion("file count less than 2 for disc upload", each)
                 return True
 
-            if has_repack_in_uuid and "repack" not in normalized and str(meta.tag).lower() in normalized:
+            if has_repack_in_uuid and "repack" not in normalized and meta.tag.lower() in normalized:
                 await log_exclusion('repack release', each)
                 return True
 
             if tracker_name == "MTV":
-                target_name = str(meta.name).replace(" ", ".").replace("DD+", "DDP")
-                dupe_name = str(entry.get('name', ''))
+                target_name = meta.name.replace(" ", ".").replace("DD+", "DDP")
+                dupe_name = entry.get('name', '')
 
                 def normalize_mtv_name(name: str) -> str:
                     # Handle audio format variations: DDP.5.1 <-> DDP5.1
@@ -588,7 +588,7 @@ class DupeChecker:
                     return False
 
             if tracker_name == "BHD":
-                target_name = str(meta.name).replace("DD+", "DDP")
+                target_name = meta.name.replace("DD+", "DDP")
                 if str(entry.get('name')) == target_name:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
@@ -603,7 +603,7 @@ class DupeChecker:
                     return False
 
             if tracker_name in ["BHD", "MTV", "RTF", "AR"] and (
-                ("2160p" in target_resolution and "2160p" in each) and ("framestor" in each.lower() or "framestor" in str(meta.uuid).lower())
+                ("2160p" in target_resolution and "2160p" in each) and ("framestor" in each.lower() or "framestor" in meta.uuid.lower())
             ):
                 return False
 
@@ -908,7 +908,7 @@ class DupeChecker:
         """
         if hdr is None:
             return set()
-        hdr_upper = str(hdr).upper()
+        hdr_upper = hdr.upper()
         terms: set[str] = set()
         if "DV" in hdr_upper or "DOVI" in hdr_upper:
             terms.add("DV")

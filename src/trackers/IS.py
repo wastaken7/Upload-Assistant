@@ -85,7 +85,7 @@ class IS:
             search_query = f"{meta.title} {meta.season}{meta.episode}"
         elif category == "BOOK":
             search_type = "t_name"
-            search_query = str(meta.title)
+            search_query = meta.title
         else:
             return dupes
 
@@ -132,11 +132,11 @@ class IS:
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         category = str(meta.category)
         genres = str(meta.genres).lower()
         keywords = str(meta.keywords).lower()
-        is_anime = bool(meta.anime)
+        is_anime = meta.anime
         non_eng = False
         sd = bool(meta.sd)
         if str(meta.original_language) != "en":
@@ -225,7 +225,7 @@ class IS:
             elif resolution in ["1080p", "1080i", "720p"]:
                 return tv_hd
             elif sd:
-                if "xvid" in str(meta.video_encode).lower():
+                if "xvid" in meta.video_encode.lower():
                     return tv_sd_xvid
                 else:
                     return tv_sd_x264
@@ -245,7 +245,7 @@ class IS:
         return 0
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:
@@ -262,10 +262,10 @@ class IS:
     async def get_name(self, meta: Meta) -> str:
         scene_name = meta.scene_name
         if scene_name:
-            return str(scene_name)
+            return scene_name
         else:
-            name_value = str(meta.name)
-            aka_value = str(meta.aka)
+            name_value = meta.name
+            aka_value = meta.aka
             is_name = name_value.replace(aka_value, '').replace('Dubbed', '').replace('Dual-Audio', '')
             is_name = re.sub(r"\s{2,}", " ", is_name)
             is_name = is_name.replace(' ', '.')

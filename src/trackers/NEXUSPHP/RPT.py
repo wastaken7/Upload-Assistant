@@ -69,7 +69,7 @@ class RPT(NEXUSPHP):
 
         is_disc = str(meta.is_disc).lower()
         mtype = str(meta.type).lower()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -97,7 +97,7 @@ class RPT(NEXUSPHP):
         vc1 = 3
         xvid = 5
 
-        codec = str(meta.video_codec).lower()
+        codec = meta.video_codec.lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -113,7 +113,7 @@ class RPT(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if resolution == "1080p" or resolution == "1080i":
             return 2
@@ -127,7 +127,7 @@ class RPT(NEXUSPHP):
         return 5
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.audio).lower()
+        audio_codec = meta.audio.lower()
 
         if "true" in audio_codec or "atmos" in audio_codec:
             return 1

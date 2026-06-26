@@ -261,9 +261,9 @@ def get_user_input(
 
     # Use default if no input and no existing value
     if value == "" and default:
-        return str(default)
+        return default
 
-    return str(value)
+    return value
 
 
 def configure_default_section(
@@ -850,11 +850,11 @@ def generate_config_file(config_data: ConfigDict, existing_path: Optional[Path] 
     def format_config(obj: Any) -> Any:
         if isinstance(obj, dict):
             # Process each key-value pair in dictionaries
-            obj_dict = cast(dict[Any, Any], obj)
+            obj_dict = obj
             return {str(k): format_config(v) for k, v in obj_dict.items()}
         elif isinstance(obj, list):
             # Process each item in lists
-            obj_list = cast(list[Any], obj)
+            obj_list = obj
             return [format_config(item) for item in obj_list]
         elif isinstance(obj, str):
             # Convert string "true"/"false" to Python True/False

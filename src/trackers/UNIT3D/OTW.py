@@ -121,20 +121,20 @@ class OTW(UNIT3D):
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        type_value = str(type) if type is not None else meta_type
+        type_value = type if type is not None else meta_type
         return {'type_id': type_id.get(type_value, '0')}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        otw_name = str(meta.name)
+        otw_name = meta.name
         source = str(meta.source)
-        resolution = str(meta.resolution)
-        aka = str(meta.aka)
+        resolution = meta.resolution
+        aka = meta.aka
         type = str(meta.type)
-        video_codec = str(meta.video_codec)
+        video_codec = meta.video_codec
         if aka:
             otw_name = otw_name.replace(f"{aka} ", '')
         is_disc = str(meta.is_disc)
-        audio = str(meta.audio)
+        audio = meta.audio
         if is_disc == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
             otw_name = otw_name.replace(source, f"{resolution} {source}", 1)
             otw_name = otw_name.replace(audio, f"{video_codec} {audio}", 1)
@@ -142,10 +142,10 @@ class OTW(UNIT3D):
             years: list[int] = []
 
             tmdb_year = meta.year
-            if tmdb_year and str(tmdb_year).isdigit():
-                year = str(tmdb_year)
+            if tmdb_year and tmdb_year.isdigit():
+                year = tmdb_year
             else:
-                if tmdb_year and str(tmdb_year).isdigit():
+                if tmdb_year and tmdb_year.isdigit():
                     years.append(int(tmdb_year))
 
                 imdb_info = cast(dict[str, Any], meta.imdb_info)
@@ -153,14 +153,14 @@ class OTW(UNIT3D):
                 if imdb_year and str(imdb_year).isdigit():
                     years.append(int(imdb_year))
 
-                tvdb_episode_data = cast(dict[str, Any], meta.tvdb_episode_data)
+                tvdb_episode_data = meta.tvdb_episode_data
                 series_year = tvdb_episode_data.get('series_year')
                 if series_year and str(series_year).isdigit():
                     years.append(int(series_year))
                 # Use the oldest year if any found, else empty string
                 year = str(min(years)) if years else ""
             if not meta.no_year and not meta.search_year:
-                title = str(meta.title)
+                title = meta.title
                 otw_name = otw_name.replace(title, f"{title} {year}", 1)
 
         return {'name': otw_name}

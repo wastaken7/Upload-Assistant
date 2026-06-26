@@ -79,7 +79,7 @@ class DP(UNIT3D):
 
         audio_languages = meta.audio_languages
         if isinstance(audio_languages, list):
-            audio_languages_list = cast(list[Any], audio_languages)
+            audio_languages_list = audio_languages
             normalized_languages = {str(lang).strip() for lang in audio_languages_list if str(lang).strip()}
 
             if len(normalized_languages) > 2:
@@ -87,12 +87,12 @@ class DP(UNIT3D):
             elif len(normalized_languages) > 1:
                 languages_result = "Dual-Audio"
             else:
-                languages_result = str(next(iter(normalized_languages), "SKIPPED"))
+                languages_result = next(iter(normalized_languages), "SKIPPED")
 
         return f'{languages_result}'
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        dp_name = str(meta.name)
+        dp_name = meta.name
 
         audio = await self.get_audio(meta)
         if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
@@ -163,7 +163,7 @@ class DP(UNIT3D):
                         meta_type = "EBOOK"
 
         if meta.category == "GAME":
-            meta_type = "CONSOLE" if meta.console_game else str(meta.platform).upper()
+            meta_type = "CONSOLE" if meta.console_game else meta.platform.upper()
 
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}

@@ -76,7 +76,7 @@ class BJS:
 
         if meta.category == "GAME":
             pc_platforms = {"PC", "MAC", "LINUX"}
-            platform = str(meta.platform).upper().strip()
+            platform = meta.platform.upper().strip()
             if platform in pc_platforms:
                 builder = DescriptionBuilder(self.tracker, self.config)
                 has_install_notes = await builder.get_user_description(meta)
@@ -295,7 +295,7 @@ class BJS:
             "XSX": "17",
         }
 
-        platform = str(meta.platform).upper().strip()
+        platform = meta.platform.upper().strip()
         return platform_map.get(platform, "3")  # Default to PC
 
     def get_game_language(self, meta: Meta) -> str:
@@ -350,7 +350,7 @@ class BJS:
     def is_console_platform(self, meta: Meta) -> bool:
         """Check if the platform is a console (not PC/Mac/Linux/Emulator)."""
         pc_platforms = {"PC", "MAC", "LINUX", "EMULATOR"}
-        platform = str(meta.platform).upper().strip()
+        platform = meta.platform.upper().strip()
         return platform not in pc_platforms and platform != ""
 
     def get_game_subcategory(self, meta: Meta) -> str:
@@ -414,7 +414,7 @@ class BJS:
         width, height = "0", "0"
 
         if meta.is_disc == "BDMV":
-            resolution_str = str(meta.resolution)
+            resolution_str = meta.resolution
             try:
                 height_num = int(resolution_str.lower().replace("p", "").replace("i", ""))
                 height = str(height_num)
@@ -454,8 +454,8 @@ class BJS:
             "avc": "H.264",
         }
 
-        video_encode = str(meta.video_encode).lower()
-        video_codec = str(meta.video_codec)
+        video_encode = meta.video_encode.lower()
+        video_codec = meta.video_codec
 
         search_text = f"{video_encode} {video_codec.lower()}"
 
@@ -860,7 +860,7 @@ class BJS:
             return dupes
 
     def get_edition(self, meta: Meta) -> str:
-        edition_str = str(meta.edition).lower()
+        edition_str = meta.edition.lower()
         if not edition_str:
             return ""
 
@@ -887,7 +887,7 @@ class BJS:
             is_disc_type = meta.is_disc
 
             if is_disc_type == "BDMV":
-                disctype = str(meta.disctype)
+                disctype = meta.disctype
                 if disctype in ["BD100", "BD66", "BD50", "BD25"]:
                     return disctype
 
@@ -906,7 +906,7 @@ class BJS:
                     return "BD25"
 
             elif is_disc_type == "DVD":
-                dvd_size = str(meta.dvd_size)
+                dvd_size = meta.dvd_size
                 if dvd_size in ["DVD9", "DVD5"]:
                     return dvd_size
                 return "DVD9"
@@ -1119,13 +1119,13 @@ class BJS:
             except (KeyError, IndexError, TypeError):
                 pass
         else:
-            if str(meta.bit_depth) == "10":
+            if meta.bit_depth == "10":
                 is_10_bit = True
 
         if is_10_bit:
             found_tags.add("10-bit")
 
-        hdr_string = str(meta.hdr).upper()
+        hdr_string = meta.hdr.upper()
         if "DV" in hdr_string:
             found_tags.add("Dolby Vision")
         if "HDR10+" in hdr_string:
@@ -1354,7 +1354,7 @@ class BJS:
             })
 
             if meta.platform == "PC":
-                tag = str(meta.tag)
+                tag = meta.tag
                 if tag:
                     data["release"] = tag.lstrip("-")
                 game_version = meta.game_version
@@ -1507,8 +1507,8 @@ class BJS:
         imdb_tv_year = imdb_info.get("tv_year", "")
         tvdb_episode_year = meta.tvdb_episode_year
 
-        if tvdb_episode_year and str(tvdb_episode_year).isdigit():
-            return str(tvdb_episode_year)
+        if tvdb_episode_year and tvdb_episode_year.isdigit():
+            return tvdb_episode_year
 
         if imdb_tv_year and str(imdb_tv_year).isdigit():
             return str(imdb_tv_year)

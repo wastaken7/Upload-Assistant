@@ -137,18 +137,18 @@ class LST(UNIT3D):
             return None
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        lst_name = str(meta.name)
-        resolution = str(meta.resolution)
-        video_encode = str(meta.video_encode)
+        lst_name = meta.name
+        resolution = meta.resolution
+        video_encode = meta.video_encode
         name_type = meta.type
 
         if name_type == "DVDRIP":
             if meta.category == "MOVIE":
                 lst_name = lst_name.replace(f"{meta.source}{meta.video_encode}", f"{resolution}", 1)
-                lst_name = lst_name.replace(str(meta.audio), f"{meta.audio}{video_encode}", 1)
+                lst_name = lst_name.replace(meta.audio, f"{meta.audio}{video_encode}", 1)
             else:
                 lst_name = lst_name.replace(str(meta.source), f"{resolution}", 1)
-                lst_name = lst_name.replace(str(meta.video_codec), f"{meta.audio} {meta.video_codec}", 1)
+                lst_name = lst_name.replace(meta.video_codec, f"{meta.audio} {meta.video_codec}", 1)
 
         if meta.trump_reason == "exact_match":
             lst_name = lst_name + " - TRUMP"

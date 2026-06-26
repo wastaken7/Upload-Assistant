@@ -43,7 +43,7 @@ class ANT:
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []
-        flags.extend([each for each in ["Directors", "Extended", "Uncut", "Unrated", "4KRemaster", "IMAX"] if each in str(meta.edition).replace("'", "")])
+        flags.extend([each for each in ["Directors", "Extended", "Uncut", "Unrated", "4KRemaster", "IMAX"] if each in meta.edition.replace("'", "")])
         flags.extend([each.replace("-", "") for each in ["Dual-Audio", "Atmos"] if each in meta.audio])
         if meta.has_commentary or meta.manual_commentary:
             flags.append('Commentary')
@@ -61,7 +61,7 @@ class ANT:
 
     async def get_release_group(self, meta: Meta) -> str:
         if meta.tag:
-            tag = str(meta.tag)
+            tag = meta.tag
 
             return tag[1:]  # Remove leading character
 
@@ -131,7 +131,7 @@ class ANT:
             keywords = meta.keywords.lower()
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
-                antType = 0 if int(meta.runtime if meta.runtime is not None else 60) >= 45 or int(meta.runtime if meta.runtime is not None else 60) == 0 else 1
+                antType = 0 if meta.runtime if meta.runtime is not None else 60 >= 45 or meta.runtime if meta.runtime is not None else 60 == 0 else 1
             if tmdb_type == "miniseries" or "miniseries" in keywords:
                 antType = 2
             if "short" in keywords or "short film" in keywords:
@@ -203,7 +203,7 @@ class ANT:
         else:
             mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mi_path, encoding='utf-8') as f:
-                mediainfo_output = str(await f.read())
+                mediainfo_output = await f.read()
             data.update({"mediainfo": mediainfo_output})
         if meta.scene:
             # ID of "Scene?" checkbox on upload form is actually "censored"
@@ -297,7 +297,7 @@ class ANT:
         Possible values:
         DD+, DD, DTS-HD MA, DTS, TrueHD, FLAC, PCM, OPUS, AAC, MP3, MP2
         """
-        audio = str(meta.audio)
+        audio = meta.audio
         if not audio:
             return "NoAudio"
 
@@ -377,7 +377,7 @@ class ANT:
         }
         if meta.tmdb != 0:
             params["tmdb"] = meta.tmdb
-        elif meta.imdb_id is not None and int(meta.imdb_id) != 0:
+        elif meta.imdb_id is not None and meta.imdb_id != 0:
             params["imdb"] = meta.imdb
 
         headers = {

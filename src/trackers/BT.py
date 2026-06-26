@@ -169,7 +169,7 @@ class BT:
 
     async def get_container(self, meta: Meta) -> str:
         container = meta.container
-        container_str = str(container) if container is not None else ''
+        container_str = container if container is not None else ''
         container_lower = container_str.lower()
 
         if meta.category == "BOOK":
@@ -219,7 +219,7 @@ class BT:
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "GAME":
             pc_platforms = {"PC", "MAC", "LINUX"}
-            platform = str(meta.platform).upper().strip()
+            platform = meta.platform.upper().strip()
             if platform in pc_platforms:
                 builder = DescriptionBuilder(self.tracker, self.config)
                 has_install_notes = await builder.get_user_description(meta)
@@ -360,12 +360,12 @@ class BT:
             "XSX": "Multiplataforma",
         }
 
-        platform = str(meta.platform).upper().strip()
+        platform = meta.platform.upper().strip()
         return platform_map.get(platform, "")
 
     def get_game_os(self, meta: Meta) -> str:
         """Map meta.platform to BT sys_jogo dropdown value."""
-        platform = str(meta.platform).upper().strip()
+        platform = meta.platform.upper().strip()
         if platform == "PC":
             return "Windows"
         elif platform == "MAC":
@@ -380,8 +380,8 @@ class BT:
 
     def get_game_format(self, meta: Meta) -> str:
         """Map game container/type to BT formato_jogo dropdown value."""
-        platform = str(meta.platform).upper().strip()
-        container = str(meta.container).lower()
+        platform = meta.platform.upper().strip()
+        container = meta.container.lower()
 
         if platform == "MOBILE":
             return "APK"
@@ -683,7 +683,7 @@ class BT:
                 meta.skipping = f"{self.tracker}"
                 return dupes
 
-        is_tv_pack = bool(meta.tv_pack)
+        is_tv_pack = meta.tv_pack
 
         search_url = f"{self.base_url}/torrents.php?searchstr={searchstr}"
         try:
@@ -920,7 +920,7 @@ class BT:
         if isinstance(image_list, list):
             image_list_items = image_list
             combined_images.extend(
-                [cast(dict[str, Any], img) for img in image_list_items if isinstance(img, dict)]
+                [img for img in image_list_items if isinstance(img, dict)]
             )
         if isinstance(spectrograms_images, list):
             spectrograms_images_list = spectrograms_images
@@ -962,7 +962,7 @@ class BT:
         data: dict[str, Any] = {
             "submit": "true",
             "auth": BT.secret_token,
-            "year": str(meta.year),
+            "year": meta.year,
             "title": meta.title,
             "type": await self.get_type(meta),
         }
@@ -980,8 +980,8 @@ class BT:
             cover_path = meta.cover_path
             if isinstance(cover_path, str) and cover_path.startswith(("http://", "https://")):
                 cover_url = cover_path
-            elif meta.poster and str(meta.poster).startswith(("http://", "https://")):
-                cover_url = str(meta.poster)
+            elif meta.poster and meta.poster.startswith(("http://", "https://")):
+                cover_url = meta.poster
 
             data.update({
                 "idioma_ori": self.get_game_language(meta),
@@ -999,9 +999,9 @@ class BT:
                 "rating": str(meta.igdb_rating),
             })
 
-            platform = str(meta.platform).upper().strip()
+            platform = meta.platform.upper().strip()
             if platform == "PC":
-                tag = str(meta.tag)
+                tag = meta.tag
                 if tag:
                     data["versaoapp"] = tag.lstrip("-")
 
@@ -1014,9 +1014,9 @@ class BT:
             resolved_lang = await self.get_book_language(meta)
             resolved_format = await self.get_container(meta)
 
-            audiobook = bool(meta.audiobook)
-            magazine = bool(meta.magazine)
-            comic = bool(meta.comic)
+            audiobook = meta.audiobook
+            magazine = meta.magazine
+            comic = meta.comic
 
             data["title"] = self.common.portuguese_title_capitalization(meta.title)
             data.update({
@@ -1041,7 +1041,7 @@ class BT:
                     "edicao": edicao_str,
                     "paginas": self.get_book_pages(meta),
                     "tags": tags,
-                    "desc": html_to_bbcode(str(meta.overview)),
+                    "desc": html_to_bbcode(meta.overview),
                     "especificas": description,
                     "screen[]": await self.get_screens(meta),
                 })
@@ -1064,7 +1064,7 @@ class BT:
                 data.update({
                     "diretor": meta.author,
                     "tags": tags,
-                    "desc": html_to_bbcode(str(meta.overview)),
+                    "desc": html_to_bbcode(meta.overview),
                     "screen[]": await self.get_screens(meta),
                 })
         else:
@@ -1108,7 +1108,7 @@ class BT:
                     data["scene"] = "on"
 
             # Common data TV/Anime
-            tv_pack = bool(meta.tv_pack)
+            tv_pack = meta.tv_pack
             if meta.category == "TV" or meta.anime:
                 data.update({
                     "episodio": meta.episode,
@@ -1127,7 +1127,7 @@ class BT:
                     "horas": "",
                     "minutos": "",
                     "rating": str(meta.imdb_info.get("rating", "")),
-                    "releasedate": str(meta.year),
+                    "releasedate": meta.year,
                     "vote": "",
                 })
 
@@ -1149,7 +1149,7 @@ class BT:
         return data
 
     def get_audiobook_bitrate(self, meta: Meta) -> str:
-        container_lower = str(meta.container).lower()
+        container_lower = meta.container.lower()
         if container_lower in ("flac", "wav", "alac", "ape", "dsf", "dff"):
             return "Lossless"
 

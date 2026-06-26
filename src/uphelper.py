@@ -519,38 +519,25 @@ class UploadHelper:
                     lang_summary = str(languages)
                 lines.append(("Languages", lang_summary))
 
-        if not meta.emby:
-            lines.append(("Overview", f"{meta.overview[:60]}...."))
-            if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
-                lines.append(("Episode Title", str(meta.auto_episode_title)))
-            if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
-                lines.append(("Episode overview", meta.overview_meta))
-            lines.append(("Genre", str(meta.genres)))
-            if meta.demographic != "":
-                lines.append(("Demographic", meta.demographic))
-        if meta.emby_debug:
-            if meta.original_imdb != 0:
-                imdb = str(meta.original_imdb).zfill(7)
-                lines.append(("IMDB", f"https://www.imdb.com/title/tt{imdb}"))
-            if meta.original_tmdb != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.original_tmdb}"))
-            if meta.original_tvdb != 0:
-                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.original_tvdb}&tab=series"))
-            if meta.original_tvmaze != 0:
-                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.original_tvmaze}"))
-            if meta.original_mal != 0:
-                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.original_mal}"))
-        else:
-            if meta.tmdb_id or 0 != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}"))
-            if meta.imdb_id or 0 != 0:
-                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
-            if meta.tvdb_id or 0 != 0:
-                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
-            if meta.tvmaze_id or 0 != 0:
-                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
-            if meta.mal_id or 0 != 0:
-                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
+        lines.append(("Overview", f"{meta.overview[:60]}...."))
+        if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
+            lines.append(("Episode Title", str(meta.auto_episode_title)))
+        if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
+            lines.append(("Episode overview", meta.overview_meta))
+        lines.append(("Genre", str(meta.genres)))
+        if meta.demographic != "":
+            lines.append(("Demographic", meta.demographic))
+
+        if meta.tmdb_id or 0 != 0:
+            lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}"))
+        if meta.imdb_id or 0 != 0:
+            lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
+        if meta.tvdb_id or 0 != 0:
+            lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
+        if meta.tvmaze_id or 0 != 0:
+            lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
+        if meta.mal_id or 0 != 0:
+            lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
 
         resolution = meta.resolution
         source = meta.source
@@ -575,13 +562,12 @@ class UploadHelper:
             lines.append(("Region", str(region)))
             lines.append(("Distributor", distributor))
 
-        if not meta.emby:
-            if meta.freeleech != 0:
-                lines.append(("Freeleech", str(meta.freeleech)))
-            lines.append("")
+        if meta.freeleech != 0:
+            lines.append(("Freeleech", str(meta.freeleech)))
+        lines.append("")
 
-            if meta.personalrelease is True:
-                lines.append("[bold green]Personal Release![/bold green]")
+        if meta.personalrelease is True:
+            lines.append("[bold green]Personal Release![/bold green]")
 
         # Format and align labels and values
         max_label_len = 0
@@ -602,16 +588,15 @@ class UploadHelper:
 
         console.print("\n".join(formatted_lines), highlight=False)
 
-        if meta.unattended and not meta.unattended_confirm and not meta.emby_debug:
+        if meta.unattended and not meta.unattended_confirm:
             if meta.debug is True:
                 console.print("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
             return True
         else:
-            if not meta.emby:
-                await self.get_missing(meta)
-                ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
-                if ring_the_bell:
-                    console.print(ring_the_bell)
+            await self.get_missing(meta)
+            ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
+            if ring_the_bell:
+                console.print(ring_the_bell)
 
             if meta.is_disc is True:
                 meta.keep_folder = False
@@ -621,112 +606,88 @@ class UploadHelper:
                 if kf_confirm != 'y':
                     console.print("[bold red]Aborting...[/bold red]")
                     exit()
-            if not meta.emby:
-                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
-                confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
-            elif not meta.emby_debug:
-                confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
-        if meta.emby_debug:
-            if meta.original_imdb != meta.imdb_id:
-                imdb = str(meta.imdb_id).zfill(7)
-                console.print(f"[bold red]IMDB ID changed from {meta.original_imdb} to {meta.imdb_id}[/bold red]")
-                console.print(f"[bold cyan]IMDB URL:[/bold cyan] [yellow]https://www.imdb.com/title/tt{imdb}[/yellow]")
-            if meta.original_tmdb != meta.tmdb_id:
-                console.print(f"[bold red]TMDB ID changed from {meta.original_tmdb} to {meta.tmdb_id}[/bold red]")
-                console.print(f"[bold cyan]TMDB URL:[/bold cyan] [yellow]https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}[/yellow]")
-            if meta.original_mal != meta.mal_id:
-                console.print(f"[bold red]MAL ID changed from {meta.original_mal} to {meta.mal_id}[/bold red]")
-                console.print(f"[bold cyan]MAL URL:[/bold cyan] [yellow]https://myanimelist.net/anime/{meta.mal_id}[/yellow]")
-            if meta.original_tvmaze != meta.tvmaze_id:
-                console.print(f"[bold red]TVMaze ID changed from {meta.original_tvmaze} to {meta.tvmaze_id}[/bold red]")
-                console.print(f"[bold cyan]TVMaze URL:[/bold cyan] [yellow]https://www.tvmaze.com/shows/{meta.tvmaze_id}[/yellow]")
-            if meta.original_tvdb != meta.tvdb_id:
-                console.print(f"[bold red]TVDB ID changed from {meta.original_tvdb} to {meta.tvdb_id}[/bold red]")
-                console.print(f"[bold cyan]TVDB URL:[/bold cyan] [yellow]https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series[/yellow]")
-            if meta.original_category != meta.category:
-                console.print(f"[bold red]Category changed from {meta.original_category} to {meta.category}[/bold red]")
-            console.print(
-                f"[bold cyan]Regex Title:[/bold cyan] [yellow]{(meta.regex_title if meta.regex_title is not None else 'N/A')}[/yellow], [bold cyan]Secondary Title:[/bold cyan] [yellow]{(meta.regex_secondary_title if meta.regex_secondary_title is not None else 'N/A')}[/yellow], [bold cyan]Year:[/bold cyan] [yellow]{(meta.regex_year if meta.regex_year is not None else 'N/A')}, [bold cyan]AKA:[/bold cyan] [yellow]{meta.aka}[/yellow]"
-            )
+            console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+            confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == "y"
             console.print()
-            if (
-                meta.original_imdb == meta.imdb_id
-                and meta.original_tmdb == meta.tmdb_id
-                and meta.original_mal == meta.mal_id
-                and meta.original_tvmaze == meta.tvmaze_id
-                and meta.original_tvdb == meta.tvdb_id
-                and meta.original_category == meta.category
-            ):
-                console.print("[bold yellow]Database ID's are correct![/bold yellow]")
-                return True
-            else:
-                nfo_dir = os.path.join(f"{meta.base_dir}/data")
-                os.makedirs(nfo_dir, exist_ok=True)
-                json_file_path = os.path.join(nfo_dir, "db_check.json")
+            if confirm:
+                if (
+                    meta.original_imdb == meta.imdb_id
+                    and meta.original_tmdb == meta.tmdb_id
+                    and meta.original_mal == meta.mal_id
+                    and meta.original_tvmaze == meta.tvmaze_id
+                    and meta.original_tvdb == meta.tvdb_id
+                    and meta.original_category == meta.category
+                ):
+                    console.print("[bold yellow]Database ID's are correct![/bold yellow]")
+                    return True
+                else:
+                    nfo_dir = os.path.join(f"{meta.base_dir}/data")
+                    os.makedirs(nfo_dir, exist_ok=True)
+                    json_file_path = os.path.join(nfo_dir, "db_check.json")
 
-                def imdb_url(imdb_id: Any) -> Optional[str]:
-                    return f"https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}" if imdb_id and str(imdb_id).isdigit() else None
+                    def imdb_url(imdb_id: Any) -> Optional[str]:
+                        return f"https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}" if imdb_id and str(imdb_id).isdigit() else None
 
-                def tmdb_url(tmdb_id: Any, category: Any) -> Optional[str]:
-                    return f"https://www.themoviedb.org/{str(category).lower()}/{tmdb_id}" if tmdb_id and category else None
+                    def tmdb_url(tmdb_id: Any, category: Any) -> Optional[str]:
+                        return f"https://www.themoviedb.org/{str(category).lower()}/{tmdb_id}" if tmdb_id and category else None
 
-                def tvdb_url(tvdb_id: Any) -> Optional[str]:
-                    return f"https://www.thetvdb.com/?id={tvdb_id}&tab=series" if tvdb_id else None
+                    def tvdb_url(tvdb_id: Any) -> Optional[str]:
+                        return f"https://www.thetvdb.com/?id={tvdb_id}&tab=series" if tvdb_id else None
 
-                def tvmaze_url(tvmaze_id: Any) -> Optional[str]:
-                    return f"https://www.tvmaze.com/shows/{tvmaze_id}" if tvmaze_id else None
+                    def tvmaze_url(tvmaze_id: Any) -> Optional[str]:
+                        return f"https://www.tvmaze.com/shows/{tvmaze_id}" if tvmaze_id else None
 
-                def mal_url(mal_id: Any) -> Optional[str]:
-                    return f"https://myanimelist.net/anime/{mal_id}" if mal_id else None
+                    def mal_url(mal_id: Any) -> Optional[str]:
+                        return f"https://myanimelist.net/anime/{mal_id}" if mal_id else None
 
-                db_check_entry = {
-                    "path": meta.path,
-                    "original": {
-                        "imdb_id": (meta.original_imdb if meta.original_imdb is not None else "N/A"),
-                        "imdb_url": imdb_url(meta.original_imdb),
-                        "tmdb_id": (meta.original_tmdb if meta.original_tmdb is not None else "N/A"),
-                        "tmdb_url": tmdb_url(meta.original_tmdb, meta.original_category),
-                        "tvdb_id": (meta.original_tvdb if meta.original_tvdb is not None else "N/A"),
-                        "tvdb_url": tvdb_url(meta.original_tvdb),
-                        "tvmaze_id": (meta.original_tvmaze if meta.original_tvmaze is not None else "N/A"),
-                        "tvmaze_url": tvmaze_url(meta.original_tvmaze),
-                        "mal_id": (meta.original_mal if meta.original_mal is not None else "N/A"),
-                        "mal_url": mal_url(meta.original_mal),
-                        "category": (meta.original_category if meta.original_category is not None else "N/A"),
-                    },
-                    "changed": {
-                        "imdb_id": (meta.imdb_id if meta.imdb_id is not None else "N/A"),
-                        "imdb_url": imdb_url(meta.imdb_id),
-                        "tmdb_id": (meta.tmdb_id if meta.tmdb_id is not None else "N/A"),
-                        "tmdb_url": tmdb_url(meta.tmdb_id, meta.category),
-                        "tvdb_id": (meta.tvdb_id if meta.tvdb_id is not None else "N/A"),
-                        "tvdb_url": tvdb_url(meta.tvdb_id),
-                        "tvmaze_id": (meta.tvmaze_id if meta.tvmaze_id is not None else "N/A"),
-                        "tvmaze_url": tvmaze_url(meta.tvmaze_id),
-                        "mal_id": (meta.mal_id if meta.mal_id is not None else "N/A"),
-                        "mal_url": mal_url(meta.mal_id),
-                        "category": (meta.category if meta.category is not None else "N/A"),
-                    },
-                    "tracker": (meta.matched_tracker if meta.matched_tracker is not None else "N/A"),
-                }
+                    db_check_entry = {
+                        "path": meta.path,
+                        "original": {
+                            "imdb_id": (meta.original_imdb if meta.original_imdb is not None else "N/A"),
+                            "imdb_url": imdb_url(meta.original_imdb),
+                            "tmdb_id": (meta.original_tmdb if meta.original_tmdb is not None else "N/A"),
+                            "tmdb_url": tmdb_url(meta.original_tmdb, meta.original_category),
+                            "tvdb_id": (meta.original_tvdb if meta.original_tvdb is not None else "N/A"),
+                            "tvdb_url": tvdb_url(meta.original_tvdb),
+                            "tvmaze_id": (meta.original_tvmaze if meta.original_tvmaze is not None else "N/A"),
+                            "tvmaze_url": tvmaze_url(meta.original_tvmaze),
+                            "mal_id": (meta.original_mal if meta.original_mal is not None else "N/A"),
+                            "mal_url": mal_url(meta.original_mal),
+                            "category": (meta.original_category if meta.original_category is not None else "N/A"),
+                        },
+                        "changed": {
+                            "imdb_id": (meta.imdb_id if meta.imdb_id is not None else "N/A"),
+                            "imdb_url": imdb_url(meta.imdb_id),
+                            "tmdb_id": (meta.tmdb_id if meta.tmdb_id is not None else "N/A"),
+                            "tmdb_url": tmdb_url(meta.tmdb_id, meta.category),
+                            "tvdb_id": (meta.tvdb_id if meta.tvdb_id is not None else "N/A"),
+                            "tvdb_url": tvdb_url(meta.tvdb_id),
+                            "tvmaze_id": (meta.tvmaze_id if meta.tvmaze_id is not None else "N/A"),
+                            "tvmaze_url": tvmaze_url(meta.tvmaze_id),
+                            "mal_id": (meta.mal_id if meta.mal_id is not None else "N/A"),
+                            "mal_url": mal_url(meta.mal_id),
+                            "category": (meta.category if meta.category is not None else "N/A"),
+                        },
+                        "tracker": (meta.matched_tracker if meta.matched_tracker is not None else "N/A"),
+                    }
 
-                # Append to JSON file (as a list of entries)
-                db_data_list: list[dict[str, Any]] = []
-                if os.path.exists(json_file_path):
-                    async with aiofiles.open(json_file_path, encoding='utf-8') as f:
-                        try:
-                            file_contents = await f.read()
-                            if file_contents:
-                                parsed_data = json.loads(file_contents)
-                                if isinstance(parsed_data, list):
-                                    db_data_list = cast(list[dict[str, Any]], parsed_data)
-                        except Exception:
-                            db_data_list = []
-                db_data_list.append(db_check_entry)
+                    # Append to JSON file (as a list of entries)
+                    db_data_list: list[dict[str, Any]] = []
+                    if os.path.exists(json_file_path):
+                        async with aiofiles.open(json_file_path, encoding="utf-8") as f:
+                            try:
+                                file_contents = await f.read()
+                                if file_contents:
+                                    parsed_data = json.loads(file_contents)
+                                    if isinstance(parsed_data, list):
+                                        db_data_list = cast(list[dict[str, Any]], parsed_data)
+                            except Exception:
+                                db_data_list = []
+                    db_data_list.append(db_check_entry)
 
-                async with aiofiles.open(json_file_path, 'w', encoding='utf-8') as f:
-                    await f.write(json.dumps(db_data_list, indent=2, ensure_ascii=False))
-                return True
+                    async with aiofiles.open(json_file_path, "w", encoding="utf-8") as f:
+                        await f.write(json.dumps(db_data_list, indent=2, ensure_ascii=False))
+                    return True
 
         return confirm
 

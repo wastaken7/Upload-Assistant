@@ -101,7 +101,7 @@ class SAM(UNIT3D):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
         if resolved_type == "GAME" or (meta.category == "GAME" and resolved_type not in type_id):
-            platform = str(meta.platform).lower()
+            platform = meta.platform.lower()
             nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):

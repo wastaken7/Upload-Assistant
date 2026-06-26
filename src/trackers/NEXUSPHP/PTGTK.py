@@ -70,7 +70,7 @@ class PTGTK(NEXUSPHP):
 
         is_disc = str(meta.is_disc).lower()
         mtype = str(meta.type).lower()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -102,7 +102,7 @@ class PTGTK(NEXUSPHP):
         vp9 = 8
         xvid = 3
 
-        codec = str(meta.video_codec).lower()
+        codec = meta.video_codec.lower()
 
         if "av1" in codec:
             return av1
@@ -122,7 +122,7 @@ class PTGTK(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if resolution == "1080p":
             return 1
@@ -153,7 +153,7 @@ class PTGTK(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = str(meta.tag).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:

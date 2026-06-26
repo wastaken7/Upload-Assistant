@@ -70,7 +70,7 @@ class LPT(NEXUSPHP):
 
         is_disc = str(meta.is_disc).lower()
         mtype = str(meta.type).lower()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -105,7 +105,7 @@ class LPT(NEXUSPHP):
         other = 6
         vc1 = 3
 
-        codec = str(meta.video_codec).lower()
+        codec = meta.video_codec.lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -121,7 +121,7 @@ class LPT(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if "4320" in resolution:
             return 6
@@ -139,7 +139,7 @@ class LPT(NEXUSPHP):
         return 7
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.audio).lower()
+        audio_codec = meta.audio.lower()
 
         if "flac" in audio_codec:
             return 1
@@ -189,7 +189,7 @@ class LPT(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = str(meta.tag).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:

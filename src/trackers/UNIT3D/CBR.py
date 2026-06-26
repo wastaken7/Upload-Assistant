@@ -97,7 +97,7 @@ class CBR(UNIT3D):
 
         resolved_type = type if type else meta.type
         if resolved_type == "GAME" or (meta.category == "GAME" and resolved_type not in type_id):
-            platform = str(meta.platform).lower()
+            platform = meta.platform.lower()
             nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
@@ -144,8 +144,8 @@ class CBR(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
-        cbr_name = str(meta.name)
-        name = str(meta.name)
+        cbr_name = meta.name
+        name = meta.name
 
         if category == "BOOK":
             book_title = self.common.portuguese_title_capitalization(meta.title)
@@ -182,7 +182,7 @@ class CBR(UNIT3D):
 
             # If it is a Series or Anime, remove the year from the title.
             if meta.category in ["TV", "ANIMES"]:
-                year = str(meta.year)
+                year = meta.year
                 if year and year in cbr_name:
                     cbr_name = cbr_name.replace(f"({year})", "").replace(year, "").strip()
 
@@ -192,11 +192,11 @@ class CBR(UNIT3D):
 
             # If it is Brazilian, use only the AKA title, deleting the foreign title
             if meta.original_language == "pt" and meta.aka:
-                aka_clean = str(meta.aka).replace("AKA", "").strip()
+                aka_clean = meta.aka.replace("AKA", "").strip()
                 title = meta.title
                 cbr_name = cbr_name.replace(meta.aka, "").replace(title, aka_clean).strip()
 
-            tag_lower = str(meta.tag).lower()
+            tag_lower = meta.tag.lower()
             invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
             if not meta.is_disc:
@@ -248,7 +248,7 @@ class CBR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category == "BOOK" and bool(meta.audiobook) and not meta.narrator:
+        if meta.category == "BOOK" and meta.audiobook and not meta.narrator:
             console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
             return False
 

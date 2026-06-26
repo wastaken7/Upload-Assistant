@@ -31,7 +31,7 @@ def _coerce_int(value: Any) -> Optional[int]:
 
 def _as_dict_list(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, list):
-        return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+        return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
     return []
 
 
@@ -191,7 +191,7 @@ class tvdb_data:
             if results and len(results) > 0:
                 # Try to find the best match based on year
                 best_match: Optional[dict[str, Any]] = None
-                search_year = str(year) if year else ''
+                search_year = year if year else ''
 
                 if search_year:
                     # First, try to find exact year match
@@ -204,7 +204,7 @@ class tvdb_data:
                 if not best_match and search_year:
                     for result in results:
                         aliases_raw = result.get('aliases', [])
-                        aliases = cast(list[Any], aliases_raw) if isinstance(aliases_raw, list) else []
+                        aliases = aliases_raw if isinstance(aliases_raw, list) else []
                         if aliases:
                             # Check if any alias contains the year in parentheses
                             for alias in aliases:
@@ -256,7 +256,7 @@ class tvdb_data:
 
             aired_norm = None
             if aired_date:
-                aired_norm = str(aired_date).strip().replace('.', '-')
+                aired_norm = aired_date.strip().replace('.', '-')
 
             # Normalize numeric inputs
             try:
@@ -529,7 +529,7 @@ class tvdb_data:
                 elif isinstance(imdb, int):
                     imdb_formatted = f"tt{imdb:07d}"
                 else:
-                    imdb_formatted = str(imdb)
+                    imdb_formatted = imdb
 
                 if debug:
                     console.print(f"[cyan]Trying TVDB lookup with IMDB ID: {imdb_formatted}[/cyan]")
@@ -726,7 +726,7 @@ class tvdb_data:
 
         # For daily shows, match by air date if provided.
         if aired_date:
-            aired_norm = str(aired_date).strip().replace('.', '-')
+            aired_norm = aired_date.strip().replace('.', '-')
             for ep in episodes:
                 if ep.get('aired') == aired_norm:
                     if debug:

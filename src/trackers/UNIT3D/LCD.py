@@ -29,7 +29,7 @@ class LCD(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name_value = meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext
-        name = str(name_value)
+        name = name_value
 
         replacements = {
             '.mkv': '',
@@ -63,7 +63,7 @@ class LCD(UNIT3D):
         for old, new in replacements.items():
             name = name.replace(old, new)
 
-        tag_lower = str(meta.tag).lower()
+        tag_lower = meta.tag.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:

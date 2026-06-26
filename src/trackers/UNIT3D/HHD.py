@@ -122,7 +122,7 @@ class HHD(UNIT3D):
             resolved_type = "OTHER"
 
         if meta.category == "GAME":
-            resolved_type = "CONSOLE" if meta.console_game else str(meta.platform).upper()
+            resolved_type = "CONSOLE" if meta.console_game else meta.platform.upper()
 
         return {"type_id": type_id.get(resolved_type, "0")}
 

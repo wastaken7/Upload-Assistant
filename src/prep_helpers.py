@@ -100,7 +100,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.adult_media = False
 
     folder_id = os.path.basename(meta.path)
-    if meta.uuid is None:
+    if not meta.uuid:
         meta.uuid = folder_id
     if meta.isdir:
         meta.basename_no_ext = folder_id
@@ -234,48 +234,29 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         search_term = os.path.basename(meta.path)
         search_file_folder = "folder"
         try:
-            if meta.emby:
-                title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
-                if meta.debug:
-                    console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
-                if secondary_title:
-                    meta.secondary_title = secondary_title
-                if extracted_year and not meta.year:
-                    meta.year = extracted_year
-                if title:
-                    filename = title
-                    untouched_filename = search_term
-                    meta.regex_title = title
-                    meta.regex_secondary_title = secondary_title
-                    meta.regex_year = extracted_year
-                else:
-                    guess_name = search_term.replace("-", " ")
-                    untouched_filename = search_term
-                    filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
+            title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
+            if meta.debug:
+                console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
+            if secondary_title:
+                meta.secondary_title = secondary_title
+            if extracted_year and not meta.year:
+                meta.year = extracted_year
+            if title:
+                filename = title
+                untouched_filename = search_term
             else:
-                title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
-                if meta.debug:
-                    console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
-                if secondary_title:
-                    meta.secondary_title = secondary_title
-                if extracted_year and not meta.year:
-                    meta.year = extracted_year
-                if title:
-                    filename = title
-                    untouched_filename = search_term
-                else:
-                    guess_name = bdinfo["title"].replace("-", " ")
-                    untouched_filename = bdinfo["title"]
-                    filename = str(guessit_fn(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", ""))
+                guess_name = bdinfo["title"].replace("-", " ")
+                untouched_filename = bdinfo["title"]
+                filename = str(guessit_fn(re.sub(r"[^0-9a-zA-Z\[\\]]+", " ", guess_name), {"excludes": ["country", "language"]}).get("title", ""))
 
-                try:
-                    is_hfr = bdinfo["video"][0]["fps"].split()[0] if bdinfo["video"] else "25"
-                    if int(float(is_hfr)) > 30:
-                        meta.hfr = True
-                    else:
-                        meta.hfr = False
-                except Exception:
+            try:
+                is_hfr = bdinfo["video"][0]["fps"].split()[0] if bdinfo["video"] else "25"
+                if int(float(is_hfr)) > 30:
+                    meta.hfr = True
+                else:
                     meta.hfr = False
+            except Exception:
+                meta.hfr = False
 
             try:
                 meta.search_year = guessit_fn(bdinfo["title"])["year"]
@@ -290,16 +271,13 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             except Exception:
                 meta.search_year = ""
 
-        if not meta.resolution or meta.resolution is None and not meta.emby:
+        if not meta.resolution or meta.resolution is None:
             meta.resolution = await mi_resolution(
                 bdinfo["video"][0]["res"],
                 guessit_fn(video),
                 width="OTHER",
                 scan="p",
             )
-
-        elif meta.emby:
-            meta.resolution = "1080p"
 
         meta.sd = await video_manager.is_sd(meta.resolution)
         mi = None
@@ -309,61 +287,40 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         meta.filelist = []
         search_term = os.path.basename(meta.path)
         search_file_folder = "folder"
-        if meta.emby:
-            title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
-            if meta.debug:
-                console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
-            if secondary_title:
-                meta.secondary_title = secondary_title
-            if extracted_year and not meta.year:
-                meta.year = extracted_year
-            if title:
-                filename = title
-                untouched_filename = search_term
-                meta.regex_title = title
-                meta.regex_secondary_title = secondary_title
-                meta.regex_year = extracted_year
-            else:
-                guess_name = search_term.replace("-", " ")
-                filename = guess_name
-                untouched_filename = search_term
-            meta.resolution = "480p"
-            meta.search_year = ""
+        title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
+        if meta.debug:
+            console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
+        if secondary_title:
+            meta.secondary_title = secondary_title
+        if extracted_year and not meta.year:
+            meta.year = extracted_year
+        if title:
+            filename = title
+            untouched_filename = search_term
         else:
-            title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
-            if meta.debug:
-                console.print(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
-            if secondary_title:
-                meta.secondary_title = secondary_title
-            if extracted_year and not meta.year:
-                meta.year = extracted_year
-            if title:
-                filename = title
-                untouched_filename = search_term
-            else:
-                guess_name = meta.discs[0]["path"].replace("-", " ")
-                filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
-                untouched_filename = os.path.basename(os.path.dirname(meta.discs[0]["path"]))
-            try:
-                meta.search_year = guessit_fn(meta.discs[0]["path"])["year"]
-            except Exception:
-                meta.search_year = ""
-            if not meta.edit:
-                mi = await exportInfo(
-                    f"{meta.discs[0]['path']}/VTS_{meta.discs[0]['main_set'][0][:2]}_0.IFO",
-                    False,
-                    meta.uuid,
-                    meta.base_dir,
-                    is_dvd=True,
-                    debug=meta.debug,
-                )
-                meta.mediainfo = mi
-            else:
-                mi = meta.mediainfo
+            guess_name = meta.discs[0]["path"].replace("-", " ")
+            filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
+            untouched_filename = os.path.basename(os.path.dirname(meta.discs[0]["path"]))
+        try:
+            meta.search_year = guessit_fn(meta.discs[0]["path"])["year"]
+        except Exception:
+            meta.search_year = ""
+        if not meta.edit:
+            mi = await exportInfo(
+                f"{meta.discs[0]['path']}/VTS_{meta.discs[0]['main_set'][0][:2]}_0.IFO",
+                False,
+                meta.uuid,
+                meta.base_dir,
+                is_dvd=True,
+                debug=meta.debug,
+            )
+            meta.mediainfo = mi
+        else:
+            mi = meta.mediainfo
 
-            meta.dvd_size = await prep_instance.disc_info_manager.get_dvd_size(meta.discs, meta.manual_dvds)
-            meta.resolution, meta.hfr = await video_manager.get_resolution(guessit_fn(video), meta.uuid, base_dir, meta)
-            meta.sd = await video_manager.is_sd(meta.resolution)
+        meta.dvd_size = await prep_instance.disc_info_manager.get_dvd_size(meta.discs, meta.manual_dvds)
+        meta.resolution, meta.hfr = await video_manager.get_resolution(guessit_fn(video), meta.uuid, base_dir, meta)
+        meta.sd = await video_manager.is_sd(meta.resolution)
 
     elif meta.is_disc == "HDDVD":
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta.path, meta, meta.imdb_id)
@@ -478,7 +435,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             elif meta.category == "GAME" or str(meta.manual_category or "").upper() == "GAME":
                 meta.filename = filename
                 await prep_instance._gather_game_prep(meta, videopath, base_dir)
-            elif not meta.emby:
+            else:
                 # rely only on guessit for search_year for tv matching
                 try:
                     meta.search_year = guessit_fn(video)["year"]
@@ -495,9 +452,6 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     meta.resolution, meta.hfr = await video_manager.get_resolution(guessit_fn(video), meta.uuid, base_dir, meta)
 
                 meta.sd = await video_manager.is_sd(meta.resolution)
-            else:
-                meta.resolution = "1080p"
-                meta.search_year = ""
         except Exception as e:
             console.print(f"[red]Error processing Mediainfo: {e}[/red]")
             raise Exception(f"Error processing Mediainfo: {e}") from e
@@ -584,7 +538,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
             raise Exception("Conformance errors found in mediainfo")
 
     meta.valid_mi = True
-    if not meta.is_disc and not meta.emby and meta.category not in ("BOOK", "GAME"):
+    if not meta.is_disc and meta.category not in ("BOOK", "GAME"):
         try:
             valid_mi = validate_mediainfo(meta, debug=meta.debug)
         except NoAudioMediaError as e:
@@ -602,7 +556,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
     meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track["@type"] == "Text" and track["Default"] == "Yes"]) > 1
 
     # Check if there's a language restriction
-    if meta.has_languages and not meta.emby:
+    if meta.has_languages:
         try:
             parsed_info = await languages_manager.parsed_mediainfo(meta)
             audio_languages = [audio_track["language"].lower() for audio_track in parsed_info.get("audio", []) if "language" in audio_track and audio_track["language"]]
@@ -621,32 +575,24 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
 async def process_trackers_and_torrent(
     prep_instance: Any, meta: Meta, client: Clients, hash_ids: list[str], tracker_ids: list[str], _search_term: str, _search_file_folder: str
 ) -> None:
-    if not meta.emby:
-        if "description" not in meta or meta.description is None:
-            meta.description = ""
+    if "description" not in meta or meta.description is None:
+        meta.description = ""
 
-        description_text = meta.description
-        if description_text is None:
-            description_text = ""
-        async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
-            "w",
-            newline="",
-            encoding="utf8",
-        ) as description:
-            if len(description_text):
-                await description.write(description_text)
+    description_text = meta.description
+    if description_text is None:
+        description_text = ""
+    async with aiofiles.open(
+        f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+        "w",
+        newline="",
+        encoding="utf8",
+    ) as description:
+        if len(description_text):
+            await description.write(description_text)
 
     meta.skip_trackers = False
-    if meta.emby:
-        meta.skip_tracker_descriptions = True
-        meta.keep_images = False
-        if meta.imdb_id != 0:
-            meta.skip_trackers = True
-    if meta.emby_debug:
-        meta.skip_trackers = True
 
-    if not meta.emby and meta.trackers:
+    if meta.trackers:
         trackers = meta.trackers
     else:
         default_trackers = prep_instance.config["TRACKERS"].get("default_trackers", "")
@@ -948,22 +894,18 @@ async def search_metadata(
 
     # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
     ping_unit3d_config = prep_instance.config["DEFAULT"].get("ping_unit3d", False)
-    if (not meta.region or not meta.distributor) and meta.is_disc == "BDMV" and ping_unit3d_config and not meta.edit and not meta.emby and not meta.site_check:
+    if (not meta.region or not meta.distributor) and meta.is_disc == "BDMV" and ping_unit3d_config and not meta.edit and not meta.site_check:
         await prep_instance.tracker_data_manager.ping_unit3d(meta)
 
     # the first user override check that allows to set metadata ids.
     # it relies on imdb or tvdb already being set.
     user_overrides = prep_instance.config["DEFAULT"].get("user_overrides", False)
-    if user_overrides and (meta.imdb_id != 0 or meta.tvdb_id != 0) and not meta.emby:
+    if user_overrides and (meta.imdb_id != 0 or meta.tvdb_id != 0):
         meta = await prep_instance.overrides.get_source_override(meta, other_id=True)
         category = meta.category
         meta.category = str(category).upper() if category is not None else ""
         # set a flag so that the other check later doesn't run
         meta.no_override = True
-
-    emby_cat = meta.emby_cat
-    if emby_cat is not None and str(emby_cat).upper() != str(meta.category or "").upper():
-        return
 
     if meta.debug:
         console.print("ID inputs into prep")
@@ -1000,27 +942,18 @@ async def search_metadata(
     mi_data: dict[str, Any] = mi or {}
 
     # Run a check against mediainfo to see if it has tmdb/imdb
-    if (meta.tmdb_id == 0 or meta.imdb_id == 0) and not meta.emby and meta.category not in ("BOOK", "GAME"):
+    if (meta.tmdb_id == 0 or meta.imdb_id == 0) and meta.category not in ("BOOK", "GAME"):
         meta.category, meta.tmdb_id, meta.imdb_id, meta.tvdb_id = await prep_instance.tmdb_manager.get_tmdb_imdb_from_mediainfo(mi_data, meta)
-
-    # Flag for emby if no IDs were found
-    if meta.imdb_id == 0 and meta.tvdb_id == 0 and meta.tmdb_id == 0 and meta.tvmaze_id == 0 and meta.mal_id == 0 and meta.emby:
-        meta.no_ids = True
 
     meta.video_duration = await video_manager.get_video_duration(meta)
     duration = meta.video_duration
 
     unattended = not (not meta.unattended or meta.unattended and meta.unattended_confirm)
-    debug = bool(meta.emby_debug or meta.debug)
+    debug = bool(meta.debug)
 
     # run a search to find tmdb and imdb ids if we don't have them
     if int(meta.tmdb_id or 0) == 0 and int(meta.imdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME"):
-        if meta.category == "TV":
-            year = meta.manual_year or meta.search_year or meta.year
-        elif meta.emby_debug:
-            year = ""
-        else:
-            year = meta.manual_year or meta.year or meta.search_year
+        year = meta.manual_year or meta.search_year or meta.year if meta.category == "TV" else meta.manual_year or meta.year or meta.search_year
         year_value = _normalize_search_year(year)
         category_pref = meta.category or ""
         tmdb_task: asyncio.Task[tuple[int, str]] = asyncio.create_task(
@@ -1343,7 +1276,6 @@ async def finalize_metadata(
         and get_bluray_info
         and (meta.distributor is None or meta.region is None)
         and meta.imdb_id != 0
-        and not meta.emby
         and not meta.edit
         and not meta.site_check
     ):
@@ -1368,7 +1300,7 @@ async def finalize_metadata(
 
     # user override check that only sets data after metadata setting
     user_overrides = prep_instance.config["DEFAULT"].get("user_overrides", False)
-    if user_overrides and not meta.no_override and not meta.emby:
+    if user_overrides and not meta.no_override:
         meta = await prep_instance.overrides.get_source_override(meta)
 
     meta.video = video
@@ -1377,7 +1309,7 @@ async def finalize_metadata(
     base_dir = meta.base_dir
     folder_id = os.path.basename(meta.path)
 
-    if not meta.emby and meta.category in ("TV", "MOVIE"):
+    if meta.category in ("TV", "MOVIE"):
         meta.container = await video_manager.get_container(meta)
 
         meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)

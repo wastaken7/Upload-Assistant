@@ -49,7 +49,7 @@ class SN:
                 'Mina': '47'
             }
 
-            demographic = str(meta.demographic if meta.demographic is not None else "Mina")
+            demographic = meta.demographic if meta.demographic is not None else "Mina"
             sub_cat_id = demographics_map.get(demographic, sub_cat_id)
 
         category = str(meta.category)
@@ -59,7 +59,7 @@ class SN:
             sub_cat_id = await self.get_type_id(str(meta.source))
         elif category == 'TV':
             cat_id = '2'
-            sub_cat_id = "6" if bool(meta.tv_pack) else "5"
+            sub_cat_id = "6" if meta.tv_pack else "5"
             # todo need to do a check for docs and add as subcat
 
         mi_dump: Optional[str]
@@ -98,7 +98,7 @@ class SN:
         api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
         data: dict[str, Any] = {
             "api_key": api_key,
-            "name": str(meta.name),
+            "name": meta.name,
             "category_id": cat_id,
             "type_id": sub_cat_id,
             "media_ref": f"tt{meta.imdb}",
@@ -106,7 +106,7 @@ class SN:
             "media_info": mi_dump,
         }
 
-        if not bool(meta.debug):
+        if not meta.debug:
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(self.upload_url, data=data, files=files)
@@ -116,7 +116,7 @@ class SN:
 
             try:
                 if response.json().get('success'):
-                    tracker_status = cast(dict[str, Any], meta.tracker_status)
+                    tracker_status = meta.tracker_status
                     tracker_status.setdefault(self.tracker, {})
                     tracker_status[self.tracker]['status_message'] = response.json()['link']
                     if 'link' in response.json():
@@ -146,7 +146,7 @@ class SN:
         else:
             console.print("[cyan]SN Request Data:")
             console.print(Redaction.redact_private_info(data))
-            tracker_status = cast(dict[str, Any], meta.tracker_status)
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -160,7 +160,7 @@ class SN:
             base = await base_file.read()
 
         parts: list[str] = [base]
-        images = cast(list[dict[str, Any]], meta.image_list)
+        images = meta.image_list
         if images:
             parts.append("[center]")
             for image in images:
@@ -188,9 +188,9 @@ class SN:
         }
 
         # Determine search parameters based on metadata
-        imdb_id = int(meta.imdb_id or 0)
+        imdb_id = meta.imdb_id or 0
         category = str(meta.category)
-        title = str(meta.title)
+        title = meta.title
         if imdb_id == 0:
             if category == 'TV':
                 params["filter"] = f"{title}{meta.season}"
@@ -201,7 +201,7 @@ class SN:
             if category == 'TV':
                 params["filter"] = f"{meta.season}"
             else:
-                params["filter"] = str(meta.resolution)
+                params["filter"] = meta.resolution
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

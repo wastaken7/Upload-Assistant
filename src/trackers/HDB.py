@@ -72,7 +72,7 @@ class HDB:
             "XviD": 4,
             "VP9": 6
         }
-        searchcodec = str(meta.video_codec or meta.video_encode or "")
+        searchcodec = meta.video_codec or meta.video_encode or ""
         codec_id = codecmap.get(searchcodec, 0)
         return codec_id
 
@@ -140,7 +140,7 @@ class HDB:
             "CRAV": 80,
             'MAX': 88
         }
-        service_key = str(meta.service or "")
+        service_key = meta.service or ""
         service_id = service_dict.get(service_key)
         if service_id is not None:
             tags.append(service_id)
@@ -156,7 +156,7 @@ class HDB:
             "STUDIO CANAL": 65,
             "ARROW": 64
         }
-        distributor_key = str(meta.distributor or "")
+        distributor_key = meta.distributor or ""
         distributor_id = distributor_dict.get(distributor_key)
         if distributor_id is not None:
             tags.append(distributor_id)
@@ -169,7 +169,7 @@ class HDB:
 
         # Audio
         # DTS:X, Dolby Atmos, Auro-3D, Silent
-        audio = str(meta.audio)
+        audio = meta.audio
         if "DTS:X" in audio:
             tags.append(7)
         if "Atmos" in audio:
@@ -179,7 +179,7 @@ class HDB:
 
         # Video Metadata
         # HDR10, HDR10+, Dolby Vision, 10-bit,
-        hdr_value = str(meta.hdr)
+        hdr_value = meta.hdr
         if "HDR" in hdr_value:
             if "HDR10+" in hdr_value:
                 tags.append(25)  # HDR10+
@@ -193,10 +193,10 @@ class HDB:
         return tags
 
     async def edit_name(self, meta: Meta) -> str:
-        hdb_name = str(meta.name)
-        audio = str(meta.audio)
+        hdb_name = meta.name
+        audio = meta.audio
         hdb_name = hdb_name.replace('H.265', 'HEVC')
-        if str(meta.source or "").upper() == "WEB" and str(meta.service or "").strip() != "":
+        if meta.source or "".upper() == "WEB" and meta.service or "".strip() != "":
             hdb_name = hdb_name.replace(f"{meta.service} ", "", 1)
         if "DV" in meta.hdr:
             hdb_name = hdb_name.replace(' DV ', ' DoVi ')
@@ -209,8 +209,8 @@ class HDB:
         hdb_name = hdb_name.replace(meta.aka, "")
         if meta.imdb_info:
             hdb_name = hdb_name.replace(meta.title, meta.imdb_info["aka"])
-            if str(meta.year) != str(meta.imdb_info.get("year", meta.year)) and str(meta.year).strip() != "":
-                hdb_name = hdb_name.replace(str(meta.year), str(meta.imdb_info["year"]))
+            if meta.year != str(meta.imdb_info.get("year", meta.year)) and meta.year.strip() != "":
+                hdb_name = hdb_name.replace(meta.year, str(meta.imdb_info["year"]))
         # Remove Dubbed/Dual-Audio from title
         hdb_name = hdb_name.replace('PQ10', 'HDR')
         hdb_name = hdb_name.replace('Dubbed', '').replace('Dual-Audio', '')
@@ -244,7 +244,7 @@ class HDB:
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
             hdb_desc = await desc_file.read()
 
-        base_piece_mb = int(meta.base_torrent_piece_mb or 0)
+        base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
@@ -305,8 +305,8 @@ class HDB:
         else:
             data['imdb'] = 0
         if meta.category == "TV":
-            data["tvdb_season"] = int(meta.season_int)
-            data["tvdb_episode"] = int(meta.episode_int)
+            data["tvdb_season"] = meta.season_int
+            data["tvdb_episode"] = meta.episode_int
         # aniDB
 
         url = "https://hdbits.org/upload/upload"
@@ -349,9 +349,9 @@ class HDB:
             'medium': await self.get_type_medium_id(meta)
         }
 
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             data["imdb"] = {"id": meta.imdb}
-        if int(meta.tvdb_id or 0) != 0:
+        if meta.tvdb_id or 0 != 0:
             data["tvdb"] = {"id": meta.tvdb_id}
 
         # Build search_terms list
@@ -603,7 +603,7 @@ class HDB:
                 )
             if images_list:
                 desc_parts.append("[center]")
-                screen_limit = int(meta.screens or 0)
+                screen_limit = meta.screens or 0
                 for each in range(len(images_list[:screen_limit])):
                     img_url = str(images_list[each].get('img_url', ''))
                     web_url = str(images_list[each].get('web_url', ''))
@@ -624,7 +624,7 @@ class HDB:
         uploadSuccess = False
         sorted_group_indices: list[str] = []
         if meta.comparison:
-            comparison_path = str(meta.comparison)
+            comparison_path = meta.comparison
             if not comparison_path or not os.path.isdir(comparison_path):
                 console.print(f"[red]Comparison path not found: {comparison_path}")
                 return None
@@ -653,13 +653,13 @@ class HDB:
 
                     sorted_files = sorted(files_list, key=_sort_key)
 
-                    group_images[str(group_idx)] = []
+                    group_images[group_idx] = []
                     for filename in sorted_files:
                         file_path = os.path.join(comparison_path, filename)
                         if os.path.exists(file_path):
-                            group_images[str(group_idx)].append(file_path)
+                            group_images[group_idx].append(file_path)
 
-                    max_images_per_group = max(max_images_per_group, len(group_images[str(group_idx)]))
+                    max_images_per_group = max(max_images_per_group, len(group_images[group_idx]))
             else:
                 comparison_files: list[str] = [f for f in os.listdir(comparison_path) if f.lower().endswith('.png')]
                 filename_pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
@@ -709,13 +709,13 @@ class HDB:
             image_patterns = ["*.png", ".[!.]*.png"]
             image_glob: list[str] = []
             for image_pattern in image_patterns:
-                full_pattern = os.path.join(glob.escape(screenshot_dir), str(image_pattern))
+                full_pattern = os.path.join(glob.escape(screenshot_dir), image_pattern)
                 glob_results: list[str] = await asyncio.to_thread(glob.glob, full_pattern)
                 image_glob.extend(glob_results)
             unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
             unwanted_files: set[str] = set()
             for unwanted_pattern in unwanted_patterns:
-                unwanted_full_pattern = os.path.join(glob.escape(screenshot_dir), str(unwanted_pattern))
+                unwanted_full_pattern = os.path.join(glob.escape(screenshot_dir), unwanted_pattern)
                 glob_results = await asyncio.to_thread(glob.glob, unwanted_full_pattern)
                 unwanted_files.update(glob_results)
                 hidden_pattern = os.path.join(glob.escape(screenshot_dir), "." + unwanted_pattern)

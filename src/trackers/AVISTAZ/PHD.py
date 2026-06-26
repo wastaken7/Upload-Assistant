@@ -35,11 +35,11 @@ class PHD(AZTrackerBase):
         if meta.is_disc == "BDMV":
             is_bd_disc = True
 
-        video_codec = str(meta.video_codec)
+        video_codec = meta.video_codec
         if video_codec:
             video_codec = video_codec.strip().lower()
 
-        video_encode = str(meta.video_encode)
+        video_encode = meta.video_encode
         if video_encode:
             video_encode = video_encode.strip().lower()
 
@@ -63,7 +63,7 @@ class PHD(AZTrackerBase):
 
         year_value = meta.year
         current_year = datetime.now(timezone.utc).year
-        year = int(year_value) if year_value and str(year_value).isdigit() else None
+        year = int(year_value) if year_value and year_value.isdigit() else None
         if year is not None:
             is_older_than_50_years = (current_year - year) >= 50
             if is_older_than_50_years:
@@ -138,7 +138,7 @@ class PHD(AZTrackerBase):
             )
 
         # Tags
-        tag = str(meta.tag)
+        tag = meta.tag
         if tag:
             tag = tag.strip().lower()
             if tag in ('rarbg', 'fgt', 'grym', 'tbs'):
@@ -175,7 +175,7 @@ class PHD(AZTrackerBase):
             warnings.append('Allowed Video Codecs for x265 encodes must be 10-bit')
 
         # 6
-        resolution_text = str(meta.resolution).lower().replace("p", "").replace("i", "")
+        resolution_text = meta.resolution.lower().replace("p", "").replace("i", "")
         resolution = int(resolution_text) if resolution_text.isdigit() else 0
         if resolution > 1080 and video_encode in ('h.264', 'x264'):
             warnings.append('H.264/x264 only allowed for 1080p and below.')
@@ -184,7 +184,7 @@ class PHD(AZTrackerBase):
         if video_codec not in ('avc', 'mpeg-2', 'vc-1', 'avc', 'h.264', 'vp9', 'h.265', 'x264', 'x265', 'hevc'):
             warnings.append(f'Video codec not allowed in your upload: {video_codec}.')
 
-        mediainfo = cast(dict[str, Any], meta.mediainfo)
+        mediainfo = meta.mediainfo
         media = cast(dict[str, Any], mediainfo.get('media', {}))
         media_tracks = cast(list[dict[str, Any]], media.get('track', []))
 
@@ -313,7 +313,7 @@ class PHD(AZTrackerBase):
             warnings.append(rule)
 
         # Hybrid
-        if type in ("remux", "encode") and "hybrid" in str(meta.name).lower():
+        if type in ("remux", "encode") and "hybrid" in meta.name.lower():
             warnings.append(
                 'Hybrid Remuxes and Encodes are subject to the following condition:\n\n'
                 'Hybrid user releases are permitted, but are treated similarly to regular '

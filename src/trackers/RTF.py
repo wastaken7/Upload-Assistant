@@ -205,7 +205,7 @@ class RTF:
             return []
 
         year_value = meta.year
-        year = int(year_value) if year_value and str(year_value).isdigit() else None
+        year = int(year_value) if year_value and year_value.isdigit() else None
         # Collect all possible years from different sources
         years: list[int] = []
 
@@ -216,7 +216,7 @@ class RTF:
 
         # TVDB episode year
         tvdb_episode_year = meta.tvdb_episode_year
-        if tvdb_episode_year and str(tvdb_episode_year).isdigit():
+        if tvdb_episode_year and tvdb_episode_year.isdigit():
             years.append(int(tvdb_episode_year))
 
         # Get most recent aired date from all TVDB episodes
@@ -283,7 +283,7 @@ class RTF:
                 return []
 
         else:
-            if year is not None and datetime.datetime.now(datetime.timezone.utc).date().year - int(year) <= 9:
+            if year is not None and datetime.datetime.now(datetime.timezone.utc).date().year - year <= 9:
                 if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
                 meta.skipping = "RTF"
@@ -296,7 +296,7 @@ class RTF:
         }
         params = {'includingDead': '1'}
 
-        imdb_id_value = int(meta.imdb_id or 0)
+        imdb_id_value = meta.imdb_id or 0
         if imdb_id_value != 0:
             imdb_id_str = str(meta.imdb_id)
             params['imdbId'] = imdb_id_str if imdb_id_str.startswith("tt") else "tt" + imdb_id_str

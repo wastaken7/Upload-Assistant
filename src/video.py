@@ -307,8 +307,8 @@ class VideoManager:
             scan = "i" if match else "p"
         width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
         height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
-        width = self.closest(width_list, int(width))
-        height = self.closest(height_list, int(height))
+        width = self.closest(width_list, width)
+        height = self.closest(height_list, height)
         res = f"{width}x{height}{scan}"
         resolution = await mi_resolution(res, guess, width, scan)
         return resolution, hfr

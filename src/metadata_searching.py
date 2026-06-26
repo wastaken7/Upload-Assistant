@@ -958,7 +958,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
                 _apply_tvdb_series_metadata(meta, tvdb_episode_data, tvdb_name)
                 meta.we_checked_tvdb = True
                 if meta.debug and isinstance(tvdb_episode_data, list):
-                    tvdb_episode_list = cast(list[Any], tvdb_episode_data)
+                    tvdb_episode_list = tvdb_episode_data
                     console.print(f"[green]TVDb episodes list retrieved with {len(tvdb_episode_list)} episodes[/green]")
             else:
                 console.print(f"[yellow]Unexpected TVDb episodes result format: {tvdb_episodes_result}[/yellow]")

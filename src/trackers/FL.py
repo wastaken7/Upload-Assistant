@@ -85,28 +85,28 @@ class FL:
         return cat_id
 
     async def edit_name(self, meta: Meta) -> str:
-        fl_name = str(meta.name)
-        hdr = str(meta.hdr)
-        audio = str(meta.audio)
+        fl_name = meta.name
+        hdr = meta.hdr
+        audio = meta.audio
         if 'DV' in hdr:
             fl_name = fl_name.replace(' DV ', ' DoVi ')
         if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
             fl_name = fl_name.replace(audio, audio.replace(' ', '', 1))
-        fl_name = fl_name.replace(str(meta.aka), "")
+        fl_name = fl_name.replace(meta.aka, "")
         imdb_info = meta.imdb_info
         if isinstance(imdb_info, dict):
             imdb_info_dict = cast(dict[str, Any], imdb_info)
-            title = str(meta.title)
+            title = meta.title
             imdb_aka = str(imdb_info_dict.get('aka', ''))
             if imdb_aka:
                 fl_name = fl_name.replace(title, imdb_aka)
-            meta_year = str(meta.year).strip()
+            meta_year = meta.year.strip()
             imdb_year = str(imdb_info_dict.get("year", meta.year))
             if meta_year and meta.year != imdb_info_dict.get("year", meta.year):
                 fl_name = fl_name.replace(meta_year, imdb_year)
-        if "DD+" in audio and "DDP" in str(meta.basename_no_ext):
+        if "DD+" in audio and "DDP" in meta.basename_no_ext:
             fl_name = fl_name.replace('DD+', 'DDP')
-        if "Atmos" in audio and "Atmos" not in str(meta.basename_no_ext):
+        if "Atmos" in audio and "Atmos" not in meta.basename_no_ext:
             fl_name = fl_name.replace('Atmos', '')
 
         fl_name = fl_name.replace('BluRay REMUX', 'Remux').replace('BluRay Remux', 'Remux').replace('Bluray Remux', 'Remux')
@@ -161,7 +161,7 @@ class FL:
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
-        torrentFileName = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else str(meta.basename_no_ext)
+        torrentFileName = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else meta.basename_no_ext
 
         # Download new .torrent from site
         desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
@@ -173,7 +173,7 @@ class FL:
             mi_dump = await mi_file.read()
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(str(torrentFileName))
+        torrentFileName = unidecode(torrentFileName)
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent")
         }
@@ -420,13 +420,13 @@ class FL:
         if meta.is_disc != "BDMV":
             mi = meta.mediainfo
             if isinstance(mi, dict):
-                mi_dict = cast(dict[str, Any], mi)
+                mi_dict = mi
                 media = mi_dict.get('media')
                 if isinstance(media, dict):
                     media_dict = cast(dict[str, Any], media)
                     tracks = media_dict.get('track')
                     if isinstance(tracks, list):
-                        tracks_list = cast(list[Any], tracks)
+                        tracks_list = tracks
                         for track in tracks_list:
                             if not isinstance(track, dict):
                                 continue
@@ -438,13 +438,13 @@ class FL:
         else:
             bdinfo = meta.bdinfo
             if isinstance(bdinfo, dict):
-                bdinfo_dict = cast(dict[str, Any], bdinfo)
+                bdinfo_dict = bdinfo
                 subtitles = bdinfo_dict.get('subtitles')
                 if isinstance(subtitles, list) and "Romanian" in subtitles:
                     has_ro_sub = True
                 audio_tracks = bdinfo_dict.get('audio')
                 if isinstance(audio_tracks, list):
-                    audio_tracks_list = cast(list[Any], audio_tracks)
+                    audio_tracks_list = audio_tracks
                     for audio_track in audio_tracks_list:
                         if isinstance(audio_track, dict):
                             audio_track_dict = cast(dict[str, Any], audio_track)

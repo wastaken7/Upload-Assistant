@@ -89,9 +89,9 @@ class NEXUSPHP:
             "incldead": "0",
         }
 
-        search_name = str(meta.title)
-        year = str(meta.year)
-        episode = str(meta.episode)
+        search_name = meta.title
+        year = meta.year
+        episode = meta.episode
         season = str(meta.season)
         season_episode = f"{season}{episode}" if season or episode else ""
 
@@ -218,7 +218,7 @@ class NEXUSPHP:
             desc_parts.append(f"◎译　　名　{' / '.join(aka)}")
 
         release_date = data.get("first_air_date") or data.get("release_date", "")
-        year = release_date[:4] if release_date else str(meta.year)
+        year = release_date[:4] if release_date else meta.year
         if year:
             desc_parts.append(f"◎年　　代　{year}")
 

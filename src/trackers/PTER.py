@@ -75,7 +75,7 @@ class PTER:
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
         cookies = await common.parseCookieFile(cookiefile)
-        imdb_id = int(meta.imdb_id or 0)
+        imdb_id = meta.imdb_id or 0
         imdb = f"tt{meta.imdb}" if imdb_id != 0 else ""
         source = await self.get_type_medium_id(meta)
         search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
@@ -137,7 +137,7 @@ class PTER:
             "英国": 4, "阿根廷": 8, "澳大利亚": 4, "比利时": 4,
             "巴西": 8, "加拿大": 4, "瑞士": 4, "智利": 8,
         }
-        ptgen = cast(dict[str, Any], meta.ptgen)
+        ptgen = meta.ptgen
         regions_value = ptgen.get("region", [])
         regions = cast(list[str], regions_value) if isinstance(regions_value, list) else []
         for area in area_map:
@@ -182,7 +182,7 @@ class PTER:
 
         parts: list[str] = []
 
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             ptgen = await common.ptgen(meta, self.ptgen_api, self.ptgen_retry)
             if ptgen.strip() != '':
                 parts.append(ptgen)
@@ -216,16 +216,16 @@ class PTER:
             images = await self.pterimg_upload(meta)
             if len(images) > 0:
                 parts.append("[center]")
-                for each in range(len(images[: int(meta.screens)])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
                 parts.append("[/center]")
         else:
-            images = cast(list[dict[str, Any]], meta.image_list)
+            images = meta.image_list
             if len(images) > 0:
                 parts.append("[center]")
-                for each in range(len(images[: int(meta.screens)])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
@@ -338,13 +338,13 @@ class PTER:
         return image_list
 
     async def edit_name(self, meta: Meta) -> str:
-        pter_name = str(meta.name)
+        pter_name = meta.name
 
         remove_list = ['Dubbed', 'Dual-Audio']
         for each in remove_list:
             pter_name = pter_name.replace(each, '')
 
-        pter_name = pter_name.replace(str(meta.aka), "")
+        pter_name = pter_name.replace(meta.aka, "")
         pter_name = pter_name.replace('PQ10', 'HDR')
 
         if meta.type == "WEBDL" and meta.has_encode_settings is True:
@@ -354,7 +354,7 @@ class PTER:
 
     async def is_zhongzi(self, meta: Meta) -> Optional[str]:
         if meta.is_disc != "BDMV":
-            mi = cast(dict[str, Any], meta.mediainfo)
+            mi = meta.mediainfo
             media = cast(dict[str, Any], mi.get('media', {}))
             tracks = cast(list[dict[str, Any]], media.get('track', []))
             for track in tracks:
@@ -363,7 +363,7 @@ class PTER:
                     if language == "zh":
                         return 'yes'
         else:
-            bdinfo = cast(dict[str, Any], meta.bdinfo)
+            bdinfo = meta.bdinfo
             subtitles = cast(list[str], bdinfo.get('subtitles', []))
             for language in subtitles:
                 if language == "Chinese":
@@ -392,7 +392,7 @@ class PTER:
 
         async with aiofiles.open(torrent_path, 'rb') as torrentFile:
             torrent_bytes = await torrentFile.read()
-        filelist = cast(list[Any], meta.filelist)
+        filelist = meta.filelist
         if len(filelist) == 1:
             torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
         else:
@@ -402,7 +402,7 @@ class PTER:
         }
 
         # use chinese small_descr
-        ptgen = cast(dict[str, Any], meta.ptgen)
+        ptgen = meta.ptgen
         trans_title = cast(list[str], ptgen.get("trans_title", []))
         genres = cast(list[str], ptgen.get("genre", []))
         if trans_title != ['']:
@@ -413,7 +413,7 @@ class PTER:
             small_descr += "| 类别:" + genre_value
             small_descr = small_descr.replace('/ |', '|')
         else:
-            small_descr = str(meta.title)
+            small_descr = meta.title
         data: dict[str, Any] = {
             "name": pter_name,
             "small_descr": small_descr,

@@ -35,7 +35,7 @@ class TTR(UNIT3D):
         return {'name': name}
 
     def build_name(self, meta: Meta) -> str:
-        name = str(meta.name_notag)
+        name = meta.name_notag
 
         def ask_spanish_type(kind: str) -> str:
             console.print(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
@@ -80,7 +80,7 @@ class TTR(UNIT3D):
         else:
             tracks = cast(
                 list[dict[str, Any]],
-                cast(dict[str, Any], meta.mediainfo).get("media", {}).get("track", []),
+                meta.mediainfo.get("media", {}).get("track", []),
             )
             spanish_audio_type = None
             spanish_subs_type = None
@@ -108,7 +108,7 @@ class TTR(UNIT3D):
             elif spanish_subs_type:
                 name += f" {spanish_subs_type} Subs"
 
-        tag = str(meta.tag)
+        tag = meta.tag
         if tag:
             name += tag
 

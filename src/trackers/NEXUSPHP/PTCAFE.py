@@ -104,7 +104,7 @@ class PTCAFE(NEXUSPHP):
         is_disc = str(meta.is_disc).lower()
         is_diy = meta.diy_disc
         mtype = str(meta.type).lower()
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -148,7 +148,7 @@ class PTCAFE(NEXUSPHP):
         x265 = 3
         xvid = 8
 
-        codec = str(meta.video_codec).lower()
+        codec = meta.video_codec.lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -174,7 +174,7 @@ class PTCAFE(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
 
         if "1080" in resolution:
             return 3
@@ -190,7 +190,7 @@ class PTCAFE(NEXUSPHP):
         return 6
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.audio).lower()
+        audio_codec = meta.audio.lower()
 
         if "dts:x 7.1" in audio_codec:
             return 1
@@ -262,7 +262,7 @@ class PTCAFE(NEXUSPHP):
             "-wiki": 29,
         }
 
-        group = str(meta.tag).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 30)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:

@@ -139,7 +139,7 @@ class PTP:
                     ptp_torrent_id: Optional[Union[int, str]] = None
                     ptp_torrent_hash: Optional[str] = None
 
-                    normalized_search = str(search_value or '').lower()
+                    normalized_search = search_value or ''.lower()
                     if normalized_search:
                         for torrent in torrents:
                             release_name = str(torrent.get('ReleaseName', '')).lower()
@@ -193,10 +193,10 @@ class PTP:
                     if torrent.get('Id', 0) == str(ptp_torrent_id):
                         ptp_infohash = torrent.get('InfoHash', None)
                 return imdb_id, ptp_infohash
-            elif int(response.status_code) in [400, 401, 403]:
+            elif response.status_code in [400, 401, 403]:
                 console.print(response.text)
                 return None, None
-            elif int(response.status_code) == 503:
+            elif response.status_code == 503:
                 console.print("[bold yellow]PTP Unavailable (503)")
                 return None, None
             else:
@@ -397,7 +397,7 @@ class PTP:
             "sci.fi", "short", "silent", "sport", "thriller", "video.art", "war", "western"
         ]
 
-        check_against_list = cast(list[Any], check_against) if isinstance(check_against, list) else [check_against]
+        check_against_list = check_against if isinstance(check_against, list) else [check_against]
         normalized_check_against: list[str] = [
             x.lower().replace(' ', '').replace('-', '') for x in check_against_list if isinstance(x, str)
         ]
@@ -571,7 +571,7 @@ class PTP:
             if tmdb_type == "movie":
                 ptpType = (
                     "Feature Film"
-                    if int(meta.runtime if meta.runtime is not None else 60) >= 45 or int(meta.runtime if meta.runtime is not None else 60) == 0
+                    if meta.runtime if meta.runtime is not None else 60 >= 45 or meta.runtime if meta.runtime is not None else 60 == 0
                     else "Short Film"
                 )
             if tmdb_type == "miniseries" or "miniseries" in keywords:
@@ -627,7 +627,7 @@ class PTP:
             other_res = f"{video_mi['Width']}x{video_mi['Height']}"
             res = "Other"
         if meta.is_disc == "DVD":
-            res = str(meta.source or "").replace(" DVD", "")
+            res = meta.source or "".replace(" DVD", "")
         return res, other_res
 
     def get_container(self, meta: Meta) -> Optional[str]:
@@ -924,7 +924,7 @@ class PTP:
             bdinfo_keys: list[str] = []
             if each['type'] == "BDMV":
                 bdinfo_keys = [key for key in each if key.startswith("bdinfo")]
-                bdinfo = cast(dict[str, Any], meta.bdinfo)
+                bdinfo = meta.bdinfo
                 if len(bdinfo_keys) > 1:
                     edition = str(bdinfo.get("edition", "Unknown Edition"))
                     desc.write(f"[b]{edition}[/b]\n\n")
@@ -941,7 +941,7 @@ class PTP:
                         desc.write("\n\n")
                 except Exception as e:
                     console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
-                for img_index in range(len(images[: int(meta.screens)])):
+                for img_index in range(len(images[: meta.screens])):
                     raw_url = str(image_list[img_index].get('raw_url', ''))
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
@@ -953,7 +953,7 @@ class PTP:
                 if base2ptp.strip() != "":
                     desc.write(base2ptp)
                     desc.write("\n\n")
-                for img_index in range(len(images[: int(meta.screens)])):
+                for img_index in range(len(images[: meta.screens])):
                     raw_url = image_list[img_index]['raw_url']
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
@@ -1222,7 +1222,7 @@ class PTP:
             except Exception as e:
                 console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
 
-            for img_index in range(len(images[: int(meta.screens)])):
+            for img_index in range(len(images[: meta.screens])):
                 raw_url = image_list[img_index]['raw_url']
                 desc.write(f"[img]{raw_url}[/img]\n")
             desc.write("\n")
@@ -1567,7 +1567,7 @@ class PTP:
         # IF SPECIAL (idk how to check for this automatically)
             # data["special"] = "on"
         imdb_id_value = meta.imdb_id
-        imdb_id_int = int(imdb_id_value) if isinstance(imdb_id_value, (int, str)) else 0
+        imdb_id_int = imdb_id_value if isinstance(imdb_id_value, (int, str)) else 0
         if imdb_id_int == 0:
             data["imdb"] = "0"
         else:
@@ -1594,7 +1594,7 @@ class PTP:
             elif isinstance(cover, str):
                 cover = None
             while cover is None:
-                cover_input = str(cli_ui.ask_string("No Cover was found. Please input a link to a cover: \n", default="") or "").strip()
+                cover_input = cli_ui.ask_string("No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
@@ -1622,7 +1622,7 @@ class PTP:
             directors_value = imdb_info.get('directors')
             if isinstance(directors_value, (list, tuple)):
                 director_names = [
-                    str(director) for director in cast(list[Any], directors_value) if isinstance(director, str)
+                    director for director in cast(list[Any], directors_value) if isinstance(director, str)
                 ]
                 directors = tuple(director_names)
             if directors:
@@ -1636,7 +1636,7 @@ class PTP:
 
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
-        base_piece_mb = int(meta.base_torrent_piece_mb or 0)
+        base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed

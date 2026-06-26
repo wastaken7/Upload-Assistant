@@ -37,8 +37,8 @@ class RF(UNIT3D):
         return True
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        rf_name = str(meta.name)
-        tag_value = str(meta.tag)
+        rf_name = meta.name
+        tag_value = meta.tag
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -69,7 +69,7 @@ class RF(UNIT3D):
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        type_value = str(type) if type is not None else str(meta.type)
+        type_value = type if type is not None else str(meta.type)
         return {'type_id': type_id.get(type_value, '0')}
 
     async def get_resolution_id(
@@ -96,5 +96,5 @@ class RF(UNIT3D):
             return resolution_id
         elif reverse:
             return {v: k for k, v in resolution_id.items()}
-        resolution_value = str(resolution) if resolution is not None else str(meta.resolution)
+        resolution_value = resolution if resolution is not None else meta.resolution
         return {'resolution_id': resolution_id.get(resolution_value, '10')}

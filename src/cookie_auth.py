@@ -90,7 +90,7 @@ class CookieValidator:
             try:
                 async with aiofiles.open(auth_file, encoding='utf-8') as f:
                     auth_key = await f.read()
-                    auth_key = str(auth_key).strip()
+                    auth_key = auth_key.strip()
                     if auth_key:
                         return auth_key
             except Exception as e:
@@ -553,11 +553,11 @@ class CookieAuthUploader:
                     elif success_status_code:
                         valid_codes = {
                             int(code.strip())
-                            for code in str(success_status_code).split(",")
+                            for code in success_status_code.split(",")
                             if code.strip().isdigit()
                         }
 
-                        if int(response.status_code) in valid_codes:
+                        if response.status_code in valid_codes:
                             success = True
 
                     elif error_text and error_text not in response.text:
@@ -622,7 +622,7 @@ class CookieAuthUploader:
                 table_data.add_column("Value", style="magenta")
 
                 for k, v in data_dict.items():
-                    key = str(k)
+                    key = k
                     if any(keyword in key.lower() for keyword in sensitive_keywords):
                         table_data.add_row(key, "[REDACTED]")
                     else:

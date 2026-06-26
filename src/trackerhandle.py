@@ -130,8 +130,8 @@ async def process_trackers(
         tracker_class: Any = None
         if tracker not in {"MANUAL", "THR", "PTP"}:
             tracker_class = tracker_class_map[tracker](config=config)
-        if str(meta.name).endswith("DUPE?"):
-            meta.name = str(meta.name).replace(" DUPE?", "")
+        if meta.name.endswith("DUPE?"):
+            meta.name = meta.name.replace(" DUPE?", "")
 
         tracker = tracker.replace(" ", "").upper().strip()
 
@@ -183,7 +183,7 @@ async def process_trackers(
             return True
 
         if tracker in api_trackers:
-            tracker_status = cast(StatusDict, meta.tracker_status or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
@@ -195,7 +195,7 @@ async def process_trackers(
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -215,7 +215,7 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
@@ -225,14 +225,14 @@ async def process_trackers(
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker in other_api_trackers:
-            tracker_status = cast(StatusDict, meta.tracker_status or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -255,7 +255,7 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
@@ -265,14 +265,14 @@ async def process_trackers(
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker in http_trackers:
-            tracker_status = cast(StatusDict, meta.tracker_status or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -294,7 +294,7 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.tracker_status or {}).get(tracker_class.tracker, {})
+                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
                 if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
@@ -331,7 +331,7 @@ async def process_trackers(
                     console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
         elif tracker == "THR":
-            tracker_status = cast(StatusDict, meta.tracker_status or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 thr = THR(config=config)
@@ -348,15 +348,15 @@ async def process_trackers(
                     return
                 if is_uploaded:
                     await client.add_to_client(meta, "THR")
-                    status = cast(StatusDict, meta.tracker_status or {}).get("THR", {})
+                    status = meta.tracker_status or {}.get("THR", {})
                     print_tracker_result(tracker, thr, status, True)
                 else:
-                    status = cast(StatusDict, meta.tracker_status or {}).get("THR", {})
+                    status = meta.tracker_status or {}.get("THR", {})
                     print_tracker_result(tracker, thr, status, False)
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker == "PTP":
-            tracker_status = cast(StatusDict, meta.tracker_status or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
@@ -374,7 +374,7 @@ async def process_trackers(
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
                         return
-                    status = cast(StatusDict, meta.tracker_status or {}).get(ptp.tracker, {})
+                    status = meta.tracker_status or {}.get(ptp.tracker, {})
                     if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
                         await client.add_to_client(meta, "PTP")
                         print_tracker_result(tracker, ptp, status, True)
@@ -386,7 +386,7 @@ async def process_trackers(
                     return
 
     multi_screens = int(config['DEFAULT'].get('multiScreens', 2))
-    discs = cast(list[Any], meta.discs or [])
+    discs = meta.discs or []
     one_disc = True
     if discs and len(discs) == 1:
         one_disc = True

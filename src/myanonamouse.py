@@ -136,7 +136,7 @@ class MyAnonamouseManager:
         Search MyAnonamouse API by torrent ID.
         Returns a dict of metadata or None if not found/error.
         """
-        clean_id = str(torrent_id).strip()
+        clean_id = torrent_id.strip()
         if not clean_id or not clean_id.isdigit():
             return None
 

@@ -165,7 +165,7 @@ class TvmazeManager:
                     if isinstance(data, list):
                         return [
                             cast(dict[str, Any], item)
-                            for item in cast(list[Any], data)
+                            for item in data
                             if isinstance(item, dict)
                         ]
                     return None
@@ -253,7 +253,7 @@ class TvmazeManager:
 
                     episodes: list[dict[str, Any]] = []
                     if isinstance(tvdb_data, dict):
-                        tvdb_data_dict = cast(dict[str, Any], tvdb_data)
+                        tvdb_data_dict = tvdb_data
                         tvdb_episodes_raw = tvdb_data_dict.get('episodes', [])
                         if isinstance(tvdb_episodes_raw, list):
                             episodes = list(cast(list[dict[str, Any]], tvdb_episodes_raw))

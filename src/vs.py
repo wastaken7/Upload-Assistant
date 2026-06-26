@@ -74,7 +74,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         frames = []
 
     # Indexing the source using ffms2 or lsmash for m2ts files
-    if str(source).endswith(".m2ts"):
+    if source.endswith(".m2ts"):
         console.print(f"Indexing {source} with LSMASHSource... This may take a while.", markup=False)
         src: Any = core.lsmas.LWLibavSource(source)
     else:

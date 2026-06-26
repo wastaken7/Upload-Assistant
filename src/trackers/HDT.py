@@ -59,7 +59,7 @@ class HDT:
     async def get_category_id(self, meta: Meta) -> int:
         cat_id = 0
         category = str(meta.category)
-        resolution = str(meta.resolution)
+        resolution = meta.resolution
         if category == 'MOVIE':
             # BDMV
             if meta.is_disc == "BDMV" or meta.type == "DISC":
@@ -115,9 +115,9 @@ class HDT:
         return cat_id
 
     async def edit_name(self, meta: Meta) -> str:
-        hdt_name = str(meta.name)
-        audio = str(meta.audio)
-        hdr = str(meta.hdr)
+        hdt_name = meta.name
+        audio = meta.audio
+        hdr = meta.hdr
         if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
             hdt_name = hdt_name.replace(audio, audio.replace(' ', '', 1))
         if 'DV' in hdr:
@@ -157,7 +157,7 @@ class HDT:
         return description
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
-        if str(meta.resolution) not in ["2160p", "1080p", "1080i", "720p"]:
+        if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
             meta.skipping = f"{self.tracker}"
             return []
@@ -170,7 +170,7 @@ class HDT:
                 return []
 
         search_url = f'{self.base_url}/torrents.php?'
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             imdbID = f"tt{meta.imdb}"
             params: dict[str, Union[str, int]] = {
                 'csrfToken': self.secret_token,
@@ -180,7 +180,7 @@ class HDT:
                 'category[]': await self.get_category_id(meta)
             }
         else:
-            params = {"csrfToken": self.secret_token, "search": str(meta.title), "category[]": await self.get_category_id(meta), "options": "3"}
+            params = {"csrfToken": self.secret_token, "search": meta.title, "category[]": await self.get_category_id(meta), "options": "3"}
 
         results: list[dict[str, Optional[str]]] = []
 
@@ -237,11 +237,11 @@ class HDT:
         }
 
         # 3D
-        if "3D" in str(meta.three_d):
+        if "3D" in meta.three_d:
             data['3d'] = 'true'
 
         # HDR
-        hdr_value = str(meta.hdr)
+        hdr_value = meta.hdr
         if "HDR" in hdr_value:
             if "HDR10+" in hdr_value:
                 data['HDR10'] = 'true'
@@ -252,7 +252,7 @@ class HDT:
             data['DolbyVision'] = 'true'
 
         # IMDB
-        if int(meta.imdb_id or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             data["infosite"] = f"{meta.imdb_info.get('imdb_url', '')}/"
 
         # Full Season Pack
@@ -270,7 +270,7 @@ class HDT:
         return data
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:

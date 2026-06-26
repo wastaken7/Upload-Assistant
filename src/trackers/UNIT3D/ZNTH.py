@@ -31,7 +31,7 @@ class ZNTH(UNIT3D):
             if not meta.isbn and not meta.asin:
                 console.print(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
                 return False
-            if bool(meta.audiobook) and not meta.narrator:
+            if meta.audiobook and not meta.narrator:
                 console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
                 return False
 
@@ -39,23 +39,23 @@ class ZNTH(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
-        audiobook = bool(meta.audiobook)
+        audiobook = meta.audiobook
 
         if category == "BOOK":
-            author = str(meta.author or "").strip()
-            title = str(meta.title or meta.name or "").strip()
-            year = str(meta.year or "").strip()
+            author = meta.author or "".strip()
+            title = meta.title or meta.name or "".strip()
+            year = meta.year or "".strip()
             format_val = str(meta.type or meta.container or "").strip().upper()
-            tag = str(meta.tag or "").strip().lstrip("-")
+            tag = meta.tag or "".strip().lstrip("-")
 
             # Determine source/retail
-            source = str(meta.source or "").strip().upper()
+            source = meta.source or "".strip().upper()
             manual_source = str(meta.manual_source or "").strip().upper()
             if manual_source in ("RETAIL", "SCAN", "HYBRID"):
                 source = manual_source
 
             if source not in ("RETAIL", "SCAN", "HYBRID"):
-                filename_lower = (str(meta.basename_no_ext) + " " + str(meta.title)).lower()
+                filename_lower = (meta.basename_no_ext + " " + meta.title).lower()
                 if "scan" in filename_lower:
                     source = "SCAN"
                 elif "hybrid" in filename_lower:
@@ -66,7 +66,7 @@ class ZNTH(UNIT3D):
                     ext = format_val.upper()
                     source = "SCAN" if ext == "PDF" else "RETAiL"
 
-            is_retail = source in ("RETAIL", "RETAiL") or "retail" in str(meta.basename_no_ext).lower()
+            is_retail = source in ("RETAIL", "RETAiL") or "retail" in meta.basename_no_ext.lower()
 
             if audiobook:
                 # AudioBook Naming
@@ -116,9 +116,9 @@ class ZNTH(UNIT3D):
                         if not any(x in edition_lower for x in ["edition", "ed.", "ed"]):
                             edition = f"{edition} Edition"
 
-                isbn_val = str(meta.isbn or "").strip()
-                is_scan = source == "SCAN" or "scan" in str(meta.basename_no_ext).lower() or "scan" in str(meta.title).lower()
-                is_ocr = bool(meta.ocr) or "ocr" in str(meta.basename_no_ext).lower() or "ocr" in str(meta.title).lower()
+                isbn_val = meta.isbn or "".strip()
+                is_scan = source == "SCAN" or "scan" in meta.basename_no_ext.lower() or "scan" in meta.title.lower()
+                is_ocr = bool(meta.ocr) or "ocr" in meta.basename_no_ext.lower() or "ocr" in meta.title.lower()
 
                 parts = []
                 if author:
@@ -153,7 +153,7 @@ class ZNTH(UNIT3D):
             if meta.category == "TV" and meta.episode_title != "":
                 znth_name = znth_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
             imdb_year = str(meta.imdb_info.get("year", ""))
-            year = str(meta.year)
+            year = meta.year
             if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
                 znth_name = znth_name.replace(f"{year}", imdb_year, 1)
             return {"name": znth_name}

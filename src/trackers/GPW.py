@@ -121,7 +121,7 @@ class GPW:
         if not isinstance(found_language_strings_raw, list):
             return []
 
-        found_language_strings_list = cast(list[Any], found_language_strings_raw)
+        found_language_strings_list = found_language_strings_raw
         found_language_strings = [lang for lang in found_language_strings_list if isinstance(lang, str)]
         return [lang.lower() for lang in found_language_strings]
 
@@ -132,15 +132,15 @@ class GPW:
         found_language_strings_raw = meta.audio_languages
         if not isinstance(found_language_strings_raw, list):
             return False
-        found_language_strings_list = cast(list[Any], found_language_strings_raw)
+        found_language_strings_list = found_language_strings_raw
         found_language_strings = [lang for lang in found_language_strings_list if isinstance(lang, str)]
 
         chinese_languages = {'mandarin', 'chinese', 'zh', 'zh-cn', 'zh-hans', 'zh-hant', 'putonghua', '国语', '普通话'}
         return any(lang.strip().lower() in chinese_languages for lang in found_language_strings)
 
     def get_codec(self, meta: Meta) -> str:
-        video_encode = str(meta.video_encode).strip().lower()
-        codec_final = str(meta.video_codec).strip().lower()
+        video_encode = meta.video_encode.strip().lower()
+        codec_final = meta.video_codec.strip().lower()
 
         codec_map = {
             'divx': 'DivX',
@@ -246,7 +246,7 @@ class GPW:
             videos_dict = cast(dict[str, Any], videos)
             results = videos_dict.get('results')
             if isinstance(results, list):
-                results_list = cast(list[Any], results)
+                results_list = results
                 video_results.extend(
                     cast(dict[str, Any], result)
                     for result in results_list
@@ -294,7 +294,7 @@ class GPW:
             return False
 
         media_type = str(meta.type).lower()
-        tag = str(meta.tag).strip().lower()
+        tag = meta.tag.strip().lower()
         if media_type == "remux" and tag in ("-hdt", "-frds"):
             console.print(f"{self.tracker}: Remuxes from {meta.tag} are not allowed on {self.tracker}")
             return False
@@ -482,7 +482,7 @@ class GPW:
             return ''
 
     def get_edition(self, meta: Meta) -> str:
-        edition_str = str(meta.edition).lower()
+        edition_str = meta.edition.lower()
         if not edition_str:
             return ''
 
@@ -553,12 +553,12 @@ class GPW:
 
         imdb_directors = dict(meta.imdb_info).get("directors")
         if isinstance(imdb_directors, list):
-            imdb_directors_list = cast(list[Any], imdb_directors)
+            imdb_directors_list = imdb_directors
             director_entries.extend(name for name in imdb_directors_list if isinstance(name, str))
 
         tmdb_directors = meta.tmdb_directors
         if isinstance(tmdb_directors, list):
-            tmdb_directors_list = cast(list[Any], tmdb_directors)
+            tmdb_directors_list = tmdb_directors
             director_entries.extend(name for name in tmdb_directors_list if isinstance(name, str))
 
         if director_entries:
@@ -575,7 +575,7 @@ class GPW:
                 found_tags.append(tag_id)
 
         # Collections
-        distributor = str(meta.distributor).upper()
+        distributor = meta.distributor.upper()
         if distributor in ('WARNER ARCHIVE', 'WARNER ARCHIVE COLLECTION', 'WAC'):
             add_tag('warner_archive_collection')
         elif distributor in ('CRITERION', 'CRITERION COLLECTION', 'CC'):
@@ -584,7 +584,7 @@ class GPW:
             add_tag('masters_of_cinema')
 
         # Editions
-        edition = str(meta.edition).lower()
+        edition = meta.edition.lower()
         if "director's cut" in edition:
             add_tag('director_s_cut')
         elif 'extended' in edition:
@@ -650,7 +650,7 @@ class GPW:
         return False
 
     async def _get_poster(self, meta: Meta) -> str:
-        poster_url = str(meta.poster).strip()
+        poster_url = meta.poster.strip()
         if not poster_url:
             tmdb_poster = meta.tmdb_poster
             if tmdb_poster:
@@ -800,15 +800,15 @@ class GPW:
             raw_stars = imdb_info.get('stars', [])
             raw_stars_id = imdb_info.get('stars_id', [])
 
-            directors = [str(x).strip() for x in raw_directors if isinstance(x, str) and str(x).strip()]
-            directors_id = [str(x).strip() for x in raw_directors_id if isinstance(x, str) and re.match(r'^nm\d+$', str(x).strip())]
-            writers = [str(x).strip() for x in raw_writers if isinstance(x, str) and str(x).strip()]
-            writers_id = [str(x).strip() for x in raw_writers_id if isinstance(x, str) and re.match(r'^nm\d+$', str(x).strip())]
-            stars = [str(x).strip() for x in raw_stars if isinstance(x, str) and str(x).strip()]
-            stars_id = [str(x).strip() for x in raw_stars_id if isinstance(x, str) and re.match(r'^nm\d+$', str(x).strip())]
+            directors = [x.strip() for x in raw_directors if isinstance(x, str) and x.strip()]
+            directors_id = [x.strip() for x in raw_directors_id if isinstance(x, str) and re.match(r'^nm\d+$', x.strip())]
+            writers = [x.strip() for x in raw_writers if isinstance(x, str) and x.strip()]
+            writers_id = [x.strip() for x in raw_writers_id if isinstance(x, str) and re.match(r'^nm\d+$', x.strip())]
+            stars = [x.strip() for x in raw_stars if isinstance(x, str) and x.strip()]
+            stars_id = [x.strip() for x in raw_stars_id if isinstance(x, str) and re.match(r'^nm\d+$', x.strip())]
 
-        first_director_id = str(directors_id[0]).strip() if isinstance(directors_id, list) and directors_id else ''
-        first_director_name = str(directors[0]).strip() if isinstance(directors, list) and directors else ''
+        first_director_id = directors_id[0].strip() if isinstance(directors_id, list) and directors_id else ''
+        first_director_name = directors[0].strip() if isinstance(directors, list) and directors else ''
         has_valid_director = bool(re.match(r'^nm\d+$', first_director_id)) and bool(first_director_name) and first_director_name.lower() != 'n/a'
 
         if has_valid_director:
@@ -844,10 +844,10 @@ class GPW:
         # Add writer entries (best-effort).
         if isinstance(writers, list) and isinstance(writers_id, list):
             for idx, writer_name_value in enumerate(writers):
-                writer_name = str(writer_name_value).strip()
+                writer_name = writer_name_value.strip()
                 if not writer_name or writer_name.lower() == 'n/a':
                     continue
-                writer_id = str(writers_id[idx]).strip() if idx < len(writers_id) else ''
+                writer_id = writers_id[idx].strip() if idx < len(writers_id) else ''
                 if not re.match(r'^nm\d+$', writer_id):
                     continue
                 if writer_id in artist_ids:
@@ -861,10 +861,10 @@ class GPW:
         # Add cast entries (best-effort) so new groups include actor info.
         if isinstance(stars, list) and isinstance(stars_id, list):
             for idx, star_name_value in enumerate(stars):
-                star_name = str(star_name_value).strip()
+                star_name = star_name_value.strip()
                 if not star_name or star_name.lower() == 'n/a':
                     continue
-                star_id = str(stars_id[idx]).strip() if idx < len(stars_id) else ''
+                star_id = stars_id[idx].strip() if idx < len(stars_id) else ''
                 if not re.match(r'^nm\d+$', star_id):
                     continue
                 if star_id in artist_ids:
@@ -1004,10 +1004,10 @@ class GPW:
         return type_map.get(release_type, 'Untouched')
 
     def get_media_flags(self, meta: Meta) -> dict[str, str]:
-        audio = str(meta.audio).lower()
-        hdr = str(meta.hdr)
-        bit_depth = str(meta.bit_depth)
-        channels = str(meta.channels)
+        audio = meta.audio.lower()
+        hdr = meta.hdr
+        bit_depth = meta.bit_depth
+        channels = meta.channels
 
         flags: dict[str, str] = {}
 
@@ -1037,7 +1037,7 @@ class GPW:
         return flags
 
     def get_resolution(self, meta: Meta) -> str:
-        resolution = str(meta.resolution).lower()
+        resolution = meta.resolution.lower()
         source = str(meta.source).upper()
 
         if source in ["NTSC", "PAL"]:

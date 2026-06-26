@@ -42,7 +42,7 @@ class AITHER(UNIT3D):
         return should_continue
 
     async def get_additional_data(self, meta: Meta):
-        hdr_value = str(meta.hdr or "")
+        hdr_value = meta.hdr or ""
         has_hdr10p = 'HDR10+' in hdr_value
 
         data: dict[str, Any] = {
@@ -66,9 +66,9 @@ class AITHER(UNIT3D):
         source: str = meta.source or ""
         alt_title = meta.aka if not meta.no_aka else ""
 
-        year = str(meta.year)
+        year = meta.year
         if meta.category == "TV":
-            year = str(meta.year) if meta.search_year != "" else ""
+            year = meta.year if meta.search_year != "" else ""
         manual_year_value = str(meta.manual_year)
         if manual_year_value and int(manual_year_value) > 0:
             year = manual_year_value
@@ -94,7 +94,7 @@ class AITHER(UNIT3D):
             aither_name = aither_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
 
         elif meta.is_disc == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            aither_name = aither_name.replace(str(meta.source or ""), f"{resolution} {meta.source}", 1)
+            aither_name = aither_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
             aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
 
         if meta.trump_reason == "exact_match":

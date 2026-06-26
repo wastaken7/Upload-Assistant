@@ -108,7 +108,7 @@ class IHD(UNIT3D):
             lang = str(track_or_string)
         if not lang:
             return ""
-        lang_str = str(lang).lower()
+        lang_str = lang.lower()
 
         # Strip country code if present (e.g., "en-US" → "en")
         if "-" in lang_str:
@@ -150,18 +150,18 @@ class IHD(UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        ihd_name = str(meta.name)
-        resolution = str(meta.resolution)
+        ihd_name = meta.name
+        resolution = meta.resolution
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         audio_languages_value = meta.audio_languages
         audio_languages: list[str] = []
         if isinstance(audio_languages_value, list):
-            audio_languages_list = cast(list[Any], audio_languages_value)
+            audio_languages_list = audio_languages_value
             audio_languages = [str(item) for item in audio_languages_list]
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = str(audio_languages[0]).upper()
+            foreign_lang = audio_languages[0].upper()
             ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
 
         return {'name': ihd_name}
@@ -188,12 +188,12 @@ class IHD(UNIT3D):
             audio_languages: list[str] = []
             subtitle_languages: list[str] = []
             if isinstance(audio_languages_value, list):
-                audio_languages_list = cast(list[Any], audio_languages_value)
+                audio_languages_list = audio_languages_value
                 audio_languages = [str(item) for item in audio_languages_list]
             else:
                 audio_languages = []
             if isinstance(subtitle_languages_value, list):
-                subtitle_languages_list = cast(list[Any], subtitle_languages_value)
+                subtitle_languages_list = subtitle_languages_value
                 subtitle_languages = [str(item) for item in subtitle_languages_list]
             else:
                 subtitle_languages = []
