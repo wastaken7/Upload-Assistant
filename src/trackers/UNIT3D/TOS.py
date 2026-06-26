@@ -31,7 +31,6 @@ class TOS(UNIT3D):
             "3T3AM",
             "BARBiE",
         ]
-        pass
 
     async def get_category_id(
         self,

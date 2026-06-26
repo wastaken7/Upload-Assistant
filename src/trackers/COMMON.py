@@ -38,7 +38,6 @@ class COMMON:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.parser = self.MediaInfoParser()
-        pass
 
     def _normalize_language_token(self, language: str) -> str:
         normalized = unicodedata.normalize('NFKD', language)

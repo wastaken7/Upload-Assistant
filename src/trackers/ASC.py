@@ -1028,7 +1028,6 @@ class ASC:
                         return layout_dict
                 except (OSError, json.JSONDecodeError):
                     console.print(f"{self.tracker}: [yellow]Failed to read cached layout data.[/yellow]")
-                    pass
 
             try:
                 response = await self.session.post(url, data=payload, timeout=20)
@@ -1042,7 +1041,6 @@ class ASC:
                             await f.write(json.dumps(layout_dict))
                     except Exception as e:
                         console.print(f"{self.tracker}: [red]Failed to cache layout data: {e}[/red]")
-                        pass
 
                 return layout_dict
             except Exception:

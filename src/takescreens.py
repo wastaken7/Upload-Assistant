@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import gc
 import glob
 import json
@@ -884,7 +885,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
                 continue
 
             try:
-                audio = getattr(mutagen, "File")(audio_path)
+                audio = mutagen.File(audio_path)
                 if audio is None:
                     continue
 
@@ -907,7 +908,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
                 # 2. MP3 ID3 APIC
                 if audio.tags:
                     apic_to_use = None
-                    for key in audio.tags.keys():
+                    for key in audio.tags:
                         if key.startswith("APIC"):
                             apic = audio.tags[key]
                             if getattr(apic, "type", None) == 3:
@@ -915,7 +916,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
                                 break
 
                     if not apic_to_use and not confirmed_only:
-                        for key in audio.tags.keys():
+                        for key in audio.tags:
                             if key.startswith("APIC"):
                                 apic_to_use = audio.tags[key]
                                 break
@@ -1187,10 +1188,8 @@ async def generate_ebook_screenshots(
     else:
         from rarfile import RarFile
 
-    try:
+    with contextlib.suppress(Exception):
         fitz.TOOLS.mupdf_display_errors(False)
-    except Exception:
-        pass
 
     output_dir = os.path.abspath(f"{base_dir}/tmp/{folder_id}")
     os.makedirs(output_dir, exist_ok=True)
@@ -1241,18 +1240,14 @@ async def generate_ebook_screenshots(
                 try:
                     compressed_file = zipfile.ZipFile(path, "r")
                 except Exception:
-                    try:
+                    with contextlib.suppress(Exception):
                         compressed_file = RarFile(path, "r")
-                    except Exception:
-                        pass
             else:
                 try:
                     compressed_file = RarFile(path, "r")
                 except Exception:
-                    try:
+                    with contextlib.suppress(Exception):
                         compressed_file = zipfile.ZipFile(path, "r")
-                    except Exception:
-                        pass
 
             if not compressed_file:
                 console.print(f"[red]Invalid CBR/CBZ file: {path}[/red]")

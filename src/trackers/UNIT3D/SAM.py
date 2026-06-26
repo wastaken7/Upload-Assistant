@@ -25,7 +25,6 @@ class SAM(UNIT3D):
         self.torrent_url = f"{self.base_url}/torrents/"
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.banned_groups = []
-        pass
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         cbr = CBR(self.config)

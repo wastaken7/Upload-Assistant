@@ -52,7 +52,6 @@ class HUNO(UNIT3D):
             "passtheimage",
             "hawke.pics",
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

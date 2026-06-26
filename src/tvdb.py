@@ -172,7 +172,6 @@ def _get_tvdb_or_warn(config: Optional[dict[str, Any]] = None) -> Optional[TVDB]
 class tvdb_data:
     def __init__(self, config: Any) -> None:
         self.config = config
-        pass
 
     async def search_tvdb_series(
         self,

@@ -1349,7 +1349,7 @@ class QbittorrentClientMixin:
                     tracker_patterns[name.lower()] = {"url": url, "pattern": pattern}
 
             prioritized = ["aither", "ulcx", "lst", "blu", "oe", "btn", "bhd", "huno", "hdb", "rf", "otw", "yus", "dp", "sp", "ptp"]
-            all_known = sorted(list(tracker_patterns.keys()))
+            all_known = sorted(tracker_patterns.keys())
             tracker_priority = prioritized + [t for t in all_known if t not in prioritized]
 
             if proxy_url:
@@ -1530,7 +1530,7 @@ class QbittorrentClientMixin:
                                     if meta.debug:
                                         console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
                                 else:
-                                    msg = display_tracker.get("msg", "")
+                                    display_tracker.get("msg", "")
 
                         except qbittorrentapi.APIError as e:
                             if meta.debug:

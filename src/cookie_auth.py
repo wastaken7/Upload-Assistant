@@ -34,7 +34,6 @@ class CookieValidator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.common = COMMON(config)
-        pass
 
     async def load_session_cookies(self, meta: Meta, tracker: str) -> Optional[http.cookiejar.MozillaCookieJar]:
         cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
@@ -473,7 +472,6 @@ class CookieAuthUploader:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.common = COMMON(config)
-        pass
 
     async def handle_upload(
         self,

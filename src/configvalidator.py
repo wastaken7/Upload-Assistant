@@ -120,7 +120,6 @@ VALID_TORRENT_CLIENTS = ["qbit", "rtorrent", "deluge", "transmission", "watch"]
 
 class ConfigValidationError(Exception):
     """Raised when config validation fails with critical errors."""
-    pass
 
 
 class ConfigValidationWarning:

@@ -31,7 +31,6 @@ class HHD(UNIT3D):
             'SasukeducK', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'TGALAXY', 'TORRENTGALAXY',
             'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'x0r', 'YAWNiX', 'YIFY', 'YTS', 'PSA', ['EVO', 'WEB-DL only']
         ]  # fmt: off
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

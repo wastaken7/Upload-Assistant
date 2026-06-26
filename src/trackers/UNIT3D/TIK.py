@@ -31,7 +31,6 @@ class TIK(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

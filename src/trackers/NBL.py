@@ -42,7 +42,6 @@ class NBL:
                               'SpaceFish', 'SPASM', 'SSA', 'Telly', 'Tenrai-Sensei', 'TM', 'Trix', 'URANiME', 'VipapkStudios', 'ViSiON', 'Wardevil', 'xRed',
                               'XS', 'YakuboEncodes', 'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT']
 
-        pass
 
     async def get_cat_id(self, meta: Meta) -> int:
         cat_id = 3 if meta.tv_pack == 1 else 1

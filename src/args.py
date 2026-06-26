@@ -76,7 +76,6 @@ class Args:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        pass
 
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
         input = list(argv)

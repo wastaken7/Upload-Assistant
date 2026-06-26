@@ -53,7 +53,6 @@ class MTV:
             'TM', 'ViSiON',  # ViSiON: Xvid releases -- re-encoded
             'WAF', 'x0r', 'XS', 'YIFY', 'ZKBL', 'ZmN'
         ]
-        pass
 
     # For loading
     async def async_json_loads(self, data_str: str) -> Any:
@@ -481,10 +480,7 @@ class MTV:
             if "mtv_timeout" in meta and meta.mtv_timeout:
                 meta.skipping = "MTV"
                 return False
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            else:
-                recreate = True
+            recreate = cli_ui.ask_yes_no("Log in again and create new session?") if not meta.unattended or meta.unattended and meta.unattended_confirm else True
             if recreate is True:
                 if await aiofiles.os.path.exists(cookiefile):
                     await aiofiles.os.remove(cookiefile)  # Using async file removal

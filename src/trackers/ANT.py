@@ -39,7 +39,6 @@ class ANT:
             'SPASM', 'SM737', 'SPDVD', 'STUTTERSHIT', 'TBS', 'Telly', 'TM', 'UPiNSMOKE', 'URANiME', 'WAF', 'xRed',
             'XS', 'YIFY', 'YTS', 'Zeus', 'ZKBL', 'ZmN', 'ZMNT'
         ]
-        pass
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []

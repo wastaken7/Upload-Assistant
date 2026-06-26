@@ -29,7 +29,6 @@ class STC(UNIT3D):
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = [""]
         self.approved_image_hosts = ['imgbox', 'imgbb']
-        pass
 
     async def get_type_id(
         self,

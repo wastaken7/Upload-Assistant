@@ -44,7 +44,6 @@ class UNIT3D:
         self.pending_url = ""
         self.search_url = ""
         self.upload_url = ""
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         _meta = meta

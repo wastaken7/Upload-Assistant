@@ -437,10 +437,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             if extracted_year and not meta.year:
                 meta.year = extracted_year
 
-            if meta.isdir:
-                guess_name = os.path.basename(meta.path).replace("_", "").replace("-", "") if meta.path else ""
-            else:
-                guess_name = ntpath.basename(video).replace("-", " ")
+            guess_name = (os.path.basename(meta.path).replace("_", "").replace("-", "") if meta.path else "") if meta.isdir else ntpath.basename(video).replace("-", " ")
         except Exception as e:
             console.print(f"[red]Error extracting title and year: {e}[/red]")
             raise Exception(f"Error extracting title and year: {e}") from e
@@ -1199,10 +1196,7 @@ async def finalize_metadata(
                 meta.aka = f"AKA {aka.strip()}"
                 meta.title = meta.title.strip()
             elif imdb_aka is not None:
-                if f"({year})" in imdb_aka:
-                    imdb_aka = meta.imdb_info.get("aka", "").replace(f"({year})", "").strip()
-                else:
-                    imdb_aka = meta.imdb_info.get("aka", "").strip()
+                imdb_aka = meta.imdb_info.get("aka", "").replace(f"({year})", "").strip() if f"({year})" in imdb_aka else meta.imdb_info.get("aka", "").strip()
                 meta.aka = f"AKA {imdb_aka.strip()}"
                 meta.title = meta.title.strip()
 

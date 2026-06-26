@@ -269,10 +269,7 @@ class HDB:
         # Proceed with the upload process
         async with aiofiles.open(torrent_file_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
-        if len(meta.filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", "."))
-        else:
-            torrentFileName = unidecode(os.path.basename(meta.path).replace(" ", "."))
+        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(os.path.basename(meta.path).replace(" ", "."))
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorrent")
         }

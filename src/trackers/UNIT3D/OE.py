@@ -45,7 +45,6 @@ class OE(UNIT3D):
             'VipapkSudios', 'ViSION', 'WAF', 'Wardevil', 'x0r', 'xRed', 'XS', 'YakuboEncodes', 'YAWNTiC', 'YAWNiX', 'YIFY', 'YTS',
             'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT'
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):

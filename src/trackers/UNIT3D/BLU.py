@@ -32,7 +32,6 @@ class BLU(UNIT3D):
             'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'Telly', 'TheFarm', 'TM', 'TRiToN', 'UPiNSMOKE', 'URANiME', 'VN_Foxcore', 'WAF',
             'WKS', 'x0r', 'xRed', 'XS', 'YIFY', 'ZKBL', 'ZmN', 'ZMNT',
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

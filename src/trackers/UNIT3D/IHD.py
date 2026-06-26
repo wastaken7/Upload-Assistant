@@ -26,7 +26,6 @@ class IHD(UNIT3D):
         self.requests_url = f'{self.base_url}/api/requests/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
-        pass
 
     async def get_category_id(
         self,

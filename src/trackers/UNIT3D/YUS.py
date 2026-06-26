@@ -31,7 +31,6 @@ class YUS(UNIT3D):
             'NorTekst', 'NORViNE', 'PANDEMONiUM', 'PiTBULL', 'RAPiDCOWS', 'RARBG', 'Radarr', 'RCDiVX', 'RDN', 'ROCKETRACCOON',
             'SANTi', 'SHOWTiME', 'SOOSi', 'SUXWIC', 'TOXVIO', 'TWA', 'VXT', 'Will1869', 'x0r', 'XS',
             'YIFY', 'YOLAND', 'YTS', 'ZKBL', 'ZmN', 'ZMNT']
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

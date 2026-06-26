@@ -33,7 +33,6 @@ class BHDTV:
         self.upload_url = 'https://www.bit-hdtv.com/takeupload.php'
         # self.forum_link = 'https://www.bit-hdtv.com/rules.php'
         self.banned_groups = []
-        pass
 
     async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)

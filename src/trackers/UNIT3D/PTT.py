@@ -21,7 +21,6 @@ class PTT(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = ['ViP', 'BiRD', 'M@RTiNU$', 'inTGrity', 'CiNEMAET', 'MusicET', 'TeamET', 'R2D2']
-        pass
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ptt_name = str(meta.name)

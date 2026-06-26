@@ -35,7 +35,6 @@ class OTW(UNIT3D):
             'SicFoI', 'SPASM', 'STUTTERSHIT', 'Telly', 'TM', 'UPiNSMOKE', 'WAF', 'xRed',
             'XS', 'YELLO', 'YIFY', 'YTS', 'ZKBL', 'ZmN', '4f8c4100292', 'Azkars', 'Sync0rdi'
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

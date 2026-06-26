@@ -33,7 +33,6 @@ class DP(UNIT3D):
             'TAoE', 'TGALAXY', 'TGx', 'TORRENTGALAXY', 'ToVaR', 'Trix', 'TSP', 'TSPxL', 'ViSION', 'VXT',
             'WAF', 'WKS', 'X0r', 'YIFY', 'YTS',
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

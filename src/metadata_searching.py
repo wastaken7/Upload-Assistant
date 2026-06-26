@@ -538,11 +538,9 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
     if isinstance(results[0], Exception):
         error_msg = f"TMDB metadata retrieval failed: {str(results[0])}"
         console.print(f"[bold red]{error_msg}[/bold red]")
-        pass
     elif not results[0]:  # Check if the result is empty (empty dict)
         error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta.tmdb_id}"
         console.print(f"[bold red]{error_msg}[/bold red]")
-        pass
     else:
         tmdb_metadata = results[0]
 

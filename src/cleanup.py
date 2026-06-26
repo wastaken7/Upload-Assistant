@@ -191,7 +191,6 @@ class CleanupManager:
                             delete_fn()
         except Exception as e:
             console.print(f"[red]Error cleaning up threads: {e}[/red]")
-            pass
 
         # 🔹 Print remaining active threads
         # active_threads = [t for t in threading.enumerate()]

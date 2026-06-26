@@ -26,7 +26,6 @@ log = logging.getLogger(__name__)
 
 class EncryptionError(Exception):
     """Raised when encryption or key derivation fails."""
-    pass
 
 # Defaults and env var names
 # These are environment variable *names* and not actual secrets — suppress

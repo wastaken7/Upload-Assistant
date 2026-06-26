@@ -23,7 +23,6 @@ class SN:
         self.forum_link = 'https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules'
         self.search_url = 'https://swarmazon.club/api/search.php'
         self.banned_groups = [""]
-        pass
 
     async def get_type_id(self, type: str) -> str:
         type_id = {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")

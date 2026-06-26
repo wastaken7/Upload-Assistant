@@ -842,7 +842,7 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
     ) -> str:
-        image_list = meta[f"{self.tracker}_images_key"] if f"{self.tracker}_images_key" in meta else meta.image_list
+        image_list = meta.get(f"{self.tracker}_images_key", meta.image_list)
         image_list = cast(list[Any], image_list)
 
         if image_list is None:

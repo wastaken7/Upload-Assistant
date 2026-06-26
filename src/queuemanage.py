@@ -6,7 +6,7 @@ import json
 import os
 import re
 import shlex
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Optional, Union, cast
 

@@ -1,5 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import json
 import math
 import os
@@ -49,10 +50,8 @@ def get_path_size(path: str) -> int:
         for f in filenames:
             fp = os.path.join(dirpath, f)
             if not os.path.islink(fp):
-                try:
+                with contextlib.suppress(OSError):
                     total_size += os.path.getsize(fp)
-                except OSError:
-                    pass
     return total_size
 
 
@@ -582,10 +581,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     except Exception as e:
         console.print(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
         nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
-        try:
+        with contextlib.suppress(Exception):
             os.makedirs(nzb_output_dir, exist_ok=True)
-        except Exception:
-            pass
 
     # Determine tmp base directory for staging (falls back to default tmp dir if empty)
     usenet_tmp_dir = usenet_cfg.get("usenet_tmp_dir")

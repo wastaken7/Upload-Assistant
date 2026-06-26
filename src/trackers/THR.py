@@ -32,7 +32,6 @@ class THR:
         self.username = str(config['TRACKERS']['THR'].get('username', ''))
         self.password = str(config['TRACKERS']['THR'].get('password', ''))
         self.banned_groups = [""]
-        pass
 
     async def upload(self, meta: Meta) -> Optional[bool]:
         common = COMMON(config=self.config)

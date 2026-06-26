@@ -363,10 +363,7 @@ class FF:
             return 'x264'
 
     async def edit_name(self, meta: Meta) -> str:
-        if meta.scene:
-            ff_name = str(meta.scene_name) if meta.scene_name else str(meta.basename_no_ext).replace(" ", ".")
-        else:
-            ff_name = meta.clean_name.replace(" ", ".")
+        ff_name = (str(meta.scene_name) if meta.scene_name else str(meta.basename_no_ext).replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
 
         return ff_name
 

@@ -23,7 +23,6 @@ class LT(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = ["EVO"]
-        pass
 
     async def get_category_id(
         self,

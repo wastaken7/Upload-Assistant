@@ -23,7 +23,6 @@ class RAS(UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = ["YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY"]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

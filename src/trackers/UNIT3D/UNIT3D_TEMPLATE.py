@@ -23,7 +23,6 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = [""]
-        pass
 
     # The section below can be deleted if no changes are needed, as everything else is handled in UNIT3D.py
     # If advanced changes are required, copy the necessary functions from UNIT3D.py here

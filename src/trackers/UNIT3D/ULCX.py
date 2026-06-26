@@ -31,7 +31,6 @@ class ULCX(UNIT3D):
             ['Ralphy', 'Encodes'], 'RARBG', 'Sicario', 'SM737', 'SPDVD', 'SWTYBLZ', 'TAoE', 'TGx', 'Tigole', 'TSP',
             'TSPxL', 'VXT', 'Vyndros', 'Will1869', 'x0r', 'YIFY', 'Alcaide_Kira', 'PHOCiS', 'HDT', 'SPx', 'seedpool'
         ]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

@@ -25,7 +25,6 @@ class LST(UNIT3D):
         self.torrent_url = f'{self.base_url}/torrents/'
         self.trumping_url = f'{self.base_url}/api/reports/torrents/'
         self.banned_groups = []
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":

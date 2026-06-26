@@ -28,7 +28,6 @@ class A4K(UNIT3D):
         self.rehost_images_manager = RehostImagesManager(config)
         self.approved_image_hosts = ['ptpimg', 'onlyimage','imgbox', 'ptscreens', 'imgbb', 'imgur', 'postimg']
         self.banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
-        pass
 
     async def get_type_id(
         self,

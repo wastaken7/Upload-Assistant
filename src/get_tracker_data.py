@@ -369,7 +369,7 @@ class TrackerDataManager:
             else:
                 # Process all trackers with API = true if no specific tracker is set in meta
                 from src.trackersetup import api_trackers
-                other_api = sorted(list(api_trackers - {"BHD"}))
+                other_api = sorted(api_trackers - {"BHD"})
                 tracker_order = ["PTP", "HDB", "BHD"] + other_api
 
                 if cat == "TV" or meta.category == "TV":
@@ -435,7 +435,7 @@ class TrackerDataManager:
         # Prioritize trackers in this order
         from src.trackersetup import api_trackers
         prioritized = ["BLU", "AITHER", "ULCX", "LST", "OE"]
-        tracker_order = prioritized + sorted(list(api_trackers - set(prioritized) - {"BHD"}))
+        tracker_order = prioritized + sorted(api_trackers - set(prioritized) - {"BHD"})
 
         # Check if we have stored torrent comments
         if meta.torrent_comments:

@@ -39,7 +39,6 @@ class BHD:
         self.requests_url = f"https://beyond-hd.me/api/requests/{api_key}"
         self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD', 'Telly', 'AOC', 'WKS', 'SasukeducK', 'CRUCiBLE', 'iFT', 'ProRes', 'MezRips', 'Flights', 'BiTOR', 'iVy', 'QxR', 'SyncUP', 'OFT', 'TGS']
         self.approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bhd', 'bam']
-        pass
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {

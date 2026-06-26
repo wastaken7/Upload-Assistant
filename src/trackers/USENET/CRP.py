@@ -134,10 +134,7 @@ class CRP:
 
     async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ""
-        if meta.is_disc == "BDMV":
-            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
-        else:
-            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+        info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.is_disc == "BDMV" else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             try:

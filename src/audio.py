@@ -401,7 +401,6 @@ async def _get_audio_v2(
                         dual = "Dubbed"
                 except Exception:
                     console.print(traceback.format_exc())
-                    pass
 
     # Convert commercial name to naming conventions
     audio_codec_map = {
