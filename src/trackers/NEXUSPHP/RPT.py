@@ -2,9 +2,9 @@
 import re
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.NEXUSPHP import NEXUSPHP
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -24,13 +24,13 @@ class RPT(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.get("category", "")).upper()
-        genres = str(meta.get("genres", "")).lower()
-        keywords = str(meta.get("keywords", "")).lower()
+        category = str(meta.category).upper()
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
 
         if "documentary" in genres or "documentary" in keywords:
             return documentaries
-        if meta.get("anime") or "animation" in genres or "animation" in keywords:
+        if meta.anime or "animation" in genres or "animation" in keywords:
             return animations
 
         if category == "MOVIE":
@@ -66,9 +66,9 @@ class RPT(NEXUSPHP):
         uhd = 2
         web_dl = 4
 
-        is_disc = str(meta.get("is_disc", "")).lower()
-        mtype = str(meta.get("type", "")).lower()
-        resolution = str(meta.get("resolution", "")).lower()
+        is_disc = str(meta.is_disc).lower()
+        mtype = str(meta.type).lower()
+        resolution = str(meta.resolution).lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -96,7 +96,7 @@ class RPT(NEXUSPHP):
         vc1 = 3
         xvid = 5
 
-        codec = str(meta.get("video_codec", "")).lower()
+        codec = str(meta.video_codec).lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -112,13 +112,13 @@ class RPT(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.get("resolution", "")).lower()
+        resolution = str(meta.resolution).lower()
 
         if resolution == "1080p" or resolution == "1080i":
             return 2
         if resolution == "720p":
             return 3
-        if meta.get("sd", False):
+        if meta.sd:
             return 4
         if resolution == "2160p":
             return 1
@@ -126,7 +126,7 @@ class RPT(NEXUSPHP):
         return 5
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.get("audio", "")).lower()
+        audio_codec = str(meta.audio).lower()
 
         if "true" in audio_codec or "atmos" in audio_codec:
             return 1
@@ -155,13 +155,13 @@ class RPT(NEXUSPHP):
         hdr = 7
         reposting_prohibited = 1
 
-        audio_tracks = meta.get("audio_languages", [])
-        mhdr = meta.get("hdr", "")
-        subtitle_tracks = meta.get("subtitle_languages", [])
+        audio_tracks = meta.audio_languages
+        mhdr = meta.hdr
+        subtitle_tracks = meta.subtitle_languages
 
         checkboxes = []
 
-        if meta.get("exclusive", False):
+        if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
 
         if "Chinese" in audio_tracks or "Mandarin" in audio_tracks:
@@ -176,5 +176,5 @@ class RPT(NEXUSPHP):
         return checkboxes
 
     def get_anonymous(self, meta: Meta) -> bool:
-        anon = not (meta["anon"] == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         return anon

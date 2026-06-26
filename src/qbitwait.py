@@ -9,6 +9,7 @@ import aiohttp
 import qbittorrentapi
 
 from src.console import console
+from src.meta import Meta
 
 
 class Wait:
@@ -208,12 +209,12 @@ class Wait:
                 await self.qbt_session.close()
                 self.qbt_session = None
 
-    async def select_and_recheck_best_torrent(self, meta: dict[str, Any], path: str, check_interval: int = 5) -> bool:
+    async def select_and_recheck_best_torrent(self, meta: Meta, path: str, check_interval: int = 5) -> bool:
         if not self.proxy_url and not self.qbt_client:
             console.print("[red]qBittorrent is not configured.[/red]")
             return False
 
-        torrent_comments = meta.get('torrent_comments')
+        torrent_comments = meta.torrent_comments
         if not isinstance(torrent_comments, list):
             console.print("[red]No torrent comments found in metadata[/red]")
             return False
@@ -229,11 +230,11 @@ class Wait:
             return False
 
         matching_torrents: list[dict[str, Any]] = []
-        hash_used = meta.get('hash_used')
+        hash_used = meta.hash_used
         if isinstance(hash_used, str) and hash_used:
             torrent_hash = hash_used.lower()
         else:
-            meta_name = meta.get('name')
+            meta_name = meta.name
             meta_name_lower = meta_name.lower() if isinstance(meta_name, str) else None
             for tc in torrent_comments_list:
                 content_path = str(tc.get('content_path', '') or '')
@@ -394,7 +395,7 @@ class Wait:
                 final_progress = float(getattr(torrent, 'progress', 0) or 0)
 
             console.print(f"[green]Recheck completed. State: {final_state}, Progress: {final_progress*100:.2f}%[/green]")
-            meta['we_rechecked_torrent'] = True
+            meta.we_rechecked_torrent = True
 
             if final_state not in {'pausedUP', 'seeding', 'completed', 'stalledUP', 'uploading'}:
                 console.print("[yellow]Torrent needs to download missing data. Waiting for completion...[/yellow]")

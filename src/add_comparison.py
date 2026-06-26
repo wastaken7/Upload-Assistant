@@ -27,11 +27,11 @@ class ComparisonManager:
         self.uploadscreens_manager = UploadScreensManager(cast(dict[str, Any], config))
 
     async def add_comparison(self) -> Union[ComparisonData, list[ComparisonGroup]]:
-        comparison_path = self.meta.get('comparison')
+        comparison_path = self.meta.comparison
         if not isinstance(comparison_path, str) or not os.path.isdir(comparison_path):
             return []
 
-        comparison_data_file = f"{self.meta['base_dir']}/tmp/{self.meta['uuid']}/comparison_data.json"
+        comparison_data_file = f"{self.meta.base_dir}/tmp/{self.meta.uuid}/comparison_data.json"
         if os.path.exists(comparison_data_file):
             try:
                 raw_text = await asyncio.to_thread(Path(comparison_data_file).read_text)
@@ -49,18 +49,18 @@ class ComparisonManager:
                     saved_comparison_data = cast(list[ComparisonGroup], raw_list)
                 else:
                     raise ValueError("Invalid comparison data format: must be a dict of dicts or a list of dicts")
-                if self.meta.get('debug'):
+                if self.meta.debug:
                     console.print(f"[cyan]Loading previously saved comparison data from {comparison_data_file}")
-                self.meta["comparison_groups"] = saved_comparison_data
+                self.meta.comparison_groups = saved_comparison_data
 
-                comparison_index = self.meta.get('comparison_index')
+                comparison_index = self.meta.comparison_index
                 if comparison_index is not None:
                     # Normalize comparison_index to string once
                     comparison_index_str = str(comparison_index).strip()
 
                     # Initialize image_list once if needed
                     if 'image_list' not in self.meta:
-                        self.meta['image_list'] = []
+                        self.meta.image_list = []
 
                     urls_to_add: list[dict[str, Any]] = []
                     found = False
@@ -85,10 +85,10 @@ class ComparisonManager:
                             console.print(f"[yellow]Comparison index '{comparison_index_str}' is not a valid integer for list data[/yellow]")
 
                     if found and urls_to_add:
-                        if self.meta.get('debug'):
+                        if self.meta.debug:
                             console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
-                        image_list = cast(list[dict[str, Any]], self.meta.get('image_list', []))
-                        self.meta['image_list'] = image_list
+                        image_list = cast(list[dict[str, Any]], self.meta.image_list)
+                        self.meta.image_list = image_list
                         for url_info in urls_to_add:
                             if url_info not in image_list:
                                 image_list.append(url_info)
@@ -151,7 +151,7 @@ class ComparisonManager:
                 "name": group_name
             }
 
-        comparison_index = self.meta.get('comparison_index')
+        comparison_index = self.meta.comparison_index
         if comparison_index is None:
             console.print("[red]No comparison index provided. Please specify a comparison index matching the input file.")
             while True:
@@ -164,24 +164,24 @@ class ComparisonManager:
         comparison_index_str = str(comparison_index).strip() if comparison_index is not None else ""
         if comparison_index_str and comparison_index_str in meta_comparisons:
             if 'image_list' not in self.meta:
-                self.meta['image_list'] = []
+                self.meta.image_list = []
 
             urls_to_add = cast(list[dict[str, Any]], meta_comparisons[comparison_index_str].get('urls', []))
-            if self.meta.get('debug'):
+            if self.meta.debug:
                 console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
 
-            image_list = cast(list[dict[str, Any]], self.meta.get('image_list', []))
-            self.meta['image_list'] = image_list
+            image_list = cast(list[dict[str, Any]], self.meta.image_list)
+            self.meta.image_list = image_list
             for url_info in urls_to_add:
                 if url_info not in image_list:
                     image_list.append(url_info)
 
-        self.meta["comparison_groups"] = meta_comparisons
+        self.meta.comparison_groups = meta_comparisons
 
         try:
             comparison_json = json.dumps(meta_comparisons, indent=4)
             await asyncio.to_thread(Path(comparison_data_file).write_text, comparison_json)
-            if self.meta.get('debug'):
+            if self.meta.debug:
                 console.print(f"[cyan]Saved comparison data to {comparison_data_file}")
         except Exception as e:
             console.print(f"[yellow]Failed to save comparison data: {e}")

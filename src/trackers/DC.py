@@ -8,10 +8,10 @@ import httpx
 from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 class DC:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
@@ -31,11 +31,11 @@ class DC:
 
     async def mediainfo(self, meta: Meta) -> str:
         mediainfo = ""
-        if meta["category"] in ("TV", "MOVIE"):
-            if meta.get("is_disc") == "BDMV":
+        if meta.category in ("TV", "MOVIE"):
+            if meta.is_disc == "BDMV":
                 mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
             else:
-                mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
+                mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
                 async with aiofiles.open(mi_path, encoding="utf-8") as f:
                     mediainfo = await f.read()
 
@@ -63,17 +63,17 @@ class DC:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta['ua_signature']}[/url][/center]",
+            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url][/center]",
         )
 
         return description
 
     def get_category_id(self, meta: Meta) -> Optional[int]:
-        resolution = meta.get('resolution', '')
-        category = meta.get('category', '')
-        is_disc = meta.get('is_disc', '')
-        tv_pack = meta.get('tv_pack', '')
-        sd = meta.get('sd', '')
+        resolution = meta.resolution
+        category = meta.category
+        is_disc = meta.is_disc
+        tv_pack = meta.tv_pack
+        sd = meta.sd
 
         if is_disc == 'BDMV':
             if resolution == '1080p' and category == 'MOVIE':
@@ -91,12 +91,12 @@ class DC:
             return 12
 
         if category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 return 44
             return 28
 
         if category == "GAME":
-            platform = meta["platform"]
+            platform = meta.platform
             if platform == "PC":
                 return 25
             elif platform == "MAC":
@@ -118,10 +118,10 @@ class DC:
         return None
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        imdb_id = meta.get('imdb_info', {}).get('imdbID')
+        imdb_id = meta.imdb_info.get("imdbID")
         category_id = self.get_category_id(meta)
 
-        search_params = {"search": meta["title"]}
+        search_params = {"search": meta.title}
         if imdb_id:
             search_params = {"searchText": imdb_id}
 
@@ -173,12 +173,12 @@ class DC:
         Mod also mentioned that metadata-based titles are acceptable.
         https://digitalcore.club/forum/6/topic/2810/clarification-needed-p2p-non-scene-torrent-naming-conventions
         """
-        tracker_name = meta["basename_no_ext"]
-        scene_name = meta.get("scene_name") or ""
+        tracker_name = meta.basename_no_ext
+        scene_name = meta.scene_name or ""
 
         use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
         if use_metadata_name:
-            clean_name = meta.get("clean_name") or ""
+            clean_name = meta.clean_name or ""
             tracker_name = scene_name if scene_name else clean_name
             # T1)  Acceptable characters are as follows:
             #         ABCDEFGHIJKLMNOPQRSTUVWXYZ
@@ -193,7 +193,7 @@ class DC:
                 tracker_name += " [UNRAR]"
 
         else:
-            tracker_name = f"{scene_name} [UNRAR]" if scene_name else meta["basename_no_ext"]
+            tracker_name = f"{scene_name} [UNRAR]" if scene_name else meta.basename_no_ext
 
         return tracker_name
 
@@ -217,8 +217,8 @@ class DC:
         return
 
     async def get_firstpic(self, meta: Meta) -> str:
-        if meta["category"] == "BOOK":
-            covers = meta.get("covers")
+        if meta.category == "BOOK":
+            covers = meta.covers
             if isinstance(covers, list) and len(covers) > 0:
                 raw_url = covers[0].get("raw_url")
                 if raw_url:
@@ -226,11 +226,11 @@ class DC:
         return ""
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
-        anon = '1' if meta['anon'] or self.config['TRACKERS'][self.tracker].get('anon', False) else '0'
+        anon = "1" if meta.anon or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"
 
         data = {
             "category": self.get_category_id(meta),
-            "imdbId": meta.get("imdb_info", {}).get("imdbID", ""),
+            "imdbId": meta.imdb_info.get("imdbID", ""),
             "nfo": await self.generate_description(meta),
             "mediainfo": await self.mediainfo(meta),
             "reqid": "0",
@@ -240,7 +240,7 @@ class DC:
             "p2p": "0",
             "unrar": "1",
             "firstpic": await self.get_firstpic(meta),
-            "language": meta.get("book_language", ""),
+            "language": meta.book_language,
         }
 
         return data
@@ -250,11 +250,11 @@ class DC:
         torrent_title = await self.edit_name(meta)
         response = None
 
-        if not meta.get('debug', False):
+        if not meta.debug:
             try:
                 upload_url = f'{self.api_base_url}/upload'
                 await self.common.create_torrent_for_upload(meta, self.tracker, 'DigitalCore.club')
-                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+                torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
                 async with aiofiles.open(torrent_path, 'rb') as torrent_file:
                     torrent_bytes = await torrent_file.read()
@@ -267,8 +267,8 @@ class DC:
 
                 if response.status_code == 200 and response_data.get('id'):
                     torrent_id = str(response_data['id'])
-                    meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id + '/'
-                    meta['tracker_status'][self.tracker]['status_message'] = response_data.get('message')
+                    meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
+                    meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
 
                     await self.common.download_tracker_torrent(
                         meta,
@@ -279,27 +279,27 @@ class DC:
                     return True
 
                 else:
-                    meta['tracker_status'][self.tracker]['status_message'] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
                     return False
 
             except httpx.HTTPStatusError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: HTTP {e.response.status_code} - {e.response.text}'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
                 return False
             except httpx.TimeoutException:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Request timed out after {self.session.timeout.write} seconds'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: Request timed out after {self.session.timeout.write} seconds"
                 return False
             except httpx.RequestError as e:
                 resp_text = getattr(getattr(e, 'response', None), 'text', 'No response received')
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}.\nResponse: {resp_text}'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {resp_text}"
                 return False
             except Exception as e:
                 resp_text = response.text if response is not None else 'No response received'
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e}.\nResponse: {resp_text}'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: It may have uploaded, go check. Error: {e}.\nResponse: {resp_text}"
                 return False
 
         else:
             console.print("[cyan]DC Request Data:")
             console.print(Redaction.redact_private_info(data))
-            meta['tracker_status'][self.tracker]['status_message'] = 'Debug mode enabled, not uploading'
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

@@ -3,10 +3,10 @@ import re
 from typing import Any, Optional
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -29,16 +29,16 @@ class RF(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
             return False
-        if meta.get('category') == "TV":
-            if not meta['unattended']:
+        if meta.category == "TV":
+            if not meta.unattended:
                 console.print('[bold red]RF only ALLOWS Movies.')
             return False
 
         return True
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        rf_name = str(meta.get('name', ''))
-        tag_value = str(meta.get('tag', ''))
+        rf_name = str(meta.name)
+        tag_value = str(meta.tag)
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -69,7 +69,7 @@ class RF(UNIT3D):
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        type_value = str(type) if type is not None else str(meta.get('type', ''))
+        type_value = str(type) if type is not None else str(meta.type)
         return {'type_id': type_id.get(type_value, '0')}
 
     async def get_resolution_id(
@@ -96,5 +96,5 @@ class RF(UNIT3D):
             return resolution_id
         elif reverse:
             return {v: k for k, v in resolution_id.items()}
-        resolution_value = str(resolution) if resolution is not None else str(meta.get('resolution', ''))
+        resolution_value = str(resolution) if resolution is not None else str(meta.resolution)
         return {'resolution_id': resolution_id.get(resolution_value, '10')}

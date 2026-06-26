@@ -15,6 +15,7 @@ from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -55,15 +56,15 @@ class GPW:
             'yes.ilikeshots.club': 'ilikeshots',
         }
 
-    async def load_cookies(self, meta: dict[str, Any]) -> Any:
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+    async def load_cookies(self, meta: Meta) -> Any:
+        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             return False
 
         return await self.common.parseCookieFile(cookie_file)
 
-    async def load_localized_data(self, meta: dict[str, Any]) -> None:
-        localized_data_file = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/tmdb_localized_data.json'
+    async def load_localized_data(self, meta: Meta) -> None:
+        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
         main_ch_data: dict[str, Any] = {}
         data: dict[str, Any] = {}
 
@@ -99,8 +100,8 @@ class GPW:
 
         return
 
-    def get_container(self, meta: dict[str, Any]) -> str:
-        container_value = meta.get('container', '')
+    def get_container(self, meta: Meta) -> str:
+        container_value = meta.container
         container = container_value if isinstance(container_value, str) else ''
         if container == 'm2ts':
             return container
@@ -111,11 +112,11 @@ class GPW:
 
         return 'Other'
 
-    async def get_subtitle(self, meta: dict[str, Any]) -> list[str]:
-        if not meta.get('language_checked', False):
+    async def get_subtitle(self, meta: Meta) -> list[str]:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        found_language_strings_raw = meta.get('subtitle_languages')
+        found_language_strings_raw = meta.subtitle_languages
         if not isinstance(found_language_strings_raw, list):
             return []
 
@@ -123,11 +124,11 @@ class GPW:
         found_language_strings = [lang for lang in found_language_strings_list if isinstance(lang, str)]
         return [lang.lower() for lang in found_language_strings]
 
-    async def get_ch_dubs(self, meta: dict[str, Any]) -> bool:
-        if not meta.get('language_checked', False):
+    async def get_ch_dubs(self, meta: Meta) -> bool:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        found_language_strings_raw = meta.get('audio_languages')
+        found_language_strings_raw = meta.audio_languages
         if not isinstance(found_language_strings_raw, list):
             return False
         found_language_strings_list = cast(list[Any], found_language_strings_raw)
@@ -136,9 +137,9 @@ class GPW:
         chinese_languages = {'mandarin', 'chinese', 'zh', 'zh-cn', 'zh-hans', 'zh-hant', 'putonghua', '国语', '普通话'}
         return any(lang.strip().lower() in chinese_languages for lang in found_language_strings)
 
-    def get_codec(self, meta: dict[str, Any]) -> str:
-        video_encode = str(meta.get("video_encode", "")).strip().lower()
-        codec_final = str(meta.get("video_codec", "")).strip().lower()
+    def get_codec(self, meta: Meta) -> str:
+        video_encode = str(meta.video_encode).strip().lower()
+        codec_final = str(meta.video_codec).strip().lower()
 
         codec_map = {
             'divx': 'DivX',
@@ -157,7 +158,7 @@ class GPW:
 
         return 'Other'
 
-    def get_audio_codec(self, meta: dict[str, Any]) -> str:
+    def get_audio_codec(self, meta: Meta) -> str:
         priority_order = [
             'DTS-X', 'E-AC-3 JOC', 'TrueHD', 'DTS-HD', 'PCM', 'FLAC', 'DTS-ES',
             'DTS', 'E-AC-3', 'AC3', 'AAC', 'Opus', 'Vorbis', 'MP3', 'MP2'
@@ -181,7 +182,7 @@ class GPW:
             'MP3': ['MP3']
         }
 
-        audio_description = meta.get('audio')
+        audio_description = meta.audio
 
         if not audio_description or not isinstance(audio_description, str):
             return 'Outro'
@@ -195,13 +196,13 @@ class GPW:
 
         return 'Outro'
 
-    def get_title(self, meta: dict[str, Any]) -> str:
+    def get_title(self, meta: Meta) -> str:
         title_value = self.tmdb_data.get('name') or self.tmdb_data.get('title') or ''
         title = title_value if isinstance(title_value, str) else ''
 
-        return title if title and title != meta.get('title') else ''
+        return title if title and title != meta.title else ""
 
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
+    async def check_image_hosts(self, meta: Meta) -> None:
         # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
         await self.rehost_images_manager.check_hosts(
             meta,
@@ -212,7 +213,7 @@ class GPW:
         )
         return
 
-    async def get_release_desc(self, meta: dict[str, Any]) -> str:
+    async def get_release_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         description = await builder.general_description_generator(
             meta,
@@ -233,11 +234,11 @@ class GPW:
             tv_info=False,
             ua_signature=True,
             user_description=True,
-            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/align]",
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/align]",
         )
         return description
 
-    def get_trailer(self, meta: dict[str, Any]) -> str:
+    def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = []
         videos = self.tmdb_data.get('videos')
         if isinstance(videos, dict):
@@ -258,16 +259,16 @@ class GPW:
             youtube = youtube_value if isinstance(youtube_value, str) else ''
 
         if not youtube:
-            meta_trailer = str(meta.get("youtube", ""))
+            meta_trailer = str(meta.youtube)
             if meta_trailer:
                 youtube = meta_trailer.replace('https://www.youtube.com/watch?v=', '').replace('/', '')
 
         return youtube
 
-    async def get_tags(self, meta: dict[str, Any]) -> str:
+    async def get_tags(self, meta: Meta) -> str:
         tags = ''
 
-        genres = meta.get('genres', '')
+        genres = meta.genres
         if genres and isinstance(genres, str):
             genre_names = [g.strip() for g in genres.split(',') if g.strip()]
             if genre_names:
@@ -286,34 +287,34 @@ class GPW:
 
         return tags
 
-    def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta['category'] != 'MOVIE':
+    def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.category != "MOVIE":
             console.print(f'{self.tracker}: Only feature films, short films, and live performances are permitted on {self.tracker}')
             return False
 
-        media_type = str(meta.get("type", "")).lower()
-        tag = str(meta.get("tag", "")).strip().lower()
+        media_type = str(meta.type).lower()
+        tag = str(meta.tag).strip().lower()
         if media_type == "remux" and tag in ("-hdt", "-frds"):
-            console.print(f"{self.tracker}: Remuxes from {meta['tag']} are not allowed on {self.tracker}")
+            console.print(f"{self.tracker}: Remuxes from {meta.tag} are not allowed on {self.tracker}")
             return False
         if media_type == "webdl" and tag == "-evo":
-            console.print(f"{self.tracker}: WEB-DLs from {meta['tag']} are not allowed on {self.tracker}")
+            console.print(f"{self.tracker}: WEB-DLs from {meta.tag} are not allowed on {self.tracker}")
             return False
 
         return True
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
 
         if not self.get_additional_checks(meta):
-            meta["skipping"] = "GPW"
+            meta.skipping = "GPW"
             return []
 
         group_id = await self.get_groupid(meta)
         if not group_id:
             return []
 
-        imdb = dict(meta.get("imdb_info", {})).get("imdbID", "")
+        imdb = dict(meta.imdb_info).get("imdbID", "")
         if not imdb:
             console.print(f"{self.tracker}: IMDb ID not found in metadata. Skipping search.")
             return []
@@ -360,7 +361,9 @@ class GPW:
 
             try:
                 async with httpx.AsyncClient(
-                    cookies=cookies, timeout=30, headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+                    cookies=cookies,
+                    timeout=30,
+                    headers={"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"},
                 ) as client:
                     response = await client.get(search_url)
                     response.raise_for_status()
@@ -409,7 +412,7 @@ class GPW:
                 console.print(f'An unexpected error occurred while processing the search: {e}', markup=False)
                 return []
 
-    async def get_slots(self, meta: dict[str, Any], client: httpx.AsyncClient, group_id: str) -> None:
+    async def get_slots(self, meta: Meta, client: httpx.AsyncClient, group_id: str) -> None:
         url = f'{self.base_url}/torrents.php?id={group_id}'
 
         try:
@@ -458,16 +461,16 @@ class GPW:
 
             if final_slots:
                 final_slots = final_slots.replace('Slot', '').replace('Empty slots:', '').strip()
-                if resolution == meta.get('resolution'):
+                if resolution == meta.resolution:
                     console.print(f'\n[green]Available Slots for[/green] {resolution}:')
                     console.print(f'{final_slots}\n')
 
-    async def get_media_info(self, meta: dict[str, Any]) -> str:
+    async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ''
-        if meta.get('is_disc') == 'BDMV':
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt"
+        if meta.is_disc == "BDMV":
+            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
         else:
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
+            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             try:
@@ -480,8 +483,8 @@ class GPW:
             console.print(f'[bold red]Info file not found: {info_file_path}[/bold red]')
             return ''
 
-    def get_edition(self, meta: dict[str, Any]) -> str:
-        edition_str = str(meta.get("edition", "")).lower()
+    def get_edition(self, meta: Meta) -> str:
+        edition_str = str(meta.edition).lower()
         if not edition_str:
             return ''
 
@@ -502,17 +505,17 @@ class GPW:
 
         return ''
 
-    def get_processing_other(self, meta: dict[str, Any]) -> str:
-        if meta.get('type') == 'DISC':
-            is_disc_type = meta.get('is_disc')
+    def get_processing_other(self, meta: Meta) -> str:
+        if meta.type == "DISC":
+            is_disc_type = meta.is_disc
 
             if is_disc_type == 'BDMV':
-                disctype = meta.get('disctype')
+                disctype = meta.disctype
                 if isinstance(disctype, str) and disctype in ['BD100', 'BD66', 'BD50', 'BD25']:
                     return disctype
 
                 try:
-                    size_in_gb = meta['bdinfo']['size']
+                    size_in_gb = meta.bdinfo["size"]
                 except (KeyError, IndexError, TypeError):
                     size_in_gb = 0
 
@@ -526,15 +529,15 @@ class GPW:
                     return 'BD25'
 
             elif is_disc_type == 'DVD':
-                dvd_size = meta.get('dvd_size')
+                dvd_size = meta.dvd_size
                 if isinstance(dvd_size, str) and dvd_size in ['DVD9', 'DVD5']:
                     return dvd_size
                 return 'DVD9'
 
         return ""
 
-    def get_screens(self, meta: dict[str, Any]) -> list[str]:
-        images_value = meta.get('image_list', [])
+    def get_screens(self, meta: Meta) -> list[str]:
+        images_value = meta.image_list
         images_list: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
         screenshot_urls: list[str] = []
         for image in images_list:
@@ -547,15 +550,15 @@ class GPW:
 
         return screenshot_urls
 
-    def get_credits(self, meta: dict[str, Any]) -> str:
+    def get_credits(self, meta: Meta) -> str:
         director_entries: list[str] = []
 
-        imdb_directors = dict(meta.get("imdb_info", {})).get("directors")
+        imdb_directors = dict(meta.imdb_info).get("directors")
         if isinstance(imdb_directors, list):
             imdb_directors_list = cast(list[Any], imdb_directors)
             director_entries.extend(name for name in imdb_directors_list if isinstance(name, str))
 
-        tmdb_directors = meta.get('tmdb_directors')
+        tmdb_directors = meta.tmdb_directors
         if isinstance(tmdb_directors, list):
             tmdb_directors_list = cast(list[Any], tmdb_directors)
             director_entries.extend(name for name in tmdb_directors_list if isinstance(name, str))
@@ -566,7 +569,7 @@ class GPW:
 
         return 'N/A'
 
-    def get_remaster_title(self, meta: dict[str, Any]) -> str:
+    def get_remaster_title(self, meta: Meta) -> str:
         found_tags: list[str] = []
 
         def add_tag(tag_id: str) -> None:
@@ -574,7 +577,7 @@ class GPW:
                 found_tags.append(tag_id)
 
         # Collections
-        distributor = str(meta.get("distributor", "")).upper()
+        distributor = str(meta.distributor).upper()
         if distributor in ('WARNER ARCHIVE', 'WARNER ARCHIVE COLLECTION', 'WAC'):
             add_tag('warner_archive_collection')
         elif distributor in ('CRITERION', 'CRITERION COLLECTION', 'CC'):
@@ -583,7 +586,7 @@ class GPW:
             add_tag('masters_of_cinema')
 
         # Editions
-        edition = str(meta.get("edition", "")).lower()
+        edition = str(meta.edition).lower()
         if "director's cut" in edition:
             add_tag('director_s_cut')
         elif 'extended' in edition:
@@ -598,14 +601,14 @@ class GPW:
             add_tag('unrated')
 
         # Audio
-        if meta.get('dual_audio', False):
+        if meta.dual_audio:
             add_tag('dual_audio')
 
-        if meta.get('extras'):
+        if meta.extras:
             add_tag('extras')
 
         # Commentary
-        has_commentary = meta.get('has_commentary', False) or meta.get('manual_commentary', False)
+        has_commentary = meta.has_commentary or meta.manual_commentary
 
         # Ensure 'with_commentary' is last if it exists
         if has_commentary:
@@ -621,9 +624,9 @@ class GPW:
 
         return remaster_title_show
 
-    async def get_groupid(self, meta: dict[str, Any]) -> bool:
+    async def get_groupid(self, meta: Meta) -> bool:
         GPW.group_id = ""
-        search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.get('imdb_info', {}).get('imdbID')}"
+        search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.imdb_info.get('imdbID')}"
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -648,17 +651,17 @@ class GPW:
             return True
         return False
 
-    async def _get_poster(self, meta: dict[str, Any]) -> str:
-        poster_url = str(meta.get("poster", "")).strip()
+    async def _get_poster(self, meta: Meta) -> str:
+        poster_url = str(meta.poster).strip()
         if not poster_url:
-            tmdb_poster = meta.get("tmdb_poster", "")
+            tmdb_poster = meta.tmdb_poster
             if tmdb_poster:
                 poster_url = f"https://image.tmdb.org/t/p/original{tmdb_poster}"
 
         if not poster_url:
             return ""
 
-        poster_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], "poster.jpg")
+        poster_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "poster.jpg")
         if not os.path.exists(poster_path):
             try:
                 async with httpx.AsyncClient() as client:
@@ -683,7 +686,7 @@ class GPW:
 
         return ""
 
-    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         poster_url = await self._get_poster(meta)
 
         if not poster_url:
@@ -697,8 +700,8 @@ class GPW:
                 else:
                     console.print("[red]Invalid host. Please use a URL from the allowed hosts.[/red]")
 
-        imdb_identifier = str(meta.get('imdb_info', {}).get('imdbID') or meta.get('imdb') or "").strip()
-        tmdb_identifier = str(meta.get('tmdb_id') or "").strip()
+        imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
+        tmdb_identifier = str(meta.tmdb_id or "").strip()
         if imdb_identifier:
             data_source = "imdb"
             identifier = imdb_identifier
@@ -714,12 +717,12 @@ class GPW:
             "identifier": identifier,
             "desc": self.tmdb_data.get("overview", ""),
             "image": poster_url,
-            "maindesc": meta.get("overview", ""),
-            "name": meta.get("title"),
+            "maindesc": meta.overview,
+            "name": meta.title,
             "releasetype": self._get_movie_type(meta),
             "subname": self.get_title(meta),
             "tags": await self.get_tags(meta),
-            "year": meta.get("year"),
+            "year": meta.year,
         }
 
         # Keep backward-compatible identifiers for sites/APIs that still parse legacy field names.
@@ -734,7 +737,7 @@ class GPW:
 
         return data
 
-    async def _get_artist_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def _get_artist_data(self, meta: Meta) -> dict[str, Any]:
         directors: list[str] = []
         directors_id: list[str] = []
         writers: list[str] = []
@@ -744,7 +747,7 @@ class GPW:
         cast_character_map: dict[str, str] = {}
         full_credits: list[dict[str, Any]] = []
 
-        imdb_identifier = str(meta.get('imdb_info', {}).get('imdbID') or meta.get('imdb') or '').strip()
+        imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
         full_credits_success = False
         if imdb_identifier:
             movie_info_raw = await self._fetch_gpw_movie_info(meta, "imdb", imdb_identifier)
@@ -791,7 +794,7 @@ class GPW:
 
         # Fallback: if FullCredits is unavailable/invalid, use existing imdb_info fields.
         if not full_credits_success:
-            imdb_info = meta.get('imdb_info', {})
+            imdb_info = meta.imdb_info
             raw_directors = imdb_info.get('directors', [])
             raw_directors_id = imdb_info.get('directors_id', [])
             raw_writers = imdb_info.get('writers', [])
@@ -883,7 +886,7 @@ class GPW:
         }
         return post_data
 
-    async def _fetch_gpw_movie_info(self, meta: dict[str, Any], data_source: str, identifier: str) -> dict[str, Any]:
+    async def _fetch_gpw_movie_info(self, meta: Meta, data_source: str, identifier: str) -> dict[str, Any]:
         if not data_source or not identifier:
             return {}
 
@@ -920,7 +923,9 @@ class GPW:
 
                 request_cookies = cookies if use_cookies and cookies else None
                 async with httpx.AsyncClient(
-                    timeout=15, cookies=request_cookies, headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+                    timeout=15,
+                    cookies=request_cookies,
+                    headers={"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"},
                 ) as client:
                     if method == "post":
                         response = await client.post(url, data=params)
@@ -946,9 +951,9 @@ class GPW:
 
         return best_response
 
-    def _get_movie_type(self, meta: dict[str, Any]) -> str:
+    def _get_movie_type(self, meta: Meta) -> str:
         movie_type = ''
-        imdb_info = meta.get('imdb_info', {})
+        imdb_info = meta.imdb_info
         if imdb_info:
             imdbType = imdb_info.get('type', 'movie').lower()
             if imdbType in ("movie", "tv movie", 'tvmovie', 'video'):
@@ -957,11 +962,11 @@ class GPW:
 
         return movie_type
 
-    def get_source(self, meta: dict[str, Any]) -> str:
-        source_type = str(meta.get("type", "")).lower()
+    def get_source(self, meta: Meta) -> str:
+        source_type = str(meta.type).lower()
 
         if source_type == 'disc':
-            is_disc = str(meta.get("is_disc", "")).upper()
+            is_disc = str(meta.is_disc).upper()
             if is_disc == 'BDMV':
                 return 'Blu-ray'
             elif is_disc in ('HDDVD', 'DVD'):
@@ -990,21 +995,21 @@ class GPW:
 
         return keyword_map.get(source_type, 'Other')
 
-    def get_processing(self, meta: dict[str, Any]) -> str:
+    def get_processing(self, meta: Meta) -> str:
         type_map = {
             'ENCODE': 'Encode',
             'REMUX': 'Remux',
             'DIY': 'DIY',
             'UNTOUCHED': 'Untouched'
         }
-        release_type = str(meta.get("type", "")).strip().upper()
+        release_type = str(meta.type).strip().upper()
         return type_map.get(release_type, 'Untouched')
 
-    def get_media_flags(self, meta: dict[str, Any]) -> dict[str, str]:
-        audio = str(meta.get('audio', '')).lower()
-        hdr = str(meta.get('hdr', ''))
-        bit_depth = str(meta.get('bit_depth', ''))
-        channels = str(meta.get('channels', ''))
+    def get_media_flags(self, meta: Meta) -> dict[str, str]:
+        audio = str(meta.audio).lower()
+        hdr = str(meta.hdr)
+        bit_depth = str(meta.bit_depth)
+        channels = str(meta.channels)
 
         flags: dict[str, str] = {}
 
@@ -1033,9 +1038,9 @@ class GPW:
 
         return flags
 
-    def get_resolution(self, meta: dict[str, Any]) -> str:
-        resolution = str(meta.get("resolution", "")).lower()
-        source = str(meta.get("source", "")).upper()
+    def get_resolution(self, meta: Meta) -> str:
+        resolution = str(meta.resolution).lower()
+        source = str(meta.source).upper()
 
         if source in ["NTSC", "PAL"]:
             return source.upper()
@@ -1044,7 +1049,7 @@ class GPW:
         else:
             return "Other"
 
-    async def fetch_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         await self.load_localized_data(meta)
         await self.get_groupid(meta)
         remaster_title = self.get_remaster_title(meta)
@@ -1057,30 +1062,28 @@ class GPW:
             console.print(f'{self.tracker}: This movie is not registered in the database, please enter additional information.')
             data.update(await self.get_additional_data(meta))
 
-        data.update(
-            {
-                "codec_other": meta.get("video_codec", "") if codec == "Other" else "",
-                "codec": codec,
-                "container_other": meta.get("container", "") if container == "Other" else "",
-                "container": container,
-                "mediainfo[]": await self.get_media_info(meta),
-                "movie_edition_information": "on" if remaster_title else "",
-                "processing_other": self.get_processing_other(meta) if meta.get("type") == "DISC" else "",
-                "processing": self.get_processing(meta),
-                "release_desc": await self.get_release_desc(meta),
-                "remaster_custom_title": "",
-                "remaster_title": remaster_title,
-                "remaster_year": "",
-                "resolution_height": "",
-                "resolution_width": "",
-                "resolution": self.get_resolution(meta),
-                "source_other": "",
-                "source": self.get_source(meta),
-                "submit": "true",
-                "subtitle_type": ("2" if meta.get("hardcoded_subs", False) else "1" if meta.get("subtitle_languages", []) else "3"),
-                "subtitles[]": await self.get_subtitle(meta),
-            }
-        )
+        data.update({
+            "codec_other": meta.video_codec if codec == "Other" else "",
+            "codec": codec,
+            "container_other": meta.container if container == "Other" else "",
+            "container": container,
+            "mediainfo[]": await self.get_media_info(meta),
+            "movie_edition_information": "on" if remaster_title else "",
+            "processing_other": self.get_processing_other(meta) if meta.type == "DISC" else "",
+            "processing": self.get_processing(meta),
+            "release_desc": await self.get_release_desc(meta),
+            "remaster_custom_title": "",
+            "remaster_title": remaster_title,
+            "remaster_year": "",
+            "resolution_height": "",
+            "resolution_width": "",
+            "resolution": self.get_resolution(meta),
+            "source_other": "",
+            "source": self.get_source(meta),
+            "submit": "true",
+            "subtitle_type": ("2" if meta.hardcoded_subs else "1" if meta.subtitle_languages else "3"),
+            "subtitles[]": await self.get_subtitle(meta),
+        })
         if GPW.group_id:
             data["groupid"] = GPW.group_id
 
@@ -1089,24 +1092,24 @@ class GPW:
                 'chinese_dubbed': 'on'
             })
 
-        if meta.get('sfx_subtitles', False):
+        if meta.sfx_subtitles:
             data.update({
                 'special_effects_subtitles': 'on'
             })
 
-        if meta.get('scene', False):
+        if meta.scene:
             data.update({
                 'scene': 'on'
             })
 
-        if meta.get('personalrelease', False):
-            if meta.get("is_disc"):
+        if meta.personalrelease:
+            if meta.is_disc:
                 data.update({"buy": "on"})
             else:
                 data.update({"diy": "on"})
 
         exclusive_flag = None
-        if meta.get("exclusive", False) or self.tracker_config.get("exclusive", False):
+        if meta.exclusive or self.tracker_config.get("exclusive", False):
             exclusive_flag = "1"
         if exclusive_flag:
             data.update({"jinzhuan": "on"})
@@ -1115,15 +1118,15 @@ class GPW:
 
         return data
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         data = await self.fetch_data(meta)
 
-        if not meta.get('debug', False):
+        if not meta.debug:
             response_data = ''
             torrent_id = ''
             upload_url = f'{self.base_url}/api.php?api_key={self.api_key}&action=upload'
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+            torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
             async with aiofiles.open(torrent_path, 'rb') as torrent_file:
                 torrent_bytes = await torrent_file.read()
@@ -1150,7 +1153,7 @@ class GPW:
                         return False
 
                     if not isinstance(response_data, dict):
-                        meta['tracker_status'][self.tracker]['status_message'] = f'data error: Invalid API response: {response_data}'
+                        meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid API response: {response_data}"
                         return False
 
                     status_value = str(response_data.get('status', '')).strip().lower()
@@ -1160,37 +1163,33 @@ class GPW:
                     success_status = status_value in ('success', 'ok', '200')
                     if success_status and torrent_id_from_payload:
                         torrent_id = torrent_id_from_payload
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                        meta['tracker_status'][self.tracker]['status_message'] = 'Torrent uploaded successfully.'
+                        meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
+                        meta.tracker_status[self.tracker]["status_message"] = "Torrent uploaded successfully."
                         await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
                         return True
 
                     error_message = str(response_data.get('error') or response_data.get('message') or 'Upload failed')
                     duplicate_phrase = 'the exact same torrent file already exists on the site'
                     if duplicate_phrase in error_message.lower():
-                        meta['tracker_status'][self.tracker]['status_message'] = (
-                            'data error: Torrent already exists on GPW (duplicate file).'
-                        )
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GPW (duplicate file)."
                         return False
 
-                    meta['tracker_status'][self.tracker]['status_message'] = (
-                        f'data error: {error_message}.'
-                    )
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: {error_message}."
                     return False
 
             except httpx.TimeoutException:
-                meta['tracker_status'][self.tracker]['status_message'] = 'data error: Request timed out after 10 seconds'
+                meta.tracker_status[self.tracker]["status_message"] = "data error: Request timed out after 10 seconds"
                 return False
             except httpx.RequestError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}.'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}."
                 return False
             except Exception as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e}.'
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: It may have uploaded, go check. Error: {e}."
                 return False
 
         else:
             console.print("[cyan]GPW Request Data:")
             console.print(Redaction.redact_private_info(data))
-            meta['tracker_status'][self.tracker]['status_message'] = 'Debug mode enabled, not uploading.'
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True

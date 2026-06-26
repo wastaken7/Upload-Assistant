@@ -11,6 +11,7 @@ from langcodes.tag_parser import LanguageTagError
 
 from src.cleanup import cleanup_manager
 from src.console import console
+from src.meta import Meta
 
 
 class LanguagesManager:
@@ -24,9 +25,9 @@ class LanguagesManager:
                 deduped.append(value)
         return deduped
 
-    async def parse_blu_ray(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def parse_blu_ray(self, meta: Meta) -> dict[str, Any]:
         try:
-            bd_summary_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
+            bd_summary_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
             if not os.path.exists(bd_summary_file):
                 console.print(f"[yellow]BD_SUMMARY_00.txt not found at {bd_summary_file}[/yellow]")
                 return {}
@@ -121,10 +122,9 @@ class LanguagesManager:
 
         return parsed_data
 
-
-    async def parsed_mediainfo(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def parsed_mediainfo(self, meta: Meta) -> dict[str, Any]:
         try:
-            mediainfo_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
+            mediainfo_file = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
             if os.path.exists(mediainfo_file):
                 async with aiofiles.open(mediainfo_file, encoding='utf-8') as f:
                     mediainfo_content = await f.read()
@@ -190,47 +190,46 @@ class LanguagesManager:
 
         return parsed_data
 
-
-    async def process_desc_language(self, meta: dict[str, Any], tracker: str = "") -> None:
-        if meta.get("category") not in ["MOVIE", "TV"]:
-            meta["language_checked"] = True
-            meta["audio_languages"] = []
-            meta["subtitle_languages"] = []
+    async def process_desc_language(self, meta: Meta, tracker: str = "") -> None:
+        if meta.category not in ["MOVIE", "TV"]:
+            meta.language_checked = True
+            meta.audio_languages = []
+            meta.subtitle_languages = []
             return None
 
         if 'language_checked' not in meta:
-            meta['language_checked'] = False
+            meta.language_checked = False
         if 'tracker_status' not in meta:
-            meta['tracker_status'] = {}
-        if tracker not in meta['tracker_status']:
-            meta['tracker_status'][tracker] = {}
+            meta.tracker_status = {}
+        if tracker not in meta.tracker_status:
+            meta.tracker_status[tracker] = {}
         if 'unattended_audio_skip' not in meta:
-            meta['unattended_audio_skip'] = False
+            meta.unattended_audio_skip = False
         if 'unattended_subtitle_skip' not in meta:
-            meta['unattended_subtitle_skip'] = False
+            meta.unattended_subtitle_skip = False
         if 'no_subs' not in meta:
-            meta['no_subs'] = False
+            meta.no_subs = False
         if 'write_hc_languages' not in meta:
-            meta['write_hc_languages'] = False
+            meta.write_hc_languages = False
         if 'write_audio_languages' not in meta:
-            meta['write_audio_languages'] = False
+            meta.write_audio_languages = False
         if 'write_subtitle_languages' not in meta:
-            meta['write_subtitle_languages'] = False
+            meta.write_subtitle_languages = False
         if 'write_hc_languages' not in meta:
-            meta['write_hc_languages'] = False
-        if meta['is_disc'] != "BDMV":
+            meta.write_hc_languages = False
+        if meta.is_disc != "BDMV":
             try:
                 parsed_info = await self.parsed_mediainfo(meta)
-                audio_languages: list[str] = cast(list[str], meta.get('audio_languages') or [])
-                subtitle_languages: list[str] = cast(list[str], meta.get('subtitle_languages') or [])
-                meta['audio_languages'] = audio_languages
-                meta['subtitle_languages'] = subtitle_languages
+                audio_languages: list[str] = cast(list[str], meta.audio_languages or [])
+                subtitle_languages: list[str] = cast(list[str], meta.subtitle_languages or [])
+                meta.audio_languages = audio_languages
+                meta.subtitle_languages = subtitle_languages
                 if 'write_audio_languages' not in meta:
-                    meta['write_audio_languages'] = False
+                    meta.write_audio_languages = False
                 if 'write_subtitle_languages' not in meta:
-                    meta['write_subtitle_languages'] = False
+                    meta.write_subtitle_languages = False
                 if not audio_languages or not subtitle_languages:
-                    if not meta.get('unattended_audio_skip', False) and not audio_languages:
+                    if not meta.unattended_audio_skip and not audio_languages:
                         found_any_language = False
                         tracks_without_language: list[str] = []
                         audio_tracks = cast(list[dict[str, Any]], parsed_info.get('audio', []))
@@ -240,7 +239,7 @@ class LanguagesManager:
 
                             # Skip commentary tracks
                             if "title" in audio_track and "commentary" in audio_track['title'].lower():
-                                if meta['debug']:
+                                if meta.debug:
                                     console.print(f"Skipping commentary track: {audio_track['title']}")
                                 continue
 
@@ -248,7 +247,7 @@ class LanguagesManager:
                                 language_found = audio_track['language']
 
                             if not language_found and 'title' in audio_track:
-                                if meta['debug']:
+                                if meta.debug:
                                     console.print(f"Attempting to extract language from title: {audio_track['title']}")
                                 title_language = self.extract_language_from_title(audio_track['title'])
                                 if title_language:
@@ -265,7 +264,7 @@ class LanguagesManager:
                                 tracks_without_language.append(track_info)
 
                         if not found_any_language:
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 console.print("No audio language/s found for the following tracks:")
                                 for track_info in tracks_without_language:
                                     console.print(f"  - {track_info}")
@@ -279,24 +278,24 @@ class LanguagesManager:
                                     sys.exit(1)
                                 if audio_lang:
                                     audio_languages.extend([lang.strip() for lang in audio_lang.split(',')])
-                                    meta['audio_languages'] = audio_languages
-                                    meta['write_audio_languages'] = True
+                                    meta.audio_languages = audio_languages
+                                    meta.write_audio_languages = True
                                 else:
-                                    meta['audio_languages'] = None
-                                    meta['unattended_audio_skip'] = True
-                                    meta['tracker_status'][tracker]['skip_upload'] = True
+                                    meta.audio_languages = None
+                                    meta.unattended_audio_skip = True
+                                    meta.tracker_status[tracker]["skip_upload"] = True
                             else:
-                                meta['unattended_audio_skip'] = True
-                                meta['tracker_status'][tracker]['skip_upload'] = True
-                                if meta['debug']:
-                                    meta['audio_languages'] = ['English, Portuguese']
+                                meta.unattended_audio_skip = True
+                                meta.tracker_status[tracker]["skip_upload"] = True
+                                if meta.debug:
+                                    meta.audio_languages = ["English, Portuguese"]
 
                         if audio_languages:
                             audio_languages = [lang.split()[0] for lang in audio_languages]
                             audio_languages = self._dedupe_preserve_order(audio_languages)
-                            meta['audio_languages'] = audio_languages
+                            meta.audio_languages = audio_languages
 
-                    if (not meta.get('unattended_subtitle_skip', False) or not meta.get('unattended_audio_skip', False)) and not subtitle_languages:
+                    if (not meta.unattended_subtitle_skip or not meta.unattended_audio_skip) and not subtitle_languages:
                         if 'text' in parsed_info:
                             tracks_without_language: list[str] = []
                             text_tracks = cast(list[dict[str, Any]], parsed_info.get('text', []))
@@ -311,7 +310,7 @@ class LanguagesManager:
                                     subtitle_languages.append(text_track['language'])
 
                             if tracks_without_language:
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                     console.print("No subtitle language/s found for the following tracks:")
                                     for track_info in tracks_without_language:
                                         console.print(f"  - {track_info}")
@@ -325,25 +324,25 @@ class LanguagesManager:
                                         sys.exit(1)
                                     if subtitle_lang:
                                         subtitle_languages.extend([lang.strip() for lang in subtitle_lang.split(',')])
-                                        meta['subtitle_languages'] = subtitle_languages
-                                        meta['write_subtitle_languages'] = True
+                                        meta.subtitle_languages = subtitle_languages
+                                        meta.write_subtitle_languages = True
                                     else:
-                                        meta['subtitle_languages'] = None
-                                        meta['unattended_subtitle_skip'] = True
-                                        meta['tracker_status'][tracker]['skip_upload'] = True
+                                        meta.subtitle_languages = None
+                                        meta.unattended_subtitle_skip = True
+                                        meta.tracker_status[tracker]["skip_upload"] = True
                                 else:
-                                    meta['unattended_subtitle_skip'] = True
-                                    meta['tracker_status'][tracker]['skip_upload'] = True
-                                    if meta['debug']:
-                                        meta['subtitle_languages'] = ['English, Portuguese']
+                                    meta.unattended_subtitle_skip = True
+                                    meta.tracker_status[tracker]["skip_upload"] = True
+                                    if meta.debug:
+                                        meta.subtitle_languages = ["English, Portuguese"]
 
                             if subtitle_languages:
                                 subtitle_languages = [lang.split()[0] for lang in subtitle_languages]
                                 subtitle_languages = self._dedupe_preserve_order(subtitle_languages)
-                                meta['subtitle_languages'] = subtitle_languages
+                                meta.subtitle_languages = subtitle_languages
 
-                        if meta.get('hardcoded_subs', False):
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                        if meta.hardcoded_subs:
+                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 try:
                                     hc_lang = cli_ui.ask_string("What language/s are the hardcoded subtitles?")
                                 except EOFError:
@@ -352,38 +351,38 @@ class LanguagesManager:
                                     cleanup_manager.reset_terminal()
                                     sys.exit(1)
                                 if hc_lang:
-                                    meta['subtitle_languages'] = [hc_lang]
-                                    meta['write_hc_languages'] = True
+                                    meta.subtitle_languages = [hc_lang]
+                                    meta.write_hc_languages = True
                                 else:
-                                    meta['subtitle_languages'] = None
-                                    meta['unattended_subtitle_skip'] = True
-                                    meta['tracker_status'][tracker]['skip_upload'] = True
+                                    meta.subtitle_languages = None
+                                    meta.unattended_subtitle_skip = True
+                                    meta.tracker_status[tracker]["skip_upload"] = True
                             else:
-                                meta['subtitle_languages'] = "English"
-                                meta['write_hc_languages'] = True
-                        if 'text' not in parsed_info and not meta.get('hardcoded_subs', False):
-                            meta['no_subs'] = True
+                                meta.subtitle_languages = "English"
+                                meta.write_hc_languages = True
+                        if "text" not in parsed_info and not meta.hardcoded_subs:
+                            meta.no_subs = True
 
             except Exception as e:
                 console.print(f"[red]Error processing mediainfo languages: {e}[/red]")
 
-            meta['language_checked'] = True
+            meta.language_checked = True
             return None
 
-        elif meta['is_disc'] == "BDMV":
+        elif meta.is_disc == "BDMV":
             if "language_checked" not in meta:
-                meta['language_checked'] = False
+                meta.language_checked = False
             if 'bluray_audio_skip' not in meta:
-                meta['bluray_audio_skip'] = False
-            existing_audio_languages: list[str] = meta.get('audio_languages') or []
-            existing_subtitle_languages: list[str] = meta.get('subtitle_languages') or []
+                meta.bluray_audio_skip = False
+            existing_audio_languages: list[str] = meta.audio_languages or []
+            existing_subtitle_languages: list[str] = meta.subtitle_languages or []
             try:
                 bluray = await self.parse_blu_ray(meta)
                 audio_tracks = bluray.get("audio", [])
                 commentary_tracks = [track for track in audio_tracks if track.get("is_commentary")]
                 if commentary_tracks:
                     for track in commentary_tracks:
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"Skipping commentary track: {track}")
                         audio_tracks.remove(track)
                 audio_languages_ordered: list[str] = self._dedupe_preserve_order(existing_audio_languages)
@@ -409,8 +408,8 @@ class LanguagesManager:
                                 bitrate_num = int(value)
 
                     lang = track.get("language", "")
-                    if bitrate_num is not None and bitrate_num < 258 and lang and lang in audio_language_set and len(lang) > 1 and not meta['bluray_audio_skip']:
-                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    if bitrate_num is not None and bitrate_num < 258 and lang and lang in audio_language_set and len(lang) > 1 and not meta.bluray_audio_skip:
+                        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                             console.print(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
                             try:
                                 if cli_ui.ask_yes_no(f"Remove '{lang}' from audio languages?", default=True):
@@ -424,13 +423,13 @@ class LanguagesManager:
                         else:
                             audio_language_set.discard(lang)
                             audio_languages_ordered = [item for item in audio_languages_ordered if item != lang]
-                        meta['bluray_audio_skip'] = True
+                        meta.bluray_audio_skip = True
 
                 subtitle_tracks = bluray.get("subtitles", [])
                 sub_commentary_tracks = [track for track in subtitle_tracks if track.get("is_commentary")]
                 if sub_commentary_tracks:
                     for track in sub_commentary_tracks:
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"Skipping commentary subtitle track: {track}")
                         subtitle_tracks.remove(track)
                 subtitle_languages_ordered: list[str] = self._dedupe_preserve_order(existing_subtitle_languages)
@@ -447,17 +446,17 @@ class LanguagesManager:
                             subtitle_languages_ordered.append(track)
                             subtitle_language_set.add(track)
                 if subtitle_language_set:
-                    meta['subtitle_languages'] = subtitle_languages_ordered
+                    meta.subtitle_languages = subtitle_languages_ordered
 
-                meta['audio_languages'] = audio_languages_ordered
+                meta.audio_languages = audio_languages_ordered
             except Exception as e:
                 console.print(f"[red]Error processing BDInfo languages: {e}[/red]")
 
-            meta['language_checked'] = True
+            meta.language_checked = True
             return None
 
         else:
-            meta['language_checked'] = True
+            meta.language_checked = True
             return None
 
 

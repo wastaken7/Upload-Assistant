@@ -7,8 +7,8 @@ from typing import Any, Optional, cast
 
 from src.args import Args
 from src.console import console
+from src.meta import Meta
 
-Meta = dict[str, Any]
 UserArgsEntry = dict[str, Any]
 
 
@@ -18,14 +18,14 @@ class ApplyOverrides:
 
     async def get_source_override(self, meta: Meta, other_id: bool = False) -> Meta:
         try:
-            user_args_path = Path(meta['base_dir']) / "data" / "templates" / "user-args.json"
+            user_args_path = Path(meta.base_dir) / "data" / "templates" / "user-args.json"
             user_args_text = await asyncio.to_thread(user_args_path.read_text, encoding="utf-8")
             console.print("[green]Found user-args.json")
             user_args = cast(dict[str, Any], json.loads(user_args_text))
 
-            current_tmdb_id = meta.get('tmdb_id', 0)
-            current_imdb_id = meta.get('imdb_id', 0)
-            current_tvdb_id = meta.get('tvdb_id', 0)
+            current_tmdb_id = meta.tmdb_id
+            current_imdb_id = meta.imdb_id
+            current_tvdb_id = meta.tvdb_id
 
             # Convert to int for comparison if it's a string
             if isinstance(current_tmdb_id, str) and current_tmdb_id.isdigit():
@@ -47,9 +47,9 @@ class ApplyOverrides:
 
                     # Parse the entry's TMDB ID from the user-args.json file
                     entry_category, entry_normalized_id = await self.parse_tmdb_id(entry_tmdb_id)
-                    if entry_category and entry_category != meta['category']:
-                        if meta['debug']:
-                            console.print(f"Skipping user entry because override category {entry_category} does not match UA category {meta['category']}:")
+                    if entry_category and entry_category != meta.category:
+                        if meta.debug:
+                            console.print(f"Skipping user entry because override category {entry_category} does not match UA category {meta.category}:")
                         continue
 
                     # Check if IDs match
@@ -138,14 +138,14 @@ class ApplyOverrides:
                         i += 1
                 i += 1
 
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[Debug] Tracking changes for keys: {', '.join(arg_keys_to_track)}")
 
             # Create a new Args instance and process the arguments
             arg_processor = Args(self.config)
             full_args = ['upload.py'] + args
             updated_meta, _, _ = arg_processor.parse(full_args, meta.copy())
-            updated_meta['path'] = meta.get('path')
+            updated_meta["path"] = meta.path
             modified_keys: list[str] = []
 
             # Handle ID arguments specifically
@@ -174,8 +174,8 @@ class ApplyOverrides:
                         for related_key in id_mappings[key]:
                             meta[related_key] = value
                             modified_keys.append(related_key)
-                            if meta['debug']:
-                                console.print(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
+                            if meta.debug:
+                                console.print(f"[Debug] Override: {related_key} changed from {getattr(meta, related_key, None)} to {value}")
                 # Handle regular fields
                 elif key in updated_meta and key in meta:
                     # Skip path to preserve original
@@ -188,14 +188,14 @@ class ApplyOverrides:
                     if new_value != old_value:
                         meta[key] = new_value
                         modified_keys.append(key)
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"[Debug] Override: {key} changed from {old_value} to {new_value}")
-            if meta['debug'] and modified_keys:
+            if meta.debug and modified_keys:
                 console.print(f"[Debug] Applied overrides for: {', '.join(modified_keys)}")
 
         except Exception as e:
             console.print(f"[red]Error processing arguments: {e}")
-            if meta['debug']:
+            if meta.debug:
                 console.print(traceback.format_exc())
 
         return meta

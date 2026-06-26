@@ -1,10 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, Optional
 
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -31,7 +31,7 @@ class TLZ(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        category_value = str(meta.get('category', ''))
+        category_value = str(meta.category)
         category_id = {
             'MOVIE': '1',
             'TV': '2',
@@ -46,19 +46,19 @@ class TLZ(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_value = str(meta.get('type', ''))
+        type_value = str(meta.type)
         type_id = {
             'FILM': '1',
             'EPISODE': '3',
             'PACK': '4',
         }.get(type_value, '0')
 
-        if meta.get('tv_pack'):
+        if meta.tv_pack:
             type_id = '4'
         elif type_id != '4':
             type_id = '3'
 
-        if str(meta.get('category', '')) == 'MOVIE':
+        if str(meta.category) == "MOVIE":
             type_id = '1'
 
         return {'type_id': type_id}

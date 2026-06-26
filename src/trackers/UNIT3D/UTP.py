@@ -1,10 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, Optional
 
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -31,7 +31,7 @@ class UTP(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        category_name = meta['category']
+        category_name = meta.category
         category_id = {
             'MOVIE': '1',
             'TV': '2',
@@ -47,11 +47,11 @@ class UTP(UNIT3D):
     ) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1080p': '3',
-            '1080i': '4',
-        }.get(meta['resolution'], '11')  # Default to Other (11)
+            "4320p": "1",
+            "2160p": "2",
+            "1080p": "3",
+            "1080i": "4",
+        }.get(meta.resolution, "11")  # Default to Other (11)
         return {'resolution_id': resolution_id}
 
     async def get_type_id(
@@ -63,13 +63,13 @@ class UTP(UNIT3D):
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'ENCODE': '3',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6',
-        }.get(str(meta.get('type', '')).upper(), '3')  # Default to ENCODE
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+        }.get(str(meta.type).upper(), "3")  # Default to ENCODE
         return {'type_id': type_id}
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
@@ -82,7 +82,7 @@ class UTP(UNIT3D):
         from src.get_desc import DescriptionBuilder
 
         # Save original values and transform
-        original_image_list = meta.get('image_list', [])
+        original_image_list = meta.image_list
         transformed_image_list: list[dict[str, Any]] = [
             {
                 'web_url': img.get('raw_url', ''),   # Link goes to full image
@@ -107,14 +107,14 @@ class UTP(UNIT3D):
             ]
 
         # Temporarily replace image_list
-        meta['image_list'] = transformed_image_list
+        meta.image_list = transformed_image_list
 
         try:
             builder = DescriptionBuilder(self.tracker, self.config)
             description = await builder.unit3d_edit_desc(meta)
         finally:
             # Restore original values even if an error occurs
-            meta['image_list'] = original_image_list
+            meta.image_list = original_image_list
             for key, value in original_new_images.items():
                 meta[key] = value
 
@@ -131,22 +131,22 @@ class UTP(UNIT3D):
         TV:    Name AKA Original LOCALE S##E## Year Cut Ratio Hybrid REPACK PROPER RERip Edition Region 3D SOURCE TYPE Resolution HDR VCodec ACodec Channels Object-Tag
 
         """
-        category = str(meta.get('category', ''))
-        release_type = str(meta.get('type', '')).upper()
+        category = str(meta.category)
+        release_type = str(meta.type).upper()
 
         # Common components
-        title = str(meta.get('title', ''))
-        aka = str(meta.get('aka', '')).strip()
-        year = str(meta.get('year', ''))
-        three_d = str(meta.get('3D', ''))
-        uhd = str(meta.get('uhd', ''))
-        edition = str(meta.get('edition', ''))
-        hybrid = 'Hybrid' if meta.get('webdv', "") else ''
-        repack = str(meta.get('repack', ''))
-        resolution = str(meta.get('resolution', ''))
-        hdr = str(meta.get('hdr', ''))
-        service = str(meta.get('service', ''))
-        audio_raw = str(meta.get('audio', ''))
+        title = str(meta.title)
+        aka = str(meta.aka).strip()
+        year = str(meta.year)
+        three_d = str(meta.three_d)
+        uhd = str(meta.uhd)
+        edition = str(meta.edition)
+        hybrid = "Hybrid" if meta.webdv else ""
+        repack = str(meta.repack)
+        resolution = str(meta.resolution)
+        hdr = str(meta.hdr)
+        service = str(meta.service)
+        audio_raw = str(meta.audio)
         # Only include audio for Atmos or lossless codecs
         lossless_indicators = ['Atmos', 'TrueHD', 'DTS-HD MA', 'DTS:X', 'LPCM', 'FLAC', 'PCM']
         if any(indicator in audio_raw for indicator in lossless_indicators):
@@ -154,14 +154,14 @@ class UTP(UNIT3D):
             audio = ' '.join(audio.split())
         else:
             audio = ""  # Don't include lossy audio (AAC, DD, DD+, etc.) in name
-        video_codec = str(meta.get('video_codec', ''))
-        video_encode = str(meta.get('video_encode', ''))
-        tag = str(meta.get('tag', ''))
-        region = str(meta.get('region', '')) if meta.get('region') else ''
-        season = str(meta.get('season', ''))
-        episode = str(meta.get('episode', ''))
+        video_codec = str(meta.video_codec)
+        video_encode = str(meta.video_encode)
+        tag = str(meta.tag)
+        region = str(meta.region) if meta.region else ""
+        season = str(meta.season)
+        episode = str(meta.episode)
 
-        source_tag = str(meta.get('source', ''))
+        source_tag = str(meta.source)
         type_tag = ""
         vcodec = video_codec  # Default for DISC/REMUX (AVC, HEVC)
 
@@ -176,7 +176,7 @@ class UTP(UNIT3D):
             vcodec = video_encode
         elif release_type == "HDTV":
             vcodec = video_encode
-        # DISC: source_tag stays as meta['source'] (Blu-ray), three_d/uhd handled in template
+        # DISC: source_tag stays as meta.source (Blu-ray), three_d/uhd handled in template
 
         # Build name using single template per category
         if category == "MOVIE":
@@ -184,7 +184,7 @@ class UTP(UNIT3D):
         elif category == "TV":
             name = f"{title} {aka} {season}{episode} {year} {hybrid} {edition} {repack} {region} {three_d} {uhd} {source_tag} {type_tag} {resolution} {hdr} {vcodec} {audio}"
         else:
-            name = str(meta.get('name', ''))
+            name = str(meta.name)
 
         # Clean up multiple spaces and add tag
         name = ' '.join(name.split())

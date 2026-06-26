@@ -15,8 +15,7 @@ import aiofiles.ospath
 import cli_ui
 
 from src.console import console
-
-Meta = dict[str, Any]
+from src.meta import Meta
 
 
 def generate_random_poster() -> str:
@@ -78,9 +77,9 @@ async def check_binary(binary_name: str, config_path: Optional[str] = None, meta
         return resolved
 
     # If the binary is not found, attempt to download it automatically if meta is provided
-    if meta and meta.get("base_dir"):
-        base_dir = meta["base_dir"]
-        debug = meta.get("debug", False)
+    if meta and meta.base_dir:
+        base_dir = meta.base_dir
+        debug = meta.debug
         try:
             if binary_name == "7z":
                 from bin.get_7z import SevenZipBinaryManager
@@ -521,24 +520,24 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     if archive_password:
         if str(archive_password).lower() == "random":
             archive_password = secrets.token_urlsafe(16)
-            if meta.get("debug", False):
+            if meta.debug:
                 console.print(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
             else:
                 console.print("[cyan]Generated unique random password for Usenet archive encryption.[/cyan]")
         else:
             console.print("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
-        meta["archive_password"] = archive_password
+        meta.archive_password = archive_password
 
     # Determine paths and names
-    base_dir = meta["base_dir"]
-    input_path = meta["path"]
+    base_dir = meta.base_dir
+    input_path = meta.path
     import hashlib
 
     # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
-    clean_uuid = "".join(c for c in meta["uuid"] if c.isalnum() or c in "._-")[:30]
-    uuid_hash = hashlib.md5(meta["uuid"].encode("utf-8")).hexdigest()[:8]
+    clean_uuid = "".join(c for c in meta.uuid if c.isalnum() or c in "._-")[:30]
+    uuid_hash = hashlib.md5(meta.uuid.encode("utf-8")).hexdigest()[:8]
     uuid = f"{clean_uuid}_{uuid_hash}" if clean_uuid else uuid_hash
-    name = meta["basename_no_ext"]
+    name = meta.basename_no_ext
 
     # Sanitize name for filenames
     safe_name = "".join(c for c in name if c.isalnum() or c in "._- ")
@@ -548,7 +547,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     archive_name = safe_name
     if archive_password:
         archive_name = secrets.token_hex(16)
-        if meta.get("debug", False):
+        if meta.debug:
             console.print(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
         else:
             console.print("[cyan]Obfuscating archive filenames for security.[/cyan]")
@@ -566,13 +565,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     # Determine NZB output directory (falls back to default tmp dir if empty)
     nzb_output_dir = usenet_cfg.get("nzb_output_dir")
     if not nzb_output_dir:
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
 
     try:
         os.makedirs(nzb_output_dir, exist_ok=True)
     except Exception as e:
         console.print(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
         try:
             os.makedirs(nzb_output_dir, exist_ok=True)
         except Exception:
@@ -586,9 +585,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             tmp_base = usenet_tmp_dir
         except Exception as e:
             console.print(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
     else:
-        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta["path"]))
+        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
 
     # Check if a valid NZB file already exists to skip the upload process
     final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")
@@ -602,7 +601,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     usenet_dir = os.path.join(tmp_base, uuid, "usenet")
     await aiofiles.os.makedirs(usenet_dir, exist_ok=True)
 
-    is_debug = meta.get("debug", False)
+    is_debug = meta.debug
     uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
     use_pesto = uploader == "pesto"
 
@@ -743,7 +742,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     # 5. Subject line
     obscure_subject = usenet_cfg.get("obscure_subject", True)
-    custom_subject = meta.get("usenet_subject")
+    custom_subject = meta.usenet_subject
 
     if custom_subject:
         subject = custom_subject

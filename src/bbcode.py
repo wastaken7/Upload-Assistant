@@ -6,6 +6,7 @@ import urllib.parse
 from typing import Any
 
 from src.console import console
+from src.meta import Meta
 
 # Bold - KEEP
 # Italic - KEEP
@@ -134,15 +135,15 @@ class BBCODE:
             return "", imagelist
         return description, imagelist
 
-    def clean_bhd_description(self, description: str, meta: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    def clean_bhd_description(self, description: str, meta: Meta) -> tuple[str, list[dict[str, Any]]]:
         # Unescape html
         desc = html.unescape(description)
         desc = desc.replace('\r\n', '\n')
         imagelist: list[dict[str, Any]] = []
 
-        if "framestor" in meta and meta['framestor']:
+        if "framestor" in meta and meta.framestor:
             framestor_desc = desc
-            save_path = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
+            save_path = os.path.join(meta.base_dir, "tmp", meta.uuid)
             os.makedirs(save_path, exist_ok=True)
             nfo_file_path = os.path.join(save_path, "bhd.nfo")
             with open(nfo_file_path, 'w', encoding='utf-8') as f:
@@ -151,8 +152,8 @@ class BBCODE:
                 finally:
                     f.close()
             console.print(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
-            meta['nfo'] = True
-            meta['bhd_nfo'] = True
+            meta.nfo = True
+            meta.bhd_nfo = True
 
         # Remove size tags
         desc = re.sub(r"\[size=.*?\]", "", desc)
@@ -186,7 +187,7 @@ class BBCODE:
         desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
-        if meta.get('flux', False):
+        if meta.flux:
             # Strip trailing whitespace and newlines:
             desc = desc.rstrip()
 

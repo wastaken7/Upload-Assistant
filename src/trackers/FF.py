@@ -13,6 +13,7 @@ from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.meta import Meta
 
 
 class FF:
@@ -30,8 +31,8 @@ class FF:
         self.auth_token = None
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30.0)
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+    async def validate_credentials(self, meta: Meta) -> bool:
+        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{self.tracker}.txt")
         if not os.path.exists(cookie_file):
             await self.login(meta)
 
@@ -41,7 +42,7 @@ class FF:
         self.session.cookies = cookie_jar
         return True
 
-    async def validate_cookies(self, meta: dict[str, Any]) -> bool:
+    async def validate_cookies(self, meta: Meta) -> bool:
         return await self.cookie_validator.cookie_validation(
             meta=meta,
             tracker=self.tracker,
@@ -49,9 +50,9 @@ class FF:
             success_text='friends.php',
         )
 
-    async def login(self, meta: dict[str, Any]) -> None:
+    async def login(self, meta: Meta) -> None:
         login_url = "https://www.funfile.org/takelogin.php"
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{self.tracker}.txt")
 
         payload = {
             "returnto": "/index.php",
@@ -82,15 +83,15 @@ class FF:
         else:
             console.print(f"{self.tracker}: Login failed. Status code: {response.status_code}", markup=False)
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[str]:
+    async def search_existing(self, meta: Meta) -> list[str]:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return []
         self.session.cookies = cookie_jar
 
-        query = meta['title']
-        if meta['category'] == 'TV':
-            query = f"{meta['title']} {meta.get('season', '')}{meta.get('episode', '')}"
+        query = meta.title
+        if meta.category == "TV":
+            query = f"{meta.title} {meta.season}{meta.episode}"
 
         search_url = f"{self.base_url}/suggest.php?q={query}"
         response = await self.session.get(search_url)
@@ -101,13 +102,13 @@ class FF:
             response = await self.session.get(search_url)
             if response.status_code != 200 or 'login' in str(response.url) or 'login' in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta['skipping'] = self.tracker
+                meta.skipping = self.tracker
                 return []
 
         items = [line.strip() for line in response.text.splitlines() if line.strip()]
         return items
 
-    async def get_requests(self, meta: dict[str, Any]) -> Union[bool, list[dict[str, str]]]:
+    async def get_requests(self, meta: Meta) -> Union[bool, list[dict[str, str]]]:
         if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
             return False
 
@@ -119,8 +120,8 @@ class FF:
                 self.session.cookies = cookie_jar
                 category = self.get_type_id(meta)
 
-                query_1 = meta['title']
-                query_2 = meta['title'].replace(' ', '.')
+                query_1 = meta.title
+                query_2 = meta.title.replace(" ", ".")
 
                 search_url_1 = f"{self.requests_url}?filter=open&category={category}&search={query_1}"
 
@@ -174,7 +175,7 @@ class FF:
                 console.print(f"An error occurred while fetching requests: {e}", markup=False)
                 return []
 
-    async def generate_description(self, meta: dict[str, Any]) -> str:
+    async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         description = await builder.general_description_generator(
             meta,
@@ -195,14 +196,14 @@ class FF:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta['ua_signature']}[/size][/center][/url]",
+            signature=f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta.ua_signature}[/size][/center][/url]",
         )
         return description
 
-    def get_type_id(self, meta: dict[str, Any]) -> str:
-        if meta.get('anime'):
+    def get_type_id(self, meta: Meta) -> str:
+        if meta.anime:
             return '44'
-        category = meta['category']
+        category = meta.category
 
         if category == 'MOVIE':
             return '19'
@@ -212,20 +213,20 @@ class FF:
 
         return '19'
 
-    def file_information(self, meta: dict[str, Any]) -> None:
-        vc = meta.get('video_codec', '')
+    def file_information(self, meta: Meta) -> None:
+        vc = meta.video_codec
         if vc:
             self.video_codec = vc.strip().lower()
 
-        ve = meta.get('video_encode', '')
+        ve = meta.video_encode
         if ve:
             self.video_encode = ve.strip().lower()
 
-        vs = meta.get('source', '')
+        vs = meta.source
         if vs:
             self.video_source = vs.strip().lower()
 
-        vt = meta.get('type', '')
+        vt = meta.type
         if vt:
             self.video_type = vt.strip().lower()
 
@@ -239,37 +240,37 @@ class FF:
         else:
             return "x264"
 
-    def tv_type(self, meta: dict[str, Any]) -> str:
+    def tv_type(self, meta: Meta) -> str:
         # Possible values: "XviD", "HR-XviD", "x264-SD", "x264-HD", "x265-SD", "x265-HD", "Web-SD", "Web-HD", "DVDR", "MP4"
         if self.video_source == 'dvd':
             return "DVDR"
 
         if self.video_source == 'web':
-            if meta.get('sd'):
+            if meta.sd:
                 return "Web-SD"
             else:
                 return "Web-HD"
 
         if self.video_codec == 'hevc':
-            if meta.get('sd'):
+            if meta.sd:
                 return "x265-SD"
             else:
                 return "x265-HD"
         else:
-            if meta.get('sd'):
+            if meta.sd:
                 return "x264-SD"
             else:
                 return "x264-HD"
 
-    def anime_type(self, meta: dict[str, Any]) -> str:
+    def anime_type(self, meta: Meta) -> str:
         # Possible values: "TVSeries", "TVSpecial", "Movie", "OVA", "ONA", "DVDSpecial"
-        if meta.get('tvmaze_episode_data', {}).get('season_number') == 0:
+        if meta.tvmaze_episode_data.get("season_number") == 0:
             return "TVSpecial"
 
         if self.video_source == 'dvd':
             return "DVDSpecial"
 
-        category = meta['category']
+        category = meta.category
 
         if category == 'TV':
             return "TVSeries"
@@ -333,10 +334,10 @@ class FF:
         src = (self.video_source or "").strip().lower()
         return mapping.get(src)
 
-    def anime_v_dar(self, meta: dict[str, Any]) -> str:
+    def anime_v_dar(self, meta: Meta) -> str:
         # Possible values: "16_9", "4_3"
-        if meta.get('is_disc') != "BDMV":
-            tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+        if meta.is_disc != "BDMV":
+            tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
                 if track.get('@type') == "Video":
                     dar_str = track.get('DisplayAspectRatio')
@@ -361,16 +362,16 @@ class FF:
         else:
             return 'x264'
 
-    async def edit_name(self, meta: dict[str, Any]) -> str:
-        if meta.get("scene", False):
-            ff_name = str(meta.get("scene_name")) if meta.get("scene_name", "") else str(meta["basename_no_ext"]).replace(" ", ".")
+    async def edit_name(self, meta: Meta) -> str:
+        if meta.scene:
+            ff_name = str(meta.scene_name) if meta.scene_name else str(meta.basename_no_ext).replace(" ", ".")
         else:
-            ff_name = meta.get("clean_name", "").replace(" ", ".")
+            ff_name = meta.clean_name.replace(" ", ".")
 
         return ff_name
 
-    async def languages(self, meta: dict[str, Any]) -> dict[str, list[str]]:
-        if not meta.get('language_checked', False):
+    async def languages(self, meta: Meta) -> dict[str, list[str]]:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
         lang_map = {
@@ -389,9 +390,9 @@ class FF:
         anime_s_type: list[str] = []
         anime_s_lang: list[str] = []
 
-        audio_languages = meta.get('audio_languages', [])
+        audio_languages = meta.audio_languages
         if isinstance(audio_languages, list) and audio_languages:
-            audio_desc = meta.get('audio', '').lower()
+            audio_desc = meta.audio.lower()
             found_codec = '0'
             codec_options = {
                 'aac': 'aac', 'ac3': 'ac3', 'dd': 'ac3', 'dolby digital': 'ac3', 'ogg': 'ogg', 'mp3': 'mp3',
@@ -402,7 +403,7 @@ class FF:
                     found_codec = value
                     break
 
-            channels_desc = meta.get('channels', '')
+            channels_desc = meta.channels
             channel_map = {
                 '2.0': '2',
                 '5.1': '5_1',
@@ -418,7 +419,7 @@ class FF:
                 anime_a_ch.append(found_channel)
                 anime_a_lang.append(lang_code)
 
-        subtitle_languages = meta.get('subtitle_languages', [])
+        subtitle_languages = meta.subtitle_languages
         if isinstance(subtitle_languages, list) and subtitle_languages:
             subtitle_format = 'srt'
             subtitle_type = 'sub'
@@ -440,8 +441,8 @@ class FF:
             'anime_s_lang': anime_s_lang,
         }
 
-    async def get_poster(self, meta: dict[str, Any]) -> Optional[tuple[str, bytes, str]]:
-        poster_url = meta.get('poster')
+    async def get_poster(self, meta: Meta) -> Optional[tuple[str, bytes, str]]:
+        poster_url = meta.poster
 
         poster_file = None
         if poster_url:
@@ -449,15 +450,15 @@ class FF:
                 response = await client.get(poster_url)
                 if response.status_code == 200:
                     poster_ext = os.path.splitext(poster_url)[1] or ".jpg"
-                    poster_filename = f"{meta.get('name')}{poster_ext}"
+                    poster_filename = f"{meta.name}{poster_ext}"
                     poster_file = (poster_filename, response.content, "image/jpeg")
 
                     return poster_file
 
         return None
 
-    def get_nfo(self, meta: dict[str, Any]) -> dict[str, tuple[str, Any, str]]:
-        nfo_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+    def get_nfo(self, meta: Meta) -> dict[str, tuple[str, Any, str]]:
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:
@@ -472,7 +473,7 @@ class FF:
             }
         return {}
 
-    async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
         languages = await self.languages(meta)
         self.file_information(meta)
 
@@ -483,42 +484,42 @@ class FF:
             'descr': await self.generate_description(meta),
         }
 
-        if meta.get('anime'):
+        if meta.anime:
             data.update({
-                'anime_type': self.anime_type(meta),
-                'anime_source': self.anime_source(meta),
-                'anime_container': 'mkv',
-                'anime_v_res': meta.get('resolution'),
-                'anime_v_dar': self.anime_v_dar(meta),
-                'anime_v_codec': self.anime_v_codec(meta),
-                'anime_a_codec[]': ['0'] + languages.get('anime_a_codec', []),
-                'anime_a_ch[]': ['0'] + languages.get('anime_a_ch', []),
-                'anime_a_lang[]': ['0'] + languages.get('anime_a_lang', []),
-                'anime_s_format[]': ['0'] + languages.get('anime_s_format', []),
-                'anime_s_type[]': ['0'] + languages.get('anime_s_type', []),
-                'anime_s_lang[]': ['0'] + languages.get('anime_s_lang', []),
+                "anime_type": self.anime_type(meta),
+                "anime_source": self.anime_source(meta),
+                "anime_container": "mkv",
+                "anime_v_res": meta.resolution,
+                "anime_v_dar": self.anime_v_dar(meta),
+                "anime_v_codec": self.anime_v_codec(meta),
+                "anime_a_codec[]": ["0"] + languages.get("anime_a_codec", []),
+                "anime_a_ch[]": ["0"] + languages.get("anime_a_ch", []),
+                "anime_a_lang[]": ["0"] + languages.get("anime_a_lang", []),
+                "anime_s_format[]": ["0"] + languages.get("anime_s_format", []),
+                "anime_s_type[]": ["0"] + languages.get("anime_s_type", []),
+                "anime_s_lang[]": ["0"] + languages.get("anime_s_lang", []),
             })
 
         else:
-            if meta['category'] == 'MOVIE':
+            if meta.category == "MOVIE":
                 data.update({
-                    'movie_type': self.movie_type(meta),
-                    'movie_source': self.movie_source(meta),
-                    'movie_imdb': str(meta.get('imdb_info', {}).get('imdb_url', '')),
-                    'pack': 0,
+                    "movie_type": self.movie_type(meta),
+                    "movie_source": self.movie_source(meta),
+                    "movie_imdb": str(meta.imdb_info.get("imdb_url", "")),
+                    "pack": 0,
                 })
 
-            if meta['category'] == 'TV':
+            if meta.category == "TV":
                 data.update({
-                    'tv_type': self.tv_type(meta),
-                    'tv_source': self.tv_source(meta),
-                    'tv_imdb': str(meta.get('imdb_info', {}).get('imdb_url', '')),
-                    'pack': 1 if meta.get('tv_pack', 0) else 0,
+                    "tv_type": self.tv_type(meta),
+                    "tv_source": self.tv_source(meta),
+                    "tv_imdb": str(meta.imdb_info.get("imdb_url", "")),
+                    "pack": 1 if meta.tv_pack else 0,
                 })
 
         return data
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False

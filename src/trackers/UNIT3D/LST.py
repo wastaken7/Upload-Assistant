@@ -2,10 +2,10 @@
 from typing import Any, Optional
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -28,15 +28,15 @@ class LST(UNIT3D):
         pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.get("category") == "BOOK":
+        if meta.category == "BOOK":
             return True
 
         should_continue = True
-        if not meta['valid_mi_settings']:
+        if not meta.valid_mi_settings:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        if meta['is_disc'] not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
+        if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True
         ):
             return False
@@ -54,7 +54,7 @@ class LST(UNIT3D):
         elif reverse:
             return {v: k for k, v in category_id.items()}
 
-        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        resolved_category = category if category is not None and category != "" else meta.category
         return {"category_id": category_id.get(resolved_category, "0")}
 
     async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
@@ -82,12 +82,12 @@ class LST(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
         val = type_id.get(resolved_type, "0")
-        if meta.get("category") == "BOOK" and resolved_type not in type_id:
+        if meta.category == "BOOK" and resolved_type not in type_id:
             val = "15"
 
         return {"type_id": val}
@@ -103,14 +103,14 @@ class LST(UNIT3D):
         if edition_id is not None:
             data['edition_id'] = edition_id
 
-        if meta.get("category") == "BOOK":
-            openlibrary_id = meta.get("openlibrary") or meta.get("openlibrary_id") or meta.get("openlibrary_book_id") or ""
-            isbn = meta.get("isbn") or ""
+        if meta.category == "BOOK":
+            openlibrary_id = meta.openlibrary or meta.openlibrary_id or meta.openlibrary_book_id or ""
+            isbn = meta.isbn or ""
 
             data["book_exists_on_openlibrary"] = "1"
             data["openlibrary_book_id"] = openlibrary_id
             data["openlibrary_isbn"] = isbn
-            data["extra_openlibrary_ids"] = meta.get("extra_openlibrary_ids") or ""
+            data["extra_openlibrary_ids"] = meta.extra_openlibrary_ids or ""
 
         return data
 
@@ -130,27 +130,27 @@ class LST(UNIT3D):
             'X Cut': 11,
             'Other': 0  # Default value for "Other"
         }
-        edition = meta.get('edition', '')
+        edition = meta.edition
         if edition in edition_mapping:
             return edition_mapping[edition]
         else:
             return None
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        lst_name = str(meta.get('name', ''))
-        resolution = str(meta.get('resolution', ''))
-        video_encode = str(meta.get('video_encode', ''))
-        name_type = meta.get('type', "")
+        lst_name = str(meta.name)
+        resolution = str(meta.resolution)
+        video_encode = str(meta.video_encode)
+        name_type = meta.type
 
         if name_type == "DVDRIP":
-            if meta.get('category') == "MOVIE":
-                lst_name = lst_name.replace(f"{meta.get('source', '')}{meta.get('video_encode', '')}", f"{resolution}", 1)
-                lst_name = lst_name.replace(str(meta.get('audio', '')), f"{meta.get('audio', '')}{video_encode}", 1)
+            if meta.category == "MOVIE":
+                lst_name = lst_name.replace(f"{meta.source}{meta.video_encode}", f"{resolution}", 1)
+                lst_name = lst_name.replace(str(meta.audio), f"{meta.audio}{video_encode}", 1)
             else:
-                lst_name = lst_name.replace(str(meta.get('source', '')), f"{resolution}", 1)
-                lst_name = lst_name.replace(str(meta.get('video_codec', '')), f"{meta.get('audio', '')} {meta.get('video_codec', '')}", 1)
+                lst_name = lst_name.replace(str(meta.source), f"{resolution}", 1)
+                lst_name = lst_name.replace(str(meta.video_codec), f"{meta.audio} {meta.video_codec}", 1)
 
-        if meta.get('trump_reason') == 'exact_match':
+        if meta.trump_reason == "exact_match":
             lst_name = lst_name + " - TRUMP"
 
         return {'name': lst_name}

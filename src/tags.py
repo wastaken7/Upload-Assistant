@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional, cast
 import guessit
 
 from src.console import console
+from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
@@ -18,29 +19,29 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = False) -> str:
+async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> str:
     # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
     release_group = None
     basename = os.path.basename(video)
     matched_anime = False
 
     # Try specialized regex patterns first
-    if meta.get('anime', False):
+    if meta.anime:
         # Anime pattern: [Group] at the beginning
         basename_stripped = os.path.splitext(basename)[0]
         anime_match = re.search(r'^\s*\[(.+?)\]', basename_stripped)
         if anime_match:
             matched_anime = True
             release_group = anime_match.group(1)
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"Anime regex match: {release_group}")
-    if (not meta.get('anime', False) or not matched_anime) and meta.get('is_disc') != "BDMV":
+    if (not meta.anime or not matched_anime) and meta.is_disc != "BDMV":
         # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
         if os.path.isdir(video):
             # If video is a directory, use the directory name as basename
             basename_stripped = os.path.basename(os.path.normpath(video))
-        elif (meta.get("tv_pack", False) or meta.get("keep_folder", False) or meta.get("category") in ("BOOK", "GAME")) and not season_pack_check:
-            basename_stripped = meta['uuid']
+        elif (meta.tv_pack or meta.keep_folder or meta.category in ("BOOK", "GAME")) and not season_pack_check:
+            basename_stripped = meta.uuid
         else:
             # If video is a file, use the filename without extension
             basename_no_path = os.path.basename(video)
@@ -81,17 +82,17 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             release_group = non_anime_match.group(1).strip()
             if "Z0N3" in release_group:
                 release_group = release_group.replace("Z0N3", "D-Z0N3")
-            if not meta.get('scene', False) and release_group and len(release_group) > 12:
+            if not meta.scene and release_group and len(release_group) > 12:
                 release_group = None
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"Non-anime regex match: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
-    if not release_group and meta.get('is_disc'):
+    if not release_group and meta.is_disc:
         try:
             parsed = guessit_fn(video)
             release_group = cast(Optional[str], parsed.get('release_group'))
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"Guessit match: {release_group}")
 
         except Exception as e:
@@ -99,7 +100,7 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             release_group = None
 
     # BDMV validation
-    if meta['is_disc'] == "BDMV" and release_group and f"{release_group}" not in video:
+    if meta.is_disc == "BDMV" and release_group and f"{release_group}" not in video:
         release_group = None
 
     # Format the tag
@@ -116,16 +117,16 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
     return tag
 
 
-async def tag_override(meta: dict[str, Any]) -> dict[str, Any]:
+async def tag_override(meta: Meta) -> dict[str, Any]:
     try:
-        tags_text = await asyncio.to_thread(Path(f"{meta['base_dir']}/data/tags.json").read_text, encoding="utf-8")
+        tags_text = await asyncio.to_thread(Path(f"{meta.base_dir}/data/tags.json").read_text, encoding="utf-8")
         tags = json.loads(tags_text)
 
         for tag in tags:
             value = tags.get(tag)
-            if value.get('in_name', "") == tag and tag in meta['path']:
-                meta['tag'] = f"-{tag}"
-            if meta['tag'][1:] == tag:
+            if value.get("in_name", "") == tag and tag in meta.path:
+                meta.tag = f"-{tag}"
+            if meta.tag[1:] == tag:
                 for key in value:
                     if key == 'type':
                         if meta[key] == "ENCODE":
@@ -135,7 +136,7 @@ async def tag_override(meta: dict[str, Any]) -> dict[str, Any]:
                     elif key == 'personalrelease':
                         meta[key] = _is_true(value.get(key, "False"))
                     elif key == 'template':
-                        meta['description_template'] = value.get(key)
+                        meta.description_template = value.get(key)
                     else:
                         meta[key] = value.get(key)
     except Exception as e:

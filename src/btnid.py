@@ -1,15 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import uuid
-from collections.abc import MutableMapping
 from typing import Any, Optional, cast
 
 import httpx
-from typing_extensions import TypeAlias
 
 from src.bbcode import BBCODE
 from src.console import console
-
-Meta: TypeAlias = MutableMapping[str, Any]
+from src.meta import Meta
 
 
 class BtnIdManager:
@@ -21,7 +18,7 @@ class BtnIdManager:
     async def get_btn_torrents(btn_api: str, btn_id: str, meta: Meta) -> tuple[int, int]:
         imdb_id = 0
         tvdb_id = 0
-        if meta.get('debug'):
+        if meta.debug:
             console.print("Fetching BTN data...", markup=False)
         post_query_url = "https://api.broadcasthe.net/"
         post_data = {
@@ -64,11 +61,11 @@ class BtnIdManager:
                 console.print("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
             else:
                 console.print(f"[red]BTN API error (code {code}): {message}[/red]")
-            if meta.get('debug'):
+            if meta.debug:
                 console.print(data)
             return 0, 0
 
-        if meta.get('debug'):
+        if meta.debug:
             console.print(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
         result = data.get('result')
@@ -81,7 +78,7 @@ class BtnIdManager:
 
                 if imdb_id or tvdb_id:
                     return int(imdb_id or 0), int(tvdb_id or 0)
-        if meta.get('debug'):
+        if meta.debug:
             console.print("[red]No IMDb or TVDb ID found.")
         return 0, 0
 
@@ -98,7 +95,7 @@ class BtnIdManager:
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
-        if meta.get('debug'):
+        if meta.debug:
             console.print("Fetching BHD data...", markup=False)
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
@@ -187,29 +184,29 @@ class BtnIdManager:
         tmdb = 0
         raw_tmdb_id = first_result.get("tmdb_id", "")
         if raw_tmdb_id and raw_tmdb_id != "0":
-            meta["category"], parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.get("category"))
+            meta.category, parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.category)
             tmdb = int(parsed_tmdb_id)
 
-        if skip_tracker_descriptions and not meta.get("keep_images"):
+        if skip_tracker_descriptions and not meta.keep_images:
             return imdb, tmdb
 
         bbcode = BBCODE()
         imagelist = []
         if "framestor" in name:
-            meta["framestor"] = True
+            meta.framestor = True
         elif "flux" in name:
-            meta["flux"] = True
+            meta.flux = True
         description, imagelist = bbcode.clean_bhd_description(description, cast(dict[str, Any], meta))
         if not skip_tracker_descriptions:
-            meta["description"] = description
-            meta["image_list"] = imagelist
-        elif meta.get('keep_images'):
-            meta["description"] = ""
-            meta["image_list"] = imagelist
+            meta.description = description
+            meta.image_list = imagelist
+        elif meta.keep_images:
+            meta.description = ""
+            meta.image_list = imagelist
 
         if (imdb and int(imdb) != 0) or (tmdb and int(tmdb) != 0):
             console.print(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
-        elif meta.get('debug'):
+        elif meta.debug:
             console.print(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
 
         return imdb, tmdb

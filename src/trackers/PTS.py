@@ -8,9 +8,9 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -36,7 +36,7 @@ class PTS:
         return cookies is not None
 
     async def get_type(self, meta: Meta) -> Optional[str]:
-        if meta.get('anime'):
+        if meta.anime:
             return '407'
 
         category_map = {
@@ -44,7 +44,7 @@ class PTS:
             'MOVIE': '404'
         }
 
-        return category_map.get(meta['category'])
+        return category_map.get(meta.category)
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -67,7 +67,7 @@ class PTS:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
 
         return desc
@@ -81,22 +81,18 @@ class PTS:
             user_input = input("Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
             if user_input.lower() not in ['y', 'yes']:
                 console.print("Upload cancelled by user.", markup=False)
-                meta['skipping'] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return
 
         search_url = f"{self.base_url}/torrents.php"
-        params: dict[str, Any] = {
-            'incldead': 1,
-            'search': str(meta.get('imdb_info', {}).get('imdbID', '')),
-            'search_area': 4
-        }
+        params: dict[str, Any] = {"incldead": 1, "search": str(meta.imdb_info.get("imdbID", "")), "search_area": 4}
         found_items: list[str] = []
 
         try:
             response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
             if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return found_items
             response.raise_for_status()
 
@@ -120,10 +116,10 @@ class PTS:
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'name': meta['name'],
-            'url': str(meta.get('imdb_info', {}).get('imdb_url', '')),
-            'descr': await self.generate_description(meta),
-            'type': await self.get_type(meta),
+            "name": meta.name,
+            "url": str(meta.imdb_info.get("imdb_url", "")),
+            "descr": await self.generate_description(meta),
+            "type": await self.get_type(meta),
         }
 
         return data

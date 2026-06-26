@@ -6,6 +6,7 @@ import cli_ui
 import httpx
 
 from src.console import console
+from src.meta import Meta
 
 
 class TvmazeManager:
@@ -180,7 +181,7 @@ class TvmazeManager:
         tvmaze_id: int,
         season: int,
         episode: int,
-        meta: Optional[dict[str, Any]] = None,
+        meta: Optional[Meta] = None,
     ) -> Optional[dict[str, Any]]:
         url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodebynumber"
         params = {
@@ -238,17 +239,17 @@ class TvmazeManager:
                 airdate = None
 
                 # First priority: manual_date
-                if meta and meta.get('manual_date'):
-                    manual_date = meta['manual_date']
+                if meta and meta.manual_date:
+                    manual_date = meta.manual_date
                     if isinstance(manual_date, str):
                         airdate = manual_date
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[cyan]Using manual_date: {airdate}[/cyan]")
 
                 # Second priority: find airdate from tvdb_episode_data using tvdb_episode_id
-                elif meta and meta.get('tvdb_episode_id') and meta.get('tvdb_episode_data'):
-                    tvdb_episode_id = meta['tvdb_episode_id']
-                    tvdb_data = meta['tvdb_episode_data']
+                elif meta and meta.tvdb_episode_id and meta.tvdb_episode_data:
+                    tvdb_episode_id = meta.tvdb_episode_id
+                    tvdb_data = meta.tvdb_episode_data
 
                     episodes: list[dict[str, Any]] = []
                     if isinstance(tvdb_data, dict):
@@ -264,20 +265,20 @@ class TvmazeManager:
                             ep_airdate = ep.get('aired')
                             if isinstance(ep_airdate, str):
                                 airdate = ep_airdate
-                                if meta.get('debug'):
+                                if meta.debug:
                                     console.print(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
                                 break
 
-                    if not airdate and meta.get('debug'):
+                    if not airdate and meta.debug:
                         console.print(f"[yellow]Could not find airdate for TVDB episode ID {tvdb_episode_id}[/yellow]")
 
                 # Try date-based lookup if we have an airdate
                 if isinstance(airdate, str) and airdate:
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
                     return await self.get_tvmaze_episode_data_by_date(tvmaze_id, airdate)
                 else:
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print("[yellow]No airdate available for fallback lookup[/yellow]")
                     return None
             else:

@@ -12,6 +12,7 @@ from pymediainfo import MediaInfo
 
 from src.console import console
 from src.exceptions import NoAudioMediaError
+from src.meta import Meta
 
 
 def validate_file_path(file_path: str) -> str:
@@ -515,10 +516,10 @@ async def exportInfo(
     return mi
 
 
-def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False) -> bool:
-    if not any(str(f).lower().endswith(".mkv") for f in meta.get("filelist", [])):
+def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
+    if not any(str(f).lower().endswith(".mkv") for f in meta.filelist):
         if debug:
-            console.print(f"[yellow]Skipping {meta.get('path')} (not an .mkv file)[/yellow]")
+            console.print(f"[yellow]Skipping {meta.path} (not an .mkv file)[/yellow]")
         return True
 
     unique_id = None
@@ -527,7 +528,7 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
     if debug:
         console.print("[cyan]Validating MediaInfo")
 
-    mediainfo_data = meta.get("mediainfo", {})
+    mediainfo_data = meta.mediainfo
 
     if "media" in mediainfo_data and "track" in mediainfo_data["media"]:
         tracks = mediainfo_data["media"]["track"]
@@ -537,7 +538,7 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
         has_audio = any(track.get("@type", "") == "Audio" for track in tracks)
 
         if not has_audio:
-            raise NoAudioMediaError(f"{meta['ua_name']} does not support no audio media.")
+            raise NoAudioMediaError(f"{meta.ua_name} does not support no audio media.")
 
         for track in tracks:
             track_type = track.get("@type", "")
@@ -567,18 +568,18 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
     return bool(valid_settings) if settings else bool(unique_id)
 
 
-async def get_conformance_error(meta: dict[str, Any]) -> bool:
-    if meta.get("is_disc") != "BDMV" and meta.get("mediainfo", {}).get("media", {}).get("track"):
-        general_track = next((track for track in meta["mediainfo"]["media"]["track"] if track.get("@type") == "General"), None)
+async def get_conformance_error(meta: Meta) -> bool:
+    if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
+        general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
         if general_track and general_track.get("extra", {}).get("ConformanceErrors", {}):
             try:
                 return True
             except ValueError:
-                if meta["debug"]:
+                if meta.debug:
                     console.print(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
                 return True
         else:
-            if meta["debug"]:
+            if meta.debug:
                 console.print("[green]No Conformance errors found in MediaInfo General track[/green]")
             return False
     else:

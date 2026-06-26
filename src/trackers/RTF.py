@@ -10,6 +10,7 @@ import httpx
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
@@ -40,7 +41,7 @@ class RTF:
         self.banned_groups: list[str] = []
         pass
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         """Upload a torrent to RetroFlix tracker.
 
         Args:
@@ -53,23 +54,21 @@ class RTF:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=self.forum_link)
-        if meta['bdinfo'] is not None:
+        if meta.bdinfo is not None:
             mi_dump = None
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", encoding='utf-8') as f:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bd_dump = await f.read()
         else:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", encoding='utf-8') as f:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
             bd_dump = None
 
-        screenshots = [
-            image['raw_url'] for image in meta['image_list'] if image['raw_url'] is not None
-        ]
+        screenshots = [image["raw_url"] for image in meta.image_list if image["raw_url"] is not None]
 
-        imdb_url_value = meta.get('imdb_info', {}).get('imdb_url', '')
+        imdb_url_value = meta.imdb_info.get("imdb_url", "")
         imdb_url = str(imdb_url_value) if imdb_url_value else ''
         json_data = {
-            "name": meta["name"],
+            "name": meta.name,
             # description does not work for some reason
             "description": "",
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
@@ -78,13 +77,13 @@ class RTF:
             "url": f"{imdb_url}/" if imdb_url else "",
             # auto pulled from IMDB
             "descr": "",
-            "poster": meta["poster"] if meta["poster"] is not None else "",
-            "type": "401" if meta["category"] == "MOVIE" else "402",
+            "poster": meta.poster if meta.poster is not None else "",
+            "type": "401" if meta.category == "MOVIE" else "402",
             "screenshots": screenshots,
             "isAnonymous": self.config["TRACKERS"][self.tracker]["anon"],
         }
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb') as binary_file:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent", "rb") as binary_file:
             binary_file_data = await binary_file.read()
             base64_encoded_data = base64.b64encode(binary_file_data)
             base64_message = base64_encoded_data.decode('utf-8')
@@ -96,7 +95,7 @@ class RTF:
             'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
         }
 
-        if meta['debug'] is False:
+        if meta.debug is False:
             try:
                 async with httpx.AsyncClient(timeout=40.0) as client:
                     response = await client.post(url=self.upload_url, json=json_data, headers=headers)
@@ -109,49 +108,49 @@ class RTF:
                             # Check if there's an error in the response despite 201 status
                             if response_json.get('error', False):
                                 error_msg = response_json.get('message', 'Unknown error occurred')
-                                meta['tracker_status'][self.tracker]['status_message'] = f"Upload error: {error_msg}"
+                                meta.tracker_status[self.tracker]["status_message"] = f"Upload error: {error_msg}"
                                 return False
 
-                            meta['tracker_status'][self.tracker]['status_message'] = response_json
+                            meta.tracker_status[self.tracker]["status_message"] = response_json
                             t_id = response_json['torrent']['id']
-                            meta['tracker_status'][self.tracker]['torrent_id'] = t_id
+                            meta.tracker_status[self.tracker]["torrent_id"] = t_id
                             await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag,
                                                                       self.config['TRACKERS'][self.tracker].get('announce_url'),
                                                                       "https://retroflix.club/browse/t/" + str(t_id))
                             return True
                         except KeyError as e:
-                            meta['tracker_status'][self.tracker]['status_message'] = f"Error parsing response: {response.text}: missing key {e}"
+                            meta.tracker_status[self.tracker]["status_message"] = f"Error parsing response: {response.text}: missing key {e}"
                             return False
 
                     # Handle error responses
                     elif response.status_code == 400:
                         response_json = response.json()
                         error_msg = response_json.get('message', 'Bad request or torrent file')
-                        meta['tracker_status'][self.tracker]['status_message'] = f"Bad request: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"Bad request: {error_msg}"
                         return False
 
                     elif response.status_code == 403:
                         response_json = response.json()
                         error_msg = response_json.get('message', 'You are not allowed to upload')
-                        meta['tracker_status'][self.tracker]['status_message'] = f"Permission denied: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"Permission denied: {error_msg}"
                         return False
 
                     elif response.status_code == 409:
                         response_json = response.json()
                         error_msg = response_json.get('message', 'Torrent already exists')
-                        meta['tracker_status'][self.tracker]['status_message'] = f"Duplicate: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"Duplicate: {error_msg}"
                         return False
 
                     elif response.status_code == 413:
                         response_json = response.json()
                         error_msg = response_json.get('message', 'Torrent file is too big or has too many files')
-                        meta['tracker_status'][self.tracker]['status_message'] = f"File size error: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"File size error: {error_msg}"
                         return False
 
                     elif response.status_code == 422:
                         response_json = response.json()
                         error_msg = response_json.get('message', 'Upload rejected based on rules')
-                        meta['tracker_status'][self.tracker]['status_message'] = f"Upload rejected: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"Upload rejected: {error_msg}"
                         return False
 
                     else:
@@ -163,17 +162,17 @@ class RTF:
                             error_msg = f'HTTP {response.status_code}: {response.text[:200]}'
 
                         console.print(f"[bold red]Unexpected response: {error_msg}")
-                        meta['tracker_status'][self.tracker]['status_message'] = f"Unexpected response: {error_msg}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"Unexpected response: {error_msg}"
                         return False
 
             except httpx.TimeoutException:
-                meta['tracker_status'][self.tracker]['status_message'] = "data error: RTF request timed out while uploading."
+                meta.tracker_status[self.tracker]["status_message"] = "data error: RTF request timed out while uploading."
                 return False
             except httpx.RequestError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f"data error: An error occurred while making the request: {e}"
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
                 return False
             except Exception as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f"data error - Unexpected error: {e}"
+                meta.tracker_status[self.tracker]["status_message"] = f"data error - Unexpected error: {e}"
                 return False
 
         else:
@@ -182,11 +181,11 @@ class RTF:
             if 'file' in debug_data and debug_data['file']:
                 debug_data['file'] = f"{str(debug_data['file'])[:10]}..."
             console.print(debug_data)
-            meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         """Search for existing torrents on RetroFlix tracker.
 
         Validates content eligibility (age requirements, no adult content) and searches
@@ -202,27 +201,27 @@ class RTF:
         """
         common = COMMON(config=self.config)
         if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            meta['skipping'] = "RTF"
+            meta.skipping = "RTF"
             return []
 
-        year_value = meta.get('year')
+        year_value = meta.year
         year = int(year_value) if year_value and str(year_value).isdigit() else None
         # Collect all possible years from different sources
         years: list[int] = []
 
         # IMDB end year
-        imdb_end_year = meta.get('imdb_info', {}).get('end_year')
+        imdb_end_year = meta.imdb_info.get("end_year")
         if imdb_end_year and str(imdb_end_year).isdigit():
             years.append(int(imdb_end_year))
 
         # TVDB episode year
-        tvdb_episode_year = meta.get('tvdb_episode_year')
+        tvdb_episode_year = meta.tvdb_episode_year
         if tvdb_episode_year and str(tvdb_episode_year).isdigit():
             years.append(int(tvdb_episode_year))
 
         # Get most recent aired date from all TVDB episodes
         most_recent_aired_date = None
-        tvdb_episodes_value = meta.get('tvdb_episode_data', {}).get('episodes', [])
+        tvdb_episodes_value = meta.tvdb_episode_data.get("episodes", [])
         tvdb_episodes = cast(list[dict[str, Any]], tvdb_episodes_value) if isinstance(tvdb_episodes_value, list) else []
         if tvdb_episodes:
             for episode in tvdb_episodes:
@@ -248,46 +247,46 @@ class RTF:
         most_recent_year = max(years) if years else year
 
         # Update year with the most recent year for TV shows
-        if meta.get('category') == "TV":
+        if meta.category == "TV":
             year = most_recent_year
 
         # Check if content is at least 10 years old using actual date comparison
-        if meta.get('category') == "MOVIE" and meta.get('release_date'):
+        if meta.category == "MOVIE" and meta.release_date:
             try:
-                release_date = datetime.datetime.strptime(meta['release_date'], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc).date()
+                release_date = datetime.datetime.strptime(meta.release_date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc).date()
                 year = release_date.year
                 # Calculate date exactly 10 years ago from today
                 ten_years_ago = datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
                 if release_date > ten_years_ago:
-                    if not meta.get('unattended', False):
+                    if not meta.unattended:
                         console.print("[red]Content must be older than 10 Years to upload at RTF")
-                    meta['skipping'] = "RTF"
+                    meta.skipping = "RTF"
                     return []
             except (ValueError, AttributeError):
                 # If date parsing fails, fall back to year comparison
-                release_year = meta['release_date'].split('-')[0]
+                release_year = meta.release_date.split("-")[0]
                 if release_year.isdigit():
                     year = int(release_year)
                     if datetime.datetime.now(datetime.timezone.utc).date().year - year <= 9:
-                        if not meta.get('unattended', False):
+                        if not meta.unattended:
                             console.print("[red]Content must be older than 10 Years to upload at RTF")
-                        meta['skipping'] = "RTF"
+                        meta.skipping = "RTF"
                         return []
 
-        elif meta.get('category') == "TV" and most_recent_aired_date:
+        elif meta.category == "TV" and most_recent_aired_date:
             # For TV shows, use the most recent aired date for comparison if available
             ten_years_ago = datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
-                if not meta.get('unattended', False):
+                if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
-                meta['skipping'] = "RTF"
+                meta.skipping = "RTF"
                 return []
 
         else:
             if year is not None and datetime.datetime.now(datetime.timezone.utc).date().year - int(year) <= 9:
-                if not meta.get('unattended', False):
+                if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
-                meta['skipping'] = "RTF"
+                meta.skipping = "RTF"
                 return []
 
         dupes: list[dict[str, Any]] = []
@@ -297,12 +296,12 @@ class RTF:
         }
         params = {'includingDead': '1'}
 
-        imdb_id_value = int(meta.get('imdb_id', 0) or 0)
+        imdb_id_value = int(meta.imdb_id or 0)
         if imdb_id_value != 0:
-            imdb_id_str = str(meta.get('imdb_id'))
+            imdb_id_str = str(meta.imdb_id)
             params['imdbId'] = imdb_id_str if imdb_id_str.startswith("tt") else "tt" + imdb_id_str
         else:
-            params['search'] = meta['title'].replace(':', '').replace("'", '').replace(",", '')
+            params["search"] = meta.title.replace(":", "").replace("'", "").replace(",", "")
 
         def build_download_url(entry: dict[str, Any]) -> str:
             torrent_id = entry.get('id')
@@ -346,7 +345,7 @@ class RTF:
 
         return dupes
 
-    async def api_test(self, meta: dict[str, Any]) -> Optional[bool]:
+    async def api_test(self, meta: Meta) -> Optional[bool]:
         """Test if the stored API key is valid.
 
         RetroFlix API keys expire weekly, so this method validates the current key
@@ -382,7 +381,7 @@ class RTF:
             await self.generate_new_api(meta)
             return None
 
-    async def generate_new_api(self, meta: dict[str, Any]) -> Optional[bool]:
+    async def generate_new_api(self, meta: Meta) -> Optional[bool]:
         """Generate a new API key for RetroFlix tracker.
 
         Authenticates using username/password and retrieves a new API token,
@@ -403,7 +402,7 @@ class RTF:
             'password': self.config['TRACKERS'][self.tracker]['password'],
         }
 
-        base_dir = meta.get('base_dir', '.')
+        base_dir = meta.base_dir if meta.base_dir is not None else "."
         config_path = f"{base_dir}/data/config.py"
 
         try:

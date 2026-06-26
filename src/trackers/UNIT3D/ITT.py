@@ -4,10 +4,10 @@ from typing import Any, Optional, cast
 
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -30,7 +30,7 @@ class ITT(UNIT3D):
     async def get_type_name(self, meta: Meta) -> Optional[str]:
         type_name: Optional[str] = None
 
-        uuid_string = meta.get("basename_no_ext", "")
+        uuid_string = meta.basename_no_ext
         if uuid_string:
             lower_uuid = uuid_string.lower()
 
@@ -46,7 +46,7 @@ class ITT(UNIT3D):
                 type_name = 'BDRip'
 
         if type_name is None:
-            type_value = meta.get('type')
+            type_value = meta.type
             type_name = str(type_value) if type_value else None
 
         return type_name
@@ -87,40 +87,40 @@ class ITT(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         type_name = await self.get_type_name(meta) or ''
-        title = str(meta.get('title', ""))
-        year = str(meta.get('year', ""))
-        if int(meta.get('manual_year') or 0) > 0:
-            year = str(meta.get('manual_year'))
-        resolution = str(meta.get('resolution', ""))
+        title = str(meta.title)
+        year = str(meta.year)
+        if int(meta.manual_year or 0) > 0:
+            year = str(meta.manual_year)
+        resolution = str(meta.resolution)
         if resolution == "OTHER":
             resolution = ""
-        audio = str(meta.get('audio', ""))
-        season = str(meta.get('season') or "")
-        episode = str(meta.get('episode') or "")
-        repack = str(meta.get('repack', ""))
-        three_d = str(meta.get('3D', ""))
-        tag = str(meta.get('tag', ""))
-        source = str(meta.get('source', ""))
-        hdr = str(meta.get('hdr', ""))
-        video_codec = str(meta.get('video_codec', ""))
-        region = str(meta.get('region', ""))
-        if meta.get('is_disc', "") == "BDMV":
-            video_codec = str(meta.get('video_codec', ""))
-            region = str(meta.get('region', ""))
-        elif meta.get('is_disc', "") == "DVD":
-            region = str(meta.get('region', ""))
-        edition = str(meta.get('edition', ""))
+        audio = str(meta.audio)
+        season = str(meta.season or "")
+        episode = str(meta.episode or "")
+        repack = str(meta.repack)
+        three_d = str(meta.three_d)
+        tag = str(meta.tag)
+        source = str(meta.source)
+        hdr = str(meta.hdr)
+        video_codec = str(meta.video_codec)
+        region = str(meta.region)
+        if meta.is_disc == "BDMV":
+            video_codec = str(meta.video_codec)
+            region = str(meta.region)
+        elif meta.is_disc == "DVD":
+            region = str(meta.region)
+        edition = str(meta.edition)
         if 'hybrid' in edition.upper():
             edition = edition.replace('Hybrid', '').strip()
 
-        if meta.get('category') == "TV":
-            year = str(meta.get('year', '')) if meta.get('search_year', "") != "" else ""
-            if meta.get('manual_date'):
+        if meta.category == "TV":
+            year = str(meta.year) if meta.search_year != "" else ""
+            if meta.manual_date:
                 season = ''
                 episode = ''
-        if meta.get('no_season', False) is True:
+        if meta.no_season is True:
             season = ''
-        if meta.get('no_year', False) is True:
+        if meta.no_year is True:
             year = ''
 
         dubs = await self.get_dubs(meta)
@@ -152,9 +152,9 @@ class ITT(UNIT3D):
             itt_name = ' '.join(itt_name.split())
         except Exception:
             console.print("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            console.print(f"--category [yellow]{meta['category']}")
-            console.print(f"--type [yellow]{meta['type']}")
-            console.print(f"--source [yellow]{meta['source']}")
+            console.print(f"--category [yellow]{meta.category}")
+            console.print(f"--type [yellow]{meta.type}")
+            console.print(f"--source [yellow]{meta.source}")
             console.print("[bold green]If you specified type, try also specifying source")
 
             exit()
@@ -165,10 +165,10 @@ class ITT(UNIT3D):
         return {"name": re.sub(r"\s{2,}", " ", itt_name)}
 
     async def get_dubs(self, meta: Meta) -> str:
-        if not meta.get('language_checked', False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         dubs = ''
-        audio_languages_value = meta.get('audio_languages', [])
+        audio_languages_value = meta.audio_languages
         audio_languages: set[str] = set()
         if isinstance(audio_languages_value, list):
             audio_languages_list = cast(list[Any], audio_languages_value)

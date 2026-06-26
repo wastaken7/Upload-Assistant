@@ -2,10 +2,9 @@
 from typing import Any
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
-
-Meta = dict[str, Any]
 
 
 class ACM(UNIT3D):
@@ -32,7 +31,7 @@ class ACM(UNIT3D):
             'TM', 'TR', 'TW', 'UZ', 'VN', 'YE'
         ]  # fmt: off
 
-        origin_country = meta.get("origin_country", [])
+        origin_country = meta.origin_country
         if origin_country and any(country not in asia for country in origin_country):
             console.print(f"{self.tracker}: Origin country is not Asian, skipping upload...")
             return False
@@ -57,12 +56,12 @@ class ACM(UNIT3D):
         elif resolution:
             return {"resolution_id": resolution_id.get(resolution, "6")}
         else:
-            meta_resolution = meta.get("resolution", "")
+            meta_resolution = meta.resolution
             resolved_id = resolution_id.get(meta_resolution, "6")
             return {"resolution_id": resolved_id}
 
     def get_subs_tag(self, meta: Meta) -> str:
-        subs = meta.get("subtitle_languages", [])
+        subs = meta.subtitle_languages
         if not subs:
             return " [No subs]"
         elif "English" in subs:
@@ -72,12 +71,12 @@ class ACM(UNIT3D):
         return f" [{subs[0][:3]} subs only]"
 
     async def get_keywords(self, meta: Meta) -> dict[str, str]:
-        raw_keywords = meta.get("keywords", "")
+        raw_keywords = meta.keywords
         keywords_list = [k.strip() for k in raw_keywords.split(",") if k.strip()]
 
         return {"keywords": ", ".join(keywords_list[:10])}
 
-    async def get_region_id(self, meta: dict[str, Any]) -> dict[str, str]:
+    async def get_region_id(self, meta: Meta) -> dict[str, str]:
         region_map = {
             "KOR": "1",
             "JPN": "3",
@@ -106,26 +105,26 @@ class ACM(UNIT3D):
             "NLD": "25",
             "POL": "26",
         }
-        region = meta.get("region", "")
+        region = meta.region
 
         return {"region_id": region_map.get(region, "")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name: str = meta.get("name", "")
-        aka: str = meta.get("aka", "")
-        original_title: str = meta.get("original_title", "")
-        audio: str = meta.get("audio", "")
-        source: str = meta.get("source", "")
-        is_disc: str = meta.get("is_disc", "")
-        resolution: str = meta.get("resolution", "")
+        name: str = meta.name
+        aka: str = meta.aka
+        original_title: str = meta.original_title
+        audio: str = meta.audio
+        source: str = meta.source
+        is_disc: str = meta.is_disc
+        resolution: str = meta.resolution
         if aka != "":
             # ugly fix to remove the extra space in the title
             aka = aka + " "
             name = name.replace(aka, f" / {original_title} {chr(int('202A', 16))}")
         elif aka == "":
-            if meta.get("title") != original_title:
+            if meta.title != original_title:
                 # name = f'{name[:name.find(year)]}/ {original_title} {chr(int("202A", 16))}{name[name.find(year):]}'
-                name = name.replace(meta["title"], f"{meta['title']} / {original_title} {chr(int('202A', 16))}")
+                name = name.replace(meta.title, f"{meta.title} / {original_title} {chr(int('202A', 16))}")
         if "AAC" in audio:
             name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
         name = name.replace("DD+ ", "DD+")
@@ -136,7 +135,7 @@ class ACM(UNIT3D):
         if is_disc == "DVD":
             name = name.replace(f"{source} DVD5", f"{resolution} DVD {source}")
             name = name.replace(f"{source} DVD9", f"{resolution} DVD {source}")
-            if audio == meta.get("channels"):
+            if audio == meta.channels:
                 name = name.replace(f"{audio}", f"MPEG {audio}")
 
         name = name + self.get_subs_tag(meta)

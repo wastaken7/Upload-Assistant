@@ -10,6 +10,7 @@ import cli_ui
 import httpx
 
 from src.console import console
+from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
@@ -40,7 +41,7 @@ class BHD:
         self.approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bhd', 'bam']
         pass
 
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
+    async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
             "ptpimg.me": "ptpimg",
@@ -59,30 +60,30 @@ class BHD:
         )
         return None
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(str(meta['category']))
-        source_id = await self.get_source(str(meta['source']))
+        cat_id = await self.get_cat_id(str(meta.category))
+        source_id = await self.get_source(str(meta.source))
         type_id = await self.get_type(meta)
         draft = await self.get_live(meta)
         await self.edit_desc(meta)
         tags = await self.get_tags(meta)
         custom, edition = await self.get_edition(meta, tags)
         bhd_name = await self.edit_name(meta)
-        anon = 0 if meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False) else 1
+        anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
         mi_dump = None
-        if meta['is_disc'] == "BDMV":
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", encoding='utf-8') as f:
+        if meta.is_disc == "BDMV":
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
         else:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", encoding='utf-8') as f:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", encoding='utf-8') as f:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             desc = await f.read()
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_file_path, 'rb') as f:
             torrent_bytes = await f.read()
 
@@ -92,16 +93,16 @@ class BHD:
         }
 
         data: dict[str, Any] = {
-            'name': bhd_name,
-            'category_id': cat_id,
-            'type': type_id,
-            'source': source_id,
-            'imdb_id': meta['imdb'],
-            'tmdb_id': meta['tmdb'],
-            'description': desc,
-            'anon': anon,
-            'sd': meta.get('sd', 0),
-            'live': draft
+            "name": bhd_name,
+            "category_id": cat_id,
+            "type": type_id,
+            "source": source_id,
+            "imdb_id": meta.imdb,
+            "tmdb_id": meta.tmdb,
+            "description": desc,
+            "anon": anon,
+            "sd": meta.sd,
+            "live": draft,
             # 'internal' : 0,
             # 'featured' : 0,
             # 'free' : 0,
@@ -110,30 +111,32 @@ class BHD:
         }
         # Internal
         if (
-            self.config['TRACKERS'][self.tracker].get('internal', False) is True
-            and meta['tag'] != ""
-            and meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', [])
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True
+            and meta.tag != ""
+            and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data['internal'] = 1
 
-        if meta.get('tv_pack', 0) == 1:
+        if meta.tv_pack == 1:
             data['pack'] = 1
-        if meta.get('season') == "S00":
+        if meta.season == "S00":
             data['special'] = 1
         allowed_regions = ['AUS', 'CAN', 'CEE', 'CHN', 'ESP', 'EUR', 'FRA', 'GBR', 'GER', 'HKG', 'ITA', 'JPN', 'KOR', 'NOR', 'NLD', 'RUS', 'TWN', 'USA']
-        if meta.get('region', "") in allowed_regions:
-            data['region'] = meta['region']
+        if meta.region in allowed_regions:
+            data["region"] = meta.region
         if custom is True:
             data['custom_edition'] = edition
         elif edition != "":
             data['edition'] = edition
         if len(tags) > 0:
             data['tags'] = ','.join(tags)
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"}
+        headers = {
+            "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
+        }
 
         url = self.upload_url + str(self.tracker_config.get('api_key', '')).strip()
         details_link: Union[str, None] = None
-        if meta['debug'] is False:
+        if meta.debug is False:
             try:
                 async with httpx.AsyncClient(timeout=60) as client:
                     response = await client.post(url=url, files=files, data=data, headers=headers)
@@ -152,23 +155,23 @@ class BHD:
                         match = re.search(r"https://beyond-hd\.me/torrent/download/.*\.(\d+)\.", response_json['status_message'])
                         if match:
                             torrent_id = match.group(1)
-                            meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                            meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                             details_link = f"https://beyond-hd.me/details/{torrent_id}"
-                            meta['tracker_status'][self.tracker]['status_message'] = response_json
+                            meta.tracker_status[self.tracker]["status_message"] = response_json
                         else:
-                            meta['tracker_status'][self.tracker]['status_message'] = "No valid details link found in status_message."
+                            meta.tracker_status[self.tracker]["status_message"] = "No valid details link found in status_message."
                             return True
                     else:
-                        meta['tracker_status'][self.tracker]['status_message'] = "data error: No status_message in response."
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: No status_message in response."
                         return False
 
             except Exception as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f"data error: {e}"
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
             console.print("[cyan]BHD Request Data:")
             console.print(data)
-            meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
 
@@ -206,48 +209,48 @@ class BHD:
         source_id = sources.get(source)
         return source_id
 
-    async def get_type(self, meta: dict[str, Any]) -> str:
-        if meta['is_disc'] == "BDMV":
-            bdinfo = meta['bdinfo']
+    async def get_type(self, meta: Meta) -> str:
+        if meta.is_disc == "BDMV":
+            bdinfo = meta.bdinfo
             bd_sizes = [25, 50, 66, 100]
             bd_size = 100
             for each in bd_sizes:
                 if bdinfo['size'] < each:
                     bd_size = each
                     break
-            type_id = f"UHD {bd_size}" if meta['uhd'] == "UHD" and bd_size != 25 else f"BD {bd_size}"
+            type_id = f"UHD {bd_size}" if meta.uhd == "UHD" and bd_size != 25 else f"BD {bd_size}"
             if type_id not in ['UHD 100', 'UHD 66', 'UHD 50', 'BD 50', 'BD 25']:
                 type_id = "Other"
-        elif meta['is_disc'] == "DVD":
-            if "DVD5" in meta['dvd_size']:
+        elif meta.is_disc == "DVD":
+            if "DVD5" in meta.dvd_size:
                 type_id = "DVD 5"
-            elif "DVD9" in meta['dvd_size']:
+            elif "DVD9" in meta.dvd_size:
                 type_id = "DVD 9"
             else:
                 type_id = "Other"
         else:
             type_id = "Other"
-            if meta['type'] == "REMUX":
-                if meta['source'] == "BluRay":
+            if meta.type == "REMUX":
+                if meta.source == "BluRay":
                     type_id = "BD Remux"
-                if meta['source'] in ("PAL DVD", "NTSC DVD"):
+                if meta.source in ("PAL DVD", "NTSC DVD"):
                     type_id = "DVD Remux"
-                if meta['uhd'] == "UHD":
+                if meta.uhd == "UHD":
                     type_id = "UHD Remux"
-                if meta['source'] == "HDDVD":
+                if meta.source == "HDDVD":
                     type_id = "Other"
             else:
                 acceptable_res = ["2160p", "1080p", "1080i", "720p", "576p", "576i", "540p", "480p", "Other"]
-                type_id = meta['resolution'] if meta['resolution'] in acceptable_res else "Other"
+                type_id = meta.resolution if meta.resolution in acceptable_res else "Other"
         return type_id
 
-    async def edit_desc(self, meta: dict[str, Any]) -> None:
-        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-        base_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+    async def edit_desc(self, meta: Meta) -> None:
+        desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        base_path = f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt"
         async with aiofiles.open(base_path, encoding='utf-8') as f:
             base = await f.read()
         async with aiofiles.open(desc_path, 'w', encoding='utf-8') as desc:
-            discs = cast(list[dict[str, Any]], meta.get('discs') or [])
+            discs = cast(list[dict[str, Any]], meta.discs or [])
             if discs:
                 if discs[0]['type'] == "DVD":
                     await desc.write(f"[spoiler=VOB MediaInfo][code]{discs[0]['vob_mi']}[/code][/spoiler]")
@@ -266,9 +269,9 @@ class BHD:
                             await desc.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n")
                             await desc.write("\n")
             await desc.write(base.replace("[img]", "[img width=300]"))
-            if meta.get('comparison') and meta.get('comparison_groups'):
+            if meta.comparison and meta.comparison_groups:
                 await desc.write("[center]")
-                comparison_groups = cast(dict[str, Any], meta.get('comparison_groups') or {})
+                comparison_groups = cast(dict[str, Any], meta.comparison_groups or {})
                 sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(str(x)))
 
                 comp_sources: list[str] = []
@@ -298,16 +301,16 @@ class BHD:
 
                 await desc.write("[/comparison][/center]\n\n")
             try:
-                if meta.get('tonemapped', False) and self.config['DEFAULT'].get('tonemapped_header', None):
+                if meta.tonemapped and self.config["DEFAULT"].get("tonemapped_header", None):
                     tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
                     await desc.write(tonemapped_header)
                     await desc.write("\n\n")
             except Exception as e:
                 console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
-            images = cast(list[dict[str, Any]], meta.get(f'{self.tracker}_images_key') or meta.get('image_list') or [])
+            images = cast(list[dict[str, Any]], meta.get(f"{self.tracker}_images_key") or meta.image_list or [])
             if len(images) > 0:
                 await desc.write("[align=center]")
-                for each in range(len(images[:int(meta['screens'])])):
+                for each in range(len(images[: int(meta.screens)])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     if (each == len(images) - 1):
@@ -318,77 +321,72 @@ class BHD:
                     else:
                         await desc.write(f"[url={web_url}][img width=350]{img_url}[/img][/url] ")
                 await desc.write("[/align]")
-            await desc.write(f"\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=10]{meta['ua_signature']}[/size][/url][/align]")
+            await desc.write(f"\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=10]{meta.ua_signature}[/size][/url][/align]")
             await desc.close()
             return None
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         bhd_name = await self.edit_name(meta)
         if any(phrase in bhd_name.lower() for phrase in (
             "-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi",
             "-ncmt", "-tdd", "-flux", "-crfw", "-sonny", "-zr-", "-mkvultra",
             "-rpg", "-w4nk3r", "-irobot", "-beyondhd"
         )):
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta['skipping'] = "BHD"
+                    meta.skipping = "BHD"
                     return []
             else:
-                meta['skipping'] = "BHD"
+                meta.skipping = "BHD"
                 return []
 
-        if not meta['valid_mi_settings']:
+        if not meta.valid_mi_settings:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
-            meta['skipping'] = "BHD"
+            meta.skipping = "BHD"
             return []
 
-        if meta.get('type') in ['REMUX', 'ENCODE', 'WEBDL', 'WEBRIP'] and meta.get('container') not in ['mkv', 'mp4']:
-            console.print(f"[bold red]Container '{meta.get('container')}' is not allowed for {meta['type']}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
-            meta['skipping'] = "BHD"
+        if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and meta.container not in ["mkv", "mp4"]:
+            console.print(f"[bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
+            meta.skipping = "BHD"
             return []
 
-        if meta['type'] not in ['WEBDL'] and meta.get('tag', "") and any(x in meta['tag'] for x in ['EVO']):
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content at BHD[/bold red]')
+        if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content at BHD[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta['skipping'] = "BHD"
+                    meta.skipping = "BHD"
                     return []
             else:
-                meta['skipping'] = "BHD"
+                meta.skipping = "BHD"
                 return []
 
         common = COMMON(config=self.config)
         if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            meta["skipping"] = "BHD"
+            meta.skipping = "BHD"
             return []
 
         dupes: list[dict[str, Any]] = []
-        category = meta['category']
+        category = meta.category
         tmdbID = "movie" if category == 'MOVIE' else "tv"
         if category == 'MOVIE':
             category = "Movies"
         elif category == "TV":
             category = "TV"
-        if meta['is_disc'] == "DVD":
+        if meta.is_disc == "DVD":
             type_id: Optional[str] = None
         else:
             type_id = await self.get_type(meta)
-        data: dict[str, Any] = {
-            'action': 'search',
-            'tmdb_id': f"{tmdbID}/{meta['tmdb']}",
-            'types': type_id,
-            'categories': category
-        }
-        if meta['sd'] == 1:
+        data: dict[str, Any] = {"action": "search", "tmdb_id": f"{tmdbID}/{meta.tmdb}", "types": type_id, "categories": category}
+        if meta.sd == 1:
             data['categories'] = None
             data['types'] = None
-        if meta['category'] == 'TV':
-            data['search'] = f"{meta.get('season', '')}"
+        if meta.category == "TV":
+            data["search"] = f"{meta.season}"
         rss_key = self.tracker_config.get('bhd_rss_key', "") != ""
         if rss_key:
             data['rsskey'] = str(self.tracker_config.get('bhd_rss_key', '')).strip()
@@ -438,22 +436,22 @@ class BHD:
         """
         return str(value).strip().lower() in {"true", "1", "yes"}
 
-    async def get_live(self, meta: dict[str, Any]) -> int:
+    async def get_live(self, meta: Meta) -> int:
         draft_value = self.config['TRACKERS'][self.tracker].get('draft_default', False)
         draft_bool = draft_value if isinstance(draft_value, bool) else self._is_true(str(draft_value).strip())
 
-        draft_int = 0 if draft_bool or meta.get('draft') else 1
+        draft_int = 0 if draft_bool or meta.draft else 1
 
         return draft_int
 
-    async def get_edition(self, meta: dict[str, Any], tags: list[str]) -> tuple[bool, str]:
+    async def get_edition(self, meta: Meta, tags: list[str]) -> tuple[bool, str]:
         custom = False
-        edition = str(meta.get('edition', ""))
+        edition = str(meta.edition)
         if "Hybrid" in tags:
             edition = edition.replace('Hybrid', '').strip()
         editions = ['collector', 'cirector', 'extended', 'limited', 'special', 'theatrical', 'uncut', 'unrated']
         for each in editions:
-            if each in str(meta.get('edition')):
+            if each in str(meta.edition):
                 edition = each
             elif edition == "":
                 edition = ""
@@ -461,44 +459,44 @@ class BHD:
                 custom = True
         return custom, edition
 
-    async def get_tags(self, meta: dict[str, Any]) -> list[str]:
+    async def get_tags(self, meta: Meta) -> list[str]:
         tags: list[str] = []
-        if meta['type'] == "WEBRIP":
+        if meta.type == "WEBRIP":
             tags.append("WEBRip")
-        if meta['type'] == "WEBDL":
+        if meta.type == "WEBDL":
             tags.append("WEBDL")
-        if meta.get('3D') == "3D":
+        if meta.three_d == "3D":
             tags.append('3D')
-        if "Dual-Audio" in meta.get('audio', ""):
+        if "Dual-Audio" in meta.audio:
             tags.append('DualAudio')
-        if "Dubbed" in meta.get('audio', ""):
+        if "Dubbed" in meta.audio:
             tags.append('EnglishDub')
-        if "Open Matte" in meta.get('edition', ""):
+        if "Open Matte" in meta.edition:
             tags.append("OpenMatte")
-        if meta.get('scene', False) is True:
+        if meta.scene is True:
             tags.append("Scene")
-        if meta.get('personalrelease', False) is True:
+        if meta.personalrelease is True:
             tags.append('Personal')
-        if "hybrid" in meta.get('edition', "").lower():
+        if "hybrid" in meta.edition.lower():
             tags.append('Hybrid')
-        if meta.get('has_commentary', False) is True:
+        if meta.has_commentary is True:
             tags.append('Commentary')
-        if "DV" in meta.get('hdr', ''):
+        if "DV" in meta.hdr:
             tags.append('DV')
-        if "HDR" in meta.get('hdr', ''):
-            if "HDR10+" in meta['hdr']:
+        if "HDR" in meta.hdr:
+            if "HDR10+" in meta.hdr:
                 tags.append('HDR10+')
             else:
                 tags.append('HDR10')
-        if "HLG" in meta.get('hdr', ''):
+        if "HLG" in meta.hdr:
             tags.append('HLG')
         return tags
 
-    async def edit_name(self, meta: dict[str, Any]) -> str:
-        name = str(meta.get('name') or '')
-        if meta.get('source', '') in ('PAL DVD', 'NTSC DVD', 'DVD', 'NTSC', 'PAL'):
-            audio = str(meta.get('audio', ''))
+    async def edit_name(self, meta: Meta) -> str:
+        name = str(meta.name or "")
+        if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
+            audio = str(meta.audio)
             audio = ' '.join(audio.split())
-            name = name.replace(audio, f"{meta.get('video_codec')} {audio}")
+            name = name.replace(audio, f"{meta.video_codec} {audio}")
         name = name.replace("DD+", "DDP")
         return name

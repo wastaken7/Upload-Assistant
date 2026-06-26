@@ -5,10 +5,10 @@ from typing import Any, Optional
 import cli_ui
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -36,10 +36,10 @@ class YUS(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        genres = f"{meta.keywords} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
-            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))):
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print('[bold red]Porn/xxx is not allowed at YUS.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -73,9 +73,9 @@ class YUS(UNIT3D):
         elif reverse:
             return {v: k for k, v in cat_map.items()}
 
-        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        resolved_category = category if category is not None and category != "" else meta.category
         if resolved_category == "BOOK":
-            resolved_category = "AUDIOBOOK" if meta.get("audiobook", False) else "EBOOK"
+            resolved_category = "AUDIOBOOK" if meta.audiobook else "EBOOK"
 
         category_id = cat_map.get(resolved_category, "0")
         return {"category_id": category_id}
@@ -114,12 +114,12 @@ class YUS(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
         val = type_id.get(resolved_type, "0")
-        if meta.get("category") == "BOOK" and val == "0":
+        if meta.category == "BOOK" and val == "0":
             val = "21"  # Default to PDF for unknown book types
 
         return {"type_id": val}

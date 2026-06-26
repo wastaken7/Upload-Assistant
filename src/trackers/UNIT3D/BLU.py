@@ -4,6 +4,7 @@ from typing import Any, Optional
 import cli_ui
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -33,38 +34,33 @@ class BLU(UNIT3D):
         ]
         pass
 
-    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        if not meta.get('is_disc'):
-            container = meta.get('container', '').lower()
-            type_name = meta.get('type', '').upper()
+        if not meta.is_disc:
+            container = meta.container.lower()
+            type_name = meta.type.upper()
             allowed = ['mkv']
             if type_name == 'HDTV':
                 allowed.append('ts')
-            if type_name in ['WEBDL', 'HDTV'] and "DV" in meta.get('hdr', '') and "HDR" not in meta.get('hdr', ''):
+            if type_name in ["WEBDL", "HDTV"] and "DV" in meta.hdr and "HDR" not in meta.hdr:
                 allowed.append('mp4')
 
             if container not in allowed:
                 console.print(f"[bold red]For this release, {self.tracker} requires one of the following containers: {', '.join([a.upper() for a in allowed])}[/bold red]")
                 return False
 
-        if (
-            meta['type'] in ['ENCODE', 'REMUX']
-            and 'HDR' in meta.get('hdr', '')
-            and 'DV' in meta.get('hdr', '')
-            and (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)))
-        ):
+        if meta.type in ["ENCODE", "REMUX"] and "HDR" in meta.hdr and "DV" in meta.hdr and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
             console.print('[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]')
             console.print('[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]')
             if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                 return False
             if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
-                meta['tracker_status'][self.tracker]['other'] = True
+                meta.tracker_status[self.tracker]["other"] = True
 
-        if meta['type'] not in ['WEBDL'] and not meta['is_disc'] and meta.get('tag', "") in ['AOC', 'CMRG', 'EVO', 'TERMiNAL', 'ViSION']:
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                console.print(f'[bold red]Group {meta["tag"]} is only allowed for raw type content[/bold red]')
+        if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]:
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -72,42 +68,42 @@ class BLU(UNIT3D):
             else:
                 return False
 
-        if not meta['valid_mi_settings']:
+        if not meta.valid_mi_settings:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         return should_continue
 
-    async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
-        blu_name = meta['name']
-        if meta['category'] == 'TV' and meta.get('episode_title', "") != "":
-            blu_name = blu_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
-        imdb_name = meta.get('imdb_info', {}).get('title', "")
-        imdb_year = str(meta.get('imdb_info', {}).get('year', ""))
-        imdb_aka = meta.get('imdb_info', {}).get('aka', "")
-        year = str(meta.get('year', ""))
-        aka = meta.get('aka', "")
-        webdv = meta.get('webdv', "")
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        blu_name = meta.name
+        if meta.category == "TV" and meta.episode_title != "":
+            blu_name = blu_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
+        imdb_name = meta.imdb_info.get("title", "")
+        imdb_year = str(meta.imdb_info.get("year", ""))
+        imdb_aka = meta.imdb_info.get("aka", "")
+        year = str(meta.year)
+        aka = meta.aka
+        webdv = meta.webdv
         if imdb_name and imdb_name.strip():
             if aka:
                 blu_name = blu_name.replace(f"{aka} ", "", 1)
-            blu_name = blu_name.replace(f"{meta['title']}", imdb_name, 1)
+            blu_name = blu_name.replace(f"{meta.title}", imdb_name, 1)
 
-            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.get('no_aka', False):
+            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.no_aka:
                 blu_name = blu_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
 
-        if meta.get('category') != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
+        if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
             blu_name = blu_name.replace(f"{year}", imdb_year, 1)
 
         if webdv:
             blu_name = blu_name.replace("HYBRID ", "", 1)
 
-        if meta['tracker_status'][self.tracker].get('other', False):
-            blu_name = blu_name.replace(f"{meta['resolution']}", f"{meta['resolution']} DVP5/DVP8", 1)
+        if meta.tracker_status[self.tracker].get("other", False):
+            blu_name = blu_name.replace(f"{meta.resolution}", f"{meta.resolution} DVP5/DVP8", 1)
 
         return {'name': blu_name}
 
-    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
             'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
         }
@@ -116,13 +112,13 @@ class BLU(UNIT3D):
 
     async def get_category_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         category: Optional[str] = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        edition = meta.get('edition', '')
-        category_name = meta['category']
+        edition = meta.edition
+        category_name = meta.category
         category_id = {
             'MOVIE': '1',
             'TV': '2',
@@ -134,7 +130,7 @@ class BLU(UNIT3D):
         if category_name == 'MOVIE' and 'FANRES' in edition:
             is_fanres = True
 
-        if meta['tracker_status'][self.tracker].get('other', False):
+        if meta.tracker_status[self.tracker].get("other", False):
             is_fanres = True
 
         if is_fanres:
@@ -147,13 +143,13 @@ class BLU(UNIT3D):
         elif category is not None:
             return {'category_id': category_id.get(category, '0')}
         else:
-            meta_category = meta.get('category', '')
+            meta_category = meta.category
             resolved_id = category_id.get(meta_category, '0')
             return {'category_id': resolved_id}
 
     async def get_type_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         type: Optional[str] = None,
         reverse: bool = False,
         mapping_only: bool = False,
@@ -174,13 +170,13 @@ class BLU(UNIT3D):
         elif type is not None:
             return {'type_id': type_id.get(type, '0')}
         else:
-            meta_type = meta.get('type', '')
+            meta_type = meta.type
             resolved_id = type_id.get(meta_type, '0')
             return {'type_id': resolved_id}
 
     async def get_resolution_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         resolution: Optional[str] = None,
         reverse: bool = False,
         mapping_only: bool = False,
@@ -205,6 +201,6 @@ class BLU(UNIT3D):
         elif resolution is not None:
             return {'resolution_id': resolution_id.get(resolution, '10')}
         else:
-            meta_resolution = meta.get('resolution', '')
+            meta_resolution = meta.resolution
             resolved_id = resolution_id.get(meta_resolution, '10')
             return {'resolution_id': resolved_id}

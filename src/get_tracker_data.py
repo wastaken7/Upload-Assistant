@@ -17,6 +17,7 @@ import requests
 from src.btnid import BtnIdManager
 from src.cleanup import cleanup_manager
 from src.console import console
+from src.meta import Meta
 from src.trackermeta import TrackerMetaManager
 from src.trackersetup import tracker_class_map
 
@@ -96,19 +97,19 @@ class TrackerDataManager:
     async def get_tracker_data(
         self,
         _video: Any,
-        meta: dict[str, Any],
+        meta: Meta,
         search_term: Optional[str] = None,
         search_file_folder: Optional[str] = None,
         cat: Optional[str] = None,
         skip_tracker_descriptions: bool = False,
     ) -> dict[str, Any]:
         found_match = False
-        base_dir = meta['base_dir']
+        base_dir = meta.base_dir
         search_term_value = search_term or ""
         search_file_folder_value = search_file_folder or ""
         if search_term:
             # Check if a specific tracker is already set in meta
-            if not meta.get('emby', False):
+            if not meta.emby:
                 tracker_keys = {
                     # preference some unit3d based trackers first
                     # since they can return tmdb/imdb/tvdb ids
@@ -151,7 +152,7 @@ class TrackerDataManager:
                     'ptp': 'PTP',
                 }
 
-            specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
+            specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if getattr(meta, key, None) is not None]
 
             # Filter out trackers that don't have valid config or api_key/announce_url
             if specific_tracker:
@@ -165,7 +166,7 @@ class TrackerDataManager:
                     announce_url = tracker_config.get('announce_url', '')
 
                     if not tracker_config:
-                        if meta.get('debug'):
+                        if meta.debug:
                             console.print(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
                         continue
 
@@ -174,7 +175,7 @@ class TrackerDataManager:
                     has_announce_url = announce_url and announce_url.strip() != ''
 
                     if not has_api_key and not has_announce_url:
-                        if meta.get('debug'):
+                        if meta.debug:
                             console.print(f"[yellow]Tracker {tracker} has no api_key or announce_url set, skipping[/yellow]")
                         continue
 
@@ -182,16 +183,16 @@ class TrackerDataManager:
 
                 specific_tracker = valid_trackers
 
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
 
             if specific_tracker:
-                if meta.get('is_disc', False) and "ANT" in specific_tracker:
+                if meta.is_disc and "ANT" in specific_tracker:
                     specific_tracker.remove("ANT")
-                if meta.get('category') == "MOVIE" and "BTN" in specific_tracker:
+                if meta.category == "MOVIE" and "BTN" in specific_tracker:
                     specific_tracker.remove("BTN")
 
-                meta_trackers_raw = meta.get('trackers', [])
+                meta_trackers_raw = meta.trackers
                 meta_trackers: list[str]
                 if isinstance(meta_trackers_raw, str):
                     meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
@@ -201,20 +202,20 @@ class TrackerDataManager:
                 else:
                     meta_trackers = []
 
-                # for just searching, remove any specific trackers already in meta['trackers']
-                # since that tracker was found in client, and remove it from meta['trackers']
+                # for just searching, remove any specific trackers already in meta.trackers
+                # since that tracker was found in client, and remove it from meta.trackers
                 for tracker in list(specific_tracker):
-                    if tracker in meta_trackers and meta.get('site_check', False):
+                    if tracker in meta_trackers and meta.site_check:
                         specific_tracker.remove(tracker)
                         meta_trackers.remove(tracker)
 
-                # Update meta['trackers'] preserving list format
+                # Update meta.trackers preserving list format
                 if meta_trackers:
-                    meta['trackers'] = meta_trackers
+                    meta.trackers = meta_trackers
                 else:
-                    meta['trackers'] = []
+                    meta.trackers = []
 
-                async def process_tracker(tracker_name: str, meta: dict[str, Any], skip_tracker_descriptions: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> dict[str, Any]:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -233,9 +234,9 @@ class TrackerDataManager:
                         )
                         if match:
                             found_match = True
-                            if meta.get('debug'):
+                            if meta.debug:
                                 console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
-                            meta['matched_tracker'] = tracker_name
+                            meta.matched_tracker = tracker_name
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
                         return cast(dict[str, Any], updated_meta)
                     except aiohttp.ClientSSLError:
@@ -247,7 +248,7 @@ class TrackerDataManager:
                     return meta
 
                 while not found_match and specific_tracker:
-                    meta_trackers_raw = meta.get('trackers', [])
+                    meta_trackers_raw = meta.trackers
                     if isinstance(meta_trackers_raw, str):
                         meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
                     elif isinstance(meta_trackers_raw, list):
@@ -256,12 +257,10 @@ class TrackerDataManager:
                     else:
                         meta_trackers = []
 
-                    available_trackers, waiting_trackers = await self.get_available_trackers(
-                        specific_tracker, base_dir, debug=meta['debug']
-                    )
+                    available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                     if available_trackers:
-                        if meta['debug'] or meta.get('emby', False):
+                        if meta.debug or meta.emby:
                             console.print(f"[green]Available trackers: {', '.join(available_trackers)}[/green]")
                         tracker_to_process = available_trackers[0]
                     else:
@@ -283,28 +282,28 @@ class TrackerDataManager:
                             console.print()
 
                         else:
-                            if meta['debug']:
+                            if meta.debug:
                                 console.print("[red]No specific trackers available[/red]")
                             break
 
                     # Process the selected tracker
                     if tracker_to_process == "BTN":
-                        btn_id_value = meta.get('btn')
+                        btn_id_value = meta.btn
                         btn_id = str(btn_id_value) if btn_id_value is not None else ""
                         btn_api = self.default_config.get('btn_api')
                         if isinstance(btn_api, str) and len(btn_api) > 25:
                             imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id, meta)
                             if imdb != 0 or tvdb != 0:
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                     console.print(f"[green]Found BTN IDs: IMDb={imdb}, TVDb={tvdb}[/green]")
                                     try:
                                         if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
                                             if imdb != 0:
-                                                meta['imdb_id'] = int(imdb)
+                                                meta.imdb_id = int(imdb)
                                             if tvdb != 0:
-                                                meta['tvdb_id'] = int(tvdb)
+                                                meta.tvdb_id = int(tvdb)
                                             found_match = True
-                                            meta['matched_tracker'] = "BTN"
+                                            meta.matched_tracker = "BTN"
                                     except EOFError:
                                         console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                         await cleanup_manager.cleanup()
@@ -312,23 +311,23 @@ class TrackerDataManager:
                                         sys.exit(1)
                                 else:
                                     if imdb != 0:
-                                        meta['imdb_id'] = int(imdb)
+                                        meta.imdb_id = int(imdb)
                                     if tvdb != 0:
-                                        meta['tvdb_id'] = int(tvdb)
+                                        meta.tvdb_id = int(tvdb)
                                     found_match = True
-                                    meta['matched_tracker'] = "BTN"
+                                    meta.matched_tracker = "BTN"
                             await self.save_tracker_timestamp("BTN", base_dir=base_dir)
                     elif tracker_to_process == "ANT":
                         imdb_tmdb_list = await tracker_class_map['ANT'](config=self.config).get_data_from_files(meta)
                         if imdb_tmdb_list:
                             console.print(f"[green]Found ANT IDs: {imdb_tmdb_list}[/green]")
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 try:
                                     if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
                                         for d in imdb_tmdb_list:
                                             meta.update(d)
                                         found_match = True
-                                        meta['matched_tracker'] = "ANT"
+                                        meta.matched_tracker = "ANT"
                                 except EOFError:
                                     console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                     await cleanup_manager.cleanup()
@@ -338,7 +337,7 @@ class TrackerDataManager:
                                 for d in imdb_tmdb_list:
                                     meta.update(d)
                                 found_match = True
-                                meta['matched_tracker'] = "ANT"
+                                meta.matched_tracker = "ANT"
                         await self.save_tracker_timestamp("ANT", base_dir=base_dir)
                     else:
                         meta = await process_tracker(tracker_to_process, meta, skip_tracker_descriptions)
@@ -346,29 +345,25 @@ class TrackerDataManager:
                     if not found_match:
                         if tracker_to_process in specific_tracker:
                             specific_tracker.remove(tracker_to_process)
-                        remaining_available, remaining_waiting = await self.get_available_trackers(
-                            specific_tracker, base_dir, debug=meta['debug']
-                        )
+                        remaining_available, remaining_waiting = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                         if remaining_available or remaining_waiting:
-                            if meta['debug'] or meta.get('emby', False):
+                            if meta.debug or meta.emby:
                                 console.print(
                                     f"[yellow]No match found with {tracker_to_process}. Checking remaining trackers...[/yellow]"
                                 )
                         else:
-                            if meta['debug']:
+                            if meta.debug:
                                 console.print(
                                     f"[yellow]No match found with {tracker_to_process}. No more trackers available to check.[/yellow]"
                                 )
                             break
 
                 if found_match:
-                    if meta.get('debug'):
-                        console.print(
-                            f"[green]Successfully found match using tracker: {meta.get('matched_tracker', 'Unknown')}[/green]"
-                        )
+                    if meta.debug:
+                        console.print(f"[green]Successfully found match using tracker: {(meta.matched_tracker if meta.matched_tracker is not None else 'Unknown')}[/green]")
                 else:
-                    if meta['debug']:
+                    if meta.debug:
                         console.print("[yellow]No matches found on any available specific trackers.[/yellow]")
 
             else:
@@ -377,12 +372,12 @@ class TrackerDataManager:
                 other_api = sorted(list(api_trackers - {"BHD"}))
                 tracker_order = ["PTP", "HDB", "BHD"] + other_api
 
-                if cat == "TV" or meta.get('category') == "TV":
-                    if meta['debug']:
+                if cat == "TV" or meta.category == "TV":
+                    if meta.debug:
                         console.print("[yellow]Detected TV content, skipping PTP tracker check")
                     tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
-                async def process_tracker(tracker_name: str, meta: dict[str, Any], skip_tracker_descriptions: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> dict[str, Any]:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -401,9 +396,9 @@ class TrackerDataManager:
                         )
                         if match:
                             found_match = True
-                            if meta.get('debug'):
+                            if meta.debug:
                                 console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
-                            meta['matched_tracker'] = tracker_name
+                            meta.matched_tracker = tracker_name
                         return cast(dict[str, Any], updated_meta)
                     except aiohttp.ClientSSLError:
                         console.print(f"{tracker_name} tracker request failed due to SSL error.", markup=False)
@@ -421,8 +416,8 @@ class TrackerDataManager:
                             meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
 
                 if not found_match:
-                    meta['no_tracker_match'] = True
-                    if meta['debug']:
+                    meta.no_tracker_match = True
+                    if meta.debug:
                         console.print("[yellow]No matches found on any trackers.[/yellow]")
 
         else:
@@ -430,7 +425,7 @@ class TrackerDataManager:
 
         return meta
 
-    async def ping_unit3d(self, meta: dict[str, Any]) -> None:
+    async def ping_unit3d(self, meta: Meta) -> None:
         import re
 
         from src.trackers.COMMON import COMMON
@@ -443,21 +438,19 @@ class TrackerDataManager:
         tracker_order = prioritized + sorted(list(api_trackers - set(prioritized) - {"BHD"}))
 
         # Check if we have stored torrent comments
-        if meta.get('torrent_comments'):
+        if meta.torrent_comments:
             # Try to extract tracker IDs from stored comments
             for tracker_name in tracker_order:
                 # Skip if we already have region and distributor
-                if meta.get('region') and meta.get('distributor'):
-                    if meta.get('debug', False):
-                        console.print(
-                            f"[green]Both region ({meta['region']}) and distributor ({meta['distributor']}) found - no need to check more trackers[/green]"
-                        )
+                if meta.region and meta.distributor:
+                    if meta.debug:
+                        console.print(f"[green]Both region ({meta.region}) and distributor ({meta.distributor}) found - no need to check more trackers[/green]")
                     break
 
                 tracker_id: str = ""
                 tracker_key = tracker_name.lower()
                 # Check each stored comment for matching tracker URL
-                for comment_data in meta.get('torrent_comments', []):
+                for comment_data in meta.torrent_comments:
                     is_tracker_comment = False
                     comment = str(comment_data.get('comment', ''))
                     # Dynamically build tracker hosts
@@ -509,25 +502,24 @@ class TrackerDataManager:
                 # If we found a tracker ID, try to get region/distributor data
                 if tracker_id:
                     missing_info: list[str] = []
-                    if not meta.get('region'):
+                    if not meta.region:
                         missing_info.append("region")
-                    if not meta.get('distributor'):
+                    if not meta.distributor:
                         missing_info.append("distributor")
 
-                    if meta.get('debug', False):
+                    if meta.debug:
                         console.print(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
 
                     tracker_instance = tracker_class_map[tracker_name](config=self.config)
 
                     # Store initial state to detect changes
-                    had_region = bool(meta.get('region'))
-                    had_distributor = bool(meta.get('distributor'))
+                    had_region = bool(meta.region)
+                    had_distributor = bool(meta.distributor)
                     await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, str(tracker_id))
 
-                    if meta.get('region') and not had_region and meta.get('debug', False):
-                        console.print(f"[green]Found region '{meta['region']}' from {tracker_name}[/green]")
+                    if meta.region and not had_region and meta.debug:
+                        console.print(f"[green]Found region '{meta.region}' from {tracker_name}[/green]")
 
-                    if meta.get('distributor') and not had_distributor and meta.get('debug', False):
-                        console.print(f"[green]Found distributor '{meta['distributor']}' from {tracker_name}[/green]")
-
+                    if meta.distributor and not had_distributor and meta.debug:
+                        console.print(f"[green]Found distributor '{meta.distributor}' from {tracker_name}[/green]")
 

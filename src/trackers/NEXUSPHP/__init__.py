@@ -11,10 +11,10 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -43,8 +43,8 @@ class NEXUSPHP:
 
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
-    async def load_localized_data(self, meta: dict[str, Any]) -> None:
-        localized_data_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/tmdb_localized_data.json"
+    async def load_localized_data(self, meta: Meta) -> None:
+        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
         main_ch_data: dict[str, Any] = {}
         data: dict[str, Any] = {}
 
@@ -78,7 +78,7 @@ class NEXUSPHP:
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         if not self.announce_url:
             console.print(f"[red]Announce URL is not set for {self.tracker}[/red]", markup=True)
-            meta["skipping"] = self.tracker
+            meta.skipping = self.tracker
             return []
 
         base_url = f"{self.base_url}/torrents.php"
@@ -89,16 +89,16 @@ class NEXUSPHP:
             "incldead": "0",
         }
 
-        search_name = str(meta.get("title", ""))
-        year = str(meta.get("year", ""))
-        episode = str(meta.get("episode", ""))
-        season = str(meta.get("season", ""))
+        search_name = str(meta.title)
+        year = str(meta.year)
+        episode = str(meta.episode)
+        season = str(meta.season)
         season_episode = f"{season}{episode}" if season or episode else ""
 
-        if meta["category"] == "MOVIE":
+        if meta.category == "MOVIE":
             params["search"] = f"{search_name} {year}"
         else:
-            if meta.get("tv_pack", False):
+            if meta.tv_pack:
                 params["search"] = f"{search_name} {season}"
             else:
                 params["search"] = f"{search_name} {season_episode}"
@@ -111,7 +111,7 @@ class NEXUSPHP:
             response = await self.session.get(base_url, params=params)
             if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta["skipping"] = self.tracker
+                meta.skipping = self.tracker
                 return []
             response.raise_for_status()
 
@@ -141,7 +141,7 @@ class NEXUSPHP:
                         link = f"{self.base_url}/details.php?id={torrent_id}"
                         base_entry = {"name": name, "link": link}
 
-                        if meta.get("is_disc") == "BDMV":
+                        if meta.is_disc == "BDMV":
                             bdinfo = await self.get_dupe_bdinfo(torrent_id)
                             if bdinfo:
                                 base_entry["bd_info"] = bdinfo
@@ -196,8 +196,8 @@ class NEXUSPHP:
         original_name = data.get("original_name", "")
 
         # Season info for TV
-        season_num = meta.get("season", 0)
-        is_tv = meta.get("category") == "TV"
+        season_num = meta.season
+        is_tv = meta.category == "TV"
 
         if is_tv and season_num:
             season_info = next((s for s in data.get("seasons", []) if s.get("season_number") == season_num), {})
@@ -218,7 +218,7 @@ class NEXUSPHP:
             desc_parts.append(f"◎译　　名　{' / '.join(aka)}")
 
         release_date = data.get("first_air_date") or data.get("release_date", "")
-        year = release_date[:4] if release_date else str(meta.get("year", ""))
+        year = release_date[:4] if release_date else str(meta.year)
         if year:
             desc_parts.append(f"◎年　　代　{year}")
 
@@ -239,7 +239,7 @@ class NEXUSPHP:
             date_str = f"{release_date}({country_name})" if country_name else release_date
             desc_parts.append(f"◎上映日期　{date_str}")
 
-        imdb_info = meta.get("imdb_info", {})
+        imdb_info = meta.imdb_info
         imdb_rating = imdb_info.get("rating")
         imdb_votes = imdb_info.get("votes")
         imdb_url = imdb_info.get("imdb_url")
@@ -251,9 +251,9 @@ class NEXUSPHP:
             desc_parts.append(f"◎IMDb链接  {imdb_url}/")
 
         # Douban info from meta if available
-        douban_rating = meta.get("douban_rating")
-        douban_votes = meta.get("douban_votes")
-        douban_id = meta.get("douban_id")
+        douban_rating = meta.douban_rating
+        douban_votes = meta.douban_votes
+        douban_id = meta.douban_id
         if douban_rating:
             votes_str = f" ({douban_votes} 人评价)" if douban_votes else ""
             desc_parts.append(f"◎豆瓣评分　{douban_rating}/10{votes_str}")
@@ -275,7 +275,7 @@ class NEXUSPHP:
             if runtime and runtime[0]:
                 desc_parts.append(f"◎片　　长　{runtime[0]}分钟")
         else:
-            runtime = data.get("runtime") or meta.get("runtime")
+            runtime = data.get("runtime") or meta.runtime
             if runtime:
                 desc_parts.append(f"◎片　　长　{runtime}分钟")
 
@@ -316,7 +316,7 @@ class NEXUSPHP:
 
     async def get_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        meta["nexusphp_description"] = await self.standard_desc(meta)
+        meta.nexusphp_description = await self.standard_desc(meta)
 
         description = await builder.general_description_generator(
             meta,
@@ -337,7 +337,7 @@ class NEXUSPHP:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
 
         return description
@@ -375,13 +375,13 @@ class NEXUSPHP:
         return 0
 
     def get_douban_url(self, meta: Meta) -> str:
-        if meta.get("douban_id", 0):
-            return f"https://movie.douban.com/subject/{meta['douban_id']}/"
+        if meta.douban_id:
+            return f"https://movie.douban.com/subject/{meta.douban_id}/"
         return ""
 
     def get_imdb_url(self, meta: Meta) -> str:
-        if meta.get("imdb_id", 0):
-            return f"{meta.get('imdb_info', {}).get('imdb_url', '')}"
+        if meta.imdb_id:
+            return f"{meta.imdb_info.get('imdb_url', '')}"
         return ""
 
     def get_region(self, meta: Meta) -> int:
@@ -401,11 +401,11 @@ class NEXUSPHP:
             "descr": await self.get_description(meta),
             "font": 0,
             "medium_sel[4]": self.get_type(meta),
-            "name": meta.get("name"),
+            "name": meta.name,
             "size": 0,
             "small_descr": self.common.get_small_description(meta),
             "standard_sel[4]": self.get_resolution(meta),
-            "technical_info": await builder.get_mediainfo_section(meta) if meta.get("is_disc", "") != "BDMV" else await builder.get_bdinfo_section(meta),
+            "technical_info": await builder.get_mediainfo_section(meta) if meta.is_disc != "BDMV" else await builder.get_bdinfo_section(meta),
             "type": self.get_category(meta),
         }
 

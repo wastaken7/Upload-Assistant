@@ -1,6 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, Optional, cast
 
+from src.meta import Meta
+
 console: Any = None
 
 try:
@@ -70,7 +72,7 @@ class Prep:
 
     @staticmethod
     def _resolve_book_filelist(
-        meta: dict[str, Any],
+        meta: Meta,
         videoloc: str,
     ) -> tuple[str, list[str], str, str]:
         """Delegate to :func:`src.book_prep.resolve_book_filelist`."""
@@ -78,7 +80,7 @@ class Prep:
 
     async def _gather_book_prep(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         videopath: str,
         base_dir: str,
     ) -> None:
@@ -87,7 +89,7 @@ class Prep:
 
     @staticmethod
     def _resolve_game_filelist(
-        meta: dict[str, Any],
+        meta: Meta,
         videoloc: str,
     ) -> tuple[str, list[str], str, str]:
         """Delegate to :func:`src.prep_game.resolve_game_filelist`."""
@@ -95,14 +97,14 @@ class Prep:
 
     async def _gather_game_prep(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         videopath: str,
         base_dir: str,
     ) -> None:
         """Delegate to :func:`src.prep_game.gather_game_prep`."""
         await _gather_game_prep_fn(meta, videopath, base_dir, self.config)
 
-    async def gather_prep(self, meta: dict[str, Any], mode: str) -> dict[str, Any]:
+    async def gather_prep(self, meta: Meta, mode: str) -> dict[str, Any]:
         meta_start_time = time.time()
 
         # 1. Init metadata settings
@@ -131,21 +133,21 @@ class Prep:
         # 8. Set Final Metadata and tags
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
 
-        if meta["debug"]:
+        if meta.debug:
             console.print(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
 
         return meta
 
     def check_adult_media(self, meta) -> bool:
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if meta.get("tmdb_adult_media", False):
+        if meta.tmdb_adult_media:
             return True
-        searchable = ", ".join(part for part in (meta.get("keywords", ""), meta.get("combined_genres", "")) if part)
+        searchable = ", ".join(part for part in (meta.keywords, meta.combined_genres) if part)
         return any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", searchable, re.IGNORECASE) for keyword in adult_keywords)
 
-    async def get_cat(self, _video: str, meta: dict[str, Any]) -> Optional[str]:
-        if meta.get("manual_category"):
-            manual_category = meta.get("manual_category")
+    async def get_cat(self, _video: str, meta: Meta) -> Optional[str]:
+        if meta.manual_category:
+            manual_category = meta.manual_category
             return manual_category.upper() if isinstance(manual_category, str) else None
 
         path_patterns = [
@@ -164,27 +166,27 @@ class Prep:
             r"(?i)\d{4}\.\d{1,2}\.\d{1,2}",
         ]
 
-        path = meta.get("path", "")
-        uuid = meta.get("uuid", "")
-        if meta.get("debug", False):
+        path = meta.path
+        uuid = meta.uuid
+        if meta.debug:
             console.print(f"[cyan]Checking category for path: {path} and uuid: {uuid}[/cyan]")
 
         for pattern in path_patterns:
             if re.search(pattern, path):
-                if meta.get("debug", False):
+                if meta.debug:
                     console.print(f"[cyan]Matched TV pattern in path: {pattern}[/cyan]")
                 return "TV"
 
         for pattern in filename_patterns:
             if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
-                if meta.get("debug", False):
+                if meta.debug:
                     console.print(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
 
         if "subsplease" in path.lower() or "subsplease" in uuid.lower():
             anime_pattern = r"(?:\s-\s)?(\d{1,3})\s*\((?:\d+p|480p|480i|576i|576p|720p|1080i|1080p|2160p)\)"
             if re.search(anime_pattern, path.lower()) or re.search(anime_pattern, uuid.lower()):
-                if meta.get("debug", False):
+                if meta.debug:
                     console.print(f"[cyan]Matched Anime pattern for SubsPlease: {anime_pattern}[/cyan]")
                 return "TV"
 
@@ -194,16 +196,16 @@ class Prep:
         stream = 1 if stream_opt is True else 0
         return stream
 
-    async def parse_scene_nfo(self, meta: dict[str, Any]) -> None:
+    async def parse_scene_nfo(self, meta: Meta) -> None:
         try:
-            nfo_file = meta.get("scene_nfo_file", "")
+            nfo_file = meta.scene_nfo_file
 
             if not nfo_file:
-                if meta["debug"]:
+                if meta.debug:
                     console.print("[yellow]No NFO file found for scene release[/yellow]")
                 return
 
-            if meta["debug"]:
+            if meta.debug:
                 console.print(f"[cyan]Parsing NFO file: {nfo_file}[/cyan]")
 
             async with aiofiles.open(nfo_file, encoding="utf-8", errors="ignore") as f:
@@ -213,7 +215,7 @@ class Prep:
             source_match = re.search(r"^Source\s*:\s*(.+?)$", nfo_content, re.MULTILINE | re.IGNORECASE)
             if source_match:
                 nfo_source = source_match.group(1).strip()
-                if meta["debug"]:
+                if meta.debug:
                     console.print(f"[cyan]Found source in NFO: {nfo_source}[/cyan]")
 
                 # Check if source matches any service
@@ -222,12 +224,12 @@ class Prep:
                 # Exact match
                 for service_name, service_code in services.items():
                     if nfo_source.upper() == service_name.upper() or nfo_source.upper() == service_code.upper():
-                        meta["service"] = service_code
-                        meta["service_longname"] = service_name
-                        if meta["debug"]:
+                        meta.service = service_code
+                        meta.service_longname = service_name
+                        if meta.debug:
                             console.print(f"[green]Matched service: {service_code} ({service_name})[/green]")
                         break
 
         except Exception as e:
-            if meta["debug"]:
+            if meta.debug:
                 console.print(f"[red]Error parsing NFO file: {e}[/red]")

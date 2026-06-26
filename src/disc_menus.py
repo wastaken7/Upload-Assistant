@@ -5,12 +5,9 @@ from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from typing_extensions import TypeAlias
-
 from src.console import console
+from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
-
-Meta: TypeAlias = MutableMapping[str, Any]
 
 
 class DiscMenus:
@@ -20,7 +17,7 @@ class DiscMenus:
 
     def __init__(self, meta: Meta, config: MutableMapping[str, Any]):
         self.config = config
-        self.path_to_menu_screenshots = str(meta.get('path_to_menu_screenshots', '') or '')
+        self.path_to_menu_screenshots = str(meta.path_to_menu_screenshots or "")
         self.uploadscreens_manager = UploadScreensManager(cast(dict[str, Any], config))
 
     async def get_disc_menu_images(self, meta: Meta) -> None:
@@ -59,7 +56,7 @@ class DiscMenus:
             return_dict={},
             retry_mode=False
         )
-        meta['menu_images'] = uploaded_images
+        meta.menu_images = uploaded_images
 
         await self.save_images_to_json(meta, uploaded_images)
 
@@ -75,8 +72,8 @@ class DiscMenus:
             "menu_images": list(image_list)
         }
 
-        base_dir = str(meta.get('base_dir', ''))
-        uuid_value = str(meta.get('uuid', ''))
+        base_dir = str(meta.base_dir)
+        uuid_value = str(meta.uuid)
         json_path = os.path.join(base_dir, 'tmp', uuid_value, 'menu_images.json')
         os.makedirs(os.path.dirname(json_path), exist_ok=True)
 

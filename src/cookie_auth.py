@@ -17,6 +17,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
@@ -35,8 +36,8 @@ class CookieValidator:
         self.common = COMMON(config)
         pass
 
-    async def load_session_cookies(self, meta: dict[str, Any], tracker: str) -> Optional[http.cookiejar.MozillaCookieJar]:
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{tracker}.txt")
+    async def load_session_cookies(self, meta: Meta, tracker: str) -> Optional[http.cookiejar.MozillaCookieJar]:
+        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
         try:
@@ -81,9 +82,9 @@ class CookieValidator:
         except Exception as e:
             console.print(f"{tracker}: Failed to update the cookie file: {e}")
 
-    async def get_ar_auth_key(self, meta: dict[str, Any], tracker: str) -> Optional[str]:
+    async def get_ar_auth_key(self, meta: Meta, tracker: str) -> Optional[str]:
         """Retrieve the saved auth key for AR tracker."""
-        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{tracker}.txt")
+        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
         auth_file = cookie_file.replace('.txt', '_auth.txt')
 
         if os.path.exists(auth_file):
@@ -98,7 +99,7 @@ class CookieValidator:
 
         return None
 
-    async def ar_login(self, meta: dict[str, Any], tracker: str, cookie_file: str) -> bool:
+    async def ar_login(self, meta: Meta, tracker: str, cookie_file: str) -> bool:
         """Perform automatic login to AR and save cookies in Netscape format."""
         username = self.config['TRACKERS'][tracker].get('username', '').strip()
         password = self.config['TRACKERS'][tracker].get('password', '').strip()
@@ -110,7 +111,7 @@ class CookieValidator:
         base_url = 'https://alpharatio.cc'
         login_url = f'{base_url}/login.php'
 
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, follow_redirects=True) as client:
@@ -131,7 +132,7 @@ class CookieValidator:
                 # Check for login success by looking for error indicators
                 if 'login.php?act=recover' in response.text or 'Forgot your password' in response.text:
                     console.print(f"{tracker}: [red]Login failed. Please check your username and password.[/red]")
-                    if meta.get('debug', False):
+                    if meta.debug:
                         failure_path = await self.common.save_html_file(meta, tracker, response.text, "Failed_Login")
                         console.print(f"{tracker}: Login response saved to [yellow]{failure_path}[/yellow] for debugging.")
                     return False
@@ -208,13 +209,13 @@ class CookieValidator:
             return False
         except Exception as e:
             console.print(f"{tracker}: Login error: {e}")
-            if meta.get('debug', False):
+            if meta.debug:
                 console.print(traceback.format_exc())
             return False
 
     async def cookie_validation(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         tracker: str,
         test_url: str = "",
         status_code: str = "",
@@ -230,13 +231,13 @@ class CookieValidator:
         if not cookie_jar:
             return False
 
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=20.0, cookies=cookie_jar) as session:
                 response = await session.get(test_url)
                 text = response.text
-                # if meta.get('debug', False):
+                # if meta.debug:
                 #    console.print(text)
 
                 # Check for key indicators of successful login
@@ -312,7 +313,7 @@ class CookieValidator:
 
         return False
 
-    async def handle_validation_failure(self, meta: dict[str, Any], tracker: str, text: str) -> None:
+    async def handle_validation_failure(self, meta: Meta, tracker: str, text: str) -> None:
         console.print(
             f"{tracker}: Validation failed. The cookie appears to be expired or invalid.\n"
             f"{tracker}: Please log in through your usual browser and export the cookies again."
@@ -476,7 +477,7 @@ class CookieAuthUploader:
 
     async def handle_upload(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         tracker: str,
         source_flag: str,
         torrent_url: str,
@@ -518,7 +519,7 @@ class CookieAuthUploader:
                 error = "You must provide at least one of: success_status_code, error_text, success_text, or success_list."
             else:
                 error = "Only one of success_status_code, error_text, success_text, or success_list should be provided."
-            meta["tracker_status"][tracker]["status_message"] = error
+            meta.tracker_status[tracker]["status_message"] = error
             return False
 
         user_announce_url = self.config["TRACKERS"][tracker]["announce_url"]
@@ -534,11 +535,11 @@ class CookieAuthUploader:
         if additional_files:
             files.update(additional_files)
 
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
-        if meta.get("debug", False):
+        if meta.debug:
             self.upload_debug(tracker, data)
-            meta["tracker_status"][tracker]["status_message"] = "Debug mode enabled, not uploading"
+            meta.tracker_status[tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{tracker}" + "_DEBUG", f"{tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
 
@@ -589,23 +590,23 @@ class CookieAuthUploader:
                         return False
 
             except httpx.ConnectTimeout:
-                meta["tracker_status"][tracker]["status_message"] = "Connection timed out"
+                meta.tracker_status[tracker]["status_message"] = "Connection timed out"
             except httpx.ReadTimeout:
-                meta["tracker_status"][tracker]["status_message"] = "Read timed out"
+                meta.tracker_status[tracker]["status_message"] = "Read timed out"
             except httpx.ConnectError:
-                meta["tracker_status"][tracker]["status_message"] = "Failed to connect to the server"
+                meta.tracker_status[tracker]["status_message"] = "Failed to connect to the server"
             except httpx.ProxyError:
-                meta["tracker_status"][tracker]["status_message"] = "Proxy connection failed"
+                meta.tracker_status[tracker]["status_message"] = "Proxy connection failed"
             except httpx.DecodingError:
-                meta["tracker_status"][tracker]["status_message"] = "Response decoding failed"
+                meta.tracker_status[tracker]["status_message"] = "Response decoding failed"
             except httpx.TooManyRedirects:
-                meta["tracker_status"][tracker]["status_message"] = "Too many redirects"
+                meta.tracker_status[tracker]["status_message"] = "Too many redirects"
             except httpx.HTTPStatusError as e:
-                meta["tracker_status"][tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
+                meta.tracker_status[tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
             except httpx.RequestError as e:
-                meta["tracker_status"][tracker]["status_message"] = f"Request error: {e}"
+                meta.tracker_status[tracker]["status_message"] = f"Request error: {e}"
             except Exception as e:
-                meta["tracker_status"][tracker]["status_message"] = f"Unexpected upload error: {e}"
+                meta.tracker_status[tracker]["status_message"] = f"Unexpected upload error: {e}"
 
         await self.common.create_torrent_ready_to_seed(meta, tracker, source_flag, user_announce_url, torrent_url)
         return False
@@ -639,7 +640,7 @@ class CookieAuthUploader:
 
     async def load_torrent_file(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         tracker: str,
         torrent_field_name: str,
         torrent_name: str,
@@ -648,11 +649,11 @@ class CookieAuthUploader:
     ) -> dict[str, tuple[str, bytes, str]]:
         """Load the torrent file into memory."""
         await self.common.create_torrent_for_upload(meta, tracker, source_flag, announce_url=default_announce)
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
             file_bytes = await f.read()
 
-        name = torrent_name if torrent_name else f"{tracker}.{meta.get('infohash', '')}.placeholder"
+        name = torrent_name if torrent_name else f"{tracker}.{meta.infohash}.placeholder"
 
         return {
             torrent_field_name: (
@@ -664,7 +665,7 @@ class CookieAuthUploader:
 
     async def handle_successful_upload(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         tracker: str,
         response: httpx.Response,
         id_pattern: str,
@@ -679,28 +680,28 @@ class CookieAuthUploader:
             url_match = re.search(id_pattern, str(response.url))
             if url_match:
                 torrent_id = url_match.group(1)
-                meta["tracker_status"][tracker]["torrent_id"] = torrent_id
+                meta.tracker_status[tracker]["torrent_id"] = torrent_id
             else:
                 # Fall back to searching in response text
                 text_match = re.search(id_pattern, response.text)
                 if text_match:
                     torrent_id = text_match.group(1)
-                    meta["tracker_status"][tracker]["torrent_id"] = torrent_id
+                    meta.tracker_status[tracker]["torrent_id"] = torrent_id
 
         torrent_hash = await self.common.create_torrent_ready_to_seed(
             meta, tracker, source_flag, user_announce_url, torrent_url + torrent_id, hash_is_id=hash_is_id
         )
 
         if hash_is_id and torrent_hash is not None:
-            meta["tracker_status"][tracker]["torrent_id"] = torrent_hash
+            meta.tracker_status[tracker]["torrent_id"] = torrent_hash
 
-        meta["tracker_status"][tracker]["status_message"] = "Torrent uploaded successfully."
+        meta.tracker_status[tracker]["status_message"] = "Torrent uploaded successfully."
 
         return True
 
     async def handle_failed_upload(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         tracker: str,
         success_status_code: str,
         success_text: str,
@@ -727,5 +728,5 @@ class CookieAuthUploader:
             "You can open this file in a web browser to see what went wrong.\n"
         )
 
-        meta["tracker_status"][tracker]["status_message"] = "\n".join(message)
+        meta.tracker_status[tracker]["status_message"] = "\n".join(message)
         return False

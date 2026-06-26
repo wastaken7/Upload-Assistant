@@ -22,9 +22,9 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
+from src.meta import Meta
 from src.usenetcreate import verify_nzb_has_password
 
-Meta = dict[str, Any]
 
 class COMMON:
     LANGUAGE_EQUIVALENCE_GROUPS: tuple[set[str], ...] = (
@@ -147,7 +147,7 @@ class COMMON:
         if isinstance(tracker_config, dict):
             allow_ext_subtitles = tracker_config.get("allow_ext_subtitles", False)
         if allow_ext_subtitles:
-            subs_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE_SUBS.torrent"
+            subs_path = f"{meta.base_dir}/tmp/{meta.uuid}/BASE_SUBS.torrent"
             if await self.path_exists(subs_path):
                 torrent_filename = "BASE_SUBS"
         return torrent_filename
@@ -164,7 +164,7 @@ class COMMON:
         if torrent_filename == "BASE":
             torrent_filename = await self.get_torrent_filename(meta, tracker_cfg)
 
-        path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent"
+        path = f"{meta.base_dir}/tmp/{meta.uuid}/{torrent_filename}.torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
@@ -196,7 +196,7 @@ class COMMON:
             if 'created by' in new_torrent.metainfo:
                 created_by = str(new_torrent.metainfo['created by'])
                 if "mkbrr" in created_by.lower():
-                    new_torrent.metainfo["created by"] = f"{created_by} using {meta['ua_name']} {meta.get('current_version', '')}"
+                    new_torrent.metainfo["created by"] = f"{created_by} using {meta.ua_name} {meta.current_version}"
             # Inject metadata IDs as top-level fields
             id_keys_map = {
                 "imdb_id": "imdb",
@@ -210,10 +210,10 @@ class COMMON:
                 "isbn": "isbn",
             }
             for meta_key, torrent_key in id_keys_map.items():
-                val = meta.get(meta_key)
+                val = getattr(meta, meta_key, None)
                 if val is not None and val != 0 and val != "":
                     if meta_key == "tmdb_id":
-                        cat = str(meta.get("category", "")).upper()
+                        cat = str(meta.category).upper()
                         if cat in ("TV", "MOVIE"):
                             new_torrent.metainfo[torrent_key] = f"{cat.lower()}/{val}"
                         else:
@@ -228,7 +228,7 @@ class COMMON:
 
             # setting comment as blank as if BASE.torrent is manually created then it can result in private info such as download link being exposed.
             new_torrent.metainfo['comment'] = ''
-            entropy_value = meta.get('entropy')
+            entropy_value = meta.entropy
             if entropy_value is not None:
                 try:
                     entropy_int = int(entropy_value)
@@ -239,7 +239,7 @@ class COMMON:
                 except (ValueError, TypeError):
                     # Skip entropy setting if value is invalid
                     pass
-            out_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+            out_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
             await loop.run_in_executor(None, lambda: Torrent.copy(new_torrent).write(out_path, overwrite=True))
 
     async def download_tracker_torrent(
@@ -252,7 +252,7 @@ class COMMON:
         hash_is_id: bool = False,
         cross: bool = False,
     ) -> Optional[str]:
-        path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent" if cross else f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}_cross].torrent" if cross else f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         if downurl:
             try:
                 cookie_jar = None
@@ -303,7 +303,7 @@ class COMMON:
         """
         Modifies the torrent file to include the tracker's announce URL, a comment, and a source flag.
         """
-        path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
@@ -338,7 +338,7 @@ class COMMON:
         return None
 
     async def get_torrent_hash(self, meta: Meta, tracker: str) -> str:
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_content = await torrent_file.read()
             bencode_module = cast(Any, bencodepy)
@@ -361,7 +361,7 @@ class COMMON:
             console.print("[yellow]No image links to save.[/yellow]")
             return None
 
-        output_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+        output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, "pack_image_links.json")
 
@@ -438,7 +438,7 @@ class COMMON:
             async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(existing_data, indent=2))
 
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
                 console.print(f"[blue]  - JSON: {output_file}[/blue]")
 
@@ -568,7 +568,7 @@ class COMMON:
         if filename:
             console.print(f"Filename: {filename}")  # Ensure filename is printed if available
 
-        if not meta['unattended']:
+        if not meta.unattended:
             selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
             try:
                 return bool(selection == '' or selection == 'y' or selection == 'yes')
@@ -607,24 +607,24 @@ class COMMON:
                 region_id = attributes.get('region_id', 0)
                 distributor_id = attributes.get('distributor_id', 0)
 
-                if meta['debug']:
+                if meta.debug:
                     console.print(f"[blue]Region ID: {region_id}[/blue]")
                     console.print(f"[blue]Distributor ID: {distributor_id}[/blue]")
 
                 # use reverse to reverse map the id to the name
-                if not meta.get('region') and region_id:
+                if not meta.region and region_id:
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
-                        meta['region'] = region_name
-                        if meta['debug']:
+                        meta.region = region_name
+                        if meta.debug:
                             console.print(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
 
                 # use reverse to reverse map the id to the name
-                if not meta.get('distributor') and distributor_id:
+                if not meta.distributor and distributor_id:
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
-                        meta['distributor'] = distributor_name
-                        if meta['debug']:
+                        meta.distributor = distributor_name
+                        if meta.debug:
                             console.print(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
                 return
 
@@ -635,22 +635,22 @@ class COMMON:
                     region_id = attributes.get('region_id')
                     distributor_id = attributes.get('distributor_id')
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[blue]Region ID: {region_id}[/blue]")
                         console.print(f"[blue]Distributor ID: {distributor_id}[/blue]")
 
-                    if not meta.get('region') and region_id:
+                    if not meta.region and region_id:
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
-                            meta['region'] = region_name
-                            if meta['debug']:
+                            meta.region = region_name
+                            if meta.debug:
                                 console.print(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
 
-                    if not meta.get('distributor') and distributor_id:
+                    if not meta.distributor and distributor_id:
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
-                            meta['distributor'] = distributor_name
-                            if meta['debug']:
+                            meta.distributor = distributor_name
+                            if meta.debug:
                                 console.print(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
         except Exception as e:
             console.print_exception()
@@ -687,16 +687,16 @@ class COMMON:
 
         # Determine the search method and add parameters accordingly
         if file_name:
-            params['file_name'] = file_name   # Add file_name to params
-            if meta.get('debug'):
+            params['file_name'] = file_name  # Add file_name to params
+            if meta.debug:
                 console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
             url = f"{torrent_url}{id}"
-            if meta.get('debug'):
+            if meta.debug:
                 console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
-            if meta.get('debug'):
+            if meta.debug:
                 console.print("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, [], None
 
@@ -734,16 +734,16 @@ class COMMON:
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.get('region') and meta.get('is_disc') == "BDMV":
+                if not meta.region and meta.is_disc == "BDMV":
                     region_id = attributes.get('region_id')
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
-                        meta['region'] = region_name
-                if not meta.get('distributor') and meta.get('is_disc') == "BDMV":
+                        meta.region = region_name
+                if not meta.distributor and meta.is_disc == "BDMV":
                     distributor_id = attributes.get('distributor_id')
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
-                        meta['distributor'] = distributor_name
+                        meta.distributor = distributor_name
             else:
                 # Handle response when searching by ID
                 if id and not data:
@@ -761,22 +761,22 @@ class COMMON:
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.get('region') and meta.get('is_disc') == "BDMV":
+                    if not meta.region and meta.is_disc == "BDMV":
                         region_id = attributes.get('region_id')
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
-                            meta['region'] = region_name
-                    if not meta.get('distributor') and meta.get('is_disc') == "BDMV":
+                            meta.region = region_name
+                    if not meta.distributor and meta.is_disc == "BDMV":
                         distributor_id = attributes.get('distributor_id')
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
-                            meta['distributor'] = distributor_name
+                            meta.distributor = distributor_name
                     # Handle file name extraction
                     files = attributes.get('files', [])
                     if files:
                         file_name = files[0]['name'] if len(files) == 1 else [file['name'] for file in files[:5]]
 
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
             if (tmdb or imdb or tvdb) and not id:
@@ -797,7 +797,7 @@ class COMMON:
 
                     from src.trackersetup import api_trackers
 
-                    if meta.get("unattended") or any(meta.get(t.lower()) for t in api_trackers):
+                    if meta.unattended or any(meta.get(t.lower()) for t in api_trackers):
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     else:
                         console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
@@ -812,11 +812,11 @@ class COMMON:
                             console.print("[yellow]Description discarded.[/yellow]")
                         else:
                             console.print("[green]Keeping the original description.[/green]")
-                    if not meta.get('keep_images'):
+                    if not meta.keep_images:
                         imagelist = []
                 else:
                     description = ""
-                    if not meta.get('keep_images'):
+                    if not meta.keep_images:
                         imagelist = []
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
@@ -861,8 +861,8 @@ class COMMON:
         try:
             async with httpx.AsyncClient() as client:
                 # get douban url
-                if int(meta.get('imdb_id', 0)) != 0:
-                    data['search'] = f"tt{meta['imdb_id']}"
+                if int(meta.imdb_id) != 0:
+                    data["search"] = f"tt{meta.imdb_id}"
                     ptgen_json = await fetch_ptgen(client, url, data)
 
                     # Check for error and retry if needed
@@ -897,14 +897,14 @@ class COMMON:
                     console.print("[bold red]Failed to get valid ptgen response after retries")
                     return ""
 
-                meta['ptgen'] = ptgen_json
-                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
-                    await f.write(json.dumps(meta, indent=4))
+                meta.ptgen = ptgen_json
+                async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(meta.to_dict(), indent=4))
 
                 ptgen_text = ptgen_json.get('format', '')
                 if "[/img]" in ptgen_text:
                     ptgen_text = ptgen_text.split("[/img]")[1]
-                ptgen_text = f"[img]{meta.get('imdb_info', {}).get('cover', meta.get('cover', ''))}[/img]{ptgen_text}"
+                ptgen_text = f"[img]{meta.imdb_info.get('cover', meta.cover)}[/img]{ptgen_text}"
 
         except Exception:
             console.print_exception()
@@ -1173,23 +1173,16 @@ class COMMON:
         :return: A string containing the cleaned MediaInfo content.
         """
         mediainfo = ''
-        mi_path = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/MEDIAINFO_CLEANPATH.txt'
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
-        if meta.get('is_disc') == 'BDMV':
+        if meta.is_disc == "BDMV":
             # 1. Generate/Load initial MediaInfo (Playlist) if not exists
             if not os.path.isfile(mi_path):
-                if meta.get('debug'):
+                if meta.debug:
                     console.print("[blue]Generating MediaInfo for BDMV...[/blue]")
 
-                path = meta['discs'][0]['playlists'][0]['path']
-                await exportInfo(
-                    path,
-                    False,
-                    meta['uuid'],
-                    meta['base_dir'],
-                    is_dvd=False,
-                    debug=meta.get('debug', False)
-                )
+                path = meta.discs[0]["playlists"][0]["path"]
+                await exportInfo(path, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
 
             # Helper to read and filter lines from the export file
             async def read_and_clean() -> str:
@@ -1211,27 +1204,20 @@ class COMMON:
 
             # 2. Check char_limit and fallback to largest M2TS if necessary
             if char_limit and len(mediainfo) > char_limit:
-                if meta.get('debug'):
+                if meta.debug:
                     console.print(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
 
-                items = meta['discs'][0]['playlists'][0].get('items', [])
+                items = meta.discs[0]["playlists"][0].get("items", [])
 
                 if items:
                     largest_item = max(items, key=lambda x: x.get('size', 0))
                     largest_m2ts = largest_item.get('file')
 
                     if largest_m2ts:
-                        if meta.get('debug'):
+                        if meta.debug:
                             console.print(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
 
-                        await exportInfo(
-                            largest_m2ts,
-                            False,
-                            meta['uuid'],
-                            meta['base_dir'],
-                            is_dvd=False,
-                            debug=meta.get('debug', False)
-                        )
+                        await exportInfo(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
 
                         mediainfo = await read_and_clean()
 
@@ -1276,12 +1262,12 @@ class COMMON:
         :return: True if the media meets the specified language requirements, False otherwise.
         :rtype: bool
         """
-        category = meta.get("category", "")
+        category = meta.category
         if category not in ("TV", "MOVIE", "BOOK"):
             return True
 
         if category == "BOOK":
-            book_language = meta.get("book_language", "")
+            book_language = meta.book_language
             if book_language:
                 book_language_lower = book_language.lower()
                 languages_lower = [lang.lower() for lang in languages_to_check]
@@ -1296,13 +1282,13 @@ class COMMON:
             return True
 
         try:
-            if not meta.get("language_checked", False):
+            if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=tracker)
 
             alias_lookup = self._build_language_alias_lookup()
 
-            meta_audio_languages = self._coerce_language_values(meta.get("audio_languages", []))
-            meta_subtitle_languages = self._coerce_language_values(meta.get("subtitle_languages", []))
+            meta_audio_languages = self._coerce_language_values(meta.audio_languages)
+            meta_subtitle_languages = self._coerce_language_values(meta.subtitle_languages)
 
             languages_to_check = [lang.lower() for lang in languages_to_check]
             audio_languages = [lang.lower() for lang in meta_audio_languages]
@@ -1315,7 +1301,7 @@ class COMMON:
             language_display = None
             original_ok = False
             if original_language:
-                original_language_raw = meta.get("original_language", [])
+                original_language_raw = meta.original_language
                 first_lang = ""
                 if original_language_raw:
                     if isinstance(original_language_raw, str):
@@ -1329,7 +1315,7 @@ class COMMON:
                     original_language_expanded = self._expand_language_candidates(first_lang, alias_lookup)
                     original_ok = bool(original_language_expanded.intersection(audio_languages_normalized))
 
-                    if meta.get('debug') and not original_ok:
+                    if meta.debug and not original_ok:
                         console.print(
                             f"[blue]Debug: Original language expanded candidates: "
                             f"{', '.join(sorted(original_language_expanded)) or 'None'}[/blue]"
@@ -1341,7 +1327,7 @@ class COMMON:
                     f"[yellow]Required original audio language:[/yellow] {language_display}\n"
                     f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
                 )
-                return not meta.get('unattended') and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+                return not meta.unattended and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
 
             audio_ok = (
                 not check_audio
@@ -1352,7 +1338,7 @@ class COMMON:
                 or any(lang in subtitle_languages for lang in languages_to_check)
             )
 
-            if meta.get('debug'):
+            if meta.debug:
                 console.print(f"[blue]Debug: Audio Languages Found: {audio_languages}[/blue]")
                 console.print(f"[blue]Debug: Subtitle Languages Found: {subtitle_languages}[/blue]")
                 console.print(f"[blue]Debug: Original Audio Language: {language_display}[/blue]")
@@ -1411,7 +1397,7 @@ class COMMON:
         :return: Path to the saved HTML file.
         :rtype: str
         """
-        html_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{file_name}.html"
+        html_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}]{file_name}.html"
         os.makedirs(os.path.dirname(html_path), exist_ok=True)
         async with aiofiles.open(html_path, "w", encoding="utf-8") as f:
             await f.write(text)
@@ -1427,11 +1413,11 @@ class COMMON:
         """
         v_raw = None
         a_raw = None
-        is_bdmv = meta.get("is_disc") == "BDMV"
-        is_dvd = meta.get("is_disc") == "DVD"
+        is_bdmv = meta.is_disc == "BDMV"
+        is_dvd = meta.is_disc == "DVD"
 
         if is_bdmv:
-            discs = meta.get("discs", [])
+            discs = meta.discs
             if discs:
                 bdinfo = discs[0].get("bdinfo", {})
                 v_tracks = bdinfo.get("video", [])
@@ -1443,7 +1429,7 @@ class COMMON:
         elif is_dvd:
             pass
         else:
-            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
                 t_type = track.get("@type")
                 if t_type == "Video" and v_raw is None:
@@ -1475,8 +1461,8 @@ class COMMON:
         :return: Small description.
         :rtype: str
         """
-        resolution = meta.get("resolution", "")
-        audio = meta.get("audio", "")
+        resolution = meta.resolution
+        audio = meta.audio
         video_bitrate, audio_bitrate = self.get_bitrates(meta)
 
         return f"{resolution} @ {video_bitrate} kbps - {audio} @ {audio_bitrate} kbps"
@@ -1489,8 +1475,8 @@ class COMMON:
         :param tracker: The tracker name for display in the prompt.
         :return: True if the user confirms or if the media is not adult, False otherwise.
         """
-        if meta.get("adult_media", False):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+        if meta.adult_media:
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -1572,7 +1558,7 @@ class COMMON:
         return "".join(formatted_parts)
 
     async def check_nzb_file(self, tracker: str, meta: Meta) -> bool:
-        nzb_path = meta.get("nzb_path")
+        nzb_path = meta.nzb_path
         if not nzb_path or not os.path.exists(nzb_path):
             console.print(f"{tracker}: [red]Error: The NZB file is missing. Aborting upload...[/red]")
             return False

@@ -6,11 +6,11 @@ import cli_ui
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -39,7 +39,7 @@ class STC(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_value = str(meta.get('type', ''))
+        type_value = str(meta.type)
         type_id = {
             'DISC': '1',
             'REMUX': '2',
@@ -48,25 +48,23 @@ class STC(UNIT3D):
             'HDTV': '6',
             'ENCODE': '3'
         }.get(type_value, '0')
-        if meta.get('tv_pack'):
+        if meta.tv_pack:
             is_web = type_value in ["WEBDL", "WEBRIP"]
-            type_id = ('17' if not is_web else '14') if meta.get('sd') else ('18' if not is_web else '13')
+            type_id = ("17" if not is_web else "14") if meta.sd else ("18" if not is_web else "13")
 
         return {'type_id': type_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
-        if str(meta.get('category', '')) != 'TV':
-            if not bool(meta.get('unattended')):
+        if str(meta.category) != "TV":
+            if not bool(meta.unattended):
                 console.print(f'[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]')
             return False
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+        genres = f"{meta.keywords} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not bool(meta.get('unattended')) or (
-                bool(meta.get('unattended')) and meta.get('unattended_confirm', False)
-            ):
+            if not bool(meta.unattended) or (bool(meta.unattended) and meta.unattended_confirm):
                 console.print(f'[bold red]Porn is not allowed at {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass

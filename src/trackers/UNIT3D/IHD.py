@@ -5,10 +5,10 @@ import pycountry
 
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -35,8 +35,8 @@ class IHD(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
-        category_name = meta['category']
-        anime = meta.get('anime', False)
+        category_name = meta.category
+        anime = meta.anime
         category_id = {
             'MOVIE': '1',
             'TV': '2',
@@ -65,7 +65,7 @@ class IHD(UNIT3D):
         elif category is not None:
             return {'category_id': category_id.get(category, '0')}
         else:
-            meta_category = meta.get('category', '')
+            meta_category = meta.category
             resolved_id = category_id.get(meta_category, '0')
             return {'category_id': resolved_id}
 
@@ -90,7 +90,7 @@ class IHD(UNIT3D):
         elif resolution is not None:
             return {'resolution_id': resolution_id.get(resolution, '10')}
         else:
-            meta_resolution = meta.get('resolution', '')
+            meta_resolution = meta.resolution
             resolved_id = resolution_id.get(meta_resolution, '10')
             return {'resolution_id': resolved_id}
 
@@ -130,15 +130,11 @@ class IHD(UNIT3D):
         if "mediainfo" not in meta:
             return False
 
-        original_languages = {
-            lang.lower()
-            for lang in meta.get("original_language", [])
-            if isinstance(lang, str) and lang.strip()
-        }
+        original_languages = {lang.lower() for lang in meta.original_language if isinstance(lang, str) and lang.strip()}
         if not original_languages:
             return False
 
-        tracks_value = meta["mediainfo"].get("media", {}).get("track", [])
+        tracks_value = meta.mediainfo.get("media", {}).get("track", [])
         tracks_list = cast(list[Any], tracks_value) if isinstance(tracks_value, list) else []
         for track in tracks_list:
             if not isinstance(track, dict):
@@ -154,12 +150,12 @@ class IHD(UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        ihd_name = str(meta.get('name', ''))
-        resolution = str(meta.get('resolution', ''))
+        ihd_name = str(meta.name)
+        resolution = str(meta.resolution)
 
-        if not meta.get('language_checked', False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages_value = meta.get('audio_languages', [])
+        audio_languages_value = meta.audio_languages
         audio_languages: list[str] = []
         if isinstance(audio_languages_value, list):
             audio_languages_list = cast(list[Any], audio_languages_value)
@@ -173,22 +169,22 @@ class IHD(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        if meta['resolution'] not in ['4320p', '2160p', '1440p', '1080p', '1080i']:
-            if not meta['unattended'] or meta['debug']:
+        if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:
+            if not meta.unattended or meta.debug:
                 console.print(f'[bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]')
             should_continue = False
 
-        if not meta['valid_mi_settings']:
-            if not meta['unattended'] or meta['debug']:
+        if not meta.valid_mi_settings:
+            if not meta.unattended or meta.debug:
                 console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             should_continue = False
 
-        if meta['is_disc'] != "BDMV":
-            if not meta.get('language_checked', False):
+        if meta.is_disc != "BDMV":
+            if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
             original_language = self.original_language_check(meta)
-            audio_languages_value = meta.get('audio_languages', [])
-            subtitle_languages_value = meta.get('subtitle_languages', [])
+            audio_languages_value = meta.audio_languages
+            subtitle_languages_value = meta.subtitle_languages
             audio_languages: list[str] = []
             subtitle_languages: list[str] = []
             if isinstance(audio_languages_value, list):
@@ -205,7 +201,7 @@ class IHD(UNIT3D):
             has_eng_subs = await languages_manager.has_english_language(subtitle_languages if subtitle_languages else '')
             # Require at least one English audio/subtitle track or an original language audio track
             if not (original_language or has_eng_audio or has_eng_subs):
-                if not meta['unattended'] or meta['debug']:
+                if not meta.unattended or meta.debug:
                     console.print(f'[bold red]{self.tracker} requires at least one English audio or subtitle track or an original language audio track.')
                 should_continue = False
 

@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Any, Optional, cast
 
 from src.console import console
-
-Meta = dict[str, Any]
+from src.meta import Meta
 
 
 class NfoLinkManager:
@@ -53,32 +52,28 @@ class NfoLinkManager:
         """Create an Emby-compliant NFO file from metadata"""
         try:
             # Get basic info
-            imdb_info = cast(dict[str, Any], meta.get('imdb_info') or {})
-            title = str(imdb_info.get('title') or meta.get('title') or '')
-            year = (
-                str(imdb_info.get('year') or meta.get('year') or '')
-                if meta['category'] == "MOVIE"
-                else str(meta.get('search_year') or '')
-            )
-            plot = str(meta.get('overview') or '')
+            imdb_info = cast(dict[str, Any], meta.imdb_info or {})
+            title = str(imdb_info.get("title") or meta.title or "")
+            year = str(imdb_info.get("year") or meta.year or "") if meta.category == "MOVIE" else str(meta.search_year or "")
+            plot = str(meta.overview or "")
             rating = str(imdb_info.get('rating') or '')
-            runtime = imdb_info.get('runtime') or meta.get('runtime') or ''
-            genres = imdb_info.get('genres') or meta.get('genres') or ''
-            country = str(imdb_info.get('country') or meta.get('country') or '')
+            runtime = imdb_info.get("runtime") or meta.runtime or ""
+            genres = imdb_info.get("genres") or meta.genres or ""
+            country = str(imdb_info.get("country") or meta.country or "")
             aka = str(imdb_info.get('aka') or title)
             tagline = str(imdb_info.get('plot') or '')
-            premiered = str(meta.get('release_date') or '')
+            premiered = str(meta.release_date or "")
 
             # IDs
-            imdb_id_raw = imdb_info.get('imdbID') or meta.get('imdb_id') or ''
+            imdb_id_raw = imdb_info.get("imdbID") or meta.imdb_id or ""
             imdb_id = str(imdb_id_raw).replace('tt', '') if imdb_id_raw else ''
-            tmdb_id = str(meta.get('tmdb_id') or '')
-            tvdb_id = str(meta.get('tvdb_id') or '')
+            tmdb_id = str(meta.tmdb_id or "")
+            tvdb_id = str(meta.tvdb_id or "")
 
             # Cast and crew
-            cast_list = cast(list[dict[str, Any]], meta.get('cast') or [])
-            directors = cast(list[Any], meta.get('directors') or [])
-            studios = cast(list[Any], meta.get('studios') or [])
+            cast_list = cast(list[dict[str, Any]], meta.cast or [])
+            directors = cast(list[Any], meta.directors or [])
+            studios = cast(list[Any], meta.studios or [])
 
             # Build NFO XML content with proper structure
             nfo_content = '''<?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -197,27 +192,27 @@ class NfoLinkManager:
             nfo_content += '\n</movie>'
 
             # Save NFO file
-            movie_name = str(meta.get('title') or 'movie')
+            movie_name = str(meta.title or "movie")
             # Remove or replace invalid characters: < > : " | ? * \ /
             movie_name = re.sub(r'[<>:"|?*\\/]', '', movie_name)
-            meta['linking_failed'] = False
+            meta.linking_failed = False
             link_dir = await self.linking(meta, movie_name, year)
 
-            uuid = str(meta.get('uuid') or '')
-            filelist = cast(list[str], meta.get('filelist') or [])
-            if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.get('keep_folder'):
+            uuid = str(meta.uuid or "")
+            filelist = cast(list[str], meta.filelist or [])
+            if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.keep_folder:
                 # Single file - create symlink in the target folder
                 src_file = filelist[0]
                 filename = os.path.splitext(os.path.basename(src_file))[0]
             else:
                 filename = uuid
 
-            if meta['category'] == "TV" and link_dir is not None and not meta.get('linking_failed', False):
-                season_number = str(meta.get('season_int') or meta.get('season') or "1")
-                season_year = str(meta.get('search_year') or meta.get('year') or "")
-                tvdbid = str(meta.get('tvdb_id') or '')
-                tvmazeid = str(meta.get('tvmaze_id') or '')
-                plot = str(meta.get('overview') or '')
+            if meta.category == "TV" and link_dir is not None and not meta.linking_failed:
+                season_number = str(meta.season_int or meta.season or "1")
+                season_year = str(meta.search_year or meta.year or "")
+                tvdbid = str(meta.tvdb_id or "")
+                tvmazeid = str(meta.tvmaze_id or "")
+                plot = str(meta.overview or "")
                 outline = str(imdb_info.get('plot') or '')
 
                 season_folder = link_dir
@@ -227,17 +222,17 @@ class NfoLinkManager:
                     )
                 nfo_file_path = os.path.join(season_folder, "season.nfo")
 
-            elif link_dir is not None and not meta.get('linking_failed', False):
+            elif link_dir is not None and not meta.linking_failed:
                 nfo_file_path = os.path.join(link_dir, f"{filename}.nfo")
             else:
-                if meta.get('linking_failed', False):
+                if meta.linking_failed:
                     console.print("[red]Linking failed, saving NFO in data/nfos[/red]")
-                nfo_dir = os.path.join(f"{meta['base_dir']}/data/nfos/{meta['uuid']}/")
+                nfo_dir = os.path.join(f"{meta.base_dir}/data/nfos/{meta.uuid}/")
                 os.makedirs(nfo_dir, exist_ok=True)
                 nfo_file_path = os.path.join(nfo_dir, f"{filename}.nfo")
             await asyncio.to_thread(Path(nfo_file_path).write_text, nfo_content, encoding="utf-8")
 
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[green]Emby NFO created at {nfo_file_path}")
 
             return nfo_file_path
@@ -247,57 +242,53 @@ class NfoLinkManager:
             return None
 
     async def linking(self, meta: Meta, movie_name: str, year: str) -> Optional[str]:
-        if meta['category'] == "MOVIE":
-            if not meta['is_disc']:
+        if meta.category == "MOVIE":
+            if not meta.is_disc:
                 folder_name = f"{movie_name} ({year})"
-            elif meta['is_disc'] == "BDMV":
+            elif meta.is_disc == "BDMV":
                 folder_name = f"{movie_name} ({year}) - Disc"
             else:
-                folder_name = f"{movie_name} ({year}) - {meta['is_disc']}"
+                folder_name = f"{movie_name} ({year}) - {meta.is_disc}"
         else:
-            if not meta.get('search_year'):
-                if not meta['is_disc']:
+            if not meta.search_year:
+                if not meta.is_disc:
                     folder_name = f"{movie_name}"
-                elif meta['is_disc'] == "BDMV":
+                elif meta.is_disc == "BDMV":
                     folder_name = f"{movie_name} - Disc"
                 else:
-                    folder_name = f"{movie_name} - {meta['is_disc']}"
+                    folder_name = f"{movie_name} - {meta.is_disc}"
             else:
-                if not meta['is_disc']:
-                    folder_name = f"{movie_name} ({meta['search_year']})"
-                elif meta['is_disc'] == "BDMV":
-                    folder_name = f"{movie_name} ({meta['search_year']}) - Disc"
+                if not meta.is_disc:
+                    folder_name = f"{movie_name} ({meta.search_year})"
+                elif meta.is_disc == "BDMV":
+                    folder_name = f"{movie_name} ({meta.search_year}) - Disc"
                 else:
-                    folder_name = f"{movie_name} ({meta['search_year']}) - {meta['is_disc']}"
+                    folder_name = f"{movie_name} ({meta.search_year}) - {meta.is_disc}"
 
-        target_base = (
-            self.default_config.get('emby_tv_dir')
-            if meta['category'] == "TV"
-            else self.default_config.get('emby_dir')
-        )
+        target_base = self.default_config.get("emby_tv_dir") if meta.category == "TV" else self.default_config.get("emby_dir")
         if target_base is not None:
-            if meta['category'] == "MOVIE":
+            if meta.category == "MOVIE":
                 target_dir = os.path.join(target_base, folder_name)
             else:
-                if meta.get('season') == 'S00':
+                if meta.season == "S00":
                     season = "Specials"
                 else:
-                    season_value = meta.get('season_int')
+                    season_value = meta.season_int
                     season_int = str(season_value).zfill(2) if season_value is not None else "01"
                     season = f"Season {season_int}"
                 target_dir = os.path.join(target_base, folder_name, season)
 
             os.makedirs(target_dir, exist_ok=True)
             # Get source path and files
-            path = cast(Optional[str], meta.get('path'))
-            filelist = cast(list[str], meta.get('filelist') or [])
+            path = cast(Optional[str], meta.path)
+            filelist = cast(list[str], meta.filelist or [])
 
             if not path:
                 console.print("[red]No path found in meta.")
                 return None
 
             # Handle single file vs folder content
-            if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.get('keep_folder'):
+            if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.keep_folder:
                 # Single file - create symlink in the target folder
                 src_file = filelist[0]
                 filename = os.path.basename(src_file)
@@ -313,11 +304,11 @@ class NfoLinkManager:
                         stderr=subprocess.DEVNULL,
                     )
 
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[green]Created symlink: {target_file}")
 
                 except subprocess.CalledProcessError:
-                    meta['linking_failed'] = True
+                    meta.linking_failed = True
 
             else:
                 # Folder content - symlink all files from the source folder
@@ -345,11 +336,11 @@ class NfoLinkManager:
                                 stderr=subprocess.DEVNULL,
                             )
 
-                            if meta.get('debug'):
+                            if meta.debug:
                                 console.print(f"[green]Created symlink: {file}")
 
                         except subprocess.CalledProcessError:
-                            meta['linking_failed'] = True
+                            meta.linking_failed = True
 
             console.print(f"[green]Movie folder created: {target_dir}")
             return target_dir

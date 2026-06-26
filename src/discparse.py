@@ -19,6 +19,7 @@ from pymediainfo import MediaInfo
 from bin.get_playlist import MplsParser
 from src.console import console
 from src.exportmi import setup_mediainfo_library
+from src.meta import Meta
 
 PlaylistItem = dict[str, Any]
 PlaylistInfo = dict[str, Any]
@@ -92,7 +93,7 @@ class DiscParse:
 
     async def get_bdinfo(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         discs: list[dict[str, Any]],
         folder_id: str,
         base_dir: str,
@@ -103,7 +104,7 @@ class DiscParse:
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
 
-        if meta.get('emby', False):
+        if meta.emby:
             return discs, meta_discs
 
         for i in range(len(discs)):
@@ -124,7 +125,7 @@ class DiscParse:
                     console.print(f"[bold red]PLAYLIST directory not found for disc {path}")
                     continue
 
-                if meta.get('debug'):
+                if meta.debug:
                     console.print(f"[cyan]Parsing playlists from: {playlists_path}")
 
                 def _load_mpls(mpls_path: str) -> tuple[Any, Any]:
@@ -142,7 +143,7 @@ class DiscParse:
                         continue
 
                     mpls_path = os.path.join(playlists_path, file_name)
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[cyan]Processing playlist: {file_name}")
 
                     try:
@@ -155,11 +156,11 @@ class DiscParse:
 
                         play_items = getattr(playlist_data, "play_items", None)
                         if not play_items:
-                            if meta.get('debug'):
+                            if meta.debug:
                                 console.print(f"[yellow]  No play_items found in {file_name}")
                             continue
 
-                        if meta.get('debug'):
+                        if meta.debug:
                             console.print(f"[cyan]  Found {len(play_items)} play items in {file_name}")
 
                         for item in play_items:
@@ -181,13 +182,13 @@ class DiscParse:
                                     file_counts[m2ts_file] += 1
                                     file_sizes[m2ts_file] = size
                                     total_play_items += 1
-                                elif meta.get('debug'):
+                                elif meta.debug:
                                     console.print(f"[yellow]    Missing m2ts file: {clip_name}.m2ts")
                             except AttributeError as e:
                                 console.print(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
 
                         if not file_sizes:
-                            if meta.get('debug'):
+                            if meta.debug:
                                 console.print(f"[yellow]  No m2ts files found for {file_name}")
                             continue
 
@@ -201,7 +202,7 @@ class DiscParse:
                             "total_play_items": total_play_items,
                         })
 
-                        if meta.get('debug'):
+                        if meta.debug:
                             duplicates = [f for f, c in file_counts.items() if c > 1]
                             if duplicates:
                                 console.print(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(file_sizes)} unique files ({len(duplicates)} files repeated), {total_size // (1024 * 1024)} MB total")
@@ -218,7 +219,7 @@ class DiscParse:
                 scored_playlists.sort(key=lambda x: x[1], reverse=True)
                 top_playlists = [p for p, _score in scored_playlists[:5]]
 
-                if use_largest or (meta['unattended'] and not meta.get('unattended_confirm', False)):
+                if use_largest or (meta.unattended and not meta.unattended_confirm):
                     best_playlist, best_score = scored_playlists[0]
                     console.print(f"[yellow]Auto-selecting best playlist using weighted scoring: {best_playlist['file']} ({best_score:.2f})")
                     selected_playlists = [best_playlist]
@@ -361,7 +362,7 @@ class DiscParse:
                                 current_label = bdinfo.get('label', f"Playlist {idx}")
                                 console.print(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
 
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                     console.print("[bold green]You can create a custom Edition for this playlist.")
                                     user_input_raw = cli_ui.ask_string(f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): ")
                                     user_input = (user_input_raw or "").strip()
@@ -377,7 +378,7 @@ class DiscParse:
                                 discs[i]['summary'] = bd_summary_cleaned
                                 discs[i]['bdinfo'] = bdinfo
                                 discs[i]['playlists'] = selected_playlists
-                                if valid_playlists and meta['unattended'] and not meta.get('unattended_confirm', False):
+                                if valid_playlists and meta.unattended and not meta.unattended_confirm:
                                     simplified_playlists: list[dict[str, Any]] = [{"file": p["file"], "duration": p["duration"]} for p in valid_playlists]
                                     duration_map: dict[int, dict[str, Any]] = {}
 
@@ -396,7 +397,7 @@ class DiscParse:
                                     simplified_playlists.sort(key=lambda x: float(x["duration"]), reverse=True)
                                     discs[i]['all_valid_playlists'] = simplified_playlists
 
-                                    if meta['debug']:
+                                    if meta.debug:
                                         console.print(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
                             else:
                                 discs[i][f'summary_{idx}'] = bd_summary_cleaned
@@ -700,7 +701,7 @@ class DiscParse:
             each['size'] = dvd_size
         return discs
 
-    async def get_hddvd_info(self, discs: list[dict[str, Any]], meta: dict[str, Any]):
+    async def get_hddvd_info(self, discs: list[dict[str, Any]], meta: Meta):
         use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
         for each in discs:
             path = each.get('path')
@@ -710,9 +711,9 @@ class DiscParse:
 
             try:
                 # Define the playlist path
-                playlist_path = os.path.join(meta['path'], "ADV_OBJ")
+                playlist_path = os.path.join(meta.path, "ADV_OBJ")
                 xpl_files = glob(f"{playlist_path}/*.xpl")
-                if meta['debug']:
+                if meta.debug:
                     console.print(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
@@ -751,7 +752,7 @@ class DiscParse:
                             key=lambda p: p["totalSize"]
                         )
                     ]
-                elif meta['unattended'] and not meta.get('unattended_confirm', False):
+                elif meta.unattended and not meta.unattended_confirm:
                     console.print("[yellow]Unattended mode: Auto-selecting the largest playlist.")
                     selected_playlists = [
                         max(
@@ -951,7 +952,7 @@ class DiscParse:
                     each['largest_evo'] = selected_evo_path
 
                 # Save playlist information in meta under HDDVD_PLAYLIST
-                meta["HDDVD_PLAYLIST"] = selected_playlist
+                meta.HDDVD_PLAYLIST = selected_playlist
 
             except (FileNotFoundError, ValueError, ET.ParseError) as e:
                 console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")

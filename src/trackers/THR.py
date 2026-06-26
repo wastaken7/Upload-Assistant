@@ -17,9 +17,9 @@ from unidecode import unidecode
 
 from src.bbcode import BBCODE
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -40,11 +40,11 @@ class THR:
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         await self.edit_desc(meta)
-        thr_name = unidecode(str(meta.get('name', '')).replace('DD+', 'DDP'))
+        thr_name = unidecode(str(meta.name).replace("DD+", "DDP"))
 
         # Confirm the correct naming order for THR
         cli_ui.info(f"THR name: {thr_name}")
-        if not bool(meta.get('unattended', False)):
+        if not bool(meta.unattended):
             thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
             if thr_confirm is not True:
                 thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="") or ""
@@ -58,22 +58,22 @@ class THR:
 
         mi_file: bytes = b""
 
-        if str(meta.get('is_disc', '')) == 'BDMV':
+        if str(meta.is_disc) == "BDMV":
             mi_file = b""
-            # bd_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", 'r', encoding='utf-8'
+            # bd_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", 'r', encoding='utf-8'
         else:
-            mi_file_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt")
+            mi_file_path = os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt")
             async with aiofiles.open(mi_file_path, 'rb') as f:
                 mi_file = await f.read()
             # bd_file = None
 
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt",
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/[THR]DESCRIPTION.txt",
+            encoding="utf-8",
         ) as f:
             desc = await f.read()
 
-        torrent_path = os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR].torrent")
+        torrent_path = os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/[THR].torrent")
         async with aiofiles.open(torrent_path, 'rb') as f:
             tfile = await f.read()
 
@@ -82,22 +82,24 @@ class THR:
         files: dict[str, tuple[str, Any]] = {
             'tfile': (f'{torrent_name}.torrent', tfile)
         }
-        imdb_info = cast(dict[str, Any], meta.get('imdb_info', {}))
+        imdb_info = cast(dict[str, Any], meta.imdb_info)
         payload: dict[str, Any] = {
-            'name': thr_name,
-            'descr': desc,
-            'type': cat_id,
-            'url': f"{imdb_info.get('imdb_url', '')}/",
-            'tube': str(meta.get('youtube', '')),
+            "name": thr_name,
+            "descr": desc,
+            "type": cat_id,
+            "url": f"{imdb_info.get('imdb_url', '')}/",
+            "tube": str(meta.youtube),
         }
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"}
+        headers = {
+            "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
+        }
         # If pronfo fails, put mediainfo into THR parser
-        if str(meta.get('is_disc', '')) != 'BDMV':
+        if str(meta.is_disc) != "BDMV":
             files['nfo'] = ("MEDIAINFO.txt", mi_file)
         if subs:
             payload['subs[]'] = tuple(subs)
 
-        thr_upload_prompt = True if not bool(meta.get('debug')) else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
+        thr_upload_prompt = True if not bool(meta.debug) else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
 
         if thr_upload_prompt is True:
             await asyncio.sleep(0.5)
@@ -111,13 +113,13 @@ class THR:
                     async with httpx.AsyncClient(cookies=cookies, follow_redirects=True) as session:
                         response = await session.post(url=url, files=files, data=payload, headers=headers)
 
-                        if meta.get('debug'):
+                        if meta.debug:
                             console.print(f"[dim]Response status: {response.status_code}")
                             console.print(f"[dim]Response URL: {response.url}")
                             console.print(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
-                            tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+                            tracker_status = cast(dict[str, Any], meta.tracker_status)
                             tracker_status.setdefault(self.tracker, {})
                             tracker_status[self.tracker]['status_message'] = response.url
                             return True
@@ -141,7 +143,7 @@ class THR:
             except Exception as e:
                 console.print(f"[red]Error during upload: {str(e)}")
                 console.print_exception()
-                if meta.get('debug') and response is not None:
+                if meta.debug and response is not None:
                     with contextlib.suppress(Exception):
                         console.print(f"[red]Response: {response.text[:500]}...")
                 console.print("[yellow]It may have uploaded, please check THR manually")
@@ -149,18 +151,18 @@ class THR:
         else:
             console.print("[cyan]THR Request Data:")
             console.print(payload)
-            tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+            tracker_status = cast(dict[str, Any], meta.tracker_status)
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return False
 
     async def get_cat_id(self, meta: Meta) -> str:
-        genres = str(meta.get('genres', '')).lower()
-        keywords = str(meta.get('keywords', '')).lower()
-        category = str(meta.get('category', ''))
-        is_disc = str(meta.get('is_disc', ''))
-        sd = int(meta.get('sd', 0) or 0)
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
+        category = str(meta.category)
+        is_disc = str(meta.is_disc)
+        sd = int(meta.sd or 0)
         cat = '17'
 
         if 'documentary' in genres or 'documentary' in keywords:
@@ -174,15 +176,15 @@ class THR:
                 cat = '4' if sd == 1 else '17'
         elif category == "TV":
             cat = '7' if sd == 1 else '34'
-        elif bool(meta.get('anime')):
+        elif bool(meta.anime):
             cat = '31'
         return cat
 
     def get_subtitles(self, meta: Meta) -> list[int]:
         subs: list[int] = []
         sub_langs: list[str] = []
-        if str(meta.get('is_disc', '')) != 'BDMV':
-            with open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json", encoding='utf-8') as f:
+        if str(meta.is_disc) != "BDMV":
+            with open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
                 mi = cast(dict[str, Any], json.load(f))
             tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get('media', {})).get('track', []))
             for track in tracks:
@@ -192,7 +194,7 @@ class THR:
                     if language in ['hr', 'en', 'bs', 'sr', 'sl'] and language not in sub_langs:
                         sub_langs.append(str(language))
         else:
-            bdinfo = cast(dict[str, Any], meta.get('bdinfo', {}))
+            bdinfo = cast(dict[str, Any], meta.bdinfo)
             for sub in cast(list[Any], bdinfo.get('subtitles', [])):
                 if sub not in sub_langs:
                     sub_langs.append(str(sub))
@@ -212,34 +214,34 @@ class THR:
         pronfo = False
         bbcode = BBCODE()
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt",
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+            encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
 
         desc_parts: list[str] = []
-        tag_value = str(meta.get('tag', ''))
+        tag_value = str(meta.tag)
         tag = "" if tag_value == "" else f" / {tag_value[1:]}"
-        res = str(meta.get('source', '')) if str(meta.get('is_disc', '')) == "DVD" else str(meta.get('resolution', ''))
+        res = str(meta.source) if str(meta.is_disc) == "DVD" else str(meta.resolution)
         desc_parts.append("[quote=Info]")
-        name_aka = f"{meta.get('title', '')} {meta.get('aka', '')} {meta.get('year', '')}"
+        name_aka = f"{meta.title} {meta.aka} {meta.year}"
         name_aka = unidecode(name_aka)
         # name_aka = re.sub("[^0-9a-zA-Z. '\-\[\]]+", " ", name_aka)
         desc_parts.append(f"Name: {' '.join(name_aka.split())}\n\n")
-        desc_parts.append(f"Overview: {meta.get('overview', '')}\n\n")
-        desc_parts.append(f"{res} / {meta.get('type', '')}{tag}\n\n")
-        category = str(meta.get('category', ''))
+        desc_parts.append(f"Overview: {meta.overview}\n\n")
+        desc_parts.append(f"{res} / {meta.type}{tag}\n\n")
+        category = str(meta.category)
         desc_parts.append(f"Category: {category}\n")
-        desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.get('tmdb', '')}\n")
-        if int(meta.get('imdb_id', 0) or 0) != 0:
-            imdb_info = cast(dict[str, Any], meta.get('imdb_info', {}))
+        desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
+        if int(meta.imdb_id or 0) != 0:
+            imdb_info = cast(dict[str, Any], meta.imdb_info)
             desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")
-        if int(meta.get('tvdb_id', 0) or 0) != 0:
-            desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.get('tvdb_id', '')}&tab=series\n")
-        if int(meta.get('tvmaze_id', 0) or 0) != 0:
-            desc_parts.append(f"TVMaze: https://www.tvmaze.com/shows/{meta.get('tvmaze_id', '')}\n")
-        if int(meta.get('mal_id', 0) or 0) != 0:
-            desc_parts.append(f"MAL: https://myanimelist.net/anime/{meta.get('mal_id', '')}\n")
+        if int(meta.tvdb_id or 0) != 0:
+            desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
+        if int(meta.tvmaze_id or 0) != 0:
+            desc_parts.append(f"TVMaze: https://www.tvmaze.com/shows/{meta.tvmaze_id}\n")
+        if int(meta.mal_id or 0) != 0:
+            desc_parts.append(f"MAL: https://myanimelist.net/anime/{meta.mal_id}\n")
         desc_parts.append("[/quote]")
 
         image_glob: list[str] = []
@@ -257,7 +259,7 @@ class THR:
             desc_parts.append("\n\n" + base)
 
         # REHOST IMAGES
-        tmp_dir = os.path.join(str(meta['base_dir']), 'tmp', str(meta['uuid']))
+        tmp_dir = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
         image_patterns: list[str] = ["*.png", ".[!.]*.png"]
         for pattern in image_patterns:
             image_glob.extend(glob.glob(os.path.join(tmp_dir, pattern)))
@@ -325,15 +327,13 @@ class THR:
             await asyncio.sleep(1)
 
         desc_parts.append("[align=center]")
-        if str(meta.get('is_disc', '')) == 'BDMV':
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt") as bd_file:
+        if str(meta.is_disc) == "BDMV":
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
         elif self.config['TRACKERS']['THR'].get('pronfo_api_key'):
             # ProNFO
             pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['THR'].get('pronfo_api_key', '')}"
-            async with aiofiles.open(
-                f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-            ) as mi_file:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt") as mi_file:
                 data = {
                     'content': await mi_file.read(),
                     'theme': self.config['TRACKERS']['THR'].get('pronfo_theme', 'gray'),
@@ -349,28 +349,28 @@ class THR:
                     pronfo = True
             except Exception:
                 console.print('[bold red]Error parsing pronfo response, using THR parser instead')
-                if meta['debug']:
+                if meta.debug:
                     console.print(f"[red]{response}")
                     console.print(response.text)
 
-        screens = int(meta.get('screens', 0) or 0)
+        screens = int(meta.screens or 0)
         desc_parts.extend([f"\n[img]{each}[/img]\n" for each in image_list[:screens]])
             # if pronfo:
-            #     with open(os.path.abspath(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"), 'r') as mi_file:
+        #     with open(os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"), 'r') as mi_file:
             #         full_mi = mi_file.read()
             #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
             #         mi_file.close()
-        desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta['ua_signature']}[/url][/size][/align]")
+        desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[THR]DESCRIPTION.txt",
-            'w',
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/[THR]DESCRIPTION.txt",
+            "w",
+            encoding="utf-8",
         ) as desc:
             await desc.write("".join(desc_parts))
         return pronfo
 
     async def search_existing(self, meta: Meta) -> list[str]:
-        imdb_id = str(meta.get('imdb', ''))
+        imdb_id = str(meta.imdb)
         base_search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes: list[str] = []
 
@@ -401,7 +401,7 @@ class THR:
                         page_url += f"&page={current_page}"
 
                     page_count += 1
-                    if meta.get('debug', False):
+                    if meta.debug:
                         console.print(f"[dim]Searching page {page_count}...")
                     response = await client.get(page_url)
 
@@ -413,7 +413,7 @@ class THR:
                             dupes.append(dupe)
                             all_titles_seen.add(dupe)
 
-                    if meta.get('debug', False) and has_next_page:
+                    if meta.debug and has_next_page:
                         console.print(f"[dim]Next page available: page {next_page_number}")
 
                     if has_next_page:
@@ -445,12 +445,12 @@ class THR:
 
         if response.status_code == 200 or response.status_code == 302:
             html_length = len(response.text)
-            if meta.get('debug', False):
+            if meta.debug:
                 console.print(f"[dim]Response HTML length: {html_length} bytes")
 
             if html_length < 1000:
                 console.print(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
-                if meta.get('debug', False):
+                if meta.debug:
                     console.print(f"[yellow]Response content: {response.text[:500]}")
                 return page_dupes, False, current_page
 
@@ -480,18 +480,18 @@ class THR:
                             dupe = dupe.replace("return overlibImage('", "")
                             page_dupes.append(dupe)
                         except Exception as parsing_error:
-                            if meta.get('debug', False):
+                            if meta.debug:
                                 console.print(f"[yellow]Error parsing link: {parsing_error}")
 
             page_number_display = current_page + 1
-            if meta.get('debug', False):
+            if meta.debug:
                 console.print(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
 
             pagination_text = None
             for p_tag in soup.find_all('p', align="center"):
                 if p_tag.text and ('Prev' in p_tag.text or 'Next' in p_tag.text):
                     pagination_text = p_tag
-                    if meta.get('debug', False):
+                    if meta.debug:
                         console.print(f"[dim]Found pagination: {pagination_text.text.strip()}")
                     break
 
@@ -505,18 +505,18 @@ class THR:
                         if href_raw:
                             href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else str(href_raw)
 
-                        if meta.get('debug', False):
+                        if meta.debug:
                             console.print(f"[dim]Next page URL: {href}")
 
                         page_match = re.search(r'page=(\d+)', href)
                         if page_match:
                             next_page_number = int(page_match.group(1))
-                            if meta.get('debug', False):
+                            if meta.debug:
                                 console.print(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
                             break
         else:
             console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
-            if meta.get('debug', False):
+            if meta.debug:
                 console.print(f"[red]Response: {response.text[:500]}...")
 
         return page_dupes, has_next_page, next_page_number
@@ -535,7 +535,7 @@ class THR:
             'ssl': 'yes'
         }
         headers = {
-            "User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
+            "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
             "Referer": "https://www.torrenthr.org/login.php",
         }
 

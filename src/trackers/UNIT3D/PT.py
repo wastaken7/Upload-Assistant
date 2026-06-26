@@ -4,10 +4,10 @@ import re
 from typing import Any, Optional, cast
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -34,14 +34,7 @@ class PT(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'WEBDL': '4',
-            'WEBRIP': '39',
-            'HDTV': '6',
-            'ENCODE': '3'
-        }.get(str(meta.get('type', '')), '0')
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "39", "HDTV": "6", "ENCODE": "3"}.get(str(meta.type), "0")
         return {'type_id': type_id}
 
     async def get_resolution_id(
@@ -53,25 +46,25 @@ class PT(UNIT3D):
     ) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '13',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '540p': '11',
-            '480p': '8',
-            '480i': '9'
-        }.get(str(meta.get('resolution', '')), '10')
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "13",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "540p": "11",
+            "480p": "8",
+            "480i": "9",
+        }.get(str(meta.resolution), "10")
         return {'resolution_id': resolution_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = str(meta.get('name', '')).replace(' ', '.')
+        name = str(meta.name).replace(" ", ".")
 
         pt_name = name
-        tag_value = str(meta.get('tag', ''))
+        tag_value = str(meta.tag)
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -85,8 +78,8 @@ class PT(UNIT3D):
     def get_audio(self, meta: Meta) -> int:
         found_portuguese_audio = False
 
-        if meta.get('is_disc') == "BDMV":
-            bdinfo = cast(dict[str, Any], meta.get('bdinfo', {}))
+        if meta.is_disc == "BDMV":
+            bdinfo = cast(dict[str, Any], meta.bdinfo)
             audio_tracks = cast(list[dict[str, Any]], bdinfo.get("audio", []))
             if audio_tracks:
                 for track in audio_tracks:
@@ -95,11 +88,11 @@ class PT(UNIT3D):
                         found_portuguese_audio = True
                         break
 
-        needs_mediainfo_check = (meta.get('is_disc') != "BDMV") or (meta.get('is_disc') == "BDMV" and not found_portuguese_audio)
+        needs_mediainfo_check = (meta.is_disc != "BDMV") or (meta.is_disc == "BDMV" and not found_portuguese_audio)
 
         if needs_mediainfo_check:
-            base_dir = str(meta.get('base_dir', '.'))
-            uuid = str(meta.get('uuid', 'default_uuid'))
+            base_dir = str(meta.base_dir if meta.base_dir is not None else ".")
+            uuid = str(meta.uuid if meta.uuid is not None else "default_uuid")
             media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
 
             try:
@@ -132,8 +125,8 @@ class PT(UNIT3D):
     def get_subtitles(self, meta: Meta) -> int:
         found_portuguese_subtitle = False
 
-        if meta.get('is_disc') == "BDMV":
-            bdinfo = cast(dict[str, Any], meta.get('bdinfo', {}))
+        if meta.is_disc == "BDMV":
+            bdinfo = cast(dict[str, Any], meta.bdinfo)
             subtitle_tracks = cast(list[Any], bdinfo.get("subtitles", []))
             if subtitle_tracks:
                 found_portuguese_subtitle = False
@@ -142,11 +135,11 @@ class PT(UNIT3D):
                         found_portuguese_subtitle = True
                         break
 
-        needs_mediainfo_check = (meta.get('is_disc') != "BDMV") or (meta.get('is_disc') == "BDMV" and not found_portuguese_subtitle)
+        needs_mediainfo_check = (meta.is_disc != "BDMV") or (meta.is_disc == "BDMV" and not found_portuguese_subtitle)
 
         if needs_mediainfo_check:
-            base_dir = str(meta.get('base_dir', '.'))
-            uuid = str(meta.get('uuid', 'default_uuid'))
+            base_dir = str(meta.base_dir if meta.base_dir is not None else ".")
+            uuid = str(meta.uuid if meta.uuid is not None else "default_uuid")
             media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
 
             try:

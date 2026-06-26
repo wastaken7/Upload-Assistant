@@ -20,6 +20,7 @@ from src.args import Args
 from src.cleanup import cleanup_manager
 from src.console import console
 from src.imdb import imdb_manager
+from src.meta import Meta
 
 default_config: dict[str, Any] = {}
 tmdb_api_key: Optional[str] = None
@@ -163,7 +164,7 @@ class TmdbManager:
     async def get_anime(
         self,
         response: dict[str, Any],
-        meta: dict[str, Any],
+        meta: Meta,
     ) -> tuple[int, str, bool, str]:
         return await get_anime(response=response, meta=meta)
 
@@ -171,20 +172,20 @@ class TmdbManager:
         self,
         tmdb_name: str,
         mal: Optional[int],
-        meta: dict[str, Any],
+        meta: Meta,
     ) -> tuple[str, int, str, str, int, str]:
         return await get_romaji(tmdb_name=tmdb_name, mal=mal, meta=meta)
 
     async def get_tmdb_imdb_from_mediainfo(
         self,
         mediainfo: dict[str, Any],
-        meta: dict[str, Any],
+        meta: Meta,
     ) -> tuple[str, int, Optional[int], Optional[int]]:
-        category_value = str(meta.get('category') or 'MOVIE')
-        is_disc = bool(meta.get('is_disc'))
-        tmdbid = int(meta.get('tmdb_id') or 0)
-        imdbid = typing_cast(Optional[int], meta.get('imdb_id'))
-        tvdbid = typing_cast(Optional[int], meta.get('tvdb_id'))
+        category_value = str(meta.category or "MOVIE")
+        is_disc = bool(meta.is_disc)
+        tmdbid = int(meta.tmdb_id or 0)
+        imdbid = typing_cast(Optional[int], meta.imdb_id)
+        tvdbid = typing_cast(Optional[int], meta.tvdb_id)
         return await get_tmdb_imdb_from_mediainfo(
             mediainfo=mediainfo,
             category=category_value,
@@ -261,12 +262,12 @@ class TmdbManager:
             debug=debug,
         )
 
-    async def set_tmdb_metadata(self, meta: dict[str, Any], filename: Optional[str] = None) -> None:
+    async def set_tmdb_metadata(self, meta: Meta, filename: Optional[str] = None) -> None:
         return await set_tmdb_metadata(meta=meta, filename=filename)
 
     async def get_tmdb_localized_data(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         data_type: str,
         language: str,
         append_to_response: str,
@@ -1435,9 +1436,9 @@ async def get_directors(tmdb_id: int, category: str) -> list[str]:
             return []
 
 
-async def get_anime(response: dict[str, Any], meta: dict[str, Any]) -> tuple[int, str, bool, str]:
-    tmdb_name = meta['title']
-    alt_name = "" if meta.get('aka', "") == "" else meta['aka']
+async def get_anime(response: dict[str, Any], meta: Meta) -> tuple[int, str, bool, str]:
+    tmdb_name = meta.title
+    alt_name = "" if meta.aka == "" else meta.aka
     anime = False
     animation = False
     demographic = ''
@@ -1447,7 +1448,7 @@ async def get_anime(response: dict[str, Any], meta: dict[str, Any]) -> tuple[int
     if response['original_language'] == 'ja' and animation is True:
         romaji, mal_id, _eng_title, _season_year, _episodes, demographic = await get_romaji(
             tmdb_name,
-            meta.get('mal_id'),
+            meta.mal_id,
             meta,
         )
         alt_name = f"AKA {romaji}"
@@ -1457,17 +1458,17 @@ async def get_anime(response: dict[str, Any], meta: dict[str, Any]) -> tuple[int
         # mal_id = mal.results[0].mal_id
     else:
         mal_id = 0
-    if meta.get('mal_id', 0) != 0:
-        mal_id = int(meta.get('mal_id', 0) or 0)
+    if meta.mal_id != 0:
+        mal_id = int(meta.mal_id or 0)
     return mal_id, alt_name, anime, demographic
 
 
-async def get_romaji(tmdb_name: str, mal: Optional[int], meta: dict[str, Any]) -> tuple[str, int, str, str, int, str]:
+async def get_romaji(tmdb_name: str, mal: Optional[int], meta: Meta) -> tuple[str, int, str, str, int, str]:
     media: list[dict[str, Any]] = []
     demographic = 'Mina'  # Default to Mina if no tags are found
 
-    # Try AniList query with tmdb_name first, then fallback to meta['filename'] if no results
-    for search_term in [tmdb_name, meta.get('filename', '')]:
+    # Try AniList query with tmdb_name first, then fallback to meta.filename if no results
+    for search_term in [tmdb_name, meta.filename]:
         if not search_term:
             continue
         if mal is None or mal == 0:
@@ -1557,29 +1558,29 @@ async def get_romaji(tmdb_name: str, mal: Optional[int], meta: dict[str, Any]) -
                 break
         if media not in (None, []):
             break  # Found results, stop search_term loop
-    search_name = meta['filename'].lower() if "subsplease" in meta.get('filename', '').lower() else re.sub(r"[^0-9a-zA-Z\[\\]]+", "", tmdb_name.lower().replace(' ', ''))
+    search_name = meta.filename.lower() if "subsplease" in meta.filename.lower() else re.sub(r"[^0-9a-zA-Z\[\\]]+", "", tmdb_name.lower().replace(" ", ""))
 
     # Extract expected season number from various sources
     expected_season = None
 
     # Try manual_season first
-    if meta.get('manual_season'):
-        season_match = re.search(r'S?(\d+)', str(meta['manual_season']), re.IGNORECASE)
+    if meta.manual_season:
+        season_match = re.search(r"S?(\d+)", str(meta.manual_season), re.IGNORECASE)
         if season_match:
             expected_season = int(season_match.group(1))
 
     # Try parsing the filename with anitopy
-    if expected_season is None and meta.get('filename'):
+    if expected_season is None and meta.filename:
         try:
-            parsed = typing_cast(dict[str, Any], anitopy_parse_fn(meta['filename']) or {})
+            parsed = typing_cast(dict[str, Any], anitopy_parse_fn(meta.filename) or {})
             if parsed.get('anime_season'):
                 expected_season = int(parsed['anime_season'])
         except Exception:
             pass
 
-    # Fall back to meta['season'] if available
-    if expected_season is None and meta.get('season'):
-        season_match = re.search(r'S?(\d+)', str(meta['season']), re.IGNORECASE)
+    # Fall back to meta.season if available
+    if expected_season is None and meta.season:
+        season_match = re.search(r"S?(\d+)", str(meta.season), re.IGNORECASE)
         if season_match:
             expected_season = int(season_match.group(1))
 
@@ -2024,12 +2025,12 @@ async def get_tmdb_translations(
             return ""
 
 
-async def set_tmdb_metadata(meta: dict[str, Any], filename: Optional[str] = None) -> None:
-    if not meta.get('edit', False):
+async def set_tmdb_metadata(meta: Meta, filename: Optional[str] = None) -> None:
+    if not meta.edit:
         # if we have these fields already, we probably got them from a multi id searching
         # and don't need to fetch them again
         essential_fields = ['title', 'year', 'genres', 'overview']
-        tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
+        tmdb_metadata_populated = all(getattr(meta, field, None) is not None for field in essential_fields)
     else:
         # if we're in that blasted edit mode, ignore any previous set data and get fresh
         tmdb_metadata_populated = False
@@ -2040,32 +2041,32 @@ async def set_tmdb_metadata(meta: dict[str, Any], filename: Optional[str] = None
         for attempt in range(1, max_attempts + 1):
             try:
                 tmdb_metadata = await tmdb_other_meta(
-                    tmdb_id=meta['tmdb_id'],
-                    path=meta.get('path'),
-                    search_year=meta.get('search_year'),
-                    category=meta.get('category'),
-                    imdb_id=meta.get('imdb_id', 0),
-                    manual_language=meta.get('manual_language'),
-                    anime=meta.get('anime', False),
-                    mal_manual=meta.get('mal_manual'),
-                    aka=meta.get('aka', ''),
-                    original_language=meta.get('original_language'),
-                    poster=meta.get('poster'),
-                    debug=meta.get('debug', False),
-                    mode=meta.get('mode', 'cli'),
-                    tvdb_id=meta.get('tvdb_id', 0),
-                    quickie_search=meta.get('quickie_search', False),
+                    tmdb_id=meta.tmdb_id,
+                    path=meta.path,
+                    search_year=meta.search_year,
+                    category=meta.category,
+                    imdb_id=meta.imdb_id,
+                    manual_language=meta.manual_language,
+                    anime=meta.anime,
+                    mal_manual=meta.mal_manual,
+                    aka=meta.aka,
+                    original_language=meta.original_language,
+                    poster=meta.poster,
+                    debug=meta.debug,
+                    mode=(meta.mode if meta.mode is not None else "cli"),
+                    tvdb_id=meta.tvdb_id,
+                    quickie_search=meta.quickie_search,
                     filename=filename,
                 )
 
                 if tmdb_metadata and all(tmdb_metadata.get(field) for field in ['title', 'year']):
                     meta.update(tmdb_metadata)
-                    if meta.get('retrieved_aka') is not None:
-                        meta['aka'] = meta['retrieved_aka']
+                    if meta.retrieved_aka is not None:
+                        meta.aka = meta.retrieved_aka
                     break
                 else:
-                    error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta['tmdb_id']}"
-                    if meta['debug']:
+                    error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta.tmdb_id}"
+                    if meta.debug:
                         console.print(f"[bold red]{error_msg}[/bold red]")
                     if attempt < max_attempts:
                         console.print(f"[yellow]Retrying TMDB metadata fetch in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_attempts})[/yellow]")
@@ -2073,34 +2074,34 @@ async def set_tmdb_metadata(meta: dict[str, Any], filename: Optional[str] = None
                     else:
                         raise ValueError(error_msg)
             except Exception as e:
-                error_msg = f"TMDB metadata retrieval failed for ID {meta['tmdb_id']}: {str(e)}"
-                if meta['debug']:
+                error_msg = f"TMDB metadata retrieval failed for ID {meta.tmdb_id}: {str(e)}"
+                if meta.debug:
                     console.print(f"[bold red]{error_msg}[/bold red]")
                 if attempt < max_attempts:
                     console.print(f"[yellow]Retrying TMDB metadata fetch in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_attempts})[/yellow]")
                     await asyncio.sleep(delay_seconds)
                 else:
-                    console.print(f"[red]Catastrophic error getting TMDB data using ID {meta['tmdb_id']}[/red]")
-                    console.print(f"[red]Check category is set correctly, UA was using {meta.get('category')}[/red]")
+                    console.print(f"[red]Catastrophic error getting TMDB data using ID {meta.tmdb_id}[/red]")
+                    console.print(f"[red]Check category is set correctly, UA was using {meta.category}[/red]")
                     raise RuntimeError(error_msg) from e
 
 
-async def get_tmdb_localized_data(meta: dict[str, Any], data_type: str, language: str, append_to_response: str) -> dict[str, Any]:
+async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, append_to_response: str) -> dict[str, Any]:
     tmdb_data: dict[str, Any] = {}
     endpoint = None
     if data_type == 'main':
-        endpoint = f'/{meta["category"].lower()}/{meta["tmdb"]}'
+        endpoint = f"/{meta.category.lower()}/{meta.tmdb}"
     elif data_type == 'season':
-        season = meta.get('season_int')
+        season = meta.season_int
         if season is None:
             return tmdb_data
-        endpoint = f'/tv/{meta["tmdb"]}/season/{season}'
+        endpoint = f"/tv/{meta.tmdb}/season/{season}"
     elif data_type == 'episode':
-        season = meta.get('season_int')
-        episode = meta.get('episode_int')
+        season = meta.season_int
+        episode = meta.episode_int
         if season is None or episode is None:
             return tmdb_data
-        endpoint = f'/tv/{meta["tmdb"]}/season/{season}/episode/{episode}'
+        endpoint = f"/tv/{meta.tmdb}/season/{season}/episode/{episode}"
 
     url = f'{TMDB_BASE_URL}{endpoint}'
     params = {
@@ -2110,7 +2111,7 @@ async def get_tmdb_localized_data(meta: dict[str, Any], data_type: str, language
     if append_to_response:
         params.update({'append_to_response': append_to_response})
 
-    if meta.get('debug', False):
+    if meta.debug:
         console.print(
             '[green]Requesting localized data from TMDB.\n'
             f"Type: '{data_type}'.\n"
@@ -2119,7 +2120,7 @@ async def get_tmdb_localized_data(meta: dict[str, Any], data_type: str, language
             f"Endpoint: '{endpoint}'[/green]\n"
         )
 
-    save_dir = f"{meta['base_dir']}/tmp/{meta['uuid']}/"
+    save_dir = f"{meta.base_dir}/tmp/{meta.uuid}/"
     filename = f"{save_dir}tmdb_localized_data.json"
 
     # Create a cache key for this specific request

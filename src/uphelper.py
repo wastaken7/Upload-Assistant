@@ -15,9 +15,9 @@ from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
 from src.console import console
+from src.meta import Meta
 from src.trackersetup import tracker_class_map
 
-Meta = dict[str, Any]
 DupeEntry = dict[str, Any]
 
 
@@ -133,7 +133,7 @@ class UploadHelper:
 
                 size_diff_str = ""
                 if self.default_config.get("show_dupe_size_diff", True):
-                    upload_size = meta.get("source_size")
+                    upload_size = meta.source_size
                     dupe_size_raw = entry.get("size")
                     dupe_size = parse_size_to_bytes(dupe_size_raw)
                     if upload_size and dupe_size:
@@ -167,9 +167,9 @@ class UploadHelper:
 
         dupes_list: list[Union[DupeEntry, str]] = dupes
         upload: bool = False
-        meta['were_trumping'] = False
+        meta.were_trumping = False
         if not dupes_list:
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False,  meta
         else:
@@ -191,11 +191,11 @@ class UploadHelper:
                     display_name = tracker_rename
 
             # Show naming change before dupe prompts so user knows what the final name will be
-            if display_name is not None and display_name != "" and display_name != meta.get('name', ''):
+            if display_name is not None and display_name != "" and display_name != meta.name:
                 console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
 
             trumpable_text = None
-            if meta.get('trumpable_id') or (meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', [])):
+            if meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", [])):
                 trumpable_dupes = [
                     entry
                     for entry in dupes_list
@@ -204,9 +204,9 @@ class UploadHelper:
                 if trumpable_dupes:
                     trumpable_text = _format_dupes_list(trumpable_dupes)
                     console.print("[bold red]Trumpable found![/bold red]")
-                elif meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []):
+                elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f'{tracker_name}_matched_episode_ids', []))
-                    user_tag = str(meta.get('tag', '')).lstrip('-').lower()  # Remove leading dash for comparison
+                    user_tag = str(meta.tag).lstrip("-").lower()  # Remove leading dash for comparison
 
                     # Try to find a release with matching tag
                     selected_match = None
@@ -228,34 +228,34 @@ class UploadHelper:
                     console.print("[bold red]Trumpable found based on episode matching![/bold red]")
 
                     if user_tag and not tag_matched:
-                        console.print(f"[yellow]Note: No release found with matching tag '{meta.get('tag')}'. Selected release may be from a different group.[/yellow]")
+                        console.print(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
 
-            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not meta.get('ask_dupe', False):
+            if (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe:
                 dupe_text = _format_dupes_list(dupes_list)
 
-                if trumpable_text and (meta.get('trumpable_id') or (meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []))):
+                if trumpable_text and (meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []))):
                     console.print(f"[bold cyan]{trumpable_text}[/bold cyan]")
                     console.print("[yellow]Please check the trumpable entries above to see if you want to upload[/yellow]")
                     console.print("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
-                    if meta.get('dupe', False) is False:
+                    if meta.dupe is False:
                         try:
                             upload = cli_ui.ask_yes_no("Are you trumping this release?", default=False)
                             if upload:
-                                meta['we_asked'] = True
-                                meta['were_trumping'] = True
+                                meta.we_asked = True
+                                meta.were_trumping = True
                                 if not meta.get(f'{tracker_name}_trumpable_id'):
                                     meta[f'{tracker_name}_trumpable_id'] = meta.get(f'{tracker_name}_matched_id', None)
-                                if meta.get('filename_match', False) and meta.get('file_count_match', False):
-                                    meta['trump_reason'] = 'exact_match'
+                                if meta.filename_match and meta.file_count_match:
+                                    meta.trump_reason = "exact_match"
                                 else:
-                                    meta['trump_reason'] = 'trumpable_release'
-                                if meta['debug']:
-                                    console.print(f"[bold green]Trump reason: {meta['trump_reason']} on {tracker_name}[/bold green]")
+                                    meta.trump_reason = "trumpable_release"
+                                if meta.debug:
+                                    console.print(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
                             else:
                                 # For season packs: individual episodes are only in dupes for trumping purposes.
                                 # If user declines to trump, filter them out so they aren't shown as "potential dupes"
                                 # (they wouldn't match season/episode anyway).
-                                if meta.get('tv_pack') and meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []):
+                                if meta.tv_pack and meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                                     matched_ids = {ep.get('id') for ep in meta.get(f'{tracker_name}_matched_episode_ids', []) if ep.get('id')}
                                     dupes_list = [
                                         d for d in dupes_list
@@ -269,22 +269,22 @@ class UploadHelper:
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
 
-                if not meta.get('were_trumping', False):
-                    if meta.get('filename_match', False) and meta.get('file_count_match', False):
-                        console.print(f'[bold red]Exact match found! - {meta["filename_match"]}[/bold red]')
+                if not meta.were_trumping:
+                    if meta.filename_match and meta.file_count_match:
+                        console.print(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]")
                         try:
                             if tracker_name in ["AITHER", "LST"]:
                                 console.print(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
                                 upload = cli_ui.ask_yes_no("Are you trumping this exact match?", default=False)
                                 if upload:
-                                    meta['we_asked'] = True
-                                    meta['were_trumping'] = True
-                                    meta['trump_reason'] = 'exact_match'
+                                    meta.we_asked = True
+                                    meta.were_trumping = True
+                                    meta.trump_reason = "exact_match"
                                     if not meta.get(f'{tracker_name}_trumpable_id'):
                                         meta[f'{tracker_name}_trumpable_id'] = meta.get(f'{tracker_name}_matched_id', None)
                             else:
                                 upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
-                                meta['we_asked'] = True
+                                meta.we_asked = True
                         except EOFError:
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
@@ -293,10 +293,10 @@ class UploadHelper:
                     elif dupes_list:
                         # Rebuild dupe_text in case dupes was filtered after trump decline
                         dupe_text = _format_dupes_list(dupes_list)
-                        if meta.get('season_pack_exists', False):
+                        if meta.season_pack_exists:
                             # Display only the matched season pack info from dupe_checking
-                            season_pack_name = meta.get('season_pack_name', '')
-                            season_pack_link = meta.get('season_pack_link')
+                            season_pack_name = meta.season_pack_name
+                            season_pack_link = meta.season_pack_link
                             if season_pack_link:
                                 if self.default_config.get("embed_dupe_links", False):
                                     season_pack_text = f"[link={season_pack_link}]{escape(season_pack_name)}[/link]"
@@ -312,12 +312,12 @@ class UploadHelper:
                             console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
                             console.print()
                             console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
-                        if meta.get('dupe', False) is False:
+                        if meta.dupe is False:
                             try:
-                                if meta.get('is_disc') == "BDMV":
+                                if meta.is_disc == "BDMV":
                                     self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
                                 upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
-                                meta['we_asked'] = True
+                                meta.we_asked = True
                             except EOFError:
                                 console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                 await cleanup_manager.cleanup()
@@ -330,19 +330,19 @@ class UploadHelper:
                         upload = True
 
             else:
-                upload = meta.get('dupe', False) is not False
+                upload = meta.dupe is not False
 
-            display_name = display_name if display_name is not None else str(meta.get('name', ''))
+            display_name = display_name if display_name is not None else str(meta.name)
             display_name = str(display_name)
 
             if tracker_name in ["BHD"]:
-                if meta['debug']:
+                if meta.debug:
                     console.print("[yellow]BHD cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 # Ensure display_name is a string before using 'in' operator
                 if display_name:
-                    edition = meta.get('edition', '')
-                    region = meta.get('region', '')
+                    edition = meta.edition
+                    region = meta.region
                     if edition and edition in display_name:
                         display_name = display_name.replace(f"{edition} ", "")
                     if region and region in display_name:
@@ -351,36 +351,36 @@ class UploadHelper:
                     if isinstance(d, dict):
                         entry_name = str(d.get('name', '')).lower()
                         similarity = SequenceMatcher(None, entry_name, display_name.lower().strip()).ratio()
-                        if similarity > 0.9 and meta.get('size_match', False) and tracker_download_link:
+                        if similarity > 0.9 and meta.size_match and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                            if meta['debug']:
+                            if meta.debug:
                                 console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
                             break
 
-            elif meta.get('filename_match', False) and meta.get('file_count_match', False):
-                if meta['debug']:
+            elif meta.filename_match and meta.file_count_match:
+                if meta.debug:
                     console.print(f"[yellow]{tracker_name} filename and file count cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict) and tracker_download_link:
                         meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
                         break
 
-            elif meta.get('size_match', False):
-                if meta['debug']:
+            elif meta.size_match:
+                if meta.debug:
                     console.print(f"[yellow]{tracker_name} size cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict):
                         entry_name = str(d.get('name', '')).lower()
                         similarity = SequenceMatcher(None, entry_name, display_name.lower().strip()).ratio()
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"[debug] Comparing sizes with similarity {similarity:.4f}")
                         if similarity > 0.9 and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                            if meta['debug']:
+                            if meta.debug:
                                 console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
                             break
 
@@ -389,8 +389,8 @@ class UploadHelper:
             else:
                 for each in dupes_list:
                     each_name = str(each.get('name')) if isinstance(each, dict) else str(each)
-                    if each_name == meta['name']:
-                        meta['name'] = f"{meta['name']} DUPE?"
+                    if each_name == meta.name:
+                        meta.name = f"{meta.name} DUPE?"
 
                 return False, meta
 
@@ -439,29 +439,29 @@ class UploadHelper:
         confirm: bool = False
         lines: list[Union[str, tuple[str, str]]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
-        if meta['debug'] is True:
+        if meta.debug is True:
             lines.append("[bold red]DEBUG: True - Will not actually upload![/bold red]")
-            lines.append(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
+            lines.append(f"Prep material saved to {meta.base_dir}/tmp/{meta.uuid}")
         lines.append("")
-        lines.append(("Title", f"{meta['title']} ({meta['year']})"))
-        lines.append(("Category", str(meta["category"])))
-        edition = meta.get("edition")
+        lines.append(("Title", f"{meta.title} ({meta.year})"))
+        lines.append(("Category", str(meta.category)))
+        edition = meta.edition
 
         # BOOK
-        if meta["category"] == "BOOK":
-            author = meta.get("author") or missing_warning
-            book_translator = meta.get("book_translator") or ""
-            publisher = meta.get("publisher") or ""  # not essential
-            book_language = meta.get("book_language") or missing_warning
-            isbn = meta.get("isbn") or ""  # not essential
-            asin = meta.get("asin") or ""  # not essential
-            narrator = meta.get("narrator") or missing_warning
-            audiobook_duration_formatted = meta.get("audiobook_duration_formatted") or missing_warning
-            poster = meta.get("poster") or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
-            comic = bool(meta.get("comic"))
-            manga = bool(meta.get("manga"))
-            magazine = bool(meta.get("magazine"))
-            newspaper = bool(meta.get("newspaper"))
+        if meta.category == "BOOK":
+            author = meta.author or missing_warning
+            book_translator = meta.book_translator or ""
+            publisher = meta.publisher or ""  # not essential
+            book_language = meta.book_language or missing_warning
+            isbn = meta.isbn or ""  # not essential
+            asin = meta.asin or ""  # not essential
+            narrator = meta.narrator or missing_warning
+            audiobook_duration_formatted = meta.audiobook_duration_formatted or missing_warning
+            poster = meta.poster or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
+            comic = bool(meta.comic)
+            manga = bool(meta.manga)
+            magazine = bool(meta.magazine)
+            newspaper = bool(meta.newspaper)
 
             def format_value(value: bool) -> str:
                 return "[green]True[/green]" if value else "[purple]False[/purple]"
@@ -477,29 +477,29 @@ class UploadHelper:
             lines.append(("Manga", format_value(manga)))
             lines.append(("Magazine", format_value(magazine)))
             lines.append(("Newspaper", format_value(newspaper)))
-            if meta.get("audiobook"):
+            if meta.audiobook:
                 lines.append(("Narrator", str(narrator)))
                 lines.append(("Duration", str(audiobook_duration_formatted)))
             lines.append(("Cover", str(poster)))
 
-        elif meta["category"] == "GAME":
-            notes = meta.get("description_link", "") or meta.get("description_file", "") or ""
+        elif meta.category == "GAME":
+            notes = meta.description_link or meta.description_file or ""
             if notes:
                 # don't leak links or file paths
                 notes = notes[:16] if notes.startswith("http") else f"./{os.path.basename(notes)}"
-            if meta.get("platform", "") == "PC":
+            if meta.platform == "PC":
                 notes = notes if notes else "[yellow][italic]Installation instructions missing. Use -df or -dp to add them.[/italic][/yellow]"
 
-            game_subcategory_str = {"full_game": "Full Game", "full_game_dlc": "Full Game + DLC", "dlc": "DLC", "update": "Update"}.get(meta["game_subcategory"], "Unknown")
-            game_subcategory = f"[italic]{meta['game_subcategory']}[/italic] ({game_subcategory_str})"
-            version = meta.get("game_version") or missing_warning
-            developer = meta.get("developer") or missing_warning
-            publisher = meta.get("publisher") or missing_warning
-            platform = meta.get("platform") or missing_warning
-            poster = meta.get("poster") or missing_warning
-            igdb_id = meta.get("igdb_id") or "0"
-            steam_url = meta.get("steam_url")
-            languages = len(meta.get("languages", [])) if meta.get("languages") else missing_warning
+            game_subcategory_str = {"full_game": "Full Game", "full_game_dlc": "Full Game + DLC", "dlc": "DLC", "update": "Update"}.get(meta.game_subcategory, "Unknown")
+            game_subcategory = f"[italic]{meta.game_subcategory}[/italic] ({game_subcategory_str})"
+            version = meta.game_version or missing_warning
+            developer = meta.developer or missing_warning
+            publisher = meta.publisher or missing_warning
+            platform = meta.platform or missing_warning
+            poster = meta.poster or missing_warning
+            igdb_id = meta.igdb_id or "0"
+            steam_url = meta.steam_url
+            languages = len(meta.languages) if meta.languages else missing_warning
 
             lines.append(("Subcategory", game_subcategory))
             lines.append(("Version", version))
@@ -522,48 +522,48 @@ class UploadHelper:
                     lang_summary = str(languages)
                 lines.append(("Languages", lang_summary))
 
-        if not meta.get('emby', False):
-            lines.append(("Overview", f"{meta['overview'][:60]}...."))
-            if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('auto_episode_title'):
-                lines.append(("Episode Title", str(meta["auto_episode_title"])))
-            if meta.get('category') == 'TV' and not meta.get('tv_pack') and meta.get('overview_meta'):
-                lines.append(("Episode overview", str(meta["overview_meta"])))
-            lines.append(("Genre", str(meta["genres"])))
-            if str(meta.get('demographic', '')) != '':
-                lines.append(("Demographic", str(meta["demographic"])))
-        if meta.get('emby_debug', False):
-            if int(meta.get('original_imdb', 0)) != 0:
-                imdb = str(meta.get('original_imdb', 0)).zfill(7)
+        if not meta.emby:
+            lines.append(("Overview", f"{meta.overview[:60]}...."))
+            if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
+                lines.append(("Episode Title", str(meta.auto_episode_title)))
+            if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
+                lines.append(("Episode overview", meta.overview_meta))
+            lines.append(("Genre", str(meta.genres)))
+            if meta.demographic != "":
+                lines.append(("Demographic", meta.demographic))
+        if meta.emby_debug:
+            if meta.original_imdb != 0:
+                imdb = str(meta.original_imdb).zfill(7)
                 lines.append(("IMDB", f"https://www.imdb.com/title/tt{imdb}"))
-            if int(meta.get('original_tmdb', 0)) != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['original_tmdb']}"))
-            if int(meta.get('original_tvdb', 0)) != 0:
-                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta['original_tvdb']}&tab=series"))
-            if int(meta.get('original_tvmaze', 0)) != 0:
-                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta['original_tvmaze']}"))
-            if int(meta.get('original_mal', 0)) != 0:
-                lines.append(("MAL", f"https://myanimelist.net/anime/{meta['original_mal']}"))
+            if meta.original_tmdb != 0:
+                lines.append(("TMDB", f"https://www.themoviedb.org/{meta.category.lower()}/{meta.original_tmdb}"))
+            if meta.original_tvdb != 0:
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.original_tvdb}&tab=series"))
+            if meta.original_tvmaze != 0:
+                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.original_tvmaze}"))
+            if meta.original_mal != 0:
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.original_mal}"))
         else:
-            if int(meta.get('tmdb_id') or 0) != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}"))
-            if int(meta.get('imdb_id') or 0) != 0:
-                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta['imdb']}"))
-            if int(meta.get('tvdb_id') or 0) != 0:
-                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series"))
-            if int(meta.get('tvmaze_id') or 0) != 0:
-                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta['tvmaze_id']}"))
-            if int(meta.get('mal_id') or 0) != 0:
-                lines.append(("MAL", f"https://myanimelist.net/anime/{meta['mal_id']}"))
+            if meta.tmdb_id or 0 != 0:
+                lines.append(("TMDB", f"https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb_id}"))
+            if meta.imdb_id or 0 != 0:
+                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
+            if meta.tvdb_id or 0 != 0:
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
+            if meta.tvmaze_id or 0 != 0:
+                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
+            if meta.mal_id or 0 != 0:
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
 
-        resolution = meta.get("resolution", "")
-        source = meta.get("source", "")
-        type_ = meta.get("type", "")
-        tag = meta.get("tag", "")
+        resolution = meta.resolution
+        source = meta.source
+        type_ = meta.type
+        tag = meta.tag
         if tag and tag.startswith("-"):
             tag = tag[1:]
-        region = meta.get("region") or missing_warning
-        distributor = meta.get("distributor") or missing_warning
-        edition = meta.get("edition", "")
+        region = meta.region or missing_warning
+        distributor = meta.distributor or missing_warning
+        edition = meta.edition
 
         lines.append(("Edition", str(edition)))
         lines.append(("Resolution", str(resolution)))
@@ -571,19 +571,19 @@ class UploadHelper:
         lines.append(("Type", str(type_)))
         lines.append(("Edition", str(edition)))
 
-        if meta.get("category") != "BOOK":
+        if meta.category != "BOOK":
             lines.append(("Group Tag", str(tag)))
 
-        if meta.get("is_disc"):
+        if meta.is_disc:
             lines.append(("Region", str(region)))
             lines.append(("Distributor", str(distributor)))
 
-        if not meta.get('emby', False):
-            if int(meta.get('freeleech', 0)) != 0:
-                lines.append(("Freeleech", str(meta["freeleech"])))
+        if not meta.emby:
+            if int(meta.freeleech) != 0:
+                lines.append(("Freeleech", str(meta.freeleech)))
             lines.append("")
 
-            if meta.get('personalrelease', False) is True:
+            if meta.personalrelease is True:
                 lines.append("[bold green]Personal Release![/bold green]")
 
         # Format and align labels and values
@@ -605,56 +605,65 @@ class UploadHelper:
 
         console.print("\n".join(formatted_lines), highlight=False)
 
-        if meta.get('unattended', False) and not meta.get('unattended_confirm', False) and not meta.get('emby_debug', False):
-            if meta['debug'] is True:
+        if meta.unattended and not meta.unattended_confirm and not meta.emby_debug:
+            if meta.debug is True:
                 console.print("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
             return True
         else:
-            if not meta.get('emby', False):
+            if not meta.emby:
                 await self.get_missing(meta)
                 ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
                 if ring_the_bell:
                     console.print(ring_the_bell)
 
-            if meta.get('is disc', False) is True:
-                meta['keep_folder'] = False
+            if meta.is_disc is True:
+                meta.keep_folder = False
 
-            if meta.get('keep_folder') and meta['isdir']:
+            if meta.keep_folder and meta.isdir:
                 kf_confirm = console.input("[bold yellow]You specified --keep-folder. Uploading in folders might not be allowed.[/bold yellow] [green]Proceed? y/N: [/green]").strip().lower()
                 if kf_confirm != 'y':
                     console.print("[bold red]Aborting...[/bold red]")
                     exit()
-            if not meta.get('emby', False):
-                console.print(f"[bold]Base Name:[/bold] {meta['name']}\n", highlight=False)
+            if not meta.emby:
+                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
-            elif not meta.get('emby_debug', False):
+            elif not meta.emby_debug:
                 confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == 'y'
-        if meta.get('emby_debug', False):
-            if meta.get('original_imdb', 0) != meta.get('imdb_id', 0):
-                imdb = str(meta.get('imdb_id', 0)).zfill(7)
-                console.print(f"[bold red]IMDB ID changed from {meta['original_imdb']} to {meta['imdb_id']}[/bold red]")
+        if meta.emby_debug:
+            if meta.original_imdb != meta.imdb_id:
+                imdb = str(meta.imdb_id).zfill(7)
+                console.print(f"[bold red]IMDB ID changed from {meta.original_imdb} to {meta.imdb_id}[/bold red]")
                 console.print(f"[bold cyan]IMDB URL:[/bold cyan] [yellow]https://www.imdb.com/title/tt{imdb}[/yellow]")
-            if meta.get('original_tmdb', 0) != meta.get('tmdb_id', 0):
-                console.print(f"[bold red]TMDB ID changed from {meta['original_tmdb']} to {meta['tmdb_id']}[/bold red]")
-                console.print(f"[bold cyan]TMDB URL:[/bold cyan] [yellow]https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb_id']}[/yellow]")
-            if meta.get('original_mal', 0) != meta.get('mal_id', 0):
-                console.print(f"[bold red]MAL ID changed from {meta['original_mal']} to {meta['mal_id']}[/bold red]")
-                console.print(f"[bold cyan]MAL URL:[/bold cyan] [yellow]https://myanimelist.net/anime/{meta['mal_id']}[/yellow]")
-            if meta.get('original_tvmaze', 0) != meta.get('tvmaze_id', 0):
-                console.print(f"[bold red]TVMaze ID changed from {meta['original_tvmaze']} to {meta['tvmaze_id']}[/bold red]")
-                console.print(f"[bold cyan]TVMaze URL:[/bold cyan] [yellow]https://www.tvmaze.com/shows/{meta['tvmaze_id']}[/yellow]")
-            if meta.get('original_tvdb', 0) != meta.get('tvdb_id', 0):
-                console.print(f"[bold red]TVDB ID changed from {meta['original_tvdb']} to {meta['tvdb_id']}[/bold red]")
-                console.print(f"[bold cyan]TVDB URL:[/bold cyan] [yellow]https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series[/yellow]")
-            if meta.get('original_category', None) != meta.get('category', None):
-                console.print(f"[bold red]Category changed from {meta['original_category']} to {meta['category']}[/bold red]")
-            console.print(f"[bold cyan]Regex Title:[/bold cyan] [yellow]{meta.get('regex_title', 'N/A')}[/yellow], [bold cyan]Secondary Title:[/bold cyan] [yellow]{meta.get('regex_secondary_title', 'N/A')}[/yellow], [bold cyan]Year:[/bold cyan] [yellow]{meta.get('regex_year', 'N/A')}, [bold cyan]AKA:[/bold cyan] [yellow]{meta.get('aka', '')}[/yellow]")
+            if meta.original_tmdb != meta.tmdb_id:
+                console.print(f"[bold red]TMDB ID changed from {meta.original_tmdb} to {meta.tmdb_id}[/bold red]")
+                console.print(f"[bold cyan]TMDB URL:[/bold cyan] [yellow]https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb_id}[/yellow]")
+            if meta.original_mal != meta.mal_id:
+                console.print(f"[bold red]MAL ID changed from {meta.original_mal} to {meta.mal_id}[/bold red]")
+                console.print(f"[bold cyan]MAL URL:[/bold cyan] [yellow]https://myanimelist.net/anime/{meta.mal_id}[/yellow]")
+            if meta.original_tvmaze != meta.tvmaze_id:
+                console.print(f"[bold red]TVMaze ID changed from {meta.original_tvmaze} to {meta.tvmaze_id}[/bold red]")
+                console.print(f"[bold cyan]TVMaze URL:[/bold cyan] [yellow]https://www.tvmaze.com/shows/{meta.tvmaze_id}[/yellow]")
+            if meta.original_tvdb != meta.tvdb_id:
+                console.print(f"[bold red]TVDB ID changed from {meta.original_tvdb} to {meta.tvdb_id}[/bold red]")
+                console.print(f"[bold cyan]TVDB URL:[/bold cyan] [yellow]https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series[/yellow]")
+            if meta.original_category != meta.category:
+                console.print(f"[bold red]Category changed from {meta.original_category} to {meta.category}[/bold red]")
+            console.print(
+                f"[bold cyan]Regex Title:[/bold cyan] [yellow]{(meta.regex_title if meta.regex_title is not None else 'N/A')}[/yellow], [bold cyan]Secondary Title:[/bold cyan] [yellow]{(meta.regex_secondary_title if meta.regex_secondary_title is not None else 'N/A')}[/yellow], [bold cyan]Year:[/bold cyan] [yellow]{(meta.regex_year if meta.regex_year is not None else 'N/A')}, [bold cyan]AKA:[/bold cyan] [yellow]{meta.aka}[/yellow]"
+            )
             console.print()
-            if meta.get('original_imdb', 0) == meta.get('imdb_id', 0) and meta.get('original_tmdb', 0) == meta.get('tmdb_id', 0) and meta.get('original_mal', 0) == meta.get('mal_id', 0) and meta.get('original_tvmaze', 0) == meta.get('tvmaze_id', 0) and meta.get('original_tvdb', 0) == meta.get('tvdb_id', 0) and meta.get('original_category', None) == meta.get('category', None):
+            if (
+                meta.original_imdb == meta.imdb_id
+                and meta.original_tmdb == meta.tmdb_id
+                and meta.original_mal == meta.mal_id
+                and meta.original_tvmaze == meta.tvmaze_id
+                and meta.original_tvdb == meta.tvdb_id
+                and meta.original_category == meta.category
+            ):
                 console.print("[bold yellow]Database ID's are correct![/bold yellow]")
                 return True
             else:
-                nfo_dir = os.path.join(f"{meta['base_dir']}/data")
+                nfo_dir = os.path.join(f"{meta.base_dir}/data")
                 os.makedirs(nfo_dir, exist_ok=True)
                 json_file_path = os.path.join(nfo_dir, "db_check.json")
 
@@ -674,34 +683,34 @@ class UploadHelper:
                     return f"https://myanimelist.net/anime/{mal_id}" if mal_id else None
 
                 db_check_entry = {
-                    "path": meta.get('path'),
+                    "path": meta.path,
                     "original": {
-                        "imdb_id": meta.get('original_imdb', 'N/A'),
-                        "imdb_url": imdb_url(meta.get('original_imdb')),
-                        "tmdb_id": meta.get('original_tmdb', 'N/A'),
-                        "tmdb_url": tmdb_url(meta.get('original_tmdb'), meta.get('original_category')),
-                        "tvdb_id": meta.get('original_tvdb', 'N/A'),
-                        "tvdb_url": tvdb_url(meta.get('original_tvdb')),
-                        "tvmaze_id": meta.get('original_tvmaze', 'N/A'),
-                        "tvmaze_url": tvmaze_url(meta.get('original_tvmaze')),
-                        "mal_id": meta.get('original_mal', 'N/A'),
-                        "mal_url": mal_url(meta.get('original_mal')),
-                        "category": meta.get('original_category', 'N/A')
+                        "imdb_id": (meta.original_imdb if meta.original_imdb is not None else "N/A"),
+                        "imdb_url": imdb_url(meta.original_imdb),
+                        "tmdb_id": (meta.original_tmdb if meta.original_tmdb is not None else "N/A"),
+                        "tmdb_url": tmdb_url(meta.original_tmdb, meta.original_category),
+                        "tvdb_id": (meta.original_tvdb if meta.original_tvdb is not None else "N/A"),
+                        "tvdb_url": tvdb_url(meta.original_tvdb),
+                        "tvmaze_id": (meta.original_tvmaze if meta.original_tvmaze is not None else "N/A"),
+                        "tvmaze_url": tvmaze_url(meta.original_tvmaze),
+                        "mal_id": (meta.original_mal if meta.original_mal is not None else "N/A"),
+                        "mal_url": mal_url(meta.original_mal),
+                        "category": (meta.original_category if meta.original_category is not None else "N/A"),
                     },
                     "changed": {
-                        "imdb_id": meta.get('imdb_id', 'N/A'),
-                        "imdb_url": imdb_url(meta.get('imdb_id')),
-                        "tmdb_id": meta.get('tmdb_id', 'N/A'),
-                        "tmdb_url": tmdb_url(meta.get('tmdb_id'), meta.get('category')),
-                        "tvdb_id": meta.get('tvdb_id', 'N/A'),
-                        "tvdb_url": tvdb_url(meta.get('tvdb_id')),
-                        "tvmaze_id": meta.get('tvmaze_id', 'N/A'),
-                        "tvmaze_url": tvmaze_url(meta.get('tvmaze_id')),
-                        "mal_id": meta.get('mal_id', 'N/A'),
-                        "mal_url": mal_url(meta.get('mal_id')),
-                        "category": meta.get('category', 'N/A')
+                        "imdb_id": (meta.imdb_id if meta.imdb_id is not None else "N/A"),
+                        "imdb_url": imdb_url(meta.imdb_id),
+                        "tmdb_id": (meta.tmdb_id if meta.tmdb_id is not None else "N/A"),
+                        "tmdb_url": tmdb_url(meta.tmdb_id, meta.category),
+                        "tvdb_id": (meta.tvdb_id if meta.tvdb_id is not None else "N/A"),
+                        "tvdb_url": tvdb_url(meta.tvdb_id),
+                        "tvmaze_id": (meta.tvmaze_id if meta.tvmaze_id is not None else "N/A"),
+                        "tvmaze_url": tvmaze_url(meta.tvmaze_id),
+                        "mal_id": (meta.mal_id if meta.mal_id is not None else "N/A"),
+                        "mal_url": mal_url(meta.mal_id),
+                        "category": (meta.category if meta.category is not None else "N/A"),
                     },
-                    "tracker": meta.get('matched_tracker', 'N/A'),
+                    "tracker": (meta.matched_tracker if meta.matched_tracker is not None else "N/A"),
                 }
 
                 # Append to JSON file (as a list of entries)
@@ -733,21 +742,17 @@ class UploadHelper:
             'imdb': 'IMDb ID (tt1234567)',
             'distributor': "Disc Distributor e.g.(BFI, Criterion)"
         }
-        potential_missing = cast(list[str], meta.get("potential_missing", []))
-        if meta["category"] in ("TV", "MOVIE"):
-            if meta.get("imdb_id", 0) == 0:
-                meta["imdb_id"] = 0
+        potential_missing = cast(list[str], meta.potential_missing)
+        if meta.category in ("TV", "MOVIE"):
+            if meta.imdb_id == 0:
+                meta.imdb_id = 0
                 if "imdb_id" not in potential_missing:
                     potential_missing.append("imdb_id")
-                    meta["potential_missing"] = potential_missing
+                    meta.potential_missing = potential_missing
             else:
-                potential_missing = cast(list[str], meta.get("potential_missing", []))
+                potential_missing = cast(list[str], meta.potential_missing)
 
-        missing = [
-            f"--{each} | {info_notes.get(each, '')}"
-            for each in potential_missing
-            if str(meta.get(each, '')).strip() in ["", "None", "0"]
-        ]
+        missing = [f"--{each} | {info_notes.get(each, '')}" for each in potential_missing if str(getattr(meta, each, "")).strip() in ["", "None", "0"]]
 
         if missing:
             console.print("[bold yellow]Potentially missing information:[/bold yellow]")

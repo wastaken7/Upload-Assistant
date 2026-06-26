@@ -156,9 +156,9 @@ def validate_config(
 
     Args:
         config: The config object to validate
-        active_trackers: List of tracker names that will be used (from meta['trackers'])
+        active_trackers: List of tracker names that will be used (from meta.trackers)
                         If None, uses default_trackers from config
-        active_imghost: The image host to use (from meta['imghost'])
+        active_imghost: The image host to use (from meta.imghost)
                        If None, uses img_host_1 from config
 
     Returns:

@@ -1,10 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, Optional
 
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -39,9 +39,9 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-        }.get(meta['category'], '0')
+            "MOVIE": "1",
+            "TV": "2",
+        }.get(meta.category, "0")
         return {'category_id': category_id}
 
     # If default UNIT3D types, remove this function
@@ -53,14 +53,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6',
-            'ENCODE': '3'
-        }.get(meta['type'], '0')
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(meta.type, "0")
         return {'type_id': type_id}
 
     # If default UNIT3D resolutions, remove this function
@@ -73,18 +66,18 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     ) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
-            '8640p': '10',
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
-        }.get(meta['resolution'], '10')
+            "8640p": "10",
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "3",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
+        }.get(meta.resolution, "10")
         return {'resolution_id': resolution_id}
 
     # If there are tracker specific checks to be done before upload, add them here
@@ -106,5 +99,5 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
 
     # If the tracker has specific naming conventions, add them here; otherwise, remove this function
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        UNIT3D_TEMPLATE_name = meta['name']
+        UNIT3D_TEMPLATE_name = meta.name
         return {'name': UNIT3D_TEMPLATE_name}

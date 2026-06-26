@@ -11,8 +11,8 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -104,7 +104,7 @@ class IPT:
             "zombiRG",
         ]
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
+    async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
@@ -133,21 +133,21 @@ class IPT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/center][/url][/right]",
+            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/center][/url][/right]",
         )
         return description
 
     async def search_existing(self, meta: Meta):
         dupes = []
-        cat_id = 72 if meta["category"] == "MOVIE" else 73 if meta["category"] == "TV" else 0
+        cat_id = 72 if meta.category == "MOVIE" else 73 if meta.category == "TV" else 0
         if not cat_id:
             return dupes
-        search_url = f"{self.base_url}/t?{cat_id}=&q={meta['title']}"
+        search_url = f"{self.base_url}/t?{cat_id}=&q={meta.title}"
 
         forbidden_keywords = []
 
-        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
-        _type = str(meta.get("type", "") or "").strip().lower()
+        is_disc = str(meta.is_disc or "").strip().lower()
+        _type = str(meta.type or "").strip().lower()
 
         if is_disc == "bdmv":
             forbidden_keywords.extend([
@@ -164,7 +164,7 @@ class IPT:
                 "h265",
                 " web ",
             ])
-            if "1080" in meta.get("resolution", ""):
+            if "1080" in meta.resolution:
                 forbidden_keywords.extend([
                     "hevc",
                 ])
@@ -180,7 +180,7 @@ class IPT:
             response = await self.session.get(search_url, follow_redirects=True)
             if "login" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return dupes
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
@@ -213,12 +213,12 @@ class IPT:
         return dupes
 
     async def get_category_id(self, meta: Meta):
-        resolution = meta.get("resolution")
-        category = meta.get("category")
-        type_ = meta.get("type")
-        is_disc = meta.get("is_disc")
-        genres = meta.get("genres", "").lower()
-        source = meta.get("source", "").lower()
+        resolution = meta.resolution
+        category = meta.category
+        type_ = meta.type
+        is_disc = meta.is_disc
+        genres = meta.genres.lower()
+        source = meta.source.lower()
 
         # TV
         tv_web_dl = 22
@@ -262,9 +262,9 @@ class IPT:
                 return movie_dvd_r
             if resolution == "2160p":
                 return movie_4k
-            if "3D" in meta.get("3d", ""):
+            if "3D" in meta.three_d:
                 return movie_3d
-            if meta.get("video_codec", "").lower() == "x265":
+            if meta.video_codec.lower() == "x265":
                 return movie_x265
             if type_ in ("WEBDL", "WEBRIP"):
                 return movie_web_dl
@@ -280,24 +280,24 @@ class IPT:
                 return movie_cam
             if "kids" in genres or "family" in genres:
                 return movie_kids
-            if meta.get("original_language") and meta.get("original_language") != "en":
+            if meta.original_language and meta.original_language != "en":
                 return movie_non_english
             return movie_hd_bluray
 
         elif category == "TV":
-            if meta.get("tv_pack", False):
-                if meta.get("original_language") and meta.get("original_language") != "en":
+            if meta.tv_pack:
+                if meta.original_language and meta.original_language != "en":
                     return tv_packs_non_english
                 return tv_packs
             else:
-                if meta.get("original_language") and meta.get("original_language") != "en":
+                if meta.original_language and meta.original_language != "en":
                     return tv_non_english
             if is_disc:
                 if is_disc == "BDMV":
                     return tv_bd
                 if is_disc == "DVD":
                     return tv_dvd_r
-            if meta.get("video_codec", "").lower() == "x265":
+            if meta.video_codec.lower() == "x265":
                 return tv_x265
             if type_ in ("WEBDL", "WEBRIP"):
                 return tv_web_dl
@@ -310,7 +310,7 @@ class IPT:
             return tv_x264
 
     async def get_name(self, meta: Meta):
-        name: str = meta.get("scene_name", "") if meta.get("scene_name", "") else meta.get("clean_name", "")
+        name: str = meta.scene_name if meta.scene_name else meta.clean_name
 
         replacements = {
             "3DAccess": "3DA",
@@ -347,13 +347,13 @@ class IPT:
 
         name = name.replace("'", "").replace('"', "")
 
-        if meta.get("scene", False) and "[NO RAR]" not in name.upper():
+        if meta.scene and "[NO RAR]" not in name.upper():
             name += " [NO RAR]"
 
         return re.sub(r"\s{2,}", " ", name)
 
     async def get_is_freeleech(self, meta: Meta):
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/BASE.torrent"
         if not os.path.exists(torrent_path):
             return False
 
@@ -376,7 +376,7 @@ class IPT:
 
     async def get_data(self, meta: Meta):
         data = {
-            "name": meta["name"],
+            "name": meta.name,
             "descr": await self.generate_description(meta),
             "type": await self.get_category_id(meta),
         }
@@ -385,7 +385,7 @@ class IPT:
             data["freeleech"] = "on"
 
         # Anon
-        anon = not (meta["anon"] == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data.update({"anonymous": "on"})
 
@@ -413,18 +413,18 @@ class IPT:
             id_pattern=r"download\.php/(\d+)/",
         )
 
-        if upload and self.config["TRACKERS"][self.tracker]["force_data"] and not meta["debug"]:
+        if upload and self.config["TRACKERS"][self.tracker]["force_data"] and not meta.debug:
             await self.edit_post_upload(meta)
 
         return upload
 
     async def edit_post_upload(self, meta: Meta):
-        torrent_id = meta["tracker_status"][self.tracker]["torrent_id"]
+        torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
         data = {
-            "name": meta["name"],
+            "name": meta.name,
             "descr": await self.generate_description(meta),
             "type": await self.get_category_id(meta),
-            "imdb_id": str(meta.get("tmdb_id", "")),
+            "imdb_id": str(meta.tmdb_id),
             "id": torrent_id,
         }
 
@@ -432,4 +432,4 @@ class IPT:
 
         response = await self.session.post(edit_url, data=data)
         if response.status_code != 302:
-            meta["tracker_status"][self.tracker]["status_message"] += " Failed to edit torrent."
+            meta.tracker_status[self.tracker]["status_message"] += " Failed to edit torrent."

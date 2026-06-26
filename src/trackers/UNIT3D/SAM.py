@@ -2,11 +2,11 @@
 from typing import Any, Optional
 
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.CBR import CBR
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -52,11 +52,11 @@ class SAM(UNIT3D):
         elif reverse:
             return {v: k for k, v in cat_map.items()}
 
-        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        resolved_category = category if category is not None and category != "" else meta.category
         if resolved_category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 resolved_category = "AUDIOBOOK"
-            elif meta.get("comic", False) or meta.get("manga", False):
+            elif meta.comic or meta.manga:
                 resolved_category = "HQS_E_MANGAS"
             else:
                 resolved_category = "LIVROS"
@@ -96,12 +96,12 @@ class SAM(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
-        if resolved_type == "GAME" or (meta.get("category") == "GAME" and resolved_type not in type_id):
-            platform = str(meta.get("platform", "")).lower()
+        if resolved_type == "GAME" or (meta.category == "GAME" and resolved_type not in type_id):
+            platform = str(meta.platform).lower()
             nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
             if any(word in platform for word in ["playstation", "ps5", "ps4", "ps3", "ps2", "ps1", "psp", "vita"]):
@@ -118,7 +118,7 @@ class SAM(UNIT3D):
                 val = "50"  # PC
         else:
             val = type_id.get(resolved_type, "0")
-            if meta.get("category") == "BOOK" and val == "0":
+            if meta.category == "BOOK" and val == "0":
                 val = "68"
 
         return {"type_id": val}
@@ -131,14 +131,12 @@ class SAM(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.get("category") == "BOOK":
+        if meta.category == "BOOK":
             return True
         return await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
         )
 
-    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        signature = (
-            f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']} (fork)[/size][/url][/right]"
-        )
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}

@@ -3,6 +3,7 @@ from typing import Any
 
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -25,22 +26,22 @@ class AITHER(UNIT3D):
         self.trumping_url = f'{self.base_url}/api/trumping-reports/filter'
         self.banned_groups: list[str] = []
 
-    async def get_additional_checks(self, meta: dict[str, Any]):
+    async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
-        if meta['is_disc'] not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
+        if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True, original_required=True
         ):
             return False
 
-        if meta['valid_mi'] is False:
+        if meta.valid_mi is False:
             console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         return should_continue
 
-    async def get_additional_data(self, meta: dict[str, Any]):
-        hdr_value = str(meta.get('hdr') or '')
+    async def get_additional_data(self, meta: Meta):
+        hdr_value = str(meta.hdr or "")
         has_hdr10p = 'HDR10+' in hdr_value
 
         data = {
@@ -55,47 +56,47 @@ class AITHER(UNIT3D):
 
         return data
 
-    async def get_name(self, meta: dict[str, Any]):
-        aither_name: str = meta["name"]
-        resolution: str = meta.get("resolution", "")
-        video_codec: str = meta.get("video_codec", "")
-        video_encode: str = meta.get("video_encode", "")
-        name_type: str = meta.get("type", "")
-        source: str = meta.get("source", "")
-        alt_title = meta.get("aka", "") if not meta.get("no_aka", False) else ""
+    async def get_name(self, meta: Meta):
+        aither_name: str = meta.name
+        resolution: str = meta.resolution
+        video_codec: str = meta.video_codec
+        video_encode: str = meta.video_encode
+        name_type: str = meta.type
+        source: str = meta.source
+        alt_title = meta.aka if not meta.no_aka else ""
 
-        year = str(meta.get("year", ""))
-        if meta["category"] == "TV":
-            year = str(meta["year"]) if meta["search_year"] != "" else ""
-        manual_year_value = str(meta.get("manual_year", ""))
+        year = str(meta.year)
+        if meta.category == "TV":
+            year = str(meta.year) if meta.search_year != "" else ""
+        manual_year_value = str(meta.manual_year)
         if manual_year_value and int(manual_year_value) > 0:
             year = manual_year_value
-        if meta.get("no_year", False):
+        if meta.no_year:
             year = ""
 
-        if not meta.get('language_checked', False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = meta['audio_languages']
+        audio_languages: list[str] = meta.audio_languages
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
             if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
                 if year:
                     aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
-            elif meta.get('is_disc') != "BDMV":
-                aither_name = aither_name.replace(meta['resolution'], f"{foreign_lang} {meta['resolution']}", 1)
+            elif meta.is_disc != "BDMV":
+                aither_name = aither_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
 
         if name_type == "DVDRIP":
             source = "DVDRip"
-            aither_name = aither_name.replace(f"{meta['source']} ", "", 1)
-            aither_name = aither_name.replace(f"{meta['video_encode']}", "", 1)
+            aither_name = aither_name.replace(f"{meta.source} ", "", 1)
+            aither_name = aither_name.replace(f"{meta.video_encode}", "", 1)
             aither_name = aither_name.replace(f"{source}", f"{resolution} {source}", 1)
-            aither_name = aither_name.replace((meta['audio']), f"{meta['audio']}{video_encode}", 1)
+            aither_name = aither_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
 
-        elif meta['is_disc'] == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            aither_name = aither_name.replace((meta['source']), f"{resolution} {meta['source']}", 1)
-            aither_name = aither_name.replace((meta['audio']), f"{video_codec} {meta['audio']}", 1)
+        elif meta.is_disc == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            aither_name = aither_name.replace((meta.source), f"{resolution} {meta.source}", 1)
+            aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
 
-        if meta.get('trump_reason') == 'exact_match':
+        if meta.trump_reason == "exact_match":
             aither_name = aither_name + " - TRUMP"
 
         if alt_title:
