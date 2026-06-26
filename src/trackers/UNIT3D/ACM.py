@@ -114,7 +114,7 @@ class ACM(UNIT3D):
         aka: str = meta.aka
         original_title: str = meta.original_title
         audio: str = meta.audio
-        source: str = meta.source
+        source: str = meta.source or ""
         is_disc: str = meta.is_disc
         resolution: str = meta.resolution
         if aka != "":

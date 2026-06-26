@@ -4,13 +4,14 @@ import json
 import os
 import re
 from collections import defaultdict
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Union, cast
 
 import cli_ui
 
 from src.console import console
+from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
 
 ComparisonGroup = dict[str, Any]
@@ -18,7 +19,7 @@ ComparisonData = dict[str, ComparisonGroup]
 
 
 class ComparisonManager:
-    def __init__(self, meta: MutableMapping[str, Any], config: Mapping[str, Any]) -> None:
+    def __init__(self, meta: Meta, config: Mapping[str, Any]) -> None:
         self.meta = meta
         default_config = cast(Mapping[str, Any], config.get('DEFAULT', {}))
         if not isinstance(default_config, dict):
@@ -129,7 +130,7 @@ class ComparisonManager:
             group = sorted(groups[second], key=lambda x: x[0])
             group_files: list[str] = [f for _, f in group]
             custom_img_list: list[str] = [os.path.join(comparison_path, filename) for filename in group_files]
-            upload_meta = dict(self.meta)
+            upload_meta = self.meta.copy()
             console.print(f"[cyan]Uploading comparison group {second} with files: {group_files}")
 
             upload_result, _ = await self.uploadscreens_manager.upload_screens(

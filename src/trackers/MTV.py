@@ -411,7 +411,7 @@ class MTV:
         tags.extend(
             each
             for each in ["remux", "WEB.DL", "WEBRip", "HDTV", "BluRay", "DVD", "HDDVD"]
-            if (each.lower().replace(".", "") in meta.type.lower()) or (each.lower().replace("-", "") in meta.source)
+            if (each.lower().replace(".", "") in str(meta.type or "").lower()) or (each.lower().replace("-", "") in str(meta.source or ""))
         )
         # series tags
         if meta.category == "TV":

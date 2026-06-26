@@ -1065,7 +1065,7 @@ class BJS:
                     results.append(result)
 
         else:
-            image_links = [img.get("raw_url") for img in meta.image_list if img.get("raw_url")][: 6 - len(results)]
+            image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")][: 6 - len(results)]
 
             for coro in asyncio.as_completed([upload_remote_file(url) for url in image_links]):
                 result = await coro

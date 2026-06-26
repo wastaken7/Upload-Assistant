@@ -48,7 +48,7 @@ class QbittorrentClientMixin:
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         raise NotImplementedError
 
-    async def get_ptp_from_hash_qbit(self, meta: Meta, client: dict[str, Any], pathed: bool = False) -> dict[str, Any]:
+    async def get_ptp_from_hash_qbit(self, meta: Meta, client: dict[str, Any], pathed: bool = False) -> Meta:
         proxy_url = client.get('qui_proxy_url')
         qbt_proxy_url = ""
         qbt_client: Optional[qbittorrentapi.Client] = None

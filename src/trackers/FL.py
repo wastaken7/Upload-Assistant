@@ -376,7 +376,7 @@ class FL:
                     data = {
                         'mediainfo': await mi_file.read(),
                     }
-                if int(meta.imdb_id) != 0:
+                if meta.imdb_id:
                     data["imdbURL"] = f"tt{meta.imdb_id}"
                 screen_glob = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.filename}-*.png"))]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []

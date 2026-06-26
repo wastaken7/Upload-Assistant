@@ -831,8 +831,8 @@ def extract_cover_images(html_content: str) -> dict[str, str]:
             if not img_tag:
                 continue
 
-            img_id = (img_tag.get('id') or '').strip()
-            url = (img_tag.get('src') or '').strip()
+            img_id = str(img_tag.get("id") or "").strip()
+            url = str(img_tag.get("src") or "").strip()
             if not url:
                 continue
 

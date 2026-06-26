@@ -545,7 +545,7 @@ class AZTrackerBase:
                     results.append(result)
 
         else:
-            image_links = [img.get("raw_url") for img in meta.image_list if img.get("raw_url")]
+            image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
             remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
             links = image_links[:remaining_slots]
 

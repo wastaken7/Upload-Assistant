@@ -93,7 +93,7 @@ class UTP(UNIT3D):
         ]
 
         # Also transform any new_images_* keys for packed content
-        new_images_keys = [k for k in meta if k.startswith('new_images_')]
+        new_images_keys = [k for k in meta.to_dict() if k.startswith("new_images_")]
         original_new_images: dict[str, Any] = {}
         for key in new_images_keys:
             original_new_images[key] = meta[key]
@@ -135,18 +135,18 @@ class UTP(UNIT3D):
         release_type = str(meta.type).upper()
 
         # Common components
-        title = str(meta.title)
-        aka = str(meta.aka).strip()
-        year = str(meta.year)
-        three_d = str(meta.three_d)
-        uhd = str(meta.uhd)
-        edition = str(meta.edition)
+        title = meta.title
+        aka = meta.aka.strip()
+        year = meta.year
+        three_d = meta.three_d
+        uhd = meta.uhd
+        edition = meta.edition
         hybrid = "Hybrid" if meta.webdv else ""
-        repack = str(meta.repack)
-        resolution = str(meta.resolution)
-        hdr = str(meta.hdr)
-        service = str(meta.service)
-        audio_raw = str(meta.audio)
+        repack = meta.repack
+        resolution = meta.resolution
+        hdr = meta.hdr
+        service = meta.service
+        audio_raw = meta.audio
         # Only include audio for Atmos or lossless codecs
         lossless_indicators = ['Atmos', 'TrueHD', 'DTS-HD MA', 'DTS:X', 'LPCM', 'FLAC', 'PCM']
         if any(indicator in audio_raw for indicator in lossless_indicators):
@@ -154,12 +154,12 @@ class UTP(UNIT3D):
             audio = ' '.join(audio.split())
         else:
             audio = ""  # Don't include lossy audio (AAC, DD, DD+, etc.) in name
-        video_codec = str(meta.video_codec)
-        video_encode = str(meta.video_encode)
-        tag = str(meta.tag)
-        region = str(meta.region) if meta.region else ""
-        season = str(meta.season)
-        episode = str(meta.episode)
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode
+        tag = meta.tag
+        region = meta.region if meta.region else ""
+        season = meta.season
+        episode = meta.episode
 
         source_tag = str(meta.source)
         type_tag = ""
@@ -184,7 +184,7 @@ class UTP(UNIT3D):
         elif category == "TV":
             name = f"{title} {aka} {season}{episode} {year} {hybrid} {edition} {repack} {region} {three_d} {uhd} {source_tag} {type_tag} {resolution} {hdr} {vcodec} {audio}"
         else:
-            name = str(meta.name)
+            name = meta.name
 
         # Clean up multiple spaces and add tag
         name = ' '.join(name.split())

@@ -17,6 +17,7 @@ from rich.style import Style
 from typing_extensions import TypeAlias
 
 from src.console import console
+from src.meta import Meta
 
 QueueItem: TypeAlias = dict[str, Any]
 QueueList: TypeAlias = Union[list[str], list[QueueItem]]
@@ -39,7 +40,7 @@ async def _read_text_lines(path: str) -> list[str]:
 
 class QueueManager:
     @staticmethod
-    async def process_site_upload_queue(meta: Mapping[str, Any], base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+    async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
         site_upload = meta.site_upload
         if not site_upload:
             return [], None
@@ -99,7 +100,7 @@ class QueueManager:
         return queue, processed_files_log
 
     @staticmethod
-    async def process_site_upload_item(queue_item: Mapping[str, Any], meta: MutableMapping[str, Any]) -> str:
+    async def process_site_upload_item(queue_item: Mapping[str, Any], meta: Meta) -> str:
         # Set the tracker argument (-tk XXX)
         tracker = cast(str, queue_item['tracker'])
         meta.trackers = [tracker]
@@ -393,12 +394,12 @@ class QueueManager:
     @staticmethod
     async def handle_queue(
         path: str,
-        meta: MutableMapping[str, Any],
+        meta: Meta,
         paths: Sequence[str],
         base_dir: str,
     ) -> tuple[QueueList, Optional[str]]:
         allowed_extensions = ['.mkv', '.mp4', '.ts']
-        queue: list[str] = []
+        queue: list[Any] = []
 
         if meta.site_upload:
             console.print(f"[bold yellow]Processing site upload queue for tracker: {meta.site_upload}[/bold yellow]")
@@ -702,11 +703,11 @@ class QueueManager:
         return queue, log_file
 
 
-async def process_site_upload_queue(meta: Mapping[str, Any], base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
     return await QueueManager.process_site_upload_queue(meta, base_dir)
 
 
-async def process_site_upload_item(queue_item: Mapping[str, Any], meta: MutableMapping[str, Any]) -> str:
+async def process_site_upload_item(queue_item: Mapping[str, Any], meta: Meta) -> str:
     return await QueueManager.process_site_upload_item(queue_item, meta)
 
 
@@ -759,7 +760,7 @@ async def display_queue(
 
 async def handle_queue(
     path: str,
-    meta: MutableMapping[str, Any],
+    meta: Meta,
     paths: Sequence[str],
     base_dir: str,
 ) -> tuple[QueueList, Optional[str]]:

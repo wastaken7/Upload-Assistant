@@ -117,7 +117,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
     return tag
 
 
-async def tag_override(meta: Meta) -> dict[str, Any]:
+async def tag_override(meta: Meta) -> Meta:
     try:
         tags_text = await asyncio.to_thread(Path(f"{meta.base_dir}/data/tags.json").read_text, encoding="utf-8")
         tags = json.loads(tags_text)

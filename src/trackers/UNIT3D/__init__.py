@@ -201,7 +201,7 @@ class UNIT3D:
     async def get_name(self, meta: Meta) -> dict[str, str]:
         return {"name": meta.name}
 
-    async def get_description(self, meta: Meta) -> dict[str, str]:
+    async def get_description(self, meta: Meta) -> Any:
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
@@ -353,7 +353,7 @@ class UNIT3D:
         personal_release = "1" if meta.personalrelease else "0"
         return {"personal_release": personal_release}
 
-    async def get_internal(self, meta: Meta) -> dict[str, str]:
+    async def get_internal(self, meta: Meta) -> Any:
         internal = "0"
         if self.tracker_config.get("internal", False) is True and meta.tag != "" and (meta.tag[1:] in self.tracker_config.get("internal_groups", [])):
             internal = "1"

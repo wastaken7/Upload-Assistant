@@ -104,7 +104,7 @@ class Prep:
         """Delegate to :func:`src.prep_game.gather_game_prep`."""
         await _gather_game_prep_fn(meta, videopath, base_dir, self.config)
 
-    async def gather_prep(self, meta: Meta, mode: str) -> dict[str, Any]:
+    async def gather_prep(self, meta: Meta, mode: str) -> Meta:
         meta_start_time = time.time()
 
         # 1. Init metadata settings

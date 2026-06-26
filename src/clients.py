@@ -489,10 +489,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                         console.print("[bold red]Failed to connect to qBittorrent for export.")
                                         found_hash = None
 
-                                if found_hash:  # Only proceed if we still have a hash
+                                if found_hash and qbt_client is not None:  # Only proceed if we still have a hash
+                                    active_qbt = qbt_client
                                     try:
                                         torrent_file_content = await self.retry_qbt_operation(
-                                            lambda qbt_client=qbt_client, found_hash=found_hash: asyncio.to_thread(
+                                            lambda qbt_client=active_qbt, found_hash=found_hash: asyncio.to_thread(
                                                 qbt_client.torrents_export, torrent_hash=found_hash
                                             ),
                                             f"Export torrent {found_hash}"
@@ -727,7 +728,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return local_path, remote_path
 
-    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False) -> dict[str, Any]:
+    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False) -> Meta:
         default_torrent_client = self.config['DEFAULT']['default_torrent_client']
         client = self.config['TORRENT_CLIENTS'][default_torrent_client]
         torrent_client = client['torrent_client']

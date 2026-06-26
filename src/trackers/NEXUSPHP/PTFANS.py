@@ -94,7 +94,7 @@ class PTFANS(NEXUSPHP):
         xvid = 7
 
         codec = str(meta.video_codec).lower()
-        source = meta.source.lower()
+        source = str(meta.source or "").lower()
         is_bluray_source = "bluray" in source or "blu-ray" in source
 
         if "av1" in codec:

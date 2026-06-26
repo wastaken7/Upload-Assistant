@@ -169,7 +169,7 @@ class ANT:
         # Trigger regeneration automatically if size constraints aren't met
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
-            meta.max_piece_size = "128"  # 128 MiB
+            meta.max_piece_size = 128  # 128 MiB
             await TorrentCreator.create_torrent(meta, str(Path(meta.path)), "ANT", tracker_url=tracker_url)
             torrent_filename = "ANT"
 
@@ -377,7 +377,7 @@ class ANT:
         }
         if meta.tmdb != 0:
             params["tmdb"] = meta.tmdb
-        elif int(meta.imdb_id) != 0:
+        elif meta.imdb_id is not None and int(meta.imdb_id) != 0:
             params["imdb"] = meta.imdb
 
         headers = {

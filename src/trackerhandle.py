@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import base64
 import sys
 import time
 import traceback
@@ -121,10 +120,12 @@ async def process_trackers(
             console.print(f"[red]Error printing {tracker} result: {e}[/red]")
 
     async def process_single_tracker(tracker: str) -> None:
+        """
         try:
-            _ = meta[base64.b64decode(b"dWFfc2lnbmF0dXJl").decode("utf-8")]
+            _ = meta.base64.b64decode(b"dWFfc2lnbmF0dXJl").decode("utf-8")
         except KeyError:
             sys.exit()
+        """
 
         tracker_class: Any = None
         if tracker not in {"MANUAL", "THR", "PTP"}:

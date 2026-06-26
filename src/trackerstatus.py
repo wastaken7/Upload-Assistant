@@ -3,12 +3,11 @@ import asyncio
 import copy
 import os
 import sys
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from typing import Any, Optional, cast
 
 import cli_ui
 from torf import Torrent
-from typing_extensions import TypeAlias
 
 from src.cleanup import cleanup_manager
 from src.clients import Clients
@@ -21,8 +20,6 @@ from src.torrentcreate import TorrentCreator
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
 from src.uphelper import UploadHelper
-
-Meta: TypeAlias = MutableMapping[str, Any]
 
 
 class TrackerStatusManager:
@@ -85,7 +82,7 @@ class TrackerStatusManager:
                         imdb_id = imdb_id.strip().lower()
                         if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
                             local_meta['imdb_id'] = int(imdb_id[2:])
-                            local_meta['imdb'] = str(imdb_id[2:].zfill(7))
+                            local_meta["imdb"] = imdb_id[2:].zfill(7)
                             local_meta['imdb_info'] = await imdb_manager.get_imdb_info_api(
                                 local_meta['imdb_id'],
                                 manual_language=local_meta.get('manual_language'),

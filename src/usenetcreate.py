@@ -255,6 +255,9 @@ async def run_par2_with_progress(cmd: list[str], cwd: Optional[str] = None, debu
         stdout_accum = []
         last_percent = 0
 
+        if process.stdout is None:
+            raise RuntimeError("Process stdout is None")
+
         while True:
             line_bytes = await process.stdout.readline()
             if not line_bytes:
@@ -318,6 +321,9 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: Optional[str] = None, debu
 
         stdout_accum = []
         last_percent = 0
+
+        if process.stdout is None:
+            raise RuntimeError("Process stdout is None")
 
         while True:
             line_bytes = await process.stdout.readline()
@@ -389,8 +395,12 @@ async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, deb
         last_percent = 0
         stderr_accum = []
 
+        if process.stdout is None or process.stderr is None:
+            raise RuntimeError("Process stdout or stderr is None")
+
         async def drain_stderr():
             while True:
+                assert process.stderr is not None
                 line = await process.stderr.readline()
                 if not line:
                     break

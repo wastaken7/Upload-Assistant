@@ -44,8 +44,8 @@ class AITHER(UNIT3D):
         hdr_value = str(meta.hdr or "")
         has_hdr10p = 'HDR10+' in hdr_value
 
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        data: dict[str, Any] = {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
         if "DV" in hdr_value:
             data['dv'] = 1
@@ -62,7 +62,7 @@ class AITHER(UNIT3D):
         video_codec: str = meta.video_codec
         video_encode: str = meta.video_encode
         name_type: str = meta.type
-        source: str = meta.source
+        source: str = meta.source or ""
         alt_title = meta.aka if not meta.no_aka else ""
 
         year = str(meta.year)
@@ -93,7 +93,7 @@ class AITHER(UNIT3D):
             aither_name = aither_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
 
         elif meta.is_disc == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            aither_name = aither_name.replace((meta.source), f"{resolution} {meta.source}", 1)
+            aither_name = aither_name.replace(str(meta.source or ""), f"{resolution} {meta.source}", 1)
             aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
 
         if meta.trump_reason == "exact_match":

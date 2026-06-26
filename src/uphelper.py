@@ -138,8 +138,8 @@ class UploadHelper:
                     dupe_size = parse_size_to_bytes(dupe_size_raw)
                     if upload_size and dupe_size:
                         diff_bytes = dupe_size - upload_size
-                        diff_mb = int(round(diff_bytes / (1024 * 1024)))
-                        diff_pct = int(round((diff_bytes / upload_size) * 100))
+                        diff_mb = round(diff_bytes / (1024 * 1024))
+                        diff_pct = round((diff_bytes / upload_size) * 100)
 
                         p = abs(diff_pct) / 100.0
                         color_hex = get_color_for_diff(p)
@@ -153,7 +153,7 @@ class UploadHelper:
                 return f"{name}{size_diff_str}"
             return str(entry)
 
-        def _format_dupes_list(entries: list[Union[DupeEntry, str]]) -> str:
+        def _format_dupes_list(entries: list[Any]) -> str:
             seen = set()
             formatted = []
             for entry in entries:
@@ -206,7 +206,7 @@ class UploadHelper:
                     console.print("[bold red]Trumpable found![/bold red]")
                 elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f'{tracker_name}_matched_episode_ids', []))
-                    user_tag = str(meta.tag).lstrip("-").lower()  # Remove leading dash for comparison
+                    user_tag = meta.tag.lstrip("-").lower()  # Remove leading dash for comparison
 
                     # Try to find a release with matching tag
                     selected_match = None
@@ -332,8 +332,8 @@ class UploadHelper:
             else:
                 upload = meta.dupe is not False
 
-            display_name = display_name if display_name is not None else str(meta.name)
-            display_name = str(display_name)
+            display_name = display_name if display_name is not None else meta.name
+            display_name = display_name
 
             if tracker_name in ["BHD"]:
                 if meta.debug:
@@ -388,7 +388,7 @@ class UploadHelper:
                 return True, meta
             else:
                 for each in dupes_list:
-                    each_name = str(each.get('name')) if isinstance(each, dict) else str(each)
+                    each_name = str(each.get("name")) if isinstance(each, dict) else each
                     if each_name == meta.name:
                         meta.name = f"{meta.name} DUPE?"
 
@@ -458,29 +458,29 @@ class UploadHelper:
             narrator = meta.narrator or missing_warning
             audiobook_duration_formatted = meta.audiobook_duration_formatted or missing_warning
             poster = meta.poster or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
-            comic = bool(meta.comic)
-            manga = bool(meta.manga)
-            magazine = bool(meta.magazine)
-            newspaper = bool(meta.newspaper)
+            comic = meta.comic
+            manga = meta.manga
+            magazine = meta.magazine
+            newspaper = meta.newspaper
 
             def format_value(value: bool) -> str:
                 return "[green]True[/green]" if value else "[purple]False[/purple]"
 
-            lines.append(("Author", str(author)))
+            lines.append(("Author", author))
             if book_translator:
-                lines.append(("Translator", str(book_translator)))
-            lines.append(("Publisher", str(publisher)))
-            lines.append(("Language", str(book_language)))
-            lines.append(("ISBN", str(isbn)))
-            lines.append(("ASIN", str(asin)))
+                lines.append(("Translator", book_translator))
+            lines.append(("Publisher", publisher))
+            lines.append(("Language", book_language))
+            lines.append(("ISBN", isbn))
+            lines.append(("ASIN", asin))
             lines.append(("Comic", format_value(comic)))
             lines.append(("Manga", format_value(manga)))
             lines.append(("Magazine", format_value(magazine)))
             lines.append(("Newspaper", format_value(newspaper)))
             if meta.audiobook:
-                lines.append(("Narrator", str(narrator)))
+                lines.append(("Narrator", narrator))
                 lines.append(("Duration", str(audiobook_duration_formatted)))
-            lines.append(("Cover", str(poster)))
+            lines.append(("Cover", poster))
 
         elif meta.category == "GAME":
             notes = meta.description_link or meta.description_file or ""
@@ -505,10 +505,10 @@ class UploadHelper:
             lines.append(("Version", version))
             if notes:
                 lines.append(("Notes", notes))
-            lines.append(("Developer", str(developer)))
-            lines.append(("Publisher", str(publisher)))
-            lines.append(("Platform", str(platform)))
-            lines.append(("Cover", str(poster)))
+            lines.append(("Developer", developer))
+            lines.append(("Publisher", publisher))
+            lines.append(("Platform", platform))
+            lines.append(("Cover", poster))
             if int(igdb_id) > 0:
                 lines.append(("IGDB", str(igdb_id)))
             if steam_url:
@@ -536,7 +536,7 @@ class UploadHelper:
                 imdb = str(meta.original_imdb).zfill(7)
                 lines.append(("IMDB", f"https://www.imdb.com/title/tt{imdb}"))
             if meta.original_tmdb != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{meta.category.lower()}/{meta.original_tmdb}"))
+                lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.original_tmdb}"))
             if meta.original_tvdb != 0:
                 lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.original_tvdb}&tab=series"))
             if meta.original_tvmaze != 0:
@@ -545,7 +545,7 @@ class UploadHelper:
                 lines.append(("MAL", f"https://myanimelist.net/anime/{meta.original_mal}"))
         else:
             if meta.tmdb_id or 0 != 0:
-                lines.append(("TMDB", f"https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb_id}"))
+                lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}"))
             if meta.imdb_id or 0 != 0:
                 lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
             if meta.tvdb_id or 0 != 0:
@@ -565,21 +565,21 @@ class UploadHelper:
         distributor = meta.distributor or missing_warning
         edition = meta.edition
 
-        lines.append(("Edition", str(edition)))
-        lines.append(("Resolution", str(resolution)))
+        lines.append(("Edition", edition))
+        lines.append(("Resolution", resolution))
         lines.append(("Source", str(source)))
-        lines.append(("Type", str(type_)))
-        lines.append(("Edition", str(edition)))
+        lines.append(("Type", type_))
+        lines.append(("Edition", edition))
 
         if meta.category != "BOOK":
-            lines.append(("Group Tag", str(tag)))
+            lines.append(("Group Tag", tag))
 
         if meta.is_disc:
             lines.append(("Region", str(region)))
-            lines.append(("Distributor", str(distributor)))
+            lines.append(("Distributor", distributor))
 
         if not meta.emby:
-            if int(meta.freeleech) != 0:
+            if meta.freeleech != 0:
                 lines.append(("Freeleech", str(meta.freeleech)))
             lines.append("")
 
@@ -636,7 +636,7 @@ class UploadHelper:
                 console.print(f"[bold cyan]IMDB URL:[/bold cyan] [yellow]https://www.imdb.com/title/tt{imdb}[/yellow]")
             if meta.original_tmdb != meta.tmdb_id:
                 console.print(f"[bold red]TMDB ID changed from {meta.original_tmdb} to {meta.tmdb_id}[/bold red]")
-                console.print(f"[bold cyan]TMDB URL:[/bold cyan] [yellow]https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb_id}[/yellow]")
+                console.print(f"[bold cyan]TMDB URL:[/bold cyan] [yellow]https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}[/yellow]")
             if meta.original_mal != meta.mal_id:
                 console.print(f"[bold red]MAL ID changed from {meta.original_mal} to {meta.mal_id}[/bold red]")
                 console.print(f"[bold cyan]MAL URL:[/bold cyan] [yellow]https://myanimelist.net/anime/{meta.mal_id}[/yellow]")

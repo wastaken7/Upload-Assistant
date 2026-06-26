@@ -692,7 +692,7 @@ class TRACKER_SETUP:
         requests: list[dict[str, Any]] = []
         params = {
             "action": "search",
-            "tmdb_id": f"{meta.category.lower()}/{meta.tmdb_id}",
+            "tmdb_id": f"{str(meta.category or '').lower()}/{meta.tmdb_id}",
         }
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

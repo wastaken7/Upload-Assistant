@@ -626,7 +626,7 @@ class PTP:
             other_res = f"{video_mi['Width']}x{video_mi['Height']}"
             res = "Other"
         if meta.is_disc == "DVD":
-            res = meta.source.replace(" DVD", "")
+            res = str(meta.source or "").replace(" DVD", "")
         return res, other_res
 
     def get_container(self, meta: Meta) -> Optional[str]:
@@ -1548,7 +1548,7 @@ class PTP:
             "other_container": self.get_container(meta),
             "resolution": resolution,
             "source": "Other",  # Sending the source as custom.
-            "other_source": self.get_source(meta.source),
+            "other_source": self.get_source(meta.source or ""),
             "release_desc": desc,
             "nfo_text": "",
             "subtitles[]": ptp_subtitles,

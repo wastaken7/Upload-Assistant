@@ -365,7 +365,7 @@ class RtorrentClientMixin:
 
         return metainfo
 
-    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False) -> dict[str, Any]:
+    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False) -> Meta:
         default_cfg = cast(dict[str, Any], self.config.get('DEFAULT', {}))
         default_client_value = default_cfg.get('default_torrent_client')
         if not isinstance(default_client_value, str) or not default_client_value:

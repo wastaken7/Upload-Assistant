@@ -230,7 +230,7 @@ class FF:
         if vt:
             self.video_type = vt.strip().lower()
 
-    def movie_type(self, _meta: dict[str, Any]) -> str:
+    def movie_type(self, _meta: Meta) -> str:
         # Possible values: "XviD", "DVDR", "x264", "x265", "MP4", "VCD"
         if self.video_source == 'dvd':
             return "DVDR"
@@ -280,7 +280,7 @@ class FF:
 
         return "TVSeries"
 
-    def movie_source(self, _meta: dict[str, Any]) -> Optional[str]:
+    def movie_source(self, _meta: Meta) -> Optional[str]:
         # Possible values: "DVD", "DVDSCR", "Workprint", "TeleCine", "TeleSync", "CAM", "BluRay", "HD-DVD", "HDTV", "R5", "WebRIP"
         mapping = {
             "dvd": "DVD",
@@ -301,7 +301,7 @@ class FF:
         src = (self.video_source or "").strip().lower()
         return mapping.get(src)
 
-    def tv_source(self, _meta: dict[str, Any]) -> Optional[str]:
+    def tv_source(self, _meta: Meta) -> Optional[str]:
         # Possible values: "HDTV", "DSR", "PDTV", "TV", "DVD", "DvdScr", "BluRay", "WebRIP"
         mapping = {
             "hdtv": "HDTV",
@@ -319,7 +319,7 @@ class FF:
         src = (self.video_source or "").strip().lower()
         return mapping.get(src)
 
-    def anime_source(self, _meta: dict[str, Any]) -> Optional[str]:
+    def anime_source(self, _meta: Meta) -> Optional[str]:
         # Possible values: "DVD", "BluRay", "Anime Series", "HDTV"
         mapping = {
             "hdtv": "HDTV",
@@ -352,7 +352,7 @@ class FF:
         else:
             return "16_9"
 
-    def anime_v_codec(self, _meta: dict[str, Any]) -> str:
+    def anime_v_codec(self, _meta: Meta) -> str:
         # Possible values: "x264", "h264", "XviD", "DivX", "WMV", "VC1"
         if self.video_codec == 'vc-1':
             return "VC1"

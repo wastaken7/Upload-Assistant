@@ -217,8 +217,8 @@ class IPT:
         category = meta.category
         type_ = meta.type
         is_disc = meta.is_disc
-        genres = meta.genres.lower()
-        source = meta.source.lower()
+        genres = str(meta.genres or "").lower()
+        source = str(meta.source or "").lower()
 
         # TV
         tv_web_dl = 22

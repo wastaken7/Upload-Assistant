@@ -238,7 +238,7 @@ async def _get_audio_v2(
                 base_dir = meta.base_dir
                 folder_id = meta.uuid or meta.folder_id
                 if base_dir and folder_id:
-                    mi_path = os.path.join(base_dir, 'tmp', folder_id, 'MediaInfo.json')
+                    mi_path = os.path.join(base_dir, "tmp", str(folder_id), "MediaInfo.json")
                     if os.path.exists(mi_path):
                         mi_text = await asyncio.to_thread(Path(mi_path).read_text, encoding='utf-8')
                         mi = json.loads(mi_text)

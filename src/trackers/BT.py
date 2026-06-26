@@ -407,7 +407,7 @@ class BT:
 
         return "Outros"
 
-    async def get_languages(self, _meta: dict[str, Any]) -> Optional[str]:
+    async def get_languages(self, _meta: Meta) -> Optional[str]:
         lang_code = self.main_tmdb_data.get('original_language')
 
         if not isinstance(lang_code, str) or not lang_code:

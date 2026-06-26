@@ -19,7 +19,6 @@ from typing_extensions import TypeAlias
 from src.console import console
 from src.meta import Meta
 
-Meta: TypeAlias = dict[str, Any]
 ImageDict: TypeAlias = dict[str, Any]
 
 
@@ -647,9 +646,9 @@ async def _upload_screens(
     os.chdir(f"{meta.base_dir}/tmp/{meta.uuid}")
 
     initial_img_host = default_config[f'img_host_{img_host_num}']
-    img_host = str(meta.imghost)
+    img_host = meta.imghost
 
-    image_list = cast(list[ImageDict], meta.image_list)
+    image_list = meta.image_list
 
     # Treat empty allowed host list as no restriction
     if not allowed_hosts:
@@ -732,10 +731,7 @@ async def _upload_screens(
         console.print(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
         return image_list, total_screens
 
-    upload_tasks: list[tuple[int, str, str, dict[str, Any], dict[str, Any]]] = [
-        (index, image, img_host, config, meta)
-        for index, image in enumerate(image_glob[:images_needed])
-    ]
+    upload_tasks: list[tuple[int, str, str, dict[str, Any], Meta]] = [(index, image, img_host, config, meta) for index, image in enumerate(image_glob[:images_needed])]
 
     # Concurrency Control
     default_pool_size = len(upload_tasks)
@@ -748,7 +744,7 @@ async def _upload_screens(
     running_tasks: set[asyncio.Task[dict[str, Any]]] = set()
 
     async def async_upload(
-        task: tuple[int, str, str, dict[str, Any], dict[str, Any]],
+        task: tuple[int, str, str, dict[str, Any], Meta],
         max_retries: int = 3,
     ) -> Union[tuple[int, dict[str, Any]], None]:
         """Upload image with concurrency control and retry logic."""

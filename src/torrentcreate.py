@@ -31,7 +31,7 @@ def calculate_piece_size(
     total_size: int,
     min_size: int,
     max_size: int,
-    meta: Mapping[str, Any],
+    meta: Meta,
     piece_size: Optional[int] = None,
 ) -> int:
     return TorrentCreator.calculate_piece_size(
@@ -44,7 +44,7 @@ def calculate_piece_size(
 
 
 class CustomTorrent(torf.Torrent):
-    def __init__(self, meta: Mapping[str, Any], *args: Any, **kwargs: Any) -> None:
+    def __init__(self, meta: Meta, *args: Any, **kwargs: Any) -> None:
         self._meta = meta
 
         # Extract and store the precalculated piece size
@@ -88,7 +88,7 @@ class CustomTorrent(torf.Torrent):
         self._piece_size = value
         self.metainfo['info']['piece length'] = value
 
-    def validate_piece_size(self, _meta: Optional[Mapping[str, Any]] = None) -> None:
+    def validate_piece_size(self, _meta: Optional[Meta] = None) -> None:
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
             self.metainfo['info']['piece length'] = self._precalculated_piece_size
@@ -106,7 +106,7 @@ class TorrentCreator:
         total_size: int,
         min_size: int,
         max_size: int,
-        meta: Mapping[str, Any],
+        meta: Meta,
         piece_size: Optional[int] = None,
     ) -> int:
         # Set max_size
@@ -449,7 +449,7 @@ class TorrentCreator:
                     console.print(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
 
     @staticmethod
-    def inject_torrent_metadata(meta: Mapping[str, Any], torrent_path: str) -> None:
+    def inject_torrent_metadata(meta: Meta, torrent_path: str) -> None:
         """Inject metadata IDs (imdb, tmdb, etc.) as top-level fields inside the torrent file."""
         if not os.path.exists(torrent_path):
             return
@@ -583,7 +583,7 @@ class TorrentCreator:
             Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/{out_name}", overwrite=True)
 
     @staticmethod
-    def get_mkbrr_path(meta: Mapping[str, Any]) -> str:
+    def get_mkbrr_path(meta: Meta) -> str:
         """Determine the correct mkbrr binary based on OS and architecture."""
         system_mkbrr = shutil.which("mkbrr")
         if system_mkbrr:
@@ -655,5 +655,5 @@ async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uui
     await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
 
 
-def get_mkbrr_path(meta: Mapping[str, Any]) -> str:
+def get_mkbrr_path(meta: Meta) -> str:
     return TorrentCreator.get_mkbrr_path(meta)

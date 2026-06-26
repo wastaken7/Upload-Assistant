@@ -623,7 +623,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         # Create semaphore to limit concurrent tasks
         semaphore = asyncio.Semaphore(task_limit)
 
-        async def capture_dvd_with_semaphore(args: tuple[int, str, str, str, dict[str, Any], float, float, float, float]) -> tuple[int, Optional[str]]:
+        async def capture_dvd_with_semaphore(args: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, Optional[str]]:
             async with semaphore:
                 return await capture_dvd_screenshot(args)
 
@@ -739,7 +739,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         await cleanup_manager.cleanup()
 
 
-async def capture_dvd_screenshot(task: tuple[int, str, str, str, dict[str, Any], float, float, float, float]) -> tuple[int, Optional[str]]:
+async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, Optional[str]]:
     index, input_file, image, seek_time_str, meta, width, height, w_sar, h_sar = task
     seek_time = float(seek_time_str)
 
@@ -884,7 +884,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
                 continue
 
             try:
-                audio = mutagen.File(audio_path)
+                audio = getattr(mutagen, "File")(audio_path)
                 if audio is None:
                     continue
 
@@ -1589,7 +1589,7 @@ async def screenshots(
     # Create semaphore to limit concurrent tasks
     semaphore = asyncio.Semaphore(num_workers)
 
-    async def capture_with_semaphore(args: tuple[int, str, float, str, float, float, float, float, str, bool, dict[str, Any]]) -> Optional[tuple[int, Optional[str]]]:
+    async def capture_with_semaphore(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> Optional[tuple[int, Optional[str]]]:
         async with semaphore:
             return await capture_screenshot(args)
 
@@ -1800,7 +1800,7 @@ async def screenshots(
     return valid_results if valid_results else None
 
 
-async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, dict[str, Any]]) -> Optional[tuple[int, Optional[str]]]:
+async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> Optional[tuple[int, Optional[str]]]:
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
@@ -2092,7 +2092,7 @@ async def valid_ss_time(ss_times: list[str], num_screens: int, length: float, fr
     # Track retake calls and adjust start frame accordingly
     retake_offset = 0
     if retake:
-        if 'retake_call_count' not in meta:
+        if meta.retake_call_count is None:
             meta.retake_call_count = 0
 
         meta.retake_call_count += 1
@@ -2407,7 +2407,7 @@ class TakeScreensManager:
 
     async def capture_dvd_screenshot(
             self,
-            task: tuple[int, str, str, str, dict[str, Any], float, float, float, float]
+            task: tuple[int, str, str, str, Meta, float, float, float, float]
     ) -> tuple[int, Optional[str]]:
         return await capture_dvd_screenshot(task)
 
@@ -2426,7 +2426,7 @@ class TakeScreensManager:
 
     async def capture_screenshot(
             self,
-            args: tuple[int, str, float, str, float, float, float, float, str, bool, dict[str, Any]]
+            args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]
     ) -> Optional[tuple[int, Optional[str]]]:
         return await capture_screenshot(args)
 

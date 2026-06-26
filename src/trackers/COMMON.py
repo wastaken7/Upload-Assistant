@@ -861,7 +861,7 @@ class COMMON:
         try:
             async with httpx.AsyncClient() as client:
                 # get douban url
-                if int(meta.imdb_id) != 0:
+                if meta.imdb_id is not None and int(meta.imdb_id) != 0:
                     data["search"] = f"tt{meta.imdb_id}"
                     ptgen_json = await fetch_ptgen(client, url, data)
 

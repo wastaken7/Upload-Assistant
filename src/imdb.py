@@ -36,7 +36,7 @@ class ImdbManager:
 
     async def get_imdb_info_api(
         self,
-        imdbID: Union[int, str],
+        imdbID: Optional[Union[int, str]],
         manual_language: Optional[Union[str, dict[str, Any]]] = None,
         debug: bool = False,
     ) -> dict[str, Any]:

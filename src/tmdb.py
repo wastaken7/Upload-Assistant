@@ -66,7 +66,7 @@ class TmdbManager:
 
     async def get_tmdb_from_imdb(
         self,
-        imdb_id: Union[str, int],
+        imdb_id: Optional[Union[str, int]],
         tvdb_id: Optional[int] = None,
         search_year: Optional[Union[str, int]] = None,
         filename: Optional[str] = None,
@@ -116,11 +116,11 @@ class TmdbManager:
 
     async def tmdb_other_meta(
         self,
-        tmdb_id: int,
+        tmdb_id: Optional[int],
         path: Optional[str] = None,
         search_year: Optional[Union[str, int]] = None,
         category: Optional[str] = None,
-        imdb_id: Union[int, str] = 0,
+        imdb_id: Optional[Union[int, str]] = 0,
         manual_language: Optional[str] = None,
         anime: bool = False,
         mal_manual: Optional[int] = None,
@@ -129,7 +129,7 @@ class TmdbManager:
         poster: Optional[str] = None,
         debug: bool = False,
         mode: str = "discord",
-        tvdb_id: int = 0,
+        tvdb_id: Optional[int] = 0,
         quickie_search: bool = False,
         filename: Optional[str] = None,
     ) -> dict[str, Any]:
@@ -287,7 +287,7 @@ async def normalize_title(title: str) -> str:
 
 
 async def get_tmdb_from_imdb(
-    imdb_id: Union[str, int],
+    imdb_id: Optional[Union[str, int]],
     tvdb_id: Optional[int] = None,
     search_year: Optional[Union[str, int]] = None,
     filename: Optional[str] = None,
@@ -301,6 +301,8 @@ async def get_tmdb_from_imdb(
     - Returns `(category, tmdb_id, original_language)`
     - If TMDb fails, prompts the user (if in CLI mode).
     """
+    if imdb_id is None or imdb_id == 0 or str(imdb_id).strip() == "":
+        return "", 0, "", False
     if not str(imdb_id).startswith("tt"):
         if isinstance(imdb_id, str) and imdb_id.isdigit():
             imdb_id = f"tt{int(imdb_id):07d}"
@@ -973,11 +975,11 @@ async def get_tmdb_id(
 
 
 async def tmdb_other_meta(
-    tmdb_id: int,
+    tmdb_id: Optional[int],
     path: Optional[str] = None,
     search_year: Optional[Union[str, int]] = None,
     category: Optional[str] = None,
-    imdb_id: Union[int, str] = 0,
+    imdb_id: Optional[Union[int, str]] = 0,
     manual_language: Optional[str] = None,
     anime: bool = False,
     mal_manual: Optional[int] = None,
@@ -986,7 +988,7 @@ async def tmdb_other_meta(
     poster: Optional[str] = None,
     debug: bool = False,
     mode: str = "discord",
-    tvdb_id: int = 0,
+    tvdb_id: Optional[int] = 0,
     quickie_search: bool = False,
     filename: Optional[str] = None
 ) -> dict[str, Any]:
@@ -994,6 +996,9 @@ async def tmdb_other_meta(
     Fetch metadata from TMDB for a movie or TV show.
     Returns a dictionary containing metadata that can be used to update the meta object.
     """
+    tmdb_id = tmdb_id or 0
+    imdb_id = imdb_id or 0
+    tvdb_id = tvdb_id or 0
     _ = aka
     tmdb_metadata = {}
 
@@ -1305,7 +1310,7 @@ async def tmdb_other_meta(
     filename = filename if category == "MOVIE" else path
     mal_id, retrieved_aka, anime, demographic = await get_anime(
         media_data,
-        {'title': title, 'aka': retrieved_aka, 'mal_id': 0, 'filename': filename}
+        Meta({'title': title, 'aka': retrieved_aka, 'mal_id': 0, 'filename': filename})
     )
 
     if mal_manual is not None and mal_manual != 0:

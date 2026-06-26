@@ -67,7 +67,7 @@ class SUIO:
         return bool(api_key and username and self.upload_url and self.torrent_url)
 
     def get_category_id(self, meta: Meta) -> str:
-        category = meta.category.upper()
+        category = str(meta.category or "").upper()
         resolution = str(meta.resolution).lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}

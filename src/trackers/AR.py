@@ -106,31 +106,33 @@ class AR:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         return cookie_jar is not None
 
-    def get_links(self, movie: dict[str, Any], subheading: str, heading_end: str) -> str:
+    def get_links(self, movie: Meta, subheading: str, heading_end: str) -> str:
         description = ""
         description += "\n" + subheading + "Links" + heading_end + "\n"
         if 'IMAGES' in self.config:
-            if movie['imdb_id'] != 0:
-                description += f"[url={movie.get('imdb_info', {}).get('imdb_url', '')}][img]{self.config['IMAGES']['imdb_75']}[/img][/url]"
-            if movie['tmdb'] != 0:
-                description += f" [url=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/url]"
-            if movie['tvdb_id'] != 0:
-                description += f" [url=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/url]"
-            if movie['tvmaze_id'] != 0:
-                description += f" [url=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/url]"
-            if movie['mal_id'] != 0:
-                description += f" [url=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/url]"
+            if movie.imdb_id is not None and movie.imdb_id != 0:
+                imdb_url = movie.imdb_info.get("imdb_url", "") if isinstance(movie.imdb_info, dict) else ""
+                description += f"[url={imdb_url}][img]{self.config['IMAGES']['imdb_75']}[/img][/url]"
+            if movie.tmdb != 0 and movie.tmdb:
+                description += f" [url=https://www.themoviedb.org/{str(movie.category).lower()}/{str(movie.tmdb)}][img]{self.config['IMAGES']['tmdb_75']}[/img][/url]"
+            if movie.tvdb_id is not None and movie.tvdb_id != 0:
+                description += f" [url=https://www.thetvdb.com/?id={str(movie.tvdb_id)}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/url]"
+            if movie.tvmaze_id is not None and movie.tvmaze_id != 0:
+                description += f" [url=https://www.tvmaze.com/shows/{str(movie.tvmaze_id)}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/url]"
+            if movie.mal_id is not None and movie.mal_id != 0:
+                description += f" [url=https://myanimelist.net/anime/{str(movie.mal_id)}][img]{self.config['IMAGES']['mal_75']}[/img][/url]"
         else:
-            if movie['imdb_id'] != 0:
-                description += f"{movie.get('imdb_info', {}).get('imdb_url', '')}"
-            if movie['tmdb'] != 0:
-                description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
-            if movie['tvdb_id'] != 0:
-                description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
-            if movie['tvmaze_id'] != 0:
-                description += f"\nhttps://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
-            if movie['mal_id'] != 0:
-                description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
+            if movie.imdb_id is not None and movie.imdb_id != 0:
+                imdb_url = movie.imdb_info.get("imdb_url", "") if isinstance(movie.imdb_info, dict) else ""
+                description += f"{imdb_url}"
+            if movie.tmdb != 0 and movie.tmdb:
+                description += f"\nhttps://www.themoviedb.org/{str(movie.category).lower()}/{str(movie.tmdb)}"
+            if movie.tvdb_id is not None and movie.tvdb_id != 0:
+                description += f"\nhttps://www.thetvdb.com/?id={str(movie.tvdb_id)}&tab=series"
+            if movie.tvmaze_id is not None and movie.tvmaze_id != 0:
+                description += f"\nhttps://www.tvmaze.com/shows/{str(movie.tvmaze_id)}"
+            if movie.mal_id is not None and movie.mal_id != 0:
+                description += f"\nhttps://myanimelist.net/anime/{str(movie.mal_id)}"
         return description
 
     async def edit_desc(self, meta: Meta) -> None:

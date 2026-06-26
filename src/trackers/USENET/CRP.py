@@ -45,7 +45,7 @@ class CRP:
         if meta.anime:
             return "5070"
 
-        category = meta.category.upper()
+        category = str(meta.category or "").upper()
         resolution = str(meta.resolution).lower()
 
         uhd_resolutions = {"2160p", "4320p", "8640p"}
@@ -211,7 +211,7 @@ class CRP:
         tmdb_id = meta.tmdb_id
         if tmdb_id and str(tmdb_id).isdigit() and int(tmdb_id) > 0:
             data["tmdb_id"] = str(tmdb_id)
-            tmdb_type = meta.category.lower()
+            tmdb_type = str(meta.category or "").lower()
             if tmdb_type in ("movie", "tv"):
                 data["tmdb_type"] = tmdb_type
 

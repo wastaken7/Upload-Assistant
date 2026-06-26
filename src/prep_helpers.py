@@ -605,7 +605,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
     meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track["@type"] == "Text" and track["Default"] == "Yes"]) > 1
 
     # Check if there's a language restriction
-    if meta.has_languages is not None and not meta.emby:
+    if meta.has_languages and not meta.emby:
         try:
             parsed_info = await languages_manager.parsed_mediainfo(meta)
             audio_languages = [audio_track["language"].lower() for audio_track in parsed_info.get("audio", []) if "language" in audio_track and audio_track["language"]]
@@ -1391,7 +1391,7 @@ async def finalize_metadata(
         meta.three_d = await video_manager.is_3d(bdinfo)
 
         is_disc_value = str(meta.is_disc or "")
-        meta.source, meta.type = await get_source(meta.type, video, str(meta.path or ""), is_disc_value, meta, folder_id, base_dir)
+        meta.source, meta.type = await get_source(meta.type or "", video, str(meta.path or ""), is_disc_value, meta, folder_id, base_dir)
 
         meta.uhd = await video_manager.get_uhd(
             meta.type,

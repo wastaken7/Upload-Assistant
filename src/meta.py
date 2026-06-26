@@ -19,7 +19,7 @@ class Meta:
     _libplacebo_warmed: Any = None
     adult_media: bool = False
     aither: Any = None
-    aither_trumpable: list[Any] = field(default_factory=list)
+    aither_trumpable: Any = field(default_factory=list)
     aka: str = ""
     anime: bool = False
     anon: bool = False
@@ -31,13 +31,13 @@ class Meta:
     asin: str = ""
     ask_dupe: bool = False
     audio: str = ""
-    audio_languages: list[Any] = field(default_factory=list)
+    audio_languages: Any = field(default_factory=list)
     audio_spectrogram: Any = None
     audio_spectrogram_tracks: Any = None
     audiobook: bool = False
     audiobook_bitrate: Any = None
-    audiobook_duration: Optional[int] = None
-    audiobook_duration_formatted: Optional[int] = None
+    audiobook_duration: Any = None
+    audiobook_duration_formatted: Any = None
     author: str = ""
     auto_episode_title: Any = None
     auto_nfo: bool = False
@@ -67,16 +67,16 @@ class Meta:
     book_translator: Any = None
     btn: Any = None
     cast: Any = None
-    category: Optional[str] = None
-    category_id: Optional[int] = None
+    category: Any = None
+    category_id: Any = None
     channels: str = ""
     clean_name: str = ""
     cleanup: Any = None
     client: Any = None
-    combined_genres: list[Any] = field(default_factory=list)
+    combined_genres: Any = field(default_factory=list)
     comic: bool = False
     comparison: Optional[str] = None
-    comparison_groups: dict[str, Any] = field(default_factory=dict)
+    comparison_groups: Any = field(default_factory=dict)
     comparison_index: Optional[int] = None
     console_game: bool = False
     container: str = ""
@@ -112,7 +112,7 @@ class Meta:
     douban_manual: Any = None
     douban_rating: Any = None
     douban_votes: Any = None
-    downloaded_cover_images: list[Any] = field(default_factory=list)
+    downloaded_cover_images: Any = field(default_factory=list)
     draft: Any = None
     dual_audio: bool = False
     dupe: bool = False
@@ -139,10 +139,10 @@ class Meta:
     extra_openlibrary_ids: Optional[int] = None
     extras: Any = None
     ffdebug: bool = False
-    file_count_match: bool = False
+    file_count_match: Any = False
     filelist: list[Any] = field(default_factory=list)
     filename: str = ""
-    filename_match: bool = False
+    filename_match: Any = False
     first_air_date: Any = None
     flux: bool = False
     folder_id: Optional[int] = None
@@ -162,14 +162,14 @@ class Meta:
     game_version: str = ""
     genre: str = ""
     genre_ids: Optional[int] = None
-    genres: list[Any] = field(default_factory=list)
+    genres: Any = field(default_factory=list)
     hardcoded_subs: bool = False
     has_commentary: bool = False
     has_encode_settings: bool = False
-    has_languages: bool = False
+    has_languages: str = ""
     has_multiple_default_audio_tracks: bool = False
     has_multiple_default_subtitle_tracks: bool = False
-    has_subs: bool = False
+    has_subs: Any = False
     hash_used: Any = None
     hdb: Any = None
     hdb_description: Any = None
@@ -180,29 +180,29 @@ class Meta:
     igdb_first_release_date: str = ""
     igdb_id: int = 0
     igdb_manual: Any = None
-    igdb_rating: str = ""
-    igdb_rating_count: str = ""
+    igdb_rating: Any = ""
+    igdb_rating_count: Any = ""
     image_list: list[dict[str, Any]] = field(default_factory=list)
     image_sizes: dict[str, Any] = field(default_factory=dict)
-    imdb: str = ""
+    imdb: Any = ""
     imdb_id: Optional[int] = None
-    imdb_info: dict[str, Any] = field(default_factory=dict)
+    imdb_info: Any = field(default_factory=dict)
     imdb_manual: Any = None
     imdb_mismatch: bool = False
     imdb_rating: str = ""
     imghost: str = ""
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
-    is_disc: bool = False
+    is_disc: Any = False
     isbn: str = ""
     isdir: bool = False
     keep_folder: bool = False
     keep_images: bool = False
     keep_nfo: bool = False
-    keywords: list[Any] = field(default_factory=list)
+    keywords: Any = field(default_factory=list)
     language: str = ""
     language_checked: bool = False
-    languages: list[Any] = field(default_factory=list)
+    languages: Any = field(default_factory=list)
     libplacebo: bool = False
     limit_queue: Optional[int] = None
     linking_failed: bool = False
@@ -223,7 +223,7 @@ class Meta:
     manual_edition: Any = None
     manual_episode: Any = None
     manual_episode_title: str = ""
-    manual_frames: Optional[str] = None
+    manual_frames: Any = None
     manual_language: Any = None
     manual_platform: Any = None
     manual_season: Any = None
@@ -245,7 +245,7 @@ class Meta:
     name: str = ""
     name_notag: str = ""
     narrator: str = ""
-    networks: str = ""
+    networks: Any = ""
     newspaper: bool = False
     nexusphp_description: str = ""
     nfo: bool = False
@@ -274,10 +274,10 @@ class Meta:
     openlibrary_id: Optional[int] = None
     opera: bool = False
     origin_country: list[Any] = field(default_factory=list)
-    origin_country_code: Optional[int] = None
+    origin_country_code: Any = None
     original_category: str = ""
     original_imdb: int = 0
-    original_language: list[Any] = field(default_factory=list)
+    original_language: Any = None
     original_mal: int = 0
     original_title: str = ""
     original_tmdb: int = 0
@@ -286,10 +286,10 @@ class Meta:
     overview: str = ""
     overview_meta: str = ""
     part: str = ""
-    path: Optional[str] = None
+    path: Any = None
     path_to_menu_screenshots: str = ""
     personalrelease: bool = False
-    piece_size_constraints_enabled: bool = False
+    piece_size_constraints_enabled: Any = False
     platform: str = ""
     poster: str = ""
     potential_missing: list[Any] = field(default_factory=list)
@@ -313,13 +313,13 @@ class Meta:
     regex_secondary_title: str = ""
     regex_title: str = ""
     regex_year: str = ""
-    region: str = ""
+    region: Any = ""
     rehash: bool = False
     rehosted_poster: Any = None
     release_date: str = ""
     release_dates: Any = None
     release_url: str = ""
-    remove_trackers: bool = False
+    remove_trackers: Any = False
     repack: str = ""
     requested_trackers: Any = None
     requirements_minimum: str = ""
@@ -336,20 +336,20 @@ class Meta:
     scene_name: str = ""
     scene_nfo_file: str = ""
     screens: int = 0
-    screenshots_in_description: Optional[int] = None
-    screenshots_reported_torrent: Optional[int] = None
-    screenshots_trumping_torrent: Optional[int] = None
-    sd: bool = False
+    screenshots_in_description: Any = None
+    screenshots_reported_torrent: Any = None
+    screenshots_trumping_torrent: Any = None
+    sd: Any = False
     sdh_subs: Any = None
     search_requests: bool = False
-    search_year: str = ""
-    season: int = 0
+    search_year: Any = ""
+    season: Any = 0
     season_air_first_date: Any = None
     season_int: int = 0
     season_name: str = ""
     season_pack_contains_episode: Any = None
     season_pack_exists: bool = False
-    season_pack_id: Optional[int] = None
+    season_pack_id: Any = None
     season_pack_link: Any = None
     season_pack_name: str = ""
     secondary_title: Any = None
@@ -360,7 +360,7 @@ class Meta:
     site_check: bool = False
     site_upload: Any = None
     site_upload_queue: Any = None
-    size_match: bool = False
+    size_match: Any = False
     skip_auto_torrent: bool = False
     skip_gen_desc: bool = False
     skip_imghost_upload: bool = False
@@ -380,11 +380,11 @@ class Meta:
     stream: bool = False
     studios: Any = None
     subtitle_files: list[Any] = field(default_factory=list)
-    subtitle_languages: list[Any] = field(default_factory=list)
+    subtitle_languages: Any = field(default_factory=list)
     tag: str = ""
     three_d: str = ""
     title: str = ""
-    tmdb: list[Any] = field(default_factory=list)
+    tmdb: Any = field(default_factory=list)
     tmdb_adult_media: bool = False
     tmdb_cast: list[Any] = field(default_factory=list)
     tmdb_directors: list[Any] = field(default_factory=list)
@@ -403,7 +403,7 @@ class Meta:
     trackers_remove: bool = False
     transmission_label: Any = None
     trump_reason: Any = None
-    trumpable_id: Optional[int] = None
+    trumpable_id: Any = None
     trumping_trackers: list[Any] = field(default_factory=list)
     tv_movie: bool = False
     tv_pack: bool = False
@@ -415,7 +415,7 @@ class Meta:
     tvdb_episode_name: Any = None
     tvdb_episode_year: str = ""
     tvdb_id: Optional[int] = None
-    tvdb_imdb_id: Optional[int] = None
+    tvdb_imdb_id: Any = None
     tvdb_manual: Any = None
     tvdb_overview: Any = None
     tvdb_search_results: Any = None
@@ -426,12 +426,12 @@ class Meta:
     tvdb_series_year: Optional[int] = None
     tvmaze: Any = None
     tvmaze_episode_data: dict[str, Any] = field(default_factory=dict)
-    tvmaze_id: Optional[int] = None
+    tvmaze_id: Any = None
     tvmaze_manual: int = 0
-    type: Optional[str] = None
+    type: Any = None
     ua_name: str = ""
     ua_signature: str = ""
-    uhd: bool = False
+    uhd: Any = False
     ulcx: Any = None
     unattended: bool = False
     unattended_audio_skip: bool = False
@@ -448,9 +448,9 @@ class Meta:
     valid_mi: Any = None
     valid_mi_settings: Any = None
     vapoursynth: bool = False
-    video: list[Any] = field(default_factory=list)
+    video: Any = ""
     video_codec: str = ""
-    video_duration: int = 0
+    video_duration: Any = 0
     video_encode: str = ""
     we_are_uploading: bool = False
     we_asked: bool = False
@@ -468,7 +468,7 @@ class Meta:
     write_subtitle_languages: Any = None
     xxx: Any = None
     year: str = ""
-    youtube: str = ""
+    youtube: Any = ""
 
     def __init__(self, _data: Optional[dict[str, Any]] = None, **kwargs: Any) -> None:
         # Initialize default values
