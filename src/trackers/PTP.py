@@ -32,6 +32,7 @@ from src.uploadscreens import UploadScreensManager
 
 class PTP:
     supported_categories = ('MOVIE',)
+    tracker_urls = ['passthepopcorn.me']
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config

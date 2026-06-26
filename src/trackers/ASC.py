@@ -24,6 +24,7 @@ from src.trackers.COMMON import COMMON
 
 class ASC:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['amigos-share.club']
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config

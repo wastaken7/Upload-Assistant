@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class TLZ(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://tlzdigital.com/']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='TLZ')
         self.config: Config = config

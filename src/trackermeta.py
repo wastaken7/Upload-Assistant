@@ -135,7 +135,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         return []
 
     # Function to check each image's URL, host, and log resolution
-    save_directory = os.path.join(str(meta.base_dir), "tmp", str(meta.uuid))
+    save_directory = os.path.join(meta.base_dir, "tmp", meta.uuid)
 
     timeout = aiohttp.ClientTimeout(total=15, connect=5, sock_connect=5, sock_read=5)
 
@@ -475,7 +475,8 @@ async def update_metadata_from_tracker(
                             edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                             if (edit_choice or "").lower() == 'e':
-                                edited_description = click.edit(description)
+                                # pyrefly: ignore [bad-argument-type]
+                                edited_description = str(click.edit(text=description) or "")
                                 if edited_description:
                                     desc = edited_description.strip()
                                     meta.description = desc
@@ -581,7 +582,7 @@ async def update_metadata_from_tracker(
             found_match = False
 
     elif tracker_name in api_trackers:
-        if getattr(meta, tracker_key, None) is not None:
+        if meta.get(tracker_key) is not None:
             if meta.debug:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = cast(
@@ -614,7 +615,7 @@ async def update_metadata_from_tracker(
             if meta.debug:
                 console.print(f"[green]Valid data found on {tracker_name}[/green]")
             selected = await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, skip_tracker_descriptions)
-            found_match = bool(selected)
+            found_match = selected
         else:
             if meta.debug:
                 console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
@@ -638,7 +639,7 @@ async def update_metadata_from_tracker(
                 meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
                 meta.hdb_name = hdb_name
                 found_match = True
-                description_source = cast(str, meta.hdb_description or "")
+                description_source = meta.hdb_description or ""
                 description, image_list = cast(
                     tuple[Optional[str], list[ImageDict]],
                     bbcode.clean_hdb_description(description_source),
@@ -683,7 +684,7 @@ async def update_metadata_from_tracker(
                         meta.imdb_id = imdb if imdb else meta.imdb_id
                         meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
                         found_match = True
-                        description_source = cast(str, meta.hdb_description or "")
+                        description_source = meta.hdb_description or ""
                         description, image_list = cast(
                             tuple[Optional[str], list[ImageDict]],
                             bbcode.clean_hdb_description(description_source),
@@ -696,7 +697,8 @@ async def update_metadata_from_tracker(
                             edit_choice = (edit_choice_raw or "").strip().lower()
 
                             if edit_choice.lower() == 'e':
-                                edited_description = click.edit(description)
+                                # pyrefly: ignore [bad-argument-type]
+                                edited_description = str(click.edit(text=description) or "")
                                 if edited_description:
                                     description = edited_description.strip()
                                     meta.description = description
@@ -727,7 +729,7 @@ async def update_metadata_from_tracker(
                 else:
                     meta.imdb_id = imdb if imdb else meta.imdb_id
                     meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
-                    description_source = cast(str, meta.hdb_description or "")
+                    description_source = meta.hdb_description or ""
                     description, image_list = cast(
                         tuple[Optional[str], list[ImageDict]],
                         bbcode.clean_hdb_description(description_source),

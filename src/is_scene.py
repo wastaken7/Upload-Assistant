@@ -64,7 +64,7 @@ class SceneManager:
         os.makedirs(details_cache_dir, exist_ok=True)
 
         async with httpx.AsyncClient() as client:
-            if "scene" not in meta and not lower and not meta.emby_debug:
+            if "scene" not in meta and not lower:
                 # Cache file for search
                 search_cache_file = os.path.join(search_cache_dir, f"{quoted_base}.json")
                 response_json = None
@@ -106,7 +106,7 @@ class SceneManager:
                         imdb = imdb_val if imdb_val != 0 else None
 
                     # NFO Download Handling
-                    if not meta.nfo and not meta.emby and first_result.get("hasNFO") == "yes":
+                    if not meta.nfo and first_result.get("hasNFO") == "yes":
                         try:
                             release = first_result['release']
                             release_lower = release.lower()
@@ -164,7 +164,7 @@ class SceneManager:
                     if meta.debug and response_json:
                         console.print("[yellow]SRRDB: No match found")
 
-            elif not scene and lower and not meta.emby_debug:
+            elif not scene and lower:
                 release_name: str = ""
                 name_value = meta.filename
                 name = name_value.replace(" ", ".") if isinstance(name_value, str) else None
@@ -224,7 +224,7 @@ class SceneManager:
                     return video, scene, imdb
 
         check_predb = bool(self.default_config.get('check_predb', False))
-        if not scene and check_predb and not meta.emby_debug:
+        if not scene and check_predb:
             if meta.debug:
                 console.print("[yellow]SRRDB: No scene match found, checking predb")
             scene = await self.predb_check(meta, video)

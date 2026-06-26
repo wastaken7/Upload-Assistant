@@ -15,6 +15,7 @@ from src.trackers.COMMON import COMMON
 
 
 class RTF:
+    tracker_urls = ['peer.retroflix']
     """
     Edit for Tracker:
         Edit BASE.torrent with announce and source

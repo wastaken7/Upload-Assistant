@@ -2,7 +2,7 @@
 """Custom Meta class to support attribute access on metadata."""
 
 from dataclasses import MISSING, dataclass, field, fields
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 
 @dataclass(init=False)
@@ -121,9 +121,6 @@ class Meta:
     dvd_size: str = ""
     edit: bool = False
     edition: str = ""
-    emby: bool = False
-    emby_cat: Any = None
-    emby_debug: bool = False
     eng_subs: Any = None
     entropy: Any = None
     episode: str = ""
@@ -149,7 +146,7 @@ class Meta:
     force_recheck: bool = False
     foreign: bool = False
     format: str = ""
-    found_preferred_piece_size: bool = False
+    found_preferred_piece_size: Optional[str] = None
     found_tracker_match: Any = None
     frame_info_map: dict[str, Any] = field(default_factory=dict)
     frame_overlay: bool = False
@@ -204,7 +201,7 @@ class Meta:
     language_checked: bool = False
     languages: Any = field(default_factory=list)
     libplacebo: bool = False
-    limit_queue: Optional[int] = None
+    limit_queue: int = 0
     linking_failed: bool = False
     localized_overviews: dict[str, Any] = field(default_factory=dict)
     logo: str = ""
@@ -367,7 +364,7 @@ class Meta:
     skip_tracker_descriptions: bool = False
     skip_trackers: bool = False
     skip_upload_trackers: list[Any] = field(default_factory=list)
-    skip_uploading: bool = False
+    skip_uploading: Union[int, bool] = False
     skipit: bool = False
     skipping: Optional[str] = None
     sorted_filelist: bool = False
@@ -398,9 +395,9 @@ class Meta:
     tonemapped: bool = False
     torrent_comments: list[Any] = field(default_factory=list)
     tracker_status: dict[str, Any] = field(default_factory=dict)
-    trackers: list[Any] = field(default_factory=list)
+    trackers: Any = field(default_factory=list)
     trackers_pass: Any = None
-    trackers_remove: bool = False
+    trackers_remove: Any = False
     transmission_label: Any = None
     trump_reason: Any = None
     trumpable_id: Any = None
@@ -520,26 +517,44 @@ class Meta:
 
     def __deepcopy__(self, memo: Any) -> 'Meta':
         import copy
-        copied_dict = {k: copy.deepcopy(getattr(self, k), memo) for k in self.to_dict()}
+
+        copied_dict = {k: copy.deepcopy(self[k], memo) for k in self.to_dict()}
         return Meta(copied_dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a dictionary representing defined fields."""
         res = {}
         for f in fields(self):
-            val = getattr(self, f.name)
+            val = self.__getattribute__(f.name)
             if val is not None:
                 res[f.name] = val
         return res
 
-    def update(self, other: dict[str, Any]) -> None:
-        """Update attributes from a dictionary."""
-        for k, v in other.items():
-            if k in ('3D', '3d'):
-                k = 'three_d'
-            elif k == 'is disc':
-                k = 'is_disc'
-            setattr(self, k, v)
+    def update(self, other: Union[dict[str, Any], 'Meta']) -> None:
+        """Update attributes from a dictionary or another Meta instance."""
+        if isinstance(other, Meta):
+            for f in fields(other):
+                val = getattr(other, f.name)
+                setattr(self, f.name, val)
+        else:
+            for k, v in other.items():
+                if k in ('3D', '3d'):
+                    k = 'three_d'
+                elif k == 'is disc':
+                    k = 'is_disc'
+                setattr(self, k, v)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get attribute value by name, returning default if not set or None."""
+        if key in ("3D", "3d"):
+            key = "three_d"
+        elif key == "is disc":
+            key = "is_disc"
+        try:
+            val = self.__getattribute__(key)
+            return val if val is not None else default
+        except AttributeError:
+            return default
 
     def setdefault(self, key: str, default: Any = None) -> Any:
         """Get or set attribute default."""
@@ -547,9 +562,9 @@ class Meta:
             key = 'three_d'
         elif key == 'is disc':
             key = 'is_disc'
-        if getattr(self, key, None) is None:
+        if self.get(key) is None:
             setattr(self, key, default)
-        return getattr(self, key)
+        return self.__getattribute__(key)
 
     def pop(self, key: str, default: Any = None) -> Any:
         """Remove an attribute and return its value (setting to default)."""
@@ -557,7 +572,7 @@ class Meta:
             key = 'three_d'
         elif key == 'is disc':
             key = 'is_disc'
-        val = getattr(self, key, default)
+        val = self.get(key, default)
         # Reset to default
         for f in fields(self):
             if f.name == key:
@@ -578,7 +593,7 @@ class Meta:
             key = 'three_d'
         elif key == 'is disc':
             key = 'is_disc'
-        return hasattr(self, key) and getattr(self, key) is not None
+        return hasattr(self, key) and self.__getattribute__(key) is not None
 
     def __getitem__(self, key: str) -> Any:
         """Bracket read access for backwards compatibility during migration."""
@@ -586,9 +601,10 @@ class Meta:
             key = 'three_d'
         elif key == 'is disc':
             key = 'is_disc'
-        if hasattr(self, key):
-            return getattr(self, key)
-        raise KeyError(key)
+        try:
+            return self.__getattribute__(key)
+        except AttributeError:
+            raise KeyError(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Bracket write access for backwards compatibility during migration."""

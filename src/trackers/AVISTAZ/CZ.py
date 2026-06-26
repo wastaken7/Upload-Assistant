@@ -9,6 +9,7 @@ from src.trackers.COMMON import COMMON
 
 class CZ(AZTrackerBase):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.cinemaz.to']
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name='CZ')
         self.config = config

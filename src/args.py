@@ -6,7 +6,7 @@ import re
 import sys
 import urllib.parse
 from collections.abc import Sequence
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import console
@@ -311,9 +311,6 @@ class Args:
         parser.add_argument('-cleanup', '--cleanup', action='store_true', required=False, help="Clean up tmp directory")
         parser.add_argument('-fl', '--freeleech', nargs=1, required=False, help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values", default=0, dest="freeleech")
         parser.add_argument('--infohash', nargs=1, required=False, help="V1 Info Hash")
-        parser.add_argument('-emby', '--emby', action='store_true', required=False, help="Create an Emby-compliant NFO file and optionally symlink the content")
-        parser.add_argument('-emby_cat', '--emby_cat', nargs=1, required=False, help="Set the expected category for Emby (e.g., 'movie', 'tv')")
-        parser.add_argument('-emby_debug', '--emby_debug', action='store_true', required=False, help="Does debugging stuff for Audionut")
         parser.add_argument('-ch', '--channel', nargs=1, required=False, help="SPD only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.", type=str, dest='spd_channel', default="")
         parser.add_argument("-excl", "--exclusive", nargs=1, required=False, help="Set exclusive flag on all supported trackers", dest="exclusive")
         parser.add_argument('-as', '--audio-spectrogram', action='store_true', required=False, help="Generate and upload audio spectrograms", dest="audio_spectrogram", default=None)
@@ -351,7 +348,7 @@ class Args:
             value = parsed_args[key]
             if value not in (None, []):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     value2 = self.list_to_string(value_list)
                     if key == 'manual_type':
                         meta.manual_type = value2.upper().replace("-", "")
@@ -541,7 +538,7 @@ class Args:
                     meta[key] = value
             if key == 'site_upload':
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0].upper()  # Extract the tracker acronym and uppercase it
                     elif value_list:
@@ -554,7 +551,7 @@ class Args:
                     meta[key] = None
             if key in ("manual_edition"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -563,7 +560,7 @@ class Args:
                     meta[key] = value
             if key in ("manual_dvds"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     elif value_list:
@@ -576,7 +573,7 @@ class Args:
                     meta[key] = ""
             if key in ("freeleech"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
                         meta[key] = int(value_list[0])
                     else:
@@ -589,7 +586,7 @@ class Args:
                 meta[key] = ""
             if key in ["tvmaze_manual"]:
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -600,7 +597,7 @@ class Args:
                 if value:
                     # Extract from list if it's a single-item list (from nargs=1)
                     if isinstance(value, list):
-                        value_list = cast(list[Any], value)
+                        value_list = value
                         tracker_value: Any = value_list[0] if len(value_list) == 1 else value_list
                     else:
                         tracker_value = value
@@ -616,7 +613,7 @@ class Args:
                     elif isinstance(tracker_value, list):
                         # Handle list of strings
                         expanded: list[str] = []
-                        for t in cast(list[Any], tracker_value):
+                        for t in tracker_value:
                             t_str = str(t)
                             if ',' in t_str:
                                 expanded.extend([x.strip().upper() for x in t_str.split(',')])
@@ -628,7 +625,7 @@ class Args:
                 else:
                     meta[key] = []
             else:
-                meta[key] = getattr(meta, key, None)
+                meta[key] = meta.get(key)
             # if key == 'help' and value == True:
             # parser.print_help()
 
@@ -693,7 +690,7 @@ class Args:
 
         book_language_arg = meta.book_language
         if book_language_arg not in (None, ""):
-            raw_lang = str(book_language_arg).strip()
+            raw_lang = book_language_arg.strip()
             try:
                 import langcodes
 
@@ -719,7 +716,7 @@ class Args:
         manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
             meta.year = str(manual_year_arg).strip()
-            meta.search_year = int(manual_year_arg)
+            meta.search_year = manual_year_arg
 
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
@@ -760,20 +757,20 @@ class Args:
 
         game_version_arg = meta.game_version
         if game_version_arg not in (None, ""):
-            meta.game_version = str(game_version_arg).strip()
+            meta.game_version = game_version_arg.strip()
 
         game_subcategory_arg = meta.game_subcategory
         if game_subcategory_arg not in (None, ""):
-            meta.game_subcategory = str(game_subcategory_arg).strip().lower()
+            meta.game_subcategory = game_subcategory_arg.strip().lower()
 
         manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
             meta.year = str(manual_year_arg).strip()
-            meta.search_year = int(manual_year_arg)
+            meta.search_year = manual_year_arg
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:
-            return str(list[0])
+            return list[0]
         try:
             result = " ".join(list)
         except Exception:
@@ -783,7 +780,7 @@ class Args:
     def parse_tmdb_id(self, id_str: str, category: Optional[str]) -> tuple[str, int]:
         if category is None:
             category = ''
-        parsed_id: str = str(id_str).lower().strip()
+        parsed_id: str = id_str.lower().strip()
         if parsed_id.startswith('http'):
             parsed = urllib.parse.urlparse(parsed_id)
             path = parsed.path.strip('/')

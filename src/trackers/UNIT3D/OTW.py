@@ -14,6 +14,7 @@ Config = dict[str, Any]
 
 class OTW(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://oldtoons.world']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='OTW')
         self.config: Config = config

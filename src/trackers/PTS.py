@@ -16,6 +16,7 @@ Config = dict[str, Any]
 
 class PTS:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://tracker.ptskit.com']
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)

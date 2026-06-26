@@ -175,7 +175,7 @@ class ApplyOverrides:
                             meta[related_key] = value
                             modified_keys.append(related_key)
                             if meta.debug:
-                                console.print(f"[Debug] Override: {related_key} changed from {getattr(meta, related_key, None)} to {value}")
+                                console.print(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
                 # Handle regular fields
                 elif key in updated_meta and key in meta:
                     # Skip path to preserve original

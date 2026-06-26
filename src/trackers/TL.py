@@ -18,6 +18,7 @@ Config = dict[str, Any]
 
 class TL:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['tracker.tleechreload', 'tracker.torrentleech']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

@@ -300,7 +300,7 @@ class UNIT3D:
 
     async def get_flag(self, meta: Meta, flag_name: str) -> str:
         config_flag = self.tracker_config.get(flag_name)
-        if getattr(meta, flag_name, False):
+        if meta.get(flag_name, False):
             return "1"
         else:
             if config_flag is not None:

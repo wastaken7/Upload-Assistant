@@ -14,6 +14,7 @@ Config = dict[str, Any]
 
 class TTR(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://torrenteros.org']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='TTR')

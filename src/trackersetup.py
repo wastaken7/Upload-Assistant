@@ -578,7 +578,7 @@ class TRACKER_SETUP:
                 elif isinstance(tmdb_value, str):
                     tmdb_id = [int(tmdb_value)]
                 elif isinstance(tmdb_value, list):
-                    tmdb_id = [int(id_value) for id_value in cast(list[Any], tmdb_value)]
+                    tmdb_id = [int(id_value) for id_value in tmdb_value]
                 else:
                     console.print(f"[red]Invalid TMDB ID format in meta: {tmdb_value}[/red]")
                     return False
@@ -586,7 +586,7 @@ class TRACKER_SETUP:
                 seasonint = 0
                 metaseason = meta.season_int
                 if metaseason:
-                    seasonint = int(metaseason)
+                    seasonint = metaseason
                 file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker_name}_claimed_releases.json")
                 if not os.path.exists(file_path):
                     console.print(f"[red]No claim data file found for {tracker_name}[/red]")
@@ -645,9 +645,9 @@ class TRACKER_SETUP:
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
                     if 'data' in data_dict and isinstance(data_dict['data'], list):
-                        results_list.extend([item for item in cast(list[Any], data_dict['data']) if isinstance(item, dict)])
+                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
                     elif 'results' in data_dict and isinstance(data_dict['results'], list):
-                        results_list.extend([item for item in cast(list[Any], data_dict['results']) if isinstance(item, dict)])
+                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                     else:
                         console.print("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -705,9 +705,9 @@ class TRACKER_SETUP:
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
                     if 'data' in data_dict and isinstance(data_dict['data'], list):
-                        results_list.extend([item for item in cast(list[Any], data_dict['data']) if isinstance(item, dict)])
+                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
                     elif 'results' in data_dict and isinstance(data_dict['results'], list):
-                        results_list.extend([item for item in cast(list[Any], data_dict['results']) if isinstance(item, dict)])
+                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                     else:
                         console.print("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -812,7 +812,7 @@ class TRACKER_SETUP:
 
             existing_uuids = {str(entry.get('uuid')) for entry in request_data}
             uuid_value = meta.uuid
-            uuid_str = str(uuid_value) if uuid_value is not None else ""
+            uuid_str = uuid_value if uuid_value is not None else ""
 
             for each in requests:
                 type_name = False
@@ -855,7 +855,7 @@ class TRACKER_SETUP:
                         if api_episode and meta.episode_int and api_episode == meta.episode_int:
                             episode = True
                     if str(api_category) in [str(cid) for cid in category_ids]:
-                        new_url = re.sub(r'/api/requests/filter$', f'/requests/{api_id}', url)
+                        new_url = re.sub(r"/api/requests/filter$", f"/requests/{api_id}", cast(str, url))
                         if meta.category == "MOVIE" and type_name and resolution and not api_claimed:
                             console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
@@ -1176,9 +1176,9 @@ class TRACKER_SETUP:
                             data_dict = cast(JsonDict, data)
                             page_data: list[Any] = []
                             if 'data' in data_dict and isinstance(data_dict['data'], list):
-                                page_data.extend([item for item in cast(list[Any], data_dict['data']) if isinstance(item, dict)])
+                                page_data.extend([item for item in data_dict["data"] if isinstance(item, dict)])
                             elif 'results' in data_dict and isinstance(data_dict['results'], list):
-                                page_data.extend([item for item in cast(list[Any], data_dict['results']) if isinstance(item, dict)])
+                                page_data.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                             else:
                                 console.print("[bold red]Unexpected response format[/bold red]")
                                 return requests, status_code
@@ -1314,11 +1314,7 @@ class TRACKER_SETUP:
             message = f"{meta.ua_name} is trumping this torrent for reasons {meta.ua_name} has not correctly caught. User selected yes at a prompt."
 
         if tracker != 'LST':
-            payload: JsonDict = {
-                'reported_torrent_id': reported_torrent_id,
-                'trumping_torrent_id': trumping_torrent_id,
-                'message': str(message)
-            }
+            payload: JsonDict = {"reported_torrent_id": reported_torrent_id, "trumping_torrent_id": trumping_torrent_id, "message": message}
             if 'screenshots_reported_torrent' in meta:
                 payload["screenshots_reported_torrent"] = ",".join(cast(list[str], meta.screenshots_reported_torrent))
             if 'screenshots_trumping_torrent' in meta:
@@ -1335,9 +1331,7 @@ class TRACKER_SETUP:
                     user_message = None
                 message = message + ": " + user_message if user_message else message + ": No additional message provided by user"
             message = message + ": https://lst.gg/torrents/" + str(trumping_torrent_id)
-            payload: JsonDict = {
-                'message': str(message)
-            }
+            payload: JsonDict = {"message": message}
 
         if not meta.debug:
             try:

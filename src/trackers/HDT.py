@@ -20,6 +20,7 @@ Config = dict[str, Any]
 
 class HDT:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://hdts-announce.ru']
     secret_token: str = ''
 
     def __init__(self, config: Config) -> None:

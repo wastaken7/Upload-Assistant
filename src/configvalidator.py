@@ -77,8 +77,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "show_upload_duration": (bool,),
     "print_tracker_messages": (bool,),
     "print_tracker_links": (bool,),
-    "emby_dir": (str, type(None)),
-    "emby_tv_dir": (str, type(None)),
     "search_requests": (bool,),
     "check_predb": (bool,),
     "prefer_max_16_torrent": (bool,),

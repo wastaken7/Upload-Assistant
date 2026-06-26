@@ -17,6 +17,7 @@ Config = dict[str, Any]
 
 class NBL:
     supported_categories = ('TV',)
+    tracker_urls = ['tracker.nebulance']
 
     """
     Edit for Tracker:

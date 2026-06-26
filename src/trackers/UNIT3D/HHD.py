@@ -11,6 +11,7 @@ Config = dict[str, Any]
 
 class HHD(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://homiehelpdesk.net']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="HHD")

@@ -51,12 +51,9 @@ def parse_size_to_bytes(size_str: Any) -> Optional[int]:
                         # Ambiguous: could be thousands (1,024 MB) or decimal (1,544 TiB)
                         match_unit = re.search(r"([a-zA-Z]+)$", s)
                         unit = match_unit.group(1).lower() if match_unit else ""
-                        if unit in ("tb", "tib", "pb", "pib"):
-                            # A large unit like TiB/TB indicates a decimal fraction (e.g., 1.544 TiB)
-                            s = s.replace(",", ".")
-                        else:
-                            # For B, KB, MB, GB, etc., it is a thousands separator (e.g., 1,024 MB)
-                            s = s.replace(",", "")
+                        # A large unit like TiB/TB indicates a decimal fraction (e.g., 1.544 TiB)
+                        # For B, KB, MB, GB, etc., the comma is a thousands separator (e.g., 1,024 MB)
+                        s = s.replace(",", ".") if unit in ("tb", "tib", "pb", "pib") else s.replace(",", "")
                     else:
                         # 1, 2, or 4+ digits after comma -> decimal separator
                         s = s.replace(",", ".")
@@ -88,11 +85,11 @@ def parse_size_to_bytes(size_str: Any) -> Optional[int]:
         return None
 
 
-def hsl_to_rgb(h: float, s: float, l: float) -> tuple[int, int, int]:
+def hsl_to_rgb(h: float, s: float, lx: float) -> tuple[int, int, int]:
     # h in [0, 360], s in [0, 1], l in [0, 1]
-    c = (1.0 - abs(2.0 * l - 1.0)) * s
+    c = (1.0 - abs(2.0 * lx - 1.0)) * s
     x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
-    m = l - c / 2.0
+    m = lx - c / 2.0
     if 0 <= h < 60:
         r, g, b = c, x, 0.0
     elif 60 <= h < 120:
@@ -151,7 +148,7 @@ class UploadHelper:
                     else:
                         return f"{name} - {link}{size_diff_str}"
                 return f"{name}{size_diff_str}"
-            return str(entry)
+            return entry
 
         def _format_dupes_list(entries: list[Any]) -> str:
             seen = set()
@@ -752,7 +749,7 @@ class UploadHelper:
             else:
                 potential_missing = cast(list[str], meta.potential_missing)
 
-        missing = [f"--{each} | {info_notes.get(each, '')}" for each in potential_missing if str(getattr(meta, each, "")).strip() in ["", "None", "0"]]
+        missing = [f"--{each} | {info_notes.get(each, '')}" for each in potential_missing if str(meta.get(each, "")).strip() in ["", "None", "0"]]
 
         if missing:
             console.print("[bold yellow]Potentially missing information:[/bold yellow]")

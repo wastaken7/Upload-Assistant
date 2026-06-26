@@ -16,6 +16,7 @@ Config = dict[str, Any]
 
 class STC(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://skipthecommercials.xyz']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='STC')
         self.config: Config = config

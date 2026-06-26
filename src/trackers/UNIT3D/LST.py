@@ -11,6 +11,7 @@ Config = dict[str, Any]
 
 class LST(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK")
+    tracker_urls = ['https://lst.gg']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LST')

@@ -18,6 +18,7 @@ from src.meta import Meta
 
 class FF:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.funfile.org']
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.cookie_validator = CookieValidator(config)

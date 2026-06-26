@@ -14,6 +14,7 @@ Config = dict[str, Any]
 
 class LCD(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['locadora.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LCD')
         self.config: Config = config

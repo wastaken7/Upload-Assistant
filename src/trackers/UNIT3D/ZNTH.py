@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class ZNTH(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://znth.cx']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ZNTH")

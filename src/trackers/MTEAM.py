@@ -18,6 +18,7 @@ Config = dict[str, Any]
 
 
 class MTEAM:
+    tracker_urls = ['tracker.m-team.cc', 'tra1.m-team.cc', 'tracker.m-team.io', 'tra1.m-team.io', 'tra99.manfuz.co']
     """
     API Docs: https://test2.m-team.cc/api/swagger-ui/index.html
     API Limits: https://wiki.m-team.cc/zh-tw/api

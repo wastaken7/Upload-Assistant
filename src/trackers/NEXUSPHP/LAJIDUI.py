@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class LAJIDUI(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://pt.lajidui.top']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LAJIDUI")
         self.banned_groups = []

@@ -114,18 +114,18 @@ async def _check_hosts(
     if meta.skip_imghost_upload:
         if meta.debug:
             console.print(f"[yellow]Skipping image host upload for {tracker} as per meta.skip_imghost_upload setting.")
-        return getattr(meta, new_images_key, []), False, False
+        return meta.get(new_images_key, []), False, False
     if new_images_key not in meta:
         meta[new_images_key] = []
 
     if meta.debug:
         console.print(
             f"[cyan]check_hosts debug: tracker={tracker} meta.imghost={meta.imghost} approved_image_hosts={approved_image_hosts} "
-            f"image_list={len(meta.image_list or [])} {new_images_key}={len(getattr(meta, new_images_key, []) or [])}[/cyan]"  # noqa: E501
+            f"image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
         )
 
     # Check if we have main image_list but no tracker-specific images yet
-    if meta.image_list and not getattr(meta, new_images_key, None):
+    if meta.image_list and not meta.get(new_images_key):
         if meta.debug:
             console.print(f"[yellow]Checking if existing images in meta.image_list can be used for {tracker}...")
         # Check if the URLs in image_list are from approved hosts
@@ -214,9 +214,9 @@ async def _check_hosts(
 
     # Check if the tracker-specific key has valid images
     has_valid_images = False
-    if getattr(meta, new_images_key, None):
+    if meta.get(new_images_key):
         valid_hosts: list[bool] = []
-        tracker_images = cast(list[dict[str, str]], getattr(meta, new_images_key, []))
+        tracker_images = cast(list[dict[str, str]], meta.get(new_images_key, []))
         for image in tracker_images:
             raw_url = _as_str(image.get('raw_url')) or ""
             netloc = urlparse(raw_url).netloc
@@ -260,15 +260,15 @@ async def _check_hosts(
 
         break
 
-    if not getattr(meta, new_images_key, None):
+    if not meta.get(new_images_key):
         console.print("[red]All image hosts failed. Please check your configuration.")
 
     if meta.debug:
         console.print(
-            f"[cyan]check_hosts debug: done tracker={tracker} image_list={len(meta.image_list or [])} {new_images_key}={len(getattr(meta, new_images_key, []) or [])}[/cyan]"  # noqa: E501
+            f"[cyan]check_hosts debug: done tracker={tracker} image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
         )
 
-    return getattr(meta, new_images_key, []), False, images_reuploaded
+    return meta.get(new_images_key, []), False, images_reuploaded
 
 
 async def _handle_image_upload(
@@ -299,7 +299,7 @@ async def _handle_image_upload(
     if isinstance(filelist_value, str):
         filelist = [filelist_value]
     elif isinstance(filelist_value, list):
-        filelist = [str(item) for item in cast(list[Any], filelist_value) if item]
+        filelist = [str(item) for item in filelist_value if item]
     filename = meta.title
     if meta.is_disc == "HDDVD":
         path = str(meta.discs[0].get("largest_evo", ""))
@@ -569,7 +569,7 @@ async def _handle_image_upload(
             for image in uploaded_images:
                 console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
 
-        for image in cast(list[dict[str, str]], getattr(meta, new_images_key, [])):
+        for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
             raw_url = image['raw_url']
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
@@ -584,7 +584,7 @@ async def _handle_image_upload(
 
         # Ensure all uploaded images are valid
         valid_hosts: list[bool] = []
-        for image in cast(list[dict[str, str]], getattr(meta, new_images_key, [])):
+        for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
             netloc = urlparse(image['raw_url']).netloc
             matched_host = await match_host(netloc, url_host_mapping.keys())
             mapped_host = url_host_mapping.get(matched_host, matched_host)

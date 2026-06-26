@@ -23,6 +23,7 @@ Config = dict[str, Any]
 
 class HDB:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://tracker.hdbits.org']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

@@ -18,6 +18,7 @@ Config = dict[str, Any]
 
 class IPT:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://ssl.empirehost.me']
     def __init__(self, config: Config):
         self.config = config
         self.cookie_validator = CookieValidator(config)

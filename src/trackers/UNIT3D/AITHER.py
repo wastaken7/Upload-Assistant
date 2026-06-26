@@ -10,6 +10,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 class AITHER(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://aither.cc']
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='AITHER')
         self.config = config

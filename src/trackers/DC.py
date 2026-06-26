@@ -15,6 +15,7 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 class DC:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['tracker.digitalcore.club', 'trackerprxy.digitalcore.club']
 
     def __init__(self, config: Config):
         self.config = config

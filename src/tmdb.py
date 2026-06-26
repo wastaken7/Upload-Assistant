@@ -183,9 +183,9 @@ class TmdbManager:
     ) -> tuple[str, int, Optional[int], Optional[int]]:
         category_value = str(meta.category or "MOVIE")
         is_disc = bool(meta.is_disc)
-        tmdbid = int(meta.tmdb_id or 0)
-        imdbid = typing_cast(Optional[int], meta.imdb_id)
-        tvdbid = typing_cast(Optional[int], meta.tvdb_id)
+        tmdbid = meta.tmdb_id or 0
+        imdbid = meta.imdb_id or 0
+        tvdbid = meta.tvdb_id or 0
         return await get_tmdb_imdb_from_mediainfo(
             mediainfo=mediainfo,
             category=category_value,
@@ -569,7 +569,7 @@ async def get_tmdb_id(
                         }
 
                         if len(summary_exact_matches) == 1:
-                            tmdb_id = int(summary_exact_matches.pop())
+                            tmdb_id = summary_exact_matches.pop()
                             return tmdb_id, category
 
                         # If no exact matches, calculate similarity for all results and sort them
@@ -754,7 +754,7 @@ async def get_tmdb_id(
 
                         for idx, result in enumerate(sorted_results):
                             title = result.get('title') or result.get('name', '')
-                            year = result.get('release_date', result.get('first_air_date', ''))[:4]
+                            year = (result.get("release_date") or result.get("first_air_date") or "")[:4]
                             overview = result.get('overview', '')
                             similarity_score = results_with_similarity[idx][1]
 
@@ -780,7 +780,7 @@ async def get_tmdb_id(
                                         parsed_category, parsed_tmdb_id = _get_parser().parse_tmdb_id(selection, category)
                                         if parsed_tmdb_id and parsed_tmdb_id != 0:
                                             console.print(f"[green]Using manual TMDb ID: {parsed_tmdb_id} and category: {parsed_category}[/green]")
-                                            return int(parsed_tmdb_id), parsed_category
+                                            return parsed_tmdb_id, parsed_category
                                         else:
                                             console.print("[bold red]Invalid TMDb ID format. Please try again.[/bold red]")
                                             continue
@@ -1464,7 +1464,7 @@ async def get_anime(response: dict[str, Any], meta: Meta) -> tuple[int, str, boo
     else:
         mal_id = 0
     if meta.mal_id != 0:
-        mal_id = int(meta.mal_id or 0)
+        mal_id = meta.mal_id
     return mal_id, alt_name, anime, demographic
 
 
@@ -1650,7 +1650,7 @@ async def get_romaji(tmdb_name: str, mal: Optional[int], meta: Meta) -> tuple[st
         romaji = eng_title = season_year = ""
         episodes = mal_id = 0
     if mal not in (None, 0):
-        mal_id = int(mal)
+        mal_id = mal
     if not episodes:
         episodes = 0
     return romaji, mal_id, eng_title, season_year, episodes, demographic
@@ -2035,7 +2035,7 @@ async def set_tmdb_metadata(meta: Meta, filename: Optional[str] = None) -> None:
         # if we have these fields already, we probably got them from a multi id searching
         # and don't need to fetch them again
         essential_fields = ['title', 'year', 'genres', 'overview']
-        tmdb_metadata_populated = all(getattr(meta, field, None) is not None for field in essential_fields)
+        tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
     else:
         # if we're in that blasted edit mode, ignore any previous set data and get fresh
         tmdb_metadata_populated = False

@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class RPT(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://bilibili.download']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "RPT")
         self.banned_groups = []

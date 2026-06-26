@@ -22,6 +22,7 @@ Config = dict[str, Any]
 
 class SPD:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['ramjet.speedapp.io', 'ramjet.speedapp.to', 'ramjet.speedappio.org']
 
     def __init__(self, config: Config) -> None:
         self.url = "https://speedapp.io"

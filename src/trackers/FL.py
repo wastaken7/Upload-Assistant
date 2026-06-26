@@ -21,6 +21,7 @@ from src.trackers.COMMON import COMMON
 
 class FL:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['reactor.filelist', 'reactor.thefl.org']
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config

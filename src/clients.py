@@ -271,7 +271,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             mtv_torrent = bool(mtv_config_dict.get('prefer_mtv_torrent', False))
             prefer_small_pieces = mtv_torrent
         else:
-            prefer_small_pieces = bool(piece_limit)
+            prefer_small_pieces = piece_limit
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
 
         default_torrent_client = cast(str, self.config['DEFAULT']['default_torrent_client'])
@@ -348,7 +348,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         # Iterate through pre-specified hashes
         for hash_key in ['torrenthash', 'ext_torrenthash']:
-            hash_value = getattr(meta, hash_key, None)
+            hash_value = meta.get(hash_key)
             if hash_value:
                 hash_value_str = str(hash_value)
                 # If no torrent_storage_dir defined, use saved torrent from qbit
@@ -529,7 +529,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 if valid:
                     torrent = Torrent.read(resolved_path)
                     piece_size = torrent.piece_size
-                    piece_in_mib = int(piece_size) / 1024 / 1024
+                    piece_in_mib = piece_size / 1024 / 1024
 
                     if not prefer_small_pieces:
                         if meta.debug:
@@ -555,8 +555,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         valid = False
         wrong_file = False
         filelist = cast(list[str], meta.filelist)
-        meta_path = str(meta.path)
-        meta_uuid = str(meta.uuid)
+        meta_path = meta.path
+        meta_uuid = meta.uuid
 
         # Normalize the torrent hash based on the client
         if torrent_client in ('qbit', 'deluge'):
@@ -638,7 +638,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 try:
                     reuse_torrent = Torrent.read(torrent_path)
                     piece_size = reuse_torrent.piece_size
-                    piece_in_mib = int(piece_size) / 1024 / 1024
+                    piece_in_mib = piece_size / 1024 / 1024
                     torrent_storage_dir_valid = torrent_path
                     torrent_file_size_kib = round(os.path.getsize(torrent_storage_dir_valid) / 1024, 2)
                     if meta.debug:
@@ -700,7 +700,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         def _coerce_paths(value: Any) -> list[str]:
             if isinstance(value, list):
-                value_list = cast(list[Any], value)
+                value_list = value
                 return [str(v) for v in value_list if str(v)]
             return [str(value)] if value is not None else []
 

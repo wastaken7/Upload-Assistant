@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class PTCAFE(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://tracker.ptcafe.club']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTCAFE")
         self.banned_groups = []

@@ -122,7 +122,7 @@ def sanitize_book_language(meta: Meta) -> None:
         meta.book_language_iso = ""
         return
 
-    full, iso = _resolve_book_language(str(lang).strip())
+    full, iso = _resolve_book_language(lang.strip())
     if is_valid_book_language(full, iso):
         meta.book_language = full
         meta.book_language_iso = iso
@@ -176,7 +176,7 @@ async def gather_book_prep(
         "isbn": bool(meta.book_isbn),
         "asin": bool(meta.book_asin),
         "book_language": bool(meta.book_language),
-        "year": "manual_year" in meta and int(meta.manual_year or 0) > 0,
+        "year": "manual_year" in meta and (meta.manual_year or 0) > 0,
         "keywords": bool(meta.keywords),
     }
 
@@ -193,7 +193,7 @@ async def gather_book_prep(
                         meta.book_language = full
                         meta.book_language_iso = iso3
                 else:
-                    if not getattr(meta, key, None) and val:
+                    if not meta.get(key) and val:
                         meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)
@@ -211,7 +211,7 @@ async def gather_book_prep(
                         meta.book_language = full
                         meta.book_language_iso = iso3
                 else:
-                    if not getattr(meta, key, None) and val:
+                    if not meta.get(key) and val:
                         meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)
@@ -229,7 +229,7 @@ async def gather_book_prep(
                         meta.book_language = full
                         meta.book_language_iso = iso3
                 else:
-                    if not getattr(meta, key, None) and val:
+                    if not meta.get(key) and val:
                         meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)

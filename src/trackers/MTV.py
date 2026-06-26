@@ -24,6 +24,7 @@ Config = dict[str, Any]
 
 
 class MTV:
+    tracker_urls = ['tracker.morethantv']
     """
     Edit for Tracker:
         Edit BASE.torrent with announce and source

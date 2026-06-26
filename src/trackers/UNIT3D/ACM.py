@@ -9,6 +9,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 class ACM(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://eiga.moi']
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="ACM")
         self.config = config

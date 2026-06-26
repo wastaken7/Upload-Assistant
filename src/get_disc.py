@@ -53,7 +53,7 @@ class DiscInfoManager:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, discs, meta.uuid, meta.base_dir, meta.discs)
             else:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, meta.discs, meta.uuid, meta.base_dir, meta.discs)
-        elif is_disc == "DVD" and not meta.emby:
+        elif is_disc == "DVD":
             download_dvd_mediainfo(meta.base_dir, debug=meta.debug)
             discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs, base_dir=meta.base_dir, debug=meta.debug))
         elif is_disc == "HDDVD":

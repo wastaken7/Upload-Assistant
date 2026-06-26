@@ -25,6 +25,7 @@ Config = dict[str, Any]
 
 class TVC:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://tvchaosuk.com']
     # Constants for the class
     DEFAULT_LOGO_SIZE = '300'
     SCREENSHOT_THUMB_SIZE = '350'
@@ -955,7 +956,7 @@ class TVC:
         ]
 
         for id_key, url_func, img_key in link_configs:
-            if getattr(meta, id_key, 0):
+            if meta.get(id_key, 0):
                 url = url_func(meta)
                 img = self.config.get("IMAGES", {}).get(img_key, "")
                 if url and img:

@@ -18,6 +18,7 @@ Config = dict[str, Any]
 
 class OE(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://onlyencodes.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='OE')
         self.config: Config = config

@@ -112,7 +112,7 @@ class TorrentCreator:
         # Set max_size
         if piece_size:
             try:
-                max_size = min(int(piece_size) * 1024 * 1024, PIECE_SIZE_MAX)
+                max_size = min(piece_size * 1024 * 1024, PIECE_SIZE_MAX)
             except ValueError:
                 max_size = 134217728  # Fallback to default if conversion fails
         else:
@@ -218,7 +218,7 @@ class TorrentCreator:
                 include: list[str] = []
                 exclude: list[str] = []
 
-                is_subs = "BASE_SUBS" in str(output_filename)
+                is_subs = "BASE_SUBS" in output_filename
                 creation_filelist = list(meta.filelist)
                 if is_subs and meta.subtitle_files:
                     creation_filelist.extend(meta.subtitle_files)
@@ -294,12 +294,12 @@ class TorrentCreator:
                         if tracker_url:
                             cmd.extend(["-t", tracker_url])
 
-                        if int(meta.randomized) >= 1:
+                        if meta.randomized >= 1:
                             cmd.extend(["-e"])
 
                         if piece_size and not tracker_url:
                             try:
-                                max_size_bytes = int(piece_size) * 1024 * 1024
+                                max_size_bytes = piece_size * 1024 * 1024
 
                                 # Calculate the appropriate power of 2 (log2)
                                 # We want the largest power of 2 that's less than or equal to max_size_bytes
@@ -455,6 +455,7 @@ class TorrentCreator:
             return
         try:
             torrent = Torrent.read(torrent_path)
+            metainfo: dict = torrent.metainfo  # type: ignore[assignment]  # torf stub types _MetaInfo as TypedDict (read-only for unknown keys), but at runtime it is a plain mutable dict
             modified = False
             id_keys_map = {
                 "imdb_id": "imdb",
@@ -468,28 +469,26 @@ class TorrentCreator:
                 "isbn": "isbn",
             }
             for meta_key, torrent_key in id_keys_map.items():
-                val = getattr(meta, meta_key, None)
+                val = meta.get(meta_key)
                 if val is not None and val != 0 and val != "":
                     if meta_key == "tmdb_id":
                         cat = str(meta.category).upper()
                         if cat in ("TV", "MOVIE"):
-                            torrent.metainfo[torrent_key] = f"{cat.lower()}/{val}"
+                            metainfo[torrent_key] = f"{cat.lower()}/{val}"
                         else:
-                            torrent.metainfo[torrent_key] = int(val)
+                            metainfo[torrent_key] = int(val)
                     elif meta_key in ["imdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id"]:
                         try:
-                            torrent.metainfo[torrent_key] = int(val)
+                            metainfo[torrent_key] = int(val)
                         except (ValueError, TypeError):
-                            torrent.metainfo[torrent_key] = str(val)
+                            metainfo[torrent_key] = str(val)
                     else:
-                        torrent.metainfo[torrent_key] = str(val)
+                        metainfo[torrent_key] = str(val)
                     modified = True
             if modified:
                 torrent.write(torrent_path, overwrite=True)
                 if meta.debug:
-                    console.print(
-                        f"[green]Successfully injected top-level metadata into torrent: {[k for k in id_keys_map.values() if k in torrent.metainfo]}[/green]"
-                    )
+                    console.print(f"[green]Successfully injected top-level metadata into torrent: {[k for k in id_keys_map.values() if k in metainfo]}[/green]")
         except Exception as e:
             console.print(f"[yellow]Warning: Could not inject metadata into torrent: {e}[/yellow]")
 
@@ -589,7 +588,7 @@ class TorrentCreator:
         if system_mkbrr:
             return system_mkbrr
 
-        base_dir = os.path.join(str(meta.base_dir), "bin", "mkbrr")
+        base_dir = os.path.join(meta.base_dir, "bin", "mkbrr")
 
         # Detect OS & Architecture
         system = platform.system().lower()

@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class PTGTK(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://t.myaltbox.com']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTGTK")
         self.banned_groups = []

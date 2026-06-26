@@ -11,6 +11,7 @@ Config = dict[str, Any]
 
 class PHD(AZTrackerBase):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.privatehd']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='PHD')
         self.config: Config = config

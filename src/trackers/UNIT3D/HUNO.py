@@ -15,6 +15,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class HUNO(UNIT3D):
+    tracker_urls = ['https://hawke.uno']
     """
     https://hawke.uno/api-docs
     """

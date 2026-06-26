@@ -290,7 +290,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             except Exception:
                 meta.search_year = ""
 
-        if meta.resolution is None and not meta.emby:
+        if not meta.resolution or meta.resolution is None and not meta.emby:
             meta.resolution = await mi_resolution(
                 bdinfo["video"][0]["res"],
                 guessit_fn(video),
@@ -301,7 +301,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         elif meta.emby:
             meta.resolution = "1080p"
 
-        meta.sd = await video_manager.is_sd(str(meta.resolution))
+        meta.sd = await video_manager.is_sd(meta.resolution)
         mi = None
 
     elif meta.is_disc == "DVD":
@@ -395,7 +395,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             video = videopath
         else:
             videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "discord"), meta.sorted_filelist, meta.debug)
-            filelist = cast(list[str], meta.filelist or [])
+            filelist = meta.filelist
             meta.filelist = filelist
             search_term = os.path.basename(filelist[0]) if filelist else ""
             search_file_folder = "file"
@@ -491,7 +491,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                 else:
                     mi = meta.mediainfo
 
-                if meta.resolution is None:
+                if not meta.resolution or meta.resolution is None:
                     meta.resolution, meta.hfr = await video_manager.get_resolution(guessit_fn(video), meta.uuid, base_dir, meta)
 
                 meta.sd = await video_manager.is_sd(meta.resolution)
@@ -660,12 +660,12 @@ async def process_trackers_and_torrent(
     meta.requested_trackers = trackers
 
     # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
-    if not any(getattr(meta, id_type, None) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
+    if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
         await client.get_pathed_torrents(meta.path, meta)
 
     # Try to extract metadata from matching client torrent or a local torrent file
     if (
-        not any(getattr(meta, id_type, None) for id_type in ["imdb_id", "tmdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id", "asin", "isbn"])
+        not any(meta.get(id_type) for id_type in ["imdb_id", "tmdb_id", "tvdb_id", "tvmaze_id", "mal_id", "douban_id", "igdb_id", "asin", "isbn"])
         and not meta.skip_trackers
         and not meta.edit
     ):
@@ -829,7 +829,7 @@ async def search_metadata(
 
     try:
         if meta.tvmaze_manual:
-            meta.tvmaze_id = int(meta.tvmaze_manual)
+            meta.tvmaze_id = meta.tvmaze_manual
         elif not meta.tvmaze_id:
             meta.tvmaze_id = 0
     except (ValueError, TypeError):
@@ -1200,7 +1200,7 @@ async def finalize_metadata(
                 meta.aka = f"AKA {imdb_aka.strip()}"
                 meta.title = meta.title.strip()
 
-    if meta.aka is None:
+    if not meta.aka or meta.aka is None:
         meta.aka = ""
 
     # if it was skipped earlier, make sure we have the season/episode data
@@ -1427,7 +1427,6 @@ async def finalize_metadata(
                 meta.valid_mi_settings = False
                 await asyncio.sleep(2)
 
-        meta.stream
         meta.stream = await prep_instance.stream_optimized(meta.stream)
 
         if meta.tag == "-SubsPlease":  # SubsPlease-specific

@@ -9,6 +9,7 @@ Config = dict[str, Any]
 
 class YOINK(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['yoinked.org']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='YOINK')
         self.config = config

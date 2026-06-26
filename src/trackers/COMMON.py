@@ -209,7 +209,7 @@ class COMMON:
                 "isbn": "isbn",
             }
             for meta_key, torrent_key in id_keys_map.items():
-                val = getattr(meta, meta_key, None)
+                val = meta.get(meta_key)
                 if val is not None and val != 0 and val != "":
                     if meta_key == "tmdb_id":
                         cat = str(meta.category).upper()

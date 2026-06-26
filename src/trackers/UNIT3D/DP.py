@@ -12,6 +12,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 class DP(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://darkpeers.org']
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='DP')

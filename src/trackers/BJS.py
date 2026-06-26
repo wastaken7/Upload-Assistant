@@ -31,6 +31,7 @@ Config = dict[str, Any]
 
 class BJS:
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['tracker.bj-share.info']
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
@@ -1190,7 +1191,7 @@ class BJS:
 
         imdb_data: dict[str, Any] = meta.imdb_info
         imdb_names = imdb_data.get(imdb_key, [])
-        tmdb_names = getattr(meta, tmdb_key, [])
+        tmdb_names = meta.get(tmdb_key, [])
         names = imdb_names + tmdb_names
 
         limit = 1 if role in ("director", "creator") else 5

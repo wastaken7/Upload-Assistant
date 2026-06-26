@@ -12,6 +12,7 @@ Config = dict[str, Any]
 
 class RF(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://reelflix.xyz', 'https://reelflix.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='RF')
         self.config: Config = config

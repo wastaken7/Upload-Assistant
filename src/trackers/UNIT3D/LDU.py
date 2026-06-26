@@ -15,6 +15,7 @@ Config = dict[str, Any]
 
 class LDU(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK")
+    tracker_urls = ['theldu.to']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LDU')

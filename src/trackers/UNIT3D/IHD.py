@@ -14,6 +14,7 @@ Config = dict[str, Any]
 
 class IHD(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://infinityhd.net']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='IHD')
         self.config: Config = config

@@ -19,6 +19,7 @@ Config = dict[str, Any]
 
 class IS:
     supported_categories = ('TV', 'MOVIE', 'BOOK')
+    tracker_urls = ['https://immortalseed.me']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

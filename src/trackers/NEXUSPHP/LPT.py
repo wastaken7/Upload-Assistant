@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 class LPT(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://longpt.org']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LPT")
         self.banned_groups = []

@@ -13,6 +13,7 @@ Config = dict[str, Any]
 
 class ITT(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://itatorrents.xyz']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ITT')
         self.config: Config = config

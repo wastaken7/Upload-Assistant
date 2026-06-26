@@ -11,6 +11,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 class CBR(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['capybarabr.com']
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='CBR')

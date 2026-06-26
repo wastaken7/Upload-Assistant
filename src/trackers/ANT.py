@@ -21,6 +21,7 @@ Config = dict[str, Any]
 
 class ANT:
     supported_categories = ('MOVIE',)
+    tracker_urls = ['tracker.anthelion.me']
 
     def __init__(self, config: Config):
         self.tracker = 'ANT'

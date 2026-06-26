@@ -15,6 +15,7 @@ Config = dict[str, Any]
 
 class ULCX(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://upload.cx']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ULCX')
         self.config = config

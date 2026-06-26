@@ -16,6 +16,7 @@ from src.trackers.COMMON import COMMON
 
 
 class BHD:
+    tracker_urls = ['https://beyond-hd.me', 'tracker.beyond-hd.me']
     """
     Edit for Tracker:
         Edit BASE.torrent with announce and source

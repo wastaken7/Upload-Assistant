@@ -102,57 +102,35 @@ class TrackerDataManager:
         search_file_folder: Optional[str] = None,
         cat: Optional[str] = None,
         skip_tracker_descriptions: bool = False,
-    ) -> dict[str, Any]:
+    ) -> Meta:
         found_match = False
         base_dir = meta.base_dir
         search_term_value = search_term or ""
         search_file_folder_value = search_file_folder or ""
         if search_term:
             # Check if a specific tracker is already set in meta
-            if not meta.emby:
-                tracker_keys = {
-                    # preference some unit3d based trackers first
-                    # since they can return tmdb/imdb/tvdb ids
-                    'aither': 'AITHER',
-                    'blu': 'BLU',
-                    'lst': 'LST',
-                    'ulcx': 'ULCX',
-                    'oe': 'OE',
-                    'huno': 'HUNO',
-                    'ant': 'ANT',
-                    'btn': 'BTN',
-                    'bhd': 'BHD',
-                    'hdb': 'HDB',
-                    'sp': 'SP',
-                    'rf': 'RF',
-                    'otw': 'OTW',
-                    'yus': 'YUS',
-                    'dp': 'DP',
-                    'ptp': 'PTP',
-                }
-            else:
-                # Preference trackers with lesser overall torrents
-                # Leaving the more complete trackers free when really needed
-                tracker_keys = {
-                    'sp': 'SP',
-                    'otw': 'OTW',
-                    'dp': 'DP',
-                    'yus': 'YUS',
-                    'rf': 'RF',
-                    'oe': 'OE',
-                    'ulcx': 'ULCX',
-                    'huno': 'HUNO',
-                    'lst': 'LST',
-                    'ant': 'ANT',
-                    'hdb': 'HDB',
-                    'bhd': 'BHD',
-                    'blu': 'BLU',
-                    'aither': 'AITHER',
-                    'btn': 'BTN',
-                    'ptp': 'PTP',
-                }
+            tracker_keys = {
+                # preference some unit3d based trackers first
+                # since they can return tmdb/imdb/tvdb ids
+                'aither': 'AITHER',
+                'blu': 'BLU',
+                'lst': 'LST',
+                'ulcx': 'ULCX',
+                'oe': 'OE',
+                'huno': 'HUNO',
+                'ant': 'ANT',
+                'btn': 'BTN',
+                'bhd': 'BHD',
+                'hdb': 'HDB',
+                'sp': 'SP',
+                'rf': 'RF',
+                'otw': 'OTW',
+                'yus': 'YUS',
+                'dp': 'DP',
+                'ptp': 'PTP',
+            }
 
-            specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if getattr(meta, key, None) is not None]
+            specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
 
             # Filter out trackers that don't have valid config or api_key/announce_url
             if specific_tracker:
@@ -197,7 +175,7 @@ class TrackerDataManager:
                 if isinstance(meta_trackers_raw, str):
                     meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
                 elif isinstance(meta_trackers_raw, list):
-                    meta_trackers_list = cast(list[Any], meta_trackers_raw)
+                    meta_trackers_list = meta_trackers_raw
                     meta_trackers = [str(t).upper() for t in meta_trackers_list]
                 else:
                     meta_trackers = []
@@ -215,7 +193,7 @@ class TrackerDataManager:
                 else:
                     meta.trackers = []
 
-                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> Meta:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -238,7 +216,7 @@ class TrackerDataManager:
                                 console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
                             meta.matched_tracker = tracker_name
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
-                        return cast(dict[str, Any], updated_meta)
+                        return updated_meta
                     except aiohttp.ClientSSLError:
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
                         console.print(f"{tracker_name} tracker request failed due to SSL error.", markup=False)
@@ -260,7 +238,7 @@ class TrackerDataManager:
                     available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                     if available_trackers:
-                        if meta.debug or meta.emby:
+                        if meta.debug:
                             console.print(f"[green]Available trackers: {', '.join(available_trackers)}[/green]")
                         tracker_to_process = available_trackers[0]
                     else:
@@ -299,9 +277,9 @@ class TrackerDataManager:
                                     try:
                                         if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
                                             if imdb != 0:
-                                                meta.imdb_id = int(imdb)
+                                                meta.imdb_id = imdb
                                             if tvdb != 0:
-                                                meta.tvdb_id = int(tvdb)
+                                                meta.tvdb_id = tvdb
                                             found_match = True
                                             meta.matched_tracker = "BTN"
                                     except EOFError:
@@ -311,9 +289,9 @@ class TrackerDataManager:
                                         sys.exit(1)
                                 else:
                                     if imdb != 0:
-                                        meta.imdb_id = int(imdb)
+                                        meta.imdb_id = imdb
                                     if tvdb != 0:
-                                        meta.tvdb_id = int(tvdb)
+                                        meta.tvdb_id = tvdb
                                     found_match = True
                                     meta.matched_tracker = "BTN"
                             await self.save_tracker_timestamp("BTN", base_dir=base_dir)
@@ -348,7 +326,7 @@ class TrackerDataManager:
                         remaining_available, remaining_waiting = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                         if remaining_available or remaining_waiting:
-                            if meta.debug or meta.emby:
+                            if meta.debug:
                                 console.print(
                                     f"[yellow]No match found with {tracker_to_process}. Checking remaining trackers...[/yellow]"
                                 )
@@ -377,7 +355,7 @@ class TrackerDataManager:
                         console.print("[yellow]Detected TV content, skipping PTP tracker check")
                     tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
-                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> dict[str, Any]:
+                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> Meta:
                     nonlocal found_match
                     tracker_factory = tracker_class_map.get(tracker_name)
                     if tracker_factory is None:
@@ -399,7 +377,7 @@ class TrackerDataManager:
                             if meta.debug:
                                 console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
                             meta.matched_tracker = tracker_name
-                        return cast(dict[str, Any], updated_meta)
+                        return updated_meta
                     except aiohttp.ClientSSLError:
                         console.print(f"{tracker_name} tracker request failed due to SSL error.", markup=False)
                     except requests.exceptions.ConnectionError as conn_err:

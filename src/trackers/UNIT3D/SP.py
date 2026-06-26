@@ -15,6 +15,7 @@ Config = dict[str, Any]
 
 class SP(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://seedpool.org']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='SP')
         self.config: Config = config
