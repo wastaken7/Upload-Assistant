@@ -323,7 +323,7 @@ class DescriptionBuilder:
             if not self._get_bool_config("episode_overview", False) or meta["category"] != "TV":
                 return title, overview
 
-            if self.tracker in ("BJS", "BT"):
+            if self.tracker in ("CBR", "BJS", "BT", "LCD", "SAM"):
                 episode_tmdb_data = meta.get("episode_tmdb_data", {})
                 title = episode_tmdb_data.get("name", "")
                 overview = episode_tmdb_data.get("overview", "")

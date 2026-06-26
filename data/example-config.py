@@ -27,7 +27,7 @@ config = {
         "mam_api_key": "",
 
         # tvdb api key
-        # visit "https://www.thetvdb.com/dashboard/account/apikey" copy api key and insert below
+        # visit "https://www.thetvdb.com/api-information/signup" copy api key and insert below
         "tvdb_api": "",
 
         # visit "https://thetvdb.github.io/v4-api/#/Login/post_login" enter api key, generate token and insert token below
@@ -203,7 +203,7 @@ config = {
 
         # DESCRIPTION SETTINGS
         # Detailed documentation on how description layout settings work and affect description building:
-        # https://github.com/wastaken7/Upload-Assistant/blob/master/docs/description-builder.md
+        # https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
 
         # Whether to add a logo for the show/movie from TMDB to the top of the description
         "add_logo": True,
@@ -386,7 +386,7 @@ config = {
         "print_tracker_links": True,
 
         # Set true to search for matching requests on supported trackers
-        "search_requests": False,
+        "search_requests": True,
 
         # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
         "cross_seeding": True,
@@ -408,7 +408,7 @@ config = {
     "TRACKERS": {
         # Which trackers do you want to upload to?
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
-        # See: https://github.com/wastaken7/Upload-Assistant/blob/master/docs/description-builder.md
+        # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
 
         # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CRP, SUIO, CZ, DC, DS, DP, DT, EMUW, FF, FL,
         # FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MTEAM, MTV, NBL, OE,
@@ -518,7 +518,6 @@ config = {
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -671,7 +670,6 @@ config = {
             "allow_ext_subtitles": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -729,7 +727,6 @@ config = {
             "allow_ext_subtitles": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -940,7 +937,6 @@ config = {
             "full_mediainfo": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -1009,7 +1005,6 @@ config = {
             "exclusive": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -1053,7 +1048,6 @@ config = {
             "full_mediainfo": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -1093,7 +1087,6 @@ config = {
             "full_mediainfo": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,
@@ -2120,7 +2113,6 @@ config = {
             "use_metadata_name": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
-            "logo_size": "",
             "thumbnail_size": "",
             "screens_per_row": "",
             "episode_overview": True,

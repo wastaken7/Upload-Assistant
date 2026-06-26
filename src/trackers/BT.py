@@ -601,7 +601,7 @@ class BT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/align]",
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta['ua_name']} {meta['current_version']} (fork)[/size][/url][/align]",
         )
 
         return description

@@ -702,7 +702,8 @@ class COMMON:
 
         # Make the GET request with proper encoding handled by 'params'
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                console.print(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
                 response = await client.get(url=url, params=params)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:

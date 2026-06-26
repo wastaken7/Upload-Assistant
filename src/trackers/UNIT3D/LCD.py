@@ -93,7 +93,9 @@ class LCD(UNIT3D):
         return {'mediainfo': mediainfo}
 
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']}[/size][/url][/right]"
+        signature = (
+            f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']} (fork)[/size][/url][/right]"
+        )
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}
 
     async def get_category_id(

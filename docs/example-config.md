@@ -75,7 +75,7 @@ Order matters: `img_host_1` is primary, later hosts are fallbacks.
 - `seedpool_cdn_api` (str): Seedpool CDN API key.
 
 ### Description extras
-Detailed documentation on how description layout settings work and affect description building can be found in [description-builder.md](https://github.com/wastaken7/Upload-Assistant/blob/master/docs/description-builder.md).
+Detailed documentation on how description layout settings work and affect description building can be found in [description-builder.md](https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md).
 
 - `add_logo` (bool): Add a TMDb logo image at the top of the description.
 - `logo_size` (str): Logo size (example default: `"300"`).
