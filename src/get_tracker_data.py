@@ -458,6 +458,7 @@ class TrackerDataManager:
                 tracker_key = tracker_name.lower()
                 # Check each stored comment for matching tracker URL
                 for comment_data in meta.get('torrent_comments', []):
+                    is_tracker_comment = False
                     comment = str(comment_data.get('comment', ''))
                     # Dynamically build tracker hosts
                     tracker_hosts = {}

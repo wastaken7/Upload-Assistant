@@ -663,7 +663,7 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
     return actual_screens, capped_min
 
 
-async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
+async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     """Process the metadata for each queued path."""
     if use_discord and bot:
         await DiscordNotifier.send_discord_notification(
@@ -683,7 +683,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 update_oeimg_to_onlyimage()
         except Exception as e:
             console.print(f"[red]Error checking image hosts: {e}[/red]")
-            return
+            return False
 
     if not meta['unattended']:
         ua = config['DEFAULT'].get('auto_mode', False)
@@ -696,7 +696,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
     except Exception as e:
         console.print(f"Error in gather_prep: {e}")
         console.print(traceback.format_exc())
-        return
+        return False
 
     # Load covers.json if it exists and not already present in meta
     covers_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"
@@ -717,17 +717,17 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
     if meta.get('emby_cat', None) == "movie" and meta.get('category', None) != "MOVIE":
         console.print(f"[red]Wrong category detected! Expected 'MOVIE', but found: {meta.get('category', None)}[/red]")
         meta['we_are_uploading'] = False
-        return
+        return True
     elif meta.get('emby_cat', None) == "tv" and meta.get('category', None) != "TV":
         console.print("[red]TV content is not supported at this time[/red]")
         meta['we_are_uploading'] = False
-        return
+        return True
 
     # If unattended confirm and we had to get metadata ids from filename searching, skip the quick return so we can prompt about database information
     if meta.get('emby', False) and not meta.get('no_ids', False) and not meta.get('unattended_confirm', False) and meta.get('unattended', False):
         await nfo_link_manager.nfo_link(meta)
         meta['we_are_uploading'] = False
-        return
+        return True
 
     parser = Args(config)
     helper = UploadHelper(config)
@@ -848,7 +848,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         if not meta['debug']:
             await nfo_link_manager.nfo_link(meta)
         meta['we_are_uploading'] = False
-        return
+        return True
 
     if 'remove_trackers' in meta and meta['remove_trackers']:
         removed: list[str] = []
@@ -949,6 +949,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
 
     if successful_trackers < skip_uploading_int and not meta['debug']:
         console.print(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
+        return True
 
     else:
         meta['we_are_uploading'] = True
@@ -998,7 +999,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                     async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                         await f.write(json.dumps(search_data, indent=4))
             meta['we_are_uploading'] = False
-            return
+            return True
 
         filename: str = meta.get('title', '')
         bdmv_filename = meta.get('filename', '')
@@ -1372,7 +1373,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                                 )
                     except asyncio.CancelledError:
                         console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
-                        return
+                        return False
                     except Exception as e:
                         raise e
                     finally:
@@ -1527,13 +1528,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                     if not meta['trackers']:
                         console.print("[red]No trackers remain after removing MTV for skip_if_rehash.[/red]")
                         meta['we_are_uploading'] = False
-                        return
+                        return True
 
         if int(meta.get("randomized", 0)) >= 1 and not meta["mkbrr"] and not is_usenet_only:
             TorrentCreator.create_random_torrents(meta['base_dir'], meta['uuid'], meta['randomized'], meta['path'])
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
             await f.write(json.dumps(meta, indent=4))
+        return True
 
 
 async def cleanup_screenshot_temp_files(meta: Meta) -> None:
@@ -2014,7 +2016,22 @@ async def do_the_thing(base_dir: str) -> None:
 
             console.print(f"[green]Gathering info for {os.path.basename(path)}")
 
-            await process_meta(meta, base_dir, bot=bot)
+            meta_success = await process_meta(meta, base_dir, bot=bot)
+            if not meta_success:
+                if "queue" in meta and meta.get("queue") is not None:
+                    processed_files_count += 1
+                    skipped_files_count += 1
+                    console.print(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.\n\n")
+                    if log_file and (not meta.get("debug", False) or "debug" in os.path.basename(log_file)):
+                        if meta.get("site_upload_queue"):
+                            await QueueManager.save_processed_path(log_file, current_item_path)
+                        else:
+                            await save_processed_file(log_file, current_item_path)
+                await cleanup_manager.cleanup()
+                gc.collect()
+                cleanup_manager.reset_terminal()
+                continue
+
             tracker_setup = TRACKER_SETUP(config=config)
             if 'we_are_uploading' not in meta or not meta.get('we_are_uploading', False):
                 if config['DEFAULT'].get('cross_seeding', True):
