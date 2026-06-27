@@ -325,7 +325,7 @@ async def _get_audio_v2(
             # if not meta.original_language.startswith('en'):
             if not meta.is_disc:
                 eng, orig, non_en_non_commentary = False, False, False
-                orig_lang = meta.original_language.lower()
+                orig_lang = meta.original_language.lower() if meta.original_language else ""
                 if meta.debug:
                     console.print(f"DEBUG: Original Language: {orig_lang}")
                 try:
