@@ -18,7 +18,7 @@ Config = dict[str, Any]
 
 class IPT:
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://ssl.empirehost.me']
+    tracker_urls = ["ssl.empirehost.me", "routing.bgp.technology", "127.0.0.1.stackoverflow.tech"]
     def __init__(self, config: Config):
         self.config = config
         self.cookie_validator = CookieValidator(config)

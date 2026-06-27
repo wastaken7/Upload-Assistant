@@ -569,11 +569,11 @@ class PTP:
             keywords = meta.keywords.lower()
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
-                ptpType = (
-                    "Feature Film"
-                    if meta.runtime if meta.runtime is not None else 60 >= 45 or meta.runtime if meta.runtime is not None else 60 == 0
-                    else "Short Film"
-                )
+                try:
+                    runtime = int(meta.runtime) if meta.runtime is not None else 60
+                except (ValueError, TypeError):
+                    runtime = 60
+                ptpType = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
             if tmdb_type == "miniseries" or "miniseries" in keywords:
                 ptpType = "Miniseries"
             if "short" in keywords or "short film" in keywords:

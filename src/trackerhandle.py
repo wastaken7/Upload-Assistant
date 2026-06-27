@@ -195,7 +195,9 @@ async def process_trackers(
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
+                            if meta.tracker_status is None:
+                                meta.tracker_status = {}
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -215,8 +217,10 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                if meta.tracker_status is None:
+                    meta.tracker_status = {}
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -232,7 +236,9 @@ async def process_trackers(
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
+                            if meta.tracker_status is None:
+                                meta.tracker_status = {}
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -255,8 +261,10 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                if meta.tracker_status is None:
+                    meta.tracker_status = {}
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -272,7 +280,9 @@ async def process_trackers(
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = meta.tracker_status or {}.get(tracker_class.tracker, {})
+                            if meta.tracker_status is None:
+                                meta.tracker_status = {}
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -294,8 +304,10 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = meta.tracker_status or {}.get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                if meta.tracker_status is None:
+                    meta.tracker_status = {}
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -348,10 +360,14 @@ async def process_trackers(
                     return
                 if is_uploaded:
                     await client.add_to_client(meta, "THR")
-                    status = meta.tracker_status or {}.get("THR", {})
+                    if meta.tracker_status is None:
+                        meta.tracker_status = {}
+                    status = meta.tracker_status.setdefault("THR", {})
                     print_tracker_result(tracker, thr, status, True)
                 else:
-                    status = meta.tracker_status or {}.get("THR", {})
+                    if meta.tracker_status is None:
+                        meta.tracker_status = {}
+                    status = meta.tracker_status.setdefault("THR", {})
                     print_tracker_result(tracker, thr, status, False)
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
@@ -374,8 +390,10 @@ async def process_trackers(
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
                         return
-                    status = meta.tracker_status or {}.get(ptp.tracker, {})
-                    if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                    if meta.tracker_status is None:
+                        meta.tracker_status = {}
+                    status = meta.tracker_status.setdefault(ptp.tracker, {})
+                    if is_uploaded and "data error" not in str(status.get("status_message", "")):
                         await client.add_to_client(meta, "PTP")
                         print_tracker_result(tracker, ptp, status, True)
                     else:

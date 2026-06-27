@@ -67,7 +67,7 @@ class Meta:
     book_translator: Any = None
     btn: Any = None
     cast: Any = None
-    category: Any = None
+    category: str = ""
     category_id: Any = None
     channels: str = ""
     clean_name: str = ""
@@ -378,7 +378,7 @@ class Meta:
     studios: Any = None
     subtitle_files: list[Any] = field(default_factory=list)
     subtitle_languages: Any = field(default_factory=list)
-    tag: str = ""
+    tag: Optional[str] = None
     three_d: str = ""
     title: str = ""
     tmdb: Any = field(default_factory=list)
@@ -394,7 +394,7 @@ class Meta:
     tmdb_type: str = ""
     tonemapped: bool = False
     torrent_comments: list[Any] = field(default_factory=list)
-    tracker_status: dict[str, Any] = field(default_factory=dict)
+    tracker_status: Any = None
     trackers: Any = field(default_factory=list)
     trackers_pass: Any = None
     trackers_remove: Any = False

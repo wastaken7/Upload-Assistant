@@ -394,6 +394,10 @@ class DupeChecker:
                     normalized = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode("utf-8").lower()
                     # Remove common book/audiobook extensions at the end of the string
                     normalized = re.sub(r"\.(pdf|epub|mobi|azw3|kfx|cbz|cbr|mp3|m4b|flac|aac|m4a|ogg|wav)$", "", normalized)
+                    # Replace dots, underscores, brackets, parentheses with spaces to avoid squishing words
+                    normalized = re.sub(r"[._\[\]()]", " ", normalized)
+                    # Replace hyphens with spaces only if they are not surrounded by spaces
+                    normalized = re.sub(r"(?<!\s)-(?!\s)", " ", normalized)
                     cleaned = re.sub(r"[^a-z0-9\s\-:]", "", normalized)
                     return cleaned.strip()
 

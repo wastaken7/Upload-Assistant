@@ -204,7 +204,7 @@ class UNIT3D:
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
-        if meta.bdinfo is not None or meta.category == "GAME" or meta.category == "BOOK" and not meta.audiobook:
+        if meta.bdinfo or meta.category in ["GAME", "BOOK"] and not meta.audiobook:
             mediainfo = ""
         else:
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
@@ -212,7 +212,7 @@ class UNIT3D:
         return {"mediainfo": mediainfo}
 
     async def get_bdinfo(self, meta: Meta) -> dict[str, str]:
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bdinfo = await f.read()
         else:

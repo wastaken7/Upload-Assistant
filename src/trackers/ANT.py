@@ -131,7 +131,7 @@ class ANT:
             keywords = meta.keywords.lower()
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
-                antType = 0 if meta.runtime if meta.runtime is not None else 60 >= 45 or meta.runtime if meta.runtime is not None else 60 == 0 else 1
+                antType = 0 if (meta.runtime if meta.runtime is not None else 60) >= 45 or (meta.runtime if meta.runtime is not None else 60) == 0 else 1
             if tmdb_type == "miniseries" or "miniseries" in keywords:
                 antType = 2
             if "short" in keywords or "short film" in keywords:
