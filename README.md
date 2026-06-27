@@ -140,7 +140,7 @@ This branch introduces new media categories and automation features not present 
 </details>
 
 ## **Setup:**
-   - **REQUIRES AT LEAST PYTHON 3.9 AND PIP3**
+   - **REQUIRES AT LEAST PYTHON 3.14 AND PIP3**
    - Also needs MediaInfo and ffmpeg installed on your system
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
       - On linux systems, get it from your favorite package manager

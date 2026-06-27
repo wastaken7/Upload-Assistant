@@ -2,7 +2,7 @@
 """Custom Meta class to support attribute access on metadata."""
 
 from dataclasses import MISSING, dataclass, field, fields
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 
 @dataclass(init=False)
@@ -49,11 +49,11 @@ class Meta:
     base_torrent_piece_mb: int = 0
     basename_no_ext: str = ""
     bdinfo: dict[str, Any] = field(default_factory=dict)
-    bhd: Optional[Union[str, int]] = None
+    bhd: Optional[str | int] = None
     bhd_nfo: Optional[bool] = None
     bit_depth: str = ""
     bloated: bool = False
-    blu: Optional[Union[str, int]] = None
+    blu: Optional[str | int] = None
     bluray_audio_skip: bool = False
     bluray_score: int = 100
     bluray_single_score: int = 100
@@ -65,7 +65,7 @@ class Meta:
     book_publisher: Optional[str] = None
     book_title: Optional[str] = None
     book_translator: Optional[str] = None
-    btn: Optional[Union[str, int]] = None
+    btn: Optional[str | int] = None
     cast: Optional[list[str]] = None
     category: str = ""
     category_id: Optional[str] = None
@@ -73,10 +73,10 @@ class Meta:
     clean_name: str = ""
     cleanup: bool = False
     client: Optional[str] = None
-    combined_genres: Union[list[str], str] = field(default_factory=list)
+    combined_genres: list[str] | str = field(default_factory=list)
     comic: bool = False
     comparison: Optional[str] = None
-    comparison_groups: Union[dict[str, dict[str, Any]], list[dict[str, Any]]] = field(default_factory=dict)
+    comparison_groups: dict[str, dict[str, Any]] | list[dict[str, Any]] = field(default_factory=dict)
     comparison_index: Optional[int] = None
     console_game: bool = False
     container: str = ""
@@ -109,9 +109,9 @@ class Meta:
     distributor_link: str = ""
     diy_disc: bool = False
     douban_id: int = 0
-    douban_manual: Optional[Union[int, str]] = None
-    douban_rating: Optional[Union[float, str]] = None
-    douban_votes: Optional[Union[int, str]] = None
+    douban_manual: Optional[int | str] = None
+    douban_rating: Optional[float | str] = None
+    douban_votes: Optional[int | str] = None
     downloaded_cover_images: dict[str, str] = field(default_factory=dict)
     draft: Optional[bool] = None
     dual_audio: bool = False
@@ -122,7 +122,7 @@ class Meta:
     edit: bool = False
     edition: str = ""
     eng_subs: Optional[int] = None
-    entropy: Optional[Union[int, str]] = None
+    entropy: Optional[int | str] = None
     episode: str = ""
     episode_airdate: Optional[str] = None
     episode_int: int = 0
@@ -136,10 +136,10 @@ class Meta:
     extra_openlibrary_ids: Optional[int] = None
     extras: Optional[bool] = None
     ffdebug: bool = False
-    file_count_match: Union[int, bool] = False
+    file_count_match: int | bool = False
     filelist: list[Any] = field(default_factory=list)
     filename: str = ""
-    filename_match: Union[str, bool] = False
+    filename_match: str | bool = False
     first_air_date: Optional[str] = None
     flux: bool = False
     folder_id: Optional[int] = None
@@ -159,57 +159,57 @@ class Meta:
     game_version: str = ""
     genre: str = ""
     genre_ids: Optional[int] = None
-    genres: Union[str, list[str]] = field(default_factory=list)
+    genres: str | list[str] = field(default_factory=list)
     hardcoded_subs: bool = False
     has_commentary: bool = False
     has_encode_settings: bool = False
     has_languages: str = ""
     has_multiple_default_audio_tracks: bool = False
     has_multiple_default_subtitle_tracks: bool = False
-    has_subs: Union[bool, int] = False
+    has_subs: bool | int = False
     hash_used: Optional[str] = None
-    hdb: Optional[Union[str, int]] = None
+    hdb: Optional[str | int] = None
     hdb_description: Optional[str] = None
     hdb_name: Optional[str] = None
     hdr: str = ""
     hfr: Optional[bool] = None
-    huno: Optional[Union[str, int]] = None
+    huno: Optional[str | int] = None
     igdb_first_release_date: str = ""
     igdb_id: int = 0
     igdb_manual: Optional[str] = None
-    igdb_rating: Union[float, str] = ""
-    igdb_rating_count: Union[int, str] = ""
+    igdb_rating: float | str = ""
+    igdb_rating_count: int | str = ""
     image_list: list[dict[str, Any]] = field(default_factory=list)
     image_sizes: dict[str, Any] = field(default_factory=dict)
     imdb: Optional[str] = ""
     imdb_id: Optional[int] = None
     imdb_info: dict[str, Any] = field(default_factory=dict)
-    imdb_manual: Optional[Union[str, int]] = None
+    imdb_manual: Optional[str | int] = None
     imdb_mismatch: bool = False
     imdb_rating: str = ""
     imghost: str = ""
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
-    is_disc: Union[str, bool] = False
+    is_disc: str | bool = False
     isbn: str = ""
     isdir: bool = False
     keep_folder: bool = False
     keep_images: bool = False
     keep_nfo: bool = False
-    keywords: Union[list[str], str] = field(default_factory=list)
+    keywords: list[str] | str = field(default_factory=list)
     language: str = ""
     language_checked: bool = False
-    languages: Union[dict[str, list[str]], list[Any]] = field(default_factory=list)
+    languages: dict[str, list[str]] | list[Any] = field(default_factory=list)
     libplacebo: bool = False
     limit_queue: int = 0
     linking_failed: bool = False
     localized_overviews: dict[str, Any] = field(default_factory=dict)
     logo: str = ""
-    lst: Optional[Union[str, int]] = None
+    lst: Optional[str | int] = None
     magazine: bool = False
     mal: Optional[int] = None
     mal_id: int = 0
-    mal_manual: Optional[Union[str, int]] = None
+    mal_manual: Optional[str | int] = None
     manga: bool = False
     manual: bool = False
     manual_category: Optional[str] = None
@@ -217,13 +217,13 @@ class Meta:
     manual_data: Optional[str] = None
     manual_date: Optional[str] = None
     manual_dvds: Optional[str] = None
-    manual_edition: Optional[Union[str, list[str]]] = None
-    manual_episode: Optional[Union[str, int]] = None
+    manual_edition: Optional[str | list[str]] = None
+    manual_episode: Optional[str | int] = None
     manual_episode_title: str = ""
-    manual_frames: Optional[Union[str, list[int], list[str]]] = None
-    manual_language: Optional[Union[str, dict[str, Any]]] = None
+    manual_frames: Optional[str | list[int] | list[str]] = None
+    manual_language: Optional[str | dict[str, Any]] = None
     manual_platform: Optional[str] = None
-    manual_season: Optional[Union[str, int]] = None
+    manual_season: Optional[str | int] = None
     manual_source: Optional[str] = None
     manual_type: Optional[str] = None
     manual_year: int = 0
@@ -234,7 +234,7 @@ class Meta:
     menu_images: list[Any] = field(default_factory=list)
     mismatched_imdb_id: int = 0
     mkbrr: bool = False
-    mkbrr_threads: Optional[Union[str, int]] = None
+    mkbrr_threads: Optional[str | int] = None
     mode: str = ""
     modq: bool = False
     mteam_description: str = ""
@@ -242,7 +242,7 @@ class Meta:
     name: str = ""
     name_notag: str = ""
     narrator: str = ""
-    networks: Union[str, list[dict[str, Any]]] = ""
+    networks: str | list[dict[str, Any]] = ""
     newspaper: bool = False
     nexusphp_description: str = ""
     nfo: bool = False
@@ -264,7 +264,7 @@ class Meta:
     nsfw: Optional[bool] = None
     nzb_path: str = ""
     ocr: Optional[bool] = None
-    oe: Optional[Union[str, int]] = None
+    oe: Optional[str | int] = None
     onlyID: Optional[bool] = None
     openlibrary: Optional[str] = None
     openlibrary_book_id: Optional[int] = None
@@ -286,7 +286,7 @@ class Meta:
     path: Optional[str] = None
     path_to_menu_screenshots: str = ""
     personalrelease: bool = False
-    piece_size_constraints_enabled: Union[str, bool] = False
+    piece_size_constraints_enabled: str | bool = False
     platform: str = ""
     poster: str = ""
     potential_missing: list[Any] = field(default_factory=list)
@@ -296,7 +296,7 @@ class Meta:
     production_companies: list[Any] = field(default_factory=list)
     production_countries: list[Any] = field(default_factory=list)
     ptgen: dict[str, Any] = field(default_factory=dict)
-    ptp: Optional[Union[str, int]] = None
+    ptp: Optional[str | int] = None
     ptp_groupID: Optional[str] = None
     publisher: str = ""
     qbit_bandwidth_control: bool = False
@@ -316,7 +316,7 @@ class Meta:
     release_date: str = ""
     release_dates: Optional[dict[str, Any]] = None
     release_url: str = ""
-    remove_trackers: Union[list[str], bool] = False
+    remove_trackers: list[str] | bool = False
     repack: str = ""
     requested_trackers: Optional[list[str]] = None
     requirements_minimum: str = ""
@@ -336,17 +336,17 @@ class Meta:
     screenshots_in_description: Optional[bool] = None
     screenshots_reported_torrent: Optional[list[str]] = None
     screenshots_trumping_torrent: Optional[list[str]] = None
-    sd: Union[int, bool] = False
+    sd: int | bool = False
     sdh_subs: Optional[int] = None
     search_requests: bool = False
-    search_year: Union[int, str] = ""
-    season: Optional[Union[int, str]] = 0
+    search_year: int | str = ""
+    season: Optional[int | str] = 0
     season_air_first_date: Optional[str] = None
     season_int: int = 0
     season_name: str = ""
     season_pack_contains_episode: Optional[bool] = None
     season_pack_exists: bool = False
-    season_pack_id: Optional[Union[int, str]] = None
+    season_pack_id: Optional[int | str] = None
     season_pack_link: Optional[str] = None
     season_pack_name: str = ""
     secondary_title: Optional[str] = None
@@ -357,14 +357,14 @@ class Meta:
     site_check: bool = False
     site_upload: Optional[str] = None
     site_upload_queue: Optional[bool] = None
-    size_match: Union[str, bool] = False
+    size_match: str | bool = False
     skip_auto_torrent: bool = False
     skip_gen_desc: bool = False
     skip_imghost_upload: bool = False
     skip_tracker_descriptions: bool = False
     skip_trackers: bool = False
     skip_upload_trackers: list[Any] = field(default_factory=list)
-    skip_uploading: Union[int, bool] = False
+    skip_uploading: int | bool = False
     skipit: bool = False
     skipping: Optional[str] = None
     sorted_filelist: bool = False
@@ -375,20 +375,20 @@ class Meta:
     steam_manual: Optional[str] = None
     steam_url: Optional[str] = None
     stream: bool = False
-    studios: Optional[Union[list[str], str]] = None
+    studios: Optional[list[str] | str] = None
     subtitle_files: list[Any] = field(default_factory=list)
-    subtitle_languages: Optional[Union[list[str], str]] = field(default_factory=list)
+    subtitle_languages: Optional[list[str] | str] = field(default_factory=list)
     tag: Optional[str] = None
     three_d: str = ""
     title: str = ""
-    tmdb: Union[int, str, list[Any], None] = field(default_factory=list)
+    tmdb: int | str | list[Any] | None = field(default_factory=list)
     tmdb_adult_media: bool = False
     tmdb_cast: list[Any] = field(default_factory=list)
     tmdb_directors: list[Any] = field(default_factory=list)
     tmdb_episode_data: Optional[dict[str, Any]] = None
     tmdb_id: Optional[int] = None
     tmdb_logo: str = ""
-    tmdb_manual: Optional[Union[int, str]] = None
+    tmdb_manual: Optional[int | str] = None
     tmdb_poster: str = ""
     tmdb_season_data: Optional[dict[str, Any]] = None
     tmdb_type: str = ""
@@ -397,10 +397,10 @@ class Meta:
     tracker_status: Optional[dict[str, Any]] = None
     trackers: list[str] = field(default_factory=list)
     trackers_pass: Optional[int] = None
-    trackers_remove: Union[str, bool] = False
+    trackers_remove: str | bool = False
     transmission_label: Optional[str] = None
     trump_reason: Optional[str] = None
-    trumpable_id: Optional[Union[int, str]] = None
+    trumpable_id: Optional[int | str] = None
     trumping_trackers: list[Any] = field(default_factory=list)
     tv_movie: bool = False
     tv_pack: bool = False
@@ -413,23 +413,23 @@ class Meta:
     tvdb_episode_year: str = ""
     tvdb_id: Optional[int] = None
     tvdb_imdb_id: Optional[str] = None
-    tvdb_manual: Optional[Union[str, int]] = None
+    tvdb_manual: Optional[str | int] = None
     tvdb_overview: Optional[str] = None
     tvdb_search_results: Optional[list[dict[str, Any]]] = None
-    tvdb_season: Optional[Union[int, str]] = None
+    tvdb_season: Optional[int | str] = None
     tvdb_season_int: Optional[int] = None
     tvdb_season_name: str = ""
     tvdb_series_name: Optional[str] = None
     tvdb_series_year: Optional[int] = None
-    tvmaze: Optional[Union[int, str]] = None
+    tvmaze: Optional[int | str] = None
     tvmaze_episode_data: dict[str, Any] = field(default_factory=dict)
-    tvmaze_id: Optional[Union[int, str]] = None
+    tvmaze_id: Optional[int | str] = None
     tvmaze_manual: int = 0
     type: Optional[str] = None
     ua_name: str = ""
     ua_signature: str = ""
-    uhd: Union[str, bool] = False
-    ulcx: Optional[Union[str, int]] = None
+    uhd: str | bool = False
+    ulcx: Optional[str | int] = None
     unattended: bool = False
     unattended_audio_skip: bool = False
     unattended_confirm: bool = False
@@ -508,14 +508,14 @@ class Meta:
             name = 'is_disc'
         super().__setattr__(name, value)
 
-    def copy(self) -> 'Meta':
+    def copy(self) -> Meta:
         """Ensure copy returns a Meta instance."""
         return Meta(self.to_dict())
 
-    def __copy__(self) -> 'Meta':
+    def __copy__(self) -> Meta:
         return Meta(self.to_dict())
 
-    def __deepcopy__(self, memo: Any) -> 'Meta':
+    def __deepcopy__(self, memo: Any) -> Meta:
         import copy
 
         copied_dict = {k: copy.deepcopy(self[k], memo) for k in self.to_dict()}
@@ -530,7 +530,7 @@ class Meta:
                 res[f.name] = val
         return res
 
-    def update(self, other: Union[dict[str, Any], 'Meta']) -> None:
+    def update(self, other: dict[str, Any] | Meta) -> None:
         """Update attributes from a dictionary or another Meta instance."""
         if isinstance(other, Meta):
             for f in fields(other):
