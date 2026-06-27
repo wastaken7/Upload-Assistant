@@ -6,19 +6,18 @@ import json
 import os
 import platform
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional, TypeAlias, Union
 
 import aiofiles
 import httpx
 from PIL import Image
-from typing_extensions import TypeAlias
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-QueryValue: TypeAlias = Union[str, int, float, bool, None]
+QueryValue: TypeAlias = str | int | float | bool | None
 ParamsList: TypeAlias = list[tuple[str, QueryValue]]
 
 

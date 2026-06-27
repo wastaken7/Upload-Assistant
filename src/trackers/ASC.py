@@ -4,8 +4,8 @@ import json
 import os
 import platform
 import re
-from datetime import datetime, timezone
-from typing import Any, Optional, Union, cast
+from datetime import UTC, datetime
+from typing import Any, Optional, cast
 
 import aiofiles
 import cli_ui
@@ -185,7 +185,7 @@ class ASC:
             return None
         return None
 
-    async def get_type(self, meta: Meta) -> Union[str, int]:
+    async def get_type(self, meta: Meta) -> str | int:
         category = meta.category
         if category == "BOOK":
             if meta.audiobook:
@@ -492,7 +492,7 @@ class ASC:
         layout_image = {k: v for k, v in user_layout.items() if k.startswith('BARRINHA_')}
         description_parts = ['[center]']
 
-        async def append_section(key: str, content: Union[str, None]) -> None:
+        async def append_section(key: str, content: str | None) -> None:
             if content and (img := layout_image.get(key)):
                 description_parts.append(f'\n{await self.format_image(img)}')
                 description_parts.append(f'\n{content}\n')
@@ -974,7 +974,7 @@ class ASC:
         else:
             return f'{self.base_url}/enviar-series.php'
 
-    async def format_image(self, url: Union[str, None]) -> str:
+    async def format_image(self, url: str | None) -> str:
         return f'[img]{url}[/img]' if isinstance(url, str) and url else ''
 
     async def format_date(self, date_str: Optional[str]) -> str:
@@ -982,7 +982,7 @@ class ASC:
             return 'N/A'
         def _try_format(fmt: str) -> Optional[str]:
             try:
-                return datetime.strptime(date_str, fmt).replace(tzinfo=timezone.utc).strftime("%d/%m/%Y")
+                return datetime.strptime(date_str, fmt).replace(tzinfo=UTC).strftime("%d/%m/%Y")
             except (ValueError, TypeError):
                 return None
 
@@ -1100,7 +1100,7 @@ class ASC:
             parts.append(f'[url={tmdb_url}]{img_tag}[/url]\n[size=2][b]{character_info}[/b][/size]\n')
         return ''.join(parts)
 
-    async def get_requests(self, meta: Meta) -> Union[bool, list[dict[str, str]]]:
+    async def get_requests(self, meta: Meta) -> bool | list[dict[str, str]]:
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
         else:

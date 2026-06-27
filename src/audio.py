@@ -6,7 +6,7 @@ import re
 import traceback
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import cli_ui
 import langcodes
@@ -498,7 +498,7 @@ async def _get_audio_v2(
     return audio, chan, has_commentary
 
 
-def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng_original_with_non_eng: bool = False) -> None:
+def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_original_with_non_eng: bool = False) -> None:
     # Normalize to list
     if isinstance(audio_languages, str):
         audio_languages = [audio_languages]

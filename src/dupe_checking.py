@@ -1,10 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from collections.abc import MutableMapping, Sequence
-from typing import Any, Callable, Optional, TypedDict, Union, cast
-
-from typing_extensions import TypeAlias
+from collections.abc import Callable, MutableMapping, Sequence
+from typing import Any, Optional, TypedDict, cast
 
 from cogs.redaction import Redaction
 from src.console import console
@@ -14,22 +12,22 @@ from src.trackers.UNIT3D.HUNO import HUNO
 
 class DupeEntry(TypedDict, total=False):
     name: str
-    size: Optional[Union[int, str]]
+    size: Optional[int | str]
     files: list[str]
     file_count: int
     trumpable: bool
     link: Optional[str]
     download: Optional[str]
     flags: list[str]
-    id: Optional[Union[int, str]]
+    id: Optional[int | str]
     type: Optional[str]
     res: Optional[str]
-    internal: Union[int, bool]
+    internal: int | bool
     bd_info: Optional[str]
     description: Optional[str]
 
 
-DupeInput: TypeAlias = Union[str, DupeEntry, MutableMapping[str, Any]]
+type DupeInput = str | DupeEntry | MutableMapping[str, Any]
 
 
 class AttributeCheck(TypedDict):
@@ -643,7 +641,7 @@ class DupeChecker:
                 await log_exclusion("source mismatch: non-WEB-DL vs WEB-DL", each)
                 return True
 
-            skip_resolution_check = bool(is_dvd or "DVD" in target_source or is_dvdrip)
+            skip_resolution_check = is_dvd or "DVD" in target_source or is_dvdrip
 
             if tracker_name == "OTW" and not is_tv_pack and meta.category == "TV" and target_episode and target_resolution:
                 dupe_season_match = re.search(r'[sS](\d+)', each)
@@ -841,7 +839,7 @@ class DupeChecker:
         return new_dupes
 
     @staticmethod
-    async def normalize_filename(filename: Union[str, MutableMapping[str, Any]]) -> str:
+    async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:
         if isinstance(filename, dict):
             filename = str(filename.get('name', ''))
         if not isinstance(filename, str):
@@ -853,8 +851,8 @@ class DupeChecker:
     @staticmethod
     async def is_season_episode_match(
         filename: str,
-        target_season: Optional[Union[str, int]],
-        target_episode: Optional[Union[str, int]],
+        target_season: Optional[str | int],
+        target_episode: Optional[str | int],
     ) -> tuple[bool, bool]:
         """
         Check if the filename matches the given season and episode.
@@ -954,14 +952,14 @@ async def filter_dupes(dupes: Sequence[DupeInput], meta: Meta, tracker_name: str
     return await DupeChecker(config).filter_dupes(dupes, meta, tracker_name)
 
 
-async def normalize_filename(filename: Union[str, MutableMapping[str, Any]]) -> str:
+async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:
     return await DupeChecker.normalize_filename(filename)
 
 
 async def is_season_episode_match(
     filename: str,
-    target_season: Optional[Union[str, int]],
-    target_episode: Optional[Union[str, int]],
+    target_season: Optional[str | int],
+    target_episode: Optional[str | int],
 ) -> tuple[bool, bool]:
     return await DupeChecker.is_season_episode_match(filename, target_season, target_episode)
 

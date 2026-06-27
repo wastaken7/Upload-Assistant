@@ -6,13 +6,12 @@ import sys
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import aiohttp
 import cli_ui
 import click
 from PIL import Image
-from typing_extensions import TypeAlias
 
 from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
@@ -200,7 +199,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
                                 else:
                                     console.print(f"[red]Failed to fetch image {img_url}. Status: {response.status}. Skipping.")
                                     return None
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             console.print(f"[red]Timeout downloading image: {img_url}")
                             return None
                         except aiohttp.ClientError as e:
@@ -269,7 +268,7 @@ async def check_image_link(url: str, timeout: Optional[aiohttp.ClientTimeout] = 
                     else:
                         console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status})[/red]")
                         return False
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 console.print(f"[red]Timeout checking image link: {url}[/red]")
                 return False
             except Exception as e:

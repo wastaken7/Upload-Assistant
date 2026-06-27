@@ -6,7 +6,7 @@ import shutil
 import stat
 import tarfile
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import aiofiles
 import httpx
@@ -26,7 +26,7 @@ class NyuuBinaryManager:
 
     @staticmethod
     async def ensure_nyuu_binary(
-        base_dir: Union[str, Path],
+        base_dir: str | Path,
         debug: bool,
         path_7z: Optional[str] = None,
         version: str = "v0.4.2"

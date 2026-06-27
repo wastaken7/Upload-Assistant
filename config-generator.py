@@ -4,8 +4,9 @@ import ast
 import json
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, TypedDict, Union, cast
+from typing import Any, Optional, TypedDict, cast
 
 from src.console import console
 
@@ -394,7 +395,7 @@ def get_img_host(
     example_defaults: ConfigDict,
     config_comments: ConfigComments,
 ) -> None:
-    img_host_api_map: dict[str, Union[str, list[str], None]] = {
+    img_host_api_map: dict[str, str | list[str] | None] = {
         "imgbb": "imgbb_api",
         "ptpimg": "ptpimg_api",
         "lensdump": "lensdump_api",

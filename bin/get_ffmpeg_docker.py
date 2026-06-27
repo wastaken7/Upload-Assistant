@@ -6,7 +6,6 @@ import shutil
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Union
 
 import httpx
 
@@ -18,7 +17,7 @@ class FfmpegBinaryManager:
     ARM_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-01-24-12-54/ffmpeg-n8.0.1-48-g0592be14ff-linuxarm64-lgpl-8.0.tar.xz"
 
     @staticmethod
-    def download_ffmpeg_for_docker(base_dir: Union[str, Path] = ".") -> str:
+    def download_ffmpeg_for_docker(base_dir: str | Path = ".") -> str:
         """Download ffmpeg amd and arm builds and install into bin/ffmpeg/<arch>/ffmpeg.
 
         This is a synchronous helper intended for use in Dockerfile build steps.

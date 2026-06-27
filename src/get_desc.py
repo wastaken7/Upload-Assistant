@@ -5,7 +5,7 @@ import json
 import os
 import re
 import urllib.parse
-from typing import Any, Union, cast
+from typing import Any, cast
 from urllib.parse import ParseResult
 
 import aiofiles
@@ -838,7 +838,7 @@ class DescriptionBuilder:
         tv_info: bool,
         ua_signature: bool,
         user_description: bool,
-        approved_image_hosts: Union[list[str], None] = None,
+        approved_image_hosts: list[str] | None = None,
         signature: str = "",
         desc_header: str = "",
     ) -> str:
@@ -1073,7 +1073,7 @@ class DescriptionBuilder:
         meta: Meta,
         signature: str = "",
         desc_header: str = "",
-        approved_image_hosts: Union[list[str], None] = None,
+        approved_image_hosts: list[str] | None = None,
     ) -> str:
         return await self.general_description_generator(
             meta,
@@ -1813,7 +1813,7 @@ class DescriptionBuilder:
 
         return menu_image_section
 
-    def format_screenshot(self, web_url: str, raw_url: str, img_url: str = "", thumb_size: Union[str, int] = "") -> str:
+    def format_screenshot(self, web_url: str, raw_url: str, img_url: str = "", thumb_size: str | int = "") -> str:
         if not img_url:
             img_url = raw_url
         if not thumb_size:

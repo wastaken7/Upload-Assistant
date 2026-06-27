@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from src.console import console
 from src.languages import languages_manager

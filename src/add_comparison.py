@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import cli_ui
 
@@ -27,7 +27,7 @@ class ComparisonManager:
         self.default_config = default_config
         self.uploadscreens_manager = UploadScreensManager(cast(dict[str, Any], config))
 
-    async def add_comparison(self) -> Union[ComparisonData, list[ComparisonGroup]]:
+    async def add_comparison(self) -> ComparisonData | list[ComparisonGroup]:
         comparison_path = self.meta.comparison
         if not isinstance(comparison_path, str) or not os.path.isdir(comparison_path):
             return []
@@ -37,7 +37,7 @@ class ComparisonManager:
             try:
                 raw_text = await asyncio.to_thread(Path(comparison_data_file).read_text)
                 raw_data: Any = json.loads(raw_text)
-                saved_comparison_data: Union[ComparisonData, list[ComparisonGroup]]
+                saved_comparison_data: ComparisonData | list[ComparisonGroup]
                 if isinstance(raw_data, dict):
                     raw_dict = cast(dict[str, Any], raw_data)
                     if not all(isinstance(v, dict) for v in raw_dict.values()):

@@ -3,9 +3,9 @@ import json
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import cli_ui
@@ -122,8 +122,8 @@ class UploadHelper:
             raise ValueError("'DEFAULT' config section must be a dict")
         self.tracker_class_map = cast(Mapping[str, Any], tracker_class_map)
 
-    async def dupe_check(self, dupes: list[Union[DupeEntry, str]], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
-        def _format_dupe(entry: Union[DupeEntry, str]) -> str:
+    async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
+        def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get('name', ''))
                 link = entry.get('link')
@@ -162,7 +162,7 @@ class UploadHelper:
                 formatted.append(_format_dupe(entry))
             return "\n".join(formatted)
 
-        dupes_list: list[Union[DupeEntry, str]] = dupes
+        dupes_list: list[DupeEntry | str] = dupes
         upload: bool = False
         meta.were_trumping = False
         if not dupes_list:
@@ -391,7 +391,7 @@ class UploadHelper:
 
                 return False, meta
 
-    def ask_bdinfo_comparison(self, meta: Meta, dupes: list[Union[DupeEntry, str]], tracker_name: str) -> None:
+    def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
         """
         Check if any duplicate has BDInfo content and ask the user
         if they want to perform a comparison.
@@ -434,7 +434,7 @@ class UploadHelper:
 
     async def get_confirmation(self, meta: Meta) -> bool:
         confirm: bool = False
-        lines: list[Union[str, tuple[str, str]]] = []
+        lines: list[str | tuple[str, str]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
         if meta.debug is True:
             lines.append("[bold red]DEBUG: True - Will not actually upload![/bold red]")

@@ -6,8 +6,9 @@ import os
 import platform
 import re
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles

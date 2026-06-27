@@ -228,7 +228,7 @@ class RTF:
                 aired_date = str(episode.get('aired', ''))
                 if aired_date and '-' in aired_date:
                     try:
-                        episode_date = datetime.datetime.strptime(aired_date, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc).date()
+                        episode_date = datetime.datetime.strptime(aired_date, '%Y-%m-%d').replace(tzinfo=datetime.UTC).date()
                         if most_recent_aired_date is None or episode_date > most_recent_aired_date:
                             most_recent_aired_date = episode_date
                     except (ValueError, AttributeError):
@@ -253,10 +253,10 @@ class RTF:
         # Check if content is at least 10 years old using actual date comparison
         if meta.category == "MOVIE" and meta.release_date:
             try:
-                release_date = datetime.datetime.strptime(meta.release_date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc).date()
+                release_date = datetime.datetime.strptime(meta.release_date, "%Y-%m-%d").replace(tzinfo=datetime.UTC).date()
                 year = release_date.year
                 # Calculate date exactly 10 years ago from today
-                ten_years_ago = datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
+                ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
                         console.print("[red]Content must be older than 10 Years to upload at RTF")
@@ -267,7 +267,7 @@ class RTF:
                 release_year = meta.release_date.split("-")[0]
                 if release_year.isdigit():
                     year = int(release_year)
-                    if datetime.datetime.now(datetime.timezone.utc).date().year - year <= 9:
+                    if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
                             console.print("[red]Content must be older than 10 Years to upload at RTF")
                         meta.skipping = "RTF"
@@ -275,7 +275,7 @@ class RTF:
 
         elif meta.category == "TV" and most_recent_aired_date:
             # For TV shows, use the most recent aired date for comparison if available
-            ten_years_ago = datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
+            ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
@@ -283,7 +283,7 @@ class RTF:
                 return []
 
         else:
-            if year is not None and datetime.datetime.now(datetime.timezone.utc).date().year - year <= 9:
+            if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
                 meta.skipping = "RTF"

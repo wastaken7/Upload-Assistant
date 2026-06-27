@@ -7,7 +7,7 @@ import os
 import re
 import ssl
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.error import URLError
 
 from tvdb_v4_official import TVDB
@@ -17,7 +17,7 @@ from src.console import console
 YEAR_PATTERN = re.compile(r'\((19\d\d|20[0-3]\d)\)')
 
 
-tvdb: Union[TVDB, None] = None
+tvdb: TVDB | None = None
 _tvdb_init_error: Optional[Exception] = None
 _tvdb_error_reported = False
 
@@ -232,12 +232,12 @@ class tvdb_data:
 
     async def get_tvdb_episodes(
         self,
-        series_id: Union[int, str],
-        base_dir: Optional[Union[str, bool]] = None,
+        series_id: int | str,
+        base_dir: Optional[str | bool] = None,
         debug: bool = False,
-        season: Optional[Union[int, str]] = None,
-        episode: Optional[Union[int, str]] = None,
-        absolute_number: Optional[Union[int, str]] = None,
+        season: Optional[int | str] = None,
+        episode: Optional[int | str] = None,
+        absolute_number: Optional[int | str] = None,
         aired_date: Optional[str] = None,
         original_language: Optional[str] = None,
     ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
@@ -489,8 +489,8 @@ class tvdb_data:
 
     async def get_tvdb_by_external_id(
         self,
-        imdb: Optional[Union[int, str]],
-        tmdb: Optional[Union[int, str]],
+        imdb: Optional[int | str],
+        tmdb: Optional[int | str],
         debug: bool = False,
         tv_movie: bool = False,
     ) -> tuple[Optional[int], Optional[str]]:
@@ -639,7 +639,7 @@ class tvdb_data:
 
     async def get_imdb_id_from_tvdb_episode_id(
         self,
-        episode_id: Union[int, str],
+        episode_id: int | str,
         debug: bool = False,
     ) -> Optional[str]:
         try:
@@ -678,8 +678,8 @@ class tvdb_data:
     async def get_specific_episode_data(
         self,
         data: Any,
-        season: Optional[Union[int, str]],
-        episode: Optional[Union[int, str]],
+        season: Optional[int | str],
+        episode: Optional[int | str],
         debug: bool = False,
         aired_date: Optional[str] = None,
     ) -> tuple[

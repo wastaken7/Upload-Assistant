@@ -7,7 +7,7 @@ import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
 import traceback
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import httpx
@@ -21,7 +21,7 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
-def _attr_to_string(value: Union[str, AttributeValueList, None]) -> str:
+def _attr_to_string(value: str | AttributeValueList | None) -> str:
     """Convert BeautifulSoup attribute values to a plain string."""
     if isinstance(value, str):
         return value

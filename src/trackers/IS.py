@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Union
+from typing import Any
 
 import aiofiles
 import httpx
@@ -65,12 +65,12 @@ class IS:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:
             self.session.cookies.update(cookies)
-        dupes: list[dict[str, Union[str, None]]] = []
+        dupes: list[dict[str, str | None]] = []
 
         search_type = ''
         search_query = ''

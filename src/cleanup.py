@@ -62,7 +62,7 @@ class CleanupManager:
                     proc.terminate()  # Send SIGTERM first
                     try:
                         await asyncio.wait_for(asyncio.to_thread(proc.wait), timeout=3)  # Wait for process to exit
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         if not IS_ANDROID:  # Only try force kill on non-Android
                             # console.print(f"[red]Subprocess {proc.pid} did not exit in time, force killing.[/red]")
                             with contextlib.suppress(PermissionError, OSError):

@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import aiofiles
 import httpx
@@ -70,8 +70,8 @@ class HDS:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
-        dupes: list[dict[str, Union[str, None]]] = []
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
+        dupes: list[dict[str, str | None]] = []
 
         if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
@@ -208,7 +208,7 @@ class HDS:
 
         return 38
 
-    async def get_requests(self, meta: Meta) -> Union[list[dict[str, Optional[str]]], bool]:
+    async def get_requests(self, meta: Meta) -> list[dict[str, Optional[str]]] | bool:
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
         else:

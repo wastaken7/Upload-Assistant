@@ -7,7 +7,8 @@ import ssl
 import time
 import traceback
 import xmlrpc.client  # nosec B411 - Secured with defusedxml.xmlrpc.monkey_patch() below
-from typing import Any, Callable, Optional, cast
+from collections.abc import Callable
+from typing import Any, Optional, cast
 
 import bencode
 import defusedxml.xmlrpc

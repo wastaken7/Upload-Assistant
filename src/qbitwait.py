@@ -3,7 +3,7 @@ import asyncio
 import os
 import traceback
 from collections import deque
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiohttp
 import qbittorrentapi
@@ -64,7 +64,7 @@ class Wait:
                 raise ValueError("qbit_url is not configured")
             port_value = client.get('qbit_port')
             if isinstance(port_value, (int, str)):
-                port: Optional[Union[int, str]] = port_value
+                port: Optional[int | str] = port_value
             elif port_value is None:
                 port = None
             else:
@@ -180,7 +180,7 @@ class Wait:
                         raise RuntimeError("qbt_client is not initialized")
                     data = self.qbt_client.transfer_info()
                     up_speed_raw = data.get("up_info_speed", 0) if hasattr(data, "get") else getattr(data, "up_info_speed", 0)
-                    up_speed = int(cast(Union[int, str, float], up_speed_raw))
+                    up_speed = int(cast(int | str | float, up_speed_raw))
 
                 speeds.append(up_speed)
                 avg_speed = sum(speeds) / len(speeds)

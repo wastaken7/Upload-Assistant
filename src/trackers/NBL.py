@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlencode
 
 import aiofiles
@@ -109,7 +109,7 @@ class NBL:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: Upload failed: {e}"
             return False
 
-    async def search_existing(self, meta: Meta) -> Union[list[dict[str, Any]], bool]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]] | bool:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):

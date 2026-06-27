@@ -4,7 +4,7 @@ import json
 import os
 import platform
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import aiofiles
 import cli_ui
@@ -67,7 +67,7 @@ class ANT:
 
         return ""
 
-    async def get_tags(self, meta: Meta) -> Union[list[str], str]:
+    async def get_tags(self, meta: Meta) -> list[str] | str:
         meta.ant_user_tags = False
         no_tags = False
         tags: list[str] = []

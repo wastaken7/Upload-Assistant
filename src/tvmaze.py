@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import cli_ui
 import httpx
@@ -14,13 +14,13 @@ class TvmazeManager:
         self,
         filename: str,
         year: str,
-        imdbID: Optional[Union[int, str]],
-        tvdbID: Optional[Union[int, str]],
+        imdbID: Optional[int | str],
+        tvdbID: Optional[int | str],
         manual_date: Optional[str] = None,
-        tvmaze_manual: Optional[Union[int, str]] = None,
+        tvmaze_manual: Optional[int | str] = None,
         debug: bool = False,
         return_full_tuple: bool = False,
-    ) -> Union[int, tuple[int, int, int]]:
+    ) -> int | tuple[int, int, int]:
         """Searches TVMaze for a show using TVDB ID, IMDb ID, or a title query.
 
         - If `return_full_tuple=True`, returns `(tvmaze_id, imdbID, tvdbID)`.
@@ -153,7 +153,7 @@ class TvmazeManager:
         self,
         url: str,
         params: dict[str, Any],
-    ) -> Optional[Union[dict[str, Any], list[dict[str, Any]]]]:
+    ) -> Optional[dict[str, Any] | list[dict[str, Any]]]:
         """Sync function to make the request inside ThreadPoolExecutor."""
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:

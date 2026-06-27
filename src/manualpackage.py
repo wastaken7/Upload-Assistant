@@ -8,7 +8,7 @@ import shutil
 import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -31,7 +31,7 @@ class ManualPackageManager:
         self.tracker_config = tracker_config
         self.uploadscreens_manager = UploadScreensManager(cast(dict[str, Any], config))
 
-    async def package(self, meta: Meta) -> Union[str, bool]:
+    async def package(self, meta: Meta) -> str | bool:
         tag = "" if meta.tag == "" else f" / {meta.tag[1:]}"
         res = meta.source if meta.is_disc == "DVD" else meta.resolution
 

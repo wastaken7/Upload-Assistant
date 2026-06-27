@@ -9,12 +9,11 @@ import os
 import re
 import time
 from collections.abc import Sequence
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import aiofiles
 import httpx
 import pyimgbox
-from typing_extensions import TypeAlias
 
 from src.console import console
 from src.meta import Meta
@@ -37,7 +36,7 @@ class UploadScreensManager:
         return_dict: dict[str, Any],
         retry_mode: bool = False,
         max_retries: int = 3,
-        allowed_hosts: Union[list[str], None] = None,
+        allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
         return await _upload_screens(
             self.config,
@@ -634,7 +633,7 @@ async def _upload_screens(
     return_dict: dict[str, Any],
     retry_mode: bool = False,
     max_retries: int = 3,
-    allowed_hosts: Union[list[str], None] = None
+    allowed_hosts: list[str] | None = None
 ) -> tuple[list[ImageDict], int]:
     default_config = config.get('DEFAULT', {})
     if 'image_list' not in meta:
@@ -746,7 +745,7 @@ async def _upload_screens(
     async def async_upload(
         task: tuple[int, str, str, dict[str, Any], Meta],
         max_retries: int = 3,
-    ) -> Union[tuple[int, dict[str, Any]], None]:
+    ) -> tuple[int, dict[str, Any]] | None:
         """Upload image with concurrency control and retry logic."""
         index, *task_args = task
         retry_count = 0
@@ -781,7 +780,7 @@ async def _upload_screens(
                                 console.print(f"[red]Failed to upload image {index} after {max_retries} attempts: {reason}[/red]")
                                 return None
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         console.print(f"[red]Upload task {index} timed out after 60 seconds[/red]")
                         if future in running_tasks:
                             future.cancel()

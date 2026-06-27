@@ -2,8 +2,8 @@
 import os
 import re
 import sys
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, cast
+from collections.abc import Callable, Sequence
+from typing import Any, Optional, cast
 
 import anitopy
 import cli_ui

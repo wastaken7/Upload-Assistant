@@ -9,9 +9,9 @@ import subprocess
 import time
 import traceback
 import urllib.parse
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, TypedDict, Union, cast
+from typing import Any, Optional, TypedDict, cast
 
 import aiohttp
 import qbittorrentapi
@@ -117,7 +117,7 @@ class QbittorrentClientMixin:
                 except Exception as e:
                     console.print(f"[yellow]Failed to get properties: {e}")
                     return meta
-        except asyncio.TimeoutError:
+        except TimeoutError:
             console.print("[bold red]Getting torrents list timed out after retries")
             if qbt_session:
                 await qbt_session.close()
@@ -207,7 +207,7 @@ class QbittorrentClientMixin:
                                     os.remove(torrent_file_path)  # Remove invalid file
                                 else:
                                     await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta.base_dir, meta.uuid)
-                            except asyncio.TimeoutError:
+                            except TimeoutError:
                                 console.print(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
 
                         found = True
@@ -251,7 +251,7 @@ class QbittorrentClientMixin:
                 if attempt > 0:
                     console.print(f"[green]{operation_name} succeeded on attempt {attempt + 1}")
                 return result
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if attempt < max_retries:
                     console.print(f"[yellow]{operation_name} timed out after {timeout}s (attempt {attempt + 1}/{max_retries + 1}), retrying...")
                     await asyncio.sleep(1)  # Brief pause before retry
@@ -279,7 +279,7 @@ class QbittorrentClientMixin:
                 )
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.app_version), "qBittorrent API Key verification")
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     console.print("[bold red]Connection to qBittorrent timed out after retries")
                     return None
                 except qbittorrentapi.APIConnectionError:
@@ -298,7 +298,7 @@ class QbittorrentClientMixin:
                 )
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.auth_log_in), "qBittorrent login")
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     console.print("[bold red]Connection to qBittorrent timed out after retries")
                     return None
                 except qbittorrentapi.LoginFailed:
@@ -431,7 +431,7 @@ class QbittorrentClientMixin:
                         "Get torrents list",
                         initial_timeout=14.0
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 console.print("[bold red]Getting torrents list timed out after retries")
                 return None
             except Exception as e:
@@ -890,7 +890,7 @@ class QbittorrentClientMixin:
                     "Add torrent to qBittorrent",
                     initial_timeout=14.0
                 )
-        except (asyncio.TimeoutError, qbittorrentapi.APIConnectionError):
+        except (TimeoutError, qbittorrentapi.APIConnectionError):
             console.print("[bold red]Failed to add torrent to qBittorrent")
             if qbt_session:
                 await qbt_session.close()
@@ -929,7 +929,7 @@ class QbittorrentClientMixin:
                     )
                     if len(torrents_info) > 0:
                         break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Continue waiting
             except Exception:
                 pass  # Continue waiting
@@ -961,7 +961,7 @@ class QbittorrentClientMixin:
                         lambda: asyncio.to_thread(qbt_client.torrents_resume, torrent.infohash),
                         "Resume torrent"
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 console.print("[yellow]Failed to resume torrent after retries")
             except Exception as e:
                 console.print(f"[yellow]Error resuming torrent: {e}")
@@ -985,7 +985,7 @@ class QbittorrentClientMixin:
                         "Set super-seed mode",
                         initial_timeout=10.0
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 console.print(f"{tracker}: Super-seed request timed out")
             except Exception as e:
                 console.print(f"{tracker}: Super-seed error: {e}")
@@ -1017,7 +1017,7 @@ class QbittorrentClientMixin:
                         console.print(f"[cyan]Actual qBittorrent save path: {info[0].save_path}")
                     else:
                         console.print("[yellow]No torrent info returned from qBittorrent")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 console.print("[yellow]Failed to get torrent info for debug after retries")
             except Exception as e:
                 console.print(f"[yellow]Error getting torrent info for debug: {e}")
@@ -1044,7 +1044,7 @@ class QbittorrentClientMixin:
                 if meta.debug:
                     console.print("[yellow]No matching torrents for the path found in qBittorrent[/yellow]")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception as e:
             console.print(f"[red]Error searching for torrents: {str(e)}[/red]")
@@ -1060,7 +1060,7 @@ class QbittorrentClientMixin:
             mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
             piece_limit = bool(self.config['DEFAULT'].get('prefer_max_16_torrent', False))
             mtv_torrent = bool(mtv_config.get('prefer_mtv_torrent', False))
-            piece_size_constraints_enabled: Union[str, bool]
+            piece_size_constraints_enabled: str | bool
             # MTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
             if mtv_torrent:
                 piece_size_constraints_enabled = 'MTV'
@@ -1167,7 +1167,7 @@ class QbittorrentClientMixin:
 
             return unique_torrents
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception as e:
             console.print(f"[bold red]Error finding torrents: {str(e)}")
@@ -1405,7 +1405,7 @@ class QbittorrentClientMixin:
                 if qbt_client is None:
                     return []
                 return await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.torrents_info), "Get torrents list", initial_timeout=14.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             console.print("[bold red]Getting torrents list timed out after retries")
             return []
         except Exception as e:
@@ -1463,7 +1463,7 @@ class QbittorrentClientMixin:
                             lambda qbt_client=qbt_client, torrent_hash=torrent.hash: asyncio.to_thread(qbt_client.torrents_trackers, torrent_hash=torrent_hash),
                             f"Get trackers for torrent {torrent.name}",
                         )
-                except (asyncio.TimeoutError, qbittorrentapi.APIError):
+                except (TimeoutError, qbittorrentapi.APIError):
                     if meta.debug:
                         console.print(f"[yellow]Failed to get trackers for torrent {torrent.name} after retries")
                     continue
@@ -1628,7 +1628,7 @@ class QbittorrentClientMixin:
 
             # Use piece preference if MTV preference is true, otherwise use general piece limit
             use_piece_preference = prefer_small_pieces or piece_limit
-            piece_size_best_match: Union[dict[str, Any], None] = None  # Track the best match for fallback if piece preference is enabled
+            piece_size_best_match: dict[str, Any] | None = None  # Track the best match for fallback if piece preference is enabled
             found_valid_torrent = False
 
             # Try the best match first (from the sorted matching torrents)
@@ -1851,7 +1851,7 @@ class QbittorrentClientMixin:
 
             return matching_torrents
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception as e:
             console.print(f"[bold red]Error finding torrents in {client_name}: {str(e)}")

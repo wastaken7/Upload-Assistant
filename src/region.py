@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Callable, Optional, Union, cast
+from collections.abc import Callable
+from typing import Any, Optional, cast
 
 import guessit
 
@@ -88,7 +89,7 @@ async def get_distributor(distributor_in: Optional[str]) -> str:
     return distributor_out
 
 
-async def get_service(video: Optional[str] = None, tag: Optional[str] = None, audio: Optional[str] = None, guess_title: Optional[str] = None, get_services_only: bool = False) -> Union[dict[str, str], tuple[str, str]]:
+async def get_service(video: Optional[str] = None, tag: Optional[str] = None, audio: Optional[str] = None, guess_title: Optional[str] = None, get_services_only: bool = False) -> dict[str, str] | tuple[str, str]:
     services = {
         '9NOW': '9NOW', '9Now': '9NOW', 'ADN': 'ADN', 'Animation Digital Network': 'ADN', 'AE': 'AE', 'A&E': 'AE', 'AJAZ': 'AJAZ', 'Al Jazeera English': 'AJAZ',
         'ALL4': 'ALL4', 'Channel 4': 'ALL4', 'AMBC': 'AMBC', 'ABC': 'AMBC', 'AMC': 'AMC', 'AMZN': 'AMZN',

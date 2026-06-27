@@ -8,19 +8,18 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import cli_ui
 import click
 from rich.markdown import Markdown
 from rich.style import Style
-from typing_extensions import TypeAlias
 
 from src.console import console
 from src.meta import Meta
 
 QueueItem: TypeAlias = dict[str, Any]
-QueueList: TypeAlias = Union[list[str], list[QueueItem]]
+QueueList: TypeAlias = list[str] | list[QueueItem]
 
 
 async def _read_json_file(path: str) -> Any:
@@ -150,7 +149,7 @@ class QueueManager:
 
     @staticmethod
     async def gather_files_recursive(
-        path: Union[str, bytes],
+        path: str | bytes,
         allowed_extensions: Optional[Sequence[str]] = None,
     ) -> list[str]:
         """
@@ -724,7 +723,7 @@ async def load_processed_files(log_file: str) -> set[str]:
 
 
 async def gather_files_recursive(
-    path: Union[str, bytes],
+    path: str | bytes,
     allowed_extensions: Optional[Sequence[str]] = None,
 ) -> list[str]:
     return await QueueManager.gather_files_recursive(path, allowed_extensions=allowed_extensions)

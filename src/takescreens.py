@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import ffmpeg
 import psutil
@@ -126,7 +126,7 @@ async def disc_screenshots(
     folder_id: str,
     base_dir: str,
     use_vs: bool,
-    image_list: Union[list[dict[str, str]], None] = None,
+    image_list: list[dict[str, str]] | None = None,
     ffdebug: bool = False,
     num_screens: int = 0,
     force_screenshots: bool = False,
@@ -1369,8 +1369,8 @@ async def screenshots(
     meta: Meta,
     num_screens: int = 0,
     force_screenshots: bool = False,
-    manual_frames: Union[str, list[int], list[str]] = "",
-) -> Union[list[str], None]:
+    manual_frames: str | list[int] | list[str] = "",
+) -> list[str] | None:
     if meta.category == "GAME":
         return []
 
@@ -1923,7 +1923,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             async def run_cmd(info_command: Any, timeout_sec: float) -> tuple[Optional[int], bytes, bytes]:
                 try:
                     return await asyncio.wait_for(run_ffmpeg(info_command), timeout=timeout_sec)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return -1, b"", b"Timeout"
 
             info_cmd = build_cmd(use_libplacebo=True)
@@ -2154,7 +2154,7 @@ async def kill_all_child_processes() -> None:
         console.print(f"[yellow]Warning: Error during child process cleanup: {e}[/yellow]")
 
 
-async def get_frame_info(path: str, ss_time: Union[str, float], meta: Meta) -> dict[str, Any]:
+async def get_frame_info(path: str, ss_time: str | float, meta: Meta) -> dict[str, Any]:
     """Get frame information (type, exact timestamp) for a specific frame"""
     try:
         ss_time_value = float(ss_time)
@@ -2374,7 +2374,7 @@ class TakeScreensManager:
         folder_id: str,
         base_dir: str,
         use_vs: bool,
-        image_list: Union[list[dict[str, str]], None] = None,
+        image_list: list[dict[str, str]] | None = None,
         ffdebug: bool = False,
         num_screens: int = 0,
         force_screenshots: bool = False,
@@ -2415,7 +2415,7 @@ class TakeScreensManager:
         meta: Meta,
         num_screens: int = 0,
         force_screenshots: bool = False,
-        manual_frames: Union[str, list[int], list[str]] = "",
+        manual_frames: str | list[int] | list[str] = "",
     ) -> Optional[list[str]]:
         return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames)
 

@@ -5,7 +5,7 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 from pymediainfo import MediaInfo
@@ -86,7 +86,7 @@ def setup_mediainfo_library(base_dir: str, debug: bool = False) -> Optional[dict
 async def mi_resolution(
     res: str,
     guess: dict[str, Any],
-    width: Union[str, int],
+    width: str | int,
     scan: str,
 ) -> str:
     res_map = {

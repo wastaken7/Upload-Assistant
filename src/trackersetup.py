@@ -4,9 +4,9 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import cli_ui
@@ -272,7 +272,7 @@ class TRACKER_SETUP:
                     names.append(item)
             names_csv = ', '.join(names)
             file_content = {
-                "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "last_updated": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "banned_groups": names_csv,
                 "raw_data": json_data
             }
@@ -358,8 +358,8 @@ class TRACKER_SETUP:
         try:
             content = await asyncio.to_thread(self._read_file, file_path)
             data = cast(JsonDict, json.loads(content))
-            last_updated = datetime.strptime(str(data['last_updated']), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc) >= last_updated + timedelta(days=1)
+            last_updated = datetime.strptime(str(data['last_updated']), "%Y-%m-%d").replace(tzinfo=UTC)
+            return datetime.now(UTC) >= last_updated + timedelta(days=1)
         except FileNotFoundError:
             return True
         except Exception as e:
@@ -464,7 +464,7 @@ class TRACKER_SETUP:
             titles_csv = ', '.join([str(entry.get('title', '')) for entry in extracted_data])
 
             file_content = {
-                "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "last_updated": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "titles_csv": titles_csv,
                 "extracted_data": extracted_data,
                 "raw_data": data
@@ -549,7 +549,7 @@ class TRACKER_SETUP:
 
         return await self.check_tracker_claims(meta, tracker)
 
-    async def check_tracker_claims(self, meta: Meta, tracker: Union[str, list[str]]) -> bool:
+    async def check_tracker_claims(self, meta: Meta, tracker: str | list[str]) -> bool:
         trackers = [tracker.strip().upper()] if isinstance(tracker, str) else [str(s).upper() for s in cast(list[Any], tracker)]
 
         async def process_single_tracker(tracker_name: str) -> bool:
@@ -743,17 +743,17 @@ class TRACKER_SETUP:
         # console.print(f"Debug: BHD requests found: {requests}")
         return requests
 
-    async def tracker_request(self, meta: Meta, tracker: Union[str, list[str]]) -> bool:
+    async def tracker_request(self, meta: Meta, tracker: str | list[str]) -> bool:
         trackers = [tracker.strip().upper()] if isinstance(tracker, str) else [str(s).upper() for s in cast(list[Any], tracker)]
 
-        async def process_single_tracker(tracker_name: str) -> Union[bool, list[JsonDict]]:
+        async def process_single_tracker(tracker_name: str) -> bool | list[JsonDict]:
             tracker_instance = self._create_tracker_instance(tracker_name)
             if tracker_instance is None:
                 console.print(f"[red]Tracker {tracker_name} is not registered in tracker_class_map[/red]")
                 return False
 
             requests: list[JsonDict] = []
-            url: Union[str, None] = None
+            url: str | None = None
             type_ids: list[Any] = []
             resolution_ids: list[Any] = []
             category_ids: list[Any] = []

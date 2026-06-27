@@ -3,7 +3,7 @@ import asyncio
 import os
 import platform
 import re
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import cli_ui
@@ -135,7 +135,7 @@ class BHD:
         }
 
         url = self.upload_url + str(self.tracker_config.get('api_key', '')).strip()
-        details_link: Union[str, None] = None
+        details_link: str | None = None
         if meta.debug is False:
             try:
                 async with httpx.AsyncClient(timeout=60) as client:

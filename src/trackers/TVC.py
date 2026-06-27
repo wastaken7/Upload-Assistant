@@ -4,7 +4,7 @@ import json
 import os
 import re
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
@@ -75,7 +75,7 @@ class TVC:
             str: Reformatted date string, or the original if parsing fails.
         """
         try:
-            return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).strftime("%d-%m-%Y")
+            return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC).strftime("%d-%m-%Y")
         except (ValueError, TypeError):
             return date_str
 

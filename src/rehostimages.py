@@ -5,7 +5,7 @@ import json
 import os
 import re
 from collections.abc import Iterable, Mapping
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -18,7 +18,7 @@ from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
 
-def _as_str(value: Any) -> Union[str, None]:
+def _as_str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 

@@ -4,7 +4,7 @@ import json
 import os
 import platform
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -1091,7 +1091,7 @@ class BJS:
             return ""
 
         try:
-            date_object = datetime.strptime(raw_date_string, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            date_object = datetime.strptime(raw_date_string, "%Y-%m-%d").replace(tzinfo=UTC)
             formatted_date = date_object.strftime("%d %b %Y")
 
             return formatted_date

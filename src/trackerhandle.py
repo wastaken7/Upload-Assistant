@@ -4,10 +4,9 @@ import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import cli_ui
-from typing_extensions import TypeAlias
 
 from cogs.redaction import Redaction
 from src.cleanup import cleanup_manager

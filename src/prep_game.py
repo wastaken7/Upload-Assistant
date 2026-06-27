@@ -356,7 +356,7 @@ async def gather_game_prep(
                 release_date = r.get("first_release_date")
                 year = ""
                 if release_date:
-                    year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc).year})"
+                    year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.UTC).year})"
 
                 platforms = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
                 platforms_str = f" [{', '.join(platforms)}]" if platforms else ""
@@ -388,7 +388,7 @@ async def gather_game_prep(
 
     release_date = selected_game.get("first_release_date")
     if release_date and not cli_overrides["year"]:
-        dt = datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc)
+        dt = datetime.datetime.fromtimestamp(release_date, datetime.UTC)
         year_val = dt.year
         meta.year = str(year_val)
         meta.search_year = year_val

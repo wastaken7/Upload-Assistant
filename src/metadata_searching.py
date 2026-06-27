@@ -2,7 +2,7 @@
 import asyncio
 import re
 from collections.abc import Awaitable
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import httpx
 from bs4 import BeautifulSoup
@@ -59,8 +59,8 @@ class MetadataSearchingManager:
         self,
         filename: str,
         search_year: str,
-        imdb: Optional[Union[int, str]],
-        tmdb: Optional[Union[int, str]],
+        imdb: Optional[int | str],
+        tmdb: Optional[int | str],
         manual_date: Optional[str] = None,
         tvmaze_manual: Optional[str] = None,
         year: str = '',
@@ -617,8 +617,8 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
 async def get_tvmaze_tvdb(
     filename: str,
     search_year: str,
-    imdb: Optional[Union[int, str]],
-    tmdb: Optional[Union[int, str]],
+    imdb: Optional[int | str],
+    tmdb: Optional[int | str],
     tvdb_handler: Any,
     manual_date: Optional[str] = None,
     tvmaze_manual: Optional[str] = None,

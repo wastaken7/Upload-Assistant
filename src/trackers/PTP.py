@@ -8,7 +8,7 @@ import os
 import platform
 import re
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -113,7 +113,7 @@ class PTP:
         search_term: str,
         _search_file_folder: str,
         _meta: dict[str, Any],
-    ) -> tuple[Optional[int], Optional[Union[int, str]], Optional[str]]:
+    ) -> tuple[Optional[int], Optional[int | str], Optional[str]]:
         headers = {
             'ApiUser': self.api_user,
             'ApiKey': self.api_key,
@@ -136,7 +136,7 @@ class PTP:
                 for movie in movies:
                     imdb_value = movie.get('ImdbId')
                     torrents = cast(list[dict[str, Any]], movie.get('Torrents', []) or [])
-                    ptp_torrent_id: Optional[Union[int, str]] = None
+                    ptp_torrent_id: Optional[int | str] = None
                     ptp_torrent_hash: Optional[str] = None
 
                     normalized_search = search_value or ''.lower()
@@ -171,7 +171,7 @@ class PTP:
             console.print(f'[red]An error occurred: {str(e)}[/red]')
             return None, None, None
 
-    async def get_imdb_from_torrent_id(self, ptp_torrent_id: Union[int, str]) -> tuple[Optional[int], Optional[str]]:
+    async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[Optional[int], Optional[str]]:
         params = {
             'torrentid': ptp_torrent_id
         }
@@ -204,7 +204,7 @@ class PTP:
         except Exception:
             return None, None
 
-    async def get_ptp_description(self, ptp_torrent_id: Union[int, str], meta: Meta, is_disc: str) -> list[Any]:
+    async def get_ptp_description(self, ptp_torrent_id: int | str, meta: Meta, is_disc: str) -> list[Any]:
         params = {
             'id': ptp_torrent_id,
             'action': 'get_description'
@@ -257,7 +257,7 @@ class PTP:
 
         return imagelist
 
-    async def get_group_by_imdb(self, imdb: Union[int, str]) -> Optional[str]:
+    async def get_group_by_imdb(self, imdb: int | str) -> Optional[str]:
         params = {
             'imdb': imdb,
         }
@@ -350,7 +350,7 @@ class PTP:
 
         return None
 
-    async def get_torrent_info(self, imdb: Union[int, str], meta: Meta) -> dict[str, Any]:
+    async def get_torrent_info(self, imdb: int | str, meta: Meta) -> dict[str, Any]:
         params = {
             'imdb': imdb,
             'action': 'torrent_info',
@@ -408,7 +408,7 @@ class PTP:
 
         return tags
 
-    async def search_existing(self, groupID: Union[int, str], meta: Meta) -> list[str]:
+    async def search_existing(self, groupID: int | str, meta: Meta) -> list[str]:
         # Map resolutions to SD / HD / UHD
         quality = None
         if meta.sd == 1:  # 1 is SD
@@ -727,7 +727,7 @@ class PTP:
                             sub_langs.append(subID)
         sub_langs_result = list({*sub_langs})
         trumpable_unique = list({*trumpable_list})
-        trumpable_result: Union[list[int], None] = trumpable_unique if trumpable_unique else None
+        trumpable_result: list[int] | None = trumpable_unique if trumpable_unique else None
         return trumpable_result, sub_langs_result
 
     def get_remaster_title(self, meta: Meta) -> str:
@@ -1464,7 +1464,7 @@ class PTP:
             loggedIn = True
         return loggedIn
 
-    async def fill_upload_form(self, groupID: Optional[Union[int, str]], meta: Meta) -> tuple[str, dict[str, Any]]:
+    async def fill_upload_form(self, groupID: Optional[int | str], meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
         file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
@@ -1618,7 +1618,7 @@ class PTP:
                     new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
             imdb_info = cast(dict[str, Any], meta.imdb_info)
-            directors: Union[list[str], tuple[str, ...], None] = None
+            directors: list[str] | tuple[str, ...] | None = None
             directors_value = imdb_info.get('directors')
             if isinstance(directors_value, (list, tuple)):
                 director_names = [

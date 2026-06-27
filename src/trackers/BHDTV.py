@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import traceback
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import httpx
@@ -96,7 +96,7 @@ class BHDTV:
         if meta.debug is False:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.post(url=self.upload_url, data=data, files=files)
-            parsed: Union[Any, None] = None
+            parsed: Any | None = None
             if response:
                 try:
                     parsed = response.json()

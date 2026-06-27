@@ -5,7 +5,7 @@ import re
 import shutil
 import urllib.parse
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiohttp
 import defusedxml.xmlrpc
@@ -337,7 +337,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
     async def _search_single_client_for_torrent(
         self, meta: Meta, client_name: str, prefer_small_pieces: bool, mtv_torrent: bool, piece_limit: bool, best_match: Optional[dict[str, Any]]
-    ) -> Union[dict[str, Any], str, None]:
+    ) -> dict[str, Any] | str | None:
         """Search a single client for an existing torrent by hash or via API search (qbit only)."""
 
         client = self.config['TORRENT_CLIENTS'][client_name]
@@ -392,7 +392,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                     ),
                                     f"Export torrent {hash_value_str}"
                                 )
-                            except (asyncio.TimeoutError, qbittorrentapi.APIError):
+                            except (TimeoutError, qbittorrentapi.APIError):
                                 continue
                         if not torrent_file_content:
                             console.print(f"[bold red]qBittorrent returned an empty response for hash {hash_value_str}")
@@ -443,7 +443,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 found_hash = None
                 if qbt_session:
                     await qbt_session.close()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if qbt_session:
                     await qbt_session.close()
                 raise
@@ -498,7 +498,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                             ),
                                             f"Export torrent {found_hash}"
                                         )
-                                    except (asyncio.TimeoutError, qbittorrentapi.APIError) as e:
+                                    except (TimeoutError, qbittorrentapi.APIError) as e:
                                         console.print(f"[red]Error exporting torrent: {e}")
 
                             if found_hash:  # Only proceed if export succeeded
@@ -687,7 +687,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return valid, torrent_path
 
-    async def remote_path_map(self, meta: Meta, torrent_client_name: Optional[Union[str, dict[str, Any]]] = None) -> tuple[str, str]:
+    async def remote_path_map(self, meta: Meta, torrent_client_name: Optional[str | dict[str, Any]] = None) -> tuple[str, str]:
         if isinstance(torrent_client_name, dict):
             client_config: dict[str, Any] = torrent_client_name
         elif isinstance(torrent_client_name, str) and torrent_client_name:

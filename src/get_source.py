@@ -2,8 +2,9 @@
 import asyncio
 import json
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import Any, Optional, cast
 
 import guessit
 

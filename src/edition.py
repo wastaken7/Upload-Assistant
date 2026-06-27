@@ -1,7 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from typing import Any, Callable, Optional, Union, cast
+from collections.abc import Callable
+from typing import Any, Optional, cast
 
 import guessit
 
@@ -17,7 +18,7 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: Union[str, list[str]], meta: Meta) -> tuple[str, str, bool]:
+async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
     edition = ""
     imdb_info = cast(dict[str, Any], meta.imdb_info)
     edition_details = cast(dict[str, dict[str, Any]], imdb_info.get('edition_details', {}))
@@ -179,7 +180,7 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
                             try:
                                 choice = console.input(f"[yellow]Select edition number (1-{len(playlist_matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]")
 
-                                playlist_selected: Union[str, dict[str, Any]]
+                                playlist_selected: str | dict[str, Any]
 
                                 if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(playlist_matching_editions):
                                     playlist_selected = playlist_matching_editions[int(choice)-1]

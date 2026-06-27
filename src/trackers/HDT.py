@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -172,7 +172,7 @@ class HDT:
         search_url = f'{self.base_url}/torrents.php?'
         if meta.imdb_id or 0 != 0:
             imdbID = f"tt{meta.imdb}"
-            params: dict[str, Union[str, int]] = {
+            params: dict[str, str | int] = {
                 'csrfToken': self.secret_token,
                 'search': imdbID,
                 'active': '0',

@@ -1939,7 +1939,7 @@ async def do_the_thing(base_dir: str) -> None:
                     try:
                         await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
                         console.print("[green]Discord Bot is ready!")
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         console.print("[bold red]Bot failed to connect within timeout period.")
                         console.print("[yellow]Continuing without Discord integration...")
                         if 'connect_task' in locals():
@@ -2507,7 +2507,7 @@ if __name__ == "__main__":
                 async def _cleanup_with_timeout() -> None:
                     try:
                         await asyncio.wait_for(cleanup_manager.cleanup(), timeout=10.0)
-                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                    except (TimeoutError, asyncio.CancelledError):
                         console.print("[yellow]Cleanup timed out or was cancelled, forcing exit...[/yellow]")
 
                 asyncio.run(_cleanup_with_timeout())

@@ -3,7 +3,7 @@ import asyncio
 import glob
 import os
 import platform
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional
 
 import aiofiles
 import httpx
@@ -109,7 +109,7 @@ class FF:
         items = [line.strip() for line in response.text.splitlines() if line.strip()]
         return items
 
-    async def get_requests(self, meta: Meta) -> Union[bool, list[dict[str, str]]]:
+    async def get_requests(self, meta: Meta) -> bool | list[dict[str, str]]:
         if self.config['TRACKERS'][self.tracker].get('check_requests', False) is False:
             return False
 

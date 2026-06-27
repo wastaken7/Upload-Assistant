@@ -3,7 +3,7 @@ import asyncio
 import os
 import random
 import re
-from typing import Any, Literal, Optional, Union, cast
+from typing import Any, Literal, Optional, cast
 
 import aiofiles
 import certifi
@@ -20,7 +20,7 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-_shri_session_data: dict[str, dict[str, Union[str, None]]] = {}
+_shri_session_data: dict[str, dict[str, str | None]] = {}
 
 
 class SHRI(UNIT3D):

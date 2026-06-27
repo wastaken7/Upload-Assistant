@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.meta import Meta
@@ -91,7 +91,7 @@ class CZ(AZTrackerBase):
         is_older_than_50_years = False
 
         if isinstance(year, int):
-            current_year = datetime.now(timezone.utc).year
+            current_year = datetime.now(UTC).year
             if (current_year - year) >= 50:
                 is_older_than_50_years = True
 

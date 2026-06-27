@@ -5,7 +5,6 @@ import stat
 import tarfile
 import zipfile
 from pathlib import Path
-from typing import Union
 
 import aiofiles
 import httpx
@@ -23,7 +22,7 @@ except ImportError:
 
 class MkbrrBinaryManager:
     @staticmethod
-    async def ensure_mkbrr_binary(base_dir: Union[str, Path], debug: bool, version: str) -> str:
+    async def ensure_mkbrr_binary(base_dir: str | Path, debug: bool, version: str) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if debug:
@@ -224,7 +223,7 @@ class MkbrrBinaryManager:
             raise Exception(f"Failed to extract mkbrr binary: {e}") from e
 
     @staticmethod
-    def download_mkbrr_for_docker(base_dir: Union[str, Path] = ".", version: str = "v1.18.0") -> str:
+    def download_mkbrr_for_docker(base_dir: str | Path = ".", version: str = "v1.18.0") -> str:
         """Download mkbrr binary for Docker/Linux - synchronous version."""
         system = platform.system().lower()
         machine = platform.machine().lower()

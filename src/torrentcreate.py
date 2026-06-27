@@ -13,8 +13,8 @@ import subprocess
 import sys
 import time
 from collections.abc import Sequence
-from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from datetime import UTC, datetime
+from typing import Any, Optional
 
 import cli_ui
 import torf
@@ -190,11 +190,11 @@ class TorrentCreator:
     async def create_torrent(
         cls,
         meta: Meta,
-        path: Union[str, os.PathLike[str]],
+        path: str | os.PathLike[str],
         output_filename: str,
         tracker_url: Optional[str] = None,
         piece_size: int = 0,
-    ) -> Union[str, Torrent]:
+    ) -> str | Torrent:
         # Ensure only one torrent creation runs at a time
         wait_started: Optional[float] = None
         if cls._create_torrent_semaphore.locked():
@@ -418,7 +418,7 @@ class TorrentCreator:
                     private=True,
                     exclude_globs=exclude or [],
                     include_globs=custom_include,
-                    creation_date=datetime.now(timezone.utc),
+                    creation_date=datetime.now(UTC),
                     comment=f"{meta.ua_name} (fork)",
                     created_by=f"{meta.ua_name} (fork)",
                     piece_size=piece_size,
@@ -523,7 +523,7 @@ class TorrentCreator:
         cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
 
     @staticmethod
-    def create_random_torrents(base_dir: str, uuid: str, num: Union[int, str], path: str) -> None:
+    def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) -> None:
         manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", os.path.basename(path))
         base_torrent = Torrent.read(f"{base_dir}/tmp/{uuid}/BASE.torrent")
         for i in range(1, int(num) + 1):
@@ -628,11 +628,11 @@ def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_
 
 async def create_torrent(
     meta: Meta,
-    path: Union[str, os.PathLike[str]],
+    path: str | os.PathLike[str],
     output_filename: str,
     tracker_url: Optional[str] = None,
     piece_size: int = 0,
-) -> Union[str, Torrent]:
+) -> str | Torrent:
     return await TorrentCreator.create_torrent(
         meta=meta,
         path=path,
@@ -646,7 +646,7 @@ def torf_cb(torrent: Torrent, filepath: str, pieces_done: int, pieces_total: int
     TorrentCreator.torf_cb(torrent, filepath, pieces_done, pieces_total)
 
 
-def create_random_torrents(base_dir: str, uuid: str, num: Union[int, str], path: str) -> None:
+def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) -> None:
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 

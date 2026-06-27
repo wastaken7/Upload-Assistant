@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -67,7 +67,7 @@ class PTER:
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
 
-    async def search_existing(self, meta: Meta) -> Union[list[str], bool]:
+    async def search_existing(self, meta: Meta) -> list[str] | bool:
         dupes: list[str] = []
         common = COMMON(config=self.config)
         cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"

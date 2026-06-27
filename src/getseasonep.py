@@ -3,10 +3,10 @@ import asyncio
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import Any, Optional, cast
 
 import anitopy
 import guessit

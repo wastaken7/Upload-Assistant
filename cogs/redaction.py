@@ -131,7 +131,7 @@ class Redaction:
         return data
 
     @staticmethod
-    async def clean_meta_for_export(meta: "Meta") -> "Meta":
+    async def clean_meta_for_export(meta: Meta) -> Meta:
         """
         Removes all 'status_message' keys from meta.tracker_status and
         removes or clears 'torrent_comments' from meta.
@@ -170,5 +170,5 @@ def redact_private_info(data: Any, sensitive_keys: Optional[set[str]] = None) ->
     return Redaction.redact_private_info(data, sensitive_keys)
 
 
-async def clean_meta_for_export(meta: "Meta") -> "Meta":
+async def clean_meta_for_export(meta: Meta) -> Meta:
     return await Redaction.clean_meta_for_export(meta)

@@ -7,7 +7,8 @@ import re
 import secrets
 import sys
 import unicodedata
-from typing import Any, Callable, Optional, Union, cast
+from collections.abc import Callable
+from typing import Any, Optional, cast
 
 import aiofiles
 import bencodepy
@@ -295,7 +296,7 @@ class COMMON:
         meta: Meta,
         tracker: str,
         source_flag: str,
-        new_tracker: Union[str, list[str]],
+        new_tracker: str | list[str],
         comment: str = "",
         hash_is_id: bool = False,
     ) -> Optional[str]:
@@ -539,11 +540,11 @@ class COMMON:
     async def prompt_user_for_id_selection(
         self,
         meta: Meta,
-        tmdb: Optional[Union[str, int]] = None,
-        imdb: Optional[Union[str, int]] = None,
-        tvdb: Optional[Union[str, int]] = None,
-        mal: Optional[Union[str, int]] = None,
-        filename: Optional[Union[str, list[str]]] = None,
+        tmdb: Optional[str | int] = None,
+        imdb: Optional[str | int] = None,
+        tvdb: Optional[str | int] = None,
+        mal: Optional[str | int] = None,
+        filename: Optional[str | list[str]] = None,
         tracker_name: Optional[str] = None,
     ) -> bool:
         if not tracker_name:
@@ -596,7 +597,7 @@ class COMMON:
         except ValueError:
             return
         try:
-            data: Union[list[dict[str, Any]], str] = json_response.get('data', [])
+            data: list[dict[str, Any]] | str = json_response.get('data', [])
             if data == "404":
                 console.print("[yellow]No data found (404). Returning None.[/yellow]")
                 return
@@ -662,8 +663,8 @@ class COMMON:
         torrent_url: str,
         search_url: str,
         meta: Meta,
-        id: Optional[Union[str, int]] = None,
-        file_name: Optional[Union[str, list[str]]] = None,
+        id: Optional[str | int] = None,
+        file_name: Optional[str | list[str]] = None,
         skip_tracker_descriptions: bool = False,
     ) -> tuple[
         Optional[int],
@@ -674,7 +675,7 @@ class COMMON:
         Optional[str],
         Optional[str],
         list[dict[str, str]],
-        Optional[Union[str, list[str]]],
+        Optional[str | list[str]],
     ]:
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist: list[dict[str, str]] = []
@@ -713,7 +714,7 @@ class COMMON:
 
         try:
             # Handle response when searching by file name (which might return a 'data' array)
-            data: Union[list[dict[str, Any]], str] = json_response.get('data', [])
+            data: list[dict[str, Any]] | str = json_response.get('data', [])
             if data == "404":
                 console.print("[yellow]No data found (404). Returning None.[/yellow]")
                 return None, None, None, None, None, None, None, [], None

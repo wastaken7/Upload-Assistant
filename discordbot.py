@@ -59,7 +59,7 @@ class Bot(commands.Bot):
         Can be used to work out uptime.
         """
         await self.wait_until_ready()
-        self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        self.start_time = datetime.datetime.now(datetime.UTC)
 
     async def get_prefix_(self, bot: commands.Bot, message: discord.Message) -> Sequence[str]:
         """
