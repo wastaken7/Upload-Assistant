@@ -64,7 +64,7 @@ class NameManager:
         part = meta.part
         repack = meta.repack
         three_d = meta.three_d
-        tag = meta.tag
+        tag = meta.tag or ""
         source = str(meta.source)
         uhd = str(meta.uhd)
         hdr = meta.hdr

@@ -52,7 +52,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(meta.type, "0")
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(meta.type or "", "0")
         return {'type_id': type_id}
 
     # If default UNIT3D resolutions, remove this function

@@ -64,7 +64,7 @@ async def gen_desc(
     meta: Meta,
     _takescreens_manager: TakeScreensManager,
     _uploadscreens_manager: UploadScreensManager,
-) -> dict[str, Any]:
+) -> Meta:
     def clean_text(text: str) -> str:
         return text.replace("\r\n", "\n").strip()
 
@@ -87,7 +87,7 @@ async def gen_desc(
     uuid = meta.uuid
     path = meta.path
     specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
-    source_dir_path = os.path.join(path, "*.nfo")
+    source_dir_path = os.path.join(meta.path or "", "*.nfo")
 
     if meta.description_template:
         try:
@@ -203,7 +203,7 @@ async def gen_desc(
     await write_description_file(description_path, description_lines)
 
     if meta.description in ("None", "", " "):
-        meta.description = None
+        meta.description = ""
 
     return meta
 
@@ -1543,6 +1543,8 @@ class DescriptionBuilder:
             if meta.comparison and meta.comparison_groups:
                 desc_parts.append("[center]")
                 comparison_groups = meta.comparison_groups
+                if not isinstance(comparison_groups, dict):
+                    comparison_groups = {str(i): v for i, v in enumerate(comparison_groups)}
                 sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(x))
 
                 comp_sources: list[str] = []

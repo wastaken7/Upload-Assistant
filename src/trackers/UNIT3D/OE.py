@@ -177,7 +177,7 @@ class OE(UNIT3D):
         if name_type in ["ENCODE", "WEBDL", "WEBRIP"] and scale != "":
             oe_name = oe_name.replace(f"{resolution}", f"{scale}", 1)
 
-        tag_value = meta.tag
+        tag_value = meta.tag or ""
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):

@@ -63,7 +63,7 @@ class LCD(UNIT3D):
         for old, new in replacements.items():
             name = name.replace(old, new)
 
-        tag_lower = meta.tag.lower()
+        tag_lower = meta.tag.lower() if meta.tag else ""
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
@@ -117,7 +117,7 @@ class LCD(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "ENCODE": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6"}.get(meta.type, "0")
+        type_id = {"DISC": "1", "REMUX": "2", "ENCODE": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6"}.get(meta.type or "", "0")
         return {'type_id': type_id}
 
     async def get_resolution_id(

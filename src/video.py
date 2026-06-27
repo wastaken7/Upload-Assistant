@@ -417,7 +417,7 @@ class VideoManager:
                 console.print(f"[red]Error getting container for file: {e}[/red]")
                 return ''
 
-            extension = os.path.splitext(largest_file_path)[1]
+            extension = os.path.splitext(str(largest_file_path))[1]
             return extension.lstrip('.').lower() if extension else ''
 
 

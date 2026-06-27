@@ -117,7 +117,7 @@ class SAM(UNIT3D):
             else:
                 val = "50"  # PC
         else:
-            val = type_id.get(resolved_type, "0")
+            val = type_id.get(resolved_type or "", "0")
             if meta.category == "BOOK" and val == "0":
                 val = "68"
 

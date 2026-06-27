@@ -121,7 +121,7 @@ class LT(UNIT3D):
             elif resolved_type in ("AZW3", "MOBI", "KFX"):
                 resolved_type = "AZW3"
 
-        val = type_id.get(resolved_type, "0")
+        val = type_id.get(resolved_type or "", "0")
         if meta.category == "BOOK" and val == "0":
             val = "21"
 

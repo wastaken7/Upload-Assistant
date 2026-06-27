@@ -26,6 +26,8 @@ class SUIO:
         self.common = COMMON(config)
         self.tracker = "SUIO"
         self.is_usenet = True
+        self.upload_url: Optional[str] = None
+        self.torrent_url: Optional[str] = None
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
         if base_url:
@@ -297,9 +299,16 @@ class SUIO:
         return data
 
     async def upload(self, meta: Meta) -> Optional[bool]:
+        if meta.tracker_status is None:
+            meta.tracker_status = {}
+        status_map = meta.tracker_status
+        if self.tracker not in status_map:
+            status_map[self.tracker] = {}
+        status_dict = status_map[self.tracker]
+
         if not self.upload_url:
             console.print(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
-            meta.tracker_status[self.tracker]["status_message"] = "data error: base_url missing"
+            status_dict["status_message"] = "data error: base_url missing"
             return False
 
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
@@ -308,7 +317,7 @@ class SUIO:
 
         files = await self._prepare_files(meta)
         if not files:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
+            status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
         data = await self._prepare_data(meta)
@@ -319,7 +328,7 @@ class SUIO:
             console.print(data)
             console.print("Files:")
             console.print({k: v[0] for k, v in files.items()})
-            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, skipping upload."
+            status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
         params = {
             "user": username,
@@ -369,7 +378,7 @@ class SUIO:
                     err_msg = re.sub(re.escape(rlsname), "[redacted]", err_msg, flags=re.IGNORECASE)
                 if username:
                     err_msg = re.sub(re.escape(username), "[redacted]", err_msg, flags=re.IGNORECASE)
-                meta.tracker_status[self.tracker]["status_message"] = f"data error: {err_msg}"
+                status_dict["status_message"] = f"data error: {err_msg}"
                 return False
             success_msg = "Upload successful"
             if comment_match:
@@ -383,7 +392,7 @@ class SUIO:
                     success_msg = re.sub(re.escape(rlsname), "[redacted]", success_msg, flags=re.IGNORECASE)
                 if username:
                     success_msg = re.sub(re.escape(username), "[redacted]", success_msg, flags=re.IGNORECASE)
-            meta.tracker_status[self.tracker]["status_message"] = success_msg
+            status_dict["status_message"] = success_msg
             # Parse NZB release/post ID from the response text or final URL if present
             try:
                 id_match = re.search(r"ID:\s*([a-zA-Z0-9]+)", response.text, re.IGNORECASE)
@@ -392,16 +401,16 @@ class SUIO:
                 if not id_match:
                     id_match = re.search(r"(?:details\.php\?id=|details/|id=)([a-zA-Z0-9]+)", final_url, re.IGNORECASE)
                 if id_match:
-                    meta.tracker_status[self.tracker]["torrent_id"] = str(id_match.group(1))
+                    status_dict["torrent_id"] = str(id_match.group(1))
             except Exception:
                 pass
             return True
         except httpx.TimeoutException:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: Request timed out after 60 seconds"
+            status_dict["status_message"] = "data error: Request timed out after 60 seconds"
             return False
         except httpx.RequestError as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}"
+            status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
             return False
         except Exception as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: Unexpected error. Error: {e}"
+            status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
             return False

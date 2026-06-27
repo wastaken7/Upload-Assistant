@@ -63,7 +63,7 @@ class TIK(UNIT3D):
             repack = f"[{repack}]"
         three_d = meta.three_d
         three_d_tag = f"[{three_d}]" if three_d else ""
-        tag = meta.tag.replace("-", "- ")
+        tag = meta.tag.replace("-", "- ") if meta.tag else ""
         if tag == "":
             tag = "- NOGRP"
         source = str(meta.source)
@@ -416,7 +416,7 @@ class TIK(UNIT3D):
         edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
         if (edit_choice or "").lower() == 'e':
-            edited_description = click.edit(description)
+            edited_description = cast(Optional[str], click.edit(description))  # pyrefly: ignore [bad-argument-type]
             if edited_description:
                 description = edited_description.strip()
             console.print(f"Final description after editing: {description}", markup=False)

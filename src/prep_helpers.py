@@ -67,7 +67,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.cutoff = int(prep_instance.config["DEFAULT"].get("cutoff_screens", 1))
 
     meta.mode = mode
-    meta.isdir = os.path.isdir(meta.path)
+    meta.isdir = os.path.isdir(meta.path or "")
     base_dir = meta.base_dir
     meta.saved_description = False
     client = Clients(config=prep_instance.config)
@@ -99,7 +99,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.subtitle_files = cast(list[str], [])
     meta.adult_media = False
 
-    folder_id = os.path.basename(meta.path)
+    folder_id = os.path.basename(meta.path or "")
     if not meta.uuid:
         meta.uuid = folder_id
     if meta.isdir:
@@ -227,11 +227,12 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
     mi: Optional[dict[str, Any]] = None
     video = ""
     base_dir = meta.base_dir
+    meta_path: str = meta.path or ""
 
     if meta.is_disc == "BDMV":
-        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta.path, meta, meta.imdb_id)
+        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []  # No filelist for discs, use path
-        search_term = os.path.basename(meta.path)
+        search_term = os.path.basename(meta_path)
         search_file_folder = "folder"
         try:
             title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
@@ -283,9 +284,9 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         mi = None
 
     elif meta.is_disc == "DVD":
-        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta.path, meta, meta.imdb_id)
+        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []
-        search_term = os.path.basename(meta.path)
+        search_term = os.path.basename(meta_path)
         search_file_folder = "folder"
         title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
         if meta.debug:
@@ -323,9 +324,9 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         meta.sd = await video_manager.is_sd(meta.resolution)
 
     elif meta.is_disc == "HDDVD":
-        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta.path, meta, meta.imdb_id)
+        video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []
-        search_term = os.path.basename(meta.path)
+        search_term = os.path.basename(meta_path)
         search_file_folder = "folder"
         guess_name = meta.discs[0]["path"].replace("-", "")
         filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
@@ -361,7 +362,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             meta.subtitle_files = cast(list[str], [])
             subtitle_exts = {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}
             if meta.isdir:
-                for root, _, files in os.walk(meta.path):
+                for root, _, files in os.walk(meta_path):
                     if any(x in root.upper() for x in ["BDMV", "VIDEO_TS", "HVDVD_TS"]):
                         continue
                     for file in files:
@@ -369,9 +370,9 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         if ext in subtitle_exts:
                             meta.subtitle_files.append(os.path.abspath(os.path.join(root, file)))
             else:
-                parent_dir = os.path.dirname(meta.path)
+                parent_dir = os.path.dirname(meta_path)
                 if parent_dir and os.path.exists(parent_dir):
-                    base_name = os.path.splitext(os.path.basename(meta.path))[0]
+                    base_name = os.path.splitext(os.path.basename(meta_path))[0]
                     for file in os.listdir(parent_dir):
                         if os.path.isfile(os.path.join(parent_dir, file)):
                             ext = os.path.splitext(file)[1].lower()
@@ -443,7 +444,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     meta.search_year = ""
 
                 if not meta.edit:
-                    mi = await exportInfo(videopath, meta.isdir, meta.uuid, base_dir, is_dvd=meta.is_disc, debug=meta.debug)
+                    mi = await exportInfo(videopath, bool(meta.isdir), meta.uuid, base_dir, is_dvd=bool(meta.is_disc), debug=meta.debug)
                     meta.mediainfo = mi
                 else:
                     mi = meta.mediainfo
@@ -602,8 +603,8 @@ async def process_trackers_and_torrent(
         trackers = [t.strip().upper() for t in trackers.split(",")] if "," in trackers else [trackers.strip().upper()]
     else:
         trackers = [t.strip().upper() for t in trackers]
-    meta.trackers = trackers
-    meta.requested_trackers = trackers
+    meta.trackers = cast(list[str], trackers)
+    meta.requested_trackers = cast(list[str], trackers)
 
     # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
     if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:

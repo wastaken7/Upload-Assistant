@@ -403,8 +403,11 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
         async def validate_single_tracker(tracker_name: str) -> tuple[str, bool]:
             """Validate credentials for a single tracker."""
             try:
-                if tracker_name not in meta.tracker_status:
-                    meta.tracker_status[tracker_name] = {}
+                if meta.tracker_status is None:
+                    meta.tracker_status = {}
+                status_dict = meta.tracker_status
+                if tracker_name not in status_dict:
+                    status_dict[tracker_name] = {}
 
                 tracker_class = tracker_class_map[tracker_name](config=config)
                 if meta.debug:
@@ -417,12 +420,15 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
                     login = await tracker_class.validate_credentials(meta)
 
                 if not login:
-                    meta.tracker_status[tracker_name]["skipped"] = True
+                    status_dict[tracker_name]["skipped"] = True
 
                 return tracker_name, login
             except Exception as e:
+                if meta.tracker_status is None:
+                    meta.tracker_status = {}
+                status_dict = meta.tracker_status
                 console.print(f"[red]Error validating {tracker_name}: {e}[/red]")
-                meta.tracker_status[tracker_name]["skipped"] = True
+                status_dict[tracker_name]["skipped"] = True
                 return tracker_name, False
 
         # Run all tracker validations concurrently
@@ -718,7 +724,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     else:
         trackers = []
 
-    if meta.trackers_remove:
+    if isinstance(meta.trackers_remove, str) and meta.trackers_remove:
         remove_list = [t.strip().upper() for t in meta.trackers_remove.split(",")]
         for tracker in remove_list:
             if tracker in meta.trackers:
@@ -858,14 +864,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     await languages_manager.process_desc_language(meta, tracker=tracker)
                     audio_prompted = True
                 else:
-                    if 'tracker_status' not in meta:
+                    if meta.tracker_status is None:
                         meta.tracker_status = {}
-                    if tracker not in meta.tracker_status:
-                        meta.tracker_status[tracker] = {}
+                    status_dict = meta.tracker_status
+                    if tracker not in status_dict:
+                        status_dict[tracker] = {}
                     if meta.unattended_audio_skip or meta.unattended_subtitle_skip:
-                        meta.tracker_status[tracker]["skip_upload"] = True
+                        status_dict[tracker]["skip_upload"] = True
                     else:
-                        meta.tracker_status[tracker]["skip_upload"] = False
+                        status_dict[tracker]["skip_upload"] = False
 
         await asyncio.sleep(0.2)
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
@@ -928,7 +935,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 existing_uuids = {entry.get('uuid') for entry in search_data}
 
                 if meta.uuid not in existing_uuids:
-                    search_entry = {
+                    search_entry: dict[str, Any] = {
                         "uuid": meta.uuid,
                         "path": meta.path,
                         "imdb_id": meta.imdb_id,
@@ -970,9 +977,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
         progress_task = asyncio.create_task(print_progress("[yellow]Still processing, please wait...", interval=10))
         try:
-            if 'manual_frames' not in meta:
+            if 'manual_frames' not in meta or meta.manual_frames is None:
                 meta.manual_frames = ""
-            manual_frames = meta.manual_frames
+            manual_frames = meta.manual_frames if meta.manual_frames is not None else ""
 
             if meta.comparison:
                 await ComparisonManager(meta, config).add_comparison()
@@ -1409,7 +1416,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
         if meta.force_recheck:
             waiter = Wait(config)
-            await waiter.select_and_recheck_best_torrent(meta, meta.path, check_interval=5)
+            await waiter.select_and_recheck_best_torrent(meta, cast(str, meta.path), check_interval=5)
 
         # 1. Reuse existing torrent from client if possible
         reuse_torrent = None
@@ -1422,16 +1429,16 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
             # 2. Re-create base torrents if rehash is True
             if meta.rehash is True and meta.nohash is False:
-                await TorrentCreator.create_torrent(meta, Path(meta.path), "BASE")
+                await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
                 if has_local_subs:
-                    await TorrentCreator.create_torrent(meta, Path(meta.path), "BASE_SUBS")
+                    await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
 
             # 3. Otherwise generate if missing
             else:
                 if not os.path.exists(torrent_path) and meta.nohash is False:
-                    await TorrentCreator.create_torrent(meta, Path(meta.path), "BASE")
+                    await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
                 if has_local_subs and not os.path.exists(subs_torrent_path) and meta.nohash is False:
-                    await TorrentCreator.create_torrent(meta, Path(meta.path), "BASE_SUBS")
+                    await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
 
         if meta.nohash:
             meta.client = "none"
@@ -1471,7 +1478,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                         return True
 
         if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
-            TorrentCreator.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, meta.path)
+            TorrentCreator.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
 
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
             await f.write(json.dumps(meta.to_dict(), indent=4))
@@ -2030,15 +2037,15 @@ async def do_the_thing(base_dir: str) -> None:
                         trackers_list = []
                         meta.trackers = trackers_list
 
+                    tracker_status_map = meta.tracker_status if meta.tracker_status is not None else {}
+                    meta.tracker_status = tracker_status_map
                     for tracker in list(trackers_list):
-                        tracker_status = meta.tracker_status.get(tracker, {})
+                        tracker_status = tracker_status_map.get(tracker, {})
                         if tracker_status.get('upload') is not True:
                             if meta.debug:
                                 console.print(f"[yellow]{tracker} was previously marked to skip upload. Skipping double dupe check.[/yellow]")
                             trackers_list.remove(tracker)
-                            tracker_status_map = meta.tracker_status
                             tracker_status_map.pop(tracker, None)
-                            meta.tracker_status = tracker_status_map
                             continue
 
                     if trackers_list:
@@ -2097,17 +2104,23 @@ async def do_the_thing(base_dir: str) -> None:
                                         )
                                 else:
                                     console.print("[bold red]Usenet upload failed.[/bold red]")
+                                    if meta.tracker_status is None:
+                                        meta.tracker_status = {}
+                                    status_map = meta.tracker_status
                                     for t in usenet_trackers:
-                                        meta.tracker_status.setdefault(t, {})["status_message"] = "data error: Usenet upload failed, NZB missing"
-                                        meta.tracker_status[t]["upload"] = False
+                                        status_map.setdefault(t, {})["status_message"] = "data error: Usenet upload failed, NZB missing"
+                                        status_map[t]["upload"] = False
                             except Exception as e:
                                 console.print(f"[bold red]Error in Usenet upload pipeline: {e}[/bold red]")
                                 import traceback
 
                                 console.print(traceback.format_exc())
+                                if meta.tracker_status is None:
+                                    meta.tracker_status = {}
+                                status_map = meta.tracker_status
                                 for t in usenet_trackers:
-                                    meta.tracker_status.setdefault(t, {})["status_message"] = f"data error: Usenet upload failed: {e}"
-                                    meta.tracker_status[t]["upload"] = False
+                                    status_map.setdefault(t, {})["status_message"] = f"data error: Usenet upload failed: {e}"
+                                    status_map[t]["upload"] = False
 
                     async def upload_torrent_flow(meta: Meta, torrent_trackers: list[str]) -> None:
                         if torrent_trackers:
@@ -2185,7 +2198,8 @@ async def do_the_thing(base_dir: str) -> None:
                 if send_upload_links:
                     try:
                         discord_message = ""
-                        for tracker, status in meta.tracker_status.items():
+                        tracker_status_dict = meta.tracker_status or {}
+                        for tracker, status in tracker_status_dict.items():
                             discord_message += build_tracker_status_line(tracker, status)
                         discord_message += "All tracker uploads processed.\n"
                         await DiscordNotifier.send_discord_notification(config, bot, discord_message, debug=meta.debug, meta=meta)
@@ -2202,7 +2216,7 @@ async def do_the_thing(base_dir: str) -> None:
             if find_requests and meta.trackers not in ([], None, "") and not (meta.site_check and not meta.is_disc):
                 console.print("[green]Searching for requests on supported trackers.....")
                 if meta.site_check:
-                    trackers = meta.requested_trackers
+                    trackers = meta.requested_trackers if meta.requested_trackers is not None else []
                     if meta.debug:
                         console.print(f"[cyan]Using requested trackers for site check: {trackers}[/cyan]")
                 else:
@@ -2337,7 +2351,7 @@ async def process_cross_seeds(meta: Meta) -> None:
                 else:
                     ptp = PTP(config=config)
                     group_id = meta.ptp_groupID
-                    if not group_id:
+                    if not group_id and meta.imdb:
                         group_id = await ptp.get_group_by_imdb(meta.imdb)
                         meta.ptp_groupID = group_id
                     if group_id is None:

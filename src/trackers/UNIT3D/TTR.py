@@ -55,8 +55,8 @@ class TTR(UNIT3D):
             return None
 
         if meta.is_disc == "BDMV":
-            spanish_audio = "Spanish" in meta.audio_languages
-            spanish_subtitle = "Spanish" in meta.subtitle_languages
+            spanish_audio = "Spanish" in (meta.audio_languages or [])
+            spanish_subtitle = "Spanish" in (meta.subtitle_languages or [])
             unattended = meta.unattended
             confirm = meta.unattended_confirm
 
@@ -127,8 +127,8 @@ class TTR(UNIT3D):
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        if "Spanish" not in meta.audio_languages:
-            if "Spanish" not in meta.subtitle_languages:
+        if "Spanish" not in (meta.audio_languages or []):
+            if "Spanish" not in (meta.subtitle_languages or []):
                 console.print(
                     "[bold red]TTR requires at least one Spanish audio or subtitle track."
                 )

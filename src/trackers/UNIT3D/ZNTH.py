@@ -208,7 +208,7 @@ class ZNTH(UNIT3D):
             if isinstance(meta_type, str):
                 meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type, "0")
+            resolved_id = type_id.get(meta_type or "", "0")
 
             if category == "GAME":
                 resolved_id = "16"

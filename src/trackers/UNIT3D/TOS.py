@@ -41,7 +41,7 @@ class TOS(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        tags_lower = meta.tag.lower()
+        tags_lower = meta.tag.lower() if meta.tag else ""
         if "vostfr" in tags_lower or "subfrench" in tags_lower:
             category_id = "9" if meta.category == "TV" and meta.tv_pack else {"MOVIE": "6", "TV": "7"}.get(meta.category, "0")
         else:
@@ -68,7 +68,7 @@ class TOS(UNIT3D):
                 "WEBDL": "4",
                 "WEBRIP": "5",
                 "HDTV": "6",
-            }.get(meta.type, "0")
+            }.get(meta.type or "", "0")
         return {"type_id": type_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:

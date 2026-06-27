@@ -130,7 +130,7 @@ class IHD(UNIT3D):
         if "mediainfo" not in meta:
             return False
 
-        original_languages = {lang.lower() for lang in meta.original_language if isinstance(lang, str) and lang.strip()}
+        original_languages = {lang.lower() for lang in (meta.original_language or []) if isinstance(lang, str) and lang.strip()}
         if not original_languages:
             return False
 

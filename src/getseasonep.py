@@ -49,7 +49,7 @@ class SeasonEpisodeManager:
     async def get_season_episode(self, video: str, meta: Meta) -> Meta:
         if meta.category == "TV":
             filelist = cast(list[str], meta.filelist)
-            meta.tv_pack = 0
+            meta.tv_pack = False
             is_daily = False
             season_int = 1
             episode_int = 0
@@ -78,7 +78,7 @@ class SeasonEpisodeManager:
                         episode = f"E{str(episode_int).zfill(2)}"
                         # For daily shows, pass the supplied date as the episode title
                         # Season and episode will be stripped later to conform with standard daily episode naming format
-                        meta.daily_episode_title = meta.manual_date
+                        meta.daily_episode_title = meta.manual_date or ""
 
                     else:
                         try:
@@ -129,11 +129,11 @@ class SeasonEpisodeManager:
                         else:
                             episode = ""
                             episode_int = 0
-                            meta.tv_pack = 1
+                            meta.tv_pack = True
                 except Exception:
                     episode = ""
                     episode_int = 0
-                    meta.tv_pack = 1
+                    meta.tv_pack = True
 
             else:
                 # If Anime
@@ -208,7 +208,7 @@ class SeasonEpisodeManager:
                     else:
                         episode = ""
                         episode_int = 0  # Ensure it's an integer
-                        meta.tv_pack = 1
+                        meta.tv_pack = True
 
                     try:
                         if meta.season_int:
@@ -294,7 +294,7 @@ class SeasonEpisodeManager:
                 meta.season = season
             else:
                 manual_season_str = str(meta.manual_season).lower().replace("s", "")
-                meta.daily_episode_title = None  # Clear daily episode title if manual season is set
+                meta.daily_episode_title = ""  # Clear daily episode title if manual season is set
                 season_int = _safe_int(manual_season_str, 1)
                 meta.season = f"S{manual_season_str.zfill(2)}"
             if meta.manual_episode is None:
@@ -303,7 +303,7 @@ class SeasonEpisodeManager:
                 manual_episode_str = str(meta.manual_episode).lower().replace("e", "")
                 episode_int = _safe_int(manual_episode_str, 0)
                 meta.episode = f"E{manual_episode_str.zfill(2)}"
-                meta.tv_pack = 0
+                meta.tv_pack = False
 
             # if " COMPLETE " in Path(video).name.replace('.', ' '):
             #     meta.season = "COMPLETE"

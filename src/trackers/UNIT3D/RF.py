@@ -38,7 +38,7 @@ class RF(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         rf_name = meta.name
-        tag_value = meta.tag
+        tag_value = meta.tag or ""
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 

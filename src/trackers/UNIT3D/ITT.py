@@ -99,7 +99,7 @@ class ITT(UNIT3D):
         episode = meta.episode or ""
         repack = meta.repack
         three_d = meta.three_d
-        tag = meta.tag
+        tag = meta.tag or ""
         source = str(meta.source)
         hdr = meta.hdr
         video_codec = meta.video_codec

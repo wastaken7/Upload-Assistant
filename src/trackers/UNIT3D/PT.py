@@ -64,7 +64,7 @@ class PT(UNIT3D):
         name = meta.name.replace(" ", ".")
 
         pt_name = name
-        tag_value = meta.tag
+        tag_value = meta.tag or ""
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 

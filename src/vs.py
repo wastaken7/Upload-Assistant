@@ -6,8 +6,8 @@ import random
 from functools import partial
 from typing import Any, cast
 
-import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports]
-import vapoursynth as vs  # pyright: ignore[reportMissingImports]
+import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
+import vapoursynth as vs  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
 
 from src.console import console
 
@@ -41,7 +41,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
         try:
             pyver = platform.python_version_tuple()
             if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
-                import oxipng  # pyright: ignore[reportMissingImports]
+                import oxipng  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
                 oxipng = oxipng
             else:
                 oxipng = None

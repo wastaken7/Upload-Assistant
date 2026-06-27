@@ -201,7 +201,7 @@ class HUNO(UNIT3D):
         elif type:
             return {"type_id": type_id.get(type, "0")}
         else:
-            meta_type = meta.type
+            meta_type = meta.type or ""
             resolved_id = type_id.get(meta_type, "0")
             return {"type_id": resolved_id}
 
@@ -275,8 +275,10 @@ class HUNO(UNIT3D):
         data = await self.get_data(meta)
 
         # Initialize tracker status
-        meta.setdefault("tracker_status", {})
+        if meta.tracker_status is None:
+            meta.tracker_status = {}
         meta.tracker_status.setdefault(self.tracker, {})
+        status_dict = meta.tracker_status[self.tracker]
 
         api_token = str(self.config["TRACKERS"][self.tracker].get("api_key", ""))
         if not api_token:
@@ -289,7 +291,7 @@ class HUNO(UNIT3D):
         if meta.debug:
             console.print(f"[cyan]{self.tracker} Request Data:")
             console.print(data)
-            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
+            status_dict["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG", announce_url="https://fake.tracker")
             return True
 
@@ -307,20 +309,20 @@ class HUNO(UNIT3D):
                     warnings = response_data.get("warnings", [])
                     name_issues = response_data.get("name_issues", [])
                     status_message = f"{response_json.get('message')}\nModeration Status: {moderation_status}\nWarnings: {warnings}\nName Issues: {name_issues}"
-                    meta.tracker_status[self.tracker]["status_message"] = status_message
+                    status_dict["status_message"] = status_message
                     return True
                 else:
                     error_msg = response_json.get("message", "Unknown error")
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error: API error: {error_msg}"
+                    status_dict["status_message"] = f"data error: API error: {error_msg}"
                     console.print(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                     return False
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: {msg}"
+            status_dict["status_message"] = f"data error: {msg}"
             console.print(f"[bold red]{self.tracker} Upload error: {msg}[/bold red]")
             return False
         except Exception as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
+            status_dict["status_message"] = f"data error: {e}"
             console.print(f"[bold red]{self.tracker} Upload unexpected error: {e}[/bold red]")
             return False

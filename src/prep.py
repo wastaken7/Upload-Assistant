@@ -166,7 +166,7 @@ class Prep:
             r"(?i)\d{4}\.\d{1,2}\.\d{1,2}",
         ]
 
-        path = meta.path
+        path = meta.path or ""
         uuid = meta.uuid
         if meta.debug:
             console.print(f"[cyan]Checking category for path: {path} and uuid: {uuid}[/cyan]")

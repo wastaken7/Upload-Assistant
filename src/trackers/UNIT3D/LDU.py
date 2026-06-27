@@ -58,7 +58,7 @@ class LDU(UNIT3D):
         if 'hentai' in genres.lower():
             category_id = '10'
         elif any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
-            category_id = "45" if not await languages_manager.has_english_language(meta.subtitle_languages) else "6"
+            category_id = "45" if not await languages_manager.has_english_language(meta.subtitle_languages or []) else "6"
 
         if meta.category == "MOVIE":
             if meta.three_d or "3D" in meta.edition:
@@ -79,7 +79,7 @@ class LDU(UNIT3D):
                 category_id = '20'
             elif "short film" in genres.lower() or int(meta.imdb_info.get("runtime", 0) or 0) < 5:
                 category_id = '19'
-            elif not await languages_manager.has_english_language(meta.audio_languages) and not await languages_manager.has_english_language(meta.subtitle_languages):
+            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(meta.subtitle_languages or []):
                 category_id = '22'
             elif "dubbed" in meta.audio.lower():
                 category_id = '27'
@@ -90,7 +90,7 @@ class LDU(UNIT3D):
                 category_id = '9'
             elif "documentary" in genres.lower():
                 category_id = '40'
-            elif not await languages_manager.has_english_language(meta.audio_languages) and not await languages_manager.has_english_language(meta.subtitle_languages):
+            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(meta.subtitle_languages or []):
                 category_id = '29'
             elif meta.tv_pack:
                 category_id = '2'
@@ -135,7 +135,7 @@ class LDU(UNIT3D):
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().lstrip(".")
 
-        val = "14" if meta.category == "BOOK" and resolved_type not in type_id else type_id.get(resolved_type, "0")
+        val = "14" if meta.category == "BOOK" and resolved_type not in type_id else type_id.get(resolved_type or "", "0")
 
         if any(x in meta.edition.lower() for x in ["fanedit", "fanres"]):
             val = "16"

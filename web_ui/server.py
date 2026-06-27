@@ -1047,7 +1047,7 @@ def _maybe_log_api_access(response):
             # For failed auth attempts, try to extract attempted username
             if user is None and not success:
                 # Check Basic auth
-                if request.authorization and request.authorization.username:
+                if request.authorization is not None and request.authorization.username:
                     user = f"{request.authorization.username} (basic auth)"
                 # Check form data (login attempts)
                 elif request.method == "POST" and request.form.get("username"):
@@ -1217,7 +1217,7 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
         audit_path = base_dir / "data" / "config_audit.log"
         # Determine acting user: session -> Basic auth username -> persisted user -> remote_addr
         persisted = auth_mod.load_user()
-        user = _session_get("username") or (request.authorization.username if request.authorization else None) or (persisted.get("username") if persisted else None) or request.remote_addr
+        user = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None) or request.remote_addr
         # Redact sensitive fields from values before serializing to the audit log.
         audit = {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -2687,7 +2687,7 @@ def api_tokens():
         label = data.get("label", "")
         # No expiry: tokens are non-expiring by default;
         persisted = auth_mod.load_user()
-        username = _session_get("username") or (request.authorization.username if request.authorization else None) or (persisted.get("username") if persisted else None)
+        username = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None)
         if not username:
             return jsonify({"success": False, "error": "Unable to determine username for token"}), 400
 
@@ -3227,7 +3227,8 @@ def execute_command():
                         try:
                             orig_ask_string = _cli_ui.ask_string
 
-                            def wrapped_ask_string(prompt: str, _default: Optional[str] = None) -> str:
+                            def wrapped_ask_string(*question: Any, default: Optional[str] = None) -> Optional[str]:
+                                prompt = " ".join(str(q) for q in question)
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)
                                 # Wait for input or cancellation
@@ -3292,9 +3293,10 @@ def execute_command():
                                         nonlocal_upload = None
 
                                 # Ensure Windows event loop policy when needed
-                                if sys.platform == "win32":
+                                if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
                                     with contextlib.suppress(Exception):
-                                        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                                        policy_class = getattr(asyncio, "WindowsProactorEventLoopPolicy")
+                                        asyncio.set_event_loop_policy(policy_class())
                                 if nonlocal_upload is None:
                                     raise RuntimeError("upload.main not available for in-process execution")
                                 asyncio.run(nonlocal_upload())

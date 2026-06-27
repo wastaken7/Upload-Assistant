@@ -203,7 +203,7 @@ class UploadHelper:
                     console.print("[bold red]Trumpable found![/bold red]")
                 elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f'{tracker_name}_matched_episode_ids', []))
-                    user_tag = meta.tag.lstrip("-").lower()  # Remove leading dash for comparison
+                    user_tag = meta.tag.lstrip("-").lower() if meta.tag else ""  # Remove leading dash for comparison
 
                     # Try to find a release with matching tag
                     selected_match = None
@@ -541,8 +541,8 @@ class UploadHelper:
 
         resolution = meta.resolution
         source = meta.source
-        type_ = meta.type
-        tag = meta.tag
+        type_ = meta.type or ""
+        tag = meta.tag or ""
         if tag and tag.startswith("-"):
             tag = tag[1:]
         region = meta.region or missing_warning

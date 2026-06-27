@@ -32,7 +32,7 @@ class ManualPackageManager:
         self.uploadscreens_manager = UploadScreensManager(cast(dict[str, Any], config))
 
     async def package(self, meta: Meta) -> str | bool:
-        tag = "" if meta.tag == "" else f" / {meta.tag[1:]}"
+        tag = "" if not meta.tag or meta.tag == "" else f" / {meta.tag[1:]}"
         res = meta.source if meta.is_disc == "DVD" else meta.resolution
 
         generic_path = f"{meta.base_dir}/tmp/{meta.uuid}/GENERIC_INFO.txt"
@@ -85,7 +85,7 @@ class ManualPackageManager:
         try:
             if os.path.exists(f"{meta.base_dir}/tmp/{meta.uuid}/BASE.torrent"):
                 base_torrent = Torrent.read(f"{meta.base_dir}/tmp/{meta.uuid}/BASE.torrent")
-                manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", os.path.basename(meta.path))
+                manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", os.path.basename(meta.path or ""))
                 Torrent.copy(base_torrent).write(f"{meta.base_dir}/tmp/{meta.uuid}/{manual_name}.torrent", overwrite=True)
                 # shutil.copy(os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/BASE.torrent"), os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/{meta.name.replace(' ', '.')}.torrent").replace(' ', '.'))
             manual_tracker_raw = self.tracker_config.get('MANUAL')

@@ -540,6 +540,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     # Determine paths and names
     base_dir = meta.base_dir
     input_path = meta.path
+    if not input_path:
+        console.print("[red]Error: Input path is missing.[/red]")
+        return None
     import hashlib
 
     # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
@@ -574,13 +577,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     # Determine NZB output directory (falls back to default tmp dir if empty)
     nzb_output_dir = usenet_cfg.get("nzb_output_dir")
     if not nzb_output_dir:
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(input_path))
 
     try:
         os.makedirs(nzb_output_dir, exist_ok=True)
     except Exception as e:
         console.print(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
+        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(input_path))
         with contextlib.suppress(Exception):
             os.makedirs(nzb_output_dir, exist_ok=True)
 
@@ -592,9 +595,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             tmp_base = usenet_tmp_dir
         except Exception as e:
             console.print(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
+            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
     else:
-        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(meta.path))
+        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
 
     # Check if a valid NZB file already exists to skip the upload process
     final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")

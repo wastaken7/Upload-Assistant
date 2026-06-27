@@ -225,8 +225,15 @@ class CRP:
         return data
 
     async def upload(self, meta: Meta) -> Optional[bool]:
+        if meta.tracker_status is None:
+            meta.tracker_status = {}
+        status_map = meta.tracker_status
+        if self.tracker not in status_map:
+            status_map[self.tracker] = {}
+        status_dict = status_map[self.tracker]
+
         if not await self.common.check_nzb_file(self.tracker, meta):
-            meta.tracker_status[self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
+            status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
@@ -235,7 +242,7 @@ class CRP:
         files = await self._prepare_files(meta)
         if not files:
             console.print(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
-            meta.tracker_status[self.tracker]["status_message"] = "data error: NZB file not found"
+            status_dict["status_message"] = "data error: NZB file not found"
             return False
 
         data = await self._prepare_data(meta, tracker_cfg)
@@ -249,7 +256,7 @@ class CRP:
             console.print("Files:")
             console.print({k: v[0] for k, v in files.items()})
 
-            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, skipping upload."
+            status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
 
         # Perform actual upload
@@ -265,25 +272,25 @@ class CRP:
                 )
 
             if response.status_code not in (200, 201):
-                meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
+                status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                 return False
 
             response_json = response.json()
-            meta.tracker_status[self.tracker]["status_message"] = "Upload successful"
+            status_dict["status_message"] = "Upload successful"
 
             # Try to grab release ID from response
             release_id = response_json.get("public_id")
             if release_id:
-                meta.tracker_status[self.tracker]["torrent_id"] = str(release_id)
+                status_dict["torrent_id"] = str(release_id)
 
             return True
 
         except httpx.TimeoutException:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: Request timed out after 60 seconds"
+            status_dict["status_message"] = "data error: Request timed out after 60 seconds"
             return False
         except httpx.RequestError as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}"
+            status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
             return False
         except Exception as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: Unexpected error. Error: {e}"
+            status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
             return False

@@ -416,13 +416,13 @@ async def exportInfo(
         os.chdir(os.path.dirname(video))
 
     if mediainfo_cmd and is_dvd:
-        result = None
+        result: Optional[subprocess.CompletedProcess[str]] = None
         try:
             # Validate and sanitize the video path
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
             if result.returncode == 0 and result.stdout:
                 media_info = result.stdout
@@ -447,7 +447,8 @@ async def exportInfo(
         media_info = MediaInfo.parse(video, output="STRING", full=False)
 
     # Filter out unwanted lines from media info regardless of type
-    filtered_media_info = "\n".join(line for line in media_info.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
+    media_info_str = str(media_info)
+    filtered_media_info = "\n".join(line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
 
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
         await export.write(filtered_media_info.replace(video, os.path.basename(video)))
@@ -463,13 +464,14 @@ async def exportInfo(
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result2: Optional[subprocess.CompletedProcess[str]] = None
+            result2 = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
-            if result.returncode == 0 and result.stdout:
-                media_info_json = result.stdout
+            if result2.returncode == 0 and result2.stdout:
+                media_info_json = result2.stdout
                 media_info_dict = json.loads(media_info_json)
             else:
-                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+                raise subprocess.CalledProcessError(result2.returncode, cmd, result2.stdout, result2.stderr)
 
         except ValueError as e:
             console.print(f"[bold red]Path validation error: {e}[/bold red]")
@@ -482,11 +484,11 @@ async def exportInfo(
             media_info_dict = json.loads(media_info_json)
         except (subprocess.CalledProcessError, json.JSONDecodeError, Exception) as e:
             console.print(f"[bold red]Error getting JSON from specialized MediaInfo: {e}")
-            if debug and result is not None:
-                console.print(f"[red]Subprocess stderr: {result.stderr}[/red]")
-                console.print(f"[red]Subprocess returncode: {result.returncode}[/red]")
-                if result.stdout:
-                    console.print(f"[red]Subprocess stdout preview: {result.stdout[:200]}...[/red]")
+            if debug and result2 is not None:
+                console.print(f"[red]Subprocess stderr: {result2.stderr}[/red]")
+                console.print(f"[red]Subprocess returncode: {result2.returncode}[/red]")
+                if result2.stdout:
+                    console.print(f"[red]Subprocess stdout preview: {result2.stdout[:200]}...[/red]")
             console.print("[bold yellow]Falling back to standard MediaInfo for JSON...[/bold yellow]")
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)

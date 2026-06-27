@@ -1295,7 +1295,8 @@ class TRACKER_SETUP:
             return False
         reported_torrent_id = str(reported_torrent_id)
         try:
-            trumping_torrent_id = meta.tracker_status[tracker]["torrent_id"]
+            status_map = meta.tracker_status or {}
+            trumping_torrent_id = status_map[tracker]["torrent_id"]
         except KeyError:
             console.print(f"[red]No torrent ID found in meta for trumping torrent on {tracker}[/red]")
             console.print("[red]Either the upload failed, or you're in debug[/red]")

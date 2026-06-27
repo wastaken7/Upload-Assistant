@@ -118,7 +118,7 @@ class YUS(UNIT3D):
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
-        val = type_id.get(resolved_type, "0")
+        val = type_id.get(resolved_type or "", "0")
         if meta.category == "BOOK" and val == "0":
             val = "21"  # Default to PDF for unknown book types
 

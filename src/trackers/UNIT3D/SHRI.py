@@ -1039,7 +1039,7 @@ class SHRI(UNIT3D):
             )
         else:
             category_header = "--- FILM ---"
-        release_group = meta.tag.lstrip("-").strip()
+        release_group = meta.tag.lstrip("-").strip() if meta.tag else ""
 
         tonemapped_text = ""
         if meta.tonemapped:

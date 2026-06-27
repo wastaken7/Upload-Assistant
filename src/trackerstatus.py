@@ -38,11 +38,12 @@ class TrackerStatusManager:
         if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):
             meta.douban_id = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
+        if meta.tracker_status is None:
+            meta.tracker_status = {}
+        status_map = meta.tracker_status
         for tracker in meta.trackers:
-            if 'tracker_status' not in meta:
-                meta.tracker_status = {}
-            if tracker not in meta.tracker_status:
-                meta.tracker_status[tracker] = {}
+            if tracker not in status_map:
+                status_map[tracker] = {}
 
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool]]:
             nonlocal successful_trackers
