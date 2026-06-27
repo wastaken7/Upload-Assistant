@@ -772,6 +772,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
             meta.season_int = tvdb_season_int
             meta.season = f"S{tvdb_season_int:02d}"
         tvdb_episode_int = _coerce_int(meta.tvdb_episode)
+        meta.tvdb_episode_int = tvdb_episode_int
         if tvdb_episode_int is not None and tvdb_episode_int != meta.episode_int and not meta.episode and not meta.manual_date:
             meta.episode_int = tvdb_episode_int
             meta.episode = f"E{tvdb_episode_int:02d}"

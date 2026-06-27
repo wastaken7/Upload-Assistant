@@ -1369,7 +1369,7 @@ async def screenshots(
     meta: Meta,
     num_screens: int = 0,
     force_screenshots: bool = False,
-    manual_frames: Union[str, list[str]] = "",
+    manual_frames: Union[str, list[int], list[str]] = "",
 ) -> Union[list[str], None]:
     if meta.category == "GAME":
         return []
@@ -2415,7 +2415,7 @@ class TakeScreensManager:
         meta: Meta,
         num_screens: int = 0,
         force_screenshots: bool = False,
-        manual_frames: Union[str, list[str]] = "",
+        manual_frames: Union[str, list[int], list[str]] = "",
     ) -> Optional[list[str]]:
         return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames)
 

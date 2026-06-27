@@ -1163,7 +1163,7 @@ async def finalize_metadata(
                 search_year_value or "",
                 meta.imdb_id,
                 meta.tmdb_id,
-                meta.manual_data,
+                meta.manual_date,
                 meta.tvmaze_manual,
                 year=meta.year,
                 debug=meta.debug,
