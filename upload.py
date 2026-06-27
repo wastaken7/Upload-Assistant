@@ -403,8 +403,6 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
         async def validate_single_tracker(tracker_name: str) -> tuple[str, bool]:
             """Validate credentials for a single tracker."""
             try:
-                if meta.tracker_status is None:
-                    meta.tracker_status = {}
                 status_dict = meta.tracker_status
                 if tracker_name not in status_dict:
                     status_dict[tracker_name] = {}
@@ -424,8 +422,6 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
 
                 return tracker_name, login
             except Exception as e:
-                if meta.tracker_status is None:
-                    meta.tracker_status = {}
                 status_dict = meta.tracker_status
                 console.print(f"[red]Error validating {tracker_name}: {e}[/red]")
                 status_dict[tracker_name]["skipped"] = True
@@ -864,8 +860,6 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     await languages_manager.process_desc_language(meta, tracker=tracker)
                     audio_prompted = True
                 else:
-                    if meta.tracker_status is None:
-                        meta.tracker_status = {}
                     status_dict = meta.tracker_status
                     if tracker not in status_dict:
                         status_dict[tracker] = {}
@@ -2037,8 +2031,7 @@ async def do_the_thing(base_dir: str) -> None:
                         trackers_list = []
                         meta.trackers = trackers_list
 
-                    tracker_status_map = meta.tracker_status if meta.tracker_status is not None else {}
-                    meta.tracker_status = tracker_status_map
+                    tracker_status_map = meta.tracker_status
                     for tracker in list(trackers_list):
                         tracker_status = tracker_status_map.get(tracker, {})
                         if tracker_status.get('upload') is not True:
@@ -2102,10 +2095,7 @@ async def do_the_thing(base_dir: str) -> None:
                                             list(http_trackers),
                                             list(other_api_trackers),
                                         )
-                                else:
                                     console.print("[bold red]Usenet upload failed.[/bold red]")
-                                    if meta.tracker_status is None:
-                                        meta.tracker_status = {}
                                     status_map = meta.tracker_status
                                     for t in usenet_trackers:
                                         status_map.setdefault(t, {})["status_message"] = "data error: Usenet upload failed, NZB missing"
@@ -2115,8 +2105,6 @@ async def do_the_thing(base_dir: str) -> None:
                                 import traceback
 
                                 console.print(traceback.format_exc())
-                                if meta.tracker_status is None:
-                                    meta.tracker_status = {}
                                 status_map = meta.tracker_status
                                 for t in usenet_trackers:
                                     status_map.setdefault(t, {})["status_message"] = f"data error: Usenet upload failed: {e}"

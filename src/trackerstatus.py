@@ -38,8 +38,6 @@ class TrackerStatusManager:
         if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):
             meta.douban_id = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
-        if meta.tracker_status is None:
-            meta.tracker_status = {}
         status_map = meta.tracker_status
         for tracker in meta.trackers:
             if tracker not in status_map:

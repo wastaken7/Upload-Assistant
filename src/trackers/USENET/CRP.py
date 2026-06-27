@@ -225,8 +225,6 @@ class CRP:
         return data
 
     async def upload(self, meta: Meta) -> Optional[bool]:
-        if meta.tracker_status is None:
-            meta.tracker_status = {}
         status_map = meta.tracker_status
         if self.tracker not in status_map:
             status_map[self.tracker] = {}

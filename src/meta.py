@@ -394,7 +394,7 @@ class Meta:
     tmdb_type: str = ""
     tonemapped: bool = False
     torrent_comments: list[Any] = field(default_factory=list)
-    tracker_status: Optional[dict[str, Any]] = None
+    tracker_status: dict[str, Any] = field(default_factory=dict)
     trackers: list[str] = field(default_factory=list)
     trackers_pass: Optional[int] = None
     trackers_remove: str | bool = False

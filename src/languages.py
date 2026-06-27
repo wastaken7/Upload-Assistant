@@ -199,11 +199,9 @@ class LanguagesManager:
 
         if 'language_checked' not in meta:
             meta.language_checked = False
-        if meta.tracker_status is None:
-            meta.tracker_status = {}
         if tracker not in meta.tracker_status:
-            status_dict = {}
-        status_dict = status_dict
+            meta.tracker_status[tracker] = {}
+        status_dict = meta.tracker_status[tracker]
         if 'unattended_audio_skip' not in meta:
             meta.unattended_audio_skip = False
         if 'unattended_subtitle_skip' not in meta:
@@ -357,8 +355,7 @@ class LanguagesManager:
                                 else:
                                     meta.subtitle_languages = None
                                     meta.unattended_subtitle_skip = True
-                                    if meta.tracker_status is not None:
-                                        status_dict["skip_upload"] = True
+                                    status_dict["skip_upload"] = True
                             else:
                                 meta.subtitle_languages = ["English"]
                                 meta.write_hc_languages = True

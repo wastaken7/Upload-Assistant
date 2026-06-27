@@ -275,8 +275,6 @@ class HUNO(UNIT3D):
         data = await self.get_data(meta)
 
         # Initialize tracker status
-        if meta.tracker_status is None:
-            meta.tracker_status = {}
         meta.tracker_status.setdefault(self.tracker, {})
         status_dict = meta.tracker_status[self.tracker]
 

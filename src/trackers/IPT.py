@@ -134,7 +134,7 @@ class IPT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/center][/url][/right]",
+            signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/center][/url][/right]",
         )
         return description
 

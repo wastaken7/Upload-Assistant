@@ -379,7 +379,7 @@ class BJS:
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        audio_languages = set(meta.audio_languages)
+        audio_languages = set(meta.audio_languages) if meta.audio_languages is not None else ""
 
         portuguese_languages = ["Portuguese", "Português", "pt"]
 
@@ -405,7 +405,7 @@ class BJS:
 
         subtitle_type = "Nenhuma"
 
-        if "Portuguese" in found_language_strings:
+        if found_language_strings is not None and "Portuguese" in found_language_strings:
             subtitle_type = "Embutida"
 
         return subtitle_type
@@ -1079,7 +1079,7 @@ class BJS:
         """
         Extracts runtime from metadata and converts total minutes into hours and minutes.
         """
-        total_minutes = meta.video_duration
+        total_minutes = meta.video_duration if meta.video_duration is not None else 60
         hours, minutes = divmod(total_minutes, 60)
 
         return hours, minutes
@@ -1468,6 +1468,7 @@ class BJS:
         if (
             self.config["TRACKERS"][self.tracker].get("internal", False) is True
             and meta.tag != ""
+            and meta.tag is not None
             and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data.update({
