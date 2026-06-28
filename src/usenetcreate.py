@@ -547,7 +547,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
 
     # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
     clean_uuid = "".join(c for c in meta.uuid if c.isalnum() or c in "._-")[:30]
-    uuid_hash = hashlib.md5(meta.uuid.encode("utf-8")).hexdigest()[:8]
+    uuid_hash = hashlib.sha256(meta.uuid.encode("utf-8")).hexdigest()[:8]
     uuid = f"{clean_uuid}_{uuid_hash}" if clean_uuid else uuid_hash
     name = meta.basename_no_ext
 
