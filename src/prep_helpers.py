@@ -6,6 +6,7 @@ import re
 import sys
 from difflib import SequenceMatcher
 from typing import Any, Optional, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -28,6 +29,34 @@ from src.tvmaze import tvmaze_manager
 from src.video import video_manager
 
 guessit_module: Any = cast(Any, guessit)
+
+_URL_TOKEN_RE = re.compile(r"https?://[^\s<>'\"()]+", re.IGNORECASE)
+
+
+def _is_igdb_url(url: str) -> bool:
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    return host == "igdb.com" or host.endswith(".igdb.com")
+
+
+def _is_steam_app_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    host = (parsed.hostname or "").lower()
+    path = parsed.path or ""
+    return host == "store.steampowered.com" and path.startswith("/app/")
+
+
+def _nfo_has_store_link(content: str) -> bool:
+    for match in _URL_TOKEN_RE.finditer(content):
+        url = match.group(0)
+        if _is_steam_app_url(url) or _is_igdb_url(url):
+            return True
+    return False
 
 
 def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
@@ -192,13 +221,13 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                             try:
                                 async with aiofiles.open(nfo_path, encoding="utf-8", errors="ignore") as nf:
                                     nfo_content = await nf.read()
-                                    if "store.steampowered.com/app/" in nfo_content or "igdb.com" in nfo_content:
+                                    if _nfo_has_store_link(nfo_content):
                                         has_steam_link = True
                             except Exception:
                                 try:
                                     async with aiofiles.open(nfo_path, encoding="latin-1", errors="ignore") as nf:
                                         nfo_content = await nf.read()
-                                        if "store.steampowered.com/app/" in nfo_content or "igdb.com" in nfo_content:
+                                        if _nfo_has_store_link(nfo_content):
                                             has_steam_link = True
                                 except Exception:
                                     pass
