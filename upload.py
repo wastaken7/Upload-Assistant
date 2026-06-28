@@ -2457,7 +2457,7 @@ async def process_cross_seeds(meta: Meta) -> None:
     tasks = [(tracker, asyncio.create_task(handle_cross_seed(tracker))) for tracker in valid_trackers]
 
     results = await asyncio.gather(*(task for _, task in tasks), return_exceptions=True)
-    for (tracker, _), result in zip(tasks, results):
+    for (tracker, _), result in zip(tasks, results, strict=False):
         if isinstance(result, Exception):
             console.print(f"[red]Cross-seed handling failed for {tracker}: {result}[/red]")
 
