@@ -13,6 +13,7 @@ import os
 import re
 import sys
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import langcodes
 
@@ -416,10 +417,23 @@ async def gather_book_prep(
             trackers = str(comment_data.get("trackers", ""))
             comment = str(comment_data.get("comment", ""))
 
-            is_mam = "myanonamouse.net" in trackers
+            def _is_mam_host(url_or_host: str) -> bool:
+                value = (url_or_host or "").strip()
+                if not value:
+                    return False
+                parsed = urlparse(value)
+                host = parsed.hostname
+                if not host and "://" not in value:
+                    host = urlparse(f"//{value}").hostname
+                if not host:
+                    return False
+                host = host.lower().rstrip(".")
+                return host == "myanonamouse.net" or host.endswith(".myanonamouse.net")
+
+            is_mam = _is_mam_host(trackers)
             if not is_mam and comment_data.get("tracker_urls"):
                 for tu in comment_data["tracker_urls"]:
-                    if isinstance(tu, dict) and "myanonamouse.net" in str(tu.get("url", "")) or isinstance(tu, str) and "myanonamouse.net" in tu:
+                    if (isinstance(tu, dict) and _is_mam_host(str(tu.get("url", "")))) or (isinstance(tu, str) and _is_mam_host(tu)):
                         is_mam = True
                         break
 
