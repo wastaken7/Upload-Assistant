@@ -26,7 +26,7 @@ keyring==25.6.0
 langcodes==3.5.1
 language-data==1.4.0
 librosa
-lxml==6.0.2
+lxml==6.1.0
 matplotlib==3.10.9
 mobi==0.4.1
 mutagen==1.47.0
