@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional, TypeAlias, cast
+from urllib.parse import urlparse
 
 import cli_ui
 import click
@@ -152,7 +153,8 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         if img_url.startswith("https://pixhost.to/show/"):
             img_url = img_url.replace("https://pixhost.to/show/", "https://img1.pixhost.to/images/", 1)
 
-        if "tmdb.org" in img_url:
+        parsed_host = (urlparse(img_url).hostname or "").lower()
+        if parsed_host == "tmdb.org" or parsed_host.endswith(".tmdb.org"):
             return None
 
         # Verify the image link
