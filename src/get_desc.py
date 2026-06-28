@@ -85,7 +85,6 @@ async def gen_desc(
 
     base_dir = meta.base_dir
     uuid = meta.uuid
-    path = meta.path
     specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
     source_dir_path = os.path.join(meta.path or "", "*.nfo")
 

@@ -2036,7 +2036,7 @@ async def set_tmdb_metadata(meta: Meta, filename: Optional[str] = None) -> None:
         # if we have these fields already, we probably got them from a multi id searching
         # and don't need to fetch them again
         essential_fields = ['title', 'year', 'genres', 'overview']
-        tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields)
+        tmdb_metadata_populated = all(meta.get(field) is not None for field in essential_fields) and bool(meta.get("title"))
     else:
         # if we're in that blasted edit mode, ignore any previous set data and get fresh
         tmdb_metadata_populated = False

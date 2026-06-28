@@ -161,7 +161,29 @@ class CRP:
 
         return ""
 
+    async def get_screens(self, meta: Meta) -> list[str]:
+        menu_images = meta.menu_images
+        images_list = meta.get(f"{self.tracker}_images_key", meta.image_list)
+        spectrograms_images = meta.spectrograms_images
+
+        combined_images = []
+        if isinstance(menu_images, list):
+            combined_images.extend([img for img in menu_images if isinstance(img, dict)])
+        if isinstance(images_list, list):
+            combined_images.extend([img for img in images_list if isinstance(img, dict)])
+        if isinstance(spectrograms_images, list):
+            combined_images.extend([img for img in spectrograms_images if isinstance(img, dict)])
+
+        urls = []
+        for image in combined_images:
+            raw_url = image.get("raw_url")
+            if isinstance(raw_url, str) and raw_url:
+                urls.append(raw_url)
+
+        return urls
+
     async def _prepare_data(self, meta: Meta, tracker_cfg: Config) -> dict[str, Any]:
+        screenshot_urls = await self.get_screens(meta)
         data = {
             "name": await self.get_name(meta),
             "category_id": self.get_category_id(meta),
@@ -221,6 +243,10 @@ class CRP:
         anon = 0 if meta.anon == 0 and not tracker_cfg.get("anon", False) else 1
         if anon:
             data["anonymous"] = "true"
+
+        # Screenshots (optional)
+        if screenshot_urls:
+            data["screenshot_urls"] = json.dumps(screenshot_urls[:6])
 
         return data
 
