@@ -295,7 +295,7 @@ class TrackerStatusManager:
             passed_trackers: list[str] = []
             for tracker_name in meta.trackers:
                 if tracker_name in tracker_class_map:
-                    console.print(f"[yellow]Searching for existing torrents on {tracker_name}...")
+                    console.print(f"\n[yellow]Searching for existing torrents on {tracker_name}...")
                 tracker_name, status = await process_single_tracker(tracker_name, meta)
                 tracker_status[tracker_name] = status
                 if not status['banned'] and not status['skipped'] and not status['dupe']:

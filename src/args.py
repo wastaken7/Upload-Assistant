@@ -134,8 +134,8 @@ class Args:
         parser.add_argument('-oil', '--only-if-languages', dest='has_languages',  nargs='*', required=False, help="Require at least one of the languages to upload. Comma separated list e.g. 'English, French, Spanish'", type=str)
         parser.add_argument('-ns', '--no-seed', action='store_true', required=False, help="Do not add torrent to the client")
         parser.add_argument('-year', '--year', dest='manual_year', nargs=1, required=False, help="Override the year found", type=int, default=0)
-        parser.add_argument("-author", "--author", nargs=1, required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
-        parser.add_argument("-btitle", "--book-title", nargs=1, required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("-author", "--author", nargs='*', required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
+        parser.add_argument("-btitle", "--book-title", nargs='*', required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -143,7 +143,7 @@ class Args:
         parser.add_argument(
             "-btra",
             "--book-translator",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook translator",
             type=str,
@@ -152,7 +152,7 @@ class Args:
         parser.add_argument(
             "-blang",
             "--book-language",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook language (overrides auto-detected value, e.g. 'English', 'Portuguese', 'pt')",
             type=str,
@@ -188,7 +188,7 @@ class Args:
         parser.add_argument(
             "-pub",
             "--publisher",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook publisher (overrides auto-detected value)",
             type=str,
@@ -208,7 +208,7 @@ class Args:
         parser.add_argument(
             "-gv",
             "--game-version",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Game version (overrides auto-detected value, e.g. 'v1.15')",
             type=str,

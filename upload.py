@@ -778,7 +778,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         # Tracks multiple edits
         editargs_tracking = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
-        meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(sys.argv[1:]) + list(editargs_tracking), meta))
+        original_args = meta.item_args if meta.item_args is not None else list(sys.argv[1:])
+        meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(original_args) + list(editargs_tracking), meta))
         if not meta.trackers:
             meta.trackers = previous_trackers
         if isinstance(meta.trackers, str):
@@ -1840,6 +1841,7 @@ async def do_the_thing(base_dir: str) -> None:
                     queue_item_mapping = cast(Mapping[str, Any], queue_item)
                     path = await QueueManager.process_site_upload_item(queue_item_mapping, meta)
                     current_item_path = path  # Store for logging
+                    meta.item_args = [path]
                 elif meta.args_line_queue and isinstance(queue_item, dict) and "args" in queue_item:
                     # Extract path and arguments from custom args queue item
                     args_list = queue_item["args"]
@@ -1861,10 +1863,15 @@ async def do_the_thing(base_dir: str) -> None:
 
                     path = cast(str, meta.path or "")
                     current_item_path = cast(str, queue_item.get("line") or path or "")
+                    meta.item_args = args_list
                 else:
                     # Regular queue processing
                     path = queue_item if isinstance(queue_item, str) else str(queue_item)
                     current_item_path = path
+                    if meta.queue:
+                        meta.item_args = [path]
+                    else:
+                        meta.item_args = list(sys.argv[1:])
 
                 meta.path = path
                 meta.uuid = ""

@@ -193,6 +193,7 @@ class Meta:
     is_disc: str | bool = False
     isbn: str = ""
     isdir: bool = False
+    item_args: Optional[list[str]] = None
     keep_folder: bool = False
     keep_images: bool = False
     keep_nfo: bool = False
