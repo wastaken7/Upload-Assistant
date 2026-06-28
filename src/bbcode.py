@@ -124,7 +124,9 @@ class BBCODE:
                 continue
 
             raw_url = img_url
-            if "thumbs2.imgbox.com" in img_url:
+            parsed_img_url = urllib.parse.urlparse(img_url)
+            img_host = (parsed_img_url.hostname or "").lower()
+            if img_host == "thumbs2.imgbox.com":
                 raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com")
                 raw_url = raw_url.replace("_t.png", "_o.png")
 
