@@ -5,13 +5,14 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 from pymediainfo import MediaInfo
 
 from src.console import console
 from src.exceptions import NoAudioMediaError
+from src.meta import Meta
 
 
 def validate_file_path(file_path: str) -> str:
@@ -85,7 +86,7 @@ def setup_mediainfo_library(base_dir: str, debug: bool = False) -> Optional[dict
 async def mi_resolution(
     res: str,
     guess: dict[str, Any],
-    width: Union[str, int],
+    width: str | int,
     scan: str,
 ) -> str:
     res_map = {
@@ -415,13 +416,13 @@ async def exportInfo(
         os.chdir(os.path.dirname(video))
 
     if mediainfo_cmd and is_dvd:
-        result = None
+        result: Optional[subprocess.CompletedProcess[str]] = None
         try:
             # Validate and sanitize the video path
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
             if result.returncode == 0 and result.stdout:
                 media_info = result.stdout
@@ -446,7 +447,8 @@ async def exportInfo(
         media_info = MediaInfo.parse(video, output="STRING", full=False)
 
     # Filter out unwanted lines from media info regardless of type
-    filtered_media_info = "\n".join(line for line in media_info.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
+    media_info_str = str(media_info)
+    filtered_media_info = "\n".join(line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
 
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
         await export.write(filtered_media_info.replace(video, os.path.basename(video)))
@@ -462,13 +464,14 @@ async def exportInfo(
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result2: Optional[subprocess.CompletedProcess[str]] = None
+            result2 = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
-            if result.returncode == 0 and result.stdout:
-                media_info_json = result.stdout
+            if result2.returncode == 0 and result2.stdout:
+                media_info_json = result2.stdout
                 media_info_dict = json.loads(media_info_json)
             else:
-                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+                raise subprocess.CalledProcessError(result2.returncode, cmd, result2.stdout, result2.stderr)
 
         except ValueError as e:
             console.print(f"[bold red]Path validation error: {e}[/bold red]")
@@ -481,11 +484,11 @@ async def exportInfo(
             media_info_dict = json.loads(media_info_json)
         except (subprocess.CalledProcessError, json.JSONDecodeError, Exception) as e:
             console.print(f"[bold red]Error getting JSON from specialized MediaInfo: {e}")
-            if debug and result is not None:
-                console.print(f"[red]Subprocess stderr: {result.stderr}[/red]")
-                console.print(f"[red]Subprocess returncode: {result.returncode}[/red]")
-                if result.stdout:
-                    console.print(f"[red]Subprocess stdout preview: {result.stdout[:200]}...[/red]")
+            if debug and result2 is not None:
+                console.print(f"[red]Subprocess stderr: {result2.stderr}[/red]")
+                console.print(f"[red]Subprocess returncode: {result2.returncode}[/red]")
+                if result2.stdout:
+                    console.print(f"[red]Subprocess stdout preview: {result2.stdout[:200]}...[/red]")
             console.print("[bold yellow]Falling back to standard MediaInfo for JSON...[/bold yellow]")
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)
@@ -515,10 +518,10 @@ async def exportInfo(
     return mi
 
 
-def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False) -> bool:
-    if not any(str(f).lower().endswith(".mkv") for f in meta.get("filelist", [])):
+def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
+    if not any(str(f).lower().endswith(".mkv") for f in meta.filelist):
         if debug:
-            console.print(f"[yellow]Skipping {meta.get('path')} (not an .mkv file)[/yellow]")
+            console.print(f"[yellow]Skipping {meta.path} (not an .mkv file)[/yellow]")
         return True
 
     unique_id = None
@@ -527,7 +530,7 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
     if debug:
         console.print("[cyan]Validating MediaInfo")
 
-    mediainfo_data = meta.get("mediainfo", {})
+    mediainfo_data = meta.mediainfo
 
     if "media" in mediainfo_data and "track" in mediainfo_data["media"]:
         tracks = mediainfo_data["media"]["track"]
@@ -537,7 +540,7 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
         has_audio = any(track.get("@type", "") == "Audio" for track in tracks)
 
         if not has_audio:
-            raise NoAudioMediaError(f"{meta['ua_name']} does not support no audio media.")
+            raise NoAudioMediaError(f"{meta.ua_name} does not support no audio media.")
 
         for track in tracks:
             track_type = track.get("@type", "")
@@ -564,21 +567,21 @@ def validate_mediainfo(meta: dict[str, Any], debug: bool, settings: bool = False
         elif not settings and not unique_id:
             console.print("[yellow]Mediainfo failed validation (no unique ID)[/yellow]")
 
-    return bool(valid_settings) if settings else bool(unique_id)
+    return valid_settings if settings else bool(unique_id)
 
 
-async def get_conformance_error(meta: dict[str, Any]) -> bool:
-    if meta.get("is_disc") != "BDMV" and meta.get("mediainfo", {}).get("media", {}).get("track"):
-        general_track = next((track for track in meta["mediainfo"]["media"]["track"] if track.get("@type") == "General"), None)
+async def get_conformance_error(meta: Meta) -> bool:
+    if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
+        general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
         if general_track and general_track.get("extra", {}).get("ConformanceErrors", {}):
             try:
                 return True
             except ValueError:
-                if meta["debug"]:
+                if meta.debug:
                     console.print(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
                 return True
         else:
-            if meta["debug"]:
+            if meta.debug:
                 console.print("[green]No Conformance errors found in MediaInfo General track[/green]")
             return False
     else:

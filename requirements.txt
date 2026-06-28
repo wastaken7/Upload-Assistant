@@ -1,5 +1,4 @@
 aiofiles==25.1.0
-aiohttp==3.13.3
 anitopy==2.1.1
 argon2-cffi==25.1.0
 babel==2.17.0

@@ -1,15 +1,16 @@
 from typing import Any
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class ZNTH(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://znth.cx']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ZNTH")
@@ -25,36 +26,36 @@ class ZNTH(UNIT3D):
         self.banned_url = f"{self.base_url}/api/bannedReleaseGroups"
         self.banned_groups: list[str] = []
 
-    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta["category"] == "BOOK":
-            if not meta.get("isbn", "") and not meta.get("asin", ""):
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.category == "BOOK":
+            if not meta.isbn and not meta.asin:
                 console.print(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
                 return False
-            if bool(meta.get("audiobook", False)) and not meta.get("narrator", ""):
+            if meta.audiobook and not meta.narrator:
                 console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
                 return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
-    async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
-        category = meta.get("category", "")
-        audiobook = bool(meta.get("audiobook", False))
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        category = meta.category
+        audiobook = meta.audiobook
 
         if category == "BOOK":
-            author = str(meta.get("author") or "").strip()
-            title = str(meta.get("title") or meta.get("name") or "").strip()
-            year = str(meta.get("year") or "").strip()
-            format_val = str(meta.get("type") or meta.get("container") or "").strip().upper()
-            tag = str(meta.get("tag") or "").strip().lstrip("-")
+            author = meta.author or "".strip()
+            title = meta.title or meta.name or "".strip()
+            year = meta.year or "".strip()
+            format_val = str(meta.type or meta.container or "").strip().upper()
+            tag = meta.tag or "".strip().lstrip("-")
 
             # Determine source/retail
-            source = str(meta.get("source") or "").strip().upper()
-            manual_source = str(meta.get("manual_source") or "").strip().upper()
+            source = meta.source or "".strip().upper()
+            manual_source = str(meta.manual_source or "").strip().upper()
             if manual_source in ("RETAIL", "SCAN", "HYBRID"):
                 source = manual_source
 
             if source not in ("RETAIL", "SCAN", "HYBRID"):
-                filename_lower = (str(meta.get("basename_no_ext", "")) + " " + str(meta.get("title", ""))).lower()
+                filename_lower = (meta.basename_no_ext + " " + meta.title).lower()
                 if "scan" in filename_lower:
                     source = "SCAN"
                 elif "hybrid" in filename_lower:
@@ -65,7 +66,7 @@ class ZNTH(UNIT3D):
                     ext = format_val.upper()
                     source = "SCAN" if ext == "PDF" else "RETAiL"
 
-            is_retail = source in ("RETAIL", "RETAiL") or "retail" in str(meta.get("basename_no_ext", "")).lower()
+            is_retail = source in ("RETAIL", "RETAiL") or "retail" in meta.basename_no_ext.lower()
 
             if audiobook:
                 # AudioBook Naming
@@ -74,11 +75,11 @@ class ZNTH(UNIT3D):
                 lossy_formats = ["MP3", "AAC", "OPUS", "VORBIS", "M4B", "M4A", "OGG"]
                 bitrate_val = ""
                 if format_val in lossy_formats:
-                    bitrate = meta.get("audiobook_bitrate")
+                    bitrate = meta.audiobook_bitrate
                     if bitrate:
                         bitrate_val = f"{bitrate}kbps"
 
-                book_id = meta.get("isbn", "") or meta.get("asin", "")
+                book_id = meta.isbn or meta.asin
 
                 parts = []
                 if author:
@@ -106,7 +107,7 @@ class ZNTH(UNIT3D):
                 # eBook Naming
                 # Required: Author - Name Year Format ISBN
                 # Additional: Author - Name Year Edition Format ISBN Retail Scan OCR
-                edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+                edition = str(meta.manual_edition or meta.edition or "").strip()
                 if edition:
                     edition_lower = edition.lower()
                     if "1st" in edition_lower or "first" in edition_lower:
@@ -115,9 +116,9 @@ class ZNTH(UNIT3D):
                         if not any(x in edition_lower for x in ["edition", "ed.", "ed"]):
                             edition = f"{edition} Edition"
 
-                isbn_val = str(meta.get("isbn") or "").strip()
-                is_scan = source == "SCAN" or "scan" in str(meta.get("basename_no_ext", "")).lower() or "scan" in str(meta.get("title", "")).lower()
-                is_ocr = bool(meta.get("ocr")) or "ocr" in str(meta.get("basename_no_ext", "")).lower() or "ocr" in str(meta.get("title", "")).lower()
+                isbn_val = meta.isbn or "".strip()
+                is_scan = source == "SCAN" or "scan" in meta.basename_no_ext.lower() or "scan" in meta.title.lower()
+                is_ocr = bool(meta.ocr) or "ocr" in meta.basename_no_ext.lower() or "ocr" in meta.title.lower()
 
                 parts = []
                 if author:
@@ -148,19 +149,19 @@ class ZNTH(UNIT3D):
             return {"name": znth_name}
 
         elif category in ("TV", "MOVIE"):
-            znth_name = meta["name"]
-            if meta["category"] == "TV" and meta.get("episode_title", "") != "":
-                znth_name = znth_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
-            imdb_year = str(meta.get("imdb_info", {}).get("year", ""))
-            year = str(meta.get("year", ""))
-            if meta.get("category") != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
+            znth_name = meta.name
+            if meta.category == "TV" and meta.episode_title != "":
+                znth_name = znth_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
+            imdb_year = str(meta.imdb_info.get("year", ""))
+            year = meta.year
+            if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
                 znth_name = znth_name.replace(f"{year}", imdb_year, 1)
             return {"name": znth_name}
 
         else:
-            return {"name": meta["name"]}
+            return {"name": meta.name}
 
-    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
             "TV": "2",
@@ -175,13 +176,13 @@ class ZNTH(UNIT3D):
         elif category:
             return {"category_id": category_id.get(category, "0")}
         else:
-            meta_category = meta.get("category", "")
-            if meta.get("audiobook", False):
+            meta_category = meta.category
+            if meta.audiobook:
                 meta_category = "AUDIOBOOK"
             resolved_id = category_id.get(meta_category, "0")
             return {"category_id": resolved_id}
 
-    async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -202,16 +203,16 @@ class ZNTH(UNIT3D):
             resolved_type = type.upper().strip()
             return {"type_id": type_id.get(resolved_type, "0")}
         else:
-            category = meta.get("category", "")
-            meta_type = meta.get("type", "")
+            category = meta.category
+            meta_type = meta.type
             if isinstance(meta_type, str):
                 meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type, "0")
+            resolved_id = type_id.get(meta_type or "", "0")
 
             if category == "GAME":
                 resolved_id = "16"
-            elif meta.get("audiobook", False):
+            elif meta.audiobook:
                 resolved_id = "10"
             elif category == "BOOK":
                 resolved_id = "9"

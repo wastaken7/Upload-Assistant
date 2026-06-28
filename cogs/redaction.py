@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import aiofiles
 
+from src.meta import Meta
+
 if TYPE_CHECKING:
     from upload import Meta
 
@@ -115,7 +117,7 @@ class Redaction:
                 for k, v in typed_data.items()
             }
         if isinstance(data, list):
-            typed_list = cast(list[Any], data)
+            typed_list = data
             return [Redaction.redact_private_info(item, keys) for item in typed_list]
         if isinstance(data, str):
             # Try to parse as JSON first
@@ -129,14 +131,14 @@ class Redaction:
         return data
 
     @staticmethod
-    async def clean_meta_for_export(meta: "Meta") -> "Meta":
+    async def clean_meta_for_export(meta: Meta) -> Meta:
         """
-        Removes all 'status_message' keys from meta['tracker_status'] and
+        Removes all 'status_message' keys from meta.tracker_status and
         removes or clears 'torrent_comments' from meta.
         """
         # tracker status is not in the saved meta file, but adding the catch here
         # in case the meta file is updated in the future
-        tracker_status = meta.get('tracker_status')
+        tracker_status = meta.tracker_status
         if isinstance(tracker_status, dict):
             typed_status = cast(dict[str, dict[str, Any]], tracker_status)
             for tracker in list(typed_status):  # list() to avoid RuntimeError if deleting keys
@@ -144,14 +146,14 @@ class Redaction:
                     del typed_status[tracker]['status_message']
 
         if 'torrent_comments' in meta:
-            del meta['torrent_comments']
+            meta.pop("torrent_comments")
 
         if 'matched_episode_ids' in meta:
-            del meta['matched_episode_ids']
+            meta.pop("matched_episode_ids")
 
-        output_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
+        output_path = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
         async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(meta, indent=4))
+            await f.write(json.dumps(meta.to_dict(), indent=4))
 
         return meta
 
@@ -168,5 +170,5 @@ def redact_private_info(data: Any, sensitive_keys: Optional[set[str]] = None) ->
     return Redaction.redact_private_info(data, sensitive_keys)
 
 
-async def clean_meta_for_export(meta: "Meta") -> "Meta":
+async def clean_meta_for_export(meta: Meta) -> Meta:
     return await Redaction.clean_meta_for_export(meta)

@@ -1,13 +1,15 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.COMMON import COMMON
 
 
 class CZ(AZTrackerBase):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.cinemaz.to']
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name='CZ')
         self.config = config
@@ -19,17 +21,17 @@ class CZ(AZTrackerBase):
         self.torrent_url = f'{self.base_url}/torrent/'
         self.requests_url = f'{self.base_url}/requests'
 
-    def rules(self, meta: dict[str, Any]) -> str:
+    def rules(self, meta: Meta) -> str:
         warnings: list[str] = []
 
         # This also checks the rule 'FANRES content is not allowed'
-        if meta['category'] not in ('MOVIE', 'TV'):
+        if meta.category not in ("MOVIE", "TV"):
             warnings.append(
                 'The only allowed content to be uploaded are Movies and TV Shows.\n'
                 'Anything else, like games, music, software and porn is not allowed!'
             )
 
-        if meta.get('anime', False):
+        if meta.anime:
             warnings.append("Upload Anime content to our sister site AnimeTorrents.me instead. If it's on AniDB, it's an anime.")
 
         # https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
@@ -84,12 +86,12 @@ class CZ(AZTrackerBase):
             {'RU'}                         # Russia
         )
 
-        origin_countries_codes = meta.get('origin_country', [])
-        year = meta.get('year')
+        origin_countries_codes = meta.origin_country
+        year = meta.year
         is_older_than_50_years = False
 
         if isinstance(year, int):
-            current_year = datetime.now(timezone.utc).year
+            current_year = datetime.now(UTC).year
             if (current_year - year) >= 50:
                 is_older_than_50_years = True
 

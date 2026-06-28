@@ -9,16 +9,15 @@ import os
 import re
 import time
 from collections.abc import Sequence
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import aiofiles
 import httpx
 import pyimgbox
-from typing_extensions import TypeAlias
 
 from src.console import console
+from src.meta import Meta
 
-Meta: TypeAlias = dict[str, Any]
 ImageDict: TypeAlias = dict[str, Any]
 
 
@@ -37,7 +36,7 @@ class UploadScreensManager:
         return_dict: dict[str, Any],
         retry_mode: bool = False,
         max_retries: int = 3,
-        allowed_hosts: Union[list[str], None] = None,
+        allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
         return await _upload_screens(
             self.config,
@@ -151,7 +150,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                     return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
@@ -189,7 +188,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                     return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
@@ -229,7 +228,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['image']['url']
                     web_url = response_data['image']['url_viewer']
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
@@ -267,7 +266,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['image']['url']
                     web_url = response_data['image']['url_viewer']
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
@@ -305,7 +304,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
@@ -347,7 +346,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         img_url = response_data['th_url']
                         web_url = response_data['show_url']
 
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                     except ValueError as e:
@@ -524,7 +523,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         elif 'thumb' in file_data.get('variants', {}):
                             img_url = file_data['variants']['thumb']
 
-                        if meta['debug']:
+                        if meta.debug:
                             console.print(f"[green]Seedpool CDN upload successful: {file_data['cdn_id']}")
                             console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
@@ -584,7 +583,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = link
                     web_url = link
 
-                    if meta.get('debug'):
+                    if meta.debug:
                         console.print(f"[green]ShareX image host upload successful: {link}[/green]")
 
                     return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url, 'local_file_path': image}
@@ -634,21 +633,21 @@ async def _upload_screens(
     return_dict: dict[str, Any],
     retry_mode: bool = False,
     max_retries: int = 3,
-    allowed_hosts: Union[list[str], None] = None
+    allowed_hosts: list[str] | None = None
 ) -> tuple[list[ImageDict], int]:
     default_config = config.get('DEFAULT', {})
     if 'image_list' not in meta:
-        meta['image_list'] = []
+        meta.image_list = []
     upload_start_time: Optional[float] = None
-    if meta.get('debug'):
+    if meta.debug:
         upload_start_time = time.time()
 
-    os.chdir(f"{meta['base_dir']}/tmp/{meta['uuid']}")
+    os.chdir(f"{meta.base_dir}/tmp/{meta.uuid}")
 
     initial_img_host = default_config[f'img_host_{img_host_num}']
-    img_host = str(meta.get('imghost', ''))
+    img_host = meta.imghost
 
-    image_list = cast(list[ImageDict], meta.get('image_list', []))
+    image_list = meta.image_list
 
     # Treat empty allowed host list as no restriction
     if not allowed_hosts:
@@ -676,12 +675,12 @@ async def _upload_screens(
             console.print(f"[red]No approved image hosts found in config. Available: {allowed_hosts}[/red]")
             return image_list, len(image_list)
 
-    if meta['debug']:
+    if meta.debug:
         console.print(f"[blue]Using image host: {img_host} (configured: {initial_img_host})[/blue]")
     using_custom_img_list = bool(custom_img_list)
 
     if 'image_sizes' not in meta:
-        meta['image_sizes'] = {}
+        meta.image_sizes = {}
 
     # Handle image selection
 
@@ -716,7 +715,7 @@ async def _upload_screens(
 
         image_glob.sort(key=extract_numeric_suffix)
 
-        if meta['debug']:
+        if meta.debug:
             console.print("image globs (sorted):", image_glob)
 
         existing_images = [img for img in image_list if img.get('img_url') and img.get('web_url')]
@@ -724,17 +723,14 @@ async def _upload_screens(
 
     # Determine images needed
     images_needed = total_screens - existing_count if not retry_mode else total_screens
-    if meta['debug']:
+    if meta.debug:
         console.print(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
 
     if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         console.print(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
         return image_list, total_screens
 
-    upload_tasks: list[tuple[int, str, str, dict[str, Any], dict[str, Any]]] = [
-        (index, image, img_host, config, meta)
-        for index, image in enumerate(image_glob[:images_needed])
-    ]
+    upload_tasks: list[tuple[int, str, str, dict[str, Any], Meta]] = [(index, image, img_host, config, meta) for index, image in enumerate(image_glob[:images_needed])]
 
     # Concurrency Control
     default_pool_size = len(upload_tasks)
@@ -747,9 +743,9 @@ async def _upload_screens(
     running_tasks: set[asyncio.Task[dict[str, Any]]] = set()
 
     async def async_upload(
-        task: tuple[int, str, str, dict[str, Any], dict[str, Any]],
+        task: tuple[int, str, str, dict[str, Any], Meta],
         max_retries: int = 3,
-    ) -> Union[tuple[int, dict[str, Any]], None]:
+    ) -> tuple[int, dict[str, Any]] | None:
         """Upload image with concurrency control and retry logic."""
         index, *task_args = task
         retry_count = 0
@@ -784,7 +780,7 @@ async def _upload_screens(
                                 console.print(f"[red]Failed to upload image {index} after {max_retries} attempts: {reason}[/red]")
                                 return None
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         console.print(f"[red]Upload task {index} timed out after 60 seconds[/red]")
                         if future in running_tasks:
                             future.cancel()
@@ -828,20 +824,20 @@ async def _upload_screens(
             console.print(f"[red]Error during uploads: {str(e)}[/red]")
 
         successfully_uploaded = [(index, result) for index, result in results if result['status'] == 'success']
-        if meta['debug']:
+        if meta.debug:
             console.print(f"[blue]Successfully uploaded {len(successfully_uploaded)} out of {len(upload_tasks)} attempted uploads.[/blue]")
 
         # Ensure we only switch hosts if necessary
-        if meta['debug']:
+        if meta.debug:
             console.print(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
             console.print(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
-            console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta['image_list']={len(image_list)}, cutoff={meta.get('cutoff', 1)}[/blue]")
+            console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
         if len(successfully_uploaded) < len(upload_tasks) and not retry_mode and img_host == initial_img_host:
             img_host_num += 1
             next_host_key = f'img_host_{img_host_num}'
             if next_host_key in default_config:
-                meta['imghost'] = default_config[next_host_key]
-                console.print(f"[cyan]Switching to the next image host: {meta['imghost']}[/cyan]")
+                meta.imghost = default_config[next_host_key]
+                console.print(f"[cyan]Switching to the next image host: {meta.imghost}[/cyan]")
 
                 gc.collect()
                 return await _upload_screens(config, meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
@@ -860,13 +856,13 @@ async def _upload_screens(
             }
             new_images.append(new_image)
             if not using_custom_img_list and raw_url not in {img['raw_url'] for img in image_list}:
-                if meta.get('debug'):
+                if meta.debug:
                     console.print(f"[blue]Adding {raw_url} to image_list")
                 image_list.append(new_image)
                 local_file_path = upload.get('local_file_path')
                 if local_file_path:
                     image_size = os.path.getsize(local_file_path)
-                    meta['image_sizes'][raw_url] = image_size
+                    meta.image_sizes[raw_url] = image_size
 
         if len(new_images) and len(new_images) > 0:
             if not using_custom_img_list:
@@ -874,7 +870,7 @@ async def _upload_screens(
         else:
             raise Exception("No images uploaded. Configure additional image hosts or use a different -ih")
 
-        if meta.get('debug') and upload_start_time is not None:
+        if meta.debug and upload_start_time is not None:
             console.print(f"Screenshot uploads processed in {time.time() - upload_start_time:.4f} seconds")
 
         return (new_images, len(new_images)) if using_custom_img_list else (image_list, len(successfully_uploaded))

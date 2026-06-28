@@ -214,14 +214,6 @@ Implementation notes:
 Implementation notes:
 - `inject_delay` is a [per-tracker overridable setting](#tracker-overridable-settings).
 
-### Emby linking
-- `emby_dir` (str | None): Directory for Emby movie linking (enables linking when set).
-- `emby_tv_dir` (str | None): Directory for Emby TV linking.
-
-Implementation notes:
-- Emby NFO/link behavior is implemented in `src/nfo_link.py`.
-- These options are only used when Emby mode is enabled (via CLI flags); setting these paths alone does not automatically enable Emby mode.
-
 ### Requests / predb / cross-seeding
 - `search_requests` (bool): Search for matching requests on supported trackers.
 - `check_predb` (bool): Also search predb for scene releases.

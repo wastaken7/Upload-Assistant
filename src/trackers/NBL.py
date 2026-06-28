@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlencode
 
 import aiofiles
@@ -9,14 +9,15 @@ import cli_ui
 import httpx
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class NBL:
     supported_categories = ('TV',)
+    tracker_urls = ['tracker.nebulance']
 
     """
     Edit for Tracker:
@@ -42,10 +43,9 @@ class NBL:
                               'SpaceFish', 'SPASM', 'SSA', 'Telly', 'Tenrai-Sensei', 'TM', 'Trix', 'URANiME', 'VipapkStudios', 'ViSiON', 'Wardevil', 'xRed',
                               'XS', 'YakuboEncodes', 'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT']
 
-        pass
 
     async def get_cat_id(self, meta: Meta) -> int:
-        cat_id = 3 if meta.get('tv_pack', 0) == 1 else 1
+        cat_id = 3 if meta.tv_pack == 1 else 1
         return cat_id
 
     async def edit_desc(self, _meta: Meta) -> None:
@@ -55,98 +55,98 @@ class NBL:
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
-        if meta['bdinfo'] is not None:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt", encoding='utf-8') as f:
+        if meta.bdinfo is not None:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
         else:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt", encoding='utf-8') as f:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_file_path, 'rb') as f:
             torrent_bytes = await f.read()
         files: dict[str, tuple[str, bytes, str]] = {
             'file_input': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent')
         }
         data: dict[str, Any] = {
-            'action': 'upload',
-            'api_key': self.api_key,
-            'tvmazeid': int(meta.get('tvmaze_id', 0)),
-            'mediainfo': mi_dump,
-            'category': await self.get_cat_id(meta),
-            'ignoredupes': '1'
+            "action": "upload",
+            "api_key": self.api_key,
+            "tvmazeid": int(meta.tvmaze_id),
+            "mediainfo": mi_dump,
+            "category": await self.get_cat_id(meta),
+            "ignoredupes": "1",
         }
 
         try:
-            if not meta['debug']:
+            if not meta.debug:
                 async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.post(url=self.upload_url, files=files, data=data)
                     if response.status_code in [200, 201]:
                         try:
                             response_data = response.json()
-                            meta['tracker_status'][self.tracker]['status_message'] = response_data
+                            meta.tracker_status[self.tracker]["status_message"] = response_data
                             match = re.search(r"https://nebulance\.io/torrents\.php\?id=(\d+)", response_data.get('link', ''))
                             if match:
                                 torrent_id = match.group(1)
-                                meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                                meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                             return True
                         except json.JSONDecodeError:
-                            meta['tracker_status'][self.tracker]['status_message'] = "data error: NBL json decode error, the API is probably down"
+                            meta.tracker_status[self.tracker]["status_message"] = "data error: NBL json decode error, the API is probably down"
                             return False
                     else:
                         response_data = {
                             "error": f"Unexpected status code: {response.status_code}",
                             "response_content": response.text
                         }
-                        meta['tracker_status'][self.tracker]['status_message'] = response_data
+                        meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
                 console.print("[cyan]NBL Request Data:")
                 console.print(data)
-                meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+                meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True  # Debug mode - simulated success
         except Exception as e:
-            meta['tracker_status'][self.tracker]['status_message'] = f"data error: Upload failed: {e}"
+            meta.tracker_status[self.tracker]["status_message"] = f"data error: Upload failed: {e}"
             return False
 
-    async def search_existing(self, meta: Meta) -> Union[list[dict[str, Any]], bool]:
-        if meta['category'] != 'TV':
-            if meta['tvmaze_id'] != 0:
-                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]] | bool:
+        if meta.category != "TV":
+            if meta.tvmaze_id != 0:
+                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     console.print("[red]Only TV or TV Movies are allowed at NBL, this has a tvmaze ID[/red]")
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
-                        meta['skipping'] = "NBL"
+                        meta.skipping = "NBL"
                         return []
                 else:
-                    meta['skipping'] = "NBL"
+                    meta.skipping = "NBL"
                     return []
             else:
-                if not meta['unattended']:
+                if not meta.unattended:
                     console.print("[red]Only TV Is allowed at NBL")
-                meta['skipping'] = "NBL"
+                meta.skipping = "NBL"
                 return []
 
-        if meta['is_disc'] != "BDMV" and not await self.common.check_language_requirements(
+        if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True
         ):
             return False
 
-        if meta['valid_mi'] is False:
+        if meta.valid_mi is False:
             console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
-        if meta.get('is_disc') is not None:
-            if not meta['unattended']:
+        if meta.is_disc is not None:
+            if not meta.unattended:
                 console.print('[bold red]NBL does not allow raw discs')
-            meta['skipping'] = "NBL"
+            meta.skipping = "NBL"
             return []
 
         dupes: list[dict[str, Any]] = []
 
-        season = meta.get("season_int", 0)
-        tvmaze_data = meta.get('tvmaze_episode_data', {})
+        season = meta.season_int
+        tvmaze_data = meta.tvmaze_episode_data
         if tvmaze_data:
             season = tvmaze_data.get('season_number', season)
 
@@ -163,14 +163,14 @@ class NBL:
         if season_int > 0:
             params["season"] = season_int
 
-        if int(meta.get("tvmaze_id", 0) or 0) != 0:
-            params["tvmaze"] = int(meta["tvmaze_id"])
-        elif int(meta.get("imdb_id", 0) or 0) != 0:
-            params["imdb"] = meta.get("imdb_id")
+        if int(meta.tvmaze_id or 0) != 0:
+            params["tvmaze"] = int(meta.tvmaze_id)
+        elif meta.imdb_id or 0 != 0:
+            params["imdb"] = meta.imdb_id
         else:
-            params["series"] = meta["title"]
+            params["series"] = meta.title
 
-        params['tags'] = [meta['resolution']]
+        params["tags"] = [meta.resolution]
         params['per_page'] = 100
 
         response: Optional[httpx.Response] = None
@@ -195,14 +195,14 @@ class NBL:
                                 break
                         console.print(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
                         console.print(f"[bold red]NBL Search Response Content (page {page}): {response.text}")
-                        meta['skipping'] = "NBL"
+                        meta.skipping = "NBL"
                         break
 
                     try:
                         data = cast(dict[str, Any], response.json())
                     except json.JSONDecodeError:
                         console.print("[bold yellow]NBL response content is not valid JSON. Skipping this API call.")
-                        meta['skipping'] = "NBL"
+                        meta.skipping = "NBL"
                         break
 
                     items_value = data.get('items')
@@ -216,7 +216,7 @@ class NBL:
                     for each in items:
                         tags_value = each.get('tags', [])
                         tags = cast(list[Any], tags_value) if isinstance(tags_value, list) else []
-                        if meta['resolution'] in tags:
+                        if meta.resolution in tags:
                             file_list_value = each.get('file_list', [])
                             file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
                             files_str = ', '.join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
@@ -232,10 +232,10 @@ class NBL:
 
         except httpx.TimeoutException:
             console.print("[bold red]NBL request timed out after 10 seconds")
-            meta['skipping'] = "NBL"
+            meta.skipping = "NBL"
         except httpx.RequestError as e:
             console.print(f"[bold red]NBL an error occurred while making the request: {e}")
-            meta['skipping'] = "NBL"
+            meta.skipping = "NBL"
         except KeyError as e:
             console.print(f"[bold red]Unexpected KeyError: {e}")
             if response is not None and 'result' not in response.json():
@@ -249,7 +249,7 @@ class NBL:
                     'download': ''
                 })
         except Exception as e:
-            meta['skipping'] = "NBL"
+            meta.skipping = "NBL"
             console.print(f"[bold red]NBL unexpected error: {e}")
             console.print_exception()
 

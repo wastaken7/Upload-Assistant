@@ -5,15 +5,16 @@ from typing import Any, Optional
 import aiofiles
 
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class LCD(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['locadora.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LCD')
         self.config: Config = config
@@ -25,11 +26,10 @@ class LCD(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
-        pass
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name_value = meta.get("name", "") if meta.get("is_disc", "") == "BDMV" else meta.get("basename_no_ext", "")
-        name = str(name_value)
+        name_value = meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext
+        name = name_value
 
         replacements = {
             '.mkv': '',
@@ -63,9 +63,9 @@ class LCD(UNIT3D):
         for old, new in replacements.items():
             name = name.replace(old, new)
 
-        tag_lower = str(meta.get('tag', '')).lower()
+        tag_lower = meta.tag.lower() if meta.tag else ""
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-        if meta.get('tag') == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+        if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
                 name = re.sub(f"-{invalid_tag}", "", name, flags=re.IGNORECASE)
             name = f'{name}-NoGroup'
@@ -73,10 +73,10 @@ class LCD(UNIT3D):
         return {'name': name}
 
     async def get_region_id(self, meta: Meta) -> dict[str, str]:
-        if meta.get('region') == 'EUR':
+        if meta.region == "EUR":
             return {}
 
-        region_value = str(meta.get('region', ''))
+        region_value = str(meta.region)
         region_id = await self.common.unit3d_region_ids(region_value)
         if region_id:
             return {'region_id': region_id}
@@ -84,18 +84,16 @@ class LCD(UNIT3D):
         return {}
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
-        if meta.get('bdinfo') is not None:
+        if meta.bdinfo is not None:
             mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'])
         else:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding='utf-8') as f:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
                 mediainfo = await f.read()
 
         return {'mediainfo': mediainfo}
 
-    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        signature = (
-            f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta['ua_name']} {meta['current_version']} (fork)[/size][/url][/right]"
-        )
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}
 
     async def get_category_id(
@@ -106,12 +104,8 @@ class LCD(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-            'ANIMES': '6'
-        }.get(meta['category'], '0')
-        if meta['anime'] is True and category_id == '2':
+        category_id = {"MOVIE": "1", "TV": "2", "ANIMES": "6"}.get(meta.category, "0")
+        if meta.anime is True and category_id == "2":
             category_id = '6'
         return {'category_id': category_id}
 
@@ -123,14 +117,7 @@ class LCD(UNIT3D):
         mapping_only: bool = False
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'ENCODE': '3',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6'
-        }.get(meta['type'], '0')
+        type_id = {"DISC": "1", "REMUX": "2", "ENCODE": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6"}.get(meta.type or "", "0")
         return {'type_id': type_id}
 
     async def get_resolution_id(
@@ -152,5 +139,5 @@ class LCD(UNIT3D):
             "480p": "8",
             "480i": "9",
             "Other": "10",
-        }.get(meta["resolution"], "10")
+        }.get(meta.resolution, "10")
         return {'resolution_id': resolution_id}

@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -15,9 +15,9 @@ from unidecode import unidecode
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -56,7 +56,7 @@ class PTER:
     async def validate_cookies(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         url = "https://pterclub.com"
-        cookiefile = f"{meta['base_dir']}/data/cookies/PTER.txt"
+        cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
         if os.path.exists(cookiefile):
             cookies = await common.parseCookieFile(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
@@ -67,16 +67,16 @@ class PTER:
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
 
-    async def search_existing(self, meta: Meta) -> Union[list[str], bool]:
+    async def search_existing(self, meta: Meta) -> list[str] | bool:
         dupes: list[str] = []
         common = COMMON(config=self.config)
-        cookiefile = f"{meta['base_dir']}/data/cookies/PTER.txt"
+        cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
         if not os.path.exists(cookiefile):
             console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
         cookies = await common.parseCookieFile(cookiefile)
-        imdb_id = int(meta.get('imdb_id', 0) or 0)
-        imdb = f"tt{meta.get('imdb', '')}" if imdb_id != 0 else ""
+        imdb_id = meta.imdb_id or 0
+        imdb = f"tt{meta.imdb}" if imdb_id != 0 else ""
         source = await self.get_type_medium_id(meta)
         search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
 
@@ -109,16 +109,16 @@ class PTER:
 
     async def get_type_category_id(self, meta: Meta) -> str:
         cat_id = "EXIT"
-        category = str(meta.get('category', ''))
+        category = str(meta.category)
 
         if category == 'MOVIE':
             cat_id = '401'
 
         if category == 'TV':
             cat_id = '404'
-        genres_value = meta.get("genres", "")
+        genres_value = meta.genres
         genres = ', '.join(cast(list[str], genres_value)) if isinstance(genres_value, list) else str(genres_value)
-        keywords_value = meta.get("keywords", "")
+        keywords_value = meta.keywords
         keywords = ', '.join(cast(list[str], keywords_value)) if isinstance(keywords_value, list) else str(keywords_value)
         if 'documentary' in genres.lower() or 'documentary' in keywords.lower():
             cat_id = '402'
@@ -137,7 +137,7 @@ class PTER:
             "英国": 4, "阿根廷": 8, "澳大利亚": 4, "比利时": 4,
             "巴西": 8, "加拿大": 4, "瑞士": 4, "智利": 8,
         }
-        ptgen = cast(dict[str, Any], meta.get('ptgen', {}))
+        ptgen = meta.ptgen
         regions_value = ptgen.get("region", [])
         regions = cast(list[str], regions_value) if isinstance(regions_value, list) else []
         for area in area_map:
@@ -148,32 +148,32 @@ class PTER:
     async def get_type_medium_id(self, meta: Meta) -> str:
         medium_id = "EXIT"
         # 1 = UHD Discs
-        if meta.get('is_disc', '') in ("BDMV", "HD DVD"):
-            medium_id = '1' if meta['resolution'] == '2160p' else '2'  # BD Discs
+        if meta.is_disc in ("BDMV", "HD DVD"):
+            medium_id = "1" if meta.resolution == "2160p" else "2"  # BD Discs
 
-        if meta.get('is_disc', '') == "DVD":
+        if meta.is_disc == "DVD":
             medium_id = '7'
 
         # 4 = HDTV
-        if meta.get('type', '') == "HDTV":
+        if meta.type == "HDTV":
             medium_id = '4'
 
         # 6 = Encode
-        if meta.get('type', '') in ("ENCODE", "WEBRIP"):
+        if meta.type in ("ENCODE", "WEBRIP"):
             medium_id = '6'
 
         # 3 = Remux
-        if meta.get('type', '') == "REMUX":
+        if meta.type == "REMUX":
             medium_id = '3'
 
         # 5 = WEB-DL
-        if meta.get('type', '') == "WEBDL":
+        if meta.type == "WEBDL":
             medium_id = '5'
 
         return medium_id
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding='utf-8') as base_file:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
             base = await base_file.read()
 
         from src.bbcode import BBCODE
@@ -182,14 +182,14 @@ class PTER:
 
         parts: list[str] = []
 
-        if int(meta.get('imdb_id', 0) or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             ptgen = await common.ptgen(meta, self.ptgen_api, self.ptgen_retry)
             if ptgen.strip() != '':
                 parts.append(ptgen)
 
         bbcode = BBCODE()
-        if meta.get('discs', []) != []:
-            discs = cast(list[dict[str, Any]], meta.get('discs', []))
+        if meta.discs != []:
+            discs = cast(list[dict[str, Any]], meta.discs)
             for each in discs:
                 if each['type'] == "BDMV":
                     parts.append(f"[hide=BDInfo]{each['summary']}[/hide]\n")
@@ -199,7 +199,7 @@ class PTER:
                     parts.append(f"[hide=mediainfo][{each['vob_mi']}[/hide] [hide=mediainfo][{each['ifo_mi']}[/hide]\n")
                     parts.append("\n")
         else:
-            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding='utf-8') as mi_file:
+            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                 mi = await mi_file.read()
             parts.append(f"[hide=mediainfo]{mi}[/hide]")
             parts.append("\n")
@@ -216,16 +216,16 @@ class PTER:
             images = await self.pterimg_upload(meta)
             if len(images) > 0:
                 parts.append("[center]")
-                for each in range(len(images[:int(meta['screens'])])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
                 parts.append("[/center]")
         else:
-            images = cast(list[dict[str, Any]], meta.get('image_list', []))
+            images = meta.image_list
             if len(images) > 0:
                 parts.append("[center]")
-                for each in range(len(images[:int(meta['screens'])])):
+                for each in range(len(images[: meta.screens])):
                     web_url = images[each]['web_url']
                     img_url = images[each]['img_url']
                     parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
@@ -235,13 +235,13 @@ class PTER:
             parts.append("\n\n")
             parts.append(self.signature)
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as descfile:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as descfile:
             await descfile.write("".join(parts))
 
     async def get_auth_token(self, meta: Meta) -> str:
-        if not os.path.exists(f"{meta['base_dir']}/data/cookies"):
-            Path(f"{meta['base_dir']}/data/cookies").mkdir(parents=True, exist_ok=True)
-        cookiefile = f"{meta['base_dir']}/data/cookies/Pterimg.json"
+        if not os.path.exists(f"{meta.base_dir}/data/cookies"):
+            Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
+        cookiefile = f"{meta.base_dir}/data/cookies/Pterimg.json"
         logged_in = False
         response: Optional[httpx.Response] = None
         cookies: dict[str, str] = {}
@@ -278,7 +278,7 @@ class PTER:
         return loggedIn
 
     async def pterimg_upload(self, meta: Meta) -> list[dict[str, str]]:
-        images = glob.glob(f"{meta['base_dir']}/tmp/{meta['uuid']}/{meta['filename']}-*.png")
+        images = glob.glob(f"{meta.base_dir}/tmp/{meta.uuid}/{meta.filename}-*.png")
         url = 'https://s3.pterclub.com'
         image_list: list[dict[str, str]] = []
         data: dict[str, Any] = {
@@ -287,7 +287,7 @@ class PTER:
             'nsfw': 0,
             'auth_token': await self.get_auth_token(meta)
         }
-        cookiefile = f"{meta['base_dir']}/data/cookies/Pterimg.json"
+        cookiefile = f"{meta.base_dir}/data/cookies/Pterimg.json"
         if os.path.exists(cookiefile):
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
             cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
@@ -338,23 +338,23 @@ class PTER:
         return image_list
 
     async def edit_name(self, meta: Meta) -> str:
-        pter_name = str(meta.get('name', ''))
+        pter_name = meta.name
 
         remove_list = ['Dubbed', 'Dual-Audio']
         for each in remove_list:
             pter_name = pter_name.replace(each, '')
 
-        pter_name = pter_name.replace(str(meta.get("aka", '')), '')
+        pter_name = pter_name.replace(meta.aka, "")
         pter_name = pter_name.replace('PQ10', 'HDR')
 
-        if meta.get('type') == 'WEBDL' and meta.get('has_encode_settings', False) is True:
+        if meta.type == "WEBDL" and meta.has_encode_settings is True:
             pter_name = pter_name.replace('H.264', 'x264')
 
         return pter_name
 
     async def is_zhongzi(self, meta: Meta) -> Optional[str]:
-        if meta.get('is_disc', '') != 'BDMV':
-            mi = cast(dict[str, Any], meta.get('mediainfo', {}))
+        if meta.is_disc != "BDMV":
+            mi = meta.mediainfo
             media = cast(dict[str, Any], mi.get('media', {}))
             tracks = cast(list[dict[str, Any]], media.get('track', []))
             for track in tracks:
@@ -363,7 +363,7 @@ class PTER:
                     if language == "zh":
                         return 'yes'
         else:
-            bdinfo = cast(dict[str, Any], meta.get('bdinfo', {}))
+            bdinfo = meta.bdinfo
             subtitles = cast(list[str], bdinfo.get('subtitles', []))
             for language in subtitles:
                 if language == "Chinese":
@@ -375,38 +375,34 @@ class PTER:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
-        desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        desc_file = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         if not os.path.exists(desc_file):
             await self.edit_desc(meta)
 
-        anon = 'no' if meta.get('anon') == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False) else 'yes'
+        anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
 
         pter_name = await self.edit_name(meta)
 
-        mi_path = (
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if meta['bdinfo'] is not None
-            else f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-        )
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_dump:
             _ = await mi_dump.read()
         async with aiofiles.open(desc_file, encoding='utf-8') as desc_handle:
             pter_desc = await desc_handle.read()
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
         async with aiofiles.open(torrent_path, 'rb') as torrentFile:
             torrent_bytes = await torrentFile.read()
-        filelist = cast(list[Any], meta.get('filelist', []))
+        filelist = meta.filelist
         if len(filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(str(meta.get('video', ''))).replace(' ', '.'))
+            torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
         else:
-            torrentFileName = unidecode(os.path.basename(str(meta.get('path', ''))).replace(' ', '.'))
+            torrentFileName = unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"),
         }
 
         # use chinese small_descr
-        ptgen = cast(dict[str, Any], meta.get('ptgen', {}))
+        ptgen = meta.ptgen
         trans_title = cast(list[str], ptgen.get("trans_title", []))
         genres = cast(list[str], ptgen.get("genre", []))
         if trans_title != ['']:
@@ -417,7 +413,7 @@ class PTER:
             small_descr += "| 类别:" + genre_value
             small_descr = small_descr.replace('/ |', '|')
         else:
-            small_descr = str(meta.get('title', ''))
+            small_descr = meta.title
         data: dict[str, Any] = {
             "name": pter_name,
             "small_descr": small_descr,
@@ -428,20 +424,20 @@ class PTER:
             "uplver": anon,
             "zhongzi": await self.is_zhongzi(meta)
         }
-        if meta.get('personalrelease', False) is True:
+        if meta.personalrelease is True:
             data["pr"] = "yes"
 
         url = "https://pterclub.com/takeupload.php"
 
         # Submit
-        if meta.get('debug'):
+        if meta.debug:
             console.print(url)
             console.print(data)
-            meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         else:
-            cookiefile = f"{meta['base_dir']}/data/cookies/PTER.txt"
+            cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
             if os.path.exists(cookiefile):
                 cookies = await common.parseCookieFile(cookiefile)
                 async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
@@ -454,8 +450,8 @@ class PTER:
                             raise UploadException("Upload succeeded but torrent id was not present in the redirect URL.", 'red')  # noqa: F405
                         torrent_id = id_match.group(2)
                         await self.download_new_torrent(torrent_id, torrent_path)
-                        meta['tracker_status'][self.tracker]['status_message'] = str(up.url).replace('&uploaded=1', '')
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                        meta.tracker_status[self.tracker]["status_message"] = str(up.url).replace("&uploaded=1", "")
+                        meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                         return True
                     else:
                         console.print(data)

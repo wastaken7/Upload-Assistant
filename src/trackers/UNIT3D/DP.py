@@ -1,16 +1,18 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, cast
+from typing import Any
 
 import cli_ui
 
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
 
 
 class DP(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://darkpeers.org']
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='DP')
@@ -32,12 +34,11 @@ class DP(UNIT3D):
             'TAoE', 'TGALAXY', 'TGx', 'TORRENTGALAXY', 'ToVaR', 'Trix', 'TSP', 'TSPxL', 'ViSION', 'VXT',
             'WAF', 'WKS', 'X0r', 'YIFY', 'YTS',
         ]
-        pass
 
-    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
-        if meta.get('keep_folder'):
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+        if meta.keep_folder:
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print(f'[bold red]{self.tracker} does not allow single files in a folder.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -52,33 +53,33 @@ class DP(UNIT3D):
         ):
             return False
 
-        if meta['type'] not in ['WEBDL'] and meta.get('tag', "") in ['EVO']:
-            if not meta['unattended']:
+        if meta.type not in ["WEBDL"] and meta.tag in ["EVO"]:
+            if not meta.unattended:
                 console.print(f"[bold red]{self.tracker} does not allow EVO for non-WEBDL types, skipping upload.")
             return False
 
-        if meta.get('hardcoded_subs', False) and not meta['unattended']:
+        if meta.hardcoded_subs and not meta.unattended:
             console.print(f"[bold red]{self.tracker} does not allow hardcoded subtitles.")
             return False
 
         return should_continue
 
-    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
             'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
         }
 
         return data
 
-    async def get_audio(self, meta: dict[str, Any]) -> str:
+    async def get_audio(self, meta: Meta) -> str:
         languages_result = "SKIPPED"
 
-        if not meta.get('language_checked', False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        audio_languages = meta.get('audio_languages')
+        audio_languages = meta.audio_languages
         if isinstance(audio_languages, list):
-            audio_languages_list = cast(list[Any], audio_languages)
+            audio_languages_list = audio_languages
             normalized_languages = {str(lang).strip() for lang in audio_languages_list if str(lang).strip()}
 
             if len(normalized_languages) > 2:
@@ -86,12 +87,12 @@ class DP(UNIT3D):
             elif len(normalized_languages) > 1:
                 languages_result = "Dual-Audio"
             else:
-                languages_result = str(next(iter(normalized_languages), "SKIPPED"))
+                languages_result = next(iter(normalized_languages), "SKIPPED")
 
         return f'{languages_result}'
 
-    async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
-        dp_name = str(meta.get('name', ''))
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        dp_name = meta.name
 
         audio = await self.get_audio(meta)
         if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
@@ -99,7 +100,7 @@ class DP(UNIT3D):
 
         return {'name': dp_name}
 
-    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
             "TV": "2",
@@ -113,11 +114,11 @@ class DP(UNIT3D):
         elif category:
             return {"category_id": category_id.get(category, "0")}
         else:
-            meta_category = meta.get("category", "")
+            meta_category = meta.category
             resolved_id = category_id.get(meta_category, "0")
             return {"category_id": resolved_id}
 
-    async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -139,10 +140,10 @@ class DP(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        meta_type = meta.get("type", "").upper()
+        meta_type = meta.type.upper()
 
         # Book
-        if meta["category"] == "BOOK":
+        if meta.category == "BOOK":
             if type:
                 t_upper = type.upper()
                 if t_upper in ("CBR", "CBZ"):
@@ -153,17 +154,16 @@ class DP(UNIT3D):
                     t_upper = "AUDIOBOOK"
                 return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
             else:
-                if meta.get("category") == "BOOK":
-                    if meta.get("audiobook", False):
+                if meta.category == "BOOK":
+                    if meta.audiobook:
                         meta_type = "AUDIOBOOK"
-                    elif meta.get("comic", False) or meta_type in ("CBR", "CBZ"):
+                    elif meta.comic or meta_type in ("CBR", "CBZ"):
                         meta_type = "COMIC"
                     else:
                         meta_type = "EBOOK"
 
-        if meta["category"] == "GAME":
-            meta_type = "CONSOLE" if meta.get("console_game", False) else str(meta.get("platform", "")).upper()
+        if meta.category == "GAME":
+            meta_type = "CONSOLE" if meta.console_game else meta.platform.upper()
 
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}
-

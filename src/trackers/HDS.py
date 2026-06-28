@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import aiofiles
 import httpx
@@ -12,13 +12,14 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class HDS:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['hd-space.pw']
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)
@@ -61,7 +62,7 @@ class HDS:
                 tv_info=True,
                 ua_signature=True,
                 user_description=True,
-                signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta['ua_signature']}[/size][/url][/center]",
+                signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta.ua_signature}[/size][/url][/center]",
             )
         except Exception as e:
             console.print(f"Error generating description: {e}")
@@ -69,12 +70,12 @@ class HDS:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
-        dupes: list[dict[str, Union[str, None]]] = []
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
+        dupes: list[dict[str, str | None]] = []
 
-        if str(meta.get("resolution", "")) not in ["2160p", "1080p", "1080i", "720p"]:
+        if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
-            meta["skipping"] = f"{self.tracker}"
+            meta.skipping = f"{self.tracker}"
             return dupes
 
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -82,7 +83,7 @@ class HDS:
         if cookies is not None:
             self.session.cookies.update(cookies)
 
-        imdb_id = str(meta.get('imdb', ''))
+        imdb_id = str(meta.imdb)
         if imdb_id == '0':
             console.print(f'IMDb ID not found, cannot search for duplicates on {self.tracker}.')
             return dupes
@@ -103,7 +104,7 @@ class HDS:
                 response = await self.session.get(search_url, params=params)
                 if "Recover password" in response.text or "page=login" in str(response.url) or "page=login" in response.text:
                     await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                    meta["skipping"] = f"{self.tracker}"
+                    meta.skipping = f"{self.tracker}"
                     return dupes
                 response.raise_for_status()
                 parts = response.text.split("Show/Hide Categories", 1)
@@ -161,13 +162,13 @@ class HDS:
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
-        resolution = str(meta.get('resolution', ''))
-        category = str(meta.get('category', ''))
-        type_ = str(meta.get('type', ''))
-        is_disc = str(meta.get('is_disc', ''))
-        genres = str(meta.get('genres', '')).lower()
-        keywords = str(meta.get('keywords', '')).lower()
-        is_anime = bool(meta.get('anime'))
+        resolution = meta.resolution
+        category = str(meta.category)
+        type_ = str(meta.type)
+        is_disc = str(meta.is_disc)
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
+        is_anime = meta.anime
 
         if is_disc == 'BDMV':
             return 15  # Blu-Ray
@@ -207,8 +208,8 @@ class HDS:
 
         return 38
 
-    async def get_requests(self, meta: Meta) -> Union[list[dict[str, Optional[str]]], bool]:
-        if not self.config['DEFAULT'].get('search_requests', False) and not meta.get('search_requests', False):
+    async def get_requests(self, meta: Meta) -> list[dict[str, Optional[str]]] | bool:
+        if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
         else:
             try:
@@ -216,7 +217,7 @@ class HDS:
                 self.session.cookies.clear()
                 if cookies is not None:
                     self.session.cookies.update(cookies)
-                query = str(meta.get('title', ''))
+                query = meta.title
                 search_url = f'{self.base_url}/index.php?'
 
                 params: dict[str, str] = {
@@ -266,22 +267,22 @@ class HDS:
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'category': await self.get_category_id(meta),
-            'filename': str(meta.get('name', '')),
-            'genre': str(meta.get('genres', '')),
-            'imdb': str(meta.get('imdb', '')),
-            'info': await self.generate_description(meta),
-            'nuk_rea': '',
-            'nuk': 'false',
-            'req': 'false',
-            'submit': 'Send',
-            't3d': 'true' if '3D' in str(meta.get('3d', '')) else 'false',
-            'user_id': '',
-            'youtube_video': str(meta.get('youtube', '')),
+            "category": await self.get_category_id(meta),
+            "filename": meta.name,
+            "genre": str(meta.genres),
+            "imdb": str(meta.imdb),
+            "info": await self.generate_description(meta),
+            "nuk_rea": "",
+            "nuk": "false",
+            "req": "false",
+            "submit": "Send",
+            "t3d": "true" if "3D" in meta.three_d else "false",
+            "user_id": "",
+            "youtube_video": str(meta.youtube),
         }
 
         # Anon
-        anon = not (int(meta.get('anon', 0) or 0) == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
+        anon = not (int(meta.anon or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data.update({
                 'anonymous': 'true'
@@ -294,7 +295,7 @@ class HDS:
         return data
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.get('base_dir', '')), "tmp", str(meta.get('uuid', '')))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:

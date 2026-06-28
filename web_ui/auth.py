@@ -26,7 +26,6 @@ log = logging.getLogger(__name__)
 
 class EncryptionError(Exception):
     """Raised when encryption or key derivation fails."""
-    pass
 
 # Defaults and env var names
 # These are environment variable *names* and not actual secrets — suppress
@@ -243,7 +242,7 @@ def derive_aes_key(session_secret: bytes) -> bytes:
     if not session_secret:
         raise ValueError("missing session secret")
     # Ensure length >=32
-    b = bytes(session_secret)
+    b = session_secret
     if len(b) < 32:
         b = b.ljust(32, b"0")
     return b[:32]

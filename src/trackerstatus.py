@@ -3,25 +3,23 @@ import asyncio
 import copy
 import os
 import sys
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from typing import Any, Optional, cast
 
 import cli_ui
 from torf import Torrent
-from typing_extensions import TypeAlias
 
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import console
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
+from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
 from src.uphelper import UploadHelper
-
-Meta: TypeAlias = MutableMapping[str, Any]
 
 
 class TrackerStatusManager:
@@ -37,14 +35,13 @@ class TrackerStatusManager:
         tracker_setup.filter_unsupported_trackers(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
-        if any(tracker in meta["trackers"] for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):
-            meta["douban_id"] = await get_douban_id(meta)
+        if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RPT"]):
+            meta.douban_id = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
-        for tracker in meta['trackers']:
-            if 'tracker_status' not in meta:
-                meta['tracker_status'] = {}
-            if tracker not in meta['tracker_status']:
-                meta['tracker_status'][tracker] = {}
+        status_map = meta.tracker_status
+        for tracker in meta.trackers:
+            if tracker not in status_map:
+                status_map[tracker] = {}
 
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool]]:
             nonlocal successful_trackers
@@ -84,7 +81,7 @@ class TrackerStatusManager:
                         imdb_id = imdb_id.strip().lower()
                         if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
                             local_meta['imdb_id'] = int(imdb_id[2:])
-                            local_meta['imdb'] = str(imdb_id[2:].zfill(7))
+                            local_meta["imdb"] = imdb_id[2:].zfill(7)
                             local_meta['imdb_info'] = await imdb_manager.get_imdb_info_api(
                                 local_meta['imdb_id'],
                                 manual_language=local_meta.get('manual_language'),
@@ -147,17 +144,17 @@ class TrackerStatusManager:
                         ptp: Any = PTP(config=self.config)
                         groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
                         async with meta_lock:
-                            meta['ptp_groupID'] = groupID
+                            meta.ptp_groupID = groupID
                         dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
                     else:
                         dupes = []
 
                     async with meta_lock:
                         if 'initial_dupes' not in meta:
-                            meta['initial_dupes'] = {}
-                        meta['initial_dupes'][tracker_name] = copy.deepcopy(dupes)
+                            meta.initial_dupes = {}
+                        meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
 
-                    if tracker_name == "ASC" and meta.get('anon', 'false'):
+                    if tracker_name == "ASC" and (meta.anon if meta.anon is not None else "false"):
                         console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
                         console.print("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
 
@@ -179,7 +176,7 @@ class TrackerStatusManager:
                             if matched_episode_ids:
                                 meta[f'{tracker_name}_matched_episode_ids'] = matched_episode_ids
                             if trumpable_id:
-                                meta['trumpable_id'] = trumpable_id
+                                meta.trumpable_id = trumpable_id
                             if cross_seed_key in local_meta and cross_seed_value:
                                 meta[cross_seed_key] = cross_seed_value
 
@@ -189,9 +186,9 @@ class TrackerStatusManager:
                             trumpable_id_after_dupe_check = local_meta.get(f'{tracker_name}_trumpable_id')
                             async with meta_lock:
                                 if were_trumping:
-                                    meta['were_trumping'] = were_trumping
+                                    meta.were_trumping = were_trumping
                                 if trump_reason:
-                                    meta['trump_reason'] = trump_reason
+                                    meta.trump_reason = trump_reason
                                 if trumpable_id_after_dupe_check:
                                     meta[f'{tracker_name}_trumpable_id'] = trumpable_id_after_dupe_check
 
@@ -242,7 +239,7 @@ class TrackerStatusManager:
                                 elif isinstance(tracker_rename, str):
                                     display_name = tracker_rename
 
-                            if display_name is not None and display_name != "" and display_name != meta['name']:
+                            if display_name is not None and display_name != "" and display_name != meta.name:
                                 console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
                             try:
                                 edit_choice = cli_ui.ask_string(
@@ -267,11 +264,11 @@ class TrackerStatusManager:
 
             return tracker_name, local_tracker_status
 
-        if meta.get('unattended', False):
-            searching_trackers: list[str] = [name for name in meta['trackers'] if name in tracker_class_map]
+        if meta.unattended:
+            searching_trackers: list[str] = [name for name in meta.trackers if name in tracker_class_map]
             if searching_trackers:
                 console.print(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
-            tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta['trackers']]
+            tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta.trackers]
             results = await asyncio.gather(*tasks)
 
             # Collect passed trackers and skip reasons
@@ -296,15 +293,15 @@ class TrackerStatusManager:
                 console.print(f"[bold green]Trackers passed all checks: [bold yellow]{', '.join(passed_trackers)}")
         else:
             passed_trackers: list[str] = []
-            for tracker_name in meta['trackers']:
+            for tracker_name in meta.trackers:
                 if tracker_name in tracker_class_map:
-                    console.print(f"[yellow]Searching for existing torrents on {tracker_name}...")
+                    console.print(f"\n[yellow]Searching for existing torrents on {tracker_name}...")
                 tracker_name, status = await process_single_tracker(tracker_name, meta)
                 tracker_status[tracker_name] = status
                 if not status['banned'] and not status['skipped'] and not status['dupe']:
                     passed_trackers.append(tracker_name)
 
-        if meta['debug']:
+        if meta.debug:
             console.print("\n[bold]Tracker Processing Summary:[/bold]")
             for t_name, status in tracker_status.items():
                 banned_status = 'Yes' if status['banned'] else 'No'
@@ -316,7 +313,7 @@ class TrackerStatusManager:
             console.print("", markup=False)
             console.print("[bold red]DEBUG MODE does not upload to sites")
 
-        meta['tracker_status'] = tracker_status
+        meta.tracker_status = tracker_status
         return successful_trackers
 
 

@@ -1,15 +1,16 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
+from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class RAS(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://rastastugan.org']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="RAS")
@@ -23,7 +24,6 @@ class RAS(UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = ["YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY"]
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
@@ -34,7 +34,7 @@ class RAS(UNIT3D):
 
         return should_continue
 
-    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
             "TV": "2",
@@ -49,13 +49,13 @@ class RAS(UNIT3D):
         elif category:
             return {"category_id": category_id.get(category, "0")}
         else:
-            meta_category = meta.get("category", "")
-            if meta.get("audiobook", False):
+            meta_category = meta.category
+            if meta.audiobook:
                 meta_category = "AUDIOBOOK"
             resolved_id = category_id.get(meta_category, "0")
             return {"category_id": resolved_id}
 
-    async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             # Video
             "DISC": "1",
@@ -92,22 +92,22 @@ class RAS(UNIT3D):
             resolved_type = type.upper().strip()
             return {"type_id": type_id.get(resolved_type, "0")}
         else:
-            category = meta.get("category", "")
-            meta_type = meta.get("type", "")
+            category = meta.category
+            meta_type = meta.type
             if isinstance(meta_type, str):
                 meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type, "0")
+            resolved_id = type_id.get(meta_type or "", "0")
 
             if category == "GAME":
-                platform = str(meta.get("platform", "")).lower()
+                platform = meta.platform.lower()
                 if "mac" in platform:
                     resolved_id = "9"
                 elif "linux" in platform:
                     resolved_id = "18"
                 elif any(word in platform for word in ["windows", "pc"]):
                     resolved_id = "10"
-                elif meta.get("console_game", False):
+                elif meta.console_game:
                     resolved_id = "11"
                 elif meta_type in type_id:
                     resolved_id = type_id[meta_type]

@@ -1,16 +1,17 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
+from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class PHD(AZTrackerBase):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.privatehd']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='PHD')
         self.config: Config = config
@@ -31,38 +32,38 @@ class PHD(AZTrackerBase):
         warnings: list[str] = []
 
         is_bd_disc = False
-        if meta.get('is_disc', '') == 'BDMV':
+        if meta.is_disc == "BDMV":
             is_bd_disc = True
 
-        video_codec = str(meta.get('video_codec', ''))
+        video_codec = meta.video_codec
         if video_codec:
             video_codec = video_codec.strip().lower()
 
-        video_encode = str(meta.get('video_encode', ''))
+        video_encode = meta.video_encode
         if video_encode:
             video_encode = video_encode.strip().lower()
 
-        type = str(meta.get('type', ''))
+        type = str(meta.type)
         if type:
             type = type.strip().lower()
 
-        source = str(meta.get('source', ''))
+        source = str(meta.source)
         if source:
             source = source.strip().lower()
 
         # This also checks the rule 'FANRES content is not allowed'
-        if meta['category'] not in ('MOVIE', 'TV'):
+        if meta.category not in ("MOVIE", "TV"):
             warnings.append(
                 'The only allowed content to be uploaded are Movies and TV Shows.\n'
                 'Anything else, like games, music, software and porn is not allowed!'
             )
 
-        if meta.get('anime', False):
+        if meta.anime:
             warnings.append("Upload Anime content to our sister site AnimeTorrents.me instead. If it's on AniDB, it's an anime.")
 
-        year_value = meta.get('year')
-        current_year = datetime.now(timezone.utc).year
-        year = int(year_value) if year_value and str(year_value).isdigit() else None
+        year_value = meta.year
+        current_year = datetime.now(UTC).year
+        year = int(year_value) if year_value and year_value.isdigit() else None
         if year is not None:
             is_older_than_50_years = (current_year - year) >= 50
             if is_older_than_50_years:
@@ -111,7 +112,7 @@ class PHD(AZTrackerBase):
         all_countries = africa + america + europe + oceania
         cinemaz_countries = list(set(all_countries) - set(phd_allowed_countries))
 
-        origin_countries_codes_value = meta.get('origin_country', [])
+        origin_countries_codes_value = meta.origin_country
         origin_countries_codes = cast(list[str], origin_countries_codes_value) if isinstance(origin_countries_codes_value, list) else []
 
         if any(code in phd_allowed_countries for code in origin_countries_codes):
@@ -137,7 +138,7 @@ class PHD(AZTrackerBase):
             )
 
         # Tags
-        tag = str(meta.get('tag', ''))
+        tag = meta.tag
         if tag:
             tag = tag.strip().lower()
             if tag in ('rarbg', 'fgt', 'grym', 'tbs'):
@@ -146,10 +147,10 @@ class PHD(AZTrackerBase):
             if tag == 'evo' and source != 'web':
                 warnings.append('Do not upload non-web EVO releases. Existing uploads by this group can be trumped at any time.')
 
-        if meta.get('sd', '') == 1:
+        if meta.sd == 1:
             warnings.append('SD (Standard Definition) content is forbidden.')
 
-        if not is_bd_disc and meta.get('container') not in ['mkv', 'mp4']:
+        if not is_bd_disc and meta.container not in ["mkv", "mp4"]:
             warnings.append('Allowed containers: MKV, MP4.')
 
         # Video codec
@@ -170,11 +171,11 @@ class PHD(AZTrackerBase):
             warnings.append('Allowed Video Codecs for WEB (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)')
 
         # 5
-        if type == 'encode' and video_encode == 'x265' and meta.get('bit_depth', '') != '10':
+        if type == "encode" and video_encode == "x265" and meta.bit_depth != "10":
             warnings.append('Allowed Video Codecs for x265 encodes must be 10-bit')
 
         # 6
-        resolution_text = str(meta.get('resolution', '')).lower().replace('p', '').replace('i', '')
+        resolution_text = meta.resolution.lower().replace("p", "").replace("i", "")
         resolution = int(resolution_text) if resolution_text.isdigit() else 0
         if resolution > 1080 and video_encode in ('h.264', 'x264'):
             warnings.append('H.264/x264 only allowed for 1080p and below.')
@@ -183,7 +184,7 @@ class PHD(AZTrackerBase):
         if video_codec not in ('avc', 'mpeg-2', 'vc-1', 'avc', 'h.264', 'vp9', 'h.265', 'x264', 'x265', 'hevc'):
             warnings.append(f'Video codec not allowed in your upload: {video_codec}.')
 
-        mediainfo = cast(dict[str, Any], meta.get('mediainfo', {}))
+        mediainfo = meta.mediainfo
         media = cast(dict[str, Any], mediainfo.get('media', {}))
         media_tracks = cast(list[dict[str, Any]], media.get('track', []))
 
@@ -208,7 +209,7 @@ class PHD(AZTrackerBase):
                     })
 
             # 3
-            original_language = str(meta.get('original_language', ''))
+            original_language = str(meta.original_language)
             language_track = audio_tracks[0].get('language', '') if audio_tracks else ''
             if original_language and language_track:
                 # Filter to only have audio tracks that are in the original language
@@ -312,7 +313,7 @@ class PHD(AZTrackerBase):
             warnings.append(rule)
 
         # Hybrid
-        if type in ('remux', 'encode') and 'hybrid' in str(meta.get('name', '')).lower():
+        if type in ("remux", "encode") and "hybrid" in meta.name.lower():
             warnings.append(
                 'Hybrid Remuxes and Encodes are subject to the following condition:\n\n'
                 'Hybrid user releases are permitted, but are treated similarly to regular '
@@ -328,7 +329,7 @@ class PHD(AZTrackerBase):
             )
 
         # Bloated
-        if meta.get('bloated', False):
+        if meta.bloated:
             warnings.append(
                 'Audio dubs are never preferred and can always be trumped by original audio only rip (Exception for BD50/BD25).\n'
                 'Do NOT upload a multi audio release when there is already a original audio only release on site.\n'
@@ -365,7 +366,7 @@ class PHD(AZTrackerBase):
             "WEBRip": "13",
         }
 
-        source_type = str(meta.get("type", "") or "").strip().lower()
+        source_type = str(meta.type or "").strip().lower()
         html_label = translation.get(source_type)
 
         if display_name:

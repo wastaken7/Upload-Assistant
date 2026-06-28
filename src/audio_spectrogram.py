@@ -13,6 +13,7 @@ import numpy as np
 from rich.prompt import Prompt
 
 from src.console import console
+from src.meta import Meta
 
 DURATION_LIMIT = 600
 WIDTH_INCH = 16
@@ -70,42 +71,42 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
     return output_name
 
 
-async def process_audio_spectrograms(meta: dict[str, Any], config: dict[str, Any], uploadscreens_manager: Any = None) -> list[str]:
-    audio_spectrograms_images = f"{meta['base_dir']}/tmp/{meta['uuid']}/audio_spectrograms_images.json"
+async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploadscreens_manager: Any = None) -> list[str]:
+    audio_spectrograms_images = f"{meta.base_dir}/tmp/{meta.uuid}/audio_spectrograms_images.json"
     if os.path.exists(audio_spectrograms_images):
         try:
             async with aiofiles.open(audio_spectrograms_images, encoding="utf-8") as spec_file:
                 content = await spec_file.read()
                 spectrograms_image_file = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
 
-                if "spectrograms_images" in spectrograms_image_file and not meta.get("spectrograms_images"):
-                    meta["spectrograms_images"] = spectrograms_image_file["spectrograms_images"]
-                    if meta.get("debug"):
+                if "spectrograms_images" in spectrograms_image_file and not meta.spectrograms_images:
+                    meta.spectrograms_images = spectrograms_image_file["spectrograms_images"]
+                    if meta.debug:
                         console.print(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
 
         except Exception as e:
             console.print(f"[yellow]Could not load spectrograms image data: {str(e)}")
 
-    if meta.get("spectrograms_images"):
+    if meta.spectrograms_images:
         return []
 
     console.print("[yellow]Generating Audio Spectrograms...[/yellow]")
 
-    output_dir = os.path.join(meta.get("base_dir", ""), "tmp", str(meta.get("uuid", "")), "spectrograms")
+    output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid, "spectrograms")
     os.makedirs(output_dir, exist_ok=True)
 
     disc_final_path = ""
-    bdinfo = meta.get("bdinfo", {})
+    bdinfo = meta.bdinfo
     if bdinfo:
         disc_path = bdinfo.get("path", "")
         files_list = bdinfo.get("files", [])
         disc_file = files_list[0].get("file", "") if files_list else ""
         disc_final_path = os.path.join(disc_path, "STREAM", disc_file) if disc_path and disc_file else ""
-        if meta.get("debug"):
+        if meta.debug:
             console.print(f"disc_final_path: {disc_final_path}")
 
     mkv_path = ""
-    filelist = meta.get("filelist", [])
+    filelist = meta.filelist
     if filelist:
         mkv_path = filelist[0]
 
@@ -141,8 +142,8 @@ async def process_audio_spectrograms(meta: dict[str, Any], config: dict[str, Any
             title = s.get('tags', {}).get('title', 'No Title')
             console.print(f"[{i}] Lang: {lang} | Title: {title}")
 
-        unattended = meta.get("unattended", False)
-        audio_spectrogram_tracks = meta.get("audio_spectrogram_tracks")
+        unattended = meta.unattended
+        audio_spectrogram_tracks = meta.audio_spectrogram_tracks
 
         if audio_spectrogram_tracks is not None:
             choice = str(audio_spectrogram_tracks)
@@ -185,12 +186,12 @@ async def process_audio_spectrograms(meta: dict[str, Any], config: dict[str, Any
             try:
                 spec_images, _ = await uploadscreens_manager.upload_screens(meta, len(generated_files), 1, 0, len(generated_files), generated_files, {})
                 if spec_images:
-                    meta["spectrograms_images"] = spec_images
+                    meta.spectrograms_images = spec_images
                     try:
                         spectrograms_image_file_dict = {"spectrograms_images": spec_images}
                         async with aiofiles.open(audio_spectrograms_images, "w", encoding="utf-8") as spec_file:
                             await spec_file.write(json.dumps(spectrograms_image_file_dict, indent=4))
-                        if meta.get("debug"):
+                        if meta.debug:
                             console.print(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
                     except Exception as e:
                         console.print(f"[yellow]Failed to save spectrograms image data: {str(e)}")

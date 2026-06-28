@@ -3,7 +3,7 @@ import asyncio
 import os
 import random
 import re
-from typing import Any, Literal, Optional, Union, cast
+from typing import Any, Literal, Optional, cast
 
 import aiofiles
 import certifi
@@ -16,10 +16,11 @@ from babel.core import UnknownLocaleError
 from src.audio import AudioManager
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-_shri_session_data: dict[str, dict[str, Union[str, None]]] = {}
+_shri_session_data: dict[str, dict[str, str | None]] = {}
 
 
 class SHRI(UNIT3D):
@@ -75,11 +76,11 @@ class SHRI(UNIT3D):
         except (AttributeError, KeyError, LookupError):
             return lang_str
 
-    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         """Get additional tracker-specific upload data"""
         return {"mod_queue_opt_in": await self.get_flag(meta, "modq")}
 
-    async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
+    async def get_name(self, meta: Meta) -> dict[str, str]:
         """
         Rebuild release name from meta components following ShareIsland naming rules.
 
@@ -90,50 +91,50 @@ class SHRI(UNIT3D):
         - Release group tag cleaning and validation
         - DISC region injection
         """
-        if not meta.get("language_checked", False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
         # Title and basic info
-        title = meta.get("title", "")
-        italian_title = self._get_italian_title(meta.get("imdb_info", {}))
+        title = meta.title
+        italian_title = self._get_italian_title(meta.imdb_info)
         use_italian_title = self.config["TRACKERS"][self.tracker].get(
             "use_italian_title", False
         )
         if italian_title and use_italian_title:
             title = italian_title
 
-        year_value: Any = meta.get("year", "")
-        resolution_value: Any = meta.get("resolution", "")
-        source_value: Any = meta.get("source", "")
+        year_value: Any = meta.year
+        resolution_value: Any = meta.resolution
+        source_value: Any = meta.source
         year = str(year_value)
         resolution = str(resolution_value)
         source = (
             str(cast(Any, source_value[0])) if source_value else ""
         ) if isinstance(source_value, list) else str(source_value)
-        video_codec = str(meta.get("video_codec", ""))
-        video_encode = str(meta.get("video_encode", ""))
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode
 
         # TV specific
-        season = str(meta.get("season") or "")
-        episode = str(meta.get("episode") or "")
-        episode_title = str(meta.get("episode_title") or "")
-        part = str(meta.get("part") or "")
+        season = str(meta.season or "")
+        episode = meta.episode or ""
+        episode_title = meta.episode_title or ""
+        part = meta.part or ""
 
         # Optional fields
-        edition = str(meta.get("edition") or "")
-        hdr = str(meta.get("hdr") or "")
-        uhd = str(meta.get("uhd") or "")
-        three_d = str(meta.get("3D") or "")
+        edition = meta.edition or ""
+        hdr = meta.hdr or ""
+        uhd = str(meta.uhd or "")
+        three_d = meta.three_d or ""
 
         # Clean audio: remove Dual-Audio and trailing language codes
         audio = await self._get_best_italian_audio_format(meta)
 
         # Build audio language tag
         audio_lang_str = ""
-        if meta.get("audio_languages"):
+        if meta.audio_languages:
             # Normalize all to abbreviated ISO 639-3 codes
-            audio_langs_value = meta.get("audio_languages", [])
-            audio_langs_raw = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
+            audio_langs_value = meta.audio_languages
+            audio_langs_raw = audio_langs_value if isinstance(audio_langs_value, list) else []
             audio_langs = [self._get_language_name(str(lang)) for lang in audio_langs_raw]
             audio_langs = [lang for lang in audio_langs if lang]  # Remove empty
             audio_langs = list(dict.fromkeys(audio_langs))  # Dedupe preserving order
@@ -163,30 +164,24 @@ class SHRI(UNIT3D):
 
         # Detect Hybrid from filename if not in title
         hybrid = ""
-        if (
-            not edition
-            and (meta.get("webdv", False) or isinstance(meta.get("source", ""), list))
-            and "HYBRID" not in title.upper()
-        ):
+        if not edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper():
             hybrid = "Hybrid"
 
-        repack = meta.get("repack", "").strip()
+        repack = meta.repack.strip()
 
         name = None
         # Build name per ShareIsland type-specific format
         if effective_type == "DISC":
             # Inject region from validated session data if available
-            region = _shri_session_data.get(meta["uuid"], {}).get(
-                "_shri_region_name"
-            ) or meta.get("region", "")
-            if meta["is_disc"] == "BDMV":
+            region = _shri_session_data.get(meta.uuid, {}).get("_shri_region_name") or meta.region
+            if meta.is_disc == "BDMV":
                 # BDMV: Title Year 3D Edition Hybrid REPACK Resolution Region UHD Source HDR VideoCodec Audio
                 name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-            elif meta["is_disc"] == "DVD":
-                dvd_size = meta.get("dvd_size", "")
+            elif meta.is_disc == "DVD":
+                dvd_size = meta.dvd_size
                 # DVD: Title Year 3D Edition REPACK Resolution Region Source DVDSize Audio
                 name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} {region} {source} {dvd_size} {audio}"
-            elif meta["is_disc"] == "HDDVD":
+            elif meta.is_disc == "HDDVD":
                 # HDDVD: Title Year Edition REPACK Resolution Region Source VideoCodec Audio
                 name = f"{title} {year} {edition} {repack} {resolution} {region} {source} {video_codec} {audio}"
 
@@ -204,18 +199,18 @@ class SHRI(UNIT3D):
             name = f"{title} {year} {season}{episode} {episode_title} {part} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
 
         elif effective_type in ("WEBDL", "WEBRIP"):
-            service = meta.get("service", "")
+            service = meta.service
             type_str = "WEB-DL" if effective_type == "WEBDL" else "WEBRip"
             # WEB: Title Year LANG Edition Hybrid REPACK Resolution UHD Service Type Audio HDR VideoCodec
             name = f"{title} {year} {season}{episode} {episode_title} {part} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {uhd} {service} {type_str} {audio} {hdr} {video_encode}"
 
         else:
             # Fallback: use original name with cleaned audio
-            name = str(meta["name"]).replace("Dual-Audio", "").strip()
+            name = meta.name.replace("Dual-Audio", "").strip()
 
         # Ensure name is always a string
         if not name:
-            name = str(meta.get("name", "UNKNOWN"))
+            name = meta.name if meta.name is not None else "UNKNOWN"
 
         # Cleanup whitespace
         name = self.WHITESPACE_PATTERN.sub(" ", name).strip()
@@ -227,21 +222,16 @@ class SHRI(UNIT3D):
 
         return {"name": name}
 
-    def _extract_clean_release_group(self, meta: dict[str, Any]) -> str:
+    def _extract_clean_release_group(self, meta: Meta) -> str:
         """Extract release group - only accepts VU/UNTOUCHED markers from filename"""
-        raw_tag = meta.get("tag", "")
+        raw_tag = meta.tag
         tag = raw_tag.strip().lstrip("-") if isinstance(raw_tag, str) else ""
         if tag and " " not in tag and not self.INVALID_TAG_PATTERN.search(tag):
             return tag
 
         basename = self.get_basename(meta)
         # Get extension from mediainfo and remove it
-        ext = (
-            meta.get("mediainfo", {})
-            .get("media", {})
-            .get("track", [{}])[0]
-            .get("FileExtension", "")
-        )
+        ext = meta.mediainfo.get("media", {}).get("track", [{}])[0].get("FileExtension", "")
         name_no_ext = (
             basename[: -len(ext) - 1]
             if ext and basename.endswith(f".{ext}")
@@ -271,7 +261,7 @@ class SHRI(UNIT3D):
 
     async def get_type_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         type: Optional[str] = None,
         reverse: bool = False,
         mapping_only: bool = False,
@@ -300,16 +290,16 @@ class SHRI(UNIT3D):
             type_id = type_mapping.get(effective_type, "0")
             return {"type_id": type_id}
 
-    async def get_additional_checks(self, meta: dict[str, Any]) -> Literal[True]:
+    async def get_additional_checks(self, meta: Meta) -> Literal[True]:
         """
         Validate and prompt for DVD/HDDVD region/distributor before upload.
         Stores validated IDs in module-level dict keyed by UUID for use during upload.
         """
-        if meta.get("is_disc") in ["DVD", "HDDVD"]:
-            region_name = meta.get("region")
+        if meta.is_disc in ["DVD", "HDDVD"]:
+            region_name = meta.region
 
             # Prompt for region if not in meta
-            if not region_name and (not meta.get("unattended") or meta.get("unattended_confirm")):
+            if not region_name and (not meta.unattended or meta.unattended_confirm):
                 while True:
                     region_name = cli_ui.ask_string(
                         "SHRI: Region code not found for disc. Please enter it manually (mandatory): "
@@ -333,9 +323,9 @@ class SHRI(UNIT3D):
                 raise ValueError(f"Invalid region code: {region_name}")
 
             # Handle optional distributor
-            distributor_name = meta.get("distributor")
+            distributor_name = meta.distributor
             distributor_id = None
-            if not distributor_name and not meta.get("unattended"):
+            if not distributor_name and not meta.unattended:
                 distributor_name = cli_ui.ask_string(
                     "SHRI: Distributor (optional, Enter to skip): "
                 )
@@ -349,7 +339,7 @@ class SHRI(UNIT3D):
                 )
 
             # Store in module-level dict keyed by UUID (survives instance recreation)
-            _shri_session_data[meta["uuid"]] = {
+            _shri_session_data[meta.uuid] = {
                 "_shri_region_id": region_id,
                 "_shri_region_name": region_name,
                 "_shri_distributor_id": distributor_id if distributor_name else None,
@@ -357,41 +347,41 @@ class SHRI(UNIT3D):
 
         return await super().get_additional_checks(meta)  # type: ignore
 
-    async def get_region_id(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_region_id(self, meta: Meta) -> dict[str, Any]:
         """Override to use validated region ID stored in meta"""
-        data = _shri_session_data.get(meta["uuid"], {})
+        data = _shri_session_data.get(meta.uuid, {})
         region_id = data.get("_shri_region_id")
         if region_id:
             return {"region_id": region_id}
         return cast(dict[str, Any], await super().get_region_id(meta))
 
-    async def get_distributor_id(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_distributor_id(self, meta: Meta) -> dict[str, Any]:
         """Override to use validated distributor ID stored in meta"""
-        data = _shri_session_data.get(meta["uuid"], {})
+        data = _shri_session_data.get(meta.uuid, {})
         distributor_id = data.get("_shri_distributor_id")
         if distributor_id:
             return {"distributor_id": distributor_id}
         return cast(dict[str, Any], await super().get_distributor_id(meta))
 
-    def get_basename(self, meta: dict[str, Any]) -> str:
+    def get_basename(self, meta: Meta) -> str:
         """Extract basename from first file in filelist or path"""
-        path_value = next(iter(meta["filelist"]), meta["path"])
+        path_value = next(iter(meta.filelist), meta.path)
         path = path_value if isinstance(path_value, str) else ""
         return os.path.basename(path)
 
-    def _detect_type_from_technical_analysis(self, meta: dict[str, Any]) -> str:
+    def _detect_type_from_technical_analysis(self, meta: Meta) -> str:
         """Unified type detection: filename markers + MediaInfo analysis"""
         # Priority 1: Explicit REMUX markers (filename check FIRST)
         if self._has_remux_marker(meta):
             return "REMUX"
         # Priority 2: Base type from upstream
-        base_type = meta.get("type", "ENCODE")
+        base_type = meta.type if meta.type is not None else "ENCODE"
         if isinstance(base_type, str) and base_type in ("DISC", "DVDRIP", "BRRIP"):
             return base_type
         # Priority 3: Technical mediainfo analysis
         return self._analyze_encode_type(meta)
 
-    def _has_remux_marker(self, meta: dict[str, Any]) -> bool:
+    def _has_remux_marker(self, meta: Meta) -> bool:
         name_no_ext = os.path.splitext(self.get_basename(meta))[0].lower()
         if "remux" in name_no_ext:
             return True
@@ -399,7 +389,7 @@ class SHRI(UNIT3D):
             return True
 
         # Check for MakeMKV + no encoding
-        mediainfo = cast(dict[str, Any], meta.get("mediainfo", {}))
+        mediainfo = meta.mediainfo
         media = cast(dict[str, Any], mediainfo.get("media", {}))
         mi = cast(list[dict[str, Any]], media.get("track", []))
         if mi:
@@ -415,7 +405,7 @@ class SHRI(UNIT3D):
 
         return False
 
-    def _analyze_encode_type(self, meta: dict[str, Any]) -> str:
+    def _analyze_encode_type(self, meta: Meta) -> str:
         """
         Detect release type from MediaInfo technical analysis.
 
@@ -439,21 +429,21 @@ class SHRI(UNIT3D):
             return any(tool in tool_string for tool in tools)
 
         try:
-            mi = cast(dict[str, Any], meta.get("mediainfo", {}))
+            mi = meta.mediainfo
             media = cast(dict[str, Any], mi.get("media", {}))
             tracks = cast(list[dict[str, Any]], media.get("track", []))
             general_track = tracks[0] if len(tracks) > 0 else {}
             video_track = tracks[1] if len(tracks) > 1 else {}
 
             # Normalize source list
-            source_value = meta.get("source", "")
+            source_value = meta.source
             source = (
                 [str(s).upper() for s in cast(list[Any], source_value)]
                 if isinstance(source_value, list)
-                else [str(source_value).upper()] if source_value else []
+                else [source_value.upper()] if source_value else []
             )
 
-            service = str(meta.get("service", "")).upper()
+            service = str(meta.service).upper()
 
             # Extract encoding metadata
             raw_settings = video_track.get("Encoded_Library_Settings", "")
@@ -549,10 +539,10 @@ class SHRI(UNIT3D):
             pass
 
         # Final fallback: use meta type or default to ENCODE
-        type_value = meta.get("type", "ENCODE")
+        type_value = meta.type if meta.type is not None else "ENCODE"
         return type_value if isinstance(type_value, str) else "ENCODE"
 
-    def get_effective_type(self, meta: dict[str, Any]) -> str:
+    def get_effective_type(self, meta: Meta) -> str:
         """
         Determine effective type with priority hierarchy:
         1. Technical analysis (REMUX/ENCODE/WEB-DL/WEBRip detection)
@@ -619,7 +609,7 @@ class SHRI(UNIT3D):
         except (ValueError, AttributeError, KeyError, UnknownLocaleError):
             return self._get_language_name(iso_code).title()
 
-    async def _get_best_italian_audio_format(self, meta: dict[str, Any]) -> str:
+    async def _get_best_italian_audio_format(self, meta: Meta) -> str:
         """Filter Italian tracks, select best, format via get_audio_v2"""
         # fmt: off
         ITALIAN_LANGS = {"it", "italian", "italiano"}
@@ -650,17 +640,17 @@ class SHRI(UNIT3D):
         def clean(audio_str: str) -> str:
             return re.sub(r"\s*-[A-Z]{3}(-[A-Z]{3})*$", "", audio_str.replace("Dual-Audio", "").replace("Dubbed", "")).strip()
 
-        bdinfo = cast(dict[str, Any], meta.get("bdinfo", {}))
+        bdinfo = meta.bdinfo
 
         if bdinfo and bdinfo.get("audio"):
             italian = [t for t in bdinfo["audio"] if t.get("language", "").lower() in ITALIAN_LANGS]
             if not italian:
-                audio_value = meta.get("audio", "")
+                audio_value = meta.audio
                 return clean(audio_value if isinstance(audio_value, str) else "")
             best = max(italian, key=lambda t: extract_quality(t, True))
             audio_str, _, _ = await self.audio_manager.get_audio_v2({}, meta, {"audio": [best]})
         else:
-            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            tracks = meta.mediainfo.get("media", {}).get("track", [])
             italian = [
                 t for t in tracks[1:]
                 if t.get("@type") == "Audio"
@@ -668,28 +658,28 @@ class SHRI(UNIT3D):
                 and "commentary" not in str(t.get("Title", "")).lower()
             ]
             if not italian:
-                audio_value = meta.get("audio", "")
+                audio_value = meta.audio
                 return clean(audio_value if isinstance(audio_value, str) else "")
             best = max(italian, key=lambda t: extract_quality(t, False))
             audio_str, _, _ = await self.audio_manager.get_audio_v2({"media": {"track": [tracks[0], best]}}, meta, None)
 
-        return clean(str(audio_str))
+        return clean(audio_str)
 
-    async def get_description(self, meta: dict[str, Any], is_test: bool = False) -> dict[str, str]:
+    async def get_description(self, meta: Meta, is_test: bool = False) -> dict[str, str]:
         """Generate Italian BBCode description for ShareIsland"""
-        title = meta.get("title", "Unknown")
-        italian_title = self._get_italian_title(meta.get("imdb_info", {}))
+        title = meta.title if meta.title is not None else "Unknown"
+        italian_title = self._get_italian_title(meta.imdb_info)
         if italian_title:
             title = italian_title
 
-        category = meta.get("category", "MOVIE")
+        category = meta.category if meta.category is not None else "MOVIE"
 
         # Build info line: resolution, source, codec, audio, language
         info_parts: list[str] = []
-        if meta.get("resolution"):
-            info_parts.append(str(meta["resolution"]))
+        if meta.resolution:
+            info_parts.append(meta.resolution)
 
-        source_value: Any = meta.get("source", "")
+        source_value: Any = meta.source
         source = (
             str(cast(Any, source_value[0])) if source_value else ""
         ) if isinstance(source_value, list) else str(source_value)
@@ -698,7 +688,7 @@ class SHRI(UNIT3D):
                 source.replace("Blu-ray", "BluRay").replace("Web", "WEB-DL")
             )
 
-        video_codec = str(meta.get("video_codec", ""))
+        video_codec = meta.video_codec
         if "HEVC" in video_codec or "H.265" in video_codec:
             info_parts.append("x265")
         elif "AVC" in video_codec or "H.264" in video_codec:
@@ -706,16 +696,16 @@ class SHRI(UNIT3D):
         elif video_codec:
             info_parts.append(video_codec)
 
-        if meta.get("hdr") and meta["hdr"] != "SDR":
-            info_parts.append(meta["hdr"])
+        if meta.hdr and meta.hdr != "SDR":
+            info_parts.append(meta.hdr)
 
         audio = await self._get_best_italian_audio_format(meta)
         if audio:
             info_parts.append(audio)
 
-        if meta.get("audio_languages"):
-            audio_langs_value = meta.get("audio_languages", [])
-            audio_langs = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
+        if meta.audio_languages:
+            audio_langs_value = meta.audio_languages
+            audio_langs = audio_langs_value if isinstance(audio_langs_value, list) else []
             langs = [
                 self._get_italian_language_name(self._get_language_code(lang))
                 for lang in audio_langs
@@ -748,18 +738,16 @@ class SHRI(UNIT3D):
             )
 
         if not is_test:
-            desc_file = (
-                f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-            )
+            desc_file = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as f:
                 await f.write(bbcode)
 
         return {"description": bbcode}
 
-    async def _fetch_tmdb_italian(self, meta: dict[str, Any]) -> tuple[str, str]:
+    async def _fetch_tmdb_italian(self, meta: Meta) -> tuple[str, str]:
         """Fetch Italian overview and logo from TMDb API"""
         api_key = self.config.get("DEFAULT", {}).get("tmdb_api", "N/A")
-        tmdb_id = meta.get("tmdb", "")
+        tmdb_id = meta.tmdb
 
         summary = "Riassunto non disponibile."
         logo_url = ""
@@ -768,7 +756,7 @@ class SHRI(UNIT3D):
             return summary, logo_url
 
         # Use /tv/ endpoint for series, /movie/ for films
-        category = meta.get("category", "MOVIE")
+        category = meta.category if meta.category is not None else "MOVIE"
         media_type = "tv" if category == "TV" else "movie"
 
         try:
@@ -785,7 +773,7 @@ class SHRI(UNIT3D):
                 summary = " ".join(raw_summary.split())
 
                 # Try meta logo first, then fetch from TMDb
-                logo_path = meta.get("tmdb_logo", "")
+                logo_path = meta.tmdb_logo
                 if logo_path:
                     logo_url = f"https://image.tmdb.org/t/p/w300/{logo_path}"
                 else:
@@ -823,10 +811,10 @@ class SHRI(UNIT3D):
 
         return summary, logo_url
 
-    async def _format_screens_italian(self, meta: dict[str, Any]) -> str:
+    async def _format_screens_italian(self, meta: Meta) -> str:
         """Format up to 6 screenshots in 2-column grid with [img=350]"""
-        images_value = meta.get("image_list", [])
-        images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
+        images_value = meta.image_list
+        images = images_value if isinstance(images_value, list) else []
         if not images:
             return "[center]Nessuno screenshot disponibile[/center]"
 
@@ -850,7 +838,7 @@ class SHRI(UNIT3D):
         row3 = " ".join(screens[4:6]) + " \n" if len(screens) > 4 else ""
         return f"[center]{row1}{row2}{row3}[/center]"
 
-    async def _get_synthetic_mediainfo(self, meta: dict[str, Any]) -> Optional[dict[str, Any]]:
+    async def _get_synthetic_mediainfo(self, meta: Meta) -> Optional[dict[str, Any]]:
         """Extract formatted mediainfo from meta.json structure"""
 
         def safe_int(val: Any, default: int = 0) -> int:
@@ -885,7 +873,7 @@ class SHRI(UNIT3D):
             return fmt_map.get(fmt_raw, (fmt_raw, fmt_raw))
 
         try:
-            mediainfo = cast(dict[str, Any], meta.get("mediainfo", {}))
+            mediainfo = meta.mediainfo
             media = cast(dict[str, Any], mediainfo.get("media", {}))
             tracks = cast(list[dict[str, Any]], media.get("track", []))
 
@@ -903,7 +891,7 @@ class SHRI(UNIT3D):
                 ita_audio = audio_tracks[0]
 
             # General info
-            filelist = meta.get("filelist", [])
+            filelist = meta.filelist
             fn = (
                 os.path.basename(filelist[0])
                 if filelist
@@ -936,7 +924,7 @@ class SHRI(UNIT3D):
                 codec = vid_format  # Fallback to format name
             depth = f"{video.get('BitDepth', 10)} bits"
             vid_br = f"{safe_int(video.get('BitRate', 0)) / 1000000:.1f} Mb/s"
-            res = meta.get("resolution", "N/A")
+            res = meta.resolution if meta.resolution is not None else "N/A"
             asp_decimal = video.get("DisplayAspectRatio")
             asp_float = float(asp_decimal) if asp_decimal else 0.0
             if 1.77 <= asp_float <= 1.79:
@@ -1039,11 +1027,11 @@ class SHRI(UNIT3D):
         screens: str,
         synthetic_mi: Optional[dict[str, Any]],
         category: str,
-        meta: dict[str, Any],
+        meta: Meta,
     ) -> str:
         """Build ShareIsland BBCode template"""
         if category == "TV":
-            is_pack = meta.get("tv_pack", 0) == 1
+            is_pack = meta.tv_pack == 1
             category_header = (
                 "--- SERIE TV (STAGIONE) ---"
                 if is_pack
@@ -1051,10 +1039,10 @@ class SHRI(UNIT3D):
             )
         else:
             category_header = "--- FILM ---"
-        release_group = meta.get("tag", "").lstrip("-").strip()
+        release_group = meta.tag.lstrip("-").strip() if meta.tag else ""
 
         tonemapped_text = ""
-        if meta.get("tonemapped", False):
+        if meta.tonemapped:
             tonemapped_header = self.config.get("DEFAULT", {}).get(
                 "tonemapped_header", ""
             )
@@ -1104,8 +1092,8 @@ class SHRI(UNIT3D):
         )
 
         # Build LINKS section
-        imdb_id = meta.get("imdb", "")
-        tmdb_id = meta.get("tmdb", "")
+        imdb_id = meta.imdb
+        tmdb_id = meta.tmdb
         media_type = "tv" if category == "TV" else "movie"
 
         links_section = ""
@@ -1119,7 +1107,7 @@ class SHRI(UNIT3D):
                 links_section += f"[size=11][color=#FFFFFF]TMDb: https://www.themoviedb.org/{media_type}/{tmdb_id}[/color][/size]\n"
             links_section += "\n"
 
-        ua_sig = meta["ua_signature"]
+        ua_sig = meta.ua_signature
 
         # Mediainfo section
         mediainfo_section = ""

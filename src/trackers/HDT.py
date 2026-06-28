@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -13,13 +13,14 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class HDT:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://hdts-announce.ru']
     secret_token: str = ''
 
     def __init__(self, config: Config) -> None:
@@ -57,11 +58,11 @@ class HDT:
 
     async def get_category_id(self, meta: Meta) -> int:
         cat_id = 0
-        category = str(meta.get('category', ''))
-        resolution = str(meta.get('resolution', ''))
+        category = str(meta.category)
+        resolution = meta.resolution
         if category == 'MOVIE':
             # BDMV
-            if meta.get('is_disc', '') == "BDMV" or meta.get('type', '') == "DISC":
+            if meta.is_disc == "BDMV" or meta.type == "DISC":
                 if resolution == '2160p':
                     # 70 = Movie/UHD/Blu-Ray
                     cat_id = 70
@@ -70,11 +71,11 @@ class HDT:
                     cat_id = 1
 
             # REMUX
-            if meta.get('type', '') == 'REMUX':
-                cat_id = 71 if meta.get('uhd', '') == 'UHD' and meta['resolution'] == '2160p' else 2
+            if meta.type == "REMUX":
+                cat_id = 71 if meta.uhd == "UHD" and meta.resolution == "2160p" else 2
 
             # REST OF THE STUFF
-            if meta.get('type', '') not in ("DISC", "REMUX"):
+            if meta.type not in ("DISC", "REMUX"):
                 if resolution == '2160p':
                     # 64 = Movie/2160p
                     cat_id = 64
@@ -87,7 +88,7 @@ class HDT:
 
         if category == 'TV':
             # BDMV
-            if meta.get('is_disc', '') == "BDMV" or meta.get('type', '') == "DISC":
+            if meta.is_disc == "BDMV" or meta.type == "DISC":
                 if resolution == '2160p':
                     # 72 = TV Show/UHD/Blu-ray
                     cat_id = 72
@@ -96,11 +97,11 @@ class HDT:
                     cat_id = 59
 
             # REMUX
-            if meta.get('type', '') == 'REMUX':
-                cat_id = 73 if meta.get('uhd', '') == 'UHD' and meta['resolution'] == '2160p' else 60
+            if meta.type == "REMUX":
+                cat_id = 73 if meta.uhd == "UHD" and meta.resolution == "2160p" else 60
 
             # REST OF THE STUFF
-            if meta.get('type', '') not in ("DISC", "REMUX"):
+            if meta.type not in ("DISC", "REMUX"):
                 if resolution == '2160p':
                     # 65 = TV Show/2160p
                     cat_id = 65
@@ -114,10 +115,10 @@ class HDT:
         return cat_id
 
     async def edit_name(self, meta: Meta) -> str:
-        hdt_name = str(meta.get('name', ''))
-        audio = str(meta.get('audio', ''))
-        hdr = str(meta.get('hdr', ''))
-        if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE'):
+        hdt_name = meta.name
+        audio = meta.audio
+        hdr = meta.hdr
+        if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
             hdt_name = hdt_name.replace(audio, audio.replace(' ', '', 1))
         if 'DV' in hdr:
             hdt_name = hdt_name.replace(' DV ', ' DoVi ')
@@ -150,15 +151,15 @@ class HDT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta['ua_signature']}[/size][/url][/right]",
+            signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
 
         return description
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
-        if str(meta.get('resolution', '')) not in ['2160p', '1080p', '1080i', '720p']:
+        if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
-            meta['skipping'] = f'{self.tracker}'
+            meta.skipping = f"{self.tracker}"
             return []
 
         # Ensure we have valid credentials and auth_token before searching
@@ -169,9 +170,9 @@ class HDT:
                 return []
 
         search_url = f'{self.base_url}/torrents.php?'
-        if int(meta.get('imdb_id', 0) or 0) != 0:
-            imdbID = f"tt{meta.get('imdb', '')}"
-            params: dict[str, Union[str, int]] = {
+        if meta.imdb_id or 0 != 0:
+            imdbID = f"tt{meta.imdb}"
+            params: dict[str, str | int] = {
                 'csrfToken': self.secret_token,
                 'search': imdbID,
                 'active': '0',
@@ -179,12 +180,7 @@ class HDT:
                 'category[]': await self.get_category_id(meta)
             }
         else:
-            params = {
-                'csrfToken': self.secret_token,
-                'search': str(meta.get('title', '')),
-                'category[]': await self.get_category_id(meta),
-                'options': '3'
-            }
+            params = {"csrfToken": self.secret_token, "search": meta.title, "category[]": await self.get_category_id(meta), "options": "3"}
 
         results: list[dict[str, Optional[str]]] = []
 
@@ -241,11 +237,11 @@ class HDT:
         }
 
         # 3D
-        if "3D" in str(meta.get('3d', '')):
+        if "3D" in meta.three_d:
             data['3d'] = 'true'
 
         # HDR
-        hdr_value = str(meta.get('hdr', ''))
+        hdr_value = meta.hdr
         if "HDR" in hdr_value:
             if "HDR10+" in hdr_value:
                 data['HDR10'] = 'true'
@@ -256,17 +252,17 @@ class HDT:
             data['DolbyVision'] = 'true'
 
         # IMDB
-        if int(meta.get('imdb_id') or 0) != 0:
-            data['infosite'] = f"{meta.get('imdb_info', {}).get('imdb_url', '')}/"
+        if meta.imdb_id or 0 != 0:
+            data["infosite"] = f"{meta.imdb_info.get('imdb_url', '')}/"
 
         # Full Season Pack
-        if int(meta.get('tv_pack', '0') or 0) != 0:
+        if int((meta.tv_pack if meta.tv_pack is not None else "0") or 0) != 0:
             data['season'] = 'true'
         else:
             data['season'] = 'false'
 
         # Anonymous check
-        if int(meta.get('anon', 0) or 0) == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False):
+        if int(meta.anon or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False):
             data['anonymous'] = 'false'
         else:
             data['anonymous'] = 'true'
@@ -274,7 +270,7 @@ class HDT:
         return data
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.get('base_dir', '')), "tmp", str(meta.get('uuid', '')))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:

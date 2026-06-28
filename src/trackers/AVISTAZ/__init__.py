@@ -6,8 +6,9 @@ import os
 import platform
 import re
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -21,9 +22,9 @@ from src.console import console
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 class AZTrackerBase:
@@ -56,13 +57,13 @@ class AZTrackerBase:
         width, height = None, None
 
         try:
-            if meta.get('is_disc') == 'BDMV':
-                resolution_str = meta.get('resolution', '')
+            if meta.is_disc == "BDMV":
+                resolution_str = meta.resolution
                 height_num = int(resolution_str.lower().replace('p', '').replace('i', ''))
                 height = str(height_num)
                 width = str(round((16 / 9) * height_num))
             else:
-                tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+                tracks = meta.mediainfo.get("media", {}).get("track", [])
                 if len(tracks) > 1:
                     video_mi = tracks[1]
                     width = video_mi.get('Width')
@@ -76,11 +77,11 @@ class AZTrackerBase:
         return resolution
 
     def get_video_quality(self, meta: Meta) -> str:
-        resolution: str = meta.get('resolution', '')
+        resolution: str = meta.resolution
 
         if self.tracker != 'PHD':
             resolution_int = int(resolution.lower().replace('p', '').replace('i', ''))
-            if resolution_int < 720 or meta.get('sd', False):
+            if resolution_int < 720 or meta.sd:
                 return '1'
 
         keyword_map = {
@@ -96,22 +97,19 @@ class AZTrackerBase:
     async def get_media_code(self, meta: Meta) -> bool:
         self.media_code = ''
 
-        if meta['category'] == 'MOVIE':
+        if meta.category == "MOVIE":
             category = '1'
-        elif meta['category'] == 'TV':
+        elif meta.category == "TV":
             category = '2'
         else:
             return False
 
-        imdb_info = meta.get('imdb_info', {})
+        imdb_info = meta.imdb_info
         imdb_id: str = str(imdb_info.get('imdbID', ''))
-        tmdb_id: str = str(meta.get('tmdb', ''))
-        title = meta['title']
+        tmdb_id: str = str(meta.tmdb)
+        title = meta.title
 
-        headers = {
-            'Referer': f"{self.base_url}/upload/{meta['category'].lower()}",
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+        headers = {"Referer": f"{self.base_url}/upload/{meta.category.lower()}", "X-Requested-With": "XMLHttpRequest"}
 
         for attempt in range(2):
             try:
@@ -140,7 +138,7 @@ class AZTrackerBase:
                 if match:
                     self.media_code = str(match['id'])
                     if attempt == 1:
-                        console.print(f"{self.tracker}: [green]Found new ID at:[/green] {self.base_url}/{meta['category'].lower()}/{self.media_code}")
+                        console.print(f"{self.tracker}: [green]Found new ID at:[/green] {self.base_url}/{meta.category.lower()}/{self.media_code}")
                     return True
 
             except Exception as e:
@@ -172,12 +170,12 @@ class AZTrackerBase:
             'tmdb_id': tmdb_id if tmdb_id else '',
         }
 
-        if meta['category'] == 'TV':
-            tvdb_id = meta.get('tvdb')
+        if meta.category == "TV":
+            tvdb_id = meta.tvdb
             if tvdb_id:
                 data['tvdb_id'] = str(tvdb_id)
 
-        url = f"{self.base_url}/add/{meta['category'].lower()}"
+        url = f"{self.base_url}/add/{meta.category.lower()}"
 
         headers = {
             'Referer': f'{self.base_url}/upload',
@@ -191,7 +189,7 @@ class AZTrackerBase:
                 return True
             else:
                 console.print(f'{self.tracker}: Error adding media to the database. Status: {response.status_code}')
-                failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]Failed_DB_attempt.html"
+                failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]Failed_DB_attempt.html"
                 os.makedirs(os.path.dirname(failure_path), exist_ok=True)
                 async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
                     await f.write(response.text)
@@ -222,22 +220,22 @@ class AZTrackerBase:
             warnings = self.rules(meta)
             if warnings:
                 console.print(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if not cli_ui.ask_yes_no('Do you want to continue anyway?', default=False):
-                        meta['skipping'] = f'{self.tracker}'
+                        meta.skipping = f"{self.tracker}"
                         return duplicates
                 else:
-                    meta['skipping'] = f'{self.tracker}'
+                    meta.skipping = f"{self.tracker}"
                     return duplicates
 
-        if meta['type'] not in ['WEBDL'] and self.tracker == "PHD" and meta.get('tag', "") in ['FGT', 'EVO']:
-            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                console.print(f'[bold red]Group {meta["tag"]} is only allowed for web-dl[/bold red]')
+        if meta.type not in ["WEBDL"] and self.tracker == "PHD" and meta.tag in ["FGT", "EVO"]:
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                console.print(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
                 if not cli_ui.ask_yes_no('Do you want to upload anyway?', default=False):
-                    meta['skipping'] = f'{self.tracker}'
+                    meta.skipping = f"{self.tracker}"
                     return duplicates
             else:
-                meta['skipping'] = f'{self.tracker}'
+                meta.skipping = f"{self.tracker}"
                 return duplicates
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -245,14 +243,14 @@ class AZTrackerBase:
             self.session.cookies = cookie_jar
 
         if not await self.get_media_code(meta):
-            console.print(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta['category'].lower()}")
-            meta['skipping'] = f'{self.tracker}'
+            console.print(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
+            meta.skipping = f"{self.tracker}"
             return duplicates
 
-        if meta.get('resolution') == '2160p':
+        if meta.resolution == "2160p":
             resolution = 'UHD'
-        elif meta.get('resolution') in ('720p', '1080p'):
-            resolution = meta.get('resolution') or 'all'
+        elif meta.resolution in ("720p", "1080p"):
+            resolution = meta.resolution or "all"
         else:
             resolution = 'all'
 
@@ -311,7 +309,7 @@ class AZTrackerBase:
                         'link': torrent_link
                     }
 
-                    if meta.get('is_disc') == "BDMV":
+                    if meta.is_disc == "BDMV":
                         bd_info = await self.get_dupe_bdinfo(torrent_link)
                         if bd_info:
                             dupe_entry.update({
@@ -370,11 +368,11 @@ class AZTrackerBase:
     async def get_file_info(self, meta: Meta) -> str:
         info_file_path = ''
         file_info = ''
-        if meta.get('is_disc') == 'BDMV':
+        if meta.is_disc == "BDMV":
             summary_file = 'BD_SUMMARY_EXT_00' if self.tracker == 'CZ' else 'BD_SUMMARY_00'
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/{summary_file}.txt"
+            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/{summary_file}.txt"
         else:
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
+            info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             async with aiofiles.open(info_file_path, encoding='utf-8') as f:
@@ -387,24 +385,24 @@ class AZTrackerBase:
         audio_ids: set[str] = set()
         subtitle_ids: set[str] = set()
 
-        if meta.get('is_disc', False):
-            if not meta.get('language_checked', False):
+        if meta.is_disc:
+            if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-            found_subs_strings = meta.get('subtitle_languages', [])
+            found_subs_strings = meta.subtitle_languages
             for lang_str in found_subs_strings:
                 target_id = self.lang_map.get(lang_str.lower())
                 if target_id:
                     subtitle_ids.add(target_id)
 
-            found_audio_strings = meta.get('audio_languages', [])
+            found_audio_strings = meta.audio_languages
             for lang_str in found_audio_strings:
                 target_id = self.lang_map.get(lang_str.lower())
                 if target_id:
                     audio_ids.add(target_id)
         else:
             try:
-                media_info_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json"
+                media_info_path = f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json"
                 async with aiofiles.open(media_info_path, encoding='utf-8') as f:
                     data = json.loads(await f.read())
 
@@ -448,9 +446,9 @@ class AZTrackerBase:
                             audio_ids.add(target_id)
 
             except FileNotFoundError:
-                console.print(f'Warning: MediaInfo.json not found for uuid {meta.get("uuid")}. No languages will be processed.', markup=False)
+                console.print(f"Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", markup=False)
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                console.print(f'Error processing MediaInfo.json for uuid {meta.get("uuid")}: {e}', markup=False)
+                console.print(f"Error processing MediaInfo.json for uuid {meta.uuid}: {e}", markup=False)
 
         final_subtitle_ids = sorted(subtitle_ids)
         final_audio_ids = sorted(audio_ids)
@@ -500,19 +498,17 @@ class AZTrackerBase:
             return None
 
     async def get_screenshots(self, meta: Meta) -> Optional[list[str]]:
-        screenshot_dir = Path(meta['base_dir']) / 'tmp' / meta['uuid']
+        screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         local_files = sorted(screenshot_dir.glob('*.png'))
         results: list[str] = []
 
-        limit = 3 if meta.get('tv_pack', '') == 0 else 15
+        limit = 3 if meta.tv_pack == 0 else 15
 
-        disc_menu_links = [
-            img.get('raw_url')
-            for img in meta.get('menu_images', [])
-            if img.get('raw_url')
-        ][:12]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
+        disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][
+            :12
+        ]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
-        audio_spectrogram_links = [img.get("raw_url") for img in meta.get("spectrograms_images", []) if img.get("raw_url")]
+        audio_spectrogram_links = [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")]
 
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, 'rb') as f:
@@ -550,7 +546,7 @@ class AZTrackerBase:
                     results.append(result)
 
         else:
-            image_links = [img.get('raw_url') for img in meta.get('image_list', []) if img.get('raw_url')]
+            image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
             remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
             links = image_links[:remaining_slots]
 
@@ -574,7 +570,7 @@ class AZTrackerBase:
 
     async def get_requests(self, meta: Meta) -> Optional[list[dict[str, Any]]]:
         results: list[dict[str, Any]] = []
-        if not self.config['DEFAULT'].get('search_requests', False) and not meta.get('search_requests', False):
+        if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return results
         else:
             try:
@@ -582,8 +578,8 @@ class AZTrackerBase:
                 if not cookie_jar:
                     return results
                 self.session.cookies = cookie_jar
-                category = meta.get('category', '').lower()
-                query = meta['title'] + f" {meta.get('season', '')}{meta.get('episode', '')}" if category == 'tv' else meta['title']
+                category = meta.category.lower()
+                query = meta.title + f" {meta.season}{meta.episode}" if category == "tv" else meta.title
 
                 search_url = f'{self.requests_url}?type={category}&search={query}&condition=new'
 
@@ -658,7 +654,7 @@ class AZTrackerBase:
     async def get_tags(self, meta: Meta) -> list[str]:
         tags: list[str] = []
 
-        genres = meta.get('keywords', '')
+        genres = meta.keywords
         if not genres:
             return tags
 
@@ -673,7 +669,7 @@ class AZTrackerBase:
 
         tags = [str(tag_id) for tag_id in tag_ids_results if tag_id]
 
-        if meta.get('personalrelease', False):
+        if meta.personalrelease:
             if self.tracker == 'AZ':
                 tags.insert(0, '3773')
             elif self.tracker == 'CZ':
@@ -740,7 +736,7 @@ class AZTrackerBase:
         render_html = getattr(bbcode, 'render_html', None)
         final_html_desc = cast(Callable[[str], str], render_html)(processed_desc) if callable(render_html) else cast(Any, bbcode).Parser().format(processed_desc)
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf-8') as description_file:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
             await description_file.write(final_html_desc)
 
         return final_html_desc
@@ -749,7 +745,7 @@ class AZTrackerBase:
         await self.get_media_code(meta)
         data: dict[str, Any] = {
             "_token": self.az_class.secret_token,
-            "type_id": self.get_cat_id(meta["category"]),
+            "type_id": self.get_cat_id(meta.category),
             "movie_id": self.media_code,
             "media_info": await self.get_file_info(meta),
         }
@@ -762,11 +758,11 @@ class AZTrackerBase:
         elif self.tracker == 'PHD':
             default_announce = 'https://tracker.privatehd.to/announce'
 
-        if not meta.get('debug', False):
+        if not meta.debug:
             try:
                 await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=default_announce)
-                upload_url_step1 = f"{self.base_url}/upload/{meta['category'].lower()}"
-                torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+                upload_url_step1 = f"{self.base_url}/upload/{meta.category.lower()}"
+                torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
                 async with aiofiles.open(torrent_path, 'rb') as torrent_file:
                     torrent_bytes = await torrent_file.read()
@@ -780,7 +776,7 @@ class AZTrackerBase:
                     if not match:
                         console.print(f"{self.tracker}: Could not extract 'task_id' from redirect URL: {redirect_url}")
                         console.print(f'{self.tracker}: The cookie appears to be expired or invalid.')
-                        meta['skipping'] = f'{self.tracker}'
+                        meta.skipping = f"{self.tracker}"
                         return {}
 
                     task_id = match.group(1)
@@ -794,7 +790,7 @@ class AZTrackerBase:
                     return task
 
                 else:
-                    failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step1.html"
+                    failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]FailedUpload_Step1.html"
                     async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
                         await f.write(task_response.text)
                     status_message = f'''[red]Step 1 of upload failed to {self.tracker}. Status: {task_response.status_code}, URL: {task_response.url}[/red].
@@ -802,25 +798,25 @@ class AZTrackerBase:
 
             except Exception as e:
                 status_message = f'[red]An unexpected error occurred while uploading to {self.tracker}: {e}[/red]'
-                meta['skipping'] = f'{self.tracker}'
+                meta.skipping = f"{self.tracker}"
                 return {}
 
         else:
             console.print(data)
             status_message = 'Debug mode enabled, not uploading.'
 
-        meta['tracker_status'][self.tracker]['status_message'] = status_message
+        meta.tracker_status[self.tracker]["status_message"] = status_message
         return {}
 
     async def get_name(self, meta: Meta) -> str:
         # https://avistaz.to/guides/how-to-properly-titlename-a-torrent
         # https://cinemaz.to/guides/how-to-properly-titlename-a-torrent
         # https://privatehd.to/rules/upload-rules
-        aka_name = meta.get("aka") or ""
-        manual_episode_title = meta.get("manual_episode_title") or ""
-        daily_episode_title = meta.get("daily_episode_title") or ""
+        aka_name = meta.aka or ""
+        manual_episode_title = meta.manual_episode_title or ""
+        daily_episode_title = meta.daily_episode_title or ""
         upload_name: str = (
-            str(meta.get("name", "")).replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
+            meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
         )
 
         if self.tracker == 'PHD':
@@ -837,13 +833,13 @@ class AZTrackerBase:
             upload_name = re.sub(r'\bTheatrical\s+Cut\b', 'Theatrical', upload_name, flags=re.IGNORECASE)
             upload_name = re.sub(r'\s{2,}', ' ', upload_name).strip()
 
-        if meta.get('has_encode_settings', False):
+        if meta.has_encode_settings:
             upload_name = upload_name.replace('H.264', 'x264').replace('H.265', 'x265')
 
-        tag_lower = meta['tag'].lower()
+        tag_lower = meta.tag.lower()
         invalid_tags = ['nogrp', 'nogroup', 'unknown', '-unk-']
 
-        if meta['tag'] == '' or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+        if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
                 upload_name = re.sub(f'-{invalid_tag}', '', upload_name, flags=re.IGNORECASE)
 
@@ -852,11 +848,11 @@ class AZTrackerBase:
             if self.tracker == 'PHD':
                 upload_name = f'{upload_name}-NOGROUP'
 
-        if meta['category'] == 'TV':
-            year_to_use = meta.get('year')
-            if not meta.get('no_year', False) and not meta.get('search_year', ''):
-                season_int = meta.get('season_int', 0)
-                season_info = meta.get('imdb_info', {}).get('seasons_summary', [])
+        if meta.category == "TV":
+            year_to_use = meta.year
+            if not meta.no_year and not meta.search_year:
+                season_int = meta.season_int
+                season_info = meta.imdb_info.get("seasons_summary", [])
 
                 # Find the correct year for this specific season
                 season_year = None
@@ -869,11 +865,7 @@ class AZTrackerBase:
                 # Use the season-specific year if found, otherwise fall back to meta year
                 if season_year:
                     year_to_use = season_year
-                upload_name = upload_name.replace(
-                    meta['title'],
-                    f"{meta['title']} {year_to_use}",
-                    1
-                )
+                upload_name = upload_name.replace(meta.title, f"{meta.title} {year_to_use}", 1)
 
             if self.tracker == 'PHD':
                 upload_name = upload_name.replace(
@@ -881,21 +873,18 @@ class AZTrackerBase:
                     ''
                 )
 
-            if self.tracker == 'AZ' and meta.get('tv_pack', False):
-                upload_name = upload_name.replace(
-                    f"{meta['title']} {year_to_use} {meta.get('season')}",
-                    f"{meta['title']} {meta.get('season')} {year_to_use}"
-                )
+            if self.tracker == "AZ" and meta.tv_pack:
+                upload_name = upload_name.replace(f"{meta.title} {year_to_use} {meta.season}", f"{meta.title} {meta.season} {year_to_use}")
 
-        source = meta.get("source", "")
-        audio = meta.get("audio", "")
-        if meta.get("type", "") == "DVDRIP" and source:
+        source = meta.source
+        audio = meta.audio
+        if meta.type == "DVDRIP" and source:
             upload_name = upload_name.replace(source, "")
 
-        if meta.get("is_disc", "") == "DVD":
-            region = meta.get("region", "")
-            resolution = meta.get("resolution", "")
-            video_codec = str(meta.get("video_codec", "")).strip()
+        if meta.is_disc == "DVD":
+            region = meta.region
+            resolution = meta.resolution
+            video_codec = meta.video_codec.strip()
 
             if region:
                 upload_name = upload_name.replace(region, "")
@@ -946,9 +935,9 @@ class AZTrackerBase:
             "DVD Remux": "17",
         }
 
-        source_type = str(meta.get("type", "") or "").strip().lower()
-        source = str(meta.get("source", "") or "").strip().lower()
-        is_disc = str(meta.get("is_disc", "") or "").strip().lower()
+        source_type = str(meta.type or "").strip().lower()
+        source = meta.source or "".strip().lower()
+        is_disc = str(meta.is_disc or "").strip().lower()
 
         html_label = ""
 
@@ -983,7 +972,7 @@ class AZTrackerBase:
         data: dict[str, Any] = {
             "_token": self.az_class.secret_token,
             "torrent_id": "",
-            "type_id": self.get_cat_id(meta["category"]),
+            "type_id": self.get_cat_id(meta.category),
             "file_name": await self.get_name(meta),
             "anon_upload": "",
             "description": await self.edit_desc(meta),
@@ -1000,20 +989,20 @@ class AZTrackerBase:
         }
 
         # TV
-        if meta.get('category') == 'TV':
+        if meta.category == "TV":
             data.update({
-                'tv_collection': '1' if meta.get('tv_pack') == 0 else '2',
-                'tv_season': meta.get('season_int', ''),
-                'tv_episode': meta.get('episode_int', ''),
+                "tv_collection": "1" if meta.tv_pack == 0 else "2",
+                "tv_season": meta.season_int,
+                "tv_episode": meta.episode_int,
             })
 
-        anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
+        anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data.update({
                 'anon_upload': '1'
             })
 
-        if not meta.get('debug', False):
+        if not meta.debug:
             try:
                 self.upload_url_step2 = task_info.get('redirect_url', '')
                 screenshots = await self.get_screenshots(meta) or []
@@ -1030,7 +1019,7 @@ class AZTrackerBase:
         return data
 
     def check_data(self, meta: Meta, data: dict[str, Any]):
-        if not meta.get('debug', False):
+        if not meta.debug:
             if len(data['screenshots[]']) < 3:
                 return f'UPLOAD FAILED: The {self.tracker} image host did not return the minimum number of screenshots.'
 
@@ -1054,10 +1043,10 @@ class AZTrackerBase:
 
         issue = self.check_data(meta, data)
         if issue:
-            meta['tracker_status'][self.tracker] = f'data error - {issue}'
+            meta.tracker_status[self.tracker] = f"data error - {issue}"
             return False
         else:
-            if not meta.get('debug', False):
+            if not meta.debug:
                 response = await self.session.post(self.upload_url_step2, data=data)
                 if response.status_code == 302:
                     torrent_url = response.headers['Location']
@@ -1067,24 +1056,24 @@ class AZTrackerBase:
                     download_url = torrent_url.replace('/torrent/', '/download/torrent/')
                     register_download = await self.session.get(download_url)
                     if register_download.status_code != 200:
-                        meta['tracker_status'][self.tracker]['status_message'] = (
-                            f'data error - Unable to register your upload in your download history, please go to the URL and download the torrent file before you can start seeding: {torrent_url}\n'
-                            f'Error: {register_download.status_code}'
+                        meta.tracker_status[self.tracker]["status_message"] = (
+                            f"data error - Unable to register your upload in your download history, please go to the URL and download the torrent file before you can start seeding: {torrent_url}\n"
+                            f"Error: {register_download.status_code}"
                         )
                         return False
 
                     await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, torrent_url)
 
-                    meta['tracker_status'][self.tracker]['status_message'] = f'{self.tracker} torrent uploaded successfully.'
+                    meta.tracker_status[self.tracker]["status_message"] = f"{self.tracker} torrent uploaded successfully."
 
                     match = re.search(r'/torrent/(\d+)', torrent_url)
                     if match:
                         torrent_id = match.group(1)
-                        meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                        meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                     return True
 
                 else:
-                    failure_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]FailedUpload_Step2.html"
+                    failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]FailedUpload_Step2.html"
                     async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
                         await f.write(response.text)
 
@@ -1095,13 +1084,13 @@ class AZTrackerBase:
                         f'URL: {response.url}\n'
                         f"The HTML response has been saved to '{failure_path}' for analysis."
                     )
-                    meta['tracker_status'][self.tracker]['status_message'] = status_message
+                    meta.tracker_status[self.tracker]["status_message"] = status_message
                     return False
 
             else:
                 console.print(f"[cyan]{self.tracker} Request Data:")
                 console.print(Redaction.redact_private_info(data))
-                meta['tracker_status'][self.tracker]['status_message'] = 'Debug mode enabled, not uploading.'
+                meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True
 
@@ -1318,7 +1307,7 @@ class AZTrackerBase:
                 ('Romani', 'rom', 'rom'): '191',
             })
 
-        if meta.get('is_disc', ''):
+        if meta.is_disc:
             if self.tracker == 'CZ':
                 all_lang_map.update({
                     ('Portuguese', 'por', 'pt-br'): '187',
@@ -1332,7 +1321,7 @@ class AZTrackerBase:
                     ('Portuguese', 'por', 'pt-br'): '187',
                 })
 
-        if meta.get('is_disc', ''):
+        if meta.is_disc:
             if self.tracker == 'CZ':
                 all_lang_map.update({
                     ('Portuguese', 'por', 'pt-br'): '187',

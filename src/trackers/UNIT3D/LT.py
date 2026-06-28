@@ -2,15 +2,16 @@
 import re
 from typing import Any, Optional, cast
 
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class LT(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK")
+    tracker_urls = ['https://lat-team.com']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LT')
@@ -23,7 +24,6 @@ class LT(UNIT3D):
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = ["EVO"]
-        pass
 
     async def get_category_id(
         self,
@@ -45,29 +45,29 @@ class LT(UNIT3D):
         elif reverse:
             return {v: k for k, v in cat_map.items()}
 
-        resolved_category = category if category is not None and category != "" else meta.get("category", "")
+        resolved_category = category if category is not None and category != "" else meta.category
         if resolved_category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 resolved_category = "AUDIOBOOK"
-            elif meta.get("comic", False) or meta.get("manga", False):
+            elif meta.comic or meta.manga:
                 resolved_category = "COMIC"
-            elif meta.get("magazine", False):
+            elif meta.magazine:
                 resolved_category = "MAGAZINE"
             else:
                 resolved_category = "EBOOK"
 
         category_id = cat_map.get(resolved_category, "0")
 
-        keywords = str(meta.get('keywords', '')).lower()
-        overview = str(meta.get('overview', '')).lower()
-        genres = str(meta.get('genres', '')).lower()
+        keywords = str(meta.keywords).lower()
+        overview = meta.overview.lower()
+        genres = str(meta.genres).lower()
         soap_keywords = ['telenovela', 'novela', 'soap', 'culebrón', 'culebron']
-        origin_countries_value = meta.get('origin_country', [])
+        origin_countries_value = meta.origin_country
         origin_countries = cast(list[str], origin_countries_value) if isinstance(origin_countries_value, list) else []
 
         if resolved_category == "TV":
             # Anime
-            if meta.get('anime', False):
+            if meta.anime:
                 category_id = '5'
             # Telenovela / Soap
             elif any(kw in keywords for kw in soap_keywords) or any(kw in overview for kw in soap_keywords):
@@ -113,7 +113,7 @@ class LT(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type is not None and type != "" else meta.get("type", "")
+        resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
             if resolved_type in ("CBZ", "CBR"):
@@ -121,38 +121,38 @@ class LT(UNIT3D):
             elif resolved_type in ("AZW3", "MOBI", "KFX"):
                 resolved_type = "AZW3"
 
-        val = type_id.get(resolved_type, "0")
-        if meta.get("category") == "BOOK" and val == "0":
+        val = type_id.get(resolved_type or "", "0")
+        if meta.category == "BOOK" and val == "0":
             val = "21"
 
         return {"type_id": val}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        if meta.get("category") == "BOOK":
-            author = str(meta.get("author", "")).strip()
-            title = str(meta.get("title", "")).strip()
-            fmt = str(meta.get("type", "")).strip().upper()
+        if meta.category == "BOOK":
+            author = meta.author.strip()
+            title = meta.title.strip()
+            fmt = str(meta.type).strip().upper()
 
             extra_info = []
 
             # If it's comic/manga/magazine/newspaper, we can add volume, issue/number info if available
-            volume = str(meta.get("manual_season") or meta.get("season") or "").strip()
-            issue = str(meta.get("manual_episode") or meta.get("episode") or "").strip()
+            volume = str(meta.manual_season or meta.season or "").strip()
+            issue = str(meta.manual_episode or meta.episode or "").strip()
 
             if volume:
                 extra_info.append(f"Vol {volume}")
             if issue:
                 extra_info.append(f"No {issue}")
 
-            edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+            edition = str(meta.manual_edition or meta.edition or "").strip()
             if edition:
                 if not any(x in edition.lower() for x in ["edición", "edicion", "edition", "ed.", "ed"]):
                     extra_info.append(f"{edition} Edition")
                 else:
                     extra_info.append(edition)
 
-            if meta.get("audiobook", False):
-                book_lang = str(meta.get("book_language", "")).lower()
+            if meta.audiobook:
+                book_lang = meta.book_language.lower()
                 if "spain" in book_lang or "castilian" in book_lang or "castellano" in book_lang:
                     extra_info.append("Narración en Castellano")
                 elif "latin" in book_lang or "latino" in book_lang:
@@ -160,7 +160,7 @@ class LT(UNIT3D):
                 elif "portuguese" in book_lang or "português" in book_lang or "portugues" in book_lang:
                     extra_info.append("Narración en Portugués")
                 elif book_lang:
-                    lang_title = str(meta.get("book_language", "")).title()
+                    lang_title = meta.book_language.title()
                     extra_info.append(f"Narración en {lang_title}")
 
             extra_str = ""
@@ -171,18 +171,13 @@ class LT(UNIT3D):
 
             return {"name": re.sub(r"\s{2,}", " ", lt_name).strip()}
 
-        aka_value = str(meta.get('aka', ''))
-        lt_name = (
-            str(meta.get('name', ''))
-            .replace('Dual-Audio', '')
-            .replace('Dubbed', '')
-            .replace(aka_value, '')
-        )
+        aka_value = meta.aka
+        lt_name = meta.name.replace("Dual-Audio", "").replace("Dubbed", "").replace(aka_value, "")
 
-        if meta['type'] != 'DISC':  # DISC don't have mediainfo
+        if meta.type != "DISC":  # DISC don't have mediainfo
             # Check if original language is "es" if true replace title for AKA if available
-            title_value = str(meta.get('title', ''))
-            if meta.get('original_language') == 'es' and aka_value:
+            title_value = meta.title
+            if meta.original_language == "es" and aka_value:
                 lt_name = lt_name.replace(title_value, aka_value.replace('AKA', '')).strip()
             # Check if audio Spanish exists
 
@@ -203,7 +198,7 @@ class LT(UNIT3D):
             has_latino = False
             has_castilian = False
 
-            tracks_value = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+            tracks_value = meta.mediainfo.get("media", {}).get("track", [])
             tracks_list = cast(list[Any], tracks_value) if isinstance(tracks_value, list) else []
             for audio in tracks_list[2:]:
                 if not isinstance(audio, dict):
@@ -233,20 +228,20 @@ class LT(UNIT3D):
 
             if len(audios) > 0:  # If there is at least 1 audio spanish
                 if not has_latino and has_castilian:
-                    tag_value = str(meta.get('tag', ''))
+                    tag_value = meta.tag
                     lt_name = lt_name.replace(tag_value, f" [CAST]{tag_value}") if tag_value else f"{lt_name} [CAST]"
                 # else: no special tag needed for Latino-only or mixed audio
             # if not audio Spanish exists, add "[SUBS]"
-            elif not meta.get('tag'):
+            elif not meta.tag:
                 lt_name = lt_name + " [SUBS]"
             else:
-                tag_value = str(meta.get('tag', ''))
+                tag_value = meta.tag
                 lt_name = lt_name.replace(tag_value, f" [SUBS]{tag_value}")
 
         return {"name": re.sub(r"\s{2,}", " ", lt_name)}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.get("category") == "BOOK":
+        if meta.category == "BOOK":
             return True
         spanish_languages = ["spanish", "spanish (latin america)"]
         return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=spanish_languages, check_audio=True, check_subtitle=True)

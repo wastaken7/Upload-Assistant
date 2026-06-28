@@ -14,6 +14,7 @@ from PIL import Image
 
 from src.console import console
 from src.igdb import IGDBAPI
+from src.meta import Meta
 
 
 def normalize_version(version_str: str) -> str:
@@ -110,7 +111,7 @@ def extract_version_from_nfo(nfo_path: str) -> Optional[str]:
 
 
 def resolve_game_filelist(
-    meta: dict[str, Any],
+    meta: Meta,
     videoloc: str,
 ) -> tuple[str, list[str], str, str]:
     """Scan *videoloc* for game files and update *meta* in-place.
@@ -144,8 +145,8 @@ def resolve_game_filelist(
         videopath = videoloc
         filelist.append(videoloc)
 
-    meta["filelist"] = filelist
-    meta["imdb_id"] = 0
+    meta.filelist = filelist
+    meta.imdb_id = 0
 
     search_term = os.path.basename(filelist[0]) if filelist else ""
     search_file_folder = "file"
@@ -158,34 +159,34 @@ def resolve_game_filelist(
 
 
 async def gather_game_prep(
-    meta: dict[str, Any],
+    meta: Meta,
     videopath: str,
     base_dir: str,
     config: Optional[dict[str, Any]] = None,
 ) -> None:
     """Query IGDB API for game metadata and populate meta in-place."""
-    meta["category"] = "GAME"
-    meta["search_year"] = ""
-    meta["resolution"] = "Other"
-    meta["hfr"] = False
-    meta["sd"] = 0
-    meta["valid_mi_settings"] = True
+    meta.category = "GAME"
+    meta.search_year = ""
+    meta.resolution = "Other"
+    meta.hfr = False
+    meta.sd = 0
+    meta.valid_mi_settings = True
 
     # Check console game status
-    platform = meta.get("platform")
+    platform = meta.platform
     if platform:
-        platform_lower = str(platform).lower()
+        platform_lower = platform.lower()
         console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
-        meta["console_game"] = any(word in platform_lower for word in console_words)
+        meta.console_game = any(word in platform_lower for word in console_words)
     else:
-        meta["console_game"] = False
+        meta.console_game = False
 
     # Version extraction/handling logic
-    path_to_check = meta.get("path") or videopath
+    path_to_check = meta.path or videopath
     version = None
 
-    if meta.get("game_version"):
-        version = normalize_version(meta["game_version"])
+    if meta.game_version:
+        version = normalize_version(meta.game_version)
         console.print(f"[green]Game version (manual override): {version}[/green]")
     else:
         # Attempt to extract from directory name first
@@ -194,13 +195,13 @@ async def gather_game_prep(
             if search_dir:
                 folder_name = os.path.basename(search_dir)
                 version = extract_version_from_text(folder_name)
-                if version and meta["debug"]:
+                if version and meta.debug:
                     console.print(f"[green]Game version extracted from directory name: {version}[/green]")
 
         # Attempt to extract from .nfo file if not found in directory name
         if not version:
             nfo_files = []
-            for f in meta.get("filelist", []):
+            for f in meta.filelist:
                 if f.lower().endswith(".nfo"):
                     nfo_files.append(f)
             if path_to_check:
@@ -222,7 +223,7 @@ async def gather_game_prep(
                     break
 
     if version:
-        meta["game_version"] = version
+        meta.game_version = version
 
     # Check for Twitch/IGDB API credentials
     client_id = ""
@@ -242,7 +243,7 @@ async def gather_game_prep(
         return
 
     # Use title in meta (cleaned folder/file name) or extract from videopath
-    title_query = meta.get("title") or meta.get("filename")
+    title_query = meta.title or meta.filename
     if not title_query and videopath:
         title_query = os.path.splitext(os.path.basename(videopath))[0]
 
@@ -269,27 +270,27 @@ async def gather_game_prep(
 
     # Keep track of manual CLI/correction overrides
     cli_overrides = {
-        "title": bool(meta.get("title")),
-        "year": "manual_year" in meta and int(meta.get("manual_year") or 0) > 0,
-        "platform": bool(meta.get("manual_platform")),
+        "title": bool(meta.title),
+        "year": "manual_year" in meta and meta.manual_year or 0 > 0,
+        "platform": bool(meta.manual_platform),
     }
 
     igdb = IGDBAPI(client_id, client_secret, base_dir)
     selected_game = None
 
-    igdb_manual = meta.get("igdb_manual")
-    steam_manual = meta.get("steam_manual")
+    igdb_manual = meta.igdb_manual
+    steam_manual = meta.steam_manual
 
     # Auto-detect Steam ID from local NFO files if not manually specified
     if not steam_manual and not igdb_manual:
         nfo_files = []
         # Check files in filelist
-        for f in meta.get("filelist", []):
+        for f in meta.filelist:
             if f.lower().endswith(".nfo"):
                 nfo_files.append(f)
 
         # Also check the input directory or directory containing the file
-        path_to_check = meta.get("path") or videopath
+        path_to_check = meta.path or videopath
         if path_to_check:
             search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
             if os.path.isdir(search_dir):
@@ -318,16 +319,16 @@ async def gather_game_prep(
                 match = re.search(r"store\.steampowered\.com/app/(\d+)", content)
                 if match:
                     detected_steam_id = match.group(1)
-                    if meta["debug"]:
+                    if meta.debug:
                         console.print(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
                     break
             except Exception as e:
-                if meta.get("debug"):
+                if meta.debug:
                     console.print(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
 
         if detected_steam_id:
             steam_manual = detected_steam_id
-            meta["steam_manual"] = detected_steam_id
+            meta.steam_manual = detected_steam_id
 
     if igdb_manual:
         console.print(f"[cyan]Fetching IGDB metadata for ID: {igdb_manual}...[/cyan]")
@@ -346,7 +347,7 @@ async def gather_game_prep(
             return
 
         # Choose the correct game
-        if len(results) == 1 or meta.get("unattended", False):
+        if len(results) == 1 or meta.unattended:
             selected_game = results[0]
         else:
             # Prompt user to select
@@ -355,7 +356,7 @@ async def gather_game_prep(
                 release_date = r.get("first_release_date")
                 year = ""
                 if release_date:
-                    year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc).year})"
+                    year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.UTC).year})"
 
                 platforms = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
                 platforms_str = f" [{', '.join(platforms)}]" if platforms else ""
@@ -383,30 +384,30 @@ async def gather_game_prep(
     # Populate metadata
     name = selected_game.get("name")
     if name and not cli_overrides["title"]:
-        meta["title"] = name
+        meta.title = name
 
     release_date = selected_game.get("first_release_date")
     if release_date and not cli_overrides["year"]:
-        dt = datetime.datetime.fromtimestamp(release_date, datetime.timezone.utc)
+        dt = datetime.datetime.fromtimestamp(release_date, datetime.UTC)
         year_val = dt.year
-        meta["year"] = str(year_val)
-        meta["search_year"] = year_val
-        meta["igdb_first_release_date"] = dt.strftime("%d/%m/%Y")
+        meta.year = str(year_val)
+        meta.search_year = year_val
+        meta.igdb_first_release_date = dt.strftime("%d/%m/%Y")
 
     # IGDB rating data (0-100 scale)
     igdb_rating = selected_game.get("rating")
     igdb_rating_count = selected_game.get("rating_count")
     if igdb_rating is not None:
-        meta["igdb_rating"] = round(float(igdb_rating), 1)
+        meta.igdb_rating = round(float(igdb_rating), 1)
     if igdb_rating_count is not None:
-        meta["igdb_rating_count"] = int(igdb_rating_count)
+        meta.igdb_rating_count = int(igdb_rating_count)
 
     # Overview / Storyline
     summary = selected_game.get("summary")
     storyline = selected_game.get("storyline")
     overview = summary or storyline or ""
     if overview:
-        meta["overview"] = overview
+        meta.overview = overview
 
     # Cover image (poster)
     cover_info = selected_game.get("cover", {})
@@ -415,11 +416,11 @@ async def gather_game_prep(
         if cover_url.startswith("//"):
             cover_url = "https:" + cover_url
         cover_url = cover_url.replace("t_thumb", "t_cover_big")
-        meta["poster"] = cover_url
-        meta["cover_path"] = cover_url
+        meta.poster = cover_url
+        meta.cover_path = cover_url
 
         # Download and save cover locally as POSTER.png
-        tmp_dir = os.path.join(base_dir, "tmp", meta["uuid"])
+        tmp_dir = os.path.join(base_dir, "tmp", meta.uuid)
         os.makedirs(tmp_dir, exist_ok=True)
         poster_png_path = os.path.join(tmp_dir, "POSTER.png")
         try:
@@ -428,7 +429,7 @@ async def gather_game_prep(
                 if response.status_code == 200:
                     img = Image.open(io.BytesIO(response.content))
                     img.save(poster_png_path, "PNG")
-                    meta["cover_path"] = poster_png_path
+                    meta.cover_path = poster_png_path
                     console.print("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
                 else:
                     console.print(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
@@ -438,8 +439,8 @@ async def gather_game_prep(
     # Genres
     genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
     if genres:
-        meta["genres"] = ", ".join(genres)
-        meta["keywords"] = ", ".join(genres)
+        meta.genres = ", ".join(genres)
+        meta.keywords = ", ".join(genres)
 
     # Platforms
     if not cli_overrides["platform"]:
@@ -507,7 +508,7 @@ async def gather_game_prep(
                 "mac": ["mac", "macos", "osx"],
                 "linux": ["linux"],
             }
-            path_to_check = meta.get("path") or videopath or ""
+            path_to_check = meta.path or videopath or ""
             basename = os.path.basename(path_to_check).lower()
             normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
             for idx, p_name in enumerate(raw_platforms):
@@ -525,11 +526,11 @@ async def gather_game_prep(
                 if detected_platform:
                     break
         if detected_platform:
-            meta["platform"] = detected_platform
+            meta.platform = detected_platform
             console.print(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
         elif len(platforms) == 1:
-            meta["platform"] = platforms[0]
-            if meta["debug"]:
+            meta.platform = platforms[0]
+            if meta.debug:
                 console.print(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
@@ -545,9 +546,9 @@ async def gather_game_prep(
                 publishers.append(comp_name)
 
     if developers:
-        meta["developer"] = ", ".join(developers)
+        meta.developer = ", ".join(developers)
     if publishers:
-        meta["publisher"] = ", ".join(publishers)
+        meta.publisher = ", ".join(publishers)
 
     # Extract Steam URL
     steam_url = None
@@ -565,7 +566,7 @@ async def gather_game_prep(
                     steam_url = f"https://store.steampowered.com/app/{ext.get('uid')}"
                 break
     if steam_url:
-        meta["steam_url"] = steam_url
+        meta.steam_url = steam_url
 
     # Extract Languages
     languages = {}
@@ -578,7 +579,7 @@ async def gather_game_prep(
             if support_type not in languages[lang_name]:
                 languages[lang_name].append(support_type)
     if languages:
-        meta["languages"] = languages
+        meta.languages = languages
 
     # Extract available platforms
     platforms = []
@@ -586,7 +587,7 @@ async def gather_game_prep(
         platform_name = platform.get("name")
         if platform_name:
             platforms.append(platform_name)
-    meta["available_platforms"] = platforms
+    meta.available_platforms = platforms
 
     # Extract Steam App ID
     steam_id = None
@@ -599,7 +600,7 @@ async def gather_game_prep(
     if steam_id:
         url = "https://store.steampowered.com/api/appdetails"
         params = {"appids": steam_id}
-        trackers = [t.upper() for t in meta.get("trackers", [])]
+        trackers = [t.upper() for t in meta.trackers]
         target_trackers = {"ASC", "BT", "BJS", "CBR", "SAM"}
         if any(t in target_trackers for t in trackers):
             params["l"] = "brazilian"
@@ -619,7 +620,7 @@ async def gather_game_prep(
                             desc_clean = re.sub(r'<[^>]+>', '', desc).strip()
                             desc_unescaped = html.unescape(desc_clean)
                             if desc_unescaped:
-                                meta["localized_overviews"] = {"brazilian": desc_unescaped}
+                                meta.localized_overviews = {"brazilian": desc_unescaped}
 
                         # Extract PC system requirements
                         pc_reqs = app_data.get("pc_requirements", {})
@@ -627,9 +628,9 @@ async def gather_game_prep(
                             minimum = pc_reqs.get("minimum", "")
                             recommended = pc_reqs.get("recommended", "")
                             if minimum:
-                                meta["requirements_minimum"] = minimum
+                                meta.requirements_minimum = minimum
                             if recommended:
-                                meta["requirements_recommended"] = recommended
+                                meta.requirements_recommended = recommended
         except Exception as e:
             console.print(f"[yellow]Steam: Error fetching app details: {e}[/yellow]")
 
@@ -649,31 +650,31 @@ async def gather_game_prep(
                 web_url = url.replace("t_thumb", "t_1080p")
                 image_list.append({"img_url": img_url, "raw_url": raw_url, "web_url": web_url})
         if image_list:
-            meta["image_list"] = image_list
+            meta.image_list = image_list
             import json
 
-            tmp_dir = os.path.join(base_dir, "tmp", meta["uuid"])
+            tmp_dir = os.path.join(base_dir, "tmp", meta.uuid)
             os.makedirs(tmp_dir, exist_ok=True)
             image_data_file = os.path.join(tmp_dir, "image_data.json")
             image_data = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
             try:
                 async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:
                     await img_file.write(json.dumps(image_data, indent=4))
-                if meta["debug"]:
+                if meta.debug:
                     console.print(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
             except Exception as e:
                 console.print(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
-    meta["igdb_id"] = selected_game.get("id", 0)
+    meta.igdb_id = selected_game.get("id", 0)
 
     # Re-evaluate console_game in case platform was updated/detected
-    platform = meta.get("platform")
+    platform = meta.platform
     if platform:
-        platform_lower = str(platform).lower()
+        platform_lower = platform.lower()
         console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
-        meta["console_game"] = any(word in platform_lower for word in console_words)
+        meta.console_game = any(word in platform_lower for word in console_words)
     else:
-        meta["console_game"] = False
+        meta.console_game = False
 
-    if meta["debug"]:
-        console.print(f"[green]IGDB metadata successfully retrieved for game: {meta['title']}[/green]")
+    if meta.debug:
+        console.print(f"[green]IGDB metadata successfully retrieved for game: {meta.title}[/green]")

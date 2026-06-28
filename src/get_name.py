@@ -2,16 +2,16 @@
 import os
 import re
 import sys
-from collections.abc import MutableMapping, Sequence
-from typing import Any, Callable, Optional, cast
+from collections.abc import Callable, Sequence
+from typing import Any, Optional, cast
 
 import anitopy
 import cli_ui
 import guessit
-from typing_extensions import TypeAlias
 
 from src.cleanup import cleanup_manager
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 guessit_module: Any = cast(Any, guessit)
@@ -27,8 +27,6 @@ TRACKER_DISC_REQUIREMENTS = {
     'OTW': {'region': 'mandatory', 'distributor': 'optional'},
 }
 
-Meta: TypeAlias = MutableMapping[str, Any]
-
 
 class NameManager:
     def __init__(self, config: dict[str, Any]) -> None:
@@ -36,98 +34,95 @@ class NameManager:
         self.common = COMMON(config=config)
 
     async def get_name(self, meta: Meta) -> tuple[str, str, str, list[str]]:
-        active_trackers: list[str] = [
-            tracker for tracker in TRACKER_DISC_REQUIREMENTS
-            if tracker in meta.get('trackers', [])
-        ]
+        active_trackers: list[str] = [tracker for tracker in TRACKER_DISC_REQUIREMENTS if tracker in meta.trackers]
         if active_trackers:
             region, distributor, trackers_to_remove = await self.missing_disc_info(meta, active_trackers)
             for tracker in trackers_to_remove:
-                if tracker in meta['trackers']:
-                    if meta.get('unattended', False):
+                if tracker in meta.trackers:
+                    if meta.unattended:
                         console.print()
                         console.print(f"[yellow]Removing tracker {tracker} due to missing distributor/region info.[/yellow]")
-                    meta['trackers'].remove(tracker)
+                    meta.trackers.remove(tracker)
             if distributor and 'SKIPPED' not in distributor:
-                meta['distributor'] = distributor
+                meta.distributor = distributor
             if region and 'SKIPPED' not in region:
-                meta['region'] = region
-        type = str(meta.get('type', "")).upper()
-        title = str(meta.get('title', ""))
-        alt_title = str(meta.get('aka', ""))
-        year = str(meta.get('year', ""))
-        manual_year_value = meta.get('manual_year')
-        if manual_year_value is not None and int(manual_year_value) > 0:
+                meta.region = region
+        type = str(meta.type).upper()
+        title = meta.title
+        alt_title = meta.aka
+        year = meta.year
+        manual_year_value = meta.manual_year
+        if manual_year_value is not None and manual_year_value > 0:
             year = str(manual_year_value)
-        resolution = str(meta.get('resolution', ""))
+        resolution = meta.resolution
         if resolution == "OTHER":
             resolution = ""
-        audio = str(meta.get('audio', ""))
-        service = str(meta.get('service', ""))
-        season = str(meta.get('season', ""))
-        episode = str(meta.get('episode', ""))
-        part = str(meta.get('part', ""))
-        repack = str(meta.get('repack', ""))
-        three_d = str(meta.get('3D', ""))
-        tag = str(meta.get('tag', ""))
-        source = str(meta.get('source', ""))
-        uhd = str(meta.get('uhd', ""))
-        hdr = str(meta.get('hdr', ""))
-        hybrid = 'Hybrid' if meta.get('webdv', "") else ""
-        if meta.get('manual_episode_title'):
-            episode_title = str(meta.get('manual_episode_title', ""))
-        elif meta.get('daily_episode_title'):
-            episode_title = str(meta.get('daily_episode_title', ""))
+        audio = meta.audio
+        service = str(meta.service)
+        season = str(meta.season)
+        episode = meta.episode
+        part = meta.part
+        repack = meta.repack
+        three_d = meta.three_d
+        tag = meta.tag or ""
+        source = str(meta.source)
+        uhd = str(meta.uhd)
+        hdr = meta.hdr
+        hybrid = "Hybrid" if meta.webdv else ""
+        if meta.manual_episode_title:
+            episode_title = meta.manual_episode_title
+        elif meta.daily_episode_title:
+            episode_title = meta.daily_episode_title
         else:
             episode_title = ""
         video_codec = ""
         video_encode = ""
         region = ""
         dvd_size = ""
-        if meta.get('is_disc', "") == "BDMV":  # Disk
-            video_codec = str(meta.get('video_codec', ""))
-            region = str(meta.get('region', "") or "")
-        elif meta.get('is_disc', "") == "DVD":
-            region = str(meta.get('region', "") or "")
-            dvd_size = str(meta.get('dvd_size', ""))
+        if meta.is_disc == "BDMV":  # Disk
+            video_codec = meta.video_codec
+            region = str(meta.region or "")
+        elif meta.is_disc == "DVD":
+            region = str(meta.region or "")
+            dvd_size = meta.dvd_size
         else:
-            video_codec = str(meta.get('video_codec', ""))
-            video_encode = str(meta.get('video_encode', ""))
-        edition = str(meta.get('edition', ""))
+            video_codec = meta.video_codec
+            video_encode = meta.video_encode
+        edition = meta.edition
         if 'hybrid' in edition.upper():
             edition = edition.replace('Hybrid', '').strip()
 
-        if meta['category'] == "TV":
-            year = meta['year'] if meta['search_year'] != "" else ""
-            if meta.get('manual_date'):
+        if meta.category == "TV":
+            year = meta.year if meta.search_year != "" else ""
+            if meta.manual_date:
                 # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
                 season = ''
                 episode = ''
-        if meta.get('no_season', False) is True:
+        if meta.no_season is True:
             season = ''
-        if meta.get('no_year', False) is True:
+        if meta.no_year is True:
             year = ''
-        if meta.get('no_aka', False) is True:
+        if meta.no_aka is True:
             alt_title = ''
-        if meta['debug']:
+        if meta.debug:
             console.log("[cyan]get_name cat/type")
-            console.log(f"CATEGORY: {meta['category']}")
-            console.log(f"TYPE: {meta['type']}")
+            console.log(f"CATEGORY: {meta.category}")
+            console.log(f"TYPE: {meta.type}")
             console.log("[cyan]get_name meta:")
             # console.log(meta)
 
         # YAY NAMING FUN
         name = ""
         potential_missing: list[str] = []
-        if meta['category'] == "MOVIE":  # MOVIE SPECIFIC
+        if meta.category == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk
-                if meta['is_disc'] == 'BDMV':
+                if meta.is_disc == "BDMV":
                     name = f"{title} {alt_title} {year} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
                     potential_missing = ['edition', 'region', 'distributor']
-                elif meta['is_disc'] == 'DVD':
+                elif meta.is_disc == "DVD":
                     name = f"{title} {alt_title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
                     potential_missing = ['edition', 'distributor']
-                elif meta['is_disc'] == 'HDDVD':
+                elif meta.is_disc == "HDDVD":
                     name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {video_codec} {audio}"
                     potential_missing = ['edition', 'region', 'distributor']
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay/HDDVD Remux
@@ -151,15 +146,15 @@ class NameManager:
             elif type == "DVDRIP":
                 name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
                 potential_missing = []
-        elif meta['category'] == "TV":  # TV SPECIFIC
+        elif meta.category == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
-                if meta['is_disc'] == 'BDMV':
+                if meta.is_disc == "BDMV":
                     name = f"{title} {year} {alt_title} {season}{episode} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
                     potential_missing = ['edition', 'region', 'distributor']
-                if meta['is_disc'] == 'DVD':
+                if meta.is_disc == "DVD":
                     name = f"{title} {year} {alt_title} {season}{episode}{three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
                     potential_missing = ['edition', 'distributor']
-                elif meta['is_disc'] == 'HDDVD':
+                elif meta.is_disc == "HDDVD":
                     name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {video_codec} {audio}"
                     potential_missing = ['edition', 'region', 'distributor']
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux
@@ -183,10 +178,10 @@ class NameManager:
             elif type == "DVDRIP":
                 name = f"{title} {year} {alt_title} {season} {source} DVDRip {audio} {video_encode}"
                 potential_missing = []
-        elif meta["category"] == "BOOK":
+        elif meta.category == "BOOK":
             name = self.extract_book_name(meta)
             potential_missing = []
-        elif meta["category"] == "GAME":
+        elif meta.category == "GAME":
             name = self.extract_game_name(meta)
             potential_missing = []
 
@@ -194,9 +189,9 @@ class NameManager:
             name = ' '.join(name.split())
         except Exception:
             console.print("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            console.print(f"--category [yellow]{meta['category']}")
-            console.print(f"--type [yellow]{meta['type']}")
-            console.print(f"--source [yellow]{meta['source']}")
+            console.print(f"--category [yellow]{meta.category}")
+            console.print(f"--type [yellow]{meta.type}")
+            console.print(f"--source [yellow]{meta.source}")
             console.print("[bold green]If you specified type, try also specifying source")
 
             exit()
@@ -208,39 +203,39 @@ class NameManager:
         return name_notag, name, clean_name, potential_missing
 
     def extract_book_name(self, meta: Meta) -> str:
-        comic = bool(meta.get("comic", False))
-        manga = bool(meta.get("manga", False))
-        magazine = bool(meta.get("magazine", False))
-        newspaper = bool(meta.get("newspaper", False))
-        audiobook = bool(meta.get("audiobook", False))
+        comic = meta.comic
+        manga = meta.manga
+        magazine = meta.magazine
+        newspaper = meta.newspaper
+        audiobook = meta.audiobook
 
-        author = str(meta.get("author", "")).strip()
-        publisher = str(meta.get("publisher", "")).strip()
-        title = str(meta.get("title", "")).strip()
-        year = str(meta.get("year", "")).strip()
+        author = meta.author.strip()
+        publisher = meta.publisher.strip()
+        title = meta.title.strip()
+        year = meta.year.strip()
 
         # Edition/Issue logic
-        edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
+        edition = str(meta.manual_edition or meta.edition or "").strip()
         if edition and not any(x in edition.lower() for x in ["edition", "ed.", "ed"]) and not audiobook:
             edition = f"{edition} Edition"
 
-        volume = str(meta.get("manual_season") or meta.get("season") or "").strip()
-        issue = str(meta.get("manual_episode") or meta.get("episode") or "").strip()
+        volume = str(meta.manual_season or meta.season or "").strip()
+        issue = str(meta.manual_episode or meta.episode or "").strip()
 
         # Language logic (needed for non-English only)
-        book_language = str(meta.get("book_language", "")).strip()
-        book_language_iso = str(meta.get("book_language_iso", "")).strip()
+        book_language = meta.book_language.strip()
+        book_language_iso = meta.book_language_iso.strip()
         lang_display = book_language or book_language_iso
         lang_display = "" if lang_display.lower() in ("english", "eng", "en") else lang_display.upper().replace("I", "i")
 
         # Source logic: RETAiL, SCAN, HYBRiD
-        source = str(meta.get("source") or "").strip().upper()
-        manual_source = str(meta.get("manual_source") or "").strip().upper()
+        source = meta.source or "".strip().upper()
+        manual_source = str(meta.manual_source or "").strip().upper()
         if manual_source in ("RETAIL", "SCAN", "HYBRID"):
             source = manual_source
 
         if source not in ("RETAIL", "SCAN", "HYBRID"):
-            filename_lower = (str(meta.get("uuid", "")) + " " + str(meta.get("title", ""))).lower()
+            filename_lower = (meta.uuid + " " + meta.title).lower()
             if "scan" in filename_lower:
                 source = "SCAN"
             elif "hybrid" in filename_lower:
@@ -248,7 +243,7 @@ class NameManager:
             elif "retail" in filename_lower:
                 source = "RETAiL"
             else:
-                ext = str(meta.get("type", "")).upper()
+                ext = str(meta.type).upper()
                 source = "SCAN" if ext == "PDF" else "RETAiL"
         else:
             if source == "RETAIL":
@@ -259,7 +254,7 @@ class NameManager:
                 source = "SCAN"
 
         # Format logic
-        ebook_type = str(meta.get("type", "")).strip()
+        ebook_type = str(meta.type).strip()
         if ebook_type.upper() == "EPUB":
             ebook_type = "ePUB"
         elif ebook_type.upper() == "PDF":
@@ -296,20 +291,20 @@ class NameManager:
 
     def extract_game_name(self, meta: Meta) -> str:
         """Build a game release name losely based on the SCENE 2021_GAMEiSO ruleset."""
-        title = str(meta.get("title", "")).strip()
-        edition = str(meta.get("manual_edition") or meta.get("edition") or "").strip()
-        year = str(meta.get("manual_year") or meta.get("year") or "").strip()
-        platform = str(meta.get("manual_platform") or meta.get("platform") or "").strip().upper()
-        game_version = str(meta.get("game_version") or "").strip()
-        repack = str(meta.get("repack") or "").strip().upper()
+        title = meta.title.strip()
+        edition = str(meta.manual_edition or meta.edition or "").strip()
+        year = str(meta.manual_year or meta.year or "").strip()
+        platform = str(meta.manual_platform or meta.platform or "").strip().upper()
+        game_version = meta.game_version or "".strip()
+        repack = meta.repack or "".strip().upper()
 
         #  language / MULTI tag
-        languages: dict[str, Any] = meta.get("languages") or {}
+        languages: dict[str, Any] = meta.languages or {}
         lang_names: list[str] = [k for k in languages if k]
         lang_count = len(lang_names)
 
         # Detect "multi" in the original source directory/file name
-        source_path = str(meta.get("path") or meta.get("uuid") or "")
+        source_path = str(meta.path or meta.uuid or "")
         source_basename = os.path.basename(source_path).lower()
         source_has_multi = "multi" in source_basename
 
@@ -415,8 +410,8 @@ class NameManager:
             if year:
                 return title, None, year
 
-        folder_name = os.path.basename(str(meta.get('uuid', ''))) if meta.get('uuid') else ""
-        if meta['debug']:
+        folder_name = os.path.basename(meta.uuid) if meta.uuid else ""
+        if meta.debug:
             console.print(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
         # lets do some subsplease handling
         if 'subsplease' in folder_name.lower():
@@ -445,7 +440,7 @@ class NameManager:
             first_year = years[0]
             second_year = years[1]
 
-            if meta['debug']:
+            if meta.debug:
                 console.print(f"[cyan]Found double year pattern: {full_match}, using {second_year} as year[/cyan]")
 
             modified_folder_name = folder_name.replace(full_match, first_year)
@@ -595,13 +590,13 @@ class NameManager:
         return text
 
     async def missing_disc_info(self, meta: Meta, active_trackers: Sequence[str]) -> tuple[str, str, list[str]]:
-        distributor_id = await self.common.unit3d_distributor_ids(str(meta.get('distributor', "")))
-        region_id = await self.common.unit3d_region_ids(str(meta.get('region', "")))
-        region_name = str(meta.get('region', ""))
-        distributor_name = str(meta.get('distributor', ""))
+        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
+        region_id = await self.common.unit3d_region_ids(str(meta.region))
+        region_name = str(meta.region)
+        distributor_name = meta.distributor
         trackers_to_remove: list[str] = []
 
-        if meta.get('is_disc') == "BDMV":
+        if meta.is_disc == "BDMV":
             strictest = {'region': 'optional', 'distributor': 'optional'}
             for tracker in active_trackers:
                 requirements = TRACKER_DISC_REQUIREMENTS.get(tracker, {})
@@ -630,7 +625,7 @@ class NameManager:
 
     async def _prompt_for_field(self, meta: Meta, field_name: str, is_mandatory: bool) -> str:
         """Prompt user for disc field with appropriate mandatory/optional text."""
-        if meta['unattended'] and not meta.get('unattended_confirm', False):
+        if meta.unattended and not meta.unattended_confirm:
             return "SKIPPED"
         suffix = " (MANDATORY): " if is_mandatory else " (optional, press Enter to skip): "
         prompt = f"{field_name} not found for disc. Please enter it manually{suffix}"

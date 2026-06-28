@@ -18,9 +18,10 @@ class OpenLibraryManager:
     async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: Optional[str], debug: bool = False) -> str:
         """Fetch author name from key like /authors/OL26320A."""
         author_id = author_key.split("/")[-1]
+        author_cache_file = None
         if cache_dir:
             author_cache_file = os.path.join(cache_dir, f"author_{author_id}.json")
-            if os.path.exists(author_cache_file):
+            if author_cache_file and os.path.exists(author_cache_file):
                 try:
                     cache_content = await asyncio.to_thread(Path(author_cache_file).read_text, encoding="utf-8")
                     cached_data = json.loads(cache_content)
@@ -36,7 +37,7 @@ class OpenLibraryManager:
             if resp.status_code == 200:
                 data = resp.json()
                 name = data.get("name") or data.get("personal_name") or ""
-                if name and cache_dir:
+                if name and cache_dir and author_cache_file:
                     with contextlib.suppress(Exception):
                         await asyncio.to_thread(Path(author_cache_file).write_text, json.dumps(data, indent=4), encoding="utf-8")
                 return name

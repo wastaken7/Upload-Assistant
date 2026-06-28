@@ -9,6 +9,7 @@ Config = dict[str, Any]
 
 class YOINK(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['yoinked.org']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='YOINK')
         self.config = config
@@ -21,4 +22,3 @@ class YOINK(UNIT3D):
         self.requests_url = f'{self.base_url}/api/requests/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = ['YTS', 'YiFY', 'LAMA', 'MeGUSTA', 'NAHOM', 'GalaxyRG', 'RARBG', 'INFINITY']
-        pass

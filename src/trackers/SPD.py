@@ -13,15 +13,16 @@ from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
+from src.meta import Meta
 
 from .COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class SPD:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['ramjet.speedapp.io', 'ramjet.speedapp.to', 'ramjet.speedappio.org']
 
     def __init__(self, config: Config) -> None:
         self.url = "https://speedapp.io"
@@ -43,16 +44,16 @@ class SPD:
         )
 
     async def get_cat_id(self, meta: Meta) -> Optional[str]:
-        if not meta.get('language_checked', False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        subtitle_langs = cast(list[Any], meta.get("subtitle_languages") or [])
-        audio_langs = cast(list[Any], meta.get("audio_languages") or [])
+        subtitle_langs = cast(list[Any], meta.subtitle_languages or [])
+        audio_langs = cast(list[Any], meta.audio_languages or [])
         langs = [str(lang).lower() for lang in (subtitle_langs + audio_langs)]
         romanian = 'romanian' in langs
 
-        origin_countries = cast(list[Any], meta.get('origin_country', []))
-        category = str(meta.get('category', ''))
+        origin_countries = meta.origin_country
+        category = str(meta.category)
         if 'RO' in origin_countries:
             if category == 'TV':
                 return '60'
@@ -60,27 +61,27 @@ class SPD:
                 return '59'
 
         # documentary
-        genres = str(meta.get("genres", ""))
-        keywords = str(meta.get("keywords", ""))
+        genres = str(meta.genres)
+        keywords = str(meta.keywords)
         if 'documentary' in genres.lower() or 'documentary' in keywords.lower():
             return '63' if romanian else '9'
 
         # anime
-        if meta.get('anime'):
+        if meta.anime:
             return '3'
 
         # TV
         if category == 'TV':
-            if meta.get('tv_pack'):
+            if meta.tv_pack:
                 return '66' if romanian else '41'
-            elif meta.get('sd'):
+            elif meta.sd:
                 return '46' if romanian else '45'
             return '44' if romanian else '43'
 
         # MOVIE
         if category == 'MOVIE':
-            resolution = str(meta.get('resolution', ''))
-            media_type = str(meta.get('type', ''))
+            resolution = meta.resolution
+            media_type = str(meta.type)
             if resolution == '2160p' and media_type != 'DISC':
                 return '57' if romanian else '61'
             if media_type in ('REMUX', 'WEBDL', 'WEBRIP', 'HDTV', 'ENCODE'):
@@ -96,15 +97,15 @@ class SPD:
 
         # Game
         if category == "GAME":
-            if meta.get("console_game", False):
+            if meta.console_game:
                 return "52"
             return "11"
 
         return None
 
     async def get_file_info(self, meta: Meta) -> tuple[Optional[str], Optional[str]]:
-        base_path = f"{meta['base_dir']}/tmp/{meta['uuid']}"
-        if meta.get("bdinfo"):
+        base_path = f"{meta.base_dir}/tmp/{meta.uuid}"
+        if meta.bdinfo:
             async with aiofiles.open(
                 f"{base_path}/BD_SUMMARY_00.txt",
                 encoding="utf-8",
@@ -120,9 +121,7 @@ class SPD:
             return media_info, None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
-        images = cast(list[dict[str, Any]], meta.get('menu_images', [])) + cast(
-            list[dict[str, Any]], meta.get('image_list', [])
-        )
+        images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list
         return [image['raw_url'] for image in images if image.get('raw_url')]
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
@@ -130,11 +129,11 @@ class SPD:
         search_url = 'https://speedapp.io/api/torrent'
 
         params: dict[str, str] = {}
-        if int(meta.get('imdb_id', 0) or 0) != 0:
-            imdb_info = cast(dict[str, Any], meta.get('imdb_info', {}))
+        if meta.imdb_id or 0 != 0:
+            imdb_info = cast(dict[str, Any], meta.imdb_info)
             params['imdbId'] = str(imdb_info.get('imdbID', ''))
         else:
-            search_title = str(meta.get('title', '')).replace(':', '').replace("'", '').replace(',', '')
+            search_title = meta.title.replace(":", "").replace("'", "").replace(",", "")
             params['search'] = search_title
 
         try:
@@ -164,7 +163,7 @@ class SPD:
         return results
 
     async def search_channel(self, meta: Meta) -> Optional[int]:
-        spd_channel = meta.get('spd_channel', '') or self.config['TRACKERS'][self.tracker].get('channel', '')
+        spd_channel = meta.spd_channel or self.config["TRACKERS"][self.tracker].get("channel", "")
 
         # if no channel is specified, use the default
         if not spd_channel:
@@ -233,18 +232,18 @@ class SPD:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta['ua_signature']}[/url]",
+            signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
         )
 
         return description
 
     async def edit_name(self, meta: Meta) -> str:
-        tracker_name = meta["basename_no_ext"]
-        scene_name = meta.get("scene_name") or ""
+        tracker_name = meta.basename_no_ext
+        scene_name = meta.scene_name or ""
 
         use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
         if use_metadata_name:
-            clean_name = meta.get("clean_name") or ""
+            clean_name = meta.clean_name or ""
             tracker_name = scene_name if scene_name else clean_name
             tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
             tracker_name = unicodedata.normalize("NFD", tracker_name)
@@ -252,7 +251,7 @@ class SPD:
             tracker_name = tracker_name.replace("!", "")
 
         else:
-            tracker_name = scene_name or meta["basename_no_ext"]
+            tracker_name = scene_name or meta.basename_no_ext
 
         return tracker_name
 
@@ -263,7 +262,7 @@ class SPD:
             return base64_encoded_data.decode('utf-8')
 
     async def get_nfo(self, meta: Meta) -> Optional[str]:
-        nfo_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:
@@ -273,8 +272,8 @@ class SPD:
         return None
 
     def get_requirements(self, meta: Meta) -> str:
-        requirements_minimum = html_to_bbcode(meta.get("requirements_minimum", ""))
-        requirements_recommended = html_to_bbcode(meta.get("requirements_recommended", ""))
+        requirements_minimum = html_to_bbcode(meta.requirements_minimum)
+        requirements_recommended = html_to_bbcode(meta.requirements_recommended)
         requirements = ""
 
         if requirements_minimum:
@@ -288,32 +287,32 @@ class SPD:
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            "coverPhotoUrl": str(meta.get("backdrop", "")),
-            "description": str(meta.get("genres", "")),
+            "coverPhotoUrl": meta.backdrop,
+            "description": str(meta.genres),
             "name": await self.edit_name(meta),
             "nfo": await self.get_nfo(meta),
-            "poster": str(meta.get("poster", "")),
+            "poster": meta.poster,
             "technicalDetails": await self.edit_desc(meta),
             "screenshots": await self.get_screenshots(meta),
             "type": await self.get_cat_id(meta),
         }
-        if meta["category"] in ("MOVIE", "TV"):
+        if meta.category in ("MOVIE", "TV"):
             media_info, bd_info = await self.get_file_info(meta)
-            data["plot"] = (str(meta.get("overview_meta", "") or meta.get("overview", "")),)
+            data["plot"] = (meta.overview_meta or meta.overview,)
             data["bdInfo"] = bd_info
             data["media_info"] = media_info
-            data["url"] = str(cast(dict[str, Any], meta.get("imdb_info", {})).get("imdb_url", ""))
+            data["url"] = str(cast(dict[str, Any], meta.imdb_info).get("imdb_url", ""))
 
-        elif meta["category"] == "GAME" and meta.get("console_game", False) is False:
+        elif meta.category == "GAME" and meta.console_game is False:
             requirements = self.get_requirements(meta)
             if requirements:
                 data["systemRequirements"] = requirements
 
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
         torrent_filename = await self.common.get_torrent_filename(meta, tracker_config)
-        data["file"] = await self.encode_to_base64(f"{meta['base_dir']}/tmp/{meta['uuid']}/{torrent_filename}.torrent")
-        if meta.get('debug') is True:
-            data['file'] = str(data['file'])[:50] + '...[DEBUG MODE]'
+        data["file"] = await self.encode_to_base64(f"{meta.base_dir}/tmp/{meta.uuid}/{torrent_filename}.torrent")
+        if meta.debug is True:
+            data['file'] = data['file'][:50] + '...[DEBUG MODE]'
             if data.get('nfo'):
                 data['nfo'] = str(data['nfo'])[:50] + '...[DEBUG MODE]'
 
@@ -321,19 +320,19 @@ class SPD:
 
     async def upload(self, meta: Meta) -> Optional[bool]:
         data = await self.fetch_data(meta)
-        tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+        tracker_status = meta.tracker_status
         tracker_status.setdefault(self.tracker, {})
 
         channel = await self.search_channel(meta)
         if channel is None:
-            meta['skipping'] = f"{self.tracker}"
+            meta.skipping = f"{self.tracker}"
             return
         channel = str(channel)
         data['channel'] = channel
 
         torrent_id = ''
 
-        if not bool(meta.get('debug')):
+        if not meta.debug:
             response = None
             try:
                 response = await self.session.post(url=self.upload_url, json=data, headers=self.session.headers)

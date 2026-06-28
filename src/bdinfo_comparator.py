@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from src.console import console
+from src.meta import Meta
 
 PLAYLIST_VARIATION_PATTERN = re.compile(r"/\s*DN\s*-\d+dB", re.IGNORECASE)
 BITRATE_VARIATION_PATTERN = re.compile(r"\d+([.,]\d+)?(?=\s*kbps)", re.IGNORECASE)
@@ -11,7 +12,7 @@ BBCODE_PATTERN = re.compile(r"\[[^\]]*\]")
 HTML_PATTERN = re.compile(r"<[^>]*>")
 
 
-def get_relevant_lines(meta: dict[str, Any], duplicate_content: str) -> tuple[list[str], list[str]]:
+def get_relevant_lines(meta: Meta, duplicate_content: str) -> tuple[list[str], list[str]]:
     """
     Extracts and normalizes relevant BDInfo lines for comparison between source and duplicate content.
     """
@@ -81,7 +82,7 @@ def remove_playlist_variations(summary: str, extended: str, duplicate: str) -> t
     return process_content(summary), process_content(extended), process_content(duplicate)
 
 
-def compare_bdinfo(meta: dict[str, Any], entry: dict[str, Any], tracker_name: str) -> tuple[str, str]:
+def compare_bdinfo(meta: Meta, entry: dict[str, Any], tracker_name: str) -> tuple[str, str]:
     release_name = str(entry.get("name", "") or "")
     duplicate_content = has_bdinfo_content(entry)
     source_lines, target_lines = get_relevant_lines(meta, duplicate_content)
@@ -146,11 +147,11 @@ def generate_warning(release_name: str, has_content: str, has_changes: bool) -> 
     return ""
 
 
-def load_bdinfo_file(meta: dict[str, Any]) -> tuple[str, str]:
+def load_bdinfo_file(meta: Meta) -> tuple[str, str]:
     """
     Reads summary and extended summary files from the temporary metadata directory.
     """
-    base_path = Path(meta.get("base_dir", "")) / "tmp" / str(meta.get("uuid", ""))
+    base_path = Path(meta.base_dir) / "tmp" / meta.uuid
 
     def read_file(name: str) -> str:
         file_path = base_path / name

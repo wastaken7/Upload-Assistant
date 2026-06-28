@@ -1,12 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.COMMON import COMMON
 
 
 class AZ(AZTrackerBase):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.avistaz.to']
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='AZ')
         self.config = config
@@ -18,37 +20,37 @@ class AZ(AZTrackerBase):
         self.torrent_url = f'{self.base_url}/torrent/'
         self.requests_url = f'{self.base_url}/requests'
 
-    def rules(self, meta: dict[str, Any]) -> str:
+    def rules(self, meta: Meta) -> str:
         warnings: list[str] = []
 
         is_disc = False
-        if meta.get('is_disc', ''):
+        if meta.is_disc:
             is_disc = True
 
-        video_codec = meta.get('video_codec', '')
+        video_codec = meta.video_codec
         if video_codec:
             video_codec = video_codec.strip().lower()
 
-        video_encode = meta.get('video_encode', '')
+        video_encode = meta.video_encode
         if video_encode:
             video_encode = video_encode.strip().lower()
 
-        type = meta.get('type', '')
+        type = meta.type
         if type:
             type = type.strip().lower()
 
-        source = meta.get('source', '')
+        source = meta.source
         if source:
             source = source.strip().lower()
 
         # This also checks the rule 'FANRES content is not allowed'
-        if meta['category'] not in ('MOVIE', 'TV'):
+        if meta.category not in ("MOVIE", "TV"):
             warnings.append(
                 'The only allowed content to be uploaded are Movies and TV Shows.\n'
                 'Anything else, like games, music, software and porn is not allowed!'
             )
 
-        if meta.get('anime', False):
+        if meta.anime:
             warnings.append("Upload Anime content to our sister site AnimeTorrents.me instead. If it's on AniDB, it's an anime.")
 
         # https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
@@ -95,7 +97,7 @@ class AZ(AZTrackerBase):
         all_countries = africa + america + asia + europe + oceania
         cinemaz_countries = list(set(all_countries) - set(phd_countries) - set(az_allowed_countries))
 
-        origin_countries_codes = meta.get('origin_country', [])
+        origin_countries_codes = meta.origin_country
 
         if any(code in phd_countries for code in origin_countries_codes):
             warnings.append(
@@ -109,7 +111,7 @@ class AZ(AZTrackerBase):
                 'Upload this content to our sister site CinemaZ.to instead.'
             )
 
-        if not is_disc and meta.get('container') not in ['mkv', 'mp4', 'avi']:
+        if not is_disc and meta.container not in ["mkv", "mp4", "avi"]:
             warnings.append('Allowed containers: MKV, MP4, AVI.')
 
         if not is_disc and video_codec not in ('avc', 'h.264', 'h.265', 'x264', 'x265', 'hevc', 'divx', 'xvid'):
@@ -130,12 +132,12 @@ class AZ(AZTrackerBase):
             ]
 
             is_untouched_opus = False
-            audio_field = meta.get('audio', '')
-            if isinstance(audio_field, str) and 'opus' in audio_field.lower() and bool(meta.get('untouched', False)):
+            audio_field = meta.audio
+            if isinstance(audio_field, str) and "opus" in audio_field.lower() and meta.untouched:
                 is_untouched_opus = True
 
             audio_tracks: list[dict[str, Any]] = []
-            media_tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+            media_tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in media_tracks:
                 if track.get('@type') == 'Audio':
                     codec_info = track.get('Format_Commercial_IfAny') or track.get('Format')

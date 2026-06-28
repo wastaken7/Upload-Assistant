@@ -15,11 +15,13 @@ from unidecode import unidecode
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
 class FL:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['reactor.filelist', 'reactor.thefl.org']
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config
@@ -37,74 +39,74 @@ class FL:
 
         self.cookie_validator = CookieValidator(config)
 
-    async def get_category_id(self, meta: dict[str, Any]) -> int:
+    async def get_category_id(self, meta: Meta) -> int:
         _has_ro_audio, has_ro_sub = await self.get_ro_tracks(meta)
         cat_id = 4
         # 25 = 3D Movie
-        if meta['category'] == 'MOVIE':
+        if meta.category == "MOVIE":
             # 4 = Movie HD
             cat_id = 4
-            if meta['is_disc'] == "BDMV" or meta['type'] == "REMUX":
+            if meta.is_disc == "BDMV" or meta.type == "REMUX":
                 # 20 = BluRay
                 cat_id = 20
-                if meta['resolution'] == '2160p':
+                if meta.resolution == "2160p":
                     # 26 = 4k Movie - BluRay
                     cat_id = 26
-            elif meta['resolution'] == '2160p':
+            elif meta.resolution == "2160p":
                 # 6 = 4k Movie
                 cat_id = 6
-            elif meta.get('sd', 0) == 1:
+            elif meta.sd == 1:
                 # 1 = Movie SD
                 cat_id = 1
-            if has_ro_sub and meta.get('sd', 0) == 0 and meta['resolution'] != '2160p':
+            if has_ro_sub and meta.sd == 0 and meta.resolution != "2160p":
                 # 19 = Movie + RO
                 cat_id = 19
 
-        if meta['category'] == 'TV':
+        if meta.category == "TV":
             # 21 = TV HD
             cat_id = 21
-            if meta['resolution'] == '2160p':
+            if meta.resolution == "2160p":
                 # 27 = TV 4k
                 cat_id = 27
-            elif meta.get('sd', 0) == 1:
+            elif meta.sd == 1:
                 # 23 = TV SD
                 cat_id = 23
 
-        if meta['is_disc'] == "DVD":
+        if meta.is_disc == "DVD":
             # 2 = DVD
             cat_id = 2
             if has_ro_sub:
                 # 3 = DVD + RO
                 cat_id = 3
 
-        if meta.get('anime', False) is True:
+        if meta.anime is True:
             # 24 = Anime
             cat_id = 24
         return cat_id
 
-    async def edit_name(self, meta: dict[str, Any]) -> str:
-        fl_name = str(meta.get('name', ''))
-        hdr = str(meta.get('hdr', ''))
-        audio = str(meta.get('audio', ''))
+    async def edit_name(self, meta: Meta) -> str:
+        fl_name = meta.name
+        hdr = meta.hdr
+        audio = meta.audio
         if 'DV' in hdr:
             fl_name = fl_name.replace(' DV ', ' DoVi ')
-        if meta.get('type') in ('WEBDL', 'WEBRIP', 'ENCODE'):
+        if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
             fl_name = fl_name.replace(audio, audio.replace(' ', '', 1))
-        fl_name = fl_name.replace(str(meta.get('aka', '')), '')
-        imdb_info = meta.get('imdb_info')
+        fl_name = fl_name.replace(meta.aka, "")
+        imdb_info = meta.imdb_info
         if isinstance(imdb_info, dict):
             imdb_info_dict = cast(dict[str, Any], imdb_info)
-            title = str(meta.get('title', ''))
+            title = meta.title
             imdb_aka = str(imdb_info_dict.get('aka', ''))
             if imdb_aka:
                 fl_name = fl_name.replace(title, imdb_aka)
-            meta_year = str(meta.get('year', '')).strip()
-            imdb_year = str(imdb_info_dict.get('year', meta.get('year', '')))
-            if meta_year and meta.get('year') != imdb_info_dict.get('year', meta.get('year')):
+            meta_year = meta.year.strip()
+            imdb_year = str(imdb_info_dict.get("year", meta.year))
+            if meta_year and meta.year != imdb_info_dict.get("year", meta.year):
                 fl_name = fl_name.replace(meta_year, imdb_year)
-        if "DD+" in audio and "DDP" in str(meta.get("basename_no_ext", "")):
+        if "DD+" in audio and "DDP" in meta.basename_no_ext:
             fl_name = fl_name.replace('DD+', 'DDP')
-        if "Atmos" in audio and "Atmos" not in str(meta.get("basename_no_ext", "")):
+        if "Atmos" in audio and "Atmos" not in meta.basename_no_ext:
             fl_name = fl_name.replace('Atmos', '')
 
         fl_name = fl_name.replace('BluRay REMUX', 'Remux').replace('BluRay Remux', 'Remux').replace('Bluray Remux', 'Remux')
@@ -136,7 +138,7 @@ class FL:
 
         return {}
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
@@ -146,7 +148,7 @@ class FL:
 
         # Confirm the correct naming order for FL
         cli_ui.info(f"Filelist name: {fl_name}")
-        if meta.get('unattended', False) is False:
+        if meta.unattended is False:
             fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
             if fl_confirm is not True:
                 fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
@@ -159,23 +161,19 @@ class FL:
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
-        torrentFileName = str(fl_name) if meta.get("anime", True) is True and meta.get("tag", "") == "-SubsPlease" else str(meta.get("basename_no_ext", ""))
+        torrentFileName = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else meta.basename_no_ext
 
         # Download new .torrent from site
-        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, newline='', encoding='utf-8') as desc_file:
             fl_desc = await desc_file.read()
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        mi_path = (
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if meta['bdinfo'] is not None
-            else f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
-        )
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_file:
             mi_dump = await mi_file.read()
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(str(torrentFileName))
+        torrentFileName = unidecode(torrentFileName)
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent")
         }
@@ -186,34 +184,34 @@ class FL:
             'nfo': mi_dump
         }
 
-        imdb_id_value = str(meta.get('imdb_id', '0'))
+        imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
-            data['imdbid'] = meta.get('imdb')
-            imdb_info = meta.get('imdb_info')
+            data["imdbid"] = meta.imdb
+            imdb_info = meta.imdb_info
             imdb_info_dict = cast(dict[str, Any], imdb_info) if isinstance(imdb_info, dict) else {}
             data['description'] = imdb_info_dict.get('genres', '')
         if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
             data['epenis'] = self.uploader_name
         if has_ro_audio:
             data['materialro'] = 'on'
-        if meta['is_disc'] == "BDMV" or meta['type'] == "REMUX":
+        if meta.is_disc == "BDMV" or meta.type == "REMUX":
             data['freeleech'] = 'on'
-        if int(meta.get('tv_pack', '0')) != 0:
+        if int(meta.tv_pack if meta.tv_pack is not None else "0") != 0:
             data['freeleech'] = 'on'
-        if int(meta.get('freeleech', '0')) != 0:
+        if int(meta.freeleech if meta.freeleech is not None else "0") != 0:
             data['freeleech'] = 'on'
 
         url = "https://filelist.io/takeupload.php"
         # Submit
-        if meta['debug']:
+        if meta.debug:
             console.print(url)
             console.print(data)
-            meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         else:
-            cookiefile_json = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.json")
-            cookiefile_pkl = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
+            cookiefile_json = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.json")
+            cookiefile_pkl = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.pkl")
             cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
             async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
                 up = await client.post(url=url, data=data, files=files)
@@ -221,7 +219,7 @@ class FL:
             # Match url to verify successful upload
             match = re.match(r".*?filelist\.io/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
             if match:
-                meta['tracker_status'][self.tracker]['status_message'] = match.group(0)
+                meta.tracker_status[self.tracker]["status_message"] = match.group(0)
                 torrent_id = match.group(1)
                 await self.download_new_torrent(cookies, torrent_id, torrent_path)
                 return True
@@ -231,27 +229,19 @@ class FL:
                 console.print(up.text)
                 raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[str]:
+    async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile_json = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.json")
-        cookiefile_pkl = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
+        cookiefile_json = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.json")
+        cookiefile_pkl = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.pkl")
         cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
 
         search_url = "https://filelist.io/browse.php"
 
-        imdb_id_value = str(meta.get('imdb_id', '0'))
+        imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
-            params = {
-                'search': meta['imdb'],
-                'cat': await self.get_category_id(meta),
-                'searchin': '3'
-            }
+            params = {"search": meta.imdb, "cat": await self.get_category_id(meta), "searchin": "3"}
         else:
-            params = {
-                'search': meta['title'],
-                'cat': await self.get_category_id(meta),
-                'searchin': '0'
-            }
+            params = {"search": meta.title, "cat": await self.get_category_id(meta), "searchin": "0"}
 
         try:
             async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
@@ -283,9 +273,9 @@ class FL:
 
         return dupes
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
-        cookiefile_json = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.json")
-        cookiefile_pkl = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
+    async def validate_credentials(self, meta: Meta) -> bool:
+        cookiefile_json = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.json")
+        cookiefile_pkl = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.pkl")
 
         if os.path.exists(cookiefile_json):
             cookiefile = cookiefile_json
@@ -310,15 +300,15 @@ class FL:
                 return False
         return True
 
-    async def validate_cookies(self, meta: dict[str, Any], _cookiefile: str) -> bool:
+    async def validate_cookies(self, meta: Meta, _cookiefile: str) -> bool:
         url = "https://filelist.io/index.php"
-        cookiefile_json = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.json")
-        cookiefile_pkl = os.path.abspath(f"{meta['base_dir']}/data/cookies/FL.pkl")
+        cookiefile_json = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.json")
+        cookiefile_pkl = os.path.abspath(f"{meta.base_dir}/data/cookies/FL.pkl")
         cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
         if cookies:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
-            if meta['debug']:
+            if meta.debug:
                 console.print(resp.url)
             return resp.text.find("Logout") != -1
         return False
@@ -366,11 +356,11 @@ class FL:
             console.print(r.text)
         return
 
-    async def edit_desc(self, meta: dict[str, Any]) -> None:
-        base_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt"
+    async def edit_desc(self, meta: Meta) -> None:
+        base_path = f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt"
         async with aiofiles.open(base_path, encoding='utf-8') as base_file:
             base = await base_file.read()
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', newline='', encoding='utf-8') as descfile:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", newline="", encoding="utf-8") as descfile:
             from src.bbcode import BBCODE
             bbcode = BBCODE()
 
@@ -380,19 +370,19 @@ class FL:
             desc = bbcode.convert_comparison_to_centered(desc, 900)
             desc = desc.replace('[img]', '[img]').replace('[/img]', '[/img]')
             desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
-            if meta['is_disc'] != 'BDMV':
+            if meta.is_disc != "BDMV":
                 url = "https://up.img4k.net/api/description"
-                mediainfo_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
+                mediainfo_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
                 async with aiofiles.open(mediainfo_path, encoding='utf-8') as mi_file:
                     data = {
                         'mediainfo': await mi_file.read(),
                     }
-                if int(meta['imdb_id']) != 0:
-                    data['imdbURL'] = f"tt{meta['imdb_id']}"
-                screen_glob = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['filename']}-*.png"))]
+                if meta.imdb_id:
+                    data["imdbURL"] = f"tt{meta.imdb_id}"
+                screen_glob = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.filename}-*.png"))]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []
                 for screen in screen_glob:
-                    screen_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{screen}"
+                    screen_path = f"{meta.base_dir}/tmp/{meta.uuid}/{screen}"
                     async with aiofiles.open(screen_path, 'rb') as image_file:
                         image_bytes = await image_file.read()
                     files.append(('images', (os.path.basename(screen), image_bytes, 'image/png')))
@@ -401,7 +391,7 @@ class FL:
                 final_desc = response.text.replace('\r\n', '\n')
             else:
                 # BD Description Generator
-                bd_summary_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_EXT.txt"
+                bd_summary_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_EXT.txt"
                 async with aiofiles.open(bd_summary_path, encoding='utf-8') as bd_file:
                     final_desc = await bd_file.read()
                 if final_desc.strip() != "":  # Use BD_SUMMARY_EXT and bbcode format it
@@ -410,10 +400,10 @@ class FL:
                     final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
                     # Upload screens and append to the end of the description
                     url = "https://up.img4k.net/api/description"
-                    screen_glob = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['filename']}-*.png"))]
+                    screen_glob = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.filename}-*.png"))]
                     files: list[tuple[str, tuple[str, bytes, str]]] = []
                     for screen in screen_glob:
-                        screen_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{screen}"
+                        screen_path = f"{meta.base_dir}/tmp/{meta.uuid}/{screen}"
                         async with aiofiles.open(screen_path, 'rb') as image_file:
                             image_bytes = await image_file.read()
                         files.append(('images', (os.path.basename(screen), image_bytes, 'image/png')))
@@ -425,18 +415,18 @@ class FL:
             if self.signature is not None:
                 await descfile.write(self.signature)
 
-    async def get_ro_tracks(self, meta: dict[str, Any]) -> tuple[bool, bool]:
+    async def get_ro_tracks(self, meta: Meta) -> tuple[bool, bool]:
         has_ro_audio = has_ro_sub = False
-        if meta.get('is_disc', '') != 'BDMV':
-            mi = meta.get('mediainfo')
+        if meta.is_disc != "BDMV":
+            mi = meta.mediainfo
             if isinstance(mi, dict):
-                mi_dict = cast(dict[str, Any], mi)
+                mi_dict = mi
                 media = mi_dict.get('media')
                 if isinstance(media, dict):
                     media_dict = cast(dict[str, Any], media)
                     tracks = media_dict.get('track')
                     if isinstance(tracks, list):
-                        tracks_list = cast(list[Any], tracks)
+                        tracks_list = tracks
                         for track in tracks_list:
                             if not isinstance(track, dict):
                                 continue
@@ -446,15 +436,15 @@ class FL:
                             if track_dict.get('@type') == "Audio" and track_dict.get('Audio') == 'ro':
                                 has_ro_audio = True
         else:
-            bdinfo = meta.get('bdinfo')
+            bdinfo = meta.bdinfo
             if isinstance(bdinfo, dict):
-                bdinfo_dict = cast(dict[str, Any], bdinfo)
+                bdinfo_dict = bdinfo
                 subtitles = bdinfo_dict.get('subtitles')
                 if isinstance(subtitles, list) and "Romanian" in subtitles:
                     has_ro_sub = True
                 audio_tracks = bdinfo_dict.get('audio')
                 if isinstance(audio_tracks, list):
-                    audio_tracks_list = cast(list[Any], audio_tracks)
+                    audio_tracks_list = audio_tracks
                     for audio_track in audio_tracks_list:
                         if isinstance(audio_track, dict):
                             audio_track_dict = cast(dict[str, Any], audio_track)

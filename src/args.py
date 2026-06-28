@@ -6,10 +6,11 @@ import re
 import sys
 import urllib.parse
 from collections.abc import Sequence
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import console
+from src.meta import Meta
 
 
 class ShortHelpFormatter(argparse.HelpFormatter):
@@ -75,9 +76,8 @@ class Args:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        pass
 
-    def parse(self, argv: Sequence[str], meta: dict[str, Any]) -> tuple[dict[str, Any], CustomArgumentParser, list[str]]:
+    def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
         input = list(argv)
         parser = CustomArgumentParser(
             usage="upload.py [path...] [options]",
@@ -134,8 +134,8 @@ class Args:
         parser.add_argument('-oil', '--only-if-languages', dest='has_languages',  nargs='*', required=False, help="Require at least one of the languages to upload. Comma separated list e.g. 'English, French, Spanish'", type=str)
         parser.add_argument('-ns', '--no-seed', action='store_true', required=False, help="Do not add torrent to the client")
         parser.add_argument('-year', '--year', dest='manual_year', nargs=1, required=False, help="Override the year found", type=int, default=0)
-        parser.add_argument("-author", "--author", nargs=1, required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
-        parser.add_argument("-btitle", "--book-title", nargs=1, required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("-author", "--author", nargs='*', required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
+        parser.add_argument("-btitle", "--book-title", nargs='*', required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -143,7 +143,7 @@ class Args:
         parser.add_argument(
             "-btra",
             "--book-translator",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook translator",
             type=str,
@@ -152,7 +152,7 @@ class Args:
         parser.add_argument(
             "-blang",
             "--book-language",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook language (overrides auto-detected value, e.g. 'English', 'Portuguese', 'pt')",
             type=str,
@@ -188,7 +188,7 @@ class Args:
         parser.add_argument(
             "-pub",
             "--publisher",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Book/Audiobook publisher (overrides auto-detected value)",
             type=str,
@@ -208,7 +208,7 @@ class Args:
         parser.add_argument(
             "-gv",
             "--game-version",
-            nargs=1,
+            nargs='*',
             required=False,
             help="Game version (overrides auto-detected value, e.g. 'v1.15')",
             type=str,
@@ -311,9 +311,6 @@ class Args:
         parser.add_argument('-cleanup', '--cleanup', action='store_true', required=False, help="Clean up tmp directory")
         parser.add_argument('-fl', '--freeleech', nargs=1, required=False, help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values", default=0, dest="freeleech")
         parser.add_argument('--infohash', nargs=1, required=False, help="V1 Info Hash")
-        parser.add_argument('-emby', '--emby', action='store_true', required=False, help="Create an Emby-compliant NFO file and optionally symlink the content")
-        parser.add_argument('-emby_cat', '--emby_cat', nargs=1, required=False, help="Set the expected category for Emby (e.g., 'movie', 'tv')")
-        parser.add_argument('-emby_debug', '--emby_debug', action='store_true', required=False, help="Does debugging stuff for Audionut")
         parser.add_argument('-ch', '--channel', nargs=1, required=False, help="SPD only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.", type=str, dest='spd_channel', default="")
         parser.add_argument("-excl", "--exclusive", nargs=1, required=False, help="Set exclusive flag on all supported trackers", dest="exclusive")
         parser.add_argument('-as', '--audio-spectrogram', action='store_true', required=False, help="Generate and upload audio spectrograms", dest="audio_spectrogram", default=None)
@@ -345,16 +342,16 @@ class Args:
                     else:
                         break
 
-        if meta.get('tmdb_manual') is not None or meta.get('imdb_manual') is not None:
-            meta['tmdb_manual'] = meta['tmdb_id'] = meta['tmdb'] = meta['imdb_id'] = meta['imdb'] = None
+        if meta.tmdb_manual is not None or meta.imdb_manual is not None:
+            meta.tmdb_manual = meta.tmdb_id = meta.tmdb = meta.imdb_id = meta.imdb = None
         for key in parsed_args:
             value = parsed_args[key]
             if value not in (None, []):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     value2 = self.list_to_string(value_list)
                     if key == 'manual_type':
-                        meta['manual_type'] = value2.upper().replace('-', '')
+                        meta.manual_type = value2.upper().replace("-", "")
                     elif key == 'tag':
                         meta[key] = f"-{value2}"
                     elif key == 'description_file' or key == 'comparison':
@@ -362,23 +359,23 @@ class Args:
                     elif key == 'screens':
                         meta[key] = int(value2)
                     elif key == 'season':
-                        meta['manual_season'] = value2
+                        meta.manual_season = value2
                     elif key == 'episode':
-                        meta['manual_episode'] = value2
+                        meta.manual_episode = value2
                     elif key == 'manual_date':
-                        meta['manual_date'] = value2
+                        meta.manual_date = value2
                     elif key == 'tmdb_manual':
-                        meta['category'], meta['tmdb_manual'] = self.parse_tmdb_id(value2, meta.get('category'))
+                        meta.category, meta.tmdb_manual = self.parse_tmdb_id(value2, meta.category)
                     elif key == 'ptp':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
                             try:
-                                meta['ptp'] = urllib.parse.parse_qs(parsed.query)['torrentid'][0]
+                                meta.ptp = urllib.parse.parse_qs(parsed.query)["torrentid"][0]
                             except Exception:
                                 console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
                                 console.print('[red]Continuing without -ptp')
                         else:
-                            meta['ptp'] = value2
+                            meta.ptp = value2
                     elif key == 'blu':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -386,12 +383,12 @@ class Args:
                                 blupath = parsed.path
                                 if blupath.endswith('/'):
                                     blupath = blupath[:-1]
-                                meta['blu'] = blupath.split('/')[-1]
+                                meta.blu = blupath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --blu')
                         else:
-                            meta['blu'] = value2
+                            meta.blu = value2
                     elif key == 'aither':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -399,12 +396,12 @@ class Args:
                                 aitherpath = parsed.path
                                 if aitherpath.endswith('/'):
                                     aitherpath = aitherpath[:-1]
-                                meta['aither'] = aitherpath.split('/')[-1]
+                                meta.aither = aitherpath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --aither')
                         else:
-                            meta['aither'] = value2
+                            meta.aither = value2
                     elif key == 'lst':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -412,12 +409,12 @@ class Args:
                                 lstpath = parsed.path
                                 if lstpath.endswith('/'):
                                     lstpath = lstpath[:-1]
-                                meta['lst'] = lstpath.split('/')[-1]
+                                meta.lst = lstpath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --lst')
                         else:
-                            meta['lst'] = value2
+                            meta.lst = value2
                     elif key == "openlibrary":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)
@@ -425,15 +422,15 @@ class Args:
                                 path_parts = parsed.path.strip("/").split("/")
                                 for part in path_parts:
                                     if part.upper().startswith("OL") and (part.upper().endswith("W") or part.upper().endswith("M")):
-                                        meta["openlibrary"] = part
+                                        meta.openlibrary = part
                                         break
                                 else:
-                                    meta["openlibrary"] = path_parts[-1]
+                                    meta.openlibrary = path_parts[-1]
                             except Exception:
                                 console.print("[red]Unable to parse OpenLibrary ID from url")
                                 console.print("[red]Continuing without --openlibrary")
                         else:
-                            meta["openlibrary"] = value2
+                            meta.openlibrary = value2
                     elif key == 'oe':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -441,12 +438,12 @@ class Args:
                                 oepath = parsed.path
                                 if oepath.endswith('/'):
                                     oepath = oepath[:-1]
-                                meta['oe'] = oepath.split('/')[-1]
+                                meta.oe = oepath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --oe')
                         else:
-                            meta['oe'] = value2
+                            meta.oe = value2
                     elif key == 'ulcx':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
@@ -454,33 +451,33 @@ class Args:
                                 ulcxpath = parsed.path
                                 if ulcxpath.endswith('/'):
                                     ulcxpath = ulcxpath[:-1]
-                                meta['ulcx'] = ulcxpath.split('/')[-1]
+                                meta.ulcx = ulcxpath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --ulcx')
                         else:
-                            meta['ulcx'] = value2
+                            meta.ulcx = value2
                     elif key == 'hdb':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
                             try:
-                                meta['hdb'] = urllib.parse.parse_qs(parsed.query)['id'][0]
+                                meta.hdb = urllib.parse.parse_qs(parsed.query)["id"][0]
                             except Exception:
                                 console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
                                 console.print('[red]Continuing without -hdb')
                         else:
-                            meta['hdb'] = value2
+                            meta.hdb = value2
 
                     elif key == 'btn':
                         if value2.startswith('http'):
                             parsed = urllib.parse.urlparse(value2)
                             try:
-                                meta['btn'] = urllib.parse.parse_qs(parsed.query)['id'][0]
+                                meta.btn = urllib.parse.parse_qs(parsed.query)["id"][0]
                             except Exception:
                                 console.print('[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid')
                                 console.print('[red]Continuing without -hdb')
                         else:
-                            meta['btn'] = value2
+                            meta.btn = value2
 
                     elif key == 'bhd':
                         if value2.startswith('http'):
@@ -493,18 +490,18 @@ class Args:
                                 if '/download/' in bhdpath or '/torrents/' in bhdpath:
                                     torrent_id_match = re.search(r'\.(\d+)$', bhdpath)
                                     if torrent_id_match:
-                                        meta['bhd'] = torrent_id_match.group(1)
+                                        meta.bhd = torrent_id_match.group(1)
                                     else:
-                                        meta['bhd'] = bhdpath.split('/')[-1]
+                                        meta.bhd = bhdpath.split("/")[-1]
                                 else:
-                                    meta['bhd'] = bhdpath.split('/')[-1]
+                                    meta.bhd = bhdpath.split("/")[-1]
 
-                                console.print(f"[green]Parsed BHD torrent ID: {meta['bhd']}")
+                                console.print(f"[green]Parsed BHD torrent ID: {meta.bhd}")
                             except Exception as e:
                                 console.print(f'[red]Unable to parse id from url: {e}')
                                 console.print('[red]Continuing without --bhd')
                         else:
-                            meta['bhd'] = value2
+                            meta.bhd = value2
 
                     elif key == 'huno':
                         if value2.startswith('http'):
@@ -513,12 +510,12 @@ class Args:
                                 hunopath = parsed.path
                                 if hunopath.endswith('/'):
                                     hunopath = hunopath[:-1]
-                                meta['huno'] = hunopath.split('/')[-1]
+                                meta.huno = hunopath.split("/")[-1]
                             except Exception:
                                 console.print('[red]Unable to parse id from url')
                                 console.print('[red]Continuing without --huno')
                         else:
-                            meta['huno'] = value2
+                            meta.huno = value2
 
                     elif key == "steam_manual":
                         if value2.startswith("http"):
@@ -526,14 +523,14 @@ class Args:
                             try:
                                 match = re.search(r"/app/(\d+)", parsed.path)
                                 if match:
-                                    meta["steam_manual"] = match.group(1)
+                                    meta.steam_manual = match.group(1)
                                 else:
-                                    meta["steam_manual"] = value2
+                                    meta.steam_manual = value2
                             except Exception:
                                 console.print("[red]Unable to parse Steam ID from URL. Using raw value.[/red]")
-                                meta["steam_manual"] = value2
+                                meta.steam_manual = value2
                         else:
-                            meta["steam_manual"] = value2
+                            meta.steam_manual = value2
 
                     else:
                         meta[key] = value2
@@ -541,7 +538,7 @@ class Args:
                     meta[key] = value
             if key == 'site_upload':
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0].upper()  # Extract the tracker acronym and uppercase it
                     elif value_list:
@@ -554,7 +551,7 @@ class Args:
                     meta[key] = None
             if key in ("manual_edition"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -563,7 +560,7 @@ class Args:
                     meta[key] = value
             if key in ("manual_dvds"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     elif value_list:
@@ -576,7 +573,7 @@ class Args:
                     meta[key] = ""
             if key in ("freeleech"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
                         meta[key] = int(value_list[0])
                     else:
@@ -589,7 +586,7 @@ class Args:
                 meta[key] = ""
             if key in ["tvmaze_manual"]:
                 if isinstance(value, list):
-                    value_list = [str(item) for item in cast(list[Any], value)]
+                    value_list = [str(item) for item in value]
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -600,7 +597,7 @@ class Args:
                 if value:
                     # Extract from list if it's a single-item list (from nargs=1)
                     if isinstance(value, list):
-                        value_list = cast(list[Any], value)
+                        value_list = value
                         tracker_value: Any = value_list[0] if len(value_list) == 1 else value_list
                     else:
                         tracker_value = value
@@ -616,7 +613,7 @@ class Args:
                     elif isinstance(tracker_value, list):
                         # Handle list of strings
                         expanded: list[str] = []
-                        for t in cast(list[Any], tracker_value):
+                        for t in tracker_value:
                             t_str = str(t)
                             if ',' in t_str:
                                 expanded.extend([x.strip().upper() for x in t_str.split(',')])
@@ -630,19 +627,19 @@ class Args:
             else:
                 meta[key] = meta.get(key)
             # if key == 'help' and value == True:
-                # parser.print_help()
+            # parser.print_help()
 
-        manual_frames_value = meta.get('manual_frames')
+        manual_frames_value = meta.manual_frames
         if manual_frames_value is not None:
             try:
                 frames_str = str(manual_frames_value)
-                meta['manual_frames'] = [int(t.strip()) for t in frames_str.split(',') if t.strip()]
+                meta.manual_frames = [int(t.strip()) for t in frames_str.split(",") if t.strip()]
             except ValueError:
                 console.print("[red]Invalid format for manual_frames. Please provide a comma-separated list of integers.")
                 console.print(f"Processed manual_frames: {manual_frames_value}")
                 sys.exit(1)
         else:
-            meta['manual_frames'] = None
+            meta.manual_frames = None
 
         # Apply book metadata overrides: --author and --book-title map to meta keys
         # used by trackers like CBR when constructing the torrent name for BOOK category.
@@ -654,7 +651,7 @@ class Args:
         return meta, parser, before_args
 
     @staticmethod
-    def _apply_book_meta_overrides(meta: dict[str, Any]) -> None:
+    def _apply_book_meta_overrides(meta: Meta) -> None:
         """Normalise CLI book arguments (--author, --book-title, --blang, --isbn) into *meta*.
 
         Maps ``book_author`` / ``book_title`` to the ``author`` / ``title`` keys
@@ -663,37 +660,37 @@ class Args:
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.
         """
-        book_author_arg = meta.get("book_author")
+        book_author_arg = meta.book_author
         if book_author_arg not in (None, ""):
-            meta["author"] = str(book_author_arg).strip()
+            meta.author = str(book_author_arg).strip()
 
-        book_title_arg = meta.get("book_title")
+        book_title_arg = meta.book_title
         if book_title_arg not in (None, ""):
-            meta["title"] = str(book_title_arg).strip()
+            meta.title = str(book_title_arg).strip()
 
-        book_isbn_arg = meta.get("book_isbn")
+        book_isbn_arg = meta.book_isbn
         if book_isbn_arg not in (None, ""):
-            meta["isbn"] = str(book_isbn_arg).strip()
+            meta.isbn = str(book_isbn_arg).strip()
 
-        book_asin_arg = meta.get("book_asin")
+        book_asin_arg = meta.book_asin
         if book_asin_arg not in (None, ""):
-            meta["asin"] = str(book_asin_arg).strip()
+            meta.asin = str(book_asin_arg).strip()
 
-        openlibrary_arg = meta.get("openlibrary")
+        openlibrary_arg = meta.openlibrary
         if openlibrary_arg not in (None, ""):
-            meta["openlibrary"] = str(openlibrary_arg).strip()
+            meta.openlibrary = str(openlibrary_arg).strip()
 
-        book_publisher_arg = meta.get("book_publisher")
+        book_publisher_arg = meta.book_publisher
         if book_publisher_arg not in (None, ""):
-            meta["publisher"] = str(book_publisher_arg).strip()
+            meta.publisher = str(book_publisher_arg).strip()
 
-        book_translator_arg = meta.get("book_translator")
+        book_translator_arg = meta.book_translator
         if book_translator_arg not in (None, ""):
-            meta["book_translator"] = str(book_translator_arg).strip()
+            meta.book_translator = str(book_translator_arg).strip()
 
-        book_language_arg = meta.get("book_language")
+        book_language_arg = meta.book_language
         if book_language_arg not in (None, ""):
-            raw_lang = str(book_language_arg).strip()
+            raw_lang = book_language_arg.strip()
             try:
                 import langcodes
 
@@ -703,23 +700,23 @@ class Args:
                     full_name = lc.display_name("en") or raw_lang.title()
                     alpha3 = lc.to_alpha3() or ""
                     if full_name and full_name.lower() != raw_lang.lower():
-                        meta["book_language"] = full_name
-                        meta["book_language_iso"] = alpha3
+                        meta.book_language = full_name
+                        meta.book_language_iso = alpha3
                     else:
                         raise LookupError("no display name change")
                 except Exception:
                     # Fall back to find() for natural language names ("Portuguese")
                     lc = langcodes.find(raw_lang)
-                    meta["book_language"] = lc.display_name("en") or raw_lang.title()
-                    meta["book_language_iso"] = lc.to_alpha3() or ""
+                    meta.book_language = lc.display_name("en") or raw_lang.title()
+                    meta.book_language_iso = lc.to_alpha3() or ""
             except Exception:
-                meta["book_language"] = raw_lang.title()
-                meta["book_language_iso"] = ""
+                meta.book_language = raw_lang.title()
+                meta.book_language_iso = ""
 
-        manual_year_arg = meta.get("manual_year")
+        manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
-            meta["year"] = str(manual_year_arg).strip()
-            meta["search_year"] = int(manual_year_arg)
+            meta.year = str(manual_year_arg).strip()
+            meta.search_year = manual_year_arg
 
         # Detect newspapers in overridden titles
         detect_newspaper(meta)
@@ -727,9 +724,9 @@ class Args:
         sanitize_book_author(meta)
 
     @staticmethod
-    def _apply_game_meta_overrides(meta: dict[str, Any]) -> None:
+    def _apply_game_meta_overrides(meta: Meta) -> None:
         """Normalise CLI game arguments (--platform) into *meta*."""
-        manual_platform_arg = meta.get("manual_platform")
+        manual_platform_arg = meta.manual_platform
         if manual_platform_arg not in (None, ""):
             plat = str(manual_platform_arg).strip().lower()
             mapping = {
@@ -751,29 +748,29 @@ class Args:
                 "linux": "Linux",
             }
             clean_plat = mapping.get(plat, plat)
-            meta["manual_platform"] = clean_plat
-            meta["platform"] = clean_plat
+            meta.manual_platform = clean_plat
+            meta.platform = clean_plat
 
-        steam_manual_arg = meta.get("steam_manual")
+        steam_manual_arg = meta.steam_manual
         if steam_manual_arg not in (None, ""):
-            meta["steam_manual"] = str(steam_manual_arg).strip()
+            meta.steam_manual = str(steam_manual_arg).strip()
 
-        game_version_arg = meta.get("game_version")
+        game_version_arg = meta.game_version
         if game_version_arg not in (None, ""):
-            meta["game_version"] = str(game_version_arg).strip()
+            meta.game_version = game_version_arg.strip()
 
-        game_subcategory_arg = meta.get("game_subcategory")
+        game_subcategory_arg = meta.game_subcategory
         if game_subcategory_arg not in (None, ""):
-            meta["game_subcategory"] = str(game_subcategory_arg).strip().lower()
+            meta.game_subcategory = game_subcategory_arg.strip().lower()
 
-        manual_year_arg = meta.get("manual_year")
+        manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
-            meta["year"] = str(manual_year_arg).strip()
-            meta["search_year"] = int(manual_year_arg)
+            meta.year = str(manual_year_arg).strip()
+            meta.search_year = manual_year_arg
 
     def list_to_string(self, list: list[str]) -> str:
         if len(list) == 1:
-            return str(list[0])
+            return list[0]
         try:
             result = " ".join(list)
         except Exception:
@@ -783,7 +780,7 @@ class Args:
     def parse_tmdb_id(self, id_str: str, category: Optional[str]) -> tuple[str, int]:
         if category is None:
             category = ''
-        parsed_id: str = str(id_str).lower().strip()
+        parsed_id: str = id_str.lower().strip()
         if parsed_id.startswith('http'):
             parsed = urllib.parse.urlparse(parsed_id)
             path = parsed.path.strip('/')

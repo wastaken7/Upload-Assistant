@@ -128,7 +128,7 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> Optional[str]:
         console.print(f"[blue]MediaInfo Library filename: {lib_filename}[/blue]")
 
     with TemporaryDirectory() as tmp_dir:
-        tmp_dir_path = Path(str(tmp_dir))
+        tmp_dir_path = Path(tmp_dir)
         cli_archive = tmp_dir_path / cli_filename
         lib_archive = tmp_dir_path / lib_filename
 

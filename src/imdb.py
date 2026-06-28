@@ -2,10 +2,10 @@
 import asyncio
 import json
 import sys
-from collections.abc import Mapping
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, Optional, cast
 
 import anitopy
 import cli_ui
@@ -36,8 +36,8 @@ class ImdbManager:
 
     async def get_imdb_info_api(
         self,
-        imdbID: Union[int, str],
-        manual_language: Optional[Union[str, dict[str, Any]]] = None,
+        imdbID: Optional[int | str],
+        manual_language: Optional[str | dict[str, Any]] = None,
         debug: bool = False,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
@@ -457,7 +457,7 @@ class ImdbManager:
         imdb_info['sound_mixes'] = [sm.get('text', '') for sm in sound_mixes if 'text' in sm]
 
         episodes = cast(list[dict[str, Any]], imdb_info.get('episodes', []))
-        current_year = datetime.now(timezone.utc).year
+        current_year = datetime.now(UTC).year
         release_years = [
             episode['release_year']
             for episode in episodes
@@ -479,7 +479,7 @@ class ImdbManager:
     async def search_imdb(
         self,
         filename: str,
-        search_year: Optional[Union[str, int]],
+        search_year: Optional[str | int],
         quickie: bool = False,
         category: Optional[str] = None,
         debug: bool = False,
@@ -487,7 +487,7 @@ class ImdbManager:
         _path: Optional[str] = None,
         untouched_filename: Optional[str] = None,
         attempted: Optional[int] = 0,
-        duration: Optional[Union[str, int]] = None,
+        duration: Optional[str | int] = None,
         unattended: bool = False,
     ) -> int:
         search_results: list[dict[str, Any]] = []
@@ -501,11 +501,11 @@ class ImdbManager:
 
         async def run_imdb_search(
             filename: str,
-            search_year: Optional[Union[str, int]],
+            search_year: Optional[str | int],
             category: Optional[str] = None,
             debug: bool = False,
             attempted: Optional[int] = 0,
-            duration: Optional[Union[str, int]] = None,
+            duration: Optional[str | int] = None,
             wide_search: bool = False,
         ) -> list[dict[str, Any]]:
             search_results: list[dict[str, Any]] = []
@@ -898,7 +898,7 @@ class ImdbManager:
 
         return imdbID if imdbID else 0
 
-    async def get_imdb_from_episode(self, imdb_id: Union[int, str], debug: bool = False) -> Optional[dict[str, Any]]:
+    async def get_imdb_from_episode(self, imdb_id: int | str, debug: bool = False) -> Optional[dict[str, Any]]:
         if not imdb_id or imdb_id == 0:
             return None
 

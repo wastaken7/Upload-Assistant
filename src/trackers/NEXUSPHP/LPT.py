@@ -2,14 +2,15 @@
 import re
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.NEXUSPHP import NEXUSPHP
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class LPT(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://longpt.org']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LPT")
         self.banned_groups = []
@@ -24,13 +25,13 @@ class LPT(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.get("category", "")).upper()
-        genres = str(meta.get("genres", "")).lower()
-        keywords = str(meta.get("keywords", "")).lower()
+        category = str(meta.category).upper()
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
 
         if "documentary" in genres or "documentary" in keywords:
             return documentaries
-        if meta.get("anime") or "animation" in genres or "animation" in keywords:
+        if meta.anime or "animation" in genres or "animation" in keywords:
             return animations
 
         if category == "MOVIE":
@@ -67,9 +68,9 @@ class LPT(NEXUSPHP):
         uhd_remux = 11
         web_dl = 4
 
-        is_disc = str(meta.get("is_disc", "")).lower()
-        mtype = str(meta.get("type", "")).lower()
-        resolution = str(meta.get("resolution", "")).lower()
+        is_disc = str(meta.is_disc).lower()
+        mtype = str(meta.type).lower()
+        resolution = meta.resolution.lower()
 
         if is_disc == "bdmv":
             if resolution == "2160p":
@@ -104,7 +105,7 @@ class LPT(NEXUSPHP):
         other = 6
         vc1 = 3
 
-        codec = str(meta.get("video_codec", "")).lower()
+        codec = meta.video_codec.lower()
 
         if "h265" in codec or "x265" in codec or "hevc" in codec:
             return h265
@@ -120,7 +121,7 @@ class LPT(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.get("resolution", "")).lower()
+        resolution = meta.resolution.lower()
 
         if "4320" in resolution:
             return 6
@@ -132,13 +133,13 @@ class LPT(NEXUSPHP):
             return 2
         if "720" in resolution:
             return 3
-        if meta.get("sd", False):
+        if meta.sd:
             return 4
 
         return 7
 
     def get_audio_codec(self, meta: Meta) -> int:
-        audio_codec = str(meta.get("audio", "")).lower()
+        audio_codec = meta.audio.lower()
 
         if "flac" in audio_codec:
             return 1
@@ -188,7 +189,7 @@ class LPT(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = str(meta.get("tag", "")).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:
@@ -199,13 +200,13 @@ class LPT(NEXUSPHP):
         hdr = 7
         reposting_prohibited = 1
 
-        audio_tracks = meta.get("audio_languages", [])
-        subtitle_tracks = meta.get("subtitle_languages", [])
-        mhdr = meta.get("hdr", "")
+        audio_tracks = meta.audio_languages
+        subtitle_tracks = meta.subtitle_languages
+        mhdr = meta.hdr
 
         checkboxes = []
 
-        if meta.get("exclusive", False):
+        if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
 
         if "Chinese" in audio_tracks or "Mandarin" in audio_tracks:
@@ -220,7 +221,7 @@ class LPT(NEXUSPHP):
         if "HDR" in mhdr.upper():
             checkboxes.append(str(hdr))
 
-        if meta.get("diy_disc", False):
+        if meta.diy_disc:
             checkboxes.append(str(diy))
 
         return checkboxes

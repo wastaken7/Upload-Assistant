@@ -2,14 +2,15 @@
 import re
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.NEXUSPHP import NEXUSPHP
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class PTFANS(NEXUSPHP):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://ptfans.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTFANS")
         self.banned_groups = []
@@ -24,13 +25,13 @@ class PTFANS(NEXUSPHP):
         tv_series = 404
         tv_shows = 405
 
-        category = str(meta.get("category", "")).upper()
-        genres = str(meta.get("genres", "")).lower()
-        keywords = str(meta.get("keywords", "")).lower()
+        category = str(meta.category).upper()
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
 
         if "documentary" in genres or "documentary" in keywords:
             return documentaries
-        if meta.get("anime") or "animation" in genres or "animation" in keywords:
+        if meta.anime or "animation" in genres or "animation" in keywords:
             return animations
 
         if category == "MOVIE":
@@ -65,8 +66,8 @@ class PTFANS(NEXUSPHP):
         remux = 3
         web_dl = 5
 
-        is_disc = str(meta.get("is_disc", "")).lower()
-        mtype = str(meta.get("type", "")).lower()
+        is_disc = str(meta.is_disc).lower()
+        mtype = str(meta.type).lower()
 
         if is_disc == "bdmv":
             return blu_ray
@@ -93,8 +94,8 @@ class PTFANS(NEXUSPHP):
         other = 9
         xvid = 7
 
-        codec = str(meta.get("video_codec", "")).lower()
-        source = meta.get("source", "").lower()
+        codec = meta.video_codec.lower()
+        source = meta.source or "".lower()
         is_bluray_source = "bluray" in source or "blu-ray" in source
 
         if "av1" in codec:
@@ -119,7 +120,7 @@ class PTFANS(NEXUSPHP):
         return other
 
     def get_resolution(self, meta: Meta) -> int:
-        resolution = str(meta.get("resolution", "")).lower()
+        resolution = meta.resolution.lower()
 
         if resolution == "1080p":
             return 1
@@ -127,7 +128,7 @@ class PTFANS(NEXUSPHP):
             return 2
         if resolution == "720p":
             return 3
-        if meta.get("sd", False):
+        if meta.sd:
             return 4
         if resolution == "2160p":
             return 5
@@ -144,5 +145,5 @@ class PTFANS(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = str(meta.get("tag", "")).lower()
+        group = meta.tag.lower()
         return group_tag.get(group, 5)

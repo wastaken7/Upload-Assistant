@@ -7,7 +7,7 @@ import os
 import re
 import ssl
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.error import URLError
 
 from tvdb_v4_official import TVDB
@@ -17,7 +17,7 @@ from src.console import console
 YEAR_PATTERN = re.compile(r'\((19\d\d|20[0-3]\d)\)')
 
 
-tvdb: Union[TVDB, None] = None
+tvdb: TVDB | None = None
 _tvdb_init_error: Optional[Exception] = None
 _tvdb_error_reported = False
 
@@ -31,7 +31,7 @@ def _coerce_int(value: Any) -> Optional[int]:
 
 def _as_dict_list(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, list):
-        return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+        return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
     return []
 
 
@@ -172,7 +172,6 @@ def _get_tvdb_or_warn(config: Optional[dict[str, Any]] = None) -> Optional[TVDB]
 class tvdb_data:
     def __init__(self, config: Any) -> None:
         self.config = config
-        pass
 
     async def search_tvdb_series(
         self,
@@ -192,7 +191,7 @@ class tvdb_data:
             if results and len(results) > 0:
                 # Try to find the best match based on year
                 best_match: Optional[dict[str, Any]] = None
-                search_year = str(year) if year else ''
+                search_year = year if year else ''
 
                 if search_year:
                     # First, try to find exact year match
@@ -205,7 +204,7 @@ class tvdb_data:
                 if not best_match and search_year:
                     for result in results:
                         aliases_raw = result.get('aliases', [])
-                        aliases = cast(list[Any], aliases_raw) if isinstance(aliases_raw, list) else []
+                        aliases = aliases_raw if isinstance(aliases_raw, list) else []
                         if aliases:
                             # Check if any alias contains the year in parentheses
                             for alias in aliases:
@@ -233,12 +232,12 @@ class tvdb_data:
 
     async def get_tvdb_episodes(
         self,
-        series_id: Union[int, str],
-        base_dir: Optional[Union[str, bool]] = None,
+        series_id: int | str,
+        base_dir: Optional[str | bool] = None,
         debug: bool = False,
-        season: Optional[Union[int, str]] = None,
-        episode: Optional[Union[int, str]] = None,
-        absolute_number: Optional[Union[int, str]] = None,
+        season: Optional[int | str] = None,
+        episode: Optional[int | str] = None,
+        absolute_number: Optional[int | str] = None,
         aired_date: Optional[str] = None,
         original_language: Optional[str] = None,
     ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
@@ -257,7 +256,7 @@ class tvdb_data:
 
             aired_norm = None
             if aired_date:
-                aired_norm = str(aired_date).strip().replace('.', '-')
+                aired_norm = aired_date.strip().replace('.', '-')
 
             # Normalize numeric inputs
             try:
@@ -490,8 +489,8 @@ class tvdb_data:
 
     async def get_tvdb_by_external_id(
         self,
-        imdb: Optional[Union[int, str]],
-        tmdb: Optional[Union[int, str]],
+        imdb: Optional[int | str],
+        tmdb: Optional[int | str],
         debug: bool = False,
         tv_movie: bool = False,
     ) -> tuple[Optional[int], Optional[str]]:
@@ -530,7 +529,7 @@ class tvdb_data:
                 elif isinstance(imdb, int):
                     imdb_formatted = f"tt{imdb:07d}"
                 else:
-                    imdb_formatted = str(imdb)
+                    imdb_formatted = imdb
 
                 if debug:
                     console.print(f"[cyan]Trying TVDB lookup with IMDB ID: {imdb_formatted}[/cyan]")
@@ -640,7 +639,7 @@ class tvdb_data:
 
     async def get_imdb_id_from_tvdb_episode_id(
         self,
-        episode_id: Union[int, str],
+        episode_id: int | str,
         debug: bool = False,
     ) -> Optional[str]:
         try:
@@ -679,8 +678,8 @@ class tvdb_data:
     async def get_specific_episode_data(
         self,
         data: Any,
-        season: Optional[Union[int, str]],
-        episode: Optional[Union[int, str]],
+        season: Optional[int | str],
+        episode: Optional[int | str],
         debug: bool = False,
         aired_date: Optional[str] = None,
     ) -> tuple[
@@ -727,7 +726,7 @@ class tvdb_data:
 
         # For daily shows, match by air date if provided.
         if aired_date:
-            aired_norm = str(aired_date).strip().replace('.', '-')
+            aired_norm = aired_date.strip().replace('.', '-')
             for ep in episodes:
                 if ep.get('aired') == aired_norm:
                     if debug:

@@ -5,15 +5,16 @@ import cli_ui
 
 from src.console import console
 from src.languages import languages_manager
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class TTR(UNIT3D):
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['https://torrenteros.org']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='TTR')
@@ -34,7 +35,7 @@ class TTR(UNIT3D):
         return {'name': name}
 
     def build_name(self, meta: Meta) -> str:
-        name = str(meta.get('name_notag', ''))
+        name = meta.name_notag
 
         def ask_spanish_type(kind: str) -> str:
             console.print(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
@@ -53,11 +54,11 @@ class TTR(UNIT3D):
                 return 'Latino'
             return None
 
-        if meta.get('is_disc') == 'BDMV':
-            spanish_audio = "Spanish" in meta.get('audio_languages', [])
-            spanish_subtitle = "Spanish" in meta.get('subtitle_languages', [])
-            unattended = meta.get('unattended', False)
-            confirm = meta.get('unattended_confirm', False)
+        if meta.is_disc == "BDMV":
+            spanish_audio = "Spanish" in (meta.audio_languages or [])
+            spanish_subtitle = "Spanish" in (meta.subtitle_languages or [])
+            unattended = meta.unattended
+            confirm = meta.unattended_confirm
 
             if spanish_audio:
                 if unattended or confirm:
@@ -79,7 +80,7 @@ class TTR(UNIT3D):
         else:
             tracks = cast(
                 list[dict[str, Any]],
-                cast(dict[str, Any], meta.get('mediainfo', {})).get('media', {}).get('track', []),
+                meta.mediainfo.get("media", {}).get("track", []),
             )
             spanish_audio_type = None
             spanish_subs_type = None
@@ -107,7 +108,7 @@ class TTR(UNIT3D):
             elif spanish_subs_type:
                 name += f" {spanish_subs_type} Subs"
 
-        tag = str(meta.get('tag', ""))
+        tag = meta.tag
         if tag:
             name += tag
 
@@ -123,18 +124,18 @@ class TTR(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if not meta.get("language_checked", False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        if "Spanish" not in meta.get('audio_languages', []):
-            if "Spanish" not in meta.get('subtitle_languages', []):
+        if "Spanish" not in (meta.audio_languages or []):
+            if "Spanish" not in (meta.subtitle_languages or []):
                 console.print(
                     "[bold red]TTR requires at least one Spanish audio or subtitle track."
                 )
                 return False
             else:
-                if meta.get('unattended'):
-                    if not meta.get('unattended_confirm', False):
+                if meta.unattended:
+                    if not meta.unattended_confirm:
                         return False
                 else:
                     console.print(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")

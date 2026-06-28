@@ -2,15 +2,16 @@
 from typing import Any, Optional
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class HHD(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ['https://homiehelpdesk.net']
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="HHD")
@@ -31,11 +32,10 @@ class HHD(UNIT3D):
             'SasukeducK', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'TGALAXY', 'TORRENTGALAXY',
             'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'x0r', 'YAWNiX', 'YIFY', 'YTS', 'PSA', ['EVO', 'WEB-DL only']
         ]  # fmt: off
-        pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
-        if meta["type"] == "DVDRIP":
+        if meta.type == "DVDRIP":
             console.print("[bold red]DVDRIP uploads are not allowed on HHD.[/bold red]")
             return False
 
@@ -61,15 +61,15 @@ class HHD(UNIT3D):
         elif reverse:
             return {v: k for k, v in category_id.items()}
 
-        resolved_category = category if category else meta.get("category", "")
+        resolved_category = category if category else meta.category
         if resolved_category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 resolved_category = "AUDIOBOOK"
-            elif meta.get("comic", False):
+            elif meta.comic:
                 resolved_category = "COMICS"
-            elif meta.get("manga", False):
+            elif meta.manga:
                 resolved_category = "MANGA"
-            elif meta.get("magazine", False):
+            elif meta.magazine:
                 resolved_category = "MAGAZINE"
             else:
                 resolved_category = "BOOKS"
@@ -114,15 +114,15 @@ class HHD(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type else meta.get("type", "")
+        resolved_type = type if type else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper()
 
-        if meta.get("category") == "BOOK" and resolved_type not in type_id:
+        if meta.category == "BOOK" and resolved_type not in type_id:
             resolved_type = "OTHER"
 
-        if meta["category"] == "GAME":
-            resolved_type = "CONSOLE" if meta.get("console_game", False) else str(meta.get("platform", "")).upper()
+        if meta.category == "GAME":
+            resolved_type = "CONSOLE" if meta.console_game else meta.platform.upper()
 
         return {"type_id": type_id.get(resolved_type, "0")}
 
@@ -153,6 +153,6 @@ class HHD(UNIT3D):
         elif resolution is not None:
             return {'resolution_id': resolution_id.get(resolution, '10')}
         else:
-            meta_resolution = meta.get('resolution', '')
+            meta_resolution = meta.resolution
             resolved_id = resolution_id.get(meta_resolution, '10')
             return {'resolution_id': resolved_id}

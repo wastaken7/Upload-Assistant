@@ -6,10 +6,11 @@ import transmission_rpc
 from torf import Torrent
 
 from src.console import console
+from src.meta import Meta
 
 
 class TransmissionClientMixin:
-    def transmission(self, path: str, torrent: Torrent, local_path: str, remote_path: str, client: dict[str, Any], meta: dict[str, Any]) -> None:
+    def transmission(self, path: str, torrent: Torrent, local_path: str, remote_path: str, client: dict[str, Any], meta: Meta) -> None:
         try:
             tr_client = transmission_rpc.Client(
                 protocol=client['transmission_protocol'],
@@ -31,8 +32,8 @@ class TransmissionClientMixin:
 
         path = os.path.dirname(path)
 
-        if meta.get('transmission_label') is not None:
-            label = [meta['transmission_label']]
+        if meta.transmission_label is not None:
+            label = [meta.transmission_label]
         elif client.get('transmission_label') is not None:
             label = [client['transmission_label']]
         else:
@@ -44,5 +45,5 @@ class TransmissionClientMixin:
             labels=label
         )
 
-        if meta.get('debug', False):
+        if meta.debug:
             console.print(f"[cyan]Path: {path}")

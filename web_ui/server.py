@@ -16,9 +16,9 @@ import sys
 import threading
 import traceback
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
-from typing import Any, Literal, Optional, TypedDict, Union, cast
+from typing import Any, Literal, Optional, TypedDict, cast
 
 import pyotp
 from flask import Flask, Response, g, jsonify, redirect, render_template, request, session, url_for
@@ -626,11 +626,11 @@ def _create_api_token(username: str, label: str = "", persist: bool = True, toke
     Optionally accept `token_value` to use an externally-provided token string when persisting.
     """
     store = _load_token_store()
-    token_id = str(token_value) if token_value else secrets.token_urlsafe(96)
+    token_id = token_value if token_value else secrets.token_urlsafe(96)
     # Tokens are non-expiring by default and remain valid until revoked.
     expiry = None
     # Store token metadata (no per-token scopes; tokens are treated as valid/invalid)
-    store[token_id] = {"user": username, "label": label, "created": int(datetime.now(timezone.utc).timestamp()), "expiry": expiry}
+    store[token_id] = {"user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
     if persist:
         _persist_token_store(store)
     with contextlib.suppress(Exception):
@@ -647,7 +647,7 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
         return False
     # Persisted tokens do not expire unless revoked.
     expiry = None
-    store[token] = {"user": username, "label": label, "created": int(datetime.now(timezone.utc).timestamp()), "expiry": expiry}
+    store[token] = {"user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
     _persist_token_store(store)
     with contextlib.suppress(Exception):
         _write_audit_log("create_api_token", [username], None, {"id": token, "label": label}, True)
@@ -662,7 +662,7 @@ def _verify_api_token(token: str) -> Optional[str]:
     if not info:
         return None
     expiry = info.get("expiry")
-    if expiry and int(datetime.now(timezone.utc).timestamp()) > int(expiry):
+    if expiry and int(datetime.now(UTC).timestamp()) > int(expiry):
         return None
     return str(info.get("user"))
 
@@ -676,7 +676,7 @@ def _get_token_info(token: str) -> Optional[dict[str, Any]]:
     if not info:
         return None
     expiry = info.get("expiry")
-    if expiry and int(datetime.now(timezone.utc).timestamp()) > int(expiry):
+    if expiry and int(datetime.now(UTC).timestamp()) > int(expiry):
         return None
     return info
 
@@ -737,7 +737,7 @@ def _create_remember_token(username: str, days: int = 30) -> Optional[str]:
     key = _get_persistent_cookie_key()
     if not key:
         return None
-    expiry = int(datetime.now(timezone.utc).timestamp()) + days * 86400
+    expiry = int(datetime.now(UTC).timestamp()) + days * 86400
     payload = json.dumps({"u": username, "e": expiry}, separators=(",", ":")).encode("utf-8")
     b64 = base64.urlsafe_b64encode(payload).decode("ascii")
     sig = hmac.new(key, b64.encode("ascii"), hashlib.sha256).hexdigest()
@@ -762,7 +762,7 @@ def _verify_remember_token(token: str) -> Optional[str]:
             return None
         username = data.get("u")
         expiry = int(data.get("e") or 0)
-        if not username or expiry < int(datetime.now(timezone.utc).timestamp()):
+        if not username or expiry < int(datetime.now(UTC).timestamp()):
             return None
         return str(username)
     except Exception:
@@ -837,7 +837,7 @@ ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 class ProcessInfo(TypedDict, total=False):
     process: subprocess.Popen[str]
     mode: str
-    input_queue: "queue.Queue[str]"
+    input_queue: queue.Queue[str]
     # Rich Console type is not imported for typing reasons here; use Any
     record_console: Any
 
@@ -875,7 +875,7 @@ class BrowseItem(TypedDict, total=False):
     name: str
     path: str
     type: Literal["folder", "file"]
-    children: Union[list["BrowseItem"], None]
+    children: list[BrowseItem] | None
     subtitle: str  # Optional hint  (eg, when parent path when names collide)
 
 
@@ -883,9 +883,9 @@ class ConfigItem(TypedDict, total=False):
     key: str
     value: Any
     source: Literal["config", "example"]
-    children: list["ConfigItem"]
+    children: list[ConfigItem]
     help: list[str]
-    subsection: Union[str, bool]
+    subsection: str | bool
 
 
 class ConfigSection(TypedDict, total=False):
@@ -1047,7 +1047,7 @@ def _maybe_log_api_access(response):
             # For failed auth attempts, try to extract attempted username
             if user is None and not success:
                 # Check Basic auth
-                if request.authorization and request.authorization.username:
+                if request.authorization is not None and request.authorization.username:
                     user = f"{request.authorization.username} (basic auth)"
                 # Check form data (login attempts)
                 elif request.method == "POST" and request.form.get("username"):
@@ -1217,17 +1217,17 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
         audit_path = base_dir / "data" / "config_audit.log"
         # Determine acting user: session -> Basic auth username -> persisted user -> remote_addr
         persisted = auth_mod.load_user()
-        user = _session_get("username") or (request.authorization.username if request.authorization else None) or (persisted.get("username") if persisted else None) or request.remote_addr
+        user = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None) or request.remote_addr
         # Redact sensitive fields from values before serializing to the audit log.
         audit = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "user": user,
             "remote_addr": request.remote_addr,
             "action": action,
             "path": path,
             "old_value": _json_safe(_redact_sensitive(old_value)),
             "new_value": _json_safe(_redact_sensitive(new_value)),
-            "success": bool(success),
+            "success": success,
             "error": error,
         }
         with open(audit_path, "a", encoding="utf-8") as af:
@@ -1505,7 +1505,7 @@ def _build_config_items(
     for key in merged_keys:
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
-        key_path = path + [str(key)]
+        key_path = path + [key]
         help_text = comments_map.get("/".join(key_path), [])
         subsection_label = subsection_map.get("/".join(key_path))
         if subsection_label != current_subsection:
@@ -1517,7 +1517,7 @@ def _build_config_items(
             children = _build_config_items(example_value, user_value, comments_map, subsection_map, key_path)
             source: Literal["config", "example"] = "config" if key in user_dict else "example"
             item: ConfigItem = {
-                "key": str(key),
+                "key": key,
                 "source": source,
                 "children": children,
                 "help": help_text,
@@ -1530,7 +1530,7 @@ def _build_config_items(
                 value = example_value
                 source = "example"
             item = {
-                "key": str(key),
+                "key": key,
                 "value": _json_safe(value),
                 "source": source,
                 "help": help_text,
@@ -1682,8 +1682,8 @@ def _resolve_user_path(
     # Use werkzeug.security.safe_join as the primary path sanitizer, with a
     # Windows fallback since safe_join uses posixpath internally.
     # Enforce a realpath+commonpath constraint to prevent symlink escapes.
-    matched_root: Union[str, None] = None
-    candidate_norm: Union[str, None] = None
+    matched_root: str | None = None
+    candidate_norm: str | None = None
 
     if expanded and os.path.isabs(expanded):
         # If a user supplies an absolute path, only allow it if it is under
@@ -1815,7 +1815,7 @@ def _resolve_user_path(
     return safe_candidate
 
 
-def _resolve_browse_path(user_path: Union[str, None]) -> str:
+def _resolve_browse_path(user_path: str | None) -> str:
     return _resolve_user_path(user_path, require_exists=True, require_dir=True)
 
 
@@ -2463,7 +2463,7 @@ def config_options():
             continue
 
         user_section = (user_config or {}).get(section_name, {})
-        items = _build_config_items(example_section, user_section, comments_map, subsection_map, [str(section_name)])
+        items = _build_config_items(example_section, user_section, comments_map, subsection_map, [section_name])
 
         # Add special client list items to DEFAULT section
         if section_name == "DEFAULT":
@@ -2500,7 +2500,7 @@ def config_options():
             subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SETUP"
             subsection_map["DEFAULT/searching_client_list"] = "CLIENT SETUP"
 
-        sections.append({"section": str(section_name), "items": items})
+        sections.append({"section": section_name, "items": items})
 
         if section_name == "TORRENT_CLIENTS":
             client_types = set()
@@ -2687,7 +2687,7 @@ def api_tokens():
         label = data.get("label", "")
         # No expiry: tokens are non-expiring by default;
         persisted = auth_mod.load_user()
-        username = _session_get("username") or (request.authorization.username if request.authorization else None) or (persisted.get("username") if persisted else None)
+        username = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None)
         if not username:
             return jsonify({"success": False, "error": "Unable to determine username for token"}), 400
 
@@ -3227,7 +3227,8 @@ def execute_command():
                         try:
                             orig_ask_string = _cli_ui.ask_string
 
-                            def wrapped_ask_string(prompt: str, _default: Optional[str] = None) -> str:
+                            def wrapped_ask_string(*question: Any, default: Optional[str] = None) -> Optional[str]:
+                                prompt = " ".join(str(q) for q in question)
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)
                                 # Wait for input or cancellation
@@ -3264,7 +3265,7 @@ def execute_command():
                             parsed_args = shlex.split(args)
                             parsed_args = _validate_upload_assistant_args(parsed_args)
 
-                        sys.argv = [str(upload_script), validated_path] + parsed_args
+                        sys.argv = [upload_script, validated_path] + parsed_args
 
                         # Store in active_processes so /api/input can post into the queue
                         cast(Any, active_processes)[session_id] = {
@@ -3292,9 +3293,10 @@ def execute_command():
                                         nonlocal_upload = None
 
                                 # Ensure Windows event loop policy when needed
-                                if sys.platform == "win32":
+                                if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
                                     with contextlib.suppress(Exception):
-                                        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                                        policy_class = getattr(asyncio, "WindowsProactorEventLoopPolicy")
+                                        asyncio.set_event_loop_policy(policy_class())
                                 if nonlocal_upload is None:
                                     raise RuntimeError("upload.main not available for in-process execution")
                                 asyncio.run(nonlocal_upload())
@@ -3497,7 +3499,7 @@ def execute_command():
                         # Ensure the upload_script is the expected script under the repo
                         try:
                             expected_script = os.path.realpath(str(Path(base_dir) / "upload.py"))
-                            script_real = os.path.realpath(str(command[2]))
+                            script_real = os.path.realpath(command[2])
                             if script_real != expected_script:
                                 raise ValueError("Invalid script path")
                         except IndexError as err:
@@ -3578,7 +3580,7 @@ def execute_command():
 
                         console.print(f"Started subprocess reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={stderr_thread.name}", markup=False)
 
-                        def _read_output(q: queue.Queue[tuple[str, str]]) -> tuple[bool, Union[tuple[str, str], None]]:
+                        def _read_output(q: queue.Queue[tuple[str, str]]) -> tuple[bool, tuple[str, str] | None]:
                             try:
                                 return True, q.get(timeout=0.1)
                             except queue.Empty:

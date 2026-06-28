@@ -14,9 +14,9 @@ from unidecode import unidecode
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -39,7 +39,7 @@ class TTG:
         self.cookie_validator = CookieValidator(config)
 
     async def edit_name(self, meta: Meta) -> str:
-        ttg_name = str(meta.get('name', ''))
+        ttg_name = meta.name
 
         remove_list = ['Dubbed', 'Dual-Audio']
         for each in remove_list:
@@ -50,20 +50,20 @@ class TTG:
 
     async def get_type_id(self, meta: Meta) -> int:
         type_id = 0
-        lang = str(meta.get('original_language', 'UNKNOWN')).upper()
-        category = str(meta.get('category', ''))
-        resolution = str(meta.get('resolution', ''))
-        if meta['category'] == "MOVIE":
+        lang = str(meta.original_language).upper()
+        category = str(meta.category)
+        resolution = meta.resolution
+        if meta.category == "MOVIE":
             # 51 = DVDRip
             if resolution.startswith("720"):
                 type_id = 52  # 720p
             if resolution.startswith("1080"):
                 type_id = 53  # 1080p/i
-            if meta.get('is_disc') == "BDMV":
+            if meta.is_disc == "BDMV":
                 type_id = 54  # Blu-ray disc
 
         elif category == "TV":
-            if meta.get('tv_pack', 0) != 1:
+            if meta.tv_pack != 1:
                 # TV Singles
                 if resolution.startswith("720"):
                     type_id = 69  # 720p TV EU/US
@@ -87,25 +87,22 @@ class TTG:
                 if lang in ('ZH', 'CN', 'CMN'):
                     type_id = 90  # Chinese
 
-        genres_value = str(meta.get("genres", "")).lower().replace(' ', '').replace('-', '')
-        keywords_value = str(meta.get("keywords", "")).lower().replace(' ', '').replace('-', '')
+        genres_value = str(meta.genres).lower().replace(" ", "").replace("-", "")
+        keywords_value = str(meta.keywords).lower().replace(" ", "").replace("-", "")
         if "documentary" in genres_value or 'documentary' in keywords_value:
             if resolution.startswith("720"):
                 type_id = 62  # 720p
             if resolution.startswith("1080"):
                 type_id = 63  # 1080
-            if meta.get('is_disc', '') == 'BDMV':
+            if meta.is_disc == "BDMV":
                 type_id = 64  # BDMV
 
-        if (
-            "animation" in genres_value
-            or 'animation' in keywords_value
-        ) and meta.get('sd', 1) == 0:
+        if ("animation" in genres_value or "animation" in keywords_value) and meta.sd == 0:
             type_id = 58
 
         if resolution in ("2160p"):
             type_id = 108
-            if meta.get('is_disc', '') == 'BDMV':
+            if meta.is_disc == "BDMV":
                 type_id = 109
 
         # I guess complete packs?:
@@ -130,31 +127,23 @@ class TTG:
         #
         # POST > upload/upload
 
-        anon = (
-            'no'
-            if meta.get('anon') == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False)
-            else 'yes'
-        )
+        anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
 
-        mi_path = (
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt"
-            if meta['bdinfo'] is not None
-            else f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt"
-        )
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
 
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt",
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            encoding="utf-8",
         ) as desc_file:
             ttg_desc = await desc_file.read()
-        torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        filelist = cast(list[Any], meta.get('filelist', []))
+        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        filelist = meta.filelist
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
         if len(filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(str(meta.get('video', ''))).replace(' ', '.'))
+            torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
         else:
-            torrentFileName = unidecode(os.path.basename(str(meta.get('path', ''))).replace(' ', '.'))
+            torrentFileName = unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_dump:
             mi_text = await mi_dump.read()
         files = {
@@ -174,27 +163,27 @@ class TTG:
 
         }
         url = "https://totheglory.im/takeupload.php"
-        if int(meta.get('imdb_id', 0) or 0) != 0:
-            data['imdb_c'] = f"tt{meta.get('imdb')}"
+        if meta.imdb_id or 0 != 0:
+            data["imdb_c"] = f"tt{meta.imdb}"
 
         # Submit
-        if meta.get('debug'):
+        if meta.debug:
             console.print(url)
             console.print(data)
-            tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+            tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         else:
-            cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.json")
+            cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.json")
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
             cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
                 up = await client.post(url=url, data=data, files=files)
 
             if str(up.url).startswith("https://totheglory.im/details.php?id="):
-                tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+                tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
                 tracker_status[self.tracker]['status_message'] = str(up.url)
                 id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
@@ -213,19 +202,19 @@ class TTG:
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.json")
+        cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.json")
         if not os.path.exists(cookiefile):
             console.print("[bold red]Cookie file not found: TTG.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
-        imdb = f"imdb{meta.get('imdb')}" if int(meta.get('imdb_id', 0) or 0) != 0 else ""
-        if meta.get('is_disc', '') == "BDMV":
-            res_type = f"{meta.get('resolution', '')} Blu-ray"
-        elif meta.get('is_disc', '') == "DVD":
+        imdb = f"imdb{meta.imdb}" if meta.imdb_id or 0 != 0 else ""
+        if meta.is_disc == "BDMV":
+            res_type = f"{meta.resolution} Blu-ray"
+        elif meta.is_disc == "DVD":
             res_type = "DVD"
         else:
-            res_type = str(meta.get('resolution', ''))
+            res_type = meta.resolution
 
         search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
 
@@ -257,7 +246,7 @@ class TTG:
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile = os.path.abspath(f"{meta['base_dir']}/data/cookies/TTG.pkl")
+        cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.pkl")
         if not os.path.exists(cookiefile):
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
@@ -281,7 +270,7 @@ class TTG:
             cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
-                if meta.get('debug'):
+                if meta.debug:
                     console.print('[cyan]Cookies:')
                     console.print(resp.url)
                 return resp.text.find('''<a href="/logout.php">Logout</a>''') != -1
@@ -325,8 +314,8 @@ class TTG:
 
     async def edit_desc(self, meta: Meta) -> None:
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt",
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+            encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
 
@@ -335,19 +324,19 @@ class TTG:
         common = COMMON(config=self.config)
 
         parts: list[str] = []
-        if int(meta.get('imdb_id', 0) or 0) != 0:
+        if meta.imdb_id or 0 != 0:
             ptgen = await common.ptgen(meta)
             if ptgen.strip() != '':
                 parts.append(ptgen)
 
         # Add This line for all web-dls
-        if meta.get('type') == 'WEBDL' and meta.get('service_longname', '') != '' and meta.get('description', None) is None:
+        if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None:
             parts.append(
-                f"[center][b][color=#ff00ff][size=3]{meta['service_longname']}的无损REMUX片源，没有转码/This release is sourced from {meta['service_longname']} and is not transcoded, just remuxed from the direct {meta['service_longname']} stream[/size][/color][/b][/center]"
+                f"[center][b][color=#ff00ff][size=3]{meta.service_longname}的无损REMUX片源，没有转码/This release is sourced from {meta.service_longname} and is not transcoded, just remuxed from the direct {meta.service_longname} stream[/size][/color][/b][/center]"
             )
         bbcode = BBCODE()
-        if meta.get('discs', []) != []:
-            discs = cast(list[dict[str, Any]], meta.get('discs', []))
+        if meta.discs != []:
+            discs = cast(list[dict[str, Any]], meta.discs)
             for each in discs:
                 if each['type'] == "BDMV":
                     parts.append(f"[quote={each.get('name', 'BDINFO')}]{each['summary']}[/quote]\n")
@@ -361,8 +350,8 @@ class TTG:
                     parts.append("\n")
         else:
             async with aiofiles.open(
-                f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt",
-                encoding='utf-8',
+                f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt",
+                encoding="utf-8",
             ) as mi_file:
                 mi = await mi_file.read()
             parts.append(f"[quote=MediaInfo]{mi}[/quote]")
@@ -374,10 +363,10 @@ class TTG:
         desc = desc.replace('[img]', '[img]')
         desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
         parts.append(desc)
-        images = cast(list[dict[str, Any]], meta.get('image_list', []))
+        images = meta.image_list
         if images:
             parts.append("[center]")
-            screens = int(meta.get('screens', 0) or 0)
+            screens = meta.screens or 0
             for each in range(len(images[:screens])):
                 web_url = images[each].get('web_url')
                 img_url = images[each].get('img_url')
@@ -390,9 +379,9 @@ class TTG:
             parts.append(self.signature)
 
         async with aiofiles.open(
-            f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt",
-            'w',
-            encoding='utf-8',
+            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            "w",
+            encoding="utf-8",
         ) as descfile:
             await descfile.write("".join(parts))
 

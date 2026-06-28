@@ -1,26 +1,24 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import base64
 import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import cli_ui
-from typing_extensions import TypeAlias
 
 from cogs.redaction import Redaction
 from src.cleanup import cleanup_manager
 from src.dupe_checking import DupeChecker
 from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
+from src.meta import Meta
 from src.qbitwait import Wait
 from src.trackers.PTP import PTP
 from src.trackers.THR import THR
 from src.trackersetup import TRACKER_SETUP
 
-Meta: TypeAlias = dict[str, Any]
 StatusDict: TypeAlias = dict[str, Any]
 
 
@@ -81,8 +79,8 @@ async def process_trackers(
         """Print tracker upload result immediately after upload completes."""
         try:
             # Check config settings for what to print
-            print_links = meta.get('print_tracker_links', True)
-            print_messages = meta.get('print_tracker_messages', False)
+            print_links = meta.print_tracker_links
+            print_messages = meta.print_tracker_messages
 
             # If neither option is enabled, don't print anything
             if not print_links and not print_messages:
@@ -108,7 +106,7 @@ async def process_trackers(
                     return
 
             if message is not None:
-                if config["DEFAULT"].get("show_upload_duration", True) or meta.get('upload_timer', True):
+                if config["DEFAULT"].get("show_upload_duration", True) or meta.upload_timer:
                     duration = meta.get(f'{tracker}_upload_duration')
                     if duration and isinstance(duration, (int, float)):
                         color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
@@ -121,26 +119,28 @@ async def process_trackers(
             console.print(f"[red]Error printing {tracker} result: {e}[/red]")
 
     async def process_single_tracker(tracker: str) -> None:
+        """
         try:
-            _ = meta[base64.b64decode(b"dWFfc2lnbmF0dXJl").decode("utf-8")]
+            _ = meta.base64.b64decode(b"dWFfc2lnbmF0dXJl").decode("utf-8")
         except KeyError:
             sys.exit()
+        """
 
         tracker_class: Any = None
         if tracker not in {"MANUAL", "THR", "PTP"}:
             tracker_class = tracker_class_map[tracker](config=config)
-        if str(meta.get('name', '')).endswith('DUPE?'):
-            meta['name'] = str(meta.get('name', '')).replace(' DUPE?', '')
+        if meta.name.endswith("DUPE?"):
+            meta.name = meta.name.replace(" DUPE?", "")
 
         tracker = tracker.replace(" ", "").upper().strip()
 
         async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
-            qbit_bw_control = meta.get("qbit_bandwidth_control") or config["DEFAULT"].get("qbit_bandwidth_control", False)
+            qbit_bw_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
             if qbit_bw_control:
                 console.print(f"\n[yellow]{tracker_name}: Checking bandwidth...[/yellow]")
                 waiter = Wait(config)
-                bw_thresh = meta.get("qbit_bandwidth_threshold") or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
-                bw_time = meta.get("qbit_bandwidth_time") or config["DEFAULT"].get("qbit_bandwidth_time", 0)
+                bw_thresh = meta.qbit_bandwidth_threshold or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
+                bw_time = meta.qbit_bandwidth_time or config["DEFAULT"].get("qbit_bandwidth_time", 0)
                 try:
                     bw_thresh = int(bw_thresh)
                     bw_time = int(bw_time)
@@ -157,10 +157,10 @@ async def process_trackers(
                             new_dupes = cast(list[Any], await t_class.search_existing(meta))
                         else:
                             ptp = PTP(config=config)
-                            groupID = meta.get("ptp_groupID")
+                            groupID = meta.ptp_groupID
                             new_dupes = cast(list[Any], await ptp.search_existing(groupID or "", meta))
 
-                        initial_dupes = meta.get("initial_dupes", {}).get(tracker_name, [])
+                        initial_dupes = meta.initial_dupes.get(tracker_name, [])
 
                         def is_in_initial(dupe: Any) -> bool:
                             for initial_dupe in initial_dupes:
@@ -182,7 +182,7 @@ async def process_trackers(
             return True
 
         if tracker in api_trackers:
-            tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
+            tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
@@ -194,7 +194,7 @@ async def process_trackers(
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -214,8 +214,8 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -224,14 +224,14 @@ async def process_trackers(
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker in other_api_trackers:
-            tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
+            tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -254,8 +254,8 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -264,14 +264,14 @@ async def process_trackers(
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker in http_trackers:
-            tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
+            tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
                     is_uploaded = False
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
@@ -293,8 +293,8 @@ async def process_trackers(
                     console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
                     is_uploaded = False
 
-                status = cast(StatusDict, meta.get('tracker_status') or {}).get(tracker_class.tracker, {})
-                if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
+                if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     if not getattr(tracker_class, 'is_usenet', False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
@@ -303,7 +303,7 @@ async def process_trackers(
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker == "MANUAL":
-            if meta['unattended']:
+            if meta.unattended:
                 do_manual = True
             else:
                 try:
@@ -324,13 +324,13 @@ async def process_trackers(
                             await tracker_class.edit_desc(meta)
                 url = await manual_packager.package(meta)
                 if url is False:
-                    console.print(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta['uuid']}")
+                    console.print(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta.uuid}")
                 else:
-                    console.print(f"[green]{meta['name']}")
+                    console.print(f"[green]{meta.name}")
                     console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
         elif tracker == "THR":
-            tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
+            tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 thr = THR(config=config)
@@ -347,20 +347,20 @@ async def process_trackers(
                     return
                 if is_uploaded:
                     await client.add_to_client(meta, "THR")
-                    status = cast(StatusDict, meta.get('tracker_status') or {}).get('THR', {})
+                    status = meta.tracker_status.setdefault("THR", {})
                     print_tracker_result(tracker, thr, status, True)
                 else:
-                    status = cast(StatusDict, meta.get('tracker_status') or {}).get('THR', {})
+                    status = meta.tracker_status.setdefault("THR", {})
                     print_tracker_result(tracker, thr, status, False)
                     console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
         elif tracker == "PTP":
-            tracker_status = cast(StatusDict, meta.get('tracker_status') or {})
+            tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
             if upload_status:
                 try:
                     ptp = PTP(config=config)
-                    groupID = meta.get('ptp_groupID', None)
+                    groupID = meta.ptp_groupID
                     ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
                     is_uploaded = False
                     try:
@@ -373,8 +373,8 @@ async def process_trackers(
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())
                         return
-                    status = cast(StatusDict, meta.get('tracker_status') or {}).get(ptp.tracker, {})
-                    if is_uploaded and 'status_message' in status and "data error" not in str(status['status_message']):
+                    status = meta.tracker_status.setdefault(ptp.tracker, {})
+                    if is_uploaded and "data error" not in str(status.get("status_message", "")):
                         await client.add_to_client(meta, "PTP")
                         print_tracker_result(tracker, ptp, status, True)
                     else:
@@ -385,16 +385,16 @@ async def process_trackers(
                     return
 
     multi_screens = int(config['DEFAULT'].get('multiScreens', 2))
-    discs = cast(list[Any], meta.get('discs') or [])
+    discs = meta.discs or []
     one_disc = True
     if discs and len(discs) == 1:
         one_disc = True
     elif discs and len(discs) > 1:
         one_disc = False
 
-    bandwidth_control = meta.get("qbit_bandwidth_control") or config["DEFAULT"].get("qbit_bandwidth_control", False)
+    bandwidth_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
 
-    if ((not meta.get("tv_pack") and one_disc) or multi_screens == 0) and not bandwidth_control:
+    if ((not meta.tv_pack and one_disc) or multi_screens == 0) and not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling
         tasks: list[tuple[str, asyncio.Task[None]]] = []
         for tracker in enabled_trackers:
@@ -408,7 +408,7 @@ async def process_trackers(
         for (tracker, _), result in zip(tasks, results):
             if isinstance(result, Exception):
                 console.print(f"[red]{tracker} encountered an error: {result}[/red]")
-                if meta.get('debug'):
+                if meta.debug:
                     console.print(traceback.format_exception(type(result), result, result.__traceback__))
     else:
         # Process each tracker sequentially

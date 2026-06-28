@@ -6,20 +6,20 @@ import json
 import os
 import re
 import shlex
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeAlias, cast
 
 import cli_ui
 import click
 from rich.markdown import Markdown
 from rich.style import Style
-from typing_extensions import TypeAlias
 
 from src.console import console
+from src.meta import Meta
 
 QueueItem: TypeAlias = dict[str, Any]
-QueueList: TypeAlias = Union[list[str], list[QueueItem]]
+QueueList: TypeAlias = list[str] | list[QueueItem]
 
 
 async def _read_json_file(path: str) -> Any:
@@ -39,8 +39,8 @@ async def _read_text_lines(path: str) -> list[str]:
 
 class QueueManager:
     @staticmethod
-    async def process_site_upload_queue(meta: Mapping[str, Any], base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
-        site_upload = meta.get('site_upload')
+    async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+        site_upload = meta.site_upload
         if not site_upload:
             return [], None
 
@@ -99,14 +99,14 @@ class QueueManager:
         return queue, processed_files_log
 
     @staticmethod
-    async def process_site_upload_item(queue_item: Mapping[str, Any], meta: MutableMapping[str, Any]) -> str:
+    async def process_site_upload_item(queue_item: Mapping[str, Any], meta: Meta) -> str:
         # Set the tracker argument (-tk XXX)
         tracker = cast(str, queue_item['tracker'])
-        meta['trackers'] = [tracker]
+        meta.trackers = [tracker]
 
         # Set the IMDb ID
         imdb = queue_item.get('imdb_id', 0)
-        meta['imdb_id'] = imdb
+        meta.imdb_id = imdb
 
         # Return the path for processing
         return cast(str, queue_item['path'])
@@ -149,7 +149,7 @@ class QueueManager:
 
     @staticmethod
     async def gather_files_recursive(
-        path: Union[str, bytes],
+        path: str | bytes,
         allowed_extensions: Optional[Sequence[str]] = None,
     ) -> list[str]:
         """
@@ -393,35 +393,35 @@ class QueueManager:
     @staticmethod
     async def handle_queue(
         path: str,
-        meta: MutableMapping[str, Any],
+        meta: Meta,
         paths: Sequence[str],
         base_dir: str,
     ) -> tuple[QueueList, Optional[str]]:
         allowed_extensions = ['.mkv', '.mp4', '.ts']
-        queue: list[str] = []
+        queue: list[Any] = []
 
-        if meta.get('site_upload'):
-            console.print(f"[bold yellow]Processing site upload queue for tracker: {meta['site_upload']}[/bold yellow]")
+        if meta.site_upload:
+            console.print(f"[bold yellow]Processing site upload queue for tracker: {meta.site_upload}[/bold yellow]")
             site_queue, processed_log = await QueueManager.process_site_upload_queue(meta, base_dir)
 
             if site_queue:
-                meta['queue'] = f"{meta['site_upload']}_upload"
-                meta['site_upload_queue'] = True
+                meta.queue = f"{meta.site_upload}_upload"
+                meta.site_upload_queue = True
 
                 # Return the structured queue and log file
                 return site_queue, processed_log
             else:
-                console.print(f"[yellow]No unprocessed items found for {meta['site_upload']} upload[/yellow]")
+                console.print(f"[yellow]No unprocessed items found for {meta.site_upload} upload[/yellow]")
                 return [], None
 
-        log_file = os.path.join(base_dir, "tmp", f"{meta.get('queue', 'default')}_queue.log")
+        log_file = os.path.join(base_dir, "tmp", f"{(meta.queue if meta.queue is not None else 'default')}_queue.log")
 
-        if path.endswith(".txt") and not meta.get("unit3d"):
+        if path.endswith(".txt") and not meta.unit3d:
             console.print(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if os.path.exists(path):
                 queue_name = os.path.splitext(os.path.basename(path))[0]
-                meta["queue"] = queue_name
-                meta["args_line_queue"] = True
+                meta.queue = queue_name
+                meta.args_line_queue = True
 
                 log_file = await QueueManager.get_log_file(base_dir, queue_name)
                 processed_files = await QueueManager.load_processed_files(log_file)
@@ -465,7 +465,7 @@ class QueueManager:
                 except OSError as e:
                     console.print(f"[bold red]Failed to save the queue log file: {e}[/bold red]")
 
-                if meta.get("debug"):
+                if meta.debug:
                     await QueueManager.display_queue(queue, base_dir, queue_name, save_to_log=False)
 
                 return queue, log_file
@@ -473,14 +473,14 @@ class QueueManager:
                 console.print(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
-        elif path.endswith(".txt") and meta.get("unit3d"):
+        elif path.endswith(".txt") and meta.unit3d:
             console.print(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if os.path.exists(path):
                 safe_file_locations = await QueueManager.extract_safe_file_locations(path)
                 if safe_file_locations:
                     console.print(f"[cyan]Extracted {len(safe_file_locations)} safe file locations from the text file.[/cyan]")
                     queue = safe_file_locations
-                    meta['queue'] = "unit3d"
+                    meta.queue = "unit3d"
 
                     # Save the queue to the log file
                     try:
@@ -496,18 +496,18 @@ class QueueManager:
                 console.print(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
-        elif path.endswith('.log') and meta['debug']:
+        elif path.endswith(".log") and meta.debug:
             console.print(f"[bold yellow]Processing debugging queue:[/bold yellow] [bold green{path}[/bold green]")
             if os.path.exists(path):
                 log_file = path
                 queue = cast(list[str], await _read_json_file(path))
-                meta['queue'] = "debugging"
+                meta.queue = "debugging"
 
             else:
                 console.print(f"[bold red]Log file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
-        elif meta.get('queue'):
+        elif meta.queue:
             if os.path.exists(log_file):
                 existing_queue = cast(list[str], await _read_json_file(log_file))
 
@@ -520,7 +520,7 @@ class QueueManager:
                 current_set = set(current_files)
                 new_files = current_set - existing_set
                 removed_files = existing_set - current_set
-                log_file_proccess = await QueueManager.get_log_file(base_dir, meta['queue'])
+                log_file_proccess = await QueueManager.get_log_file(base_dir, meta.queue)
                 processed_files = await QueueManager.load_processed_files(log_file_proccess)
                 queued = [file for file in existing_queue if file not in processed_files]
 
@@ -529,16 +529,16 @@ class QueueManager:
 
                 if new_files or removed_files:
                     console.print("[bold yellow]Queue changes detected:[/bold yellow]")
-                    if new_files and meta.get('debug'):
+                    if new_files and meta.debug:
                         console.print(f"[green]New files found ({len(new_files)}):[/green]")
                         for file in sorted(new_files):
                             console.print(f"  + {file}")
-                    if removed_files and meta.get('debug'):
+                    if removed_files and meta.debug:
                         console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
                         for file in sorted(removed_files):
                             console.print(f"  - {file}")
 
-                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                         console.print("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
                         edit_choice_raw = cli_ui.ask_string("Enter 'u' to update, 'a' to add specific new files, 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                         edit_choice = (edit_choice_raw or "").strip().lower()
@@ -592,7 +592,7 @@ class QueueManager:
                 else:
                     # No changes detected
                     console.print("[green]No changes detected in the queue.[/green]")
-                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                         console.print("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
                         edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                         edit_choice = (edit_choice_raw or "").strip().lower()
@@ -688,25 +688,25 @@ class QueueManager:
             console.print(f"[red]No valid files or directories found for path: {path}")
             exit(1)
 
-        if meta.get('queue'):
-            queue_name = meta['queue']
-            log_file = await QueueManager.get_log_file(base_dir, meta['queue'])
+        if meta.queue:
+            queue_name = meta.queue
+            log_file = await QueueManager.get_log_file(base_dir, meta.queue)
             processed_files = await QueueManager.load_processed_files(log_file)
             queue = [file for file in queue if file not in processed_files]
             if not queue:
-                console.print(f"[bold yellow]All files in the {meta['queue']} queue have already been processed.")
+                console.print(f"[bold yellow]All files in the {meta.queue} queue have already been processed.")
                 exit(0)
-            if meta['debug']:
+            if meta.debug:
                 await QueueManager.display_queue(queue, base_dir, queue_name, save_to_log=False)
 
         return queue, log_file
 
 
-async def process_site_upload_queue(meta: Mapping[str, Any], base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
     return await QueueManager.process_site_upload_queue(meta, base_dir)
 
 
-async def process_site_upload_item(queue_item: Mapping[str, Any], meta: MutableMapping[str, Any]) -> str:
+async def process_site_upload_item(queue_item: Mapping[str, Any], meta: Meta) -> str:
     return await QueueManager.process_site_upload_item(queue_item, meta)
 
 
@@ -723,7 +723,7 @@ async def load_processed_files(log_file: str) -> set[str]:
 
 
 async def gather_files_recursive(
-    path: Union[str, bytes],
+    path: str | bytes,
     allowed_extensions: Optional[Sequence[str]] = None,
 ) -> list[str]:
     return await QueueManager.gather_files_recursive(path, allowed_extensions=allowed_extensions)
@@ -759,7 +759,7 @@ async def display_queue(
 
 async def handle_queue(
     path: str,
-    meta: MutableMapping[str, Any],
+    meta: Meta,
     paths: Sequence[str],
     base_dir: str,
 ) -> tuple[QueueList, Optional[str]]:

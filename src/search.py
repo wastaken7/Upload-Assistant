@@ -12,7 +12,6 @@ class Search:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        pass
 
     def _get_search_dirs(self) -> list[str]:
         config_dir = self.config.get('DISCORD', {}).get('search_dir', [])

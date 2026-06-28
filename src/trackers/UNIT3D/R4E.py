@@ -5,10 +5,10 @@ from typing import Any, Optional, cast
 import httpx
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -36,15 +36,15 @@ class R4E(UNIT3D):
         _ = (category, reverse, mapping_only)
         category_id = '24'
         # Use stored genre IDs if available
-        if meta and meta.get('genre_ids'):
-            genre_ids = str(meta['genre_ids']).split(',')
+        if meta and meta.genre_ids:
+            genre_ids = str(meta.genre_ids).split(",")
             is_docu = '99' in genre_ids
 
-            if meta['category'] == 'MOVIE':
+            if meta.category == "MOVIE":
                 category_id = '70'  # Motorsports Movie
                 if is_docu:
                     category_id = '66'  # Documentary
-            elif meta['category'] == 'TV':
+            elif meta.category == "TV":
                 category_id = '79'  # TV Series
                 if is_docu:
                     category_id = '2'  # TV Documentary
@@ -62,18 +62,18 @@ class R4E(UNIT3D):
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {
-            '8640p': '2160p',
-            '4320p': '2160p',
-            '2160p': '2160p',
-            '1440p': '1080p',
-            '1080p': '1080p',
-            '1080i': '1080i',
-            '720p': '720p',
-            '576p': 'SD',
-            '576i': 'SD',
-            '480p': 'SD',
-            '480i': 'SD'
-        }.get(str(meta.get('type', '')), '10')
+            "8640p": "2160p",
+            "4320p": "2160p",
+            "2160p": "2160p",
+            "1440p": "1080p",
+            "1080p": "1080p",
+            "1080i": "1080i",
+            "720p": "720p",
+            "576p": "SD",
+            "576i": "SD",
+            "480p": "SD",
+            "480i": "SD",
+        }.get(str(meta.type), "10")
         return {'type_id': type_id}
 
     async def get_personal_release(self, meta: Meta) -> dict[str, str]:
@@ -114,16 +114,16 @@ class R4E(UNIT3D):
         dupes: list[dict[str, Any]] = []
         url = "https://racing4everyone.eu/api/torrents/filter"
         params: dict[str, Any] = {
-            'api_token': str(self.config['TRACKERS']['R4E']['api_key']).strip(),
-            'tmdb': meta.get('tmdb'),
-            'categories[]': (await self.get_category_id(meta))['category_id'],
-            'types[]': (await self.get_type_id(meta))['type_id'],
-            'name': ""
+            "api_token": str(self.config["TRACKERS"]["R4E"]["api_key"]).strip(),
+            "tmdb": meta.tmdb,
+            "categories[]": (await self.get_category_id(meta))["category_id"],
+            "types[]": (await self.get_type_id(meta))["type_id"],
+            "name": "",
         }
-        if meta['category'] == 'TV':
-            params['name'] = f"{meta.get('season', '')}"
-        if meta.get('edition', "") != "":
-            params['name'] = str(params['name']) + str(meta['edition'])
+        if meta.category == "TV":
+            params["name"] = f"{meta.season}"
+        if meta.edition != "":
+            params["name"] = str(params["name"]) + meta.edition
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(url=url, params=params)

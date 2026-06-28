@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Optional, Union
 
+from src.meta import Meta
+
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="discord.player")
 
 import discord
@@ -57,7 +59,7 @@ class Bot(commands.Bot):
         Can be used to work out uptime.
         """
         await self.wait_until_ready()
-        self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        self.start_time = datetime.datetime.now(datetime.UTC)
 
     async def get_prefix_(self, bot: commands.Bot, message: discord.Message) -> Sequence[str]:
         """
@@ -122,8 +124,8 @@ class DiscordNotifier:
         config: Mapping[str, Any],
         bot: Optional[BotLike],
         message: str,
+        meta: Meta,
         debug: bool = False,
-        meta: Optional[Mapping[str, Any]] = None,
     ) -> bool:
         """
         Send a notification message to Discord channel.
@@ -137,7 +139,7 @@ class DiscordNotifier:
             bool: True if message was sent successfully, False otherwise
         """
         only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
-        unattended = bool(meta and meta.get('unattended', False))
+        unattended = bool(meta and meta.unattended)
         if only_unattended and not unattended:
             return False
         if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
@@ -164,17 +166,17 @@ class DiscordNotifier:
     async def send_upload_status_notification(
         config: Mapping[str, Any],
         bot: Optional[BotLike],
-        meta: Mapping[str, Any],
+        meta: Meta,
     ) -> bool:
         """Send Discord notification with upload status including failed trackers."""
         only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
-        unattended = bool(meta and meta.get('unattended', False))
+        unattended = bool(meta and meta.unattended)
         if only_unattended and not unattended:
             return False
         if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
             return False
 
-        tracker_status = meta.get('tracker_status', {})
+        tracker_status = meta.tracker_status
         if not tracker_status:
             return False
 
@@ -195,7 +197,7 @@ class DiscordNotifier:
                 elif status.get('dupe', False):
                     failed_trackers.append(f"{tracker} (dupe)")
 
-        release_name = meta.get('name', meta.get('title', 'Unknown Release'))
+        release_name = meta.name if meta.name is not None else meta.get("title", "Unknown Release")
         message_parts: list[str] = []
 
         if successful_uploads:
@@ -225,8 +227,8 @@ async def send_discord_notification(
     config: Mapping[str, Any],
     bot: Optional[BotLike],
     message: str,
+    meta: Meta,
     debug: bool = False,
-    meta: Optional[Mapping[str, Any]] = None,
 ) -> bool:
     return await DiscordNotifier.send_discord_notification(config, bot, message, debug=debug, meta=meta)
 
@@ -234,6 +236,6 @@ async def send_discord_notification(
 async def send_upload_status_notification(
     config: Mapping[str, Any],
     bot: Optional[BotLike],
-    meta: Mapping[str, Any],
+    meta: Meta,
 ) -> bool:
     return await DiscordNotifier.send_upload_status_notification(config, bot, meta)

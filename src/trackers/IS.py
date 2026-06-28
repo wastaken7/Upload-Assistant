@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Union
+from typing import Any
 
 import aiofiles
 import httpx
@@ -12,13 +12,14 @@ from bs4 import BeautifulSoup
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
 class IS:
     supported_categories = ('TV', 'MOVIE', 'BOOK')
+    tracker_urls = ['https://immortalseed.me']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
@@ -64,27 +65,27 @@ class IS:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Union[str, None]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:
             self.session.cookies.update(cookies)
-        dupes: list[dict[str, Union[str, None]]] = []
+        dupes: list[dict[str, str | None]] = []
 
         search_type = ''
         search_query = ''
-        category = str(meta.get('category', ''))
+        category = str(meta.category)
 
         if category == "MOVIE":
             search_type = 't_genre'
-            search_query = str(meta.get('imdb_info', {}).get('imdbID', ''))
+            search_query = str(meta.imdb_info.get("imdbID", ""))
 
         elif category == "TV":
             search_type = 't_name'
-            search_query = f"{meta.get('title', '')} {meta.get('season', '')}{meta.get('episode', '')}"
+            search_query = f"{meta.title} {meta.season}{meta.episode}"
         elif category == "BOOK":
             search_type = "t_name"
-            search_query = str(meta.get("title", ""))
+            search_query = meta.title
         else:
             return dupes
 
@@ -94,7 +95,7 @@ class IS:
             response = await self.session.get(search_url)
             if "Forget your password" in response.text or "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta["skipping"] = self.tracker
+                meta.skipping = self.tracker
                 return dupes
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -131,14 +132,14 @@ class IS:
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
-        resolution = str(meta.get('resolution', ''))
-        category = str(meta.get('category', ''))
-        genres = str(meta.get('genres', '')).lower()
-        keywords = str(meta.get('keywords', '')).lower()
-        is_anime = bool(meta.get('anime'))
+        resolution = meta.resolution
+        category = str(meta.category)
+        genres = str(meta.genres).lower()
+        keywords = str(meta.keywords).lower()
+        is_anime = meta.anime
         non_eng = False
-        sd = bool(meta.get('sd', False))
-        if str(meta.get('original_language', '')) != "en":
+        sd = bool(meta.sd)
+        if str(meta.original_language) != "en":
             non_eng = True
 
         anime = 32
@@ -212,7 +213,7 @@ class IS:
                 return anime
             elif "children" in genres or "cartoons" in genres or "children" in keywords or "cartoons" in keywords or "cartoon" in keywords:
                 return childrens_cartoons
-            elif meta.get('tv_pack'):
+            elif meta.tv_pack:
                 if resolution == "2160p":
                     return tv_season_packs_4k
                 elif sd:
@@ -224,7 +225,7 @@ class IS:
             elif resolution in ["1080p", "1080i", "720p"]:
                 return tv_hd
             elif sd:
-                if "xvid" in str(meta.get("video_encode", '')).lower():
+                if "xvid" in meta.video_encode.lower():
                     return tv_sd_xvid
                 else:
                     return tv_sd_x264
@@ -232,11 +233,11 @@ class IS:
                 return tv_480p
 
         elif category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 return audiobooks
-            elif meta.get("comic", False) or meta.get("manga", False):
+            elif meta.comic or meta.manga:
                 return comics
-            elif meta.get("magazine", False):
+            elif meta.magazine:
                 return magazines
             else:
                 return ebooks
@@ -244,7 +245,7 @@ class IS:
         return 0
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(str(meta.get('base_dir', '')), "tmp", str(meta.get('uuid', '')))
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
         if nfo_files:
@@ -255,40 +256,40 @@ class IS:
         else:
             nfo_content = await self.generate_description(meta)
             nfo_bytes = nfo_content.encode('utf-8')
-            nfo_filename = f"{meta.get('scene_name', meta['basename_no_ext'])}.nfo"
+            nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"
             return {'nfofile': (nfo_filename, nfo_bytes, "application/octet-stream")}
 
     async def get_name(self, meta: Meta) -> str:
-        scene_name = meta.get('scene_name')
+        scene_name = meta.scene_name
         if scene_name:
-            return str(scene_name)
+            return scene_name
         else:
-            name_value = str(meta.get('name', ''))
-            aka_value = str(meta.get('aka', ''))
+            name_value = meta.name
+            aka_value = meta.aka
             is_name = name_value.replace(aka_value, '').replace('Dubbed', '').replace('Dual-Audio', '')
             is_name = re.sub(r"\s{2,}", " ", is_name)
             is_name = is_name.replace(' ', '.')
         return is_name
 
     async def get_book_cover(self, meta: Meta) -> str:
-        covers = meta.get("covers")
+        covers = meta.covers
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.get("poster")
+        poster_url = meta.poster
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
         return ""
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
-        message = f"{meta.get('overview', '')}\n\n[youtube]{meta.get('youtube', '')}[/youtube]"
-        cover = meta.get("poster")
-        if meta["category"] == "BOOK":
-            message = meta.get("overview", "")
+        message = f"{meta.overview}\n\n[youtube]{meta.youtube}[/youtube]"
+        cover = meta.poster
+        if meta.category == "BOOK":
+            message = meta.overview
             cover = await self.get_book_cover(meta)
 
         data: dict[str, Any] = {
@@ -301,11 +302,11 @@ class IS:
             "submit": "Upload Torrent",
         }
 
-        if meta.get('category') == "MOVIE":
-            data['t_link'] = str(meta.get('imdb_info', {}).get('imdb_url', ''))
+        if meta.category == "MOVIE":
+            data["t_link"] = str(meta.imdb_info.get("imdb_url", ""))
 
         # Anon
-        anon = not (int(meta.get("anon", 0) or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        anon = not (int(meta.anon or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         data.update({"anonymous": "yes" if anon else "no"})
 
         return data
@@ -326,7 +327,7 @@ class IS:
             data=data,
             hash_is_id=True,
             torrent_field_name="torrentfile",
-            torrent_name=f"{meta.get('clean_name', 'placeholder')}",
+            torrent_name=f"{(meta.clean_name if meta.clean_name is not None else 'placeholder')}",
             upload_cookies=self.session.cookies,
             upload_url="https://immortalseed.me/upload.php",
             additional_files=files,

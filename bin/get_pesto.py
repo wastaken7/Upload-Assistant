@@ -4,7 +4,6 @@ import platform
 import shutil
 import stat
 from pathlib import Path
-from typing import Union
 
 import aiofiles
 import httpx
@@ -23,7 +22,7 @@ class PestoBinaryManager:
     """Download Pesto binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_pesto_binary(base_dir: Union[str, Path], debug: bool, version: str = "v0.3.30") -> str:
+    async def ensure_pesto_binary(base_dir: str | Path, debug: bool, version: str = "v0.3.30") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if debug:

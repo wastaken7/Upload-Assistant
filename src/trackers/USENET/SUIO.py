@@ -13,9 +13,9 @@ import httpx
 from PIL import Image
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 class SUIO:
@@ -26,6 +26,8 @@ class SUIO:
         self.common = COMMON(config)
         self.tracker = "SUIO"
         self.is_usenet = True
+        self.upload_url: Optional[str] = None
+        self.torrent_url: Optional[str] = None
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
         if base_url:
@@ -55,7 +57,7 @@ class SUIO:
     async def search_existing(self, meta: Meta) -> list[Any]:
         if not await self.get_additional_checks():
             console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
-            meta["skipping"] = f"{self.tracker}"
+            meta.skipping = f"{self.tracker}"
             return []
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
@@ -67,8 +69,8 @@ class SUIO:
         return bool(api_key and username and self.upload_url and self.torrent_url)
 
     def get_category_id(self, meta: Meta) -> str:
-        category = meta.get("category", "").upper()
-        resolution = str(meta.get("resolution", "")).lower()
+        category = str(meta.category or "").upper()
+        resolution = meta.resolution.lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}
         if category == "MOVIE":
@@ -78,9 +80,9 @@ class SUIO:
                 return "16"  # Movies: HD
             elif "SD" in resolution or "480p" in resolution or "576p" in resolution:
                 return "15"  # Movies: SD
-            elif meta.get("is_disc") == "BDMV":
+            elif meta.is_disc == "BDMV":
                 return "35"  # Movies: Full BR
-            elif "DVD" in str(meta.get("source", "")).upper():
+            elif "DVD" in str(meta.source).upper():
                 return "17"  # Movies: DVD
             return "movie"  # Movies: Auto fallback
         elif category == "TV":
@@ -98,21 +100,21 @@ class SUIO:
                 return "27"  # XXX: MOVIES-HD
             return "xxx"  # XXX: Auto fallback
         elif category == "GAME":
-            platform = str(meta.get("platform", "")).upper()
+            platform = meta.platform.upper()
             if "PC" in platform or "WINDOWS" in platform:
                 return "12"  # Games: PC
             elif "MAC" in platform:
                 return "13"  # Games: MAC
             return "14"  # Games: Other
         elif category == "MUSIC":
-            fmt = str(meta.get("format", "")).upper()
+            fmt = meta.format.upper()
             if "FLAC" in fmt or "LOSSLESS" in fmt:
                 return "22"  # Music: FLAC
             elif "MP3" in fmt:
                 return "7"  # Music: MP3
             return "3"  # Music: Other
         elif category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 return "29"  # Other: Audiobook
             return "9"  # Other: E-Books
         return "video"  # fallback
@@ -189,7 +191,7 @@ class SUIO:
         resolve_language = self.config.get("TRACKERS", {}).get(self.tracker, {}).get("resolve_language", True)
         if not resolve_language:
             return "0"
-        audio_languages = meta.get("audio_languages") or meta.get("book_language_iso") or []
+        audio_languages = meta.audio_languages or meta.book_language_iso or []
         if isinstance(audio_languages, str):
             audio_languages = [audio_languages]
         audio_languages = [lang for lang in audio_languages if lang]
@@ -197,7 +199,7 @@ class SUIO:
         if num_langs == 1:
             return self._map_single_language_to_id(audio_languages[0])
         elif num_langs == 2:
-            orig_code = meta.get("original_language")
+            orig_code = meta.original_language
             if self._is_same_language(audio_languages[0], orig_code):
                 return self._map_single_language_to_id(audio_languages[1])
             else:
@@ -208,7 +210,7 @@ class SUIO:
         return "0"  # Auto
 
     async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
-        nzb_path = meta.get("nzb_path")
+        nzb_path = meta.nzb_path
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
             return None
 
@@ -217,10 +219,10 @@ class SUIO:
             nzb_content = await f.read()
         files = {"nzb": (os.path.basename(nzb_path), nzb_content, "application/x-nzb")}
         # NFO file (optional)
-        nfo_dir = os.path.join(meta["base_dir"], "tmp", meta["uuid"])
+        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_content = None
         nfo_filename = None
-        if meta.get("scene"):
+        if meta.scene:
             nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
             nfo_path = nfo_files[0] if nfo_files else None
             if nfo_path and os.path.exists(nfo_path):
@@ -228,7 +230,7 @@ class SUIO:
                     nfo_content = await f.read()
                 nfo_filename = os.path.basename(nfo_path)
         else:
-            if meta.get("is_disc") == "BDMV":
+            if meta.is_disc == "BDMV":
                 bdinfo_path = os.path.join(nfo_dir, "BD_SUMMARY_00.txt")
                 if os.path.exists(bdinfo_path):
                     async with aiofiles.open(bdinfo_path, "rb") as f:
@@ -250,7 +252,7 @@ class SUIO:
         if nfo_content and nfo_filename:
             files["nfo"] = (nfo_filename, nfo_content, "application/octet-stream")
         # Cover image file (optional)
-        if meta.get("category") not in ("TV", "MOVIE"):
+        if meta.category not in ("TV", "MOVIE"):
             cover_jpg_path = os.path.join(nfo_dir, "POSTER.jpg")
             cover_png_path = os.path.join(nfo_dir, "POSTER.png")
             cover_path = None
@@ -284,7 +286,7 @@ class SUIO:
         return files
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.get("scene_name", "") or meta["basename_no_ext"]
+        return meta.scene_name or meta.basename_no_ext
 
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         data = {
@@ -297,9 +299,14 @@ class SUIO:
         return data
 
     async def upload(self, meta: Meta) -> Optional[bool]:
+        status_map = meta.tracker_status
+        if self.tracker not in status_map:
+            status_map[self.tracker] = {}
+        status_dict = status_map[self.tracker]
+
         if not self.upload_url:
             console.print(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: base_url missing"
+            status_dict["status_message"] = "data error: base_url missing"
             return False
 
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
@@ -308,18 +315,18 @@ class SUIO:
 
         files = await self._prepare_files(meta)
         if not files:
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
+            status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
         data = await self._prepare_data(meta)
-        if meta.get("debug", False):
+        if meta.debug:
             console.print(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
             console.print(f"User: {username}")
             console.print("Fields:")
             console.print(data)
             console.print("Files:")
             console.print({k: v[0] for k, v in files.items()})
-            meta["tracker_status"][self.tracker]["status_message"] = "Debug mode enabled, skipping upload."
+            status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
         params = {
             "user": username,
@@ -332,7 +339,7 @@ class SUIO:
                     files=files,
                     data=data,
                     params=params,
-                    headers={"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/Audionut/Upload-Assistant')}"},
+                    headers={"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/Audionut/Upload-Assistant')}"},
                     follow_redirects=True,
                 )
             final_url = str(response.url)
@@ -361,7 +368,7 @@ class SUIO:
                 if not err_msg:
                     err_msg = f"HTTP {response.status_code}" if response.status_code not in (200, 201) else "Unknown upload failure"
                 # Redact username / release name from error message
-                nzb_filename = os.path.basename(meta.get("nzb_path", ""))
+                nzb_filename = os.path.basename(meta.nzb_path)
                 if nzb_filename:
                     err_msg = re.sub(re.escape(nzb_filename), "[redacted]", err_msg, flags=re.IGNORECASE)
                 rlsname = data.get("rlsname", "")
@@ -369,13 +376,13 @@ class SUIO:
                     err_msg = re.sub(re.escape(rlsname), "[redacted]", err_msg, flags=re.IGNORECASE)
                 if username:
                     err_msg = re.sub(re.escape(username), "[redacted]", err_msg, flags=re.IGNORECASE)
-                meta["tracker_status"][self.tracker]["status_message"] = f"data error: {err_msg}"
+                status_dict["status_message"] = f"data error: {err_msg}"
                 return False
             success_msg = "Upload successful"
             if comment_match:
                 success_msg = re.sub(r"\s+", " ", comment_match.group(1).strip())
                 # Redact username / release name from success message
-                nzb_filename = os.path.basename(meta.get("nzb_path", ""))
+                nzb_filename = os.path.basename(meta.nzb_path)
                 if nzb_filename:
                     success_msg = re.sub(re.escape(nzb_filename), "[redacted]", success_msg, flags=re.IGNORECASE)
                 rlsname = data.get("rlsname", "")
@@ -383,7 +390,7 @@ class SUIO:
                     success_msg = re.sub(re.escape(rlsname), "[redacted]", success_msg, flags=re.IGNORECASE)
                 if username:
                     success_msg = re.sub(re.escape(username), "[redacted]", success_msg, flags=re.IGNORECASE)
-            meta["tracker_status"][self.tracker]["status_message"] = success_msg
+            status_dict["status_message"] = success_msg
             # Parse NZB release/post ID from the response text or final URL if present
             try:
                 id_match = re.search(r"ID:\s*([a-zA-Z0-9]+)", response.text, re.IGNORECASE)
@@ -392,16 +399,16 @@ class SUIO:
                 if not id_match:
                     id_match = re.search(r"(?:details\.php\?id=|details/|id=)([a-zA-Z0-9]+)", final_url, re.IGNORECASE)
                 if id_match:
-                    meta["tracker_status"][self.tracker]["torrent_id"] = str(id_match.group(1))
+                    status_dict["torrent_id"] = str(id_match.group(1))
             except Exception:
                 pass
             return True
         except httpx.TimeoutException:
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: Request timed out after 60 seconds"
+            status_dict["status_message"] = "data error: Request timed out after 60 seconds"
             return False
         except httpx.RequestError as e:
-            meta["tracker_status"][self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}"
+            status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
             return False
         except Exception as e:
-            meta["tracker_status"][self.tracker]["status_message"] = f"data error: Unexpected error. Error: {e}"
+            status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
             return False

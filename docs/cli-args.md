@@ -216,12 +216,6 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 
 - `-vs`, `--vapoursynth`: Use VapourSynth for screenshots (requires VS install). NOTE: probably broken.
 
-## Emby support
-
-- `-emby`, `--emby`: Create an Emby-compliant NFO file and optionally symlink the content.
-- `-emby_cat`, `--emby_cat {movie|tv}`: Set the expected category for Emby.
-- `-emby_debug`, `--emby_debug`: Specifc debugging mode. NOT recommended.
-
 ## SPD-only
 
 - `-ch`, `--channel ID_OR_TAG`: SPD: Channel id number or tag (without `@`).

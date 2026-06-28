@@ -6,8 +6,8 @@ import random
 from functools import partial
 from typing import Any, cast
 
-import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports]
-import vapoursynth as vs  # pyright: ignore[reportMissingImports]
+import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
+import vapoursynth as vs  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
 
 from src.console import console
 
@@ -41,7 +41,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
         try:
             pyver = platform.python_version_tuple()
             if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
-                import oxipng  # pyright: ignore[reportMissingImports]
+                import oxipng  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
                 oxipng = oxipng
             else:
                 oxipng = None
@@ -74,7 +74,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         frames = []
 
     # Indexing the source using ffms2 or lsmash for m2ts files
-    if str(source).endswith(".m2ts"):
+    if source.endswith(".m2ts"):
         console.print(f"Indexing {source} with LSMASHSource... This may take a while.", markup=False)
         src: Any = core.lsmas.LWLibavSource(source)
     else:

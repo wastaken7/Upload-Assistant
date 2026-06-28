@@ -5,7 +5,6 @@ import shutil
 import stat
 import tarfile
 from pathlib import Path
-from typing import Union
 
 import aiofiles
 import httpx
@@ -24,7 +23,7 @@ class SevenZipBinaryManager:
     """Download 7-Zip binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_7z_binary(base_dir: Union[str, Path], debug: bool, version: str = "26.01") -> str:
+    async def ensure_7z_binary(base_dir: str | Path, debug: bool, version: str = "26.01") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if debug:

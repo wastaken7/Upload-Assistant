@@ -15,11 +15,13 @@ from rich.prompt import Prompt
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
 class AR:
     supported_categories = ("TV", "MOVIE")
+    tracker_urls = ['tracker.alpharatio']
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.cookie_validator = CookieValidator(config)
@@ -38,114 +40,118 @@ class AR:
         self.torrent_url = f"{self.base_url}/torrents.php?id="
         self.banned_groups = []
 
-    async def get_type(self, meta: dict[str, Any]) -> str:
-        if (meta['type'] == 'DISC' or meta['type'] == 'REMUX') and meta['source'] == 'Blu-ray':
+    async def get_type(self, meta: Meta) -> str:
+        if (meta.type == "DISC" or meta.type == "REMUX") and meta.source == "Blu-ray":
             return "14"
 
-        if meta.get('anime'):
-            if meta['sd']:
+        if meta.anime:
+            if meta.sd:
                 return '15'
             else:
                 return {
-                    '8640p': '16',
-                    '4320p': '16',
-                    '2160p': '16',
-                    '1440p': '16',
-                    '1080p': '16',
-                    '1080i': '16',
-                    '720p': '16',
-                }.get(meta['resolution'], '15')
+                    "8640p": "16",
+                    "4320p": "16",
+                    "2160p": "16",
+                    "1440p": "16",
+                    "1080p": "16",
+                    "1080i": "16",
+                    "720p": "16",
+                }.get(meta.resolution, "15")
 
-        elif meta['category'] == "TV":
-            if meta['tv_pack']:
-                if meta['sd']:
+        elif meta.category == "TV":
+            if meta.tv_pack:
+                if meta.sd:
                     return '4'
                 else:
                     return {
-                        '8640p': '6',
-                        '4320p': '6',
-                        '2160p': '6',
-                        '1440p': '5',
-                        '1080p': '5',
-                        '1080i': '5',
-                        '720p': '5',
-                    }.get(meta['resolution'], '4')
-            elif meta['sd']:
+                        "8640p": "6",
+                        "4320p": "6",
+                        "2160p": "6",
+                        "1440p": "5",
+                        "1080p": "5",
+                        "1080i": "5",
+                        "720p": "5",
+                    }.get(meta.resolution, "4")
+            elif meta.sd:
                 return '0'
             else:
                 return {
-                    '8640p': '2',
-                    '4320p': '2',
-                    '2160p': '2',
-                    '1440p': '1',
-                    '1080p': '1',
-                    '1080i': '1',
-                    '720p': '1',
-                }.get(meta['resolution'], '0')
+                    "8640p": "2",
+                    "4320p": "2",
+                    "2160p": "2",
+                    "1440p": "1",
+                    "1080p": "1",
+                    "1080i": "1",
+                    "720p": "1",
+                }.get(meta.resolution, "0")
 
-        if meta['category'] == "MOVIE":
-            if meta['sd']:
+        if meta.category == "MOVIE":
+            if meta.sd:
                 return '7'
-            elif meta.get("adult_media", False):
+            elif meta.adult_media:
                 return '13'
             else:
                 return {
-                    '8640p': '9',
-                    '4320p': '9',
-                    '2160p': '9',
-                    '1440p': '8',
-                    '1080p': '8',
-                    '1080i': '8',
-                    '720p': '8',
-                }.get(meta['resolution'], '7')
+                    "8640p": "9",
+                    "4320p": "9",
+                    "2160p": "9",
+                    "1440p": "8",
+                    "1080p": "8",
+                    "1080i": "8",
+                    "720p": "8",
+                }.get(meta.resolution, "7")
 
         return '7'
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
+    async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         return cookie_jar is not None
 
-    def get_links(self, movie: dict[str, Any], subheading: str, heading_end: str) -> str:
+    def get_links(self, movie: Meta, subheading: str, heading_end: str) -> str:
         description = ""
         description += "\n" + subheading + "Links" + heading_end + "\n"
         if 'IMAGES' in self.config:
-            if movie['imdb_id'] != 0:
-                description += f"[url={movie.get('imdb_info', {}).get('imdb_url', '')}][img]{self.config['IMAGES']['imdb_75']}[/img][/url]"
-            if movie['tmdb'] != 0:
-                description += f" [url=https://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}][img]{self.config['IMAGES']['tmdb_75']}[/img][/url]"
-            if movie['tvdb_id'] != 0:
-                description += f" [url=https://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/url]"
-            if movie['tvmaze_id'] != 0:
-                description += f" [url=https://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/url]"
-            if movie['mal_id'] != 0:
-                description += f" [url=https://myanimelist.net/anime/{str(movie['mal_id'])}][img]{self.config['IMAGES']['mal_75']}[/img][/url]"
+            if movie.imdb_id is not None and movie.imdb_id != 0:
+                imdb_url = movie.imdb_info.get("imdb_url", "") if isinstance(movie.imdb_info, dict) else ""
+                description += f"[url={imdb_url}][img]{self.config['IMAGES']['imdb_75']}[/img][/url]"
+            if movie.tmdb != 0 and movie.tmdb:
+                description += f" [url=https://www.themoviedb.org/{str(movie.category).lower()}/{str(movie.tmdb)}][img]{self.config['IMAGES']['tmdb_75']}[/img][/url]"
+            if movie.tvdb_id is not None and movie.tvdb_id != 0:
+                description += f" [url=https://www.thetvdb.com/?id={str(movie.tvdb_id)}&tab=series][img]{self.config['IMAGES']['tvdb_75']}[/img][/url]"
+            if movie.tvmaze_id is not None and movie.tvmaze_id != 0:
+                description += f" [url=https://www.tvmaze.com/shows/{str(movie.tvmaze_id)}][img]{self.config['IMAGES']['tvmaze_75']}[/img][/url]"
+            if movie.mal_id is not None and movie.mal_id != 0:
+                description += f" [url=https://myanimelist.net/anime/{str(movie.mal_id)}][img]{self.config['IMAGES']['mal_75']}[/img][/url]"
         else:
-            if movie['imdb_id'] != 0:
-                description += f"{movie.get('imdb_info', {}).get('imdb_url', '')}"
-            if movie['tmdb'] != 0:
-                description += f"\nhttps://www.themoviedb.org/{str(movie['category'].lower())}/{str(movie['tmdb'])}"
-            if movie['tvdb_id'] != 0:
-                description += f"\nhttps://www.thetvdb.com/?id={str(movie['tvdb_id'])}&tab=series"
-            if movie['tvmaze_id'] != 0:
-                description += f"\nhttps://www.tvmaze.com/shows/{str(movie['tvmaze_id'])}"
-            if movie['mal_id'] != 0:
-                description += f"\nhttps://myanimelist.net/anime/{str(movie['mal_id'])}"
+            if movie.imdb_id is not None and movie.imdb_id != 0:
+                imdb_url = movie.imdb_info.get("imdb_url", "") if isinstance(movie.imdb_info, dict) else ""
+                description += f"{imdb_url}"
+            if movie.tmdb != 0 and movie.tmdb:
+                description += f"\nhttps://www.themoviedb.org/{str(movie.category).lower()}/{str(movie.tmdb)}"
+            if movie.tvdb_id is not None and movie.tvdb_id != 0:
+                description += f"\nhttps://www.thetvdb.com/?id={str(movie.tvdb_id)}&tab=series"
+            if movie.tvmaze_id is not None and movie.tvmaze_id != 0:
+                description += f"\nhttps://www.tvmaze.com/shows/{str(movie.tvmaze_id)}"
+            if movie.mal_id is not None and movie.mal_id != 0:
+                description += f"\nhttps://myanimelist.net/anime/{str(movie.mal_id)}"
         return description
 
-    async def edit_desc(self, meta: dict[str, Any]) -> None:
+    async def edit_desc(self, meta: Meta) -> None:
         heading = "[color=green][size=6]"
         subheading = "[color=red][size=4]"
         heading_end = "[/size][/color]"
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding='utf8') as f:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
             base = await f.read()
         base = re.sub(r'\[center\]\[spoiler=Scene NFO:\].*?\[/center\]', '', base, flags=re.DOTALL)
         base = re.sub(r'\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]', '', base, flags=re.DOTALL)
         description = ""
-        if meta['is_disc'] == "BDMV":
-            description += heading + str(meta['name']) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "BDINFO" + heading_end + "\n"
+        if meta.is_disc == "BDMV":
+            description += heading + meta.name + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "BDINFO" + heading_end + "\n"
         else:
-            description += heading + str(meta['name']) + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
-        discs = cast(list[dict[str, Any]], meta.get('discs') or [])
+            description += (
+                heading + meta.name + heading_end + "\n" + self.get_links(meta, subheading, heading_end) + "\n\n" + subheading + "MEDIAINFO" + heading_end + "\n"
+            )
+        discs = cast(list[dict[str, Any]], meta.discs or [])
         if discs:
             if len(discs) >= 2:
                 for each in discs[1:]:
@@ -157,35 +163,35 @@ class AR:
         # description += common.get_links(movie, "[COLOR=red][size=4]", "[/size][/color]")
             elif discs[0]['type'] == "DVD":
                 description += f"[hide][code]{discs[0]['vob_mi']}[/code][/hide]\n\n"
-            elif meta['is_disc'] == "BDMV":
+            elif meta.is_disc == "BDMV":
                 description += f"[hide][code]{discs[0]['summary']}[/code][/hide]\n\n"
         else:
             # Beautify MediaInfo for AR using custom template
-            filelist = cast(list[str], meta.get('filelist') or [])
-            video = filelist[0] if filelist else str(meta.get('path') or "")
+            filelist = cast(list[str], meta.filelist or [])
+            video = filelist[0] if filelist else str(meta.path or "")
             # using custom mediainfo template.
             # can not use full media info as sometimes its more than max chars per post.
-            mi_template = os.path.abspath(f"{meta['base_dir']}/data/templates/summary-mediainfo.csv")
+            mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/summary-mediainfo.csv")
             if os.path.exists(mi_template):
                 media_info = await self.parse_mediainfo_async(video, mi_template)
                 description += (f"""[code]\n{media_info}\n[/code]\n""")
                 # adding full mediainfo as spoiler
-                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding='utf-8') as mi_file:
+                async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                     full_mediainfo = await mi_file.read()
                 description += f"[hide=FULL MEDIAINFO][code]{full_mediainfo}[/code][/hide]\n"
             else:
                 console.print("[bold red]Couldn't find the MediaInfo template")
                 console.print("[green]Using normal MediaInfo for the description.")
 
-                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding='utf-8') as mi_file:
+                async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                     cleaned_mediainfo = await mi_file.read()
                     description += (f"""[code]\n{cleaned_mediainfo}\n[/code]\n\n""")
 
-            description += "\n\n" + subheading + "PLOT" + heading_end + "\n" + str(meta['overview'])
-            if meta['genres']:
-                description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta['genres'])
+            description += "\n\n" + subheading + "PLOT" + heading_end + "\n" + meta.overview
+            if meta.genres:
+                description += "\n\n" + subheading + "Genres" + heading_end + "\n" + str(meta.genres)
 
-            image_list = cast(list[dict[str, Any]], meta.get('image_list') or [])
+            image_list = meta.image_list or []
             if image_list:
                 description += "\n\n" + subheading + "Screenshots" + heading_end + "\n"
                 description += "[align=center]"
@@ -194,23 +200,23 @@ class AR:
                         description += "[url=" + image['raw_url'] + "][img]" + image['img_url'] + "[/img][/url]"
                 description += "[/align]"
             if 'youtube' in meta:
-                description += "\n\n" + subheading + "Youtube" + heading_end + "\n" + str(meta['youtube'])
+                description += "\n\n" + subheading + "Youtube" + heading_end + "\n" + str(meta.youtube)
 
             # adding extra description if passed
             if len(base) > 2:
-                description += "\n\n" + subheading + "Notes" + heading_end + "\n" + str(base)
+                description += "\n\n" + subheading + "Notes" + heading_end + "\n" + base
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", 'w', encoding='utf8') as descfile:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
             await descfile.write(description)
         return None
 
-    async def get_language_tag(self, meta: dict[str, Any]) -> str:
+    async def get_language_tag(self, meta: Meta) -> str:
         lang_tag = ""
         has_eng_audio = False
         audio_lang = ""
-        if meta['is_disc'] != "BDMV":
+        if meta.is_disc != "BDMV":
             try:
-                async with aiofiles.open(f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MediaInfo.json", encoding='utf-8') as f:
+                async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
                     mi_content = await f.read()
                     mi = json.loads(mi_content)
                 for track in mi['media']['track']:
@@ -222,21 +228,21 @@ class AR:
             except Exception as e:
                 console.print(f"[red]Error: {e}")
         else:
-            for audio in meta['bdinfo']['audio']:
+            for audio in meta.bdinfo["audio"]:
                 if audio['language'] == 'English':
                     has_eng_audio = True
                 if not has_eng_audio:
-                    audio_lang = meta['bdinfo']['audio'][0]['language'].upper()
+                    audio_lang = meta.bdinfo["audio"][0]["language"].upper()
         if audio_lang != "":
             lang_tag = audio_lang
         return lang_tag
 
-    async def get_basename(self, meta: dict[str, Any]) -> str:
-        filelist = cast(list[str], meta.get('filelist') or [])
-        path = filelist[0] if filelist else str(meta.get('path') or "")
+    async def get_basename(self, meta: Meta) -> str:
+        filelist = cast(list[str], meta.filelist or [])
+        path = filelist[0] if filelist else str(meta.path or "")
         return os.path.basename(path)
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, str]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if not cookie_jar:
@@ -244,8 +250,8 @@ class AR:
             return dupes
 
         # Combine title and year
-        title = str(meta.get('title', '')).strip()
-        year = str(meta.get('year', '')).strip()
+        title = meta.title.strip()
+        year = meta.year.strip()
         if not title:
             console.print("[red]Title is missing.")
             return dupes
@@ -254,10 +260,10 @@ class AR:
         search_query_encoded = urllib.parse.quote(search_query)
         search_url = f'{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}'
 
-        if meta.get('debug', False):
+        if meta.debug:
             console.print(f"[blue]{search_url}")
 
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
@@ -265,7 +271,7 @@ class AR:
 
                 if "login.php" in str(response.url) or "login.php" in response.text or response.status_code != 200:
                     await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                    meta['skipping'] = f"{self.tracker}"
+                    meta.skipping = f"{self.tracker}"
                     return dupes
 
                 json_response = response.json()
@@ -295,7 +301,7 @@ class AR:
             console.print(f"[red]Error occurred: {e}")
             return dupes
 
-    async def get_auth_key(self, meta: dict[str, Any]) -> Optional[str]:
+    async def get_auth_key(self, meta: Meta) -> Optional[str]:
         """Retrieve the saved auth key from cookie_auth.py."""
         auth_key = await self.cookie_validator.get_ar_auth_key(meta, self.tracker)
         if auth_key:
@@ -309,7 +315,7 @@ class AR:
         if not cookie_jar:
             return None
 
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', 'github.com/wastaken7/Upload-Assistant')}"}
+        headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
@@ -323,7 +329,7 @@ class AR:
                     if match:
                         auth_key = match.group(1)
                         # Save it for next time
-                        cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
+                        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{self.tracker}.txt")
                         auth_file = cookie_file.replace('.txt', '_auth.txt')
                         try:
                             async with aiofiles.open(auth_file, 'w', encoding='utf-8') as f:
@@ -337,7 +343,7 @@ class AR:
 
         return None
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         """Upload torrent to AR using centralized cookie_upload."""
         # Prepare the data for the upload
         common = COMMON(config=self.config)
@@ -346,25 +352,25 @@ class AR:
         type_id = await self.get_type(meta)
 
         # Read the description
-        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         try:
             async with aiofiles.open(desc_path, encoding='utf-8') as desc_file:
                 desc = await desc_file.read()
         except FileNotFoundError:
-            meta['tracker_status'][self.tracker]['status_message'] = f"data error: Description file not found at {desc_path}"
+            meta.tracker_status[self.tracker]["status_message"] = f"data error: Description file not found at {desc_path}"
             return False
 
         # Handle cover image input
-        imdb_info = cast(dict[str, Any], meta.get('imdb_info') or {})
-        cover = meta.get('poster') or imdb_info.get("cover", None)
-        while cover is None and not meta.get("unattended", False):
+        imdb_info = cast(dict[str, Any], meta.imdb_info or {})
+        cover = meta.poster or imdb_info.get("cover", None)
+        while cover is None and not meta.unattended:
             cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
                 console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
 
         # Tag Compilation
-        genres_raw = meta.get('genres', '')
+        genres_raw = meta.genres
         genres = ''
         if isinstance(genres_raw, str) and genres_raw.strip():
             tags_parts: list[str] = []
@@ -378,32 +384,32 @@ class AR:
 
         # adding tags
         tags = ""
-        if meta['imdb_id'] != 0:
-            tags += f"tt{meta.get('imdb', '')}, "
+        if meta.imdb_id != 0:
+            tags += f"tt{meta.imdb}, "
         if genres:
             tags += f"{genres}, "
 
         # Get auth key
         auth_key = await self.get_auth_key(meta)
         if not auth_key:
-            meta['tracker_status'][self.tracker]['status_message'] = "data error: Failed to extract auth key"
+            meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to extract auth key"
             return False
 
         # must use scene name if scene release
         KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
-        if meta['scene']:
-            ar_name = str(meta.get('scene_name') or '')
+        if meta.scene:
+            ar_name = meta.scene_name or ""
         else:
-            ar_name = str(meta['uuid'])
+            ar_name = meta.uuid
             base, ext = os.path.splitext(ar_name)
             if ext.lower() in KNOWN_EXTENSIONS:
                 ar_name = base
             ar_name = ar_name.replace(' ', ".").replace("'", '').replace(':', '').replace("(", '.').replace(")", '.').replace("[", '.').replace("]", '.').replace("{", '.').replace("}", '.')
             ar_name = re.sub(r'\.{2,}', '.', ar_name)
 
-        tag_lower = str(meta.get('tag', '')).lower()
+        tag_lower = meta.tag.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-        if meta['tag'] == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+        if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
                 ar_name = re.sub(f"-{invalid_tag}", "", ar_name, flags=re.IGNORECASE)
             ar_name = f"{ar_name}-NoGRP"
@@ -422,7 +428,7 @@ class AR:
         # Load cookies for upload
         upload_cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if not upload_cookies:
-            meta['tracker_status'][self.tracker]['status_message'] = "data error: Failed to load cookies for upload"
+            meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to load cookies for upload"
             return False
 
         # Use centralized handle_upload from CookieAuthUploader

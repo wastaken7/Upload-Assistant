@@ -1,5 +1,6 @@
 from typing import Any
 
+from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -25,7 +26,7 @@ class DT(UNIT3D):
 
     async def get_category_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         category: str = "",
         reverse: bool = False,
         mapping_only: bool = False,
@@ -49,13 +50,13 @@ class DT(UNIT3D):
         elif category:
             return {'category_id': category_id.get(category, '0')}
         else:
-            meta_category = meta.get('category', '')
+            meta_category = meta.category
             resolved_id = category_id.get(meta_category, '0')
             return {'category_id': resolved_id}
 
     async def get_type_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         type: str = "",
         reverse: bool = False,
         mapping_only: bool = False,
@@ -83,14 +84,14 @@ class DT(UNIT3D):
             return {'type_id': type_id_map.get(type, '0')}
         else:
             # Dynamic Logic for DT specific IDs (UHD vs 1080p)
-            meta_type = meta.get('type', '')
-            is_uhd = meta.get('uhd', False)
+            meta_type = meta.type
+            is_uhd = meta.uhd
 
             resolved_id = '0'
 
             if meta_type == 'DISC':
-                resolved_id = '3' # BD50
-                if meta.get('disctype') == 'BD25':
+                resolved_id = '3'  # BD50
+                if meta.disctype == "BD25":
                     resolved_id = '4'
             elif meta_type == 'REMUX':
                 resolved_id = '2' if is_uhd else '5'
@@ -109,7 +110,7 @@ class DT(UNIT3D):
 
     async def get_resolution_id(
         self,
-        meta: dict[str, Any],
+        meta: Meta,
         resolution: str = "",
         reverse: bool = False,
         mapping_only: bool = False,
@@ -140,6 +141,6 @@ class DT(UNIT3D):
         elif resolution:
             return {'resolution_id': resolution_id.get(resolution, '10')}
         else:
-            meta_resolution = meta.get('resolution', '')
+            meta_resolution = meta.resolution
             resolved_id = resolution_id.get(meta_resolution, '10') # 10 is 'Other'
             return {'resolution_id': resolved_id}

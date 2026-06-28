@@ -2,13 +2,15 @@
 import asyncio
 import json
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import Any, Optional, cast
 
 import guessit
 
 from src.console import console
 from src.exceptions import WeirdSystem
+from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
@@ -18,20 +20,20 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-async def get_source(type: str, video: str, path: str, is_disc: str, meta: dict[str, Any], folder_id: str, base_dir: str) -> tuple[str, str]:
+async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta, folder_id: str, base_dir: str) -> tuple[str, str]:
     source = "BluRay"
     system = ""
     mi: dict[str, Any] = {}
-    if meta.get('is_disc') != "BDMV":
+    if meta.is_disc != "BDMV":
         try:
             mi_text = await asyncio.to_thread(Path(f"{base_dir}/tmp/{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
             mi = json.loads(mi_text)
         except Exception:
-            if meta['debug']:
+            if meta.debug:
                 console.print("No mediainfo.json")
     try:
-        if meta.get('manual_source'):
-            source = str(meta['manual_source'])
+        if meta.manual_source:
+            source = str(meta.manual_source)
         else:
             try:
                 source = guessit_fn(video).get('source', source)

@@ -6,9 +6,9 @@ import aiofiles
 import httpx
 
 from src.console import console
+from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-Meta = dict[str, Any]
 Config = dict[str, Any]
 
 
@@ -31,16 +31,21 @@ class DS:
         return []
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.get("scene_name", "") or meta["basename_no_ext"]
+        return meta.scene_name or meta.basename_no_ext
 
     async def upload(self, meta: Meta) -> bool:
+        status_map = meta.tracker_status
+        if self.tracker not in status_map:
+            status_map[self.tracker] = {}
+        status_dict = status_map[self.tracker]
+
         if not self.upload_url:
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
+            status_dict["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
             return False
 
-        nzb_path = meta.get('nzb_path')
+        nzb_path = meta.nzb_path
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: NZB file missing or password missing in header"
+            status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
         nzb_name = f"{await self.get_name(meta)}.nzb"
@@ -52,8 +57,8 @@ class DS:
             'files[]': (nzb_name, nzb_content, 'application/x-nzb')
         }
 
-        if meta["debug"]:
-            meta['tracker_status'][self.tracker]['status_message'] = "Debug mode enabled, skipping upload."
+        if meta.debug:
+            status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
         else:
             try:
@@ -61,30 +66,30 @@ class DS:
                     response = await client.post(self.upload_url, files=files)
 
                 if response.status_code not in (200, 201):
-                    meta['tracker_status'][self.tracker]['status_message'] = f"data error: HTTP {response.status_code} - {response.text}"
+                    status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                     return False
 
                 try:
                     data = response.json()
                     results = data.get("results", [])
                     if not results:
-                        meta['tracker_status'][self.tracker]['status_message'] = "data error: No results returned from tracker."
+                        status_dict["status_message"] = "data error: No results returned from tracker."
                         return False
 
                     clean_result = results[0].replace(f"{nzb_name}: ", "")
-                    meta['tracker_status'][self.tracker]['status_message'] = clean_result
-                    meta['tracker_status'][self.tracker]['torrent_id'] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
+                    status_dict["status_message"] = clean_result
+                    status_dict["torrent_id"] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
                     return True
                 except json.JSONDecodeError:
-                    meta['tracker_status'][self.tracker]['status_message'] = "data error: Could not decode JSON response."
+                    status_dict["status_message"] = "data error: Could not decode JSON response."
                     return False
 
             except httpx.TimeoutException:
-                meta['tracker_status'][self.tracker]['status_message'] = 'data error: Request timed out after 60 seconds'
+                status_dict["status_message"] = "data error: Request timed out after 60 seconds"
                 return False
             except httpx.RequestError as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e}'
+                status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
                 return False
             except Exception as e:
-                meta['tracker_status'][self.tracker]['status_message'] = f'data error: Unexpected error. Error: {e}'
+                status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
                 return False

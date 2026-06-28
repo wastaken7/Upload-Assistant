@@ -11,6 +11,7 @@ import cli_ui
 from src.cleanup import cleanup_manager
 from src.console import console
 from src.exportmi import mi_resolution
+from src.meta import Meta
 
 
 class VideoManager:
@@ -38,16 +39,14 @@ class VideoManager:
         dv = ""
         if bdinfo is not None:  # Disks
             bdinfo_dict = cast(dict[str, Any], bdinfo)
-            hdr_mi = bdinfo_dict['video'][0]['hdr_dv']
-            if "HDR10+" in hdr_mi:
-                hdr = "HDR10+"
-            elif hdr_mi == "HDR10":
-                hdr = "HDR"
-            try:
-                if bdinfo_dict['video'][1]['hdr_dv'] == "Dolby Vision":
+            for track in bdinfo_dict.get("video", []):
+                hdr_mi = track.get("hdr_dv", "")
+                if "HDR10+" in hdr_mi:
+                    hdr = "HDR10+"
+                elif "HDR10" in hdr_mi and hdr != "HDR10+":
+                    hdr = "HDR"
+                if "Dolby Vision" in hdr_mi:
                     dv = "DV"
-            except Exception:
-                pass
         else:
             mi_dict = cast(dict[str, Any], mi)
             video_track = mi_dict['media']['track'][1]
@@ -69,7 +68,7 @@ class VideoManager:
                         hdr = f"{hdr} HLG"
                     if hdr_format_string == "" and "PQ" in (video_track.get('transfer_characteristics'), video_track.get('transfer_characteristics_Original', None)):
                         hdr = "PQ10"
-                    transfer_characteristics = video_track.get('transfer_characteristics_Original', None)
+                    transfer_characteristics = video_track.get("transfer_characteristics_Original") or ""
                     if "HLG" in transfer_characteristics:
                         hdr = "HLG"
                     if hdr != "HLG" and "BT.2020 (10-bit)" in transfer_characteristics:
@@ -232,12 +231,12 @@ class VideoManager:
         filelist = sorted(filelist, key=os.path.getsize, reverse=True) if sorted_filelist else sorted(filelist)
         return video, filelist
 
-    async def get_resolution(self, guess: Any, folder_id: str, base_dir: str, meta: dict[str, Any]) -> tuple[str, bool]:
+    async def get_resolution(self, guess: Any, folder_id: str, base_dir: str, meta: Meta) -> tuple[str, bool]:
         hfr = False
         mi: dict[str, Any] = {}
         dvd_mi_text = ""
-        if meta['is_disc'] == "DVD":
-            meta_discs = meta.get('discs', [])
+        if meta.is_disc == "DVD":
+            meta_discs = meta.discs
             if meta_discs and isinstance(meta_discs, list) and isinstance(meta_discs[0], dict):
                 disc = cast(dict[str, Any], meta_discs[0])
                 disc_mi = disc.get('ifo_mi_json', {})
@@ -308,8 +307,8 @@ class VideoManager:
             scan = "i" if match else "p"
         width_list = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0]
         height_list = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0]
-        width = self.closest(width_list, int(width))
-        height = self.closest(height_list, int(height))
+        width = self.closest(width_list, width)
+        height = self.closest(height_list, height)
         res = f"{width}x{height}{scan}"
         resolution = await mi_resolution(res, guess, width, scan)
         return resolution, hfr
@@ -327,9 +326,9 @@ class VideoManager:
                 break
         return res
 
-    async def get_type(self, video: str, _scene: bool, is_disc: Optional[str], meta: dict[str, Any]) -> str:
-        if meta.get('manual_type'):
-            type = cast(str, meta.get('manual_type'))
+    async def get_type(self, video: str, _scene: bool, is_disc: Optional[str], meta: Meta) -> str:
+        if meta.manual_type:
+            type = cast(str, meta.manual_type)
         else:
             filename = os.path.basename(video).lower()
             if "remux" in filename:
@@ -364,12 +363,11 @@ class VideoManager:
         sd = 1 if resolution in ("480i", "480p", "576i", "576p", "540p") else 0
         return sd
 
-    async def get_video_duration(self, meta: dict[str, Any]) -> Optional[int]:
-        if meta.get("category") in ("BOOK", "GAME"):
+    async def get_video_duration(self, meta: Meta) -> Optional[int]:
+        if meta.category in ("BOOK", "GAME"):
             return None
-        if meta.get('is_disc') != "BDMV" and meta.get('mediainfo', {}).get('media', {}).get('track'):
-            general_track = next((track for track in meta['mediainfo']['media']['track']
-                                  if track.get('@type') == 'General'), None)
+        if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
+            general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
 
             if general_track and general_track.get('Duration'):
                 try:
@@ -377,37 +375,37 @@ class VideoManager:
                     formatted_duration = int(media_duration_seconds // 60)
                     return formatted_duration
                 except ValueError:
-                    if meta['debug']:
+                    if meta.debug:
                         console.print(f"[red]Invalid duration value: {general_track['Duration']}[/red]")
                     return None
             else:
-                if meta['debug']:
+                if meta.debug:
                     console.print("[red]No valid duration found in MediaInfo General track[/red]")
                 return None
         else:
-            length = meta.get("bdinfo", {}).get("length", "")
+            length = meta.bdinfo.get("length", "")
             if length:
                 try:
                     hours, minutes, seconds = length.split(":")
                     return int(hours) * 60 + int(minutes)
                 except ValueError:
-                    if meta["debug"]:
+                    if meta.debug:
                         console.print(f"[red]Invalid duration value: {length}[/red]")
                     return None
             else:
-                if meta["debug"]:
+                if meta.debug:
                     console.print("[red]No valid duration found in BDInfo[/red]")
                 return None
 
-    async def get_container(self, meta: dict[str, Any]) -> str:
-        if meta.get('is_disc', '') == 'BDMV':
+    async def get_container(self, meta: Meta) -> str:
+        if meta.is_disc == "BDMV":
             return 'm2ts'
-        elif meta.get('is_disc', '') == 'HDDVD':
+        elif meta.is_disc == "HDDVD":
             return 'evo'
-        elif meta.get('is_disc', '') == 'DVD':
+        elif meta.is_disc == "DVD":
             return 'vob'
         else:
-            file_list = meta.get('filelist', [])
+            file_list = meta.filelist
 
             if not file_list:
                 console.print("[red]No files found to determine container[/red]")
@@ -419,7 +417,7 @@ class VideoManager:
                 console.print(f"[red]Error getting container for file: {e}[/red]")
                 return ''
 
-            extension = os.path.splitext(largest_file_path)[1]
+            extension = os.path.splitext(str(largest_file_path))[1]
             return extension.lstrip('.').lower() if extension else ''
 
 

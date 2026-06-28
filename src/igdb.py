@@ -111,7 +111,7 @@ class IGDBAPI:
         import asyncio
         from pathlib import Path
 
-        igdb_id_str = str(igdb_id).strip()
+        igdb_id_str = igdb_id.strip()
         if not igdb_id_str.isdigit():
             console.print(f"[red]IGDB: Invalid ID '{igdb_id}'[/red]")
             return None
@@ -177,7 +177,7 @@ class IGDBAPI:
         import asyncio
         from pathlib import Path
 
-        steam_id_str = str(steam_id).strip()
+        steam_id_str = steam_id.strip()
         if not steam_id_str.isdigit():
             console.print(f"[red]IGDB: Invalid Steam ID '{steam_id}'[/red]")
             return None

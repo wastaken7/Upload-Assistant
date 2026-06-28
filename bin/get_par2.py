@@ -5,7 +5,6 @@ import shutil
 import stat
 import zipfile
 from pathlib import Path
-from typing import Union
 
 import aiofiles
 import httpx
@@ -24,7 +23,7 @@ class Par2BinaryManager:
     """Download par2cmdline-turbo binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_par2_binary(base_dir: Union[str, Path], debug: bool, version: str = "v1.4.0") -> str:
+    async def ensure_par2_binary(base_dir: str | Path, debug: bool, version: str = "v1.4.0") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if debug:

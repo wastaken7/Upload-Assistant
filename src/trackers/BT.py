@@ -21,12 +21,14 @@ from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
+from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
 
 class BT:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
+    tracker_urls = ['t.brasiltracker.org']
     secret_token: str = ''
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -107,15 +109,15 @@ class BT:
                 for alias in aliases_tuple:
                     self.ultimate_lang_map[alias.lower()] = correct_id
 
-    async def validate_credentials(self, meta: dict[str, Any]) -> bool:
+    async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False
         self.session.cookies = cast(Any, cookie_jar)
         return True
 
-    async def load_localized_data(self, meta: dict[str, Any]) -> None:
-        localized_data_file = f'{meta["base_dir"]}/tmp/{meta["uuid"]}/tmdb_localized_data.json'
+    async def load_localized_data(self, meta: Meta) -> None:
+        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
         main_ptbr_data: dict[str, Any] = {}
         episode_ptbr_data: dict[str, Any] = {}
         data: dict[str, Any] = {}
@@ -148,7 +150,7 @@ class BT:
             )
             main_ptbr_data = localized_main or {}
 
-        if self.config['DEFAULT']['episode_overview'] and meta['category'] == 'TV' and not meta.get('tv_pack'):
+        if self.config["DEFAULT"]["episode_overview"] and meta.category == "TV" and not meta.tv_pack:
             episode_ptbr_data = cast(dict[str, Any], ptbr_dict.get('episode') or {})
             if not episode_ptbr_data:
                 localized_episode = await self.tmdb_manager.get_tmdb_localized_data(
@@ -161,17 +163,17 @@ class BT:
 
         self.main_tmdb_data = main_ptbr_data or {}
         self.episode_tmdb_data = episode_ptbr_data or {}
-        meta["episode_tmdb_data"] = self.episode_tmdb_data
+        meta.episode_tmdb_data = self.episode_tmdb_data
 
         return
 
-    async def get_container(self, meta: dict[str, Any]) -> str:
-        container = meta.get('container', '')
-        container_str = str(container) if container is not None else ''
+    async def get_container(self, meta: Meta) -> str:
+        container = meta.container
+        container_str = container if container is not None else ''
         container_lower = container_str.lower()
 
-        if meta.get("category") == "BOOK":
-            if meta.get("audiobook", False):
+        if meta.category == "BOOK":
+            if meta.audiobook:
                 audio_format_map = {
                     "acc": "ACC",
                     "aac": "ACC",
@@ -187,7 +189,7 @@ class BT:
                     "wma": "WMA",
                 }
                 return audio_format_map.get(container_lower, "Outro")
-            elif meta.get("magazine", False) or meta.get("comic", False):
+            elif meta.magazine or meta.comic:
                 mag_comic_format_map = {
                     "cbr": "CBR",
                     "cbz": "CBR",
@@ -214,10 +216,10 @@ class BT:
 
         return 'Outro'
 
-    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        if meta.get("category") == "GAME":
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.category == "GAME":
             pc_platforms = {"PC", "MAC", "LINUX"}
-            platform = str(meta.get("platform", "")).upper().strip()
+            platform = meta.platform.upper().strip()
             if platform in pc_platforms:
                 builder = DescriptionBuilder(self.tracker, self.config)
                 has_install_notes = await builder.get_user_description(meta)
@@ -229,17 +231,17 @@ class BT:
                     return False
         return True
 
-    async def get_type(self, meta: dict[str, Any]) -> Optional[str]:
-        if meta.get('anime'):
+    async def get_type(self, meta: Meta) -> Optional[str]:
+        if meta.anime:
             return '5'
 
-        category = meta.get("category")
+        category = meta.category
         if category == "BOOK":
-            if meta.get("audiobook", False):
+            if meta.audiobook:
                 return "15"
-            if meta.get("magazine", False):
+            if meta.magazine:
                 return "9"
-            if meta.get("comic", False):
+            if meta.comic:
                 return "11"
             return "12"
 
@@ -251,7 +253,7 @@ class BT:
 
         return category_map.get(category) if isinstance(category, str) else None
 
-    def get_game_language(self, meta: dict[str, Any]) -> str:
+    def get_game_language(self, meta: Meta) -> str:
         """Map game languages from IGDB to BT idioma_ori field (same logic as BJS)."""
         language_map: dict[str, str] = {
             "german": "Alemão",
@@ -263,7 +265,7 @@ class BT:
             "russian": "Russo",
         }
 
-        languages = meta.get("languages", {})
+        languages = meta.languages
         if not languages:
             return ""
 
@@ -292,7 +294,7 @@ class BT:
 
         return lang_names[0] if lang_names else ""
 
-    def get_game_genre(self, meta: dict[str, Any]) -> str:
+    def get_game_genre(self, meta: Meta) -> str:
         genre_map: dict[str, str] = {
             "action": "Ação",
             "adventure": "Aventura",
@@ -324,7 +326,7 @@ class BT:
             "visual novel": "Ficção",
         }
 
-        genres_str = meta.get("genres", "") or meta.get("keywords", "")
+        genres_str = meta.genres or meta.keywords
         if not genres_str:
             return ""
 
@@ -336,8 +338,8 @@ class BT:
 
         return ""
 
-    def get_game_platform_bt(self, meta: dict[str, Any]) -> str:
-        """Map meta['platform'] to BT plataforma_jogo dropdown value."""
+    def get_game_platform_bt(self, meta: Meta) -> str:
+        """Map meta.platform to BT plataforma_jogo dropdown value."""
         platform_map: dict[str, str] = {
             "PC": "PC",
             "MAC": "PC",
@@ -358,12 +360,12 @@ class BT:
             "XSX": "Multiplataforma",
         }
 
-        platform = str(meta.get("platform", "")).upper().strip()
+        platform = meta.platform.upper().strip()
         return platform_map.get(platform, "")
 
-    def get_game_os(self, meta: dict[str, Any]) -> str:
-        """Map meta['platform'] to BT sys_jogo dropdown value."""
-        platform = str(meta.get("platform", "")).upper().strip()
+    def get_game_os(self, meta: Meta) -> str:
+        """Map meta.platform to BT sys_jogo dropdown value."""
+        platform = meta.platform.upper().strip()
         if platform == "PC":
             return "Windows"
         elif platform == "MAC":
@@ -376,10 +378,10 @@ class BT:
             return "Console"
         return ""
 
-    def get_game_format(self, meta: dict[str, Any]) -> str:
+    def get_game_format(self, meta: Meta) -> str:
         """Map game container/type to BT formato_jogo dropdown value."""
-        platform = str(meta.get("platform", "")).upper().strip()
-        container = str(meta.get("container", "")).lower()
+        platform = meta.platform.upper().strip()
+        container = meta.container.lower()
 
         if platform == "MOBILE":
             return "APK"
@@ -406,7 +408,7 @@ class BT:
 
         return "Outros"
 
-    async def get_languages(self, _meta: dict[str, Any]) -> Optional[str]:
+    async def get_languages(self, _meta: Meta) -> Optional[str]:
         lang_code = self.main_tmdb_data.get('original_language')
 
         if not isinstance(lang_code, str) or not lang_code:
@@ -418,11 +420,11 @@ class BT:
         except LanguageTagError:
             return lang_code
 
-    async def get_audio(self, meta: dict[str, Any]) -> str:
-        if not meta.get('language_checked', False):
+    async def get_audio(self, meta: Meta) -> str:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        raw_audio_languages = meta.get('audio_languages')
+        raw_audio_languages = meta.audio_languages
         audio_languages_raw: list[Any] = []
         if isinstance(raw_audio_languages, list):
             audio_languages_raw = raw_audio_languages
@@ -436,7 +438,7 @@ class BT:
 
         has_pt_audio = bool(audio_languages_lower.intersection(portuguese_languages))
 
-        original_lang = str(meta.get('original_language', '')).lower()
+        original_lang = str(meta.original_language).lower()
         is_original_pt = original_lang in portuguese_languages
 
         if has_pt_audio:
@@ -449,11 +451,11 @@ class BT:
 
         return 'Legendado'
 
-    async def get_subtitle(self, meta: dict[str, Any]) -> tuple[str, list[str]]:
-        if not meta.get('language_checked', False):
+    async def get_subtitle(self, meta: Meta) -> tuple[str, list[str]]:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        raw_subtitle_languages = meta.get('subtitle_languages')
+        raw_subtitle_languages = meta.subtitle_languages
         subtitle_languages_raw: list[Any] = []
         if isinstance(raw_subtitle_languages, list):
             subtitle_languages_raw = raw_subtitle_languages
@@ -474,11 +476,11 @@ class BT:
 
         return has_pt_subtitles, subtitle_id_list
 
-    async def get_resolution(self, meta: dict[str, Any]) -> tuple[str, str]:
+    async def get_resolution(self, meta: Meta) -> tuple[str, str]:
         width = ''
         height = ''
-        if meta.get('is_disc') == 'BDMV':
-            resolution_str = meta.get('resolution', '')
+        if meta.is_disc == "BDMV":
+            resolution_str = meta.resolution
             try:
                 height_num = int(resolution_str.lower().replace('p', '').replace('i', ''))
                 height = str(height_num)
@@ -489,16 +491,16 @@ class BT:
                 pass
 
         else:
-            video_mi = meta['mediainfo']['media']['track'][1]
+            video_mi = meta.mediainfo["media"]["track"][1]
             width = str(video_mi.get('Width', ''))
             height = str(video_mi.get('Height', ''))
 
         return width, height
 
-    async def get_video_codec(self, meta: dict[str, Any]) -> str:
-        video_encode = meta.get('video_encode', '').strip().lower()
-        codec_final = meta.get('video_codec', '')
-        is_hdr = bool(meta.get('hdr'))
+    async def get_video_codec(self, meta: Meta) -> str:
+        video_encode = meta.video_encode.strip().lower()
+        codec_final = meta.video_codec
+        is_hdr = bool(meta.hdr)
 
         encode_map = {
             'x265': 'x265',
@@ -530,7 +532,7 @@ class BT:
 
         return codec_final if codec_final else "Outro"
 
-    async def get_audio_codec(self, meta: dict[str, Any]) -> str:
+    async def get_audio_codec(self, meta: Meta) -> str:
         priority_order = [
             'DTS-X', 'E-AC-3 JOC', 'TrueHD', 'DTS-HD', 'PCM', 'FLAC', 'DTS-ES',
             'DTS', 'E-AC-3', 'AC3', 'AAC', 'Opus', 'Vorbis', 'MP3', 'MP2'
@@ -554,7 +556,7 @@ class BT:
             'MP3': ['MP3']
         }
 
-        audio_description = meta.get('audio')
+        audio_description = meta.audio
 
         if not audio_description or not isinstance(audio_description, str):
             return 'Outro'
@@ -568,19 +570,19 @@ class BT:
 
         return 'Outro'
 
-    async def get_title(self, meta: dict[str, Any]) -> str:
+    async def get_title(self, meta: Meta) -> str:
         title_value = self.main_tmdb_data.get('name') or self.main_tmdb_data.get('title') or ''
         title = title_value if isinstance(title_value, str) else ''
         original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
 
-        if title and title != meta.get("title") and (not original_name_title or title.lower() != original_name_title.lower()):
+        if title and title != meta.title and (not original_name_title or title.lower() != original_name_title.lower()):
             return title
         return ""
 
-    async def get_description(self, meta: dict[str, Any]) -> str:
+    async def get_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         # Set episode_tmdb_data on meta for general_description_generator to pick it up
-        meta["episode_tmdb_data"] = self.episode_tmdb_data
+        meta.episode_tmdb_data = self.episode_tmdb_data
 
         description = await builder.general_description_generator(
             meta,
@@ -601,12 +603,12 @@ class BT:
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta['ua_name']} {meta['current_version']} (fork)[/size][/url][/align]",
+            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/align]",
         )
 
         return description
 
-    async def get_trailer(self, meta: dict[str, Any]) -> str:
+    async def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = []
         videos = self.main_tmdb_data.get('videos')
         if isinstance(videos, dict):
@@ -626,17 +628,17 @@ class BT:
             youtube = youtube_value if isinstance(youtube_value, str) else ''
 
         if not youtube:
-            meta_trailer = meta.get('youtube', '')
+            meta_trailer = meta.youtube
             if meta_trailer:
                 youtube = meta_trailer.replace('https://www.youtube.com/watch?v=', '').replace('/', '')
 
         return youtube
 
-    async def get_tags(self, meta: dict[str, Any]) -> str:
+    async def get_tags(self, meta: Meta) -> str:
         tags = ''
 
-        if meta.get("category") in ("BOOK", "GAME"):
-            keywords_str = meta.get("keywords") or meta.get("genres") or ""
+        if meta.category in ("BOOK", "GAME"):
+            keywords_str = meta.keywords or meta.genres or ""
             if keywords_str:
                 keyword_list = [k.strip() for k in keywords_str.split(",") if k.strip()]
                 tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in keyword_list)
@@ -660,28 +662,28 @@ class BT:
 
         return tags
 
-    async def search_existing(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        is_book = meta.get("category") == "BOOK"
-        is_game = meta.get("category") == "GAME"
+        is_book = meta.category == "BOOK"
+        is_game = meta.category == "GAME"
 
         if is_book or is_game:
-            searchstr = meta["title"]
+            searchstr = meta.title
         else:
-            imdb_info: dict[str, Any] = meta.get("imdb_info", {})
-            if not imdb_info.get("imdbID") and not meta.get("anime"):
+            imdb_info: dict[str, Any] = meta.imdb_info
+            if not imdb_info.get("imdbID") and not meta.anime:
                 console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return dupes
-            searchstr = meta["title"] if meta.get("anime") else imdb_info.get("imdbID")
+            searchstr = meta.title if meta.anime else imdb_info.get("imdbID")
 
         if is_game:
             should_continue = await self.get_additional_checks(meta)
             if not should_continue:
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return dupes
 
-        is_tv_pack = bool(meta.get("tv_pack"))
+        is_tv_pack = meta.tv_pack
 
         search_url = f"{self.base_url}/torrents.php?searchstr={searchstr}"
         try:
@@ -693,7 +695,7 @@ class BT:
             response = await self.session.get(search_url)
             if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return dupes
 
             # Extract auth token if present
@@ -702,7 +704,7 @@ class BT:
                 BT.secret_token = auth_match.group(1)
             else:
                 console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-                meta["skipping"] = f"{self.tracker}"
+                meta.skipping = f"{self.tracker}"
                 return dupes
 
             response.raise_for_status()
@@ -816,12 +818,9 @@ class BT:
 
         return dupes
 
-    async def get_media_info(self, meta: dict[str, Any]) -> str:
+    async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ''
-        if meta.get('is_disc') == 'BDMV':
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/BD_SUMMARY_00.txt"
-        else:
-            info_file_path = f"{meta.get('base_dir')}/tmp/{meta.get('uuid')}/MEDIAINFO_CLEANPATH.txt"
+        info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.is_disc == "BDMV" else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
         if os.path.exists(info_file_path):
             try:
@@ -834,8 +833,8 @@ class BT:
             console.print(f'[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]')
             return ''
 
-    async def get_edition(self, meta: dict[str, Any]) -> str:
-        edition_str = meta.get('edition', '').lower()
+    async def get_edition(self, meta: Meta) -> str:
+        edition_str = meta.edition.lower()
         if not edition_str:
             return ''
 
@@ -856,17 +855,17 @@ class BT:
 
         return ''
 
-    async def get_bitrate(self, meta: dict[str, Any]) -> str:
-        if meta.get('type') == 'DISC':
-            is_disc_type = meta.get('is_disc')
+    async def get_bitrate(self, meta: Meta) -> str:
+        if meta.type == "DISC":
+            is_disc_type = meta.is_disc
 
             if is_disc_type == 'BDMV':
-                disctype = meta.get('disctype')
+                disctype = meta.disctype
                 if isinstance(disctype, str) and disctype in ['BD100', 'BD66', 'BD50', 'BD25']:
                     return disctype
 
                 try:
-                    size_in_gb = meta['bdinfo']['size']
+                    size_in_gb = meta.bdinfo["size"]
                 except (KeyError, IndexError, TypeError):
                     size_in_gb = 0
 
@@ -880,12 +879,12 @@ class BT:
                     return 'BD25'
 
             elif is_disc_type == 'DVD':
-                dvd_size = meta.get('dvd_size')
+                dvd_size = meta.dvd_size
                 if isinstance(dvd_size, str) and dvd_size in ['DVD9', 'DVD5']:
                     return dvd_size
                 return 'DVD9'
 
-        source_type = meta.get('type')
+        source_type = meta.type
 
         if not source_type or not isinstance(source_type, str):
             return 'Outro'
@@ -907,10 +906,10 @@ class BT:
 
         return keyword_map.get(source_type.lower(), 'Outro')
 
-    async def get_screens(self, meta: dict[str, Any]) -> list[str]:
-        menu_images = meta.get('menu_images')
-        image_list = meta.get('image_list')
-        spectrograms_images = meta.get("spectrograms_images", [])
+    async def get_screens(self, meta: Meta) -> list[str]:
+        menu_images = meta.menu_images
+        image_list = meta.image_list
+        spectrograms_images = meta.spectrograms_images
 
         combined_images: list[dict[str, Any]] = []
         if isinstance(menu_images, list):
@@ -921,7 +920,7 @@ class BT:
         if isinstance(image_list, list):
             image_list_items = image_list
             combined_images.extend(
-                [cast(dict[str, Any], img) for img in image_list_items if isinstance(img, dict)]
+                [img for img in image_list_items if isinstance(img, dict)]
             )
         if isinstance(spectrograms_images, list):
             spectrograms_images_list = spectrograms_images
@@ -935,16 +934,16 @@ class BT:
 
         return urls
 
-    async def get_credits(self, meta: dict[str, Any]) -> str:
+    async def get_credits(self, meta: Meta) -> str:
         director_entries: list[str] = []
 
-        imdb_directors = meta.get('imdb_info', {}).get('directors')
+        imdb_directors = meta.imdb_info.get("directors")
         imdb_directors_list: list[Any] = []
         if isinstance(imdb_directors, list):
             imdb_directors_list = cast(list[Any], imdb_directors)
         director_entries.extend([name for name in imdb_directors_list if isinstance(name, str)])
 
-        tmdb_directors = meta.get('tmdb_directors')
+        tmdb_directors = meta.tmdb_directors
         tmdb_directors_list: list[Any] = []
         if isinstance(tmdb_directors, list):
             tmdb_directors_list = tmdb_directors
@@ -956,33 +955,33 @@ class BT:
 
         return 'N/A'
 
-    async def get_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
         description = await self.get_description(meta)
         tags = await self.get_tags(meta)
 
         data: dict[str, Any] = {
             "submit": "true",
             "auth": BT.secret_token,
-            "year": str(meta.get("year", "")),
-            "title": meta["title"],
+            "year": meta.year,
+            "title": meta.title,
             "type": await self.get_type(meta),
         }
 
-        if meta.get("category") == "GAME":
+        if meta.category == "GAME":
             overview = ""
-            localized_overviews = meta.get("localized_overviews", {})
+            localized_overviews = meta.localized_overviews
             if isinstance(localized_overviews, dict):
-                overview = localized_overviews.get("brazilian", "") or meta.get("overview", "")
+                overview = localized_overviews.get("brazilian", "") or meta.overview
             if not overview:
-                overview = meta.get("overview", "")
+                overview = meta.overview
 
             # Cover image
             cover_url = ""
-            cover_path = meta.get("cover_path", "")
+            cover_path = meta.cover_path
             if isinstance(cover_path, str) and cover_path.startswith(("http://", "https://")):
                 cover_url = cover_path
-            elif meta.get("poster", "") and str(meta.get("poster", "")).startswith(("http://", "https://")):
-                cover_url = str(meta.get("poster", ""))
+            elif meta.poster and meta.poster.startswith(("http://", "https://")):
+                cover_url = meta.poster
 
             data.update({
                 "idioma_ori": self.get_game_language(meta),
@@ -995,31 +994,31 @@ class BT:
                 "sinopse": overview,
                 "especificas": description,
                 "screen[]": await self.get_screens(meta),
-                "releasedate": meta.get("igdb_first_release_date", ""),
-                "vote": str(meta.get("igdb_rating_count", "")),
-                "rating": str(meta.get("igdb_rating", "")),
+                "releasedate": meta.igdb_first_release_date,
+                "vote": str(meta.igdb_rating_count),
+                "rating": str(meta.igdb_rating),
             })
 
-            platform = str(meta.get("platform", "")).upper().strip()
+            platform = meta.platform.upper().strip()
             if platform == "PC":
-                tag = str(meta.get("tag", ""))
+                tag = meta.tag
                 if tag:
                     data["versaoapp"] = tag.lstrip("-")
 
-            youtube = meta.get("youtube", "")
+            youtube = meta.youtube
             if youtube:
                 data["youtube"] = youtube
 
-        elif meta.get("category") == "BOOK":
+        elif meta.category == "BOOK":
             cover_url = await self.get_book_cover(meta)
             resolved_lang = await self.get_book_language(meta)
             resolved_format = await self.get_container(meta)
 
-            audiobook = bool(meta.get("audiobook", False))
-            magazine = bool(meta.get("magazine", False))
-            comic = bool(meta.get("comic", False))
+            audiobook = meta.audiobook
+            magazine = meta.magazine
+            comic = meta.comic
 
-            data["title"] = self.common.portuguese_title_capitalization(meta["title"])
+            data["title"] = self.common.portuguese_title_capitalization(meta.title)
             data.update({
                 "idioma_ori": resolved_lang,
                 "format": resolved_format,
@@ -1028,31 +1027,31 @@ class BT:
 
             if audiobook:
                 data.update({
-                    "banda": meta.get("author", ""),
+                    "banda": meta.author,
                     "bitrate": self.get_audiobook_bitrate(meta),
                     "especificas": description,
                 })
 
             elif magazine or comic:
-                edicao = str(meta.get("manual_edition") or meta.get("edition") or meta.get("episode") or meta.get("manual_episode") or "")
+                edicao = str(meta.manual_edition or meta.edition or meta.episode or meta.manual_episode or "")
                 edicao_str = "".join(c for c in edicao if c.isdigit())
 
                 data.update({
-                    "diretor": meta.get("publisher", "") or meta.get("author", ""),
+                    "diretor": meta.publisher or meta.author,
                     "edicao": edicao_str,
                     "paginas": self.get_book_pages(meta),
                     "tags": tags,
-                    "desc": html_to_bbcode(str(meta.get("overview", ""))),
+                    "desc": html_to_bbcode(meta.overview),
                     "especificas": description,
                     "screen[]": await self.get_screens(meta),
                 })
 
                 if magazine:
-                    data["adulto"] = "1" if meta.get("xxx") or meta.get("nsfw") else "0"
+                    data["adulto"] = "1" if meta.xxx or meta.nsfw else "0"
 
                     months_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                     months_en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-                    text_to_search = (meta.get("title", "") + " " + meta.get("basename_no_ext", "")).lower()
+                    text_to_search = (meta.title + " " + meta.basename_no_ext).lower()
                     found_month = ""
                     for m_pt, m_en in zip(months_pt, months_en):
                         if m_pt.lower() in text_to_search or m_en.lower() in text_to_search:
@@ -1063,9 +1062,9 @@ class BT:
             else:
                 # eBook
                 data.update({
-                    "diretor": meta.get("author", ""),
+                    "diretor": meta.author,
                     "tags": tags,
-                    "desc": html_to_bbcode(str(meta.get("overview", ""))),
+                    "desc": html_to_bbcode(meta.overview),
                     "screen[]": await self.get_screens(meta),
                 })
         else:
@@ -1078,11 +1077,11 @@ class BT:
                 "bitrate": await self.get_bitrate(meta),
                 "desc": "",
                 "diretor": await self.get_credits(meta),
-                "duracao": f"{str(meta.get('runtime', ''))} min",
+                "duracao": f"{str(meta.runtime)} min",
                 "especificas": description,
                 "format": await self.get_container(meta),
-                "idioma_ori": await self.get_languages(meta) or meta.get("original_language", ""),
-                "image": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.get('tmdb_poster', '')}",
+                "idioma_ori": await self.get_languages(meta) or meta.original_language,
+                "image": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.tmdb_poster}",
                 "legenda": has_pt_subtitles,
                 "mediainfo": await self.get_media_info(meta),
                 "resolucao_1": resolution_width,
@@ -1096,52 +1095,52 @@ class BT:
             }
 
             # Common data MOVIE/TV
-            if not meta.get("anime"):
-                if meta["category"] in ("MOVIE", "TV"):
+            if not meta.anime:
+                if meta.category in ("MOVIE", "TV"):
                     data.update({
-                        "3d": "Sim" if meta.get("3d") else "Nao",
+                        "3d": "Sim" if meta.three_d else "Nao",
                         "adulto": "0",
-                        "imdb_input": meta.get("imdb_info", {}).get("imdbID", ""),
-                        "nota_imdb": str(meta.get("imdb_info", {}).get("rating", "")),
+                        "imdb_input": meta.imdb_info.get("imdbID", ""),
+                        "nota_imdb": str(meta.imdb_info.get("rating", "")),
                         "title_br": await self.get_title(meta),
                     })
-                if meta.get("scene", False):
+                if meta.scene:
                     data["scene"] = "on"
 
             # Common data TV/Anime
-            tv_pack = bool(meta.get("tv_pack"))
-            if meta["category"] == "TV" or meta.get("anime"):
+            tv_pack = meta.tv_pack
+            if meta.category == "TV" or meta.anime:
                 data.update({
-                    "episodio": meta.get("episode", ""),
-                    "ntorrent": f"{meta.get('season', '')}{meta.get('episode', '')}",
-                    "temporada_e": meta.get("season", "") if not tv_pack else "",
-                    "temporada": meta.get("season", "") if tv_pack else "",
+                    "episodio": meta.episode,
+                    "ntorrent": f"{meta.season}{meta.episode}",
+                    "temporada_e": meta.season if not tv_pack else "",
+                    "temporada": meta.season if tv_pack else "",
                     "tipo": "ep_individual" if not tv_pack else "completa",
                 })
 
             # Specific
-            if meta["category"] == "MOVIE":
+            if meta.category == "MOVIE":
                 data["versao"] = await self.get_edition(meta)
-            elif meta.get("anime"):
+            elif meta.anime:
                 data.update({
-                    "fundo_torrent": meta.get("backdrop"),
+                    "fundo_torrent": meta.backdrop,
                     "horas": "",
                     "minutos": "",
-                    "rating": str(meta.get("imdb_info", {}).get("rating", "")),
-                    "releasedate": str(meta["year"]),
+                    "rating": str(meta.imdb_info.get("rating", "")),
+                    "releasedate": meta.year,
                     "vote": "",
                 })
 
         # Anon
-        anon = not (meta['anon'] == 0 and not self.config['TRACKERS'][self.tracker].get('anon', False))
+        anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data['anonymous'] = '1'
 
         # Internal
         if (
-            self.config['TRACKERS'][self.tracker].get('internal', False) is True
-            and meta['tag'] != ''
-            and (meta['tag'][1:] in self.config['TRACKERS'][self.tracker].get('internal_groups', []))
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True
+            and meta.tag != ""
+            and (meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", []))
         ):
             data.update({
                 'internal': 1,
@@ -1149,12 +1148,12 @@ class BT:
 
         return data
 
-    def get_audiobook_bitrate(self, meta: dict[str, Any]) -> str:
-        container_lower = str(meta.get("container", "")).lower()
+    def get_audiobook_bitrate(self, meta: Meta) -> str:
+        container_lower = meta.container.lower()
         if container_lower in ("flac", "wav", "alac", "ape", "dsf", "dff"):
             return "Lossless"
 
-        avg_bitrate = meta.get("audiobook_bitrate")
+        avg_bitrate = meta.audiobook_bitrate
         if avg_bitrate is None:
             return "Outro"
 
@@ -1170,27 +1169,27 @@ class BT:
 
         return str(closest_option)
 
-    def build_book_desc(self, meta: dict[str, Any]) -> str:
+    def build_book_desc(self, meta: Meta) -> str:
         """Build the BBCode table for BOOK-category uploads."""
         builder = DescriptionBuilder(self.tracker, self.config)
         return builder._build_book_desc_section(meta, header_size=3, table=False)
 
-    async def get_book_cover(self, meta: dict[str, Any]) -> str:
-        covers = meta.get("covers")
+    async def get_book_cover(self, meta: Meta) -> str:
+        covers = meta.covers
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.get("poster")
+        poster_url = meta.poster
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
         return ""
 
-    async def get_book_language(self, meta: dict[str, Any]) -> str:
-        book_lang_code = meta.get("book_language_iso")
+    async def get_book_language(self, meta: Meta) -> str:
+        book_lang_code = meta.book_language_iso
         book_lang_code = book_lang_code.lower() if isinstance(book_lang_code, str) else ""
 
         lang_map = {
@@ -1209,15 +1208,15 @@ class BT:
             "jpn": "Japonês",
         }
         resolved_lang = lang_map.get(book_lang_code, "Outro")
-        if meta.get("audiobook", False) and resolved_lang == "Japonês":
+        if meta.audiobook and resolved_lang == "Japonês":
             resolved_lang = "Outro"
         return resolved_lang
 
-    def get_book_pages(self, meta: dict[str, Any]) -> str:
-        if meta.get("audiobook", False):
+    def get_book_pages(self, meta: Meta) -> str:
+        if meta.audiobook:
             return ""
 
-        file_path = meta["filelist"][0] if meta.get("filelist") else meta.get("path", "")
+        file_path = meta.filelist[0] if meta.filelist else meta.path
         if not file_path or not os.path.exists(file_path):
             return ""
 
@@ -1240,7 +1239,7 @@ class BT:
                 pass
         return ""
 
-    async def upload(self, meta: dict[str, Any]) -> bool:
+    async def upload(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False
