@@ -7,7 +7,7 @@
     "lint:react": "eslint . --ext .js,.jsx --ignore-pattern .eslintrc.js"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.6",
+    "@babel/core": "^7.29.6",
     "@babel/eslint-parser": "^7.22.5",
     "eslint": "^8.54.0",
     "eslint-plugin-react": "^7.32.2",
