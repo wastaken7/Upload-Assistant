@@ -1,6 +1,6 @@
 # Upload Assistant
 
-[![Python Version](https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white)](https://www.python.org/) [![License](https://img.shields.io/badge/License-UAPL%20v1.0-orange)](LICENSE) [![Ruff](https://img.shields.io/badge/Ruff-000000?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff) [![Pyright](https://img.shields.io/badge/Pyright-strict-brightgreen)](https://github.com/microsoft/pyright) [![Docker Image CI](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg)](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml) [![Release Pipeline](https://github.com/wastaken7/Upload-Assistant/actions/workflows/push_release.yaml/badge.svg)](https://github.com/wastaken7/Upload-Assistant/actions/workflows/push_release.yaml)
+[![Python Version](https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white)](https://www.python.org/) [![License](https://img.shields.io/badge/License-UAPL%20v1.0-orange)](LICENSE) [![Ruff](https://img.shields.io/badge/Ruff-000000?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff) [![Pyright](https://img.shields.io/badge/Pyright-strict-brightgreen)](https://github.com/microsoft/pyright) [![Docker Image CI](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg)](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml)
 
 > [!IMPORTANT]
 > **This is a modified version of the Upload Assistant project and is not affiliated with or endorsed by Audionut.**
@@ -147,7 +147,7 @@ This branch introduces new media categories and automation features not present 
    - Also needs MediaInfo and ffmpeg installed on your system
       - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
       - On linux systems, get it from your favorite package manager
-      - If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](https://github.com/Audionut/Upload-Assistant/wiki/ffmpeg---max-workers-issues)
+      - If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](docs/ffmpeg---max-workers-issues.md)
    - Get the source:
       - Clone the repo to your system `git clone https://github.com/wastaken7/Upload-Assistant.git`
       - Fetch all of the release tags `git fetch --all --tags`
@@ -168,7 +168,7 @@ This branch introduces new media categories and automation features not present 
       - tmdb_api key can be obtained from https://www.themoviedb.org/settings/api
       - image host api keys can be obtained from their respective sites
 
-   **Additional Resources are found in the [wiki](https://github.com/Audionut/Upload-Assistant/wiki)**
+    **Additional Resources are found in the [wiki](docs/Home.md)**
 
    Feel free to contact me if you need help, I'm not that hard to find.
 
