@@ -7,8 +7,8 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, Optional, cast
 
-import aiohttp
 import defusedxml.xmlrpc
+import httpx
 import qbittorrentapi
 from torf import Torrent
 
@@ -364,15 +364,15 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         proxy_url = client.get('qui_proxy_url')
                         if proxy_url:
                             qbt_proxy_url = proxy_url.rstrip('/')
-                            async with aiohttp.ClientSession() as session:
+                            async with httpx.AsyncClient() as session:
                                 try:
-                                    async with session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
-                                                            data={'hash': hash_value_str}) as response:
-                                        if response.status == 200:
-                                            torrent_file_content = await response.read()
-                                        else:
-                                            console.print(f"[red]Failed to export torrent via proxy: {response.status}")
-                                            continue
+                                    response = await session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
+                                                                  data={'hash': hash_value_str})
+                                    if response.status_code == 200:
+                                        torrent_file_content = response.content
+                                    else:
+                                        console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                        continue
                                 except Exception as e:
                                     console.print(f"[red]Error exporting torrent via proxy: {e}")
                                     continue
@@ -418,16 +418,16 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         # Search the client if no pre-specified hash matches
         if torrent_client == 'qbit' and client.get('enable_search'):
-            qbt_session: Optional[aiohttp.ClientSession] = None
+            qbt_session: Optional[httpx.AsyncClient] = None
             try:
 
                 proxy_url = client.get('qui_proxy_url')
 
                 if proxy_url:
                     ssl_context = self.create_ssl_context_for_client(client)
-                    qbt_session = aiohttp.ClientSession(
-                        timeout=aiohttp.ClientTimeout(total=10),
-                        connector=aiohttp.TCPConnector(ssl=ssl_context)
+                    qbt_session = httpx.AsyncClient(
+                        timeout=10.0,
+                        verify=ssl_context
                     )
                 else:
                     qbt_client = await self.init_qbittorrent_client(client)
@@ -436,22 +436,22 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
                 # Clean up session if we created one
                 if qbt_session:
-                    await qbt_session.close()
+                    await qbt_session.aclose()
 
             except KeyboardInterrupt:
                 console.print("[bold red]Search cancelled by user")
                 found_hash = None
                 if qbt_session:
-                    await qbt_session.close()
+                    await qbt_session.aclose()
             except TimeoutError:
                 if qbt_session:
-                    await qbt_session.close()
+                    await qbt_session.aclose()
                 raise
             except Exception as e:
                 console.print(f"[bold red]Error searching qBittorrent: {e}")
                 found_hash = None
                 if qbt_session:
-                    await qbt_session.close()
+                    await qbt_session.aclose()
             if found_hash:
                 extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
 
@@ -469,15 +469,15 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             proxy_url = client.get('qui_proxy_url')
                             if proxy_url:
                                 qbt_proxy_url = proxy_url.rstrip('/')
-                                async with aiohttp.ClientSession() as session:
+                                async with httpx.AsyncClient() as session:
                                     try:
-                                        async with session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
-                                                                data={'hash': found_hash}) as response:
-                                            if response.status == 200:
-                                                torrent_file_content = await response.read()
-                                            else:
-                                                console.print(f"[red]Failed to export torrent via proxy: {response.status}")
-                                                found_hash = None
+                                        response = await session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
+                                                                      data={'hash': found_hash})
+                                        if response.status_code == 200:
+                                            torrent_file_content = response.content
+                                        else:
+                                            console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                            found_hash = None
                                     except Exception as e:
                                         console.print(f"[red]Error exporting torrent via proxy: {e}")
                                         found_hash = None

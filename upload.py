@@ -713,7 +713,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         trackers = [t for t in raw_trackers_list if isinstance(t, str)]
     elif isinstance(raw_trackers, str):
         if raw_trackers != "":
-            trackers = [t.strip().upper() for t in raw_trackers.split(",") if t.strip()]
+            trackers = [t.strip().upper() for t in raw_trackers.split(",") if t.strip()]  # type: ignore
             meta.trackers = trackers
         else:
             trackers = []
@@ -2095,6 +2095,7 @@ async def do_the_thing(base_dir: str) -> None:
                                             list(http_trackers),
                                             list(other_api_trackers),
                                         )
+                                else:
                                     console.print("[bold red]Usenet upload failed.[/bold red]")
                                     status_map = meta.tracker_status
                                     for t in usenet_trackers:

@@ -8,9 +8,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional, TypeAlias, cast
 
-import aiohttp
 import cli_ui
 import click
+import httpx
 from PIL import Image
 
 from src.bbcode import BBCODE
@@ -50,7 +50,7 @@ class TrackerMetaManager:
     async def check_images_concurrently(self, imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
         return await check_images_concurrently(imagelist, meta)
 
-    async def check_image_link(self, url: str, timeout: Optional[aiohttp.ClientTimeout] = None) -> bool:
+    async def check_image_link(self, url: str, timeout: Optional[httpx.Timeout] = None) -> bool:
         return await check_image_link(url, timeout)
 
     async def update_meta_with_unit3d_data(self, meta: Meta, tracker_data: Sequence[Any], tracker_name: str, skip_tracker_descriptions: bool = False) -> bool:
@@ -136,7 +136,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     # Function to check each image's URL, host, and log resolution
     save_directory = os.path.join(meta.base_dir, "tmp", meta.uuid)
 
-    timeout = aiohttp.ClientTimeout(total=15, connect=5, sock_connect=5, sock_read=5)
+    timeout = httpx.Timeout(15.0, connect=5.0, read=5.0)
 
     async def check_and_collect(image_dict: ImageDict) -> Optional[ImageDict]:
         img_url = cast(Optional[str], image_dict.get('raw_url'))
@@ -159,50 +159,50 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         try:
             if await check_image_link(img_url, timeout):
                 try:
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with httpx.AsyncClient(timeout=timeout) as session:
                         try:
-                            async with session.get(img_url) as response:
-                                if response.status == 200:
-                                    image_content = await response.read()
+                            response = await session.get(img_url)
+                            if response.status_code == 200:
+                                image_content = response.content
 
-                                    try:
-                                        image = Image.open(BytesIO(image_content))
-                                        vertical_resolution = image.height
-                                        lower_bound = expected_vertical_resolution * 0.70
-                                        upper_bound = expected_vertical_resolution * (1.30 if meta.is_disc == "DVD" else 1.00)
+                                try:
+                                    image = Image.open(BytesIO(image_content))
+                                    vertical_resolution = image.height
+                                    lower_bound = expected_vertical_resolution * 0.70
+                                    upper_bound = expected_vertical_resolution * (1.30 if meta.is_disc == "DVD" else 1.00)
 
-                                        if not (lower_bound <= vertical_resolution <= upper_bound):
-                                            console.print(
-                                                f"[red]Image {img_url} resolution ({vertical_resolution}p) "
-                                                f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
-                                            )
-                                            return None
-
-                                        # Save image
-                                        os.makedirs(save_directory, exist_ok=True)
-                                        image_filename = os.path.join(save_directory, os.path.basename(img_url))
-                                        await asyncio.to_thread(Path(image_filename).write_bytes, image_content)
-
-                                        console.print(f"Saved {img_url} as {image_filename}")
-
-                                        meta.image_sizes[img_url] = len(image_content)
-
-                                        if meta.debug:
-                                            console.print(
-                                                f"Valid image {img_url} with resolution {image.width}x{image.height} "
-                                                f"and size {len(image_content) / 1024:.2f} KiB"
-                                            )
-                                        return image_dict
-                                    except Exception as e:
-                                        console.print(f"[red]Failed to process image {img_url}: {e}")
+                                    if not (lower_bound <= vertical_resolution <= upper_bound):
+                                        console.print(
+                                            f"[red]Image {img_url} resolution ({vertical_resolution}p) "
+                                            f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
+                                        )
                                         return None
-                                else:
-                                    console.print(f"[red]Failed to fetch image {img_url}. Status: {response.status}. Skipping.")
+
+                                    # Save image
+                                    os.makedirs(save_directory, exist_ok=True)
+                                    image_filename = os.path.join(save_directory, os.path.basename(img_url))
+                                    await asyncio.to_thread(Path(image_filename).write_bytes, image_content)
+
+                                    console.print(f"Saved {img_url} as {image_filename}")
+
+                                    meta.image_sizes[img_url] = len(image_content)
+
+                                    if meta.debug:
+                                        console.print(
+                                            f"Valid image {img_url} with resolution {image.width}x{image.height} "
+                                            f"and size {len(image_content) / 1024:.2f} KiB"
+                                        )
+                                    return image_dict
+                                except Exception as e:
+                                    console.print(f"[red]Failed to process image {img_url}: {e}")
                                     return None
+                            else:
+                                console.print(f"[red]Failed to fetch image {img_url}. Status: {response.status_code}. Skipping.")
+                                return None
                         except TimeoutError:
                             console.print(f"[red]Timeout downloading image: {img_url}")
                             return None
-                        except aiohttp.ClientError as e:
+                        except httpx.HTTPError as e:
                             console.print(f"[red]Client error downloading image: {img_url} - {e}")
                             return None
                 except Exception as e:
@@ -237,37 +237,35 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     return valid_images
 
 
-async def check_image_link(url: str, timeout: Optional[aiohttp.ClientTimeout] = None) -> bool:
+async def check_image_link(url: str, timeout: Optional[httpx.Timeout] = None) -> bool:
     # Handle when pixhost url points to web_url and convert to raw_url
     if url.startswith("https://pixhost.to/show/"):
         url = url.replace("https://pixhost.to/show/", "https://img1.pixhost.to/images/", 1)
     if timeout is None:
-        timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_connect=10)
-
-    connector = aiohttp.TCPConnector(ssl=False)  # Disable SSL verification for testing
+        timeout = httpx.Timeout(20.0, connect=10.0)
 
     try:
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        async with httpx.AsyncClient(timeout=timeout, verify=False) as session:
             try:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        content_type = response.headers.get('Content-Type', '').lower()
-                        if 'image' in content_type:
-                            # Attempt to load the image
-                            image_data = await response.read()
-                            try:
-                                image = Image.open(io.BytesIO(image_data))
-                                image.verify()  # This will check if the image is broken
-                                return True
-                            except (OSError, SyntaxError) as e:
-                                console.print(f"[red]Image verification failed (corrupt image): {url} {e}[/red]")
-                                return False
-                        else:
-                            console.print(f"[red]Content type is not an image: {url}[/red]")
+                response = await session.get(url)
+                if response.status_code == 200:
+                    content_type = response.headers.get('Content-Type', '').lower()
+                    if 'image' in content_type:
+                        # Attempt to load the image
+                        image_data = response.content
+                        try:
+                            image = Image.open(io.BytesIO(image_data))
+                            image.verify()  # This will check if the image is broken
+                            return True
+                        except (OSError, SyntaxError) as e:
+                            console.print(f"[red]Image verification failed (corrupt image): {url} {e}[/red]")
                             return False
                     else:
-                        console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status})[/red]")
+                        console.print(f"[red]Content type is not an image: {url}[/red]")
                         return False
+                else:
+                    console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status_code})[/red]")
+                    return False
             except TimeoutError:
                 console.print(f"[red]Timeout checking image link: {url}[/red]")
                 return False

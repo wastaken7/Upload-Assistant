@@ -530,6 +530,19 @@ class Meta:
                 res[f.name] = val
         return res
 
+    def items(self) -> Any:
+        """Return dict-like items view."""
+        return self.to_dict().items()
+
+    def keys(self) -> Any:
+        """Return dict-like keys view."""
+        return self.to_dict().keys()
+
+    def values(self) -> Any:
+        """Return dict-like values view."""
+        return self.to_dict().values()
+
+
     def update(self, other: dict[str, Any] | Meta) -> None:
         """Update attributes from a dictionary or another Meta instance."""
         if isinstance(other, Meta):

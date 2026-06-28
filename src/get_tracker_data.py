@@ -10,8 +10,8 @@ from types import MappingProxyType
 from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
-import aiohttp
 import cli_ui
+import httpx
 import requests
 
 from src.btnid import BtnIdManager
@@ -217,9 +217,9 @@ class TrackerDataManager:
                             meta.matched_tracker = tracker_name
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
                         return updated_meta
-                    except aiohttp.ClientSSLError:
+                    except httpx.ConnectError:
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
-                        console.print(f"{tracker_name} tracker request failed due to SSL error.", markup=False)
+                        console.print(f"{tracker_name} tracker request failed due to SSL/Connection error.", markup=False)
                     except requests.exceptions.ConnectionError as conn_err:
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
                         console.print(f"{tracker_name} tracker request failed due to connection error: {conn_err}", markup=False)
@@ -378,8 +378,8 @@ class TrackerDataManager:
                                 console.print(f"[green]Match found on tracker: {tracker_name}[/green]")
                             meta.matched_tracker = tracker_name
                         return updated_meta
-                    except aiohttp.ClientSSLError:
-                        console.print(f"{tracker_name} tracker request failed due to SSL error.", markup=False)
+                    except httpx.ConnectError:
+                        console.print(f"{tracker_name} tracker request failed due to SSL/Connection error.", markup=False)
                     except requests.exceptions.ConnectionError as conn_err:
                         console.print(f"{tracker_name} tracker request failed due to connection error: {conn_err}", markup=False)
                     return meta

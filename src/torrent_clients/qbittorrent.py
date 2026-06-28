@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any, Optional, TypedDict, cast
 
-import aiohttp
+import httpx
 import qbittorrentapi
 from torf import Torrent
 
@@ -52,14 +52,14 @@ class QbittorrentClientMixin:
         proxy_url = client.get('qui_proxy_url')
         qbt_proxy_url = ""
         qbt_client: Optional[qbittorrentapi.Client] = None
-        qbt_session: Optional[aiohttp.ClientSession] = None
+        qbt_session: Optional[httpx.AsyncClient] = None
 
         if proxy_url:
             qbt_proxy_url = proxy_url.rstrip('/')
             ssl_context = self.create_ssl_context_for_client(client)
-            qbt_session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10),
-                connector=aiohttp.TCPConnector(ssl=ssl_context)
+            qbt_session = httpx.AsyncClient(
+                timeout=10.0,
+                verify=ssl_context
             )
             qbt_proxy_url = proxy_url.rstrip('/')
         else:
@@ -88,19 +88,19 @@ class QbittorrentClientMixin:
             if proxy_url:
                 if qbt_session is None:
                     raise RuntimeError("qbt_session should not be None")
-                async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties",
-                                           params={'hash': info_hash_v1}, timeout=aiohttp.ClientTimeout(total=14.0)) as response:
-                    if response.status == 200:
-                        torrent_properties = await response.json()
-                        if meta.debug:
-                            console.print(f"[cyan]Retrieved torrent properties via proxy for hash: {info_hash_v1}")
+                response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties",
+                                                 params={'hash': info_hash_v1}, timeout=14.0)
+                if response.status_code == 200:
+                    torrent_properties = response.json()
+                    if meta.debug:
+                        console.print(f"[cyan]Retrieved torrent properties via proxy for hash: {info_hash_v1}")
 
-                        torrents = [TorrentInfo(torrent_properties)]
-                    else:
-                        console.print(f"[bold red]Failed to get torrent properties via proxy: {response.status}")
-                        if qbt_session is not None:
-                            await qbt_session.close()
-                        return meta
+                    torrents = [TorrentInfo(torrent_properties)]
+                else:
+                    console.print(f"[bold red]Failed to get torrent properties via proxy: {response.status_code}")
+                    if qbt_session is not None:
+                        await qbt_session.aclose()
+                    return meta
             else:
                 try:
                     if qbt_client is None:
@@ -120,12 +120,12 @@ class QbittorrentClientMixin:
         except TimeoutError:
             console.print("[bold red]Getting torrents list timed out after retries")
             if qbt_session:
-                await qbt_session.close()
+                await qbt_session.aclose()
             return meta
         except Exception as e:
             console.print(f"[bold red]Error getting torrents list: {e}")
             if qbt_session:
-                await qbt_session.close()
+                await qbt_session.aclose()
             return meta
         found = False
 
@@ -179,13 +179,13 @@ class QbittorrentClientMixin:
                                 if proxy_url:
                                     if qbt_session is None:
                                         raise RuntimeError("qbt_session should not be None")
-                                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
-                                                                data={'hash': torrent_hash}) as response:
-                                        if response.status == 200:
-                                            torrent_file_content = await response.read()
-                                        else:
-                                            console.print(f"[red]Failed to export torrent via proxy: {response.status}")
-                                            continue
+                                    response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
+                                                                      data={'hash': torrent_hash})
+                                    if response.status_code == 200:
+                                        torrent_file_content = response.content
+                                    else:
+                                        console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                        continue
                                 else:
                                     if qbt_client is None:
                                         raise RuntimeError("qbt_client should not be None")
@@ -214,7 +214,7 @@ class QbittorrentClientMixin:
                         break
             except Exception as e:
                 if qbt_session:
-                    await qbt_session.close()
+                    await qbt_session.aclose()
                 console.print(f"[bold red]Error processing torrent {getattr(torrent, 'name', 'Unknown')}: {e}")
                 if meta.debug:
                     console.print(f"[bold red]Traceback: {traceback.format_exc()}")
@@ -224,7 +224,7 @@ class QbittorrentClientMixin:
             console.print("[bold red]Matching site torrent with the specified infohash_v1 not found.")
 
         if qbt_session:
-            await qbt_session.close()
+            await qbt_session.aclose()
 
         return meta
 
@@ -316,7 +316,7 @@ class QbittorrentClientMixin:
         meta: Meta,
         client: dict[str, Any],
         qbt_client: Optional[qbittorrentapi.Client] = None,
-        qbt_session: Optional[aiohttp.ClientSession] = None,
+        qbt_session: Optional[httpx.AsyncClient] = None,
         proxy_url: Optional[str] = None,
     ) -> Optional[str]:
         trackers_config = cast(dict[str, Any], self.config.get('TRACKERS', {}))
@@ -344,9 +344,9 @@ class QbittorrentClientMixin:
                     qbt_client = potential_qbt_client
                 elif proxy_url and qbt_session is None:
                     ssl_context = self.create_ssl_context_for_client(client)
-                    qbt_session = aiohttp.ClientSession(
-                        timeout=aiohttp.ClientTimeout(total=10),
-                        connector=aiohttp.TCPConnector(ssl=ssl_context)
+                    qbt_session = httpx.AsyncClient(
+                        timeout=10.0,
+                        verify=ssl_context
                     )
                     created_session = True
 
@@ -394,34 +394,34 @@ class QbittorrentClientMixin:
                     if meta.debug:
                         console.print(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
 
-                    async with qbt_session.get(url) as response:
-                        if response.status == 200:
-                            response_data = await response.json()
+                    response = await qbt_session.get(url)
+                    if response.status_code == 200:
+                        response_data = response.json()
 
-                            torrents_data: list[dict[str, Any]]
-                            if isinstance(response_data, dict) and 'torrents' in response_data:
-                                response_data_dict = cast(dict[str, Any], response_data)
-                                torrents_value = response_data_dict.get('torrents', [])
-                                torrents_data = cast(list[dict[str, Any]], torrents_value) if isinstance(torrents_value, list) else []
-                            elif isinstance(response_data, list):
-                                torrents_data = cast(list[dict[str, Any]], response_data)
-                            else:
-                                torrents_data = []
-
-                            if meta.debug:
-                                if torrents_data:
-                                    console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
-                                else:
-                                    console.print("[cyan]No matching torrents found via proxy search")
-
-                            torrents = self._build_mock_torrents(torrents_data)
+                        torrents_data: list[dict[str, Any]]
+                        if isinstance(response_data, dict) and 'torrents' in response_data:
+                            response_data_dict = cast(dict[str, Any], response_data)
+                            torrents_value = response_data_dict.get('torrents', [])
+                            torrents_data = cast(list[dict[str, Any]], torrents_value) if isinstance(torrents_value, list) else []
+                        elif isinstance(response_data, list):
+                            torrents_data = cast(list[dict[str, Any]], response_data)
                         else:
-                            if response.status == 404:
-                                if meta.debug:
-                                    console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                            torrents_data = []
+
+                        if meta.debug:
+                            if torrents_data:
+                                console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
                             else:
-                                console.print(f"[bold red]Failed to get torrents list via proxy: {response.status}")
-                            return None
+                                console.print("[cyan]No matching torrents found via proxy search")
+
+                        torrents = self._build_mock_torrents(torrents_data)
+                    else:
+                        if response.status_code == 404:
+                            if meta.debug:
+                                console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                        else:
+                            console.print(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
+                        return None
                 else:
                     if qbt_client is None:
                         console.print("[bold red]qBittorrent client not initialized")
@@ -504,12 +504,12 @@ class QbittorrentClientMixin:
                             continue
                         qbt_proxy_url = proxy_url.rstrip('/')
                         try:
-                            async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
-                                                        data={'hash': torrent_hash}) as response:
-                                if response.status == 200:
-                                    torrent_file_content = await response.read()
-                                else:
-                                    console.print(f"[red]Failed to export torrent via proxy: {response.status}")
+                            response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export",
+                                                              data={'hash': torrent_hash})
+                            if response.status_code == 200:
+                                torrent_file_content = response.content
+                            else:
+                                console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
                         except Exception as e:
                             console.print(f"[red]Error exporting torrent via proxy: {e}")
                     else:
@@ -580,7 +580,7 @@ class QbittorrentClientMixin:
             return result
         finally:
             if created_session and qbt_session is not None:
-                await qbt_session.close()
+                await qbt_session.aclose()
 
     async def qbittorrent(
         self,
@@ -759,9 +759,9 @@ class QbittorrentClientMixin:
 
         if proxy_url:
             ssl_context = self.create_ssl_context_for_client(client)
-            qbt_session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10),
-                connector=aiohttp.TCPConnector(ssl=ssl_context)
+            qbt_session = httpx.AsyncClient(
+                timeout=10.0,
+                verify=ssl_context
             )
             qbt_proxy_url = proxy_url.rstrip('/')
         else:
@@ -853,27 +853,30 @@ class QbittorrentClientMixin:
             if proxy_url:
                 if qbt_session is None:
                     raise RuntimeError("qbt_session cannot be None")
-                # Create FormData for multipart/form-data request
-                data = aiohttp.FormData()
-                data.add_field('savepath', save_path)
-                data.add_field('autoTMM', str(auto_management).lower())
-                data.add_field('skip_checking', str(skip_checking).lower())
-                data.add_field('paused', str(paused_on_add).lower())
-                data.add_field('contentLayout', content_layout)
+                # Create files and data for multipart/form-data request
+                files = {
+                    'torrents': ('torrent.torrent', torrent.dump(), 'application/x-bittorrent')
+                }
+                data = {
+                    'savepath': save_path,
+                    'autoTMM': str(auto_management).lower(),
+                    'skip_checking': str(skip_checking).lower(),
+                    'paused': str(paused_on_add).lower(),
+                    'contentLayout': content_layout,
+                }
                 if qbt_category:
-                    data.add_field('category', qbt_category)
+                    data['category'] = qbt_category
                 if tag:
-                    data.add_field('tags', tag)
-                data.add_field('torrents', torrent.dump(), filename='torrent.torrent', content_type='application/x-bittorrent')
+                    data['tags'] = tag
                 if meta.debug:
                     console.print(f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}")
 
-                async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add",
-                                            data=data) as response:
-                    if response.status != 200:
-                        console.print(f"[bold red]Failed to add torrent via proxy: {response.status}")
-                        await qbt_session.close()
-                        return
+                response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add",
+                                                  data=data, files=files)
+                if response.status_code != 200:
+                    console.print(f"[bold red]Failed to add torrent via proxy: {response.status_code}")
+                    await qbt_session.aclose()
+                    return
             else:
                 if qbt_client is None:
                     raise RuntimeError("qbt_client cannot be None")
@@ -893,12 +896,12 @@ class QbittorrentClientMixin:
         except (TimeoutError, qbittorrentapi.APIConnectionError):
             console.print("[bold red]Failed to add torrent to qBittorrent")
             if qbt_session:
-                await qbt_session.close()
+                await qbt_session.aclose()
             return
         except Exception as e:
             console.print(f"[bold red]Error adding torrent: {e}")
             if qbt_session:
-                await qbt_session.close()
+                await qbt_session.aclose()
             return
 
         # Wait for torrent to be added
@@ -908,16 +911,16 @@ class QbittorrentClientMixin:
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session cannot be None")
-                    async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info",
-                                               params={'hashes': torrent.infohash}) as response:
-                        if response.status == 200:
-                            torrents_info = await response.json()
-                            if len(torrents_info) > 0:
-                                if meta.debug:
-                                    console.print(f"[green]Found {tracker} torrent in qBittorrent.")
-                                break
-                        else:
-                            pass  # Continue waiting
+                    response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info",
+                                                     params={'hashes': torrent.infohash})
+                    if response.status_code == 200:
+                        torrents_info = response.json()
+                        if len(torrents_info) > 0:
+                            if meta.debug:
+                                console.print(f"[green]Found {tracker} torrent in qBittorrent.")
+                            break
+                    else:
+                        pass  # Continue waiting
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
@@ -937,7 +940,7 @@ class QbittorrentClientMixin:
         else:
             console.print("[red]Torrent addition timed out.")
             if qbt_session:
-                await qbt_session.close()
+                await qbt_session.aclose()
             return
 
         if not cross:
@@ -945,15 +948,15 @@ class QbittorrentClientMixin:
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session cannot be None")
-                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/start", data={"hashes": torrent.infohash}) as response:
-                        if response.status == 404:
-                            if meta.debug:
-                                console.print("[cyan]Start endpoint returned 404, trying legacy resume endpoint (pre-v5.0.0)...")
-                            async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash}) as resume_response:
-                                if resume_response.status != 200:
-                                    console.print(f"[yellow]Failed to resume torrent via proxy (resume): {resume_response.status}")
-                        elif response.status != 200:
-                            console.print(f"[yellow]Failed to resume torrent via proxy: {response.status}")
+                    response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/start", data={"hashes": torrent.infohash})
+                    if response.status_code == 404:
+                        if meta.debug:
+                            console.print("[cyan]Start endpoint returned 404, trying legacy resume endpoint (pre-v5.0.0)...")
+                        resume_response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash})
+                        if resume_response.status_code != 200:
+                            console.print(f"[yellow]Failed to resume torrent via proxy (resume): {resume_response.status_code}")
+                    elif response.status_code != 200:
+                        console.print(f"[yellow]Failed to resume torrent via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
@@ -973,10 +976,10 @@ class QbittorrentClientMixin:
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session cannot be None")
-                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/setSuperSeeding",
-                                                data={'hashes': torrent.infohash, "value": "true"}) as response:
-                        if response.status != 200:
-                            console.print(f"{tracker}: Failed to set super-seed via proxy: {response.status}")
+                    response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/setSuperSeeding",
+                                                      data={'hashes': torrent.infohash, "value": "true"})
+                    if response.status_code != 200:
+                        console.print(f"{tracker}: Failed to set super-seed via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
@@ -995,16 +998,16 @@ class QbittorrentClientMixin:
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session should not be None")
-                    async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info",
-                                               params={'hashes': torrent.infohash}) as response:
-                        if response.status == 200:
-                            info = await response.json()
-                            if info:
-                                console.print(f"[cyan]Actual qBittorrent save path: {info[0].get('save_path', 'Unknown')}")
-                            else:
-                                console.print("[yellow]No torrent info returned from proxy")
+                    response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info",
+                                                     params={'hashes': torrent.infohash})
+                    if response.status_code == 200:
+                        info = response.json()
+                        if info:
+                            console.print(f"[cyan]Actual qBittorrent save path: {info[0].get('save_path', 'Unknown')}")
                         else:
-                            console.print(f"[yellow]Failed to get torrent info via proxy: {response.status}")
+                            console.print("[yellow]No torrent info returned from proxy")
+                    else:
+                        console.print(f"[yellow]Failed to get torrent info via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client should not be None")
@@ -1026,7 +1029,7 @@ class QbittorrentClientMixin:
             console.print(f"Added to: {save_path}")
 
         if qbt_session:
-            await qbt_session.close()
+            await qbt_session.aclose()
 
     async def get_pathed_torrents(self, path: str, meta: Meta) -> None:
         try:
@@ -1348,7 +1351,7 @@ class QbittorrentClientMixin:
         return tracker_patterns, tracker_priority
 
     async def _fetch_torrents(
-        self, proxy_url: str, qbt_proxy_url: str, qbt_session: Optional[aiohttp.ClientSession], qbt_client: Optional[qbittorrentapi.Client], search_term: str, meta: Meta
+        self, proxy_url: str, qbt_proxy_url: str, qbt_session: Optional[httpx.AsyncClient], qbt_client: Optional[qbittorrentapi.Client], search_term: str, meta: Meta
     ) -> list[Any]:
         try:
             if proxy_url:
@@ -1371,36 +1374,36 @@ class QbittorrentClientMixin:
                 if meta.debug:
                     console.print(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
 
-                async with qbt_session.get(url) as response:
-                    if response.status == 200:
-                        response_data = await response.json()
+                response = await qbt_session.get(url)
+                if response.status_code == 200:
+                    response_data = response.json()
 
-                        # The qui proxy returns {'torrents': [...]} while standard API returns [...]
-                        torrents_data: list[dict[str, Any]]
-                        if isinstance(response_data, dict) and "torrents" in response_data:
-                            response_data_dict = cast(dict[str, Any], response_data)
-                            torrents_value = response_data_dict.get("torrents", [])
-                            torrents_data = cast(list[dict[str, Any]], torrents_value) if isinstance(torrents_value, list) else []
-                        elif isinstance(response_data, list):
-                            torrents_data = cast(list[dict[str, Any]], response_data)
-                        else:
-                            torrents_data = []
-
-                        if meta.debug:
-                            if torrents_data:
-                                console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
-                            else:
-                                console.print("[cyan]No matching torrents found via proxy search")
-
-                        return self._build_mock_torrents(torrents_data)
+                    # The qui proxy returns {'torrents': [...]} while standard API returns [...]
+                    torrents_data: list[dict[str, Any]]
+                    if isinstance(response_data, dict) and "torrents" in response_data:
+                        response_data_dict = cast(dict[str, Any], response_data)
+                        torrents_value = response_data_dict.get("torrents", [])
+                        torrents_data = cast(list[dict[str, Any]], torrents_value) if isinstance(torrents_value, list) else []
+                    elif isinstance(response_data, list):
+                        torrents_data = cast(list[dict[str, Any]], response_data)
                     else:
-                        if response.status == 404:
-                            if meta.debug:
-                                console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                        torrents_data = []
+
+                    if meta.debug:
+                        if torrents_data:
+                            console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
                         else:
-                            if meta.debug:
-                                console.print(f"[bold red]Failed to get torrents list via proxy: {response.status}")
-                        return []
+                            console.print("[cyan]No matching torrents found via proxy search")
+
+                    return self._build_mock_torrents(torrents_data)
+                else:
+                    if response.status_code == 404:
+                        if meta.debug:
+                            console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                    else:
+                        if meta.debug:
+                            console.print(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
+                    return []
             else:
                 if qbt_client is None:
                     return []
@@ -1419,7 +1422,7 @@ class QbittorrentClientMixin:
         tracker_priority: list[str],
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[aiohttp.ClientSession],
+        qbt_session: Optional[httpx.AsyncClient],
         qbt_client: Optional[qbittorrentapi.Client],
         meta: Meta,
     ) -> list[dict[str, Any]]:
@@ -1552,7 +1555,7 @@ class QbittorrentClientMixin:
         torrent_hash: str,
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[aiohttp.ClientSession],
+        qbt_session: Optional[httpx.AsyncClient],
         qbt_client: Optional[qbittorrentapi.Client],
         torrent_storage_dir: Optional[str],
         extracted_torrent_dir: str,
@@ -1580,11 +1583,11 @@ class QbittorrentClientMixin:
                     return None
                 qbt_proxy_url = proxy_url.rstrip("/")
                 try:
-                    async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export", data={"hash": torrent_hash}) as response:
-                        if response.status == 200:
-                            torrent_file_content = await response.read()
-                        else:
-                            console.print(f"[red]Failed to export {prefix}torrent via proxy: {response.status}")
+                    response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/export", data={"hash": torrent_hash})
+                    if response.status_code == 200:
+                        torrent_file_content = response.content
+                    else:
+                        console.print(f"[red]Failed to export {prefix}torrent via proxy: {response.status_code}")
                 except Exception as e:
                     console.print(f"[red]Error exporting {prefix}torrent via proxy: {e}")
             else:
@@ -1611,7 +1614,7 @@ class QbittorrentClientMixin:
         client_config: dict[str, Any],
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[aiohttp.ClientSession],
+        qbt_session: Optional[httpx.AsyncClient],
         qbt_client: Optional[qbittorrentapi.Client],
         meta: Meta,
     ) -> None:
@@ -1792,7 +1795,7 @@ class QbittorrentClientMixin:
 
     async def _search_single_qbit_client(self, client_config: dict[str, Any], _content_path: str, meta: Meta, client_name: str) -> list[dict[str, Any]]:
         """Search a single qBittorrent client for matching torrents."""
-        qbt_session: Optional[aiohttp.ClientSession] = None
+        qbt_session: Optional[httpx.AsyncClient] = None
         qbt_client: Optional[qbittorrentapi.Client] = None
         qbt_proxy_url = ""
         proxy_url = client_config.get("qui_proxy_url", "").strip()
@@ -1802,7 +1805,7 @@ class QbittorrentClientMixin:
             if proxy_url:
                 try:
                     ssl_context = self.create_ssl_context_for_client(client_config)
-                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10), connector=aiohttp.TCPConnector(ssl=ssl_context))
+                    qbt_session = httpx.AsyncClient(timeout=10.0, verify=ssl_context)
                     qbt_proxy_url = proxy_url.rstrip("/")
 
                 except Exception as e:
@@ -1860,7 +1863,7 @@ class QbittorrentClientMixin:
             return []
         finally:
             if qbt_session is not None:
-                await qbt_session.close()
+                await qbt_session.aclose()
 
 _cached_tracker_url_patterns: dict[str, list[str]] | None = None
 
