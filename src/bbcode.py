@@ -41,6 +41,12 @@ class BBCODE:
     def __init__(self) -> None:
         pass
 
+    @staticmethod
+    def _is_hdbits_url(url: str) -> bool:
+        parsed = urllib.parse.urlparse(url)
+        host = (parsed.hostname or "").lower()
+        return host == "hdbits.org" or host.endswith(".hdbits.org")
+
     def clean_hdb_description(self, description: str) -> tuple[str, list[dict[str, Any]]]:
         # Unescape html
         desc = html.unescape(description)
@@ -113,7 +119,7 @@ class BBCODE:
         url_img_matches: list[tuple[str, str]] = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
         for web_url, img_url in url_img_matches:
             # Skip HDBits images
-            if "hdbits.org" in web_url.lower() or "hdbits.org" in img_url.lower():
+            if self._is_hdbits_url(web_url) or self._is_hdbits_url(img_url):
                 desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", '')
                 continue
 
