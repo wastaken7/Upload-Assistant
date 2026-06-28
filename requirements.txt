@@ -33,7 +33,7 @@ mutagen==1.47.0
 nest_asyncio==1.6.0
 numpy==2.4.4
 packaging<25,>=21
-Pillow==11.3.0
+Pillow==12.2.0
 psutil==7.1.3
 pycountry==24.6.1
 pyimgbox==1.0.7
