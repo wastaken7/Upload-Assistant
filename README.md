@@ -36,7 +36,7 @@ This branch introduces new media categories and automation features not present 
 * **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
 
 ### 5. Extended Tracker Support
-* **Added Trackers**: Zenith (ZNTH), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT).
+* **Added Trackers**: Zenith (ZNTH), MidnightScene, M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT).
 
 ### 6. Usenet & Indexer Posting
 * **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
@@ -89,6 +89,7 @@ This branch introduces new media categories and automation features not present 
 | LongPT | LPT |
 | LST | LST |
 | Luminarr | LUME |
+| MidnightScene | MS |
 | MoreThanTV | MTV |
 | M-Team | MTEAM |
 | Nebulance | NBL |

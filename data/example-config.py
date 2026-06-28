@@ -402,7 +402,7 @@ config = {
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
 
         # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, CBR, CRP, SUIO, CZ, DC, DS, DP, DT, EMUW, FF, FL,
-        # FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MTEAM, MTV, NBL, OE,
+        # FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LAJIDUI, LCD, LDU, LPT, LST, LT, LUME, MS, MTEAM, MTV, NBL, OE,
         # OTW, PHD, PT, PTCAFE, PTER, PTFANS, PTGTK, PTP, PTS, PTT, R4E, RAS, RF, RPT, RTF, SAM, SHRI, SN, SP, SPD, STC, THR,
         # TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS, ZNTH
 
@@ -1464,6 +1464,37 @@ config = {
             "api_key": "",
             "anon": True,
             # Send uploads to LUME modq for staff approval
+            "modq": False,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "tonemapped_header": "",
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "",
+            "disc_menu_header": "",
+            "audio_spectrogram_header": "",
+            "custom_signature": "",
+            "add_bluray_link": True,
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
+        },
+        "MS":{
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
+            "use_for_search": False,
+            "api_key": "",
+            "anon": True,
+            # Send uploads to MS modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,

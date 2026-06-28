@@ -72,6 +72,7 @@ from src.trackers.UNIT3D.LDU import LDU
 from src.trackers.UNIT3D.LST import LST
 from src.trackers.UNIT3D.LT import LT
 from src.trackers.UNIT3D.LUME import LUME
+from src.trackers.UNIT3D.MS import MS
 from src.trackers.UNIT3D.OE import OE
 from src.trackers.UNIT3D.OTW import OTW
 from src.trackers.UNIT3D.PT import PT
@@ -1402,6 +1403,7 @@ tracker_class_map: dict[str, type[Any]] = {
     "LST": LST,
     "LT": LT,
     "LUME": LUME,
+    "MS": MS,
     "MTEAM": MTEAM,
     "MTV": MTV,
     "NBL": NBL,
@@ -1463,6 +1465,7 @@ api_trackers = {
     "LST",
     "LT",
     "LUME",
+    "MS",
     "OE",
     "OTW",
     "PT",
