@@ -20,6 +20,10 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional, cast
 
+from src.check_requirements import check_dependencies
+
+check_dependencies()
+
 import aiofiles
 import cli_ui
 import discord

@@ -8,6 +8,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Optional, TypedDict, cast
 
+from src.check_requirements import check_dependencies
+
+check_dependencies()
+
 from src.console import console
 
 
