@@ -961,7 +961,9 @@ async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
         import httpx
         cookies = {}
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        if "myanonamouse.net" in poster_url:
+        parsed_poster_url = urllib.parse.urlparse(poster_url)
+        poster_host = (parsed_poster_url.hostname or "").lower()
+        if poster_host == "myanonamouse.net" or poster_host.endswith(".myanonamouse.net"):
             api_key = (
                 default_config.get("mam_api_key", "").strip()
                 or default_config.get("mam_id", "").strip()
