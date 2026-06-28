@@ -10,7 +10,7 @@ certifi==2026.1.4
 cli-ui==0.19.0
 click==8.1.8
 cloudscraper==1.2.71
-cryptography==46.0.3
+cryptography==48.0.1
 defusedxml==0.7.1
 deluge-client==1.10.2
 discord.py==2.6.4
