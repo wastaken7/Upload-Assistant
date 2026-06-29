@@ -485,11 +485,12 @@ class EMUW(UNIT3D):
 
         # Use list of tuples to support duplicate keys (e.g. 1080p + 1080i)
         params: list[tuple[str, str]] = [
-            ("tmdbId", str(meta.tmdb)),
             ("categories[]", await self.get_cat_id(str(meta.category))),
             ("name", name),
             ("perPage", "100"),
         ]
+        if meta.tmdb is not None:
+            params.append(("tmdbId", str(meta.tmdb)))
 
         # 1080p (id=3) and 1080i (id=4) treated as same resolution tier
         if res_id in ['3', '4']:

@@ -41,7 +41,8 @@ class ManualPackageManager:
             await generic.write(f"Overview: {meta.overview}\n\n")
             await generic.write(f"{res} / {meta.type}{tag}\n\n")
             await generic.write(f"Category: {meta.category}\n")
-            await generic.write(f"TMDB: https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb}\n")
+            if meta.tmdb:
+                await generic.write(f"TMDB: https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb}\n")
             if meta.imdb_id != 0:
                 await generic.write(f"IMDb: https://www.imdb.com/title/tt{meta.imdb_id}\n")
             if meta.tvdb_id != 0:

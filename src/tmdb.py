@@ -2094,6 +2094,8 @@ async def set_tmdb_metadata(meta: Meta, filename: Optional[str] = None) -> None:
 
 async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, append_to_response: str) -> dict[str, Any]:
     tmdb_data: dict[str, Any] = {}
+    if meta.tmdb is None:
+        return tmdb_data
     endpoint = None
     if data_type == 'main':
         endpoint = f"/{meta.category.lower()}/{meta.tmdb}"

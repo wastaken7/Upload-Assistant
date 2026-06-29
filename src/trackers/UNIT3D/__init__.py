@@ -74,11 +74,12 @@ class UNIT3D:
 
         if category in ("MOVIE", "TV"):
             params_dict: dict[str, str] = {
-                "tmdbId": str(meta.tmdb),
                 "categories[]": category_id,
                 "name": "",
                 "perPage": "100",
             }
+            if meta.tmdb is not None:
+                params_dict["tmdbId"] = str(meta.tmdb)
 
             if self.tracker not in ["OTW"]:
                 resolutions = await self.get_resolution_id(meta)
@@ -133,7 +134,8 @@ class UNIT3D:
                     for each in data.get("data", []):
                         if check_pending:
                             entry_tmdb = str(each.get("tmdb_id") or "")
-                            if entry_tmdb != str(meta.tmdb):
+                            meta_tmdb = str(meta.tmdb) if meta.tmdb is not None else ""
+                            if entry_tmdb != meta_tmdb:
                                 continue
                         torrent_id = each.get("id", None)
                         attributes = each if check_pending else each.get("attributes", {})
@@ -302,7 +304,7 @@ class UNIT3D:
         return {}
 
     async def get_tmdb(self, meta: Meta) -> dict[str, str]:
-        return {"tmdb": f"{meta.tmdb}"}
+        return {"tmdb": str(meta.tmdb) if meta.tmdb is not None else "0"}
 
     async def get_imdb(self, meta: Meta) -> dict[str, str]:
         return {"imdb": f"{meta.imdb}"}

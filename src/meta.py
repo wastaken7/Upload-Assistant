@@ -383,7 +383,7 @@ class Meta:
     tag: Optional[str] = None
     three_d: str = ""
     title: str = ""
-    tmdb: int | str | list[Any] | None = field(default_factory=list)
+    tmdb: Optional[int] = None
     tmdb_adult_media: bool = False
     tmdb_cast: list[Any] = field(default_factory=list)
     tmdb_directors: list[Any] = field(default_factory=list)

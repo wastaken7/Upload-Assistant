@@ -252,7 +252,7 @@ class MTV:
         description = ""
         if meta.imdb_id != 0:
             description += str(meta.imdb_info.get("imdb_url", ""))
-        if meta.tmdb != 0:
+        if meta.tmdb:
             description += f"\nhttps://www.themoviedb.org/{str(meta.category.lower())}/{str(meta.tmdb)}"
         if meta.tvdb_id != 0:
             description += f"\nhttps://www.thetvdb.com/?id={str(meta.tvdb_id)}"
@@ -702,7 +702,7 @@ class MTV:
 
         if meta.imdb_id != 0:
             params["imdbid"] = "tt" + str(meta.imdb)
-        elif meta.tmdb != 0:
+        elif meta.tmdb:
             params["tmdbid"] = str(meta.tmdb)
         elif meta.tvdb_id != 0:
             params["tvdbid"] = str(meta.tvdb_id)

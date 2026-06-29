@@ -371,7 +371,9 @@ class BHD:
             type_id: Optional[str] = None
         else:
             type_id = await self.get_type(meta)
-        data: dict[str, Any] = {"action": "search", "tmdb_id": f"{tmdbID}/{meta.tmdb}", "types": type_id, "categories": category}
+        data: dict[str, Any] = {"action": "search", "types": type_id, "categories": category}
+        if meta.tmdb:
+            data["tmdb_id"] = f"{tmdbID}/{meta.tmdb}"
         if meta.sd == 1:
             data['categories'] = None
             data['types'] = None

@@ -106,7 +106,7 @@ class AZTrackerBase:
 
         imdb_info = meta.imdb_info
         imdb_id: str = str(imdb_info.get('imdbID', ''))
-        tmdb_id: str = str(meta.tmdb)
+        tmdb_id: str = str(meta.tmdb) if meta.tmdb is not None else ""
         title = meta.title
 
         headers = {"Referer": f"{self.base_url}/upload/{meta.category.lower()}", "X-Requested-With": "XMLHttpRequest"}

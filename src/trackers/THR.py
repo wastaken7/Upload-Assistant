@@ -232,7 +232,8 @@ class THR:
         desc_parts.append(f"{res} / {meta.type}{tag}\n\n")
         category = str(meta.category)
         desc_parts.append(f"Category: {category}\n")
-        desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
+        if meta.tmdb:
+            desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
         if meta.imdb_id or 0 != 0:
             imdb_info = cast(dict[str, Any], meta.imdb_info)
             desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")

@@ -752,7 +752,7 @@ class TVC:
 
         if meta.category == "MOVIE":
             # Everything movie-specific is already handled
-            if meta.debug:
+            if meta.debug and meta.tmdb is not None:
                 console.print("[yellow]Fetching TMDb movie details[/yellow]")
                 movie = tmdb.Movies(meta.tmdb)
                 response = cast(Any, movie).info()
@@ -763,6 +763,11 @@ class TVC:
             # TVC-specific extras
             if meta.networks and len(meta.networks) != 0 and "name" in meta.networks[0]:
                 meta.networks = meta.networks[0]["name"]
+
+            if meta.tmdb is None:
+                meta.setdefault("season_air_first_date", f"{meta.year}-N/A-N/A")
+                meta.setdefault("first_air_date", f"{meta.year}-N/A-N/A")
+                return {}
 
             try:
                 if not meta.tv_pack:

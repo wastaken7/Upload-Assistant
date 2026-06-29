@@ -574,15 +574,7 @@ class TRACKER_SETUP:
                     console.print("[yellow]Warning: Resolution in meta not found in tracker resolution mapping.[/yellow]")
 
                 tmdb_value = meta.tmdb
-                if isinstance(tmdb_value, int):
-                    tmdb_id = [tmdb_value]
-                elif isinstance(tmdb_value, str):
-                    tmdb_id = [int(tmdb_value)]
-                elif isinstance(tmdb_value, list):
-                    tmdb_id = [int(id_value) for id_value in tmdb_value]
-                else:
-                    console.print(f"[red]Invalid TMDB ID format in meta: {tmdb_value}[/red]")
-                    return False
+                tmdb_id = [] if tmdb_value is None else [tmdb_value]
 
                 seasonint = 0
                 metaseason = meta.season_int
@@ -634,6 +626,8 @@ class TRACKER_SETUP:
             'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
             'Accept': 'application/json'
         }
+        if meta.tmdb is None:
+            return requests
         params = {"tmdbId": meta.tmdb} if tracker == "HUNO" else {"tmdb": meta.tmdb}
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

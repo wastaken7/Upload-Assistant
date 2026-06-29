@@ -55,7 +55,7 @@ class ANT:
             flags.append('DV')
         if "Criterion" in (meta.distributor or meta.edition):
             flags.append('Criterion')
-        if "REMUX" in meta.type:
+        if meta.type and "REMUX" in meta.type:
             flags.append('Remux')
         return flags
 
@@ -170,7 +170,7 @@ class ANT:
         if torrent_file_size_kib > 250:  # 250 KiB
             console.print("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta.max_piece_size = 128  # 128 MiB
-            await TorrentCreator.create_torrent(meta, str(Path(meta.path)), "ANT", tracker_url=tracker_url)
+            await TorrentCreator.create_torrent(meta, str(Path(str(meta.path))), "ANT", tracker_url=tracker_url)
             torrent_filename = "ANT"
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
@@ -379,7 +379,7 @@ class ANT:
             't': 'search',
             'o': 'json'
         }
-        if meta.tmdb != 0:
+        if meta.tmdb:
             params["tmdb"] = meta.tmdb
         elif meta.imdb_id is not None and meta.imdb_id != 0:
             params["imdb"] = meta.imdb
