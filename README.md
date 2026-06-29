@@ -10,6 +10,7 @@
 This branch introduces new media categories and automation features not present in the upstream Audionut repository:
 
 ### 1. New Media Category Support
+
 * **Ebook & Audiobook (`BOOK` Category)**:
   * **Automatic Type Detection**: Classifies uploads into Ebooks (PDF, EPUB, MOBI), Comics/Manga (CBR, CBZ), Newspapers, or Audiobooks.
   * **Local Metadata Extraction**: Reads metadata from OPF files in EPUB/MOBI, `ComicInfo.xml` in CBR/CBZ, parses tags via Mutagen for audiobooks, and uses PyMuPDF (`fitz`) with checksum-validated regex to extract ISBNs from PDFs.
@@ -23,30 +24,34 @@ This branch introduces new media categories and automation features not present 
   * **Platform-specific Prompts**: Attended prompts for console TV standard (NTSC/PAL) and region codes (USA/EUR/JPN) for trackers like BJS.
 
 ### 2. Audio Stream Spectrogram Generation
+
 * **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs or Blu-ray BDInfo using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`.
 * **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
 * **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).
 
 ### 3. qBittorrent Bandwidth Control
+
 * **Traffic Control**: Prevents overloading your connection during uploads using `-qbcon` / `--qbit-bw-control`.
 * **Dynamic Wait**: Pauses uploading if your active client upload speed exceeds a threshold (`qbit_bandwidth_threshold` KB/s) and resumes once it stays below the limit for a set time (`qbit_bandwidth_time` seconds).
 * **Safe Rechecking**: Performs a second duplicate check after the bandwidth wait to ensure a duplicate wasn't posted while the client was waiting.
 
 ### 4. Argument-Embedded Text Queue
+
 * **Custom Parameter Queues**: When running batch uploads with a `.txt` queue file, each line is treated as an independent execution command.
 * **shlex-Split Parsing**: Allows specifying unique CLI arguments (e.g., different IMDB IDs, tags, or tracker targets) for each file/folder on its respective line.
 * **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
 
 ### 5. Extended Tracker Support
+
 * **Added Trackers**: Zenith (ZNTH), MidnightScene (MS), M-Team (MTEAM), LongPT (LPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RPT).
 
 ### 6. Usenet & Indexer Posting
+
 * **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
 * **Anonymity & Privacy**: Generates randomized poster details and obfuscates post subject lines to protect privacy.
 * **Indexer Integration**: Automatically uploads the generated `.nzb` file to configured Usenet indexers.
 
-
-## Supported Sites:
+## Supported Sites
 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
@@ -143,42 +148,44 @@ This branch introduces new media categories and automation features not present 
 </details>
 
 ## **Setup:**
-   - **REQUIRES AT LEAST PYTHON 3.14 AND PIP3**
-   - Also needs MediaInfo and ffmpeg installed on your system
-      - On Windows systems, ffmpeg must be added to PATH (https://windowsloop.com/install-ffmpeg-windows-10/)
-      - On linux systems, get it from your favorite package manager
-      - If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](docs/ffmpeg---max-workers-issues.md)
-   - Get the source:
-      - Clone the repo to your system `git clone https://github.com/wastaken7/Upload-Assistant.git`
-      - Fetch all of the release tags `git fetch --all --tags`
-      - Check out the specifc release: see [releases](https://github.com/wastaken7/Upload-Assistant/releases)
-      - `git checkout tags/tagname` where `tagname` is the release name, eg `v5.0.0`
-      - or download a zip of the source from the releases page and create/overwrite a local copy.
-   - Install necessary python modules `pip3 install --user -U -r requirements.txt`
-      - `sudo apt install pip` if needed
-  - If you receive an error about externally managed environment, or otherwise wish to keep UA python separate:
-      - Install virtual python environment `python3 -m venv venv`
-      - Activate the virtual environment `source venv/bin/activate`
-      - Then install the requirements `pip install -r requirements.txt`
-   - From the installation directory, run `python3 config-generator.py`
-   - OR
-   - Copy `data/example-config.py` to `data/config.py`, leaving `data/example-config.py` intact.
-   - NOTE: New users who use the webui will have the config file generated automatically.
-   - Edit `config.py` to use your information (more detailed information in example config options: [docs/example-config.md](docs/example-config.md))
-      - tmdb_api key can be obtained from https://www.themoviedb.org/settings/api
-      - image host api keys can be obtained from their respective sites
+
+* **REQUIRES AT LEAST PYTHON 3.14 AND PIP3**
+* Also needs MediaInfo and ffmpeg installed on your system
+  * On Windows systems, ffmpeg must be added to PATH (<https://windowsloop.com/install-ffmpeg-windows-10/>)
+  * On linux systems, get it from your favorite package manager
+  * If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](docs/ffmpeg---max-workers-issues.md)
+* Get the source:
+  * Clone the repo to your system `git clone https://github.com/wastaken7/Upload-Assistant.git`
+  * Fetch all of the release tags `git fetch --all --tags`
+  * Check out the specifc release: see [releases](https://github.com/wastaken7/Upload-Assistant/releases)
+  * `git checkout tags/tagname` where `tagname` is the release name, eg `v5.0.0`
+  * or download a zip of the source from the releases page and create/overwrite a local copy.
+* Install necessary python modules `pip3 install --user -U -r requirements.txt`
+  * `sudo apt install pip` if needed
+* If you receive an error about externally managed environment, or otherwise wish to keep UA python separate:
+  * Install virtual python environment `python3 -m venv venv`
+  * Activate the virtual environment `source venv/bin/activate`
+  * Then install the requirements `pip install -r requirements.txt`
+* From the installation directory, run `python3 config-generator.py`
+* OR
+* Copy `data/example-config.py` to `data/config.py`, leaving `data/example-config.py` intact.
+* NOTE: New users who use the webui will have the config file generated automatically.
+* Edit `config.py` to use your information (more detailed information in example config options: [docs/example-config.md](docs/example-config.md))
+  * tmdb_api key can be obtained from <https://www.themoviedb.org/settings/api>
+  * image host api keys can be obtained from their respective sites
 
     **Additional Resources are found in the [wiki](docs/Home.md)**
 
    Feel free to contact me if you need help, I'm not that hard to find.
 
 ## **Updating:**
-  - To update first navigate into the Upload-Assistant directory: `cd Upload-Assistant`
-  - `git fetch --all --tags`
-  - `git checkout tags/tagname`
-  - Or download a fresh zip from the releases page and overwrite existing files
-  - Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
-  - Run `python3 config-generator.py` and select to grab new UA config options.
+
+* To update first navigate into the Upload-Assistant directory: `cd Upload-Assistant`
+* `git fetch --all --tags`
+* `git checkout tags/tagname`
+* Or download a fresh zip from the releases page and overwrite existing files
+* Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
+* Run `python3 config-generator.py` and select to grab new UA config options.
 
 ## **CLI Usage:**
 
@@ -186,27 +193,29 @@ This branch introduces new media categories and automation features not present 
 
   Args are OPTIONAL and ALWAYS follow path, for a list of acceptable args, pass `--help`.
   Path works best in quotes.
-  - CLI arguments: [docs/cli-args.md](docs/cli-args.md)
-  - Usenet uploading: [docs/usenet.md](docs/usenet.md)
+
+* CLI arguments: [docs/cli-args.md](docs/cli-args.md)
+* Usenet uploading: [docs/usenet.md](docs/usenet.md)
 
 ## **Docker Usage:**
+
   Visit our wonderful [docker usage](docs/docker-wiki-full.md)
 
-  Also see this excellent video put together by a community member https://videos.badkitty.zone/ua
+  Also see this excellent video put together by a community member <https://videos.badkitty.zone/ua>
 
   Web UI setup (Docker GUI / Unraid): [docs/docker-gui-wiki-full.md](docs/docker-gui-wiki-full.md)
   Web UI docs: [docs/web-ui.md](docs/web-ui.md)
 
 ## **Attributions:**
 
-Built with updated BDInfoCLI from https://github.com/rokibhasansagar/BDInfoCLI-ng
+Built with updated BDInfoCLI from <https://github.com/rokibhasansagar/BDInfoCLI-ng>
 
 Features automated binary managers for:
-- [nyuu](https://github.com/animetosho/nyuu)
-- [par2cmdline-turbo](https://github.com/animetosho/par2cmdline-turbo)
-- [pesto](https://github.com/franzopl/pesto)
-- [7-Zip](https://www.7-zip.org/)
 
+* [nyuu](https://github.com/animetosho/nyuu)
+* [par2cmdline-turbo](https://github.com/animetosho/par2cmdline-turbo)
+* [pesto](https://github.com/franzopl/pesto)
+* [7-Zip](https://www.7-zip.org/)
 
 <p>
   <a href="https://github.com/autobrr/mkbrr"><img src="https://github.com/autobrr/mkbrr/blob/main/.github/assets/mkbrr-dark.png?raw=true" alt="mkbrr" height="40px;"></a>&nbsp;&nbsp;
