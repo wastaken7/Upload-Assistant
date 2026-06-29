@@ -127,7 +127,7 @@ async def tag_override(meta: Meta) -> Meta:
             value = tags.get(tag)
             if value.get("in_name", "") == tag and tag in meta.path:
                 meta.tag = f"-{tag}"
-            if meta.tag[1:] == tag:
+            if meta.tag and meta.tag[1:] == tag:
                 for key in value:
                     if key == 'type':
                         if meta[key] == "ENCODE":

@@ -175,15 +175,16 @@ class ASC:
             else:
                 return '40'  # BD25
         else:
-            return standard_map.get(meta.type, "0")
+            return standard_map.get(meta.type or "", "0")
 
     async def get_languages(self, meta: Meta) -> Optional[dict[str, str]]:
         if meta.anime:
             type_ = "116" if meta.category == "MOVIE" else "118"
 
-            anime_language = self.anime_language_map.get(meta.original_language.lower(), "6")
+            original_language = meta.original_language.lower() if meta.original_language else ""
+            anime_language = self.anime_language_map.get(original_language, "6")
 
-            lang = "8" if await self.get_audio(meta) in ("2", "3", "4") else self.language_map.get(meta.original_language.lower(), "11")
+            lang = "8" if await self.get_audio(meta) in ("2", "3", "4") else self.language_map.get(original_language, "11")
 
             return {
                 'type': type_,
@@ -204,10 +205,11 @@ class ASC:
 
         has_pt_subs = (await self.get_subtitle(meta)) == 'Embutida'
 
-        audio_languages = {lang.lower() for lang in meta.audio_languages}
+        meta_audio_languages = meta.audio_languages if meta.audio_languages else []
+        audio_languages = {lang.lower() for lang in meta_audio_languages}
         has_pt_audio = any(lang in portuguese_languages for lang in audio_languages)
 
-        original_lang = meta.original_language.lower()
+        original_lang = "" if not meta.original_language else meta.original_language.lower()
         is_original_pt = original_lang in portuguese_languages
 
         if has_pt_audio:
@@ -225,7 +227,8 @@ class ASC:
     async def get_subtitle(self, meta: Meta) -> str:
         portuguese_languages = {'portuguese', 'português', 'pt'}
 
-        found_languages = {lang.lower() for lang in meta.subtitle_languages}
+        meta_subtitle_languages = meta.subtitle_languages if meta.subtitle_languages else []
+        found_languages = {lang.lower() for lang in meta_subtitle_languages}
 
         if any(lang in portuguese_languages for lang in found_languages):
             return 'Embutida'
@@ -1194,7 +1197,7 @@ class ASC:
             "extencao": await self.get_container(meta),
             "genre": await self.get_tags(meta),
             "imdb": meta.imdb_info["imdbID"],
-            "lang": self.language_map.get(meta.original_language.lower(), "11"),
+            "lang": "1" if not meta.original_language else self.language_map.get(meta.original_language.lower(), "11"),
             "largura": resolution["width"],
             "layout": self.layout,
             "legenda": await self.get_subtitle(meta),
@@ -1251,10 +1254,8 @@ class ASC:
             await self.auto_approval(meta)
 
         # Internal
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             await self.set_internal_flag(meta)
 

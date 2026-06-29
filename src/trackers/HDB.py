@@ -270,7 +270,9 @@ class HDB:
         # Proceed with the upload process
         async with aiofiles.open(torrent_file_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(os.path.basename(meta.path).replace(" ", "."))
+        torrentFileName = (
+            unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
+        )
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorrent")
         }
@@ -285,11 +287,9 @@ class HDB:
             'tags[]': hdb_tags,
         }
 
-        # If internal, set 1
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and (meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", []))
+        # Internal
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data['origin'] = 1
         # If not BDMV fill mediainfo

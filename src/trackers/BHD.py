@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import os
 import platform
 import re
@@ -110,10 +109,8 @@ class BHD:
             # 'sticky' : 0,
         }
         # Internal
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data['internal'] = 1
 
@@ -360,10 +357,7 @@ class BHD:
                 return False
 
         common = COMMON(config=self.config)
-        if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            return False
-
-        return True
+        return common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []

@@ -1031,7 +1031,7 @@ class BT:
                     months_en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
                     text_to_search = (meta.title + " " + meta.basename_no_ext).lower()
                     found_month = ""
-                    for m_pt, m_en in zip(months_pt, months_en):
+                    for m_pt, m_en in zip(months_pt, months_en, strict=False):
                         if m_pt.lower() in text_to_search or m_en.lower() in text_to_search:
                             found_month = m_pt
                             break
@@ -1115,11 +1115,8 @@ class BT:
             data['anonymous'] = '1'
 
         # Internal
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and meta.tag is not None
-            and (meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", []))
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data.update({
                 'internal': 1,

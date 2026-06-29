@@ -1451,11 +1451,8 @@ class BJS:
                 data.update({"anonymousshowgroup": "on"})
 
         # Internal
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and meta.tag is not None
-            and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             data.update({
                 'internalrel': 1,

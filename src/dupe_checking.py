@@ -148,7 +148,7 @@ class DupeChecker:
         target_season = meta.season
         target_episode = meta.episode
         target_resolution = meta.resolution
-        tag = meta.tag.lower().replace("-", " ")
+        tag = "" if not meta.tag else meta.tag.lower().replace("-", " ")
         is_dvd = meta.is_disc == "DVD"
         is_dvdrip = meta.type == "DVDRIP"
         web_dl = meta.type == "WEBDL"
@@ -363,11 +363,14 @@ class DupeChecker:
                     console.log(f"[debug] Game title comparison: Target='{clean_target}' vs Dupe='{clean_each}'")
 
                 is_match = False
-                if clean_target == clean_each:
+                if (
+                    clean_target == clean_each
+                    or clean_target
+                    and clean_each
+                    and re.search(rf"\b{re.escape(clean_target)}\b", clean_each)
+                    or re.search(rf"\b{re.escape(clean_each)}\b", clean_target)
+                ):
                     is_match = True
-                elif clean_target and clean_each:
-                    if re.search(rf"\b{re.escape(clean_target)}\b", clean_each) or re.search(rf"\b{re.escape(clean_each)}\b", clean_target):
-                        is_match = True
 
                 if not is_match:
                     await log_exclusion("game title mismatch", each)
@@ -568,7 +571,7 @@ class DupeChecker:
                 await log_exclusion("file count less than 2 for disc upload", each)
                 return True
 
-            if has_repack_in_uuid and "repack" not in normalized and meta.tag.lower() in normalized:
+            if has_repack_in_uuid and "repack" not in normalized and meta.tag and meta.tag.lower() in normalized:
                 await log_exclusion('repack release', each)
                 return True
 
@@ -597,7 +600,7 @@ class DupeChecker:
 
             if tracker_name == "HUNO":
                 huno = HUNO(config=self.config)
-                huno_name_result: Any = await huno.get_name(cast(dict[str, Any], meta))
+                huno_name_result: Any = await huno.get_name(meta)
                 huno_name_map = cast(dict[str, Any], huno_name_result)
                 huno_name = str(huno_name_map.get('name', huno_name_result)) if isinstance(huno_name_result, dict) else str(huno_name_result)
                 if str(entry.get('name')) == huno_name:

@@ -148,10 +148,9 @@ class HUNO(UNIT3D):
 
     async def get_internal(self, meta: Meta) -> int:
         internal = 0
-        if (
-            self.config["TRACKERS"][self.tracker].get("internal", False) is True
-            and meta.tag != ""
-            and (meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", []))
+        # Internal
+        if meta.tag and (
+            self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
             internal = 1
 
