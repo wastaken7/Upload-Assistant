@@ -485,19 +485,37 @@ class BJS:
 
         return "Outro"
 
-    def get_title(self, meta: Meta) -> tuple[str, str]:
-        original_title = meta.title
-        brazilian_title = ""
+    async def get_name(self, meta: Meta) -> str:
+        """This is for the terminal display of the name only, not the actual upload name."""
+        original_title, brazilian_title = self.get_titles(meta)
+        if not brazilian_title:
+            return original_title
+        else:
+            return f"{brazilian_title} [{original_title}]"
 
-        if BJS.database_title:
-            original_title = BJS.database_title
+    def get_titles(self, meta: Meta) -> tuple[str, str]:
+        if meta.category == "BOOK":
+            return self.common.portuguese_title_capitalization(meta.title), ""
 
-        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title")
-        tmdb_title = self.main_tmdb_data.get("name") or self.main_tmdb_data.get("title")
-        if tmdb_title and tmdb_title != meta.title and (not original_name_title or original_name_title != tmdb_title):
-            brazilian_title = tmdb_title
+        if meta.category == "GAME":
+            return meta.title, ""
 
-        return original_title, brazilian_title
+        if meta.category in ("TV", "MOVIE"):
+            original_title = meta.title
+            brazilian_title = ""
+
+            if BJS.database_title:
+                original_title = BJS.database_title
+
+            main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
+            original_name_title = main_tmdb_data.get("original_name") or main_tmdb_data.get("original_title")
+            tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
+            if tmdb_title and tmdb_title != meta.title and (not original_name_title or original_name_title != tmdb_title):
+                brazilian_title = tmdb_title
+
+            return original_title, brazilian_title
+
+        return "", ""
 
     async def build_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -1282,6 +1300,7 @@ class BJS:
         if cookie_jar:
             self.session.cookies = cookie_jar
         category = meta.category
+        original_title, brazilian_title = self.get_titles(meta)
 
         # These fields are common across all upload types
         data: dict[str, Any] = {
@@ -1295,7 +1314,7 @@ class BJS:
         if category == "BOOK":
             b_lang = meta.book_language_iso
             data.update({
-                "title": self.common.portuguese_title_capitalization(meta.title),
+                "title": original_title,
                 "diretor": meta.author,
                 "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
                 "release_desc": await self.build_description(meta),
@@ -1313,7 +1332,7 @@ class BJS:
             release_desc = pt_br_overview or meta.overview
 
             data.update({
-                "title": meta.title,
+                "title": original_title,
                 "plataforma": self.get_game_platform(meta),
                 "idioma": self.get_game_language(meta),
                 "tags": await self.get_tags(meta),
@@ -1351,7 +1370,6 @@ class BJS:
 
         elif category in ("MOVIE", "TV"):
             await self.load_localized_data(meta)
-            original_title, brazilian_title = self.get_title(meta)
             width, height = self.get_resolution(meta)
             hours, minutes = self.get_runtime(meta)
 
