@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import json
 import os
 import platform
 import re
@@ -30,6 +29,12 @@ class BT:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['t.brasiltracker.org']
     secret_token: str = ''
+    tmdb_localization_requirements = {
+        "pt-BR": {
+            "main": "credits,videos,content_ratings",
+            "episode": "",
+        }
+    }
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config
@@ -111,60 +116,20 @@ class BT:
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        if cookie_jar is None:
+        if not cookie_jar:
             return False
         self.session.cookies = cast(Any, cookie_jar)
         return True
 
     async def load_localized_data(self, meta: Meta) -> None:
-        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
-        main_ptbr_data: dict[str, Any] = {}
-        episode_ptbr_data: dict[str, Any] = {}
-        data: dict[str, Any] = {}
-
-        if os.path.isfile(localized_data_file):
-            try:
-                async with aiofiles.open(localized_data_file, encoding='utf-8') as f:
-                    content = await f.read()
-                    loaded_data = json.loads(content)
-                    data = cast(dict[str, Any], loaded_data) if isinstance(loaded_data, dict) else {}
-            except json.JSONDecodeError:
-                console.print(f'Warning: Could not decode JSON from {localized_data_file}', markup=False)
-                data = {}
-            except Exception as e:
-                console.print(f'Error reading file {localized_data_file}: {e}', markup=False)
-                data = {}
-
+        data = meta.tmdb_localized_data
         ptbr_data = data.get('pt-BR')
-        ptbr_dict: dict[str, Any] = {}
-        if isinstance(ptbr_data, dict):
-            ptbr_dict = cast(dict[str, Any], ptbr_data)
-        main_ptbr_data = cast(dict[str, Any], ptbr_dict.get('main') or {})
+        if not ptbr_data or not ptbr_data.get("main"):
+            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        if not main_ptbr_data:
-            localized_main = await self.tmdb_manager.get_tmdb_localized_data(
-                meta,
-                data_type='main',
-                language='pt-BR',
-                append_to_response='credits,videos,content_ratings'
-            )
-            main_ptbr_data = localized_main or {}
-
-        if self.config["DEFAULT"]["episode_overview"] and meta.category == "TV" and not meta.tv_pack:
-            episode_ptbr_data = cast(dict[str, Any], ptbr_dict.get('episode') or {})
-            if not episode_ptbr_data:
-                localized_episode = await self.tmdb_manager.get_tmdb_localized_data(
-                    meta,
-                    data_type='episode',
-                    language='pt-BR',
-                    append_to_response=''
-                )
-                episode_ptbr_data = localized_episode or {}
-
-        self.main_tmdb_data = main_ptbr_data or {}
-        self.episode_tmdb_data = episode_ptbr_data or {}
+        self.main_tmdb_data = ptbr_data.get("main") or {}
+        self.episode_tmdb_data = ptbr_data.get("episode") or {}
         meta.episode_tmdb_data = self.episode_tmdb_data
-
         return
 
     async def get_container(self, meta: Meta) -> str:

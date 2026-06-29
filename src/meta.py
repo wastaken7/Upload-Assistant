@@ -130,6 +130,7 @@ class Meta:
     episode_overview: str = ""
     episode_title: str = ""
     episode_tmdb_data: dict[str, Any] = field(default_factory=dict)
+    tmdb_localized_data: dict[str, Any] = field(default_factory=dict)
     episodes: Optional[list[dict[str, Any]]] = None
     exclusive: bool = False
     ext_torrenthash: Optional[str] = None

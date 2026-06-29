@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import json
 import os
 import platform
 import re
@@ -35,6 +34,12 @@ class BJS:
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
+    tmdb_localization_requirements = {
+        "pt-BR": {
+            "main": "credits,videos,content_ratings",
+            "episode": "",
+        }
+    }
     file_extensions = {
         "mkv", "mp4", "avi", "ts", "m2ts", "wmv", "mov", "flv", "webm", "mpg", "mpeg", "vob", "divx", "xvid",
         "mp3", "m4b", "flac", "aac", "m4a", "ogg", "wav", "opus", "wma", "ape", "cue", "m3u",
@@ -110,36 +115,13 @@ class BJS:
         return False
 
     async def load_localized_data(self, meta: Meta) -> None:
-        localized_data_file: str = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
-        main_ptbr_data: dict[str, Any] = {}
-        episode_ptbr_data: dict[str, Any] = {}
-        data: dict[str, Any] = {}
+        data = meta.tmdb_localized_data
+        ptbr_data = data.get("pt-BR")
+        if not ptbr_data or not ptbr_data.get("main"):
+            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        if await self.common.path_exists(localized_data_file):
-            try:
-                async with aiofiles.open(localized_data_file, encoding="utf-8") as f:
-                    content = await f.read()
-                    data = json.loads(content)
-            except json.JSONDecodeError:
-                console.print(f"Warning: Could not decode JSON from {localized_data_file}", markup=False)
-                data = {}
-            except Exception as e:
-                console.print(f"Error reading file {localized_data_file}: {e}", markup=False)
-                data = {}
-
-        main_ptbr_data = dict(data.get("pt-BR", {})).get("main", {})
-
-        if not main_ptbr_data:
-            main_ptbr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="pt-BR", append_to_response="credits,videos,content_ratings")
-
-        if self.config["DEFAULT"]["episode_overview"] and meta.category == "TV" and not meta.tv_pack:
-            episode_ptbr_data = data.get("pt-BR", {}).get("episode")
-            if not episode_ptbr_data:
-                episode_ptbr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="episode", language="pt-BR", append_to_response="")
-
-        self.main_tmdb_data = main_ptbr_data or {}
-        self.episode_tmdb_data = episode_ptbr_data or {}
-
+        self.main_tmdb_data = ptbr_data.get("main") or {}
+        self.episode_tmdb_data = ptbr_data.get("episode") or {}
         return
 
     def get_container(self, meta: Meta) -> str:

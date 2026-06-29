@@ -2127,7 +2127,9 @@ async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, app
         )
 
     save_dir = f"{meta.base_dir}/tmp/{meta.uuid}/"
-    filename = f"{save_dir}tmdb_localized_data.json"
+    category_str = str(meta.category).lower()
+    tmdb_str = str(meta.tmdb)
+    filename = f"{save_dir}tmdb_localized_data_{category_str}_{tmdb_str}.json"
 
     # Create a cache key for this specific request
     cache_key = filename

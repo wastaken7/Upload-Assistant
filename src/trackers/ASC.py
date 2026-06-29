@@ -25,6 +25,13 @@ from src.trackers.COMMON import COMMON
 class ASC:
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['amigos-share.club']
+    tmdb_localization_requirements = {
+        "pt-BR": {
+            "main": "credits,videos,content_ratings",
+            "season": "credits",
+            "episode": "credits",
+        }
+    }
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -72,80 +79,14 @@ class ASC:
         return False
 
     async def load_localized_data(self, meta: Meta) -> None:
-        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
-        tmdb_data: dict[str, Any] = {}
-        self.main_tmdb_data = {}
-        self.season_tmdb_data = {}
-        self.episode_tmdb_data = {}
+        tmdb_data = meta.tmdb_localized_data
+        pt_br_data = tmdb_data.get("pt-BR")
+        if not pt_br_data or not pt_br_data.get("main"):
+            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        try:
-            async with aiofiles.open(localized_data_file, encoding='utf-8') as f:
-                content = await f.read()
-                try:
-                    tmdb_data = json.loads(content)
-                except json.JSONDecodeError as e:
-                    console.print(f"[red]Warning: JSON decode error in {localized_data_file}: {e}. Continuing with empty data.[/red]")
-                    tmdb_data = {}
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
-
-        pt_br_data = cast(dict[str, Any], tmdb_data.get('pt-BR', {}))
-        local_results: dict[str, Any] = {
-            'main': pt_br_data.get('main'),
-            'season': pt_br_data.get('season'),
-            'episode': pt_br_data.get('episode'),
-        }
-
-        tasks_to_run: list[tuple[str, Any]] = []
-
-        if local_results['main']:
-            self.main_tmdb_data = local_results['main']
-        else:
-            tasks_to_run.append(
-                ('main', self.tmdb_manager.get_tmdb_localized_data(meta, data_type='main', language='pt-BR', append_to_response='credits,videos,content_ratings'))
-            )
-
-        if meta.category == "TV":
-            if local_results['season']:
-                self.season_tmdb_data = local_results['season']
-            else:
-                tasks_to_run.append(
-                    ('season', self.tmdb_manager.get_tmdb_localized_data(meta, data_type='season', language='pt-BR', append_to_response='credits'))
-                )
-
-        if meta.category == "TV" and not meta.tv_pack:
-            if local_results['episode']:
-                self.episode_tmdb_data = local_results['episode']
-            else:
-                tasks_to_run.append(
-                    ('episode', self.tmdb_manager.get_tmdb_localized_data(meta, data_type='episode', language='pt-BR', append_to_response='credits'))
-                )
-
-        if tasks_to_run:
-            data_types = [item[0] for item in tasks_to_run]
-            coroutines = [item[1] for item in tasks_to_run]
-
-            try:
-                api_results = await asyncio.gather(*coroutines)
-
-                for data_type, result_data in zip(data_types, api_results):
-                    result_dict = cast(dict[str, Any], result_data) if isinstance(result_data, dict) else {}
-                    if result_dict:
-                        if data_type == 'main':
-                            self.main_tmdb_data = result_dict
-                        elif data_type == 'season':
-                            self.season_tmdb_data = result_dict
-                        elif data_type == 'episode':
-                            self.episode_tmdb_data = result_dict
-            except Exception as e:
-                console.print(f"[red]Error loading TMDB data: {e}[/red]")
-                # Ensure we have at least empty dicts to prevent KeyErrors
-                if not self.main_tmdb_data:
-                    self.main_tmdb_data = {}
-                if not self.season_tmdb_data:
-                    self.season_tmdb_data = {}
-                if not self.episode_tmdb_data:
-                    self.episode_tmdb_data = {}
+        self.main_tmdb_data = pt_br_data.get("main") or {}
+        self.season_tmdb_data = pt_br_data.get("season") or {}
+        self.episode_tmdb_data = pt_br_data.get("episode") or {}
 
     async def get_container(self, meta: Meta) -> Optional[str]:
         if meta.category == "BOOK":

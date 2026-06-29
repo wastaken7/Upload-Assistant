@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import json
 import os
 import re
 import unicodedata
@@ -25,6 +24,11 @@ class GPW:
     supported_categories = ("MOVIE",)
     tracker_urls = ['https://tracker.greatposterwall.com']
     group_id: str = ""
+    tmdb_localization_requirements = {
+        "zh-cn": {
+            "main": "credits",
+        }
+    }
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -65,40 +69,12 @@ class GPW:
         return await self.common.parseCookieFile(cookie_file)
 
     async def load_localized_data(self, meta: Meta) -> None:
-        localized_data_file = f"{meta.base_dir}/tmp/{meta.uuid}/tmdb_localized_data.json"
-        main_ch_data: dict[str, Any] = {}
-        data: dict[str, Any] = {}
+        data = meta.tmdb_localized_data
+        zh_cn_data = data.get("zh-cn")
+        if not zh_cn_data or not zh_cn_data.get("main"):
+            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (zh-cn).")
 
-        if os.path.isfile(localized_data_file):
-            try:
-                async with aiofiles.open(localized_data_file, encoding='utf-8') as f:
-                    content = await f.read()
-                    loaded_data = json.loads(content)
-                    data = cast(dict[str, Any], loaded_data) if isinstance(loaded_data, dict) else {}
-            except json.JSONDecodeError:
-                console.print(f'Warning: Could not decode JSON from {localized_data_file}', markup=False)
-                data = {}
-            except Exception as e:
-                console.print(f'Error reading file {localized_data_file}: {e}', markup=False)
-                data = {}
-
-        ch_data = data.get('zh-cn')
-        if isinstance(ch_data, dict):
-            ch_dict = cast(dict[str, Any], ch_data)
-            main_value = ch_dict.get('main')
-            main_ch_data = cast(dict[str, Any], main_value) if isinstance(main_value, dict) else {}
-
-        if not main_ch_data:
-            localized_main = await self.tmdb_manager.get_tmdb_localized_data(
-                meta,
-                data_type='main',
-                language='zh-cn',
-                append_to_response='credits'
-            )
-            main_ch_data = localized_main or {}
-
-        self.tmdb_data = main_ch_data
-
+        self.tmdb_data = zh_cn_data.get("main") or {}
         return
 
     def get_container(self, meta: Meta) -> str:

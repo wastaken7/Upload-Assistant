@@ -1566,3 +1566,54 @@ async def finalize_metadata(
             meta.overview = ""
         if not meta.genres:
             meta.genres = ""
+
+    # Fetch TMDB localized data if needed for active trackers
+    if int(meta.tmdb_id or 0) != 0 and meta.category in ("TV", "MOVIE"):
+        try:
+            from src.trackersetup import tracker_class_map
+            requirements: dict[str, dict[str, str]] = {}
+            for tracker_name in meta.trackers:
+                tracker_class = tracker_class_map.get(tracker_name)
+                if not tracker_class:
+                    continue
+                reqs = getattr(tracker_class, "tmdb_localization_requirements", None)
+                if not reqs:
+                    continue
+                for lang, types in reqs.items():
+                    for data_type, append_to_response in types.items():
+                        if (
+                            (data_type == "season" and meta.category != "TV") or
+                            (data_type == "episode" and (meta.category != "TV" or meta.tv_pack)) or
+                            (data_type == "episode" and tracker_name in ("BJS", "BT") and not prep_instance.config["DEFAULT"].get("episode_overview", False)) or
+                            (data_type == "main" and meta.category not in ("TV", "MOVIE"))
+                        ):
+                            continue
+
+                        existing = requirements.setdefault(lang, {}).setdefault(data_type, "")
+                        merged_tags = set(filter(None, [t.strip() for t in existing.split(",") + append_to_response.split(",")]))
+                        requirements[lang][data_type] = ",".join(sorted(merged_tags))
+
+            tasks = []
+            for lang, types in requirements.items():
+                for data_type, append_to_response in types.items():
+                    tasks.append(
+                        (lang, data_type, prep_instance.tmdb_manager.get_tmdb_localized_data(
+                            meta,
+                            data_type=data_type,
+                            language=lang,
+                            append_to_response=append_to_response
+                        ))
+                    )
+            if tasks:
+                if meta.debug:
+                    console.print(f"[cyan]Pre-fetching TMDB localized data for languages: {list(requirements.keys())}[/cyan]")
+                langs_and_types = [(item[0], item[1]) for item in tasks]
+                coroutines = [item[2] for item in tasks]
+                results = await asyncio.gather(*coroutines)
+
+                meta.tmdb_localized_data = {}
+                for (lang, data_type), result in zip(langs_and_types, results, strict=True):
+                    if result:
+                        meta.tmdb_localized_data.setdefault(lang, {})[data_type] = result
+        except Exception as e:
+            console.print(f"[red]Error pre-fetching TMDB localized data: {e}[/red]")
