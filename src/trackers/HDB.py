@@ -372,33 +372,24 @@ class HDB:
 
         # We have ids
         if not search_terms:
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.post(url, json=data)
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        results = response_data.get('data', [])
-                        if results:
-                            for each in results:
-                                result = {
-                                    'name': each['name'],
-                                    'size': each['size'],
-                                    'files': each['filename'][:-8] if each['filename'].endswith('.torrent') else each['filename'],
-                                    'filecount': each['numfiles'],
-                                    'link': f"https://hdbits.org/details.php?id={each['id']}",
-                                    'download': f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}"
-                                }
-                                dupes.append(result)
-                    else:
-                        console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
-            except httpx.TimeoutException:
-                console.print("[bold red]Request timed out while searching for existing torrents.")
-            except httpx.RequestError as e:
-                console.print(f"[bold red]An error occurred while making the request: {e}")
-            except Exception as e:
-                console.print("[bold red]Unexpected error occurred while searching torrents.")
-                console.print(str(e))
-                await asyncio.sleep(5)
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(url, json=data)
+                if response.status_code == 200:
+                    response_data = response.json()
+                    results = response_data.get('data', [])
+                    if results:
+                        for each in results:
+                            result = {
+                                'name': each['name'],
+                                'size': each['size'],
+                                'files': each['filename'][:-8] if each['filename'].endswith('.torrent') else each['filename'],
+                                'filecount': each['numfiles'],
+                                'link': f"https://hdbits.org/details.php?id={each['id']}",
+                                'download': f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}"
+                            }
+                            dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
             return dupes
 
         # Otherwise, search for each term
@@ -406,33 +397,24 @@ class HDB:
             console.print(f"[yellow]Searching HDB for: {search_term}")
             data['search'] = search_term
 
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.post(url, json=data)
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        results = response_data.get('data', [])
-                        if results:
-                            for each in results:
-                                result = {
-                                    'name': each['name'],
-                                    'size': each['size'],
-                                    'files': each['filename'][:-8] if each['filename'].endswith('.torrent') else each['filename'],
-                                    'filecount': each['numfiles'],
-                                    'link': f"https://hdbits.org/details.php?id={each['id']}",
-                                    'download': f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}"
-                                }
-                                dupes.append(result)
-                    else:
-                        console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
-            except httpx.TimeoutException:
-                console.print("[bold red]Request timed out while searching for existing torrents.")
-            except httpx.RequestError as e:
-                console.print(f"[bold red]An error occurred while making the request: {e}")
-            except Exception as e:
-                console.print("[bold red]Unexpected error occurred while searching torrents.")
-                console.print(str(e))
-                await asyncio.sleep(5)
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(url, json=data)
+                if response.status_code == 200:
+                    response_data = response.json()
+                    results = response_data.get('data', [])
+                    if results:
+                        for each in results:
+                            result = {
+                                'name': each['name'],
+                                'size': each['size'],
+                                'files': each['filename'][:-8] if each['filename'].endswith('.torrent') else each['filename'],
+                                'filecount': each['numfiles'],
+                                'link': f"https://hdbits.org/details.php?id={each['id']}",
+                                'download': f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}"
+                            }
+                            dupes.append(result)
+                else:
+                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
         return dupes
 

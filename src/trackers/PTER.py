@@ -80,30 +80,22 @@ class PTER:
         source = await self.get_type_medium_id(meta)
         search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
 
-        try:
-            async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True) as client:
-                response = await client.get(search_url)
+        async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(search_url)
 
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'lxml')
-                    rows = soup.select('table.torrents > tr:has(table.torrentname)')
-                    for row in rows:
-                        text = row.select_one('a[href^="details.php?id="]')
-                        if text is not None:
-                            release_value = text.attrs.get('title', '')
-                            release = str(release_value)
-                            if release:
-                                dupes.append(release)
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                rows = soup.select('table.torrents > tr:has(table.torrentname)')
+                for row in rows:
+                    text = row.select_one('a[href^="details.php?id="]')
+                    if text is not None:
+                        release_value = text.attrs.get('title', '')
+                        release = str(release_value)
+                        if release:
+                            dupes.append(release)
+            else:
+                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
 
         return dupes
 

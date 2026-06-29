@@ -459,32 +459,24 @@ class PTP:
         }
         url = 'https://passthepopcorn.me/torrents.php'
 
-        try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                response = await client.get(url, headers=headers, params=params)
-                await asyncio.sleep(1)  # Mimic server-friendly delay
-                if response.status_code == 200:
-                    existing: list[str] = []
-                    try:
-                        data = response.json()
-                        torrents = cast(list[dict[str, Any]], data.get('Torrents', []))
-                        existing.extend(
-                            f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
-                            for torrent in torrents
-                            if torrent.get('Quality') == quality and quality is not None
-                        )
-                    except ValueError:
-                        console.print("[red]Failed to parse JSON response from API.")
-                    return existing
-                else:
-                    console.print(f"[bold red]HTTP request failed with status code {response.status_code}")
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while trying to find existing releases.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers, params=params)
+            await asyncio.sleep(1)  # Mimic server-friendly delay
+            if response.status_code == 200:
+                existing: list[str] = []
+                try:
+                    data = response.json()
+                    torrents = cast(list[dict[str, Any]], data.get('Torrents', []))
+                    existing.extend(
+                        f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
+                        for torrent in torrents
+                        if torrent.get('Quality') == quality and quality is not None
+                    )
+                except ValueError:
+                    console.print("[red]Failed to parse JSON response from API.")
+                return existing
+            else:
+                console.print(f"[bold red]HTTP request failed with status code {response.status_code}")
 
         return []
 

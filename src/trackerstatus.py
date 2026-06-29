@@ -147,12 +147,36 @@ class TrackerStatusManager:
                                 local_meta.skipping = tracker_name
 
                         if not local_tracker_status["skipped"]:
-                            dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta))
-                            # set trackers here so that they are not double checked later with cross seeding
-                            async with meta_lock:
-                                meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
-                            if local_meta["tracker_status"][tracker_name].get("other", False):
-                                local_tracker_status["other"] = True
+                            try:
+                                dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta))
+                                # set trackers here so that they are not double checked later with cross seeding
+                                async with meta_lock:
+                                    meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
+                                if local_meta["tracker_status"][tracker_name].get("other", False):
+                                    local_tracker_status["other"] = True
+                            except Exception as e:
+                                console.print(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
+                                if local_meta.get("unattended", False):
+                                    local_tracker_status["skipped"] = True
+                                    local_meta.skipping = tracker_name
+                                    dupes = []
+                                else:
+                                    try:
+                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
+                                        if (choice or "").lower() == "y":
+                                            dupes = []
+                                            # set trackers here so that they are not double checked later with cross seeding
+                                            async with meta_lock:
+                                                meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
+                                        else:
+                                            local_tracker_status["skipped"] = True
+                                            local_meta.skipping = tracker_name
+                                            dupes = []
+                                    except EOFError:
+                                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                        await cleanup_manager.cleanup()
+                                        cleanup_manager.reset_terminal()
+                                        sys.exit(1)
                         else:
                             dupes = []
                     elif tracker_name == "PTP":
@@ -169,10 +193,31 @@ class TrackerStatusManager:
                                 local_meta.skipping = tracker_name
 
                         if not local_tracker_status["skipped"]:
-                            groupID = await ptp.get_group_by_imdb(local_meta["imdb"])
-                            async with meta_lock:
-                                meta.ptp_groupID = groupID
-                            dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
+                            try:
+                                groupID = await ptp.get_group_by_imdb(local_meta["imdb"])
+                                async with meta_lock:
+                                    meta.ptp_groupID = groupID
+                                dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
+                            except Exception as e:
+                                console.print(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
+                                if local_meta.get("unattended", False):
+                                    local_tracker_status["skipped"] = True
+                                    local_meta.skipping = tracker_name
+                                    dupes = []
+                                else:
+                                    try:
+                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
+                                        if (choice or "").lower() == "y":
+                                            dupes = []
+                                        else:
+                                            local_tracker_status["skipped"] = True
+                                            local_meta.skipping = tracker_name
+                                            dupes = []
+                                    except EOFError:
+                                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                        await cleanup_manager.cleanup()
+                                        cleanup_manager.reset_terminal()
+                                        sys.exit(1)
                         else:
                             dupes = []
                     else:

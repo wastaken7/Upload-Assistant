@@ -311,32 +311,23 @@ class RTF:
 
             return torrent_url
 
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(self.search_url, params=params, headers=headers)
-                if response.status_code == 200:
-                    data = cast(list[dict[str, Any]], response.json())
-                    for each in data:
-                        download_url = build_download_url(each)
-                        result = {
-                            'name': str(each.get('name', '')),
-                            'size': each.get('size', 0),
-                            'files': str(each.get('name', '')),
-                            'link': str(each.get('url', '')),
-                            'download': download_url,
-                        }
-                        dupes.append(result)
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(self.search_url, params=params, headers=headers)
+            if response.status_code == 200:
+                data = cast(list[dict[str, Any]], response.json())
+                for each in data:
+                    download_url = build_download_url(each)
+                    result = {
+                        'name': str(each.get('name', '')),
+                        'size': each.get('size', 0),
+                        'files': str(each.get('name', '')),
+                        'link': str(each.get('url', '')),
+                        'download': download_url,
+                    }
+                    dupes.append(result)
+            else:
+                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
-            await asyncio.sleep(5)
 
         return dupes
 

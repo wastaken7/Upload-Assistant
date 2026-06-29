@@ -218,30 +218,22 @@ class TTG:
 
         search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
 
-        try:
-            async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
-                response = await client.get(search_url)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    find = soup.find_all('a', href=True)
-                    for each in find:
-                        href_value = each.get('href')
-                        if isinstance(href_value, str) and href_value.startswith('/t/'):
-                            release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
-                            if release:
-                                dupes.append(release.group(3))
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+        async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+            response = await client.get(search_url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                find = soup.find_all('a', href=True)
+                for each in find:
+                    href_value = each.get('href')
+                    if isinstance(href_value, str) and href_value.startswith('/t/'):
+                        release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
+                        if release:
+                            dupes.append(release.group(3))
+            else:
+                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
-                await asyncio.sleep(0.5)
+            await asyncio.sleep(0.5)
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
 
         return dupes
 

@@ -674,186 +674,179 @@ class BJS:
                 "searchstr": title,
             }
 
-        try:
-            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-            if cookie_jar:
-                self.session.cookies = cookie_jar
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
 
-            BJS.already_has_the_info = False
-            BJS.database_title = ""
+        BJS.already_has_the_info = False
+        BJS.database_title = ""
 
-            response = await self.session.get(search_url, params=params, follow_redirects=True)
-            if "login.php" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = f"{self.tracker}"
-                return dupes
+        response = await self.session.get(search_url, params=params, follow_redirects=True)
+        if "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
+            return dupes
 
-            # Extract auth token if present
-            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
-            if auth_match:
-                BJS.secret_token = auth_match.group(1)
-            else:
-                console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-                meta.skipping = f"{self.tracker}"
-                return dupes
+        # Extract auth token if present
+        auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
+        if auth_match:
+            BJS.secret_token = auth_match.group(1)
+        else:
+            console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+            meta.skipping = f"{self.tracker}"
+            return dupes
 
-            soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, "html.parser")
 
-            # Check if we were redirected to a details page (it contains class "main_column")
-            torrent_details_table: Optional[Tag] = soup.find("div", class_="main_column")
-            # Or if we remained on the search results page (it contains id "torrent_table")
-            torrent_search_table: Optional[Tag] = soup.find("table", id="torrent_table")
+        # Check if we were redirected to a details page (it contains class "main_column")
+        torrent_details_table: Optional[Tag] = soup.find("div", class_="main_column")
+        # Or if we remained on the search results page (it contains id "torrent_table")
+        torrent_search_table: Optional[Tag] = soup.find("table", id="torrent_table")
 
-            if torrent_details_table:
-                BJS.already_has_the_info = True
-                BJS.database_title = self.get_database_title(soup)
+        if torrent_details_table:
+            BJS.already_has_the_info = True
+            BJS.database_title = self.get_database_title(soup)
 
-                for row in torrent_details_table.find_all("tr"):
-                    row_id = row.get("id")
-                    if isinstance(row_id, str) and row_id.startswith("torrent") and not row_id.startswith("torrent_"):
-                        torrent_id = row_id.replace("torrent", "")
-                        if not torrent_id:
-                            continue
-
-                        name = row.get("data-torrentname", "")
-                        if not name:
-                            continue
-                        name = str(name).strip()
-
-                        size_tag = row.find("td", class_="number_column nobr")
-                        size = size_tag.get_text(strip=True) if size_tag else ""
-
-                        link = f"{self.torrent_url}{torrent_id}"
-
-                        row_type = "ebook"
-                        if category == "BOOK":
-                            if meta.audiobook:
-                                row_type = "audiobook"
-                            else:
-                                fmt_attr = row.get("data-format")
-                                if fmt_attr:
-                                    fmt_attr = str(fmt_attr).lower().strip()
-                                    if fmt_attr in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
-                                        row_type = fmt_attr
-                                if row_type == "ebook":
-                                    name_lower = name.lower()
-                                    for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
-                                        if fmt in name_lower:
-                                            row_type = fmt
-                                            break
-
-                        names: list[Any] = []
-                        if name:
-                            names.append(name)
-                        if category in ("BOOK", "GAME") and BJS.database_title:
-                            names.append(BJS.database_title.strip())
-
-                        for n in names:
-                            dupe_entry = {
-                                "name": n,
-                                "size": size,
-                                "link": link,
-                                "download": f"{self.torrent_download_url}{torrent_id}",
-                                "id": torrent_id,
-                            }
-                            if self.has_extension(n):
-                                dupe_entry["files"] = [n]
-                            if category == "BOOK":
-                                dupe_entry["type"] = row_type
-                            dupes.append(dupe_entry)
-
-            elif torrent_search_table:
-                for row in torrent_search_table.find_all("tr", class_="torrent"):
-                    title_link_tag = row.find("a", href=re.compile(r"torrentid=\d+"))
-                    torrent_id = None
-                    if title_link_tag and isinstance(title_link_tag, Tag):
-                        href = title_link_tag.get("href", "")
-                        if isinstance(href, str):
-                            match = re.search(r"torrentid=(\d+)", href)
-                            if match:
-                                torrent_id = match.group(1)
-
-                    if not torrent_id:
-                        download_link_tag = row.find("a", href=re.compile(r"action=download&id=\d+"))
-                        if download_link_tag and isinstance(download_link_tag, Tag):
-                            href = download_link_tag.get("href", "")
-                            if isinstance(href, str):
-                                match = re.search(r"id=(\d+)", href)
-                                if match:
-                                    torrent_id = match.group(1)
-
+            for row in torrent_details_table.find_all("tr"):
+                row_id = row.get("id")
+                if isinstance(row_id, str) and row_id.startswith("torrent") and not row_id.startswith("torrent_"):
+                    torrent_id = row_id.replace("torrent", "")
                     if not torrent_id:
                         continue
 
+                    name = row.get("data-torrentname", "")
+                    if not name:
+                        continue
+                    name = str(name).strip()
+
+                    size_tag = row.find("td", class_="number_column nobr")
+                    size = size_tag.get_text(strip=True) if size_tag else ""
+
                     link = f"{self.torrent_url}{torrent_id}"
-
-                    torrent_info_div = row.find("div", class_="torrent_info")
-                    data_name = ""
-                    if torrent_info_div and isinstance(torrent_info_div, Tag):
-                        data_name = torrent_info_div.get("data-torrentname", "") or torrent_info_div.get("data-name", "")
-
-                    site_name = ""
-                    if title_link_tag:
-                        site_name = title_link_tag.get_text(strip=True)
 
                     row_type = "ebook"
                     if category == "BOOK":
                         if meta.audiobook:
                             row_type = "audiobook"
                         else:
-                            fmt_attr = ""
-                            if torrent_info_div and isinstance(torrent_info_div, Tag):
-                                fmt_attr = torrent_info_div.get("data-format", "")
+                            fmt_attr = row.get("data-format")
                             if fmt_attr:
                                 fmt_attr = str(fmt_attr).lower().strip()
                                 if fmt_attr in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
                                     row_type = fmt_attr
                             if row_type == "ebook":
-                                name_to_check = data_name or site_name
-                                name_lower = str(name_to_check).lower()
+                                name_lower = name.lower()
                                 for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
                                     if fmt in name_lower:
                                         row_type = fmt
                                         break
 
-                    names = []
-                    if category == "BOOK":
-                        if data_name:
-                            names.append(str(data_name).strip())
-                        if site_name:
-                            names.append(site_name.strip())
-                    else:
-                        name = data_name or site_name
-                        if name:
-                            names.append(str(name).strip())
-
-                    if not names:
-                        continue
-
-                    size = ""
-                    tds = row.find_all("td")
-                    if len(tds) >= 5:
-                        size_candidates = [
-                            td.get_text(strip=True) for td in tds if re.search(r"\d+(\.\d+)?\s*(B|KiB|MiB|GiB|TiB|KB|MB|GB|TB)", td.get_text(strip=True), re.IGNORECASE)
-                        ]
-                        size = size_candidates[0] if size_candidates else tds[4].get_text(strip=True)
+                    names: list[Any] = []
+                    if name:
+                        names.append(name)
+                    if category in ("BOOK", "GAME") and BJS.database_title:
+                        names.append(BJS.database_title.strip())
 
                     for n in names:
-                        dupe_entry = {"name": n, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                        dupe_entry = {
+                            "name": n,
+                            "size": size,
+                            "link": link,
+                            "download": f"{self.torrent_download_url}{torrent_id}",
+                            "id": torrent_id,
+                        }
                         if self.has_extension(n):
                             dupe_entry["files"] = [n]
                         if category == "BOOK":
                             dupe_entry["type"] = row_type
                         dupes.append(dupe_entry)
 
-            return dupes
+        elif torrent_search_table:
+            for row in torrent_search_table.find_all("tr", class_="torrent"):
+                title_link_tag = row.find("a", href=re.compile(r"torrentid=\d+"))
+                torrent_id = None
+                if title_link_tag and isinstance(title_link_tag, Tag):
+                    href = title_link_tag.get("href", "")
+                    if isinstance(href, str):
+                        match = re.search(r"torrentid=(\d+)", href)
+                        if match:
+                            torrent_id = match.group(1)
 
-        except Exception as e:
-            console.print(f"[bold red]Ocorreu um erro inesperado ao processar a busca: {e}[/bold red]")
-            import traceback
+                if not torrent_id:
+                    download_link_tag = row.find("a", href=re.compile(r"action=download&id=\d+"))
+                    if download_link_tag and isinstance(download_link_tag, Tag):
+                        href = download_link_tag.get("href", "")
+                        if isinstance(href, str):
+                            match = re.search(r"id=(\d+)", href)
+                            if match:
+                                torrent_id = match.group(1)
 
-            traceback.print_exc()
-            return dupes
+                if not torrent_id:
+                    continue
+
+                link = f"{self.torrent_url}{torrent_id}"
+
+                torrent_info_div = row.find("div", class_="torrent_info")
+                data_name = ""
+                if torrent_info_div and isinstance(torrent_info_div, Tag):
+                    data_name = torrent_info_div.get("data-torrentname", "") or torrent_info_div.get("data-name", "")
+
+                site_name = ""
+                if title_link_tag:
+                    site_name = title_link_tag.get_text(strip=True)
+
+                row_type = "ebook"
+                if category == "BOOK":
+                    if meta.audiobook:
+                        row_type = "audiobook"
+                    else:
+                        fmt_attr = ""
+                        if torrent_info_div and isinstance(torrent_info_div, Tag):
+                            fmt_attr = torrent_info_div.get("data-format", "")
+                        if fmt_attr:
+                            fmt_attr = str(fmt_attr).lower().strip()
+                            if fmt_attr in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                row_type = fmt_attr
+                        if row_type == "ebook":
+                            name_to_check = data_name or site_name
+                            name_lower = str(name_to_check).lower()
+                            for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                                if fmt in name_lower:
+                                    row_type = fmt
+                                    break
+
+                names = []
+                if category == "BOOK":
+                    if data_name:
+                        names.append(str(data_name).strip())
+                    if site_name:
+                        names.append(site_name.strip())
+                else:
+                    name = data_name or site_name
+                    if name:
+                        names.append(str(name).strip())
+
+                if not names:
+                    continue
+
+                size = ""
+                tds = row.find_all("td")
+                if len(tds) >= 5:
+                    size_candidates = [
+                        td.get_text(strip=True) for td in tds if re.search(r"\d+(\.\d+)?\s*(B|KiB|MiB|GiB|TiB|KB|MB|GB|TB)", td.get_text(strip=True), re.IGNORECASE)
+                    ]
+                    size = size_candidates[0] if size_candidates else tds[4].get_text(strip=True)
+
+                for n in names:
+                    dupe_entry = {"name": n, "size": size, "link": link, "download": f"{self.torrent_download_url}{torrent_id}", "id": torrent_id}
+                    if self.has_extension(n):
+                        dupe_entry["files"] = [n]
+                    if category == "BOOK":
+                        dupe_entry["type"] = row_type
+                    dupes.append(dupe_entry)
+
+        return dupes
+
 
     def get_edition(self, meta: Meta) -> str:
         edition_str = meta.edition.lower()

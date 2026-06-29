@@ -389,60 +389,49 @@ class ANT:
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url=self.search_url, params=params, headers=headers)
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        target_resolution = meta.resolution.lower()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(url=self.search_url, params=params, headers=headers)
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    target_resolution = meta.resolution.lower()
 
-                        for each in data.get('item', []):
-                            if target_resolution and each.get('resolution', '').lower() != target_resolution.lower():
-                                if meta.debug:
-                                    console.print(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
-                                continue
-
-                            largest_file = None
-                            if 'files' in each and len(each['files']) > 0:
-                                largest = each['files'][0]
-                                for file in each['files']:
-                                    current_size = int(file.get('size', 0))
-                                    largest_size = int(largest.get('size', 0))
-                                    if current_size > largest_size:
-                                        largest = file
-                                largest_file = largest.get('name', '')
-
-                            result: dict[str, Any] = {
-                                'name': largest_file or each.get('fileName', ''),
-                                'files': [file.get('name', '') for file in each.get('files', [])],
-                                'size': int(each.get('size', 0)),
-                                'link': each.get('guid', ''),
-                                'flags': each.get('flags', []),
-                                'file_count': each.get('fileCount', 0),
-                                'download': each.get('link', '').replace('&amp;', '&'),
-                            }
-                            dupes.append(result)
-
+                    for each in data.get('item', []):
+                        if target_resolution and each.get('resolution', '').lower() != target_resolution.lower():
                             if meta.debug:
-                                console.print(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+                                console.print(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+                            continue
 
-                    except json.JSONDecodeError:
-                        console.print("[bold yellow]ANT response content is not valid JSON. Skipping this API call.")
-                        meta.skipping = "ANT"
-                else:
-                    console.print(f"[bold red]ANT failed to search torrents. HTTP Status: {response.status_code}")
+                        largest_file = None
+                        if 'files' in each and len(each['files']) > 0:
+                            largest = each['files'][0]
+                            for file in each['files']:
+                                current_size = int(file.get('size', 0))
+                                largest_size = int(largest.get('size', 0))
+                                if current_size > largest_size:
+                                    largest = file
+                            largest_file = largest.get('name', '')
+
+                        result: dict[str, Any] = {
+                            'name': largest_file or each.get('fileName', ''),
+                            'files': [file.get('name', '') for file in each.get('files', [])],
+                            'size': int(each.get('size', 0)),
+                            'link': each.get('guid', ''),
+                            'flags': each.get('flags', []),
+                            'file_count': each.get('fileCount', 0),
+                            'download': each.get('link', '').replace('&amp;', '&'),
+                        }
+                        dupes.append(result)
+
+                        if meta.debug:
+                            console.print(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+
+                except json.JSONDecodeError:
+                    console.print("[bold yellow]ANT response content is not valid JSON. Skipping this API call.")
                     meta.skipping = "ANT"
-        except httpx.TimeoutException:
-            console.print("[bold red]ANT Request timed out after 5 seconds")
-            meta.skipping = "ANT"
-        except httpx.RequestError as e:
-            console.print(f"[bold red]ANT unable to search for existing torrents: {e}")
-            meta.skipping = "ANT"
-        except Exception as e:
-            console.print(f"[bold red]ANT unexpected error: {e}")
-            meta.skipping = "ANT"
-            await asyncio.sleep(5)
+            else:
+                console.print(f"[bold red]ANT failed to search torrents. HTTP Status: {response.status_code}")
+                meta.skipping = "ANT"
 
         return dupes
 

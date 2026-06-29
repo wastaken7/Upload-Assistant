@@ -91,43 +91,40 @@ class IS:
 
         search_url = f'{self.base_url}/browse.php?do=search&keywords={search_query}&search_type={search_type}'
 
-        try:
-            response = await self.session.get(search_url)
-            if "Forget your password" in response.text or "login.php" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = self.tracker
-                return dupes
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
+        response = await self.session.get(search_url)
+        if "Forget your password" in response.text or "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = self.tracker
+            return dupes
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-            torrent_table = soup.find('table', id='sortabletable')
+        torrent_table = soup.find('table', id='sortabletable')
 
-            if not torrent_table:
-                return dupes
+        if not torrent_table:
+            return dupes
 
-            torrent_rows = torrent_table.select('tbody > tr')[1:]
+        torrent_rows = torrent_table.select('tbody > tr')[1:]
 
-            for row in torrent_rows:
-                name_tag = row.select_one('a[href*="details.php?id="]')
-                if not name_tag:
-                    continue
+        for row in torrent_rows:
+            name_tag = row.select_one('a[href*="details.php?id="]')
+            if not name_tag:
+                continue
 
-                name = name_tag.get_text(strip=True)
-                href_value = name_tag.get('href')
-                torrent_link = href_value if isinstance(href_value, str) else ''
+            name = name_tag.get_text(strip=True)
+            href_value = name_tag.get('href')
+            torrent_link = href_value if isinstance(href_value, str) else ''
 
-                size_tag = row.select_one('td:nth-of-type(5)')
-                size = size_tag.get_text(strip=True) if size_tag else None
+            size_tag = row.select_one('td:nth-of-type(5)')
+            size = size_tag.get_text(strip=True) if size_tag else None
 
-                duplicate_entry = {
-                    'name': name,
-                    'size': size,
-                    'link': torrent_link
-                }
-                dupes.append(duplicate_entry)
+            duplicate_entry = {
+                'name': name,
+                'size': size,
+                'link': torrent_link
+            }
+            dupes.append(duplicate_entry)
 
-        except Exception as e:
-            console.print(f'[bold red]Error searching for duplicates on {self.tracker}: {e}[/bold red]')
 
         return dupes
 

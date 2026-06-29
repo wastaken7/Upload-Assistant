@@ -868,18 +868,14 @@ class ASC:
         else:
             return found_items
 
-        try:
-            response = await self.session.get(search_url, timeout=30)
-            if 'Esqueceu sua senha' in response.text or 'login.php' in str(response.url) or 'login.php' in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = f"{self.tracker}"
-                return found_items
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            releases = soup.find_all('li', class_='list-group-item dark-gray')
-        except Exception as e:
-            console.print(f'[bold red]Falha ao acessar a página de busca do ASC: {e}[/bold red]')
+        response = await self.session.get(search_url, timeout=30)
+        if 'Esqueceu sua senha' in response.text or 'login.php' in str(response.url) or 'login.php' in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
             return found_items
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        releases = soup.find_all('li', class_='list-group-item dark-gray')
 
         if not releases:
             return found_items
@@ -899,63 +895,59 @@ class ASC:
             size_tag = release.find('span', text=_has_size_text, class_='badge-info')
             size = size_tag.get_text(strip=True).strip() if size_tag else ''
 
-            try:
-                badges = release.find_all('span', class_='badge')
-                disc_types = ['BD25', 'BD50', 'BD66', 'BD100', 'DVD5', 'DVD9']
-                is_disc = any(badge.text.strip().upper() in disc_types for badge in badges)
+            badges = release.find_all('span', class_='badge')
+            disc_types = ['BD25', 'BD50', 'BD66', 'BD100', 'DVD5', 'DVD9']
+            is_disc = any(badge.text.strip().upper() in disc_types for badge in badges)
 
-                if is_disc:
-                    name, year, resolution, disk_type, video_codec, audio_codec = meta.title, "N/A", "N/A", "N/A", "N/A", "N/A"
-                    video_codec_terms = ['MPEG-4', 'AV1', 'AVC', 'H264', 'H265', 'HEVC', 'MPEG-1', 'MPEG-2', 'VC-1', 'VP6', 'VP9']
-                    audio_codec_terms = ['DTS', 'AC3', 'DDP', 'E-AC-3', 'TRUEHD', 'ATMOS', 'LPCM', 'AAC', 'FLAC']
+            if is_disc:
+                name, year, resolution, disk_type, video_codec, audio_codec = meta.title, "N/A", "N/A", "N/A", "N/A", "N/A"
+                video_codec_terms = ['MPEG-4', 'AV1', 'AVC', 'H264', 'H265', 'HEVC', 'MPEG-1', 'MPEG-2', 'VC-1', 'VP6', 'VP9']
+                audio_codec_terms = ['DTS', 'AC3', 'DDP', 'E-AC-3', 'TRUEHD', 'ATMOS', 'LPCM', 'AAC', 'FLAC']
 
-                    for badge in badges:
-                        badge_text = badge.text.strip()
-                        badge_text_upper = badge_text.upper()
+                for badge in badges:
+                    badge_text = badge.text.strip()
+                    badge_text_upper = badge_text.upper()
 
-                        if badge_text.isdigit() and len(badge_text) == 4:
-                            year = badge_text
-                        elif badge_text_upper in ['4K', '2160P', '1080P', '720P', '480P']:
-                            resolution = '2160p' if badge_text_upper == '4K' else badge_text
-                        elif any(term in badge_text_upper for term in video_codec_terms):
-                            video_codec = badge_text
-                        elif any(term in badge_text_upper for term in audio_codec_terms):
-                            audio_codec = badge_text
-                        elif any(term in badge_text_upper for term in disc_types):
-                            disk_type = badge_text
+                    if badge_text.isdigit() and len(badge_text) == 4:
+                        year = badge_text
+                    elif badge_text_upper in ['4K', '2160P', '1080P', '720P', '480P']:
+                        resolution = '2160p' if badge_text_upper == '4K' else badge_text
+                    elif any(term in badge_text_upper for term in video_codec_terms):
+                        video_codec = badge_text
+                    elif any(term in badge_text_upper for term in audio_codec_terms):
+                        audio_codec = badge_text
+                    elif any(term in badge_text_upper for term in disc_types):
+                        disk_type = badge_text
 
-                    name = f'{name} {year} {resolution} {disk_type} {video_codec} {audio_codec}'
-                    dupe_entry = {
-                        'name': name,
-                        'size': size,
-                        'link': torrent_link
-                    }
+                name = f'{name} {year} {resolution} {disk_type} {video_codec} {audio_codec}'
+                dupe_entry = {
+                    'name': name,
+                    'size': size,
+                    'link': torrent_link
+                }
 
-                    found_items.append(dupe_entry)
+                found_items.append(dupe_entry)
 
+            else:
+                if not details_link_tag:
+                    continue
+
+                href_value = details_link_tag.get('href')
+                if not isinstance(href_value, str):
+                    continue
+
+                if meta.category == "GAME":
+                    title_tag = release.select_one(".tooltips p a")
+                    game_title = title_tag.get_text(strip=True) if title_tag else "N/A"
+                    found_items.append({
+                        "name": game_title,
+                        "size": size,
+                        "link": torrent_link,
+                    })
                 else:
-                    if not details_link_tag:
-                        continue
+                    torrent_id = href_value.split("id=")[-1]
+                    name_search_tasks.append(asyncio.create_task(self._fetch_file_info(torrent_id, torrent_link, size)))
 
-                    href_value = details_link_tag.get('href')
-                    if not isinstance(href_value, str):
-                        continue
-
-                    if meta.category == "GAME":
-                        title_tag = release.select_one(".tooltips p a")
-                        game_title = title_tag.get_text(strip=True) if title_tag else "N/A"
-                        found_items.append({
-                            "name": game_title,
-                            "size": size,
-                            "link": torrent_link,
-                        })
-                    else:
-                        torrent_id = href_value.split("id=")[-1]
-                        name_search_tasks.append(asyncio.create_task(self._fetch_file_info(torrent_id, torrent_link, size)))
-
-            except Exception as e:
-                console.print(f'[bold red]Falha ao processar um release da lista: {e}[/bold red]')
-                continue
 
         if name_search_tasks:
             parallel_results = await asyncio.gather(*name_search_tasks)

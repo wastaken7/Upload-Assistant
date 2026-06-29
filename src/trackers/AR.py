@@ -265,41 +265,37 @@ class AR:
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
-        try:
-            async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
-                response = await client.get(search_url)
+        async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
+            response = await client.get(search_url)
 
-                if "login.php" in str(response.url) or "login.php" in response.text or response.status_code != 200:
-                    await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                    meta.skipping = f"{self.tracker}"
-                    return dupes
-
-                json_response = response.json()
-                if json_response.get('status') != 'success':
-                    console.print("[red]Invalid response status.")
-                    return dupes
-
-                results = json_response.get('response', {}).get('results', [])
-                if not results:
-                    return dupes
-
-                for res in results:
-                    if 'groupName' in res:
-                        dupe = {
-                            'name': res['groupName'],
-                            'size': res['size'],
-                            'files': res['groupName'],
-                            'file_count': res['fileCount'],
-                            'link': f'{self.search_url}?id={res["groupId"]}&torrentid={res["torrentId"]}',
-                            'download': f'{self.base_url}/torrents.php?action=download&id={res["torrentId"]}',
-                        }
-                        dupes.append(dupe)
-
+            if "login.php" in str(response.url) or "login.php" in response.text or response.status_code != 200:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta.skipping = f"{self.tracker}"
                 return dupes
 
-        except Exception as e:
-            console.print(f"[red]Error occurred: {e}")
+            json_response = response.json()
+            if json_response.get('status') != 'success':
+                console.print("[red]Invalid response status.")
+                return dupes
+
+            results = json_response.get('response', {}).get('results', [])
+            if not results:
+                return dupes
+
+            for res in results:
+                if 'groupName' in res:
+                    dupe = {
+                        'name': res['groupName'],
+                        'size': res['size'],
+                        'files': res['groupName'],
+                        'file_count': res['fileCount'],
+                        'link': f'{self.search_url}?id={res["groupId"]}&torrentid={res["torrentId"]}',
+                        'download': f'{self.base_url}/torrents.php?action=download&id={res["torrentId"]}',
+                    }
+                    dupes.append(dupe)
+
             return dupes
+
 
     async def get_auth_key(self, meta: Meta) -> Optional[str]:
         """Retrieve the saved auth key from cookie_auth.py."""

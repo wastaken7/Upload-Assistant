@@ -378,58 +378,50 @@ class THR:
             console.print("[red]No IMDb ID available for search", style="bold red")
             return dupes
 
-        try:
-            cookies = await self.login(meta)
+        cookies = await self.login(meta)
 
-            client_args: dict[str, Any] = {'timeout': 10.0, 'follow_redirects': True}
-            if cookies:
-                client_args['cookies'] = cookies
-            else:
-                console.print("[red]Failed to log in to THR for search")
-                return dupes
+        client_args: dict[str, Any] = {'timeout': 10.0, 'follow_redirects': True}
+        if cookies:
+            client_args['cookies'] = cookies
+        else:
+            console.print("[red]Failed to log in to THR for search")
+            return dupes
 
-            async with httpx.AsyncClient(**client_args) as client:
-                # Start with first page (page 0 in THR's system)
-                current_page = 0
-                more_pages = True
-                page_count = 0
-                all_titles_seen: set[str] = set()
+        async with httpx.AsyncClient(**client_args) as client:
+            # Start with first page (page 0 in THR's system)
+            current_page = 0
+            more_pages = True
+            page_count = 0
+            all_titles_seen: set[str] = set()
 
-                while more_pages:
-                    page_url = base_search_url
-                    if current_page > 0:
-                        page_url += f"&page={current_page}"
+            while more_pages:
+                page_url = base_search_url
+                if current_page > 0:
+                    page_url += f"&page={current_page}"
 
-                    page_count += 1
-                    if meta.debug:
-                        console.print(f"[dim]Searching page {page_count}...")
-                    response = await client.get(page_url)
+                page_count += 1
+                if meta.debug:
+                    console.print(f"[dim]Searching page {page_count}...")
+                response = await client.get(page_url)
 
-                    page_dupes, has_next_page, next_page_number = await self._process_search_response(
-                        response, meta, current_page)
+                page_dupes, has_next_page, next_page_number = await self._process_search_response(
+                    response, meta, current_page)
 
-                    for dupe in page_dupes:
-                        if dupe not in dupes:
-                            dupes.append(dupe)
-                            all_titles_seen.add(dupe)
+                for dupe in page_dupes:
+                    if dupe not in dupes:
+                        dupes.append(dupe)
+                        all_titles_seen.add(dupe)
 
-                    if meta.debug and has_next_page:
-                        console.print(f"[dim]Next page available: page {next_page_number}")
+                if meta.debug and has_next_page:
+                    console.print(f"[dim]Next page available: page {next_page_number}")
 
-                    if has_next_page:
-                        current_page = next_page_number
+                if has_next_page:
+                    current_page = next_page_number
 
-                        await asyncio.sleep(1)
-                    else:
-                        more_pages = False
+                    await asyncio.sleep(1)
+                else:
+                    more_pages = False
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
 
         return dupes
 

@@ -319,36 +319,33 @@ class GPW:
         cookies = await self.load_cookies(meta)
         if not cookies:
             search_url = f'{self.base_url}/api.php?api_key={self.api_key}&action=torrent&imdbID={imdb}'
-            try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.get(search_url)
-                    response.raise_for_status()
-                    data = response.json()
-                    data_dict = cast(dict[str, Any], data) if isinstance(data, dict) else {}
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(search_url)
+                response.raise_for_status()
+                data = response.json()
+                data_dict = cast(dict[str, Any], data) if isinstance(data, dict) else {}
 
-                    if data_dict.get("status") == 200 and "response" in data_dict:
-                        response_list_raw = data_dict.get('response')
-                        response_list = cast(list[Any], response_list_raw) if isinstance(response_list_raw, list) else []
-                        for item in response_list:
-                            if not isinstance(item, dict):
-                                continue
-                            item_dict = cast(dict[str, Any], item)
-                            name = item_dict.get('Name', '')
-                            year = item_dict.get('Year', '')
-                            resolution = item_dict.get('Resolution', '')
-                            source = item_dict.get('Source', '')
-                            processing = item_dict.get('Processing', '')
-                            remaster = item_dict.get('RemasterTitle', '')
-                            codec = item_dict.get('Codec', '')
+                if data_dict.get("status") == 200 and "response" in data_dict:
+                    response_list_raw = data_dict.get('response')
+                    response_list = cast(list[Any], response_list_raw) if isinstance(response_list_raw, list) else []
+                    for item in response_list:
+                        if not isinstance(item, dict):
+                            continue
+                        item_dict = cast(dict[str, Any], item)
+                        name = item_dict.get('Name', '')
+                        year = item_dict.get('Year', '')
+                        resolution = item_dict.get('Resolution', '')
+                        source = item_dict.get('Source', '')
+                        processing = item_dict.get('Processing', '')
+                        remaster = item_dict.get('RemasterTitle', '')
+                        codec = item_dict.get('Codec', '')
 
-                            formatted = f'{name} {year} {resolution} {source} {processing} {remaster} {codec}'.strip()
-                            formatted = re.sub(r'\s{2,}', ' ', formatted)
-                            dupes.append({"name": formatted})
-                        return dupes
-                    else:
-                        return []
-            except Exception as e:
-                console.print(f'An unexpected error occurred while processing the search: {e}', markup=False)
+                        formatted = f'{name} {year} {resolution} {source} {processing} {remaster} {codec}'.strip()
+                        formatted = re.sub(r'\s{2,}', ' ', formatted)
+                        dupes.append({"name": formatted})
+                    return dupes
+                else:
+                    return []
             return []
 
         else:
@@ -356,58 +353,51 @@ class GPW:
             search_url = f'{self.base_url}/torrents.php?groupname={imdb_value.upper()}'  # using TT in imdb returns the search page instead of redirecting to the group page
             found_items: list[dict[str, Any]] = []
 
-            try:
-                async with httpx.AsyncClient(
-                    cookies=cookies,
-                    timeout=30,
-                    headers={"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"},
-                ) as client:
-                    response = await client.get(search_url)
-                    response.raise_for_status()
-                    soup = BeautifulSoup(response.text, 'html.parser')
+            async with httpx.AsyncClient(
+                cookies=cookies,
+                timeout=30,
+                headers={"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"},
+            ) as client:
+                response = await client.get(search_url)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-                    torrent_table = soup.find('table', id='torrent_table')
-                    if not torrent_table:
-                        return []
+                torrent_table = soup.find('table', id='torrent_table')
+                if not torrent_table:
+                    return []
 
-                    for torrent_row in torrent_table.find_all('tr', class_='TableTorrent-rowTitle'):
-                        title_link = torrent_row.find('a', href=re.compile(r'torrentid=\d+'))
-                        if not title_link:
-                            continue
+                for torrent_row in torrent_table.find_all('tr', class_='TableTorrent-rowTitle'):
+                    title_link = torrent_row.find('a', href=re.compile(r'torrentid=\d+'))
+                    if not title_link:
+                        continue
 
-                        tooltip_value = title_link.get('data-tooltip')
-                        if not isinstance(tooltip_value, str):
-                            continue
+                    tooltip_value = title_link.get('data-tooltip')
+                    if not isinstance(tooltip_value, str):
+                        continue
 
-                        name = tooltip_value
+                    name = tooltip_value
 
-                        size_cell = torrent_row.find('td', class_='TableTorrent-cellStatSize')
-                        size = size_cell.get_text(strip=True) if size_cell else None
+                    size_cell = torrent_row.find('td', class_='TableTorrent-cellStatSize')
+                    size = size_cell.get_text(strip=True) if size_cell else None
 
-                        href_value = title_link.get('href')
-                        href_text = href_value if isinstance(href_value, str) else ''
-                        match = re.search(r'torrentid=(\d+)', href_text)
-                        torrent_link = f'{self.torrent_url}{match.group(1)}' if match else None
+                    href_value = title_link.get('href')
+                    href_text = href_value if isinstance(href_value, str) else ''
+                    match = re.search(r'torrentid=(\d+)', href_text)
+                    torrent_link = f'{self.torrent_url}{match.group(1)}' if match else None
 
-                        dupe_entry = {
-                            'name': name,
-                            'size': size,
-                            'link': torrent_link
-                        }
+                    dupe_entry = {
+                        'name': name,
+                        'size': size,
+                        'link': torrent_link
+                    }
 
-                        found_items.append(dupe_entry)
+                    found_items.append(dupe_entry)
 
-                    if found_items:
-                        await self.get_slots(meta, client, GPW.group_id)
+                if found_items:
+                    await self.get_slots(meta, client, GPW.group_id)
 
-                    return found_items
+                return found_items
 
-            except httpx.HTTPError as e:
-                console.print(f'An HTTP error occurred: {e}', markup=False)
-                return []
-            except Exception as e:
-                console.print(f'An unexpected error occurred while processing the search: {e}', markup=False)
-                return []
 
     async def get_slots(self, meta: Meta, client: httpx.AsyncClient, group_id: str) -> None:
         url = f'{self.base_url}/torrents.php?id={group_id}'

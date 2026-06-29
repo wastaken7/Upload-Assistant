@@ -520,74 +520,71 @@ class EMUW(UNIT3D):
             delay=10
         )
 
-        try:
-            # Establish session
-            scraper.get(self.base_url, timeout=15.0)
+        # Establish session
+        scraper.get(self.base_url, timeout=15.0)
 
-            # Make API request — params is a list of tuples to support duplicate keys
-            response = scraper.get(url=self.search_url, params=params, headers=headers, timeout=15.0)
+        # Make API request — params is a list of tuples to support duplicate keys
+        response = scraper.get(url=self.search_url, params=params, headers=headers, timeout=15.0)
 
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    if isinstance(data, dict):
-                        data_dict = cast(dict[str, Any], data)
-                        data_items_raw = data_dict.get('data')
-                        if not isinstance(data_items_raw, list):
-                            return dupes
-                        data_items = data_items_raw
-                        for torrent in data_items:
-                            if not isinstance(torrent, dict):
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                if isinstance(data, dict):
+                    data_dict = cast(dict[str, Any], data)
+                    data_items_raw = data_dict.get('data')
+                    if not isinstance(data_items_raw, list):
+                        return dupes
+                    data_items = data_items_raw
+                    for torrent in data_items:
+                        if not isinstance(torrent, dict):
+                            continue
+                        torrent_dict = cast(dict[str, Any], torrent)
+                        attributes = torrent_dict.get('attributes')
+                        if not isinstance(attributes, dict):
+                            continue
+                        attributes_dict = cast(dict[str, Any], attributes)
+                        if 'name' not in attributes_dict:
+                            continue
+
+                        files_value = attributes_dict.get('files', [])
+                        files_list: list[Any] = files_value if isinstance(files_value, list) else []
+                        file_names: list[str] = []
+                        for file in files_list:
+                            if not isinstance(file, dict):
                                 continue
-                            torrent_dict = cast(dict[str, Any], torrent)
-                            attributes = torrent_dict.get('attributes')
-                            if not isinstance(attributes, dict):
-                                continue
-                            attributes_dict = cast(dict[str, Any], attributes)
-                            if 'name' not in attributes_dict:
-                                continue
+                            file_dict = cast(dict[str, Any], file)
+                            name = file_dict.get('name')
+                            if isinstance(name, str):
+                                file_names.append(name)
 
-                            files_value = attributes_dict.get('files', [])
-                            files_list: list[Any] = files_value if isinstance(files_value, list) else []
-                            file_names: list[str] = []
-                            for file in files_list:
-                                if not isinstance(file, dict):
-                                    continue
-                                file_dict = cast(dict[str, Any], file)
-                                name = file_dict.get('name')
-                                if isinstance(name, str):
-                                    file_names.append(name)
+                        if not meta.is_disc:
+                            result = {
+                                'name': attributes_dict['name'],
+                                'size': attributes_dict.get('size'),
+                                'files': file_names,
+                                'file_count': len(files_list),
+                                'trumpable': attributes_dict.get('trumpable', False),
+                                'link': attributes_dict.get('details_link', None)
+                            }
+                        else:
+                            result = {
+                                'name': attributes_dict['name'],
+                                'size': attributes_dict.get('size'),
+                                'trumpable': attributes_dict.get('trumpable', False),
+                                'link': attributes_dict.get('details_link', None)
+                            }
+                        dupes.append(result)
+            except Exception as json_error:
+                console.print(f"[red]Failed to parse JSON: {json_error}")
 
-                            if not meta.is_disc:
-                                result = {
-                                    'name': attributes_dict['name'],
-                                    'size': attributes_dict.get('size'),
-                                    'files': file_names,
-                                    'file_count': len(files_list),
-                                    'trumpable': attributes_dict.get('trumpable', False),
-                                    'link': attributes_dict.get('details_link', None)
-                                }
-                            else:
-                                result = {
-                                    'name': attributes_dict['name'],
-                                    'size': attributes_dict.get('size'),
-                                    'trumpable': attributes_dict.get('trumpable', False),
-                                    'link': attributes_dict.get('details_link', None)
-                                }
-                            dupes.append(result)
-                except Exception as json_error:
-                    console.print(f"[red]Failed to parse JSON: {json_error}")
+        elif response.status_code == 403:
+            console.print(f"[red]Cloudflare protection blocked API access to {self.tracker}")
+        elif response.status_code == 429:
+            console.print(f"[yellow]Rate limited by {self.tracker}, waiting 60s...")
+            await asyncio.sleep(60)
+        else:
+            console.print(f"[yellow]Unexpected status code: {response.status_code}")
 
-            elif response.status_code == 403:
-                console.print(f"[red]Cloudflare protection blocked API access to {self.tracker}")
-            elif response.status_code == 429:
-                console.print(f"[yellow]Rate limited by {self.tracker}, waiting 60s...")
-                await asyncio.sleep(60)
-            else:
-                console.print(f"[yellow]Unexpected status code: {response.status_code}")
-
-        except Exception as e:
-            console.print(f"[red]Search error for {self.tracker}: {type(e).__name__}: {str(e)}")
 
         return dupes
 

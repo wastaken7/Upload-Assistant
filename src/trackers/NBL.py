@@ -154,10 +154,7 @@ class NBL:
             "api_key": self.api_key,
         }
 
-        try:
-            season_int = int(season) if season is not None else 0
-        except (TypeError, ValueError):
-            season_int = 0
+        season_int = int(season) if season is not None else 0
 
         if season_int > 0:
             params["season"] = season_int
@@ -173,83 +170,60 @@ class NBL:
         params['per_page'] = 100
 
         response: Optional[httpx.Response] = None
-        try:
-            max_pages = int(self.config['TRACKERS'][self.tracker].get('search_max_pages', 10))
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                for page in range(max_pages):
-                    page_params = dict(params)
-                    page_params["page"] = page
-                    search_url_with_query = f"{self.search_url}?{urlencode(page_params, doseq=True)}"
+        max_pages = int(self.config['TRACKERS'][self.tracker].get('search_max_pages', 10))
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for page in range(max_pages):
+                page_params = dict(params)
+                page_params["page"] = page
+                search_url_with_query = f"{self.search_url}?{urlencode(page_params, doseq=True)}"
 
-                    response = await client.get(search_url_with_query)
-                    if response.status_code != 200:
-                        if response.status_code == 400 and page > 0:
-                            try:
-                                error_data = cast(dict[str, Any], response.json())
-                            except json.JSONDecodeError:
-                                error_data = {}
-                            error = error_data.get('error', {})
-                            message = str(error.get('message', '')) if isinstance(error, dict) else ''
-                            if "out of range" in message.lower() and "valid pages" in message.lower():
-                                break
-                        console.print(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
-                        console.print(f"[bold red]NBL Search Response Content (page {page}): {response.text}")
-                        meta.skipping = "NBL"
-                        break
+                response = await client.get(search_url_with_query)
+                if response.status_code != 200:
+                    if response.status_code == 400 and page > 0:
+                        try:
+                            error_data = cast(dict[str, Any], response.json())
+                        except json.JSONDecodeError:
+                            error_data = {}
+                        error = error_data.get('error', {})
+                        message = str(error.get('message', '')) if isinstance(error, dict) else ''
+                        if "out of range" in message.lower() and "valid pages" in message.lower():
+                            break
+                    console.print(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
+                    console.print(f"[bold red]NBL Search Response Content (page {page}): {response.text}")
+                    meta.skipping = "NBL"
+                    break
 
-                    try:
-                        data = cast(dict[str, Any], response.json())
-                    except json.JSONDecodeError:
-                        console.print("[bold yellow]NBL response content is not valid JSON. Skipping this API call.")
-                        meta.skipping = "NBL"
-                        break
+                try:
+                    data = cast(dict[str, Any], response.json())
+                except json.JSONDecodeError:
+                    console.print("[bold yellow]NBL response content is not valid JSON. Skipping this API call.")
+                    meta.skipping = "NBL"
+                    break
 
-                    items_value = data.get('items')
-                    if not isinstance(items_value, list):
-                        result = cast(dict[str, Any], data.get('result', {}))
-                        items_value = result.get('items', [])
-                    items = cast(list[dict[str, Any]], items_value) if isinstance(items_value, list) else []
-                    if not items:
-                        break
+                items_value = data.get('items')
+                if not isinstance(items_value, list):
+                    result = cast(dict[str, Any], data.get('result', {}))
+                    items_value = result.get('items', [])
+                items = cast(list[dict[str, Any]], items_value) if isinstance(items_value, list) else []
+                if not items:
+                    break
 
-                    for each in items:
-                        tags_value = each.get('tags', [])
-                        tags = cast(list[Any], tags_value) if isinstance(tags_value, list) else []
-                        if meta.resolution in tags:
-                            file_list_value = each.get('file_list', [])
-                            file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
-                            files_str = ', '.join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
-                            result = {
-                                'name': str(each.get('rls_name', '')),
-                                'files': files_str,
-                                'size': int(each.get('size', 0)),
-                                'link': f"https://nebulance.io/torrents.php?id={each.get('group_id', '')}",
-                                'file_count': len(file_list) if file_list else 1,
-                                'download': str(each.get('download', '')),
-                            }
-                            dupes.append(result)
+                for each in items:
+                    tags_value = each.get('tags', [])
+                    tags = cast(list[Any], tags_value) if isinstance(tags_value, list) else []
+                    if meta.resolution in tags:
+                        file_list_value = each.get('file_list', [])
+                        file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
+                        files_str = ', '.join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
+                        result = {
+                            'name': str(each.get('rls_name', '')),
+                            'files': files_str,
+                            'size': int(each.get('size', 0)),
+                            'link': f"https://nebulance.io/torrents.php?id={each.get('group_id', '')}",
+                            'file_count': len(file_list) if file_list else 1,
+                            'download': str(each.get('download', '')),
+                        }
+                        dupes.append(result)
 
-        except httpx.TimeoutException:
-            console.print("[bold red]NBL request timed out after 10 seconds")
-            meta.skipping = "NBL"
-        except httpx.RequestError as e:
-            console.print(f"[bold red]NBL an error occurred while making the request: {e}")
-            meta.skipping = "NBL"
-        except KeyError as e:
-            console.print(f"[bold red]Unexpected KeyError: {e}")
-            if response is not None and 'result' not in response.json():
-                console.print("[red]NBL API returned an unexpected response. Please manually check for dupes.")
-                dupes.append({
-                    'name': "ERROR: PLEASE CHECK FOR EXISTING RELEASES MANUALLY",
-                    'files': '',
-                    'size': 0,
-                    'link': '',
-                    'file_count': 0,
-                    'download': ''
-                })
-        except Exception as e:
-            meta.skipping = "NBL"
-            console.print(f"[bold red]NBL unexpected error: {e}")
-            console.print_exception()
 
         return dupes

@@ -153,12 +153,18 @@ async def process_trackers(
                     waited = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
                     if waited:
                         console.print(f"[yellow]{tracker_name}: Redoing dupe check after bandwidth wait...[/yellow]")
-                        if tracker_name not in {"PTP"}:
-                            new_dupes = cast(list[Any], await t_class.search_existing(meta))
-                        else:
-                            ptp = PTP(config=config)
-                            groupID = meta.ptp_groupID
-                            new_dupes = cast(list[Any], await ptp.search_existing(groupID or "", meta))
+                        try:
+                            if tracker_name not in {"PTP"}:
+                                new_dupes = cast(list[Any], await t_class.search_existing(meta))
+                            else:
+                                ptp = PTP(config=config)
+                                groupID = meta.ptp_groupID
+                                new_dupes = cast(list[Any], await ptp.search_existing(groupID or "", meta))
+                        except Exception as e:
+                            console.print(f"[bold red]{tracker_name}: Error redoing duplicate check after bandwidth wait: {e}[/bold red]")
+                            status = meta.tracker_status.setdefault(tracker_name, {})
+                            status["status_message"] = f"Skipped: Error redoing dupe check after bandwidth wait: {e}"
+                            return False
 
                         initial_dupes = meta.initial_dupes.get(tracker_name, [])
 
@@ -368,7 +374,6 @@ async def process_trackers(
                         is_uploaded = await ptp.upload(meta, ptpUrl, ptpData)
                         upload_duration = time.time() - upload_start_time
                         meta[f'{tracker}_upload_duration'] = upload_duration
-                        await asyncio.sleep(5)
                     except Exception as e:
                         console.print(f"[red]Upload failed: {e}")
                         console.print(traceback.format_exc())

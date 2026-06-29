@@ -1817,6 +1817,7 @@ config = {
             "username": "",
             "password": "",
             "announce_url": "",
+            "inject_delay": 5,
         },
         "PTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

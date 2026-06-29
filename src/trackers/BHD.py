@@ -388,41 +388,33 @@ class BHD:
             data['rsskey'] = str(self.tracker_config.get('bhd_rss_key', '')).strip()
 
         url = f"https://beyond-hd.me/api/torrents/{str(self.tracker_config.get('api_key', '')).strip()}"
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.post(url, params=data)
-                if response.status_code == 200:
-                    response_data = cast(dict[str, Any], response.json())
-                    if response_data.get('status_code') == 1:
-                        results = cast(list[dict[str, Any]], response_data.get('results', []))
-                        for each in results:
-                            # Extract HDR flags from BHD data
-                            flags: list[str] = []
-                            if each.get('dv') == 1:
-                                flags.append('DV')
-                            if each.get('hdr10') == 1 or each.get('hdr10+') == 1:
-                                flags.append('HDR')
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(url, params=data)
+            if response.status_code == 200:
+                response_data = cast(dict[str, Any], response.json())
+                if response_data.get('status_code') == 1:
+                    results = cast(list[dict[str, Any]], response_data.get('results', []))
+                    for each in results:
+                        # Extract HDR flags from BHD data
+                        flags: list[str] = []
+                        if each.get('dv') == 1:
+                            flags.append('DV')
+                        if each.get('hdr10') == 1 or each.get('hdr10+') == 1:
+                            flags.append('HDR')
 
-                            result = {
-                                'name': each['name'],
-                                'link': each['url'],
-                                'size': each['size'],
-                                'flags': flags,
-                            }
-                            if rss_key:
-                                result['download'] = each.get('download_url', None)
-                            dupes.append(result)
-                    else:
-                        console.print(f"[bold red]BHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
+                        result = {
+                            'name': each['name'],
+                            'link': each['url'],
+                            'size': each['size'],
+                            'flags': flags,
+                        }
+                        if rss_key:
+                            result['download'] = each.get('download_url', None)
+                        dupes.append(result)
                 else:
-                    console.print(f"[bold red]BHD HTTP request failed. Status: {response.status_code}")
-        except httpx.TimeoutException:
-            console.print("[bold red]BHD request timed out after 5 seconds")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]BHD unable to search for existing torrents: {e}")
-        except Exception as e:
-            console.print(f"[bold red]BHD unexpected error: {e}")
-            await asyncio.sleep(5)
+                    console.print(f"[bold red]BHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
+            else:
+                console.print(f"[bold red]BHD HTTP request failed. Status: {response.status_code}")
 
         return dupes
 

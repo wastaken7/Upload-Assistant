@@ -203,26 +203,17 @@ class SN:
             else:
                 params["filter"] = meta.resolution
 
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(self.search_url, params=params)
-                if response.status_code == 200:
-                    data = cast(dict[str, Any], response.json())
-                    items = cast(list[dict[str, Any]], data.get('data', []))
-                    for item in items:
-                        result = item.get('name')
-                        if result:
-                            dupes.append(str(result))
-                else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(self.search_url, params=params)
+            if response.status_code == 200:
+                data = cast(dict[str, Any], response.json())
+                items = cast(list[dict[str, Any]], data.get('data', []))
+                for item in items:
+                    result = item.get('name')
+                    if result:
+                        dupes.append(str(result))
+            else:
+                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            console.print_exception()
-            await asyncio.sleep(5)
 
         return dupes

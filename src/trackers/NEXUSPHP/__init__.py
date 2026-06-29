@@ -103,55 +103,51 @@ class NEXUSPHP:
             else:
                 params["search"] = f"{search_name} {season_episode}"
 
-        try:
-            cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-            if cookies:
-                self.session.cookies.update(cookies)
+        cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookies:
+            self.session.cookies.update(cookies)
 
-            response = await self.session.get(base_url, params=params)
-            if "login.php" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = self.tracker
-                return []
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            table = soup.find("table", class_="torrents")
-            if not table:
-                return []
-
-            rows = table.find_all("tr")[1:]  # Skip header row
-            results = []
-            for row in rows:
-                name_link = row.find("table", class_="torrentname")
-                if not name_link:
-                    continue
-
-                a_tag = name_link.find("a", href=lambda x: bool(x and "details.php?id=" in x))
-                if a_tag:
-                    name_val = a_tag.get("title")
-                    name = " ".join(name_val) if isinstance(name_val, list) else name_val or a_tag.get_text(strip=True)
-
-                    href = a_tag.get("href")
-                    if isinstance(href, list):
-                        href = href[0]
-
-                    if isinstance(href, str):
-                        torrent_id = href.split("id=")[1].split("&")[0]
-                        link = f"{self.base_url}/details.php?id={torrent_id}"
-                        base_entry = {"name": name, "link": link}
-
-                        if meta.is_disc == "BDMV":
-                            bdinfo = await self.get_dupe_bdinfo(torrent_id)
-                            if bdinfo:
-                                base_entry["bd_info"] = bdinfo
-
-                        results.append(base_entry)
-
-            return results
-        except Exception as e:
-            console.print(f"[red]Error searching {self.tracker}: {e}[/red]", markup=True)
+        response = await self.session.get(base_url, params=params)
+        if "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = self.tracker
             return []
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        table = soup.find("table", class_="torrents")
+        if not table:
+            return []
+
+        rows = table.find_all("tr")[1:]  # Skip header row
+        results = []
+        for row in rows:
+            name_link = row.find("table", class_="torrentname")
+            if not name_link:
+                continue
+
+            a_tag = name_link.find("a", href=lambda x: bool(x and "details.php?id=" in x))
+            if a_tag:
+                name_val = a_tag.get("title")
+                name = " ".join(name_val) if isinstance(name_val, list) else name_val or a_tag.get_text(strip=True)
+
+                href = a_tag.get("href")
+                if isinstance(href, list):
+                    href = href[0]
+
+                if isinstance(href, str):
+                    torrent_id = href.split("id=")[1].split("&")[0]
+                    link = f"{self.base_url}/details.php?id={torrent_id}"
+                    base_entry = {"name": name, "link": link}
+
+                    if meta.is_disc == "BDMV":
+                        bdinfo = await self.get_dupe_bdinfo(torrent_id)
+                        if bdinfo:
+                            base_entry["bd_info"] = bdinfo
+
+                    results.append(base_entry)
+
+        return results
 
     async def get_dupe_bdinfo(self, torrent_id: str) -> str:
         try:

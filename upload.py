@@ -2384,8 +2384,7 @@ async def process_cross_seeds(meta: Meta) -> None:
                         meta.update(updated_meta)
 
             except Exception as e:
-                if meta.debug:
-                    console.print(f"[yellow]Error checking {tracker} for cross-seeds: {e}[/yellow]")
+                console.print(f"[yellow]Warning: Failed to check duplicates for cross-seed on {tracker}: {e}[/yellow]")
 
         # Run all dupe checks concurrently
         await asyncio.gather(*[check_tracker_for_dupes(tracker) for tracker in valid_unchecked_trackers], return_exceptions=True)

@@ -173,43 +173,40 @@ class IPT:
         if _type == "webdl":
             forbidden_keywords.extend(["webrip", "bluray", "blu-ray"])
 
-        try:
-            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-            if cookie_jar:
-                self.session.cookies = cookie_jar
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
 
-            response = await self.session.get(search_url, follow_redirects=True)
-            if "login" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = f"{self.tracker}"
-                return dupes
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            torrent_table = soup.find("table", id="torrents")
+        response = await self.session.get(search_url, follow_redirects=True)
+        if "login" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
+            return dupes
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        torrent_table = soup.find("table", id="torrents")
 
-            if torrent_table:
-                rows = torrent_table.find("tbody")
-                if rows:
-                    rows = rows.find_all("tr")
-                    for row in rows:
-                        cells = row.find_all("td")
+        if torrent_table:
+            rows = torrent_table.find("tbody")
+            if rows:
+                rows = rows.find_all("tr")
+                for row in rows:
+                    cells = row.find_all("td")
 
-                        if len(cells) > 5:
-                            name_cell = cells[1]
-                            link_tag = name_cell.find("a", class_="hv")
+                    if len(cells) > 5:
+                        name_cell = cells[1]
+                        link_tag = name_cell.find("a", class_="hv")
 
-                            if link_tag:
-                                name = link_tag.get_text(strip=True)
-                                torrent_path = link_tag.get("href")
-                                torrent_link = f"{self.base_url}{torrent_path}"
-                                size = cells[5].get_text(strip=True)
+                        if link_tag:
+                            name = link_tag.get_text(strip=True)
+                            torrent_path = link_tag.get("href")
+                            torrent_link = f"{self.base_url}{torrent_path}"
+                            size = cells[5].get_text(strip=True)
 
-                                if not any(keyword in name.lower() for keyword in forbidden_keywords):
-                                    duplicate_entry = {"name": name, "size": size, "link": torrent_link}
-                                    dupes.append(duplicate_entry)
+                            if not any(keyword in name.lower() for keyword in forbidden_keywords):
+                                duplicate_entry = {"name": name, "size": size, "link": torrent_link}
+                                dupes.append(duplicate_entry)
 
-        except Exception as e:
-            console.print(f"[bold red]Error searching for duplicates on {self.tracker}: {e}[/bold red]")
 
         return dupes
 

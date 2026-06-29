@@ -384,44 +384,37 @@ class MTEAM:
             "standards": [standard],
         }
 
-        try:
-            response = await self.session.post(api_url, json=payload, timeout=15)
-            res_json = response.json()
+        response = await self.session.post(api_url, json=payload, timeout=15)
+        res_json = response.json()
 
-            if res_json.get("code") != "0":
-                console.print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
-                return dupes
-
-            torrents = res_json.get("data", {}).get("data", [])
-
-            for torrent in torrents:
-                t_id = torrent.get("id")
-                if not t_id:
-                    continue
-
-                dupe_entry = {
-                    "name": torrent.get("name"),
-                    "size": int(torrent.get("size", 0)),
-                    "link": f"{self.base_url}/detail/{t_id}",
-                    "file_count": torrent.get("file_count", 0),
-                    "download": f"{self.api_base_url}/torrent/genDlToken?id={t_id}",
-                    "id": t_id,
-                }
-                if meta.is_disc == "BDMV":
-                    bdinfo = await self.get_dupe_bdinfo(t_id)
-                    if bdinfo:
-                        dupe_entry["bd_info"] = bdinfo
-
-                dupes.append(dupe_entry)
-
+        if res_json.get("code") != "0":
+            console.print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
             return dupes
 
-        except Exception as e:
-            console.print(f"[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]")
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                pass
-            else:
-                meta.skipping = f"{self.tracker}"
+        torrents = res_json.get("data", {}).get("data", [])
+
+        for torrent in torrents:
+            t_id = torrent.get("id")
+            if not t_id:
+                continue
+
+            dupe_entry = {
+                "name": torrent.get("name"),
+                "size": int(torrent.get("size", 0)),
+                "link": f"{self.base_url}/detail/{t_id}",
+                "file_count": torrent.get("file_count", 0),
+                "download": f"{self.api_base_url}/torrent/genDlToken?id={t_id}",
+                "id": t_id,
+            }
+            if meta.is_disc == "BDMV":
+                bdinfo = await self.get_dupe_bdinfo(t_id)
+                if bdinfo:
+                    dupe_entry["bd_info"] = bdinfo
+
+            dupes.append(dupe_entry)
+
+        return dupes
+
 
         return dupes
 

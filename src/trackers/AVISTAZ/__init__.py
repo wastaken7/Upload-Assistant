@@ -265,71 +265,67 @@ class AZTrackerBase:
         while page_url and page_url not in visited_urls:
             visited_urls.add(page_url)
 
-            try:
-                response = await self.session.get(page_url)
-                response.raise_for_status()
+            response = await self.session.get(page_url)
+            response.raise_for_status()
 
-                soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-                torrent_table = soup.find('table', class_='table-bordered')
-                if not torrent_table:
-                    page_url = ""
+            torrent_table = soup.find('table', class_='table-bordered')
+            if not torrent_table:
+                page_url = ""
+                continue
+
+            tbody = torrent_table.find('tbody')
+            if not tbody:
+                page_url = ""
+                continue
+
+            torrent_rows = tbody.find_all('tr', recursive=False)
+
+            for row in torrent_rows:
+                badges = [b.get_text(strip=True) for b in row.find_all('span', class_='badge-extra')]
+
+                if rip_type and rip_type not in badges:
                     continue
 
-                tbody = torrent_table.find('tbody')
-                if not tbody:
-                    page_url = ""
-                    continue
+                name_tag = row.find('a', class_='torrent-filename')
+                name = name_tag.get_text(strip=True) if name_tag else ''
 
-                torrent_rows = tbody.find_all('tr', recursive=False)
+                href_value = name_tag.get('href') if name_tag else None
+                torrent_link = href_value if isinstance(href_value, str) else ''
+                if torrent_link:
+                    match = re.search(r'/(\d+)', torrent_link)
+                    if match:
+                        torrent_link = f'{self.torrent_url}{match.group(1)}'
 
-                for row in torrent_rows:
-                    badges = [b.get_text(strip=True) for b in row.find_all('span', class_='badge-extra')]
+                cells = row.find_all('td')
+                size = ''
+                if len(cells) > 4:
+                    size_span = cells[4].find('span')
+                    size = size_span.get_text(strip=True) if size_span else cells[4].get_text(strip=True)
 
-                    if rip_type and rip_type not in badges:
-                        continue
+                dupe_entry = {
+                    'name': name,
+                    'size': size,
+                    'link': torrent_link
+                }
 
-                    name_tag = row.find('a', class_='torrent-filename')
-                    name = name_tag.get_text(strip=True) if name_tag else ''
+                if meta.is_disc == "BDMV":
+                    bd_info = await self.get_dupe_bdinfo(torrent_link)
+                    if bd_info:
+                        dupe_entry.update({
+                            'bd_info': bd_info
+                        })
 
-                    href_value = name_tag.get('href') if name_tag else None
-                    torrent_link = href_value if isinstance(href_value, str) else ''
-                    if torrent_link:
-                        match = re.search(r'/(\d+)', torrent_link)
-                        if match:
-                            torrent_link = f'{self.torrent_url}{match.group(1)}'
+                duplicates.append(dupe_entry)
 
-                    cells = row.find_all('td')
-                    size = ''
-                    if len(cells) > 4:
-                        size_span = cells[4].find('span')
-                        size = size_span.get_text(strip=True) if size_span else cells[4].get_text(strip=True)
+            next_page_tag = soup.select_one("a[rel='next']")
+            if next_page_tag and 'href' in next_page_tag.attrs:
+                next_href = next_page_tag.get('href', '')
+                page_url = next_href if isinstance(next_href, str) else ""
+            else:
+                page_url = ""
 
-                    dupe_entry = {
-                        'name': name,
-                        'size': size,
-                        'link': torrent_link
-                    }
-
-                    if meta.is_disc == "BDMV":
-                        bd_info = await self.get_dupe_bdinfo(torrent_link)
-                        if bd_info:
-                            dupe_entry.update({
-                                'bd_info': bd_info
-                            })
-
-                    duplicates.append(dupe_entry)
-
-                next_page_tag = soup.select_one("a[rel='next']")
-                if next_page_tag and 'href' in next_page_tag.attrs:
-                    next_href = next_page_tag.get('href', '')
-                    page_url = next_href if isinstance(next_href, str) else ""
-                else:
-                    page_url = ""
-
-            except httpx.RequestError as e:
-                console.print(f'{self.tracker}: Failed to search for duplicates. {e.request.url}: {e}')
-                return duplicates
 
         return duplicates
 

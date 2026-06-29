@@ -243,32 +243,18 @@ class FL:
         else:
             params = {"search": meta.title, "cat": await self.get_category_id(meta), "searchin": "0"}
 
-        try:
-            async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
-                response = await client.get(search_url, params=params)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    find = soup.find_all('a', href=True)
-                    for each in find:
-                        href_attr = each.get('href')
-                        title_attr = each.get('title')
-                        if (
-                            isinstance(href_attr, str)
-                            and href_attr.startswith('details.php?id=')
-                            and '&' not in href_attr
-                            and isinstance(title_attr, str)
-                        ):
-                            dupes.append(title_attr)
-                else:
-                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
-                await asyncio.sleep(0.5)
-
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out while searching for existing torrents.")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]An error occurred while making the request: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
+        async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
+            response = await client.get(search_url, params=params)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, "html.parser")
+                find = soup.find_all("a", href=True)
+                for each in find:
+                    href_attr = each.get("href")
+                    title_attr = each.get("title")
+                    if isinstance(href_attr, str) and href_attr.startswith("details.php?id=") and "&" not in href_attr and isinstance(title_attr, str):
+                        dupes.append(title_attr)
+            else:
+                console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
             await asyncio.sleep(0.5)
 
         return dupes
@@ -331,16 +317,14 @@ class FL:
                 'password': self.password,
                 'unlock': '1',
             }
-            await client.post('https://filelist.io/takelogin.php', data=data)
-            await asyncio.sleep(0.5)
+            await client.post("https://filelist.io/takelogin.php", data=data)
             index = 'https://filelist.io/index.php'
             response = await client.get(index)
             if response.text.find("Logout") != -1:
                 console.print('[green]Successfully logged into FL')
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                console.print('[bold red]Something went wrong while trying to log into FL')
-                await asyncio.sleep(1)
+                console.print("[bold red]Something went wrong while trying to log into FL")
                 console.print(response.url)
         return
 

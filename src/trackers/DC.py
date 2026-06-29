@@ -128,38 +128,35 @@ class DC:
 
         search_results: list[Any] = []
         dupes: list[dict[str, Any]] = []
-        try:
-            response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
-            response.raise_for_status()
+        response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
+        response.raise_for_status()
 
-            if response.text and response.text != '[]':
-                json_data = response.json()
-                if isinstance(json_data, list):
-                    search_results = json_data
-                for each in search_results:
-                    if not isinstance(each, dict):
-                        continue
-                    each_dict = cast(dict[str, Any], each)
-                    if each_dict.get('category') == category_id:
-                        name = each_dict.get('name')
-                        torrent_id = each_dict.get('id')
-                        size = each_dict.get('size')
-                        torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
-                        numfiles = each_dict.get("numfiles", "")
-                        dupe_entry: dict[str, Any] = {
-                            "id": torrent_id,
-                            "download": f"{self.api_base_url}/download/{torrent_id}",
-                            "file_count": numfiles,
-                            "name": name,
-                            "size": size,
-                            "link": torrent_link,
-                        }
-                        dupes.append(dupe_entry)
+        if response.text and response.text != '[]':
+            json_data = response.json()
+            if isinstance(json_data, list):
+                search_results = json_data
+            for each in search_results:
+                if not isinstance(each, dict):
+                    continue
+                each_dict = cast(dict[str, Any], each)
+                if each_dict.get('category') == category_id:
+                    name = each_dict.get('name')
+                    torrent_id = each_dict.get('id')
+                    size = each_dict.get('size')
+                    torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
+                    numfiles = each_dict.get("numfiles", "")
+                    dupe_entry: dict[str, Any] = {
+                        "id": torrent_id,
+                        "download": f"{self.api_base_url}/download/{torrent_id}",
+                        "file_count": numfiles,
+                        "name": name,
+                        "size": size,
+                        "link": torrent_link,
+                    }
+                    dupes.append(dupe_entry)
 
-                return dupes
+            return dupes
 
-        except Exception as e:
-            console.print(f'[bold red]Error searching for IMDb ID {imdb_id} on {self.tracker}: {e}[/bold red]')
 
         return []
 

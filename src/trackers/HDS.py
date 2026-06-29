@@ -101,63 +101,59 @@ class HDS:
                 "pages": str(current_page),
             }
 
-            try:
-                response = await self.session.get(search_url, params=params)
-                if "Recover password" in response.text or "page=login" in str(response.url) or "page=login" in response.text:
-                    await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                    meta.skipping = f"{self.tracker}"
-                    return dupes
-                response.raise_for_status()
-                parts = response.text.split("Show/Hide Categories", 1)
-                if len(parts) < 2:
-                    console.print(f"[bold yellow]{self.tracker}: Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
-                    break
-                relevant_html = parts[1]
-                soup = BeautifulSoup(relevant_html, "html.parser")
-                rows = soup.select("tr:has(td.lista)")
-
-                if not rows:
-                    break
-
-                for row in rows:
-                    name_tag = row.select_one('a[href*="page=torrent-details"]')
-                    if not name_tag:
-                        continue
-                    name = name_tag.get_text(strip=True)
-
-                    if not name and name_tag.has_attr("title"):
-                        name = str(name_tag["title"])
-                    href_value = name_tag.get("href", "")
-                    link_path = str(href_value).lstrip("/")
-                    torrent_link = f"{self.base_url.rstrip('/')}/{link_path}"
-                    cells = row.find_all("td", class_="lista")
-                    size = None
-                    if len(cells) >= 5:
-                        for cell in cells:
-                            txt = cell.get_text(strip=True)
-                            if re.search(r"([0-9.]+)\s+(GB|MB|KB|B)", txt, re.I):
-                                size = txt
-                                break
-
-                    if name and torrent_link:
-                        dupes.append({"name": name, "size": size, "link": torrent_link})
-
-                next_page = soup.find("a", href=re.compile(r"pages="), text=re.compile(r"Next|>>", re.I))
-
-                if not next_page:
-                    next_page = soup.find("a", href=re.compile(rf"pages={current_page + 1}"))
-
-                if next_page:
-                    current_page += 1
-                    # Prevents infinite loop
-                    if current_page > 10:
-                        break
-                else:
-                    break
-
-            except Exception as e:
-                console.print(f"[bold red]Error searching for duplicates on page {current_page} of {self.tracker}: {e}[/bold red]")
+            response = await self.session.get(search_url, params=params)
+            if "Recover password" in response.text or "page=login" in str(response.url) or "page=login" in response.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+                meta.skipping = f"{self.tracker}"
+                return dupes
+            response.raise_for_status()
+            parts = response.text.split("Show/Hide Categories", 1)
+            if len(parts) < 2:
+                console.print(f"[bold yellow]{self.tracker}: Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
                 break
+            relevant_html = parts[1]
+            soup = BeautifulSoup(relevant_html, "html.parser")
+            rows = soup.select("tr:has(td.lista)")
+
+            if not rows:
+                break
+
+            for row in rows:
+                name_tag = row.select_one('a[href*="page=torrent-details"]')
+                if not name_tag:
+                    continue
+                name = name_tag.get_text(strip=True)
+
+                if not name and name_tag.has_attr("title"):
+                    name = str(name_tag["title"])
+                href_value = name_tag.get("href", "")
+                link_path = str(href_value).lstrip("/")
+                torrent_link = f"{self.base_url.rstrip('/')}/{link_path}"
+                cells = row.find_all("td", class_="lista")
+                size = None
+                if len(cells) >= 5:
+                    for cell in cells:
+                        txt = cell.get_text(strip=True)
+                        if re.search(r"([0-9.]+)\s+(GB|MB|KB|B)", txt, re.I):
+                            size = txt
+                            break
+
+                if name and torrent_link:
+                    dupes.append({"name": name, "size": size, "link": torrent_link})
+
+            next_page = soup.find("a", href=re.compile(r"pages="), text=re.compile(r"Next|>>", re.I))
+
+            if not next_page:
+                next_page = soup.find("a", href=re.compile(rf"pages={current_page + 1}"))
+
+            if next_page:
+                current_page += 1
+                # Prevents infinite loop
+                if current_page > 10:
+                    break
+            else:
+                break
+
 
         console.print(f"[bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
         return dupes

@@ -90,29 +90,26 @@ class PTS:
         params: dict[str, Any] = {"incldead": 1, "search": str(meta.imdb_info.get("imdbID", "")), "search_area": 4}
         found_items: list[str] = []
 
-        try:
-            response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
-            if "login.php" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = f"{self.tracker}"
-                return found_items
-            response.raise_for_status()
+        response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
+        if "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
+            return found_items
+        response.raise_for_status()
 
-            soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-            torrents_table = soup.find('table', class_='torrents')
+        torrents_table = soup.find('table', class_='torrents')
 
-            if torrents_table:
-                torrent_name_tables = torrents_table.find_all('table', class_='torrentname')
+        if torrents_table:
+            torrent_name_tables = torrents_table.find_all('table', class_='torrentname')
 
-                for torrent_table in torrent_name_tables:
-                    name_tag = torrent_table.find('b')
-                    if name_tag:
-                        torrent_name = name_tag.get_text(strip=True)
-                        found_items.append(torrent_name)
+            for torrent_table in torrent_name_tables:
+                name_tag = torrent_table.find('b')
+                if name_tag:
+                    torrent_name = name_tag.get_text(strip=True)
+                    found_items.append(torrent_name)
 
-        except Exception as e:
-            console.print(f"An error occurred while searching: {e}", markup=False)
 
         return found_items
 

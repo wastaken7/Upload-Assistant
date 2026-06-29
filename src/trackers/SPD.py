@@ -136,29 +136,25 @@ class SPD:
             search_title = meta.title.replace(":", "").replace("'", "").replace(",", "")
             params['search'] = search_title
 
-        try:
-            response = await self.session.get(url=search_url, params=params, headers=self.session.headers)
+        response = await self.session.get(url=search_url, params=params, headers=self.session.headers)
 
-            if response.status_code == 200:
-                data = cast(list[dict[str, Any]], response.json())
-                for each in data:
-                    name = each.get('name')
-                    size = each.get('size')
-                    link = f'{self.torrent_url}{each.get("id")}/'
+        if response.status_code == 200:
+            data = cast(list[dict[str, Any]], response.json())
+            for each in data:
+                name = each.get('name')
+                size = each.get('size')
+                link = f'{self.torrent_url}{each.get("id")}/'
 
-                    if name:
-                        results.append({
-                            'name': str(name),
-                            'size': size,
-                            'link': link
-                        })
-                return results
-            else:
-                console.print(f'[bold red]HTTP request failed. Status: {response.status_code}')
+                if name:
+                    results.append({
+                        'name': str(name),
+                        'size': size,
+                        'link': link
+                    })
+            return results
+        else:
+            console.print(f'[bold red]HTTP request failed. Status: {response.status_code}')
 
-        except Exception as e:
-            console.print(f'[bold red]Unexpected error: {e}')
-            console.print_exception()
 
         return results
 

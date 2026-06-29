@@ -685,135 +685,131 @@ class BT:
         is_tv_pack = meta.tv_pack
 
         search_url = f"{self.base_url}/torrents.php?searchstr={searchstr}"
-        try:
-            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-            if cookie_jar is None:
-                return []
-            self.session.cookies = cast(Any, cookie_jar)
-
-            response = await self.session.get(search_url)
-            if "login.php" in str(response.url) or "login.php" in response.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-                meta.skipping = f"{self.tracker}"
-                return dupes
-
-            # Extract auth token if present
-            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
-            if auth_match:
-                BT.secret_token = auth_match.group(1)
-            else:
-                console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-                meta.skipping = f"{self.tracker}"
-                return dupes
-
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            torrent_table = soup.find('table', id='torrent_table')
-            if not torrent_table:
-                return []
-
-            group_links: set[str] = set()
-            for group_row in torrent_table.find_all('tr'):
-                link = group_row.find('a', href=re.compile(r'torrents\.php\?id=\d+'))
-                href_value = link.get('href') if link else None
-                if isinstance(href_value, str) and 'torrentid' not in href_value:
-                    group_links.add(href_value)
-
-            if not group_links:
-                return []
-
-            for group_link in group_links:
-                group_url = f'{self.base_url}/{group_link}'
-                group_response = await self.session.get(group_url)
-                group_response.raise_for_status()
-                group_soup = BeautifulSoup(group_response.text, 'html.parser')
-
-                for torrent_row in group_soup.find_all('tr', id=re.compile(r'^torrent\d+$')):
-                    desc_link = torrent_row.find('a', onclick=re.compile(r'gtoggle'))
-                    if not desc_link:
-                        continue
-                    description_text = ' '.join(desc_link.get_text(strip=True).split())
-
-                    row_id = torrent_row.get('id')
-                    if not isinstance(row_id, str):
-                        continue
-                    torrent_id = row_id.replace('torrent', '')
-                    file_div = group_soup.find('div', id=f'files_{torrent_id}')
-                    if not file_div:
-                        continue
-
-                    # Parse all files
-                    files = []
-                    file_table = file_div.find("table", class_="filelist_table")
-                    if file_table:
-                        for r in file_table.find_all("tr"):
-                            class_attr = r.get("class")
-                            class_list = []
-                            if isinstance(class_attr, str):
-                                class_list = [class_attr]
-                            elif isinstance(class_attr, list):
-                                class_list = list(class_attr)
-                            if "colhead_dark" in class_list:
-                                continue
-                            cell = r.find("td")
-                            if cell:
-                                fn = cell.get_text(strip=True)
-                                if fn:
-                                    files.append(fn)
-
-                    # Determine name (folder or first filename)
-                    name = ""
-                    is_existing_torrent_a_disc = any(keyword in description_text.lower() for keyword in ['bd25', 'bd50', 'bd66', 'bd100', 'dvd5', 'dvd9', 'm2ts'])
-
-                    if is_existing_torrent_a_disc or is_tv_pack or is_game:
-                        path_div = file_div.find('div', class_='filelist_path')
-                        if path_div:
-                            folder_name = path_div.get_text(strip=True).strip('/')
-                            if folder_name:
-                                name = folder_name
-                    else:
-                        if files:
-                            name = files[0]
-
-                    if not name:
-                        name = description_text
-
-                    # Size
-                    tds = torrent_row.find_all("td")
-                    size = tds[1].get_text(strip=True) if len(tds) > 1 else ""
-
-                    link = f"{self.base_url}/torrents.php?torrentid={torrent_id}"
-                    download = f"{self.base_url}/torrents.php?action=download&id={torrent_id}"
-
-                    dupe_entry = {
-                        "name": name,
-                        "size": size,
-                        "link": link,
-                        "download": download,
-                        "id": torrent_id,
-                        "files": files,
-                    }
-
-                    if is_book:
-                        audio_exts = {".mp3", ".m4b", ".flac", ".m4a", ".wav", ".ogg", ".aac", ".ac3", ".wma", ".opus"}
-                        name_lower = name.lower()
-                        is_dupe_audiobook = "audiobook" in name_lower or "audio book" in name_lower or any(any(f.lower().endswith(ext) for ext in audio_exts) for f in files)
-                        if is_dupe_audiobook:
-                            dupe_entry["type"] = "audiobook"
-                        else:
-                            for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
-                                if fmt in name_lower:
-                                    dupe_entry["type"] = fmt
-                                    break
-                            else:
-                                dupe_entry["type"] = "ebook"
-
-                    dupes.append(dupe_entry)
-
-        except Exception as e:
-            console.print(f'[bold red]Ocorreu um erro inesperado ao processar a busca: {e}[/bold red]')
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar is None:
             return []
+        self.session.cookies = cast(Any, cookie_jar)
+
+        response = await self.session.get(search_url)
+        if "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
+            return dupes
+
+        # Extract auth token if present
+        auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
+        if auth_match:
+            BT.secret_token = auth_match.group(1)
+        else:
+            console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+            meta.skipping = f"{self.tracker}"
+            return dupes
+
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        torrent_table = soup.find('table', id='torrent_table')
+        if not torrent_table:
+            return []
+
+        group_links: set[str] = set()
+        for group_row in torrent_table.find_all('tr'):
+            link = group_row.find('a', href=re.compile(r'torrents\.php\?id=\d+'))
+            href_value = link.get('href') if link else None
+            if isinstance(href_value, str) and 'torrentid' not in href_value:
+                group_links.add(href_value)
+
+        if not group_links:
+            return []
+
+        for group_link in group_links:
+            group_url = f'{self.base_url}/{group_link}'
+            group_response = await self.session.get(group_url)
+            group_response.raise_for_status()
+            group_soup = BeautifulSoup(group_response.text, 'html.parser')
+
+            for torrent_row in group_soup.find_all('tr', id=re.compile(r'^torrent\d+$')):
+                desc_link = torrent_row.find('a', onclick=re.compile(r'gtoggle'))
+                if not desc_link:
+                    continue
+                description_text = ' '.join(desc_link.get_text(strip=True).split())
+
+                row_id = torrent_row.get('id')
+                if not isinstance(row_id, str):
+                    continue
+                torrent_id = row_id.replace('torrent', '')
+                file_div = group_soup.find('div', id=f'files_{torrent_id}')
+                if not file_div:
+                    continue
+
+                # Parse all files
+                files = []
+                file_table = file_div.find("table", class_="filelist_table")
+                if file_table:
+                    for r in file_table.find_all("tr"):
+                        class_attr = r.get("class")
+                        class_list = []
+                        if isinstance(class_attr, str):
+                            class_list = [class_attr]
+                        elif isinstance(class_attr, list):
+                            class_list = list(class_attr)
+                        if "colhead_dark" in class_list:
+                            continue
+                        cell = r.find("td")
+                        if cell:
+                            fn = cell.get_text(strip=True)
+                            if fn:
+                                files.append(fn)
+
+                # Determine name (folder or first filename)
+                name = ""
+                is_existing_torrent_a_disc = any(keyword in description_text.lower() for keyword in ['bd25', 'bd50', 'bd66', 'bd100', 'dvd5', 'dvd9', 'm2ts'])
+
+                if is_existing_torrent_a_disc or is_tv_pack or is_game:
+                    path_div = file_div.find('div', class_='filelist_path')
+                    if path_div:
+                        folder_name = path_div.get_text(strip=True).strip('/')
+                        if folder_name:
+                            name = folder_name
+                else:
+                    if files:
+                        name = files[0]
+
+                if not name:
+                    name = description_text
+
+                # Size
+                tds = torrent_row.find_all("td")
+                size = tds[1].get_text(strip=True) if len(tds) > 1 else ""
+
+                link = f"{self.base_url}/torrents.php?torrentid={torrent_id}"
+                download = f"{self.base_url}/torrents.php?action=download&id={torrent_id}"
+
+                dupe_entry = {
+                    "name": name,
+                    "size": size,
+                    "link": link,
+                    "download": download,
+                    "id": torrent_id,
+                    "files": files,
+                }
+
+                if is_book:
+                    audio_exts = {".mp3", ".m4b", ".flac", ".m4a", ".wav", ".ogg", ".aac", ".ac3", ".wma", ".opus"}
+                    name_lower = name.lower()
+                    is_dupe_audiobook = "audiobook" in name_lower or "audio book" in name_lower or any(any(f.lower().endswith(ext) for ext in audio_exts) for f in files)
+                    if is_dupe_audiobook:
+                        dupe_entry["type"] = "audiobook"
+                    else:
+                        for fmt in ["epub", "pdf", "mobi", "azw3", "cbr", "cbz"]:
+                            if fmt in name_lower:
+                                dupe_entry["type"] = fmt
+                                break
+                        else:
+                            dupe_entry["type"] = "ebook"
+
+                dupes.append(dupe_entry)
+
 
         return dupes
 

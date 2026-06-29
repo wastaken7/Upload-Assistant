@@ -714,51 +714,34 @@ class MTV:
         else:
             params["q"] = meta.title.replace(": ", " ").replace("’", "").replace("'", "")
 
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(url=self.search_url, params=params)
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url=self.search_url, params=params)
 
-                if response.status_code == 200 and response.text:
-                    # Parse XML response
-                    try:
-                        loop = asyncio.get_running_loop()
-                        response_xml = await loop.run_in_executor(None, ET.fromstring, response.text)
-                        channel = cast(Optional[Any], response_xml.find('channel'))
-                        if channel is None:
-                            return dupes
-                        for each in channel.findall('item'):
-                            title = str(each.findtext('title') or '')
-                            files_text = str(each.findtext('files') or '0')
-                            size_text = str(each.findtext('size') or '0')
-                            guid = str(each.findtext('guid') or '')
-                            link = str(each.findtext('link') or '')
-                            result = {
-                                'name': title,
-                                'files': title,
-                                'file_count': int(files_text),
-                                'size': int(size_text),
-                                'link': guid,
-                                'download': link
-                            }
-                            dupes.append(result)
-                    except ET.ParseError:
-                        console.print("[red]Failed to parse XML response from MTV API")
+            if response.status_code == 200 and response.text:
+                # Parse XML response
+                try:
+                    loop = asyncio.get_running_loop()
+                    response_xml = await loop.run_in_executor(None, ET.fromstring, response.text)
+                    channel = cast(Optional[Any], response_xml.find("channel"))
+                    if channel is None:
+                        return dupes
+                    for each in channel.findall("item"):
+                        title = str(each.findtext("title") or "")
+                        files_text = str(each.findtext("files") or "0")
+                        size_text = str(each.findtext("size") or "0")
+                        guid = str(each.findtext("guid") or "")
+                        link = str(each.findtext("link") or "")
+                        result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
+                        dupes.append(result)
+                except ET.ParseError:
+                    console.print("[red]Failed to parse XML response from MTV API")
+            else:
+                # Handle potential error messages
+                if response.status_code != 200:
+                    console.print(f"[red]HTTP request failed. Status: {response.status_code}")
+                elif "status_message" in response.json():
+                    console.print(f"[yellow]{response.json().get('status_message')}")
                 else:
-                    # Handle potential error messages
-                    if response.status_code != 200:
-                        console.print(f"[red]HTTP request failed. Status: {response.status_code}")
-                    elif 'status_message' in response.json():
-                        console.print(f"[yellow]{response.json().get('status_message')}")
-                        await asyncio.sleep(5)
-                    else:
-                        console.print("[red]Site Seems to be down or not responding to API")
-        except httpx.TimeoutException:
-            console.print("[red]Request timed out after 5 seconds")
-        except httpx.RequestError as e:
-            console.print(f"[red]Unable to search for existing torrents: {e}")
-        except Exception:
-            console.print("[red]Unable to search for existing torrents on site. Most likely the site is down.")
-            traceback.print_exc()
-            await asyncio.sleep(5)
+                    console.print("[red]Site Seems to be down or not responding to API")
 
         return dupes

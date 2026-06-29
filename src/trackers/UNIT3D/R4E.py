@@ -124,31 +124,23 @@ class R4E(UNIT3D):
             params["name"] = f"{meta.season}"
         if meta.edition != "":
             params["name"] = str(params["name"]) + meta.edition
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(url=url, params=params)
-                if response.status_code == 200:
-                    data = cast(dict[str, Any], response.json())
-                    items = cast(list[dict[str, Any]], data.get('data', []))
-                    for each in items:
-                        attributes = cast(dict[str, Any], each.get('attributes', {}))
-                        result_name = str(attributes.get('name', ''))
-                        dupes.append({
-                            'name': result_name,
-                            'files': result_name,
-                            'size': 0,
-                            'link': '',
-                            'file_count': 0,
-                            'download': ''
-                        })
-                else:
-                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
-        except httpx.TimeoutException:
-            console.print("[bold red]Request timed out after 5 seconds")
-        except httpx.RequestError as e:
-            console.print(f"[bold red]Unable to search for existing torrents: {e}")
-        except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
-            await asyncio.sleep(5)
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url=url, params=params)
+            if response.status_code == 200:
+                data = cast(dict[str, Any], response.json())
+                items = cast(list[dict[str, Any]], data.get('data', []))
+                for each in items:
+                    attributes = cast(dict[str, Any], each.get('attributes', {}))
+                    result_name = str(attributes.get('name', ''))
+                    dupes.append({
+                        'name': result_name,
+                        'files': result_name,
+                        'size': 0,
+                        'link': '',
+                        'file_count': 0,
+                        'download': ''
+                    })
+            else:
+                console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
 
         return dupes
