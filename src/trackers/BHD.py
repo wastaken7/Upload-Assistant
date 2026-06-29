@@ -325,7 +325,7 @@ class BHD:
             await desc.close()
             return None
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         bhd_name = await self.edit_name(meta)
         if any(phrase in bhd_name.lower() for phrase in (
             "-framestor", "-bhdstudio", "-bmf", "-decibel", "-d-zone", "-hifi",
@@ -337,21 +337,17 @@ class BHD:
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta.skipping = "BHD"
-                    return []
+                    return False
             else:
-                meta.skipping = "BHD"
-                return []
+                return False
 
         if not meta.valid_mi_settings:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
-            meta.skipping = "BHD"
-            return []
+            return False
 
         if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and meta.container not in ["mkv", "mp4"]:
             console.print(f"[bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
-            meta.skipping = "BHD"
-            return []
+            return False
 
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -359,17 +355,17 @@ class BHD:
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta.skipping = "BHD"
-                    return []
+                    return False
             else:
-                meta.skipping = "BHD"
-                return []
+                return False
 
         common = COMMON(config=self.config)
         if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            meta.skipping = "BHD"
-            return []
+            return False
 
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         category = meta.category
         tmdbID = "movie" if category == 'MOVIE' else "tv"

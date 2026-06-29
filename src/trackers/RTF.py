@@ -185,24 +185,10 @@ class RTF:
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        """Search for existing torrents on RetroFlix tracker.
-
-        Validates content eligibility (age requirements, no adult content) and searches
-        for duplicate torrents using IMDB ID or title.
-
-        Args:
-            meta: Metadata dictionary containing torrent information.
-            disctype: Type of disc (e.g., 'BD', 'DVD').
-
-        Returns:
-            List of dictionaries containing information about existing torrents (dupes).
-            Returns empty list if content is ineligible or search fails.
-        """
+    async def get_additional_checks(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            meta.skipping = "RTF"
-            return []
+            return False
 
         year_value = meta.year
         year = int(year_value) if year_value and year_value.isdigit() else None
@@ -260,8 +246,7 @@ class RTF:
                 if release_date > ten_years_ago:
                     if not meta.unattended:
                         console.print("[red]Content must be older than 10 Years to upload at RTF")
-                    meta.skipping = "RTF"
-                    return []
+                    return False
             except (ValueError, AttributeError):
                 # If date parsing fails, fall back to year comparison
                 release_year = meta.release_date.split("-")[0]
@@ -270,8 +255,7 @@ class RTF:
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
                             console.print("[red]Content must be older than 10 Years to upload at RTF")
-                        meta.skipping = "RTF"
-                        return []
+                        return False
 
         elif meta.category == "TV" and most_recent_aired_date:
             # For TV shows, use the most recent aired date for comparison if available
@@ -279,16 +263,27 @@ class RTF:
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
-                meta.skipping = "RTF"
-                return []
+                return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
                     console.print("[red]Content must be older than 10 Years to upload at RTF")
-                meta.skipping = "RTF"
-                return []
+                return False
+        return True
 
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+        """Search for existing torrents on RetroFlix tracker.
+
+        Searches for duplicate torrents using IMDB ID or title.
+
+        Args:
+            meta: Metadata dictionary containing torrent information.
+
+        Returns:
+            List of dictionaries containing information about existing torrents (dupes).
+            Returns empty list if search fails.
+        """
         dupes: list[dict[str, Any]] = []
         headers = {
             'accept': 'application/json',

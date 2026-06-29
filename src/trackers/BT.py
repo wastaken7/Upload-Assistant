@@ -229,6 +229,15 @@ class BT:
                         "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
                     )
                     return False
+
+        is_book = meta.category == "BOOK"
+        is_game = meta.category == "GAME"
+        if not is_book and not is_game:
+            imdb_info: dict[str, Any] = meta.imdb_info
+            if not imdb_info.get("imdbID") and not meta.anime:
+                console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
+                return False
+
         return True
 
     async def get_type(self, meta: Meta) -> Optional[str]:
@@ -671,17 +680,7 @@ class BT:
             searchstr = meta.title
         else:
             imdb_info: dict[str, Any] = meta.imdb_info
-            if not imdb_info.get("imdbID") and not meta.anime:
-                console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
-                meta.skipping = f"{self.tracker}"
-                return dupes
             searchstr = meta.title if meta.anime else imdb_info.get("imdbID")
-
-        if is_game:
-            should_continue = await self.get_additional_checks(meta)
-            if not should_continue:
-                meta.skipping = f"{self.tracker}"
-                return dupes
 
         is_tv_pack = meta.tv_pack
 

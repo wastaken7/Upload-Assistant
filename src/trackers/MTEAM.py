@@ -367,11 +367,6 @@ class MTEAM:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
-        should_continue = await self.get_additional_checks(meta)
-        if not should_continue:
-            meta.skipping = f"{self.tracker}"
-            return dupes
-
         imdb_id = meta.imdb_info.get("imdbID")
         category = self.get_category_id(meta)
         standard = self.get_standard(meta)

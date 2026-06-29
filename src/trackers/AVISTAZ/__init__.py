@@ -213,30 +213,24 @@ class AZTrackerBase:
             )
         return False
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
-        duplicates: list[dict[str, str]] = []
-
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if self.config['TRACKERS'][self.tracker].get('check_for_rules', True):
             warnings = self.rules(meta)
             if warnings:
                 console.print(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if not cli_ui.ask_yes_no('Do you want to continue anyway?', default=False):
-                        meta.skipping = f"{self.tracker}"
-                        return duplicates
+                        return False
                 else:
-                    meta.skipping = f"{self.tracker}"
-                    return duplicates
+                    return False
 
         if meta.type not in ["WEBDL"] and self.tracker == "PHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
                 if not cli_ui.ask_yes_no('Do you want to upload anyway?', default=False):
-                    meta.skipping = f"{self.tracker}"
-                    return duplicates
+                    return False
             else:
-                meta.skipping = f"{self.tracker}"
-                return duplicates
+                return False
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
@@ -244,8 +238,16 @@ class AZTrackerBase:
 
         if not await self.get_media_code(meta):
             console.print(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
-            meta.skipping = f"{self.tracker}"
-            return duplicates
+            return False
+
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
+        duplicates: list[dict[str, str]] = []
+
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
 
         if meta.resolution == "2160p":
             resolution = 'UHD'

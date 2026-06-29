@@ -2347,9 +2347,27 @@ async def process_cross_seeds(meta: Meta) -> None:
 
                 # Search for existing torrents
                 if tracker != "PTP":
+                    if hasattr(tracker_class, 'get_additional_checks'):
+                        import inspect
+                        if inspect.iscoroutinefunction(tracker_class.get_additional_checks):
+                            should_continue = await tracker_class.get_additional_checks(meta)
+                        else:
+                            should_continue = tracker_class.get_additional_checks(meta)
+                        if not should_continue:
+                            meta.skipping = tracker
+                            return
                     dupes = await tracker_class.search_existing(meta)
                 else:
                     ptp = PTP(config=config)
+                    if hasattr(ptp, 'get_additional_checks'):
+                        import inspect
+                        if inspect.iscoroutinefunction(ptp.get_additional_checks):
+                            should_continue = await ptp.get_additional_checks(meta)
+                        else:
+                            should_continue = ptp.get_additional_checks(meta)
+                        if not should_continue:
+                            meta.skipping = tracker
+                            return
                     group_id = meta.ptp_groupID
                     if not group_id and meta.imdb:
                         group_id = await ptp.get_group_by_imdb(meta.imdb)

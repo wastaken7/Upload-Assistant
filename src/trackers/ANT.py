@@ -351,24 +351,28 @@ class ANT:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        dupes: list[dict[str, Any]] = []
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "TV":
             if not meta.unattended:
                 console.print('[bold red]ANT only ALLOWS Movies.')
-            meta.skipping = "ANT"
-            return dupes
+            return False
 
         if meta.valid_mi is False:
             if not meta.unattended:
                 console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
-            meta.skipping = "ANT"
-            return dupes
+            return False
 
         api_key = self.tracker_config.get('api_key')
         if not api_key or not isinstance(api_key, str) or not api_key.strip():
             console.print(f"[bold red]{self.tracker} API key not configured or invalid.")
-            meta.skipping = "ANT"
+            return False
+
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+        dupes: list[dict[str, Any]] = []
+        api_key = self.tracker_config.get('api_key')
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
             return dupes
 
         params = {

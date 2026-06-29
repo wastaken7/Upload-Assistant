@@ -73,7 +73,7 @@ class PTS:
 
         return desc
 
-    async def search_existing(self, meta: Meta) -> Optional[list[str]]:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         mandarin = await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=['mandarin', 'chinese'], check_audio=True, check_subtitle=True
         )
@@ -82,9 +82,10 @@ class PTS:
             user_input = input("Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
             if user_input.lower() not in ['y', 'yes']:
                 console.print("Upload cancelled by user.", markup=False)
-                meta.skipping = f"{self.tracker}"
-                return
+                return False
+        return True
 
+    async def search_existing(self, meta: Meta) -> Optional[list[str]]:
         search_url = f"{self.base_url}/torrents.php"
         params: dict[str, Any] = {"incldead": 1, "search": str(meta.imdb_info.get("imdbID", "")), "search_area": 4}
         found_items: list[str] = []

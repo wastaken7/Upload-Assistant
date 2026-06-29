@@ -55,18 +55,17 @@ class SUIO:
         self.banned_groups: list[str] = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
-        if not await self.get_additional_checks():
-            console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
-            meta.skipping = f"{self.tracker}"
-            return []
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
-    async def get_additional_checks(self) -> bool:
+    async def get_additional_checks(self, meta: Meta = None) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         api_key = tracker_cfg.get("api_key", "").strip()
         username = tracker_cfg.get("username", "").strip()
-        return bool(api_key and username and self.upload_url and self.torrent_url)
+        if not (api_key and username and self.upload_url and self.torrent_url):
+            console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
+            return False
+        return True
 
     def get_category_id(self, meta: Meta) -> str:
         category = str(meta.category or "").upper()

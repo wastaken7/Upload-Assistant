@@ -67,11 +67,6 @@ class UNIT3D:
             meta.skipping = f"{self.tracker}"
             return dupes
 
-        should_continue = await self.get_additional_checks(meta)
-        if not should_continue:
-            meta.skipping = f"{self.tracker}"
-            return dupes
-
         headers = {
             "authorization": f"Bearer {self.api_key}",
             "accept": "application/json",

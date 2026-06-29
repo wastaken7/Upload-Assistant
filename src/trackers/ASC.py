@@ -826,18 +826,19 @@ class ASC:
 
         return final_description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
-        found_items: list[dict[str, str]] = []
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
             console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
-            meta.skipping = f"{self.tracker}"
-            return found_items
+            return False
 
         if meta.category not in ("BOOK", "GAME") and not meta.imdb_id and not meta.anime:
             console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
-            meta.skipping = f"{self.tracker}"
-            return found_items
+            return False
 
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
+        found_items: list[dict[str, str]] = []
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)

@@ -640,13 +640,9 @@ class BJS:
         title = meta.title
         if category == "BOOK" and meta.title:
             title = self.common.portuguese_title_capitalization(meta.title)
-        should_continue = await self.get_additional_checks(meta)
         search_url = f"{self.base_url}/torrents.php"
-        if not should_continue:
-            meta.skipping = f"{self.tracker}"
-            return dupes
 
-        elif category in ("TV", "MOVIE"):
+        if category in ("TV", "MOVIE"):
             if not dict(meta.imdb_info).get("imdbID"):
                 console.print(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
                 return dupes

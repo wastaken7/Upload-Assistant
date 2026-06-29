@@ -834,15 +834,16 @@ class TVC:
 
         return {}
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
-        dupes: list[dict[str, Any]] = []
-
+    async def get_additional_checks(self, meta: Meta) -> bool:
         # UHD, Discs, remux and non-1080p HEVC are not allowed on TVC.
         if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in meta.type) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
             console.print("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
-            meta.skipping = "TVC"
-            return []
+            return False
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+        # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
+        dupes: list[dict[str, Any]] = []
 
         console.print("[red]Cannot search for dupes on TVC at this time.[/red]")
         console.print("[red]Please make sure you are not uploading duplicates.")

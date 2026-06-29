@@ -234,10 +234,6 @@ class TL:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
-        should_continue = await self.get_additional_checks(meta)
-        if not should_continue:
-            meta.skipping = f"{self.tracker}"
-            return results
 
         login = await self.login(meta, force=True)
         if not login:

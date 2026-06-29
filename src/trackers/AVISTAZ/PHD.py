@@ -61,11 +61,9 @@ class PHD(AZTrackerBase):
         if meta.anime:
             warnings.append("Upload Anime content to our sister site AnimeTorrents.me instead. If it's on AniDB, it's an anime.")
 
-        year_value = meta.year
         current_year = datetime.now(UTC).year
-        year = int(year_value) if year_value and year_value.isdigit() else None
-        if year is not None:
-            is_older_than_50_years = (current_year - year) >= 50
+        if meta.year is not None:
+            is_older_than_50_years = (current_year - int(meta.year)) >= 50
             if is_older_than_50_years:
                 warnings.append('Upload movies/series 50+ years old to our sister site CinemaZ.to instead.')
 

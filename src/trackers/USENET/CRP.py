@@ -28,17 +28,16 @@ class CRP:
         self.banned_groups = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
-        if not await self.get_additional_checks():
-            console.print(f"{self.tracker}: [red]Skipping due to missing API Key.[/red]")
-            meta.skipping = f"{self.tracker}"
-            return []
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
-    async def get_additional_checks(self) -> bool:
+    async def get_additional_checks(self, meta: Meta = None) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         api_key = tracker_cfg.get("api_key", "").strip()
-        return api_key
+        if not api_key:
+            console.print(f"{self.tracker}: [red]Skipping due to missing API Key.[/red]")
+            return False
+        return True
 
     def get_category_id(self, meta: Meta) -> str:
         # Check if anime

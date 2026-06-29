@@ -633,18 +633,16 @@ class MTV:
             console.print(f"[dim red]{traceback.format_exc()}[/dim red]")
         return False
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content at {self.tracker}[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta.skipping = "MTV"
-                    return []
+                    return False
             else:
-                meta.skipping = "MTV"
-                return []
+                return False
 
         allowed_anime = ['Thighs', 'sam', 'Vanilla', 'OZR', 'Netaro', 'Datte13', 'UDF', 'Baws', 'ARC', 'Dae', 'MTBB',
                          'Okay-Subs', 'hchcsen', 'Noyr', 'TTGA', 'GJM', 'Kaleido-Subs', 'GJM-Kaleido', 'LostYears',
@@ -657,19 +655,16 @@ class MTV:
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
                     else:
-                        meta.skipping = "MTV"
-                        return []
+                        return False
             else:
                 console.print(f'[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]')
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
                     else:
-                        meta.skipping = "MTV"
-                        return []
+                        return False
                 else:
-                    meta.skipping = "MTV"
-                    return []
+                    return False
 
         disallowed_keywords = {'xxx', 'erotic', 'porn'}
         disallowed_genres = {'adult', 'erotica'}
@@ -693,12 +688,13 @@ class MTV:
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
-                    meta.skipping = "MTV"
-                    return []
+                    return False
             else:
-                meta.skipping = "MTV"
-                return []
+                return False
 
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
         # Build request parameters

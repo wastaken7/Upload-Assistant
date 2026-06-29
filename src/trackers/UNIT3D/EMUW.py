@@ -475,11 +475,6 @@ class EMUW(UNIT3D):
             meta.skipping = self.tracker
             return dupes
 
-        should_continue = await self.get_additional_checks(meta)
-        if not should_continue:
-            meta.skipping = self.tracker
-            return dupes
-
         # For TV use only the season token; for movies leave name empty
         name = ''
         if meta.category == "TV" and meta.season:

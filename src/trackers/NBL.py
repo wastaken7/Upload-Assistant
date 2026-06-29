@@ -109,7 +109,7 @@ class NBL:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: Upload failed: {e}"
             return False
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]] | bool:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -117,16 +117,13 @@ class NBL:
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
-                        meta.skipping = "NBL"
-                        return []
+                        return False
                 else:
-                    meta.skipping = "NBL"
-                    return []
+                    return False
             else:
                 if not meta.unattended:
                     console.print("[red]Only TV Is allowed at NBL")
-                meta.skipping = "NBL"
-                return []
+                return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True
@@ -140,9 +137,11 @@ class NBL:
         if meta.is_disc is not None:
             if not meta.unattended:
                 console.print('[bold red]NBL does not allow raw discs')
-            meta.skipping = "NBL"
-            return []
+            return False
 
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]] | bool:
         dupes: list[dict[str, Any]] = []
 
         season = meta.season_int

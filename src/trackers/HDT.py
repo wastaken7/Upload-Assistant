@@ -156,12 +156,13 @@ class HDT:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
-            meta.skipping = f"{self.tracker}"
-            return []
+            return False
+        return True
 
+    async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
         # Ensure we have valid credentials and auth_token before searching
         if not hasattr(self, 'auth_token') or not self.auth_token:
             credentials_valid = await self.validate_credentials(meta)

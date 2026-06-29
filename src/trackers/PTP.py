@@ -108,6 +108,37 @@ class PTP:
     def _is_true(self, value: Any) -> bool:
         return str(value).strip().lower() in {"true", "1", "yes"}
 
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.category != "MOVIE":
+            console.print(f"[red]{self.tracker}: Only movie uploads are permitted on PTP.[/red]")
+            return False
+
+        if meta.tag:
+            tag_clean = meta.tag.strip().lower()
+            banned_groups_lower = {g.lower() for g in self.banned_groups}
+            if tag_clean in banned_groups_lower:
+                console.print(f"[red]{self.tracker}: Release group {meta.tag} is banned. Skipping upload.[/red]")
+                return False
+
+        if not self.api_user or not self.api_key:
+            console.print(f"[red]{self.tracker}: API User or API Key is missing in config. Skipping upload.[/red]")
+            return False
+
+        if not self.username or not self.password:
+            console.print(f"[red]{self.tracker}: Username or Password is missing in config. Skipping upload.[/red]")
+            return False
+
+        if not self.announce_url:
+            console.print(f"[red]{self.tracker}: Announce URL is missing. Skipping upload.[/red]")
+            return False
+
+        passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
+        if not passkey_match:
+            console.print(f"[red]{self.tracker}: Failed to extract passkey from PTP announce URL. Skipping upload.[/red]")
+            return False
+
+        return True
+
     async def get_ptp_id_imdb(
         self,
         search_term: str,
@@ -128,7 +159,6 @@ class PTP:
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(url=url, headers=headers, params=params)
-            await asyncio.sleep(1)
 
             if response.status_code == 200:
                 data = response.json()

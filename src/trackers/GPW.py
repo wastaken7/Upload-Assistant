@@ -288,7 +288,7 @@ class GPW:
 
         return tags
 
-    def get_additional_checks(self, meta: Meta) -> bool:
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category != "MOVIE":
             console.print(f'{self.tracker}: Only feature films, short films, and live performances are permitted on {self.tracker}')
             return False
@@ -306,10 +306,6 @@ class GPW:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         dupes: list[dict[str, str]] = []
-
-        if not self.get_additional_checks(meta):
-            meta.skipping = "GPW"
-            return []
 
         group_id = await self.get_groupid(meta)
         if not group_id:

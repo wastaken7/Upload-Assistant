@@ -70,13 +70,14 @@ class HDS:
 
         return description
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
-        dupes: list[dict[str, str | None]] = []
-
+    async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
             console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
-            meta.skipping = f"{self.tracker}"
-            return dupes
+            return False
+        return True
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
+        dupes: list[dict[str, str | None]] = []
 
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
