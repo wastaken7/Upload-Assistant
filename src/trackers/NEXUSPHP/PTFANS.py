@@ -26,8 +26,8 @@ class PTFANS(NEXUSPHP):
         tv_shows = 405
 
         category = str(meta.category).upper()
-        genres = str(meta.genres).lower()
-        keywords = str(meta.keywords).lower()
+        genres = ", ".join(meta.genres).lower()
+        keywords = ", ".join(meta.keywords).lower()
 
         if "documentary" in genres or "documentary" in keywords:
             return documentaries

@@ -131,8 +131,8 @@ class IS:
     async def get_category_id(self, meta: Meta) -> int:
         resolution = meta.resolution
         category = str(meta.category)
-        genres = str(meta.genres).lower()
-        keywords = str(meta.keywords).lower()
+        genres = [g.lower() for g in meta.genres]
+        keywords = [k.lower() for k in meta.keywords]
         is_anime = meta.anime
         non_eng = False
         sd = bool(meta.sd)

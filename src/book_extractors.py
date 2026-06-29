@@ -207,7 +207,7 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
 
         if genre:
             genres_list = [g.strip() for g in genre.split(",") if g.strip()]
-            metadata["keywords"] = metadata["genres"] = ", ".join(genres_list)
+            metadata["keywords"] = metadata["genres"] = genres_list
 
     except Exception as e:
         if debug:

@@ -300,12 +300,9 @@ class BT:
             "visual novel": "Ficção",
         }
 
-        genres_str = meta.genres or meta.keywords
-        if not genres_str:
-            return ""
-
-        for genre in [g.strip() for g in str(genres_str).split(",") if g.strip()]:
-            genre_lower = genre.lower()
+        genres_list = meta.genres or meta.keywords or []
+        for genre in genres_list:
+            genre_lower = genre.strip().lower()
             for key, value in genre_map.items():
                 if key in genre_lower:
                     return value
@@ -544,14 +541,34 @@ class BT:
 
         return 'Outro'
 
-    async def get_title(self, meta: Meta) -> str:
-        title_value = self.main_tmdb_data.get('name') or self.main_tmdb_data.get('title') or ''
-        title = title_value if isinstance(title_value, str) else ''
-        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
+    async def get_name(self, meta: Meta) -> str:
+        """This is for the terminal display of the name only, not the actual upload name."""
+        original_title, brazilian_title = self.get_titles(meta)
+        if not brazilian_title:
+            return original_title
+        else:
+            return f"{brazilian_title} [{original_title}]"
 
-        if title and title != meta.title and (not original_name_title or title.lower() != original_name_title.lower()):
-            return title
-        return ""
+    def get_titles(self, meta: Meta) -> tuple[str, str]:
+        if meta.category == "BOOK":
+            return self.common.portuguese_title_capitalization(meta.title), ""
+
+        if meta.category == "GAME":
+            return meta.title, ""
+
+        if meta.category in ("TV", "MOVIE"):
+            original_title = meta.title
+            brazilian_title = ""
+
+            main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
+            original_name_title = main_tmdb_data.get("original_name") or main_tmdb_data.get("original_title")
+            tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
+            if tmdb_title and tmdb_title != meta.title and (not original_name_title or original_name_title != tmdb_title):
+                brazilian_title = tmdb_title
+
+            return original_title, brazilian_title
+
+        return "", ""
 
     async def get_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -612,9 +629,9 @@ class BT:
         tags = ''
 
         if meta.category in ("BOOK", "GAME"):
-            keywords_str = meta.keywords or meta.genres or ""
-            if keywords_str:
-                keyword_list = [k.strip() for k in keywords_str.split(",") if k.strip()]
+            keywords_list = meta.keywords or meta.genres or []
+            if keywords_list:
+                keyword_list = [k.strip() for k in keywords_list if k.strip()]
                 tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in keyword_list)
         else:
             genres = self.main_tmdb_data.get("genres")
@@ -918,12 +935,13 @@ class BT:
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         description = await self.get_description(meta)
         tags = await self.get_tags(meta)
+        original_title, brazilian_title = self.get_titles(meta)
 
         data: dict[str, Any] = {
             "submit": "true",
             "auth": BT.secret_token,
             "year": meta.year,
-            "title": meta.title,
+            "title": original_title,
             "type": await self.get_type(meta),
         }
 
@@ -978,7 +996,7 @@ class BT:
             magazine = meta.magazine
             comic = meta.comic
 
-            data["title"] = self.common.portuguese_title_capitalization(meta.title)
+            data["title"] = original_title
             data.update({
                 "idioma_ori": resolved_lang,
                 "format": resolved_format,
@@ -1062,7 +1080,7 @@ class BT:
                         "adulto": "0",
                         "imdb_input": meta.imdb_info.get("imdbID", ""),
                         "nota_imdb": str(meta.imdb_info.get("rating", "")),
-                        "title_br": await self.get_title(meta),
+                        "title_br": brazilian_title,
                     })
                 if meta.scene:
                     data["scene"] = "on"
@@ -1100,6 +1118,7 @@ class BT:
         if (
             self.config["TRACKERS"][self.tracker].get("internal", False) is True
             and meta.tag != ""
+            and meta.tag is not None
             and (meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", []))
         ):
             data.update({

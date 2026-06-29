@@ -439,8 +439,8 @@ async def gather_game_prep(
     # Genres
     genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
     if genres:
-        meta.genres = ", ".join(genres)
-        meta.keywords = ", ".join(genres)
+        meta.genres = genres
+        meta.keywords = genres
 
     # Platforms
     if not cli_overrides["platform"]:

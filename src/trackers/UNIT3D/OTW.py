@@ -57,8 +57,7 @@ class OTW(UNIT3D):
             else:
                 return False
 
-        keywords_value = meta.keywords
-        keywords = ', '.join(cast(list[str], keywords_value)) if isinstance(keywords_value, list) else str(keywords_value)
+        keywords = ', '.join(meta.keywords)
         combined_genres_text = ', '.join(combined_genres)
         genres = f"{keywords} {combined_genres_text}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']

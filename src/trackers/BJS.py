@@ -579,15 +579,12 @@ class BJS:
         """Map genres from meta.genres or TMDB to BJS Portuguese tags."""
         matched_tags: list[str] = []
 
-        # Try to get genres from meta.genres first (from IGDB/Steam for games, or other sources)
-        genres_str = meta.genres or meta.keywords
-        if genres_str:
-            genre_list = [g.strip() for g in str(genres_str).split(",") if g.strip()]
-            for genre in genre_list:
-                genre_lower = genre.lower()
-                mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
-                if mapped and mapped not in matched_tags:
-                    matched_tags.append(mapped)
+        genres_list = meta.genres or meta.keywords or []
+        for genre in genres_list:
+            genre_lower = genre.strip().lower()
+            mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
+            if mapped and mapped not in matched_tags:
+                matched_tags.append(mapped)
 
         if meta.category in ("TV", "MOVIE") and not matched_tags:
             genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
@@ -1516,7 +1513,8 @@ class BJS:
         adult_yes = "1"
         adult_no = "2"
 
-        genres = f"{meta.keywords} {meta.combined_genres}"
+        keywords_str = ", ".join(meta.keywords)
+        genres = f"{keywords_str} {meta.combined_genres}"
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
 
         if meta.anime and "hentai" in genres.lower():

@@ -128,7 +128,7 @@ class ANT:
             elif imdbType == "comedy":
                 antType = 3
         else:
-            keywords = meta.keywords.lower()
+            keywords = [k.lower() for k in meta.keywords]
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
                 antType = 0 if (meta.runtime if meta.runtime is not None else 60) >= 45 or (meta.runtime if meta.runtime is not None else 60) == 0 else 1

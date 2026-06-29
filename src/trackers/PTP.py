@@ -428,9 +428,16 @@ class PTP:
         ]
 
         check_against_list = check_against if isinstance(check_against, list) else [check_against]
-        normalized_check_against: list[str] = [
-            x.lower().replace(' ', '').replace('-', '') for x in check_against_list if isinstance(x, str)
-        ]
+        normalized_check_against: list[str] = []
+        for item in check_against_list:
+            if isinstance(item, list):
+                for x in item:
+                    if isinstance(x, str) and x.strip():
+                        normalized_check_against.append(x.lower().replace(' ', '').replace('-', ''))
+            elif isinstance(item, str) and item.strip():
+                for x in item.split(','):
+                    if x.strip():
+                        normalized_check_against.append(x.strip().lower().replace(' ', '').replace('-', ''))
         for each in ptp_tags:
             clean_tag = each.replace('.', '')
             if any(clean_tag in item for item in normalized_check_against):
@@ -588,7 +595,7 @@ class PTP:
             elif imdbType == "concert":
                 ptpType = "Live Performance"
         else:
-            keywords = meta.keywords.lower()
+            keywords = [k.lower() for k in meta.keywords]
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
                 try:

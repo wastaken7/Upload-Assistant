@@ -115,7 +115,7 @@ class OpenLibraryManager:
                     # Subjects / Keywords
                     subjects = data.get("subjects")
                     if subjects and isinstance(subjects, list):
-                        metadata["keywords"] = metadata["genres"] = ", ".join(subjects[:10])
+                        metadata["keywords"] = metadata["genres"] = [str(s) for s in subjects[:10] if s]
 
                     metadata["openlibrary"] = work_id
 

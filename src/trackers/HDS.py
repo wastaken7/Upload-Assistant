@@ -163,8 +163,8 @@ class HDS:
         category = str(meta.category)
         type_ = str(meta.type)
         is_disc = str(meta.is_disc)
-        genres = str(meta.genres).lower()
-        keywords = str(meta.keywords).lower()
+        genres = [g.lower() for g in meta.genres]
+        keywords = [k.lower() for k in meta.keywords]
         is_anime = meta.anime
 
         if is_disc == 'BDMV':

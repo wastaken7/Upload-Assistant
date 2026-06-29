@@ -717,7 +717,7 @@ class DescriptionBuilder:
         if meta.game_version:
             details_lines.append(f"[b]{str_version}[/b] {meta.game_version}")
         if meta.genres:
-            details_lines.append(f"[b]{str_genre}[/b] {meta.genres}")
+            details_lines.append(f"[b]{str_genre}[/b] {', '.join(meta.genres)}")
         if meta.developer:
             details_lines.append(f"[b]{str_developer}[/b] {meta.developer}")
         if meta.publisher:

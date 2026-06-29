@@ -153,10 +153,10 @@ class TmdbManager:
             filename=filename,
         )
 
-    async def get_keywords(self, tmdb_id: int, category: str) -> str:
+    async def get_keywords(self, tmdb_id: int, category: str) -> list[str]:
         return await get_keywords(tmdb_id=tmdb_id, category=category)
 
-    async def get_genres(self, response_data: Optional[dict[str, Any]]) -> dict[str, str]:
+    async def get_genres(self, response_data: Optional[dict[str, Any]]) -> dict[str, Any]:
         return await get_genres(response_data=response_data)
 
     async def get_directors(self, tmdb_id: int, category: str) -> list[str]:
@@ -1243,17 +1243,17 @@ async def tmdb_other_meta(
         # Process keywords
         if isinstance(keywords_data, Exception):
             console.print("[bold red]Failed to fetch keywords[/bold red]")
-            keywords = ""
+            keywords = []
         else:
             try:
                 kw_json = typing_cast(dict[str, Any], keywords_data.json())  # type: ignore
                 if category == "MOVIE":
-                    keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in kw_json.get('keywords', [])])
+                    keywords = [keyword['name'].replace(',', ' ') for keyword in kw_json.get('keywords', [])]
                 else:  # TV
-                    keywords = ', '.join([keyword['name'].replace(',', ' ') for keyword in kw_json.get('results', [])])
+                    keywords = [keyword['name'].replace(',', ' ') for keyword in kw_json.get('results', [])]
             except Exception:
                 console.print("[bold red]Failed to process keywords[/bold red]")
-                keywords = ""
+                keywords = []
 
         origin_country = list(media_data.get("origin_country", []))
 
@@ -1368,7 +1368,7 @@ async def tmdb_other_meta(
     return tmdb_metadata
 
 
-async def get_keywords(tmdb_id: int, category: str) -> str:
+async def get_keywords(tmdb_id: int, category: str) -> list[str]:
     """Get keywords for a movie or TV show using httpx"""
     endpoint = "movie" if category == "MOVIE" else "tv"
     url = f"{TMDB_BASE_URL}/{endpoint}/{tmdb_id}/keywords"
@@ -1381,20 +1381,20 @@ async def get_keywords(tmdb_id: int, category: str) -> str:
                 data = response.json()
             except Exception:
                 console.print(f"[bold red]Failed to fetch keywords: {response.status_code}[/bold red]")
-                return ""
+                return []
 
             if category == "MOVIE":
                 keywords = [keyword['name'].replace(',', ' ') for keyword in data.get('keywords', [])]
             else:  # TV
                 keywords = [keyword['name'].replace(',', ' ') for keyword in data.get('results', [])]
 
-            return ', '.join(keywords)
+            return keywords
         except Exception as e:
             console.print(f'[yellow]Failed to get keywords: {str(e)}')
-            return ''
+            return []
 
 
-async def get_genres(response_data: Optional[dict[str, Any]]) -> dict[str, str]:
+async def get_genres(response_data: Optional[dict[str, Any]]) -> dict[str, Any]:
     """Extract genres from TMDB response data"""
     if response_data is not None:
         tmdb_genres = response_data.get('genres', [])
@@ -1404,15 +1404,15 @@ async def get_genres(response_data: Optional[dict[str, Any]]) -> dict[str, str]:
             genre_names = [genre['name'].replace(',', ' ') for genre in tmdb_genres]
             genre_ids = [str(genre['id']) for genre in tmdb_genres]
 
-            # Create and return both strings
+            # Create and return both strings/lists
             return {
-                'genre_names': ', '.join(genre_names),
+                'genre_names': genre_names,
                 'genre_ids': ', '.join(genre_ids)
             }
 
     # Return empty values if no genres found
     return {
-        'genre_names': '',
+        'genre_names': [],
         'genre_ids': ''
     }
 

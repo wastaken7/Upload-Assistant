@@ -325,7 +325,7 @@ class UNIT3D:
         return {"sd": f"{meta.sd}"}
 
     async def get_keywords(self, meta: Meta) -> dict[str, str]:
-        return {"keywords": meta.keywords}
+        return {"keywords": ", ".join(meta.keywords)}
 
     async def get_personal_release(self, meta: Meta) -> dict[str, str]:
         personal_release = "1" if meta.personalrelease else "0"

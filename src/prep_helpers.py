@@ -637,7 +637,7 @@ async def process_trackers_and_torrent(
 
     # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
     if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
-        await client.get_pathed_torrents(meta.path, meta)
+        await client.get_pathed_torrents(str(meta.path), meta)
 
     # Try to extract metadata from matching client torrent or a local torrent file
     if (
@@ -649,7 +649,7 @@ async def process_trackers_and_torrent(
 
         # Check local files if not found in client
         if not reuse_torrent:
-            search_dir = meta.path if meta.isdir else os.path.dirname(meta.path)
+            search_dir = str(meta.path) if meta.isdir else os.path.dirname(str(meta.path))
             if search_dir and os.path.exists(search_dir):
                 torrent_files = [os.path.join(search_dir, f) for f in os.listdir(search_dir) if f.lower().endswith(".torrent")]
                 default_torrent_client = prep_instance.config["DEFAULT"].get("default_torrent_client")
@@ -1337,7 +1337,7 @@ async def finalize_metadata(
 
     mi_data: dict[str, Any] = mi or {}
     base_dir = meta.base_dir
-    folder_id = os.path.basename(meta.path)
+    folder_id = os.path.basename(str(meta.path))
 
     if meta.category in ("TV", "MOVIE"):
         meta.container = await video_manager.get_container(meta)
@@ -1425,12 +1425,12 @@ async def finalize_metadata(
             await prep_instance.parse_scene_nfo(meta)
 
         # Combine genres from TMDB and IMDb
-        tmdb_genres = str(meta.genres or "")
+        tmdb_genres = meta.genres or []
         imdb_genres = str(meta.imdb_info.get("genres") or "")
 
         all_genres: list[str] = []
         if tmdb_genres:
-            all_genres.extend([g.strip() for g in tmdb_genres.split(",") if g.strip()])
+            all_genres.extend([g.strip() for g in tmdb_genres if g.strip()])
         if imdb_genres:
             all_genres.extend([g.strip() for g in imdb_genres.split(",") if g.strip()])
 
@@ -1485,7 +1485,7 @@ async def finalize_metadata(
                 console.print(f"[green]Detected release group in personal_release_groups, automatically setting --personalrelease to True - {detected_group}[/green]")
 
     channels = meta.channels
-    if channels and meta.tag[1:].startswith(channels):
+    if channels and meta.tag is not None and meta.tag[1:].startswith(channels):
         meta.tag = meta.tag.replace(f"-{channels}", "")
 
     if meta.no_tag:
@@ -1535,7 +1535,7 @@ async def finalize_metadata(
         if not meta.overview:
             meta.overview = ""
         if not meta.genres:
-            meta.genres = ""
+            meta.genres = []
     elif meta.category == "GAME":
         meta.container = os.path.splitext(videopath)[1].lstrip(".").lower()
         meta.audio = ""
@@ -1565,7 +1565,7 @@ async def finalize_metadata(
         if not meta.overview:
             meta.overview = ""
         if not meta.genres:
-            meta.genres = ""
+            meta.genres = []
 
     # Fetch TMDB localized data if needed for active trackers
     if int(meta.tmdb_id or 0) != 0 and meta.category in ("TV", "MOVIE"):

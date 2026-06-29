@@ -61,7 +61,7 @@ class STC(UNIT3D):
                 console.print(f'[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]')
             return False
 
-        genres = f"{meta.keywords} {meta.combined_genres}"
+        genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):

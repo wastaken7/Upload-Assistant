@@ -360,12 +360,12 @@ class TVC:
         except OSError as e:
             console.print(f"[yellow]Warning: Failed to write description file: {e}[/yellow]")
 
-    async def get_cat_id(self, genres: str) -> str:
+    async def get_cat_id(self, genres: list[str]) -> str:
         """
         Determine TVC category ID based on genre list.
 
         Args:
-            genres (str): Comma-separated genre names (e.g. "Drama, Comedy").
+            genres (list[str]): List of genre names (e.g. ["Drama", "Comedy"]).
 
         Returns:
             str: Category ID string from tv_type_map. Defaults to "holding bin" if no match.
@@ -374,7 +374,7 @@ class TVC:
         # Uses tv_type_map dict for genre → category ID mapping
         if not genres:
             return self.tv_type_map["holding bin"]
-        for g in genres.split(', '):
+        for g in genres:
             g = g.lower().replace(",", "").strip()
             if g and g in self.tv_type_map:
                 return self.tv_type_map[g]
@@ -607,7 +607,7 @@ class TVC:
             "anonymous": anon,
             "stream": meta.stream,
             "sd": meta.sd,
-            "keywords": meta.keywords,
+            "keywords": ", ".join(meta.keywords),
             "personal_release": int(meta.personalrelease),
             "internal": 0,
             "featured": 0,

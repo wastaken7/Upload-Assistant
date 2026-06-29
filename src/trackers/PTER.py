@@ -108,10 +108,8 @@ class PTER:
 
         if category == 'TV':
             cat_id = '404'
-        genres_value = meta.genres
-        genres = ', '.join(cast(list[str], genres_value)) if isinstance(genres_value, list) else str(genres_value)
-        keywords_value = meta.keywords
-        keywords = ', '.join(cast(list[str], keywords_value)) if isinstance(keywords_value, list) else str(keywords_value)
+        genres = ', '.join(meta.genres)
+        keywords = ', '.join(meta.keywords)
         if 'documentary' in genres.lower() or 'documentary' in keywords.lower():
             cat_id = '402'
 

@@ -72,8 +72,7 @@ class ACM(UNIT3D):
         return f" [{subs[0][:3]} subs only]"
 
     async def get_keywords(self, meta: Meta) -> dict[str, str]:
-        raw_keywords = meta.keywords
-        keywords_list = [k.strip() for k in raw_keywords.split(",") if k.strip()]
+        keywords_list = [k.strip() for k in meta.keywords if k.strip()]
 
         return {"keywords": ", ".join(keywords_list[:10])}
 

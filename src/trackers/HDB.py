@@ -51,7 +51,7 @@ class HDB:
         if meta.category == "TV":
             cat_id = 2
         # 3 = Documentary
-        if "documentary" in meta.genres.lower() or "documentary" in meta.keywords.lower():
+        if "documentary" in [g.lower() for g in meta.genres] or "documentary" in [k.lower() for k in meta.keywords]:
             cat_id = 3
         imdb_info = meta.imdb_info
         imdb_type = imdb_info.get('type')

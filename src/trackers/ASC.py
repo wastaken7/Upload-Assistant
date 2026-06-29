@@ -707,14 +707,11 @@ class ASC:
             "platform": "1",
             "platformer": "1",
         }
-        genres_str = meta.genres or meta.keywords
-        if not genres_str:
-            return "0"
-
-        genre_list = [g.strip().lower() for g in str(genres_str).split(",") if g.strip()]
-        for genre in genre_list:
-            if genre in genre_map:
-                return genre_map[genre]
+        genres_list = meta.genres or meta.keywords or []
+        for genre in genres_list:
+            genre_clean = genre.strip().lower()
+            if genre_clean in genre_map:
+                return genre_map[genre_clean]
 
         return "0"
 

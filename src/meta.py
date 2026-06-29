@@ -160,7 +160,7 @@ class Meta:
     game_version: str = ""
     genre: str = ""
     genre_ids: Optional[int] = None
-    genres: str | list[str] = field(default_factory=list)
+    genres: list[str] = field(default_factory=list)
     hardcoded_subs: bool = False
     has_commentary: bool = False
     has_encode_settings: bool = False
@@ -198,7 +198,7 @@ class Meta:
     keep_folder: bool = False
     keep_images: bool = False
     keep_nfo: bool = False
-    keywords: list[str] | str = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
     language: str = ""
     language_checked: bool = False
     languages: dict[str, list[str]] | list[Any] = field(default_factory=list)

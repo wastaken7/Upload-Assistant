@@ -58,9 +58,9 @@ class LT(UNIT3D):
 
         category_id = cat_map.get(resolved_category, "0")
 
-        keywords = str(meta.keywords).lower()
+        keywords = [k.lower() for k in meta.keywords]
         overview = meta.overview.lower()
-        genres = str(meta.genres).lower()
+        genres = [g.lower() for g in meta.genres]
         soap_keywords = ['telenovela', 'novela', 'soap', 'culebrón', 'culebron']
         origin_countries_value = meta.origin_country
         origin_countries = cast(list[str], origin_countries_value) if isinstance(origin_countries_value, list) else []

@@ -149,8 +149,8 @@ class MS(UNIT3D):
                 return {"type_id": type_id[resolved_type]}
 
         # Fallbacks
-        genres = str(meta.genres or "").lower()
-        keywords = str(meta.keywords or "").lower()
+        genres = [g.lower() for g in meta.genres]
+        keywords = [k.lower() for k in meta.keywords]
 
         if "documentary" in genres or "documentary" in keywords:
             val = "13"

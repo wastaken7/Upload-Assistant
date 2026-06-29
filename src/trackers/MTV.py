@@ -668,12 +668,7 @@ class MTV:
 
         disallowed_keywords = {'xxx', 'erotic', 'porn'}
         disallowed_genres = {'adult', 'erotica'}
-        keywords_value = meta.keywords
-        keywords_list: list[str] = []
-        if isinstance(keywords_value, list):
-            keywords_list.extend([str(item) for item in keywords_value])
-        else:
-            keywords_list.append(str(keywords_value))
+        keywords_list = [str(item) for item in meta.keywords]
         genres_value = meta.combined_genres
         genres_list: list[str] = []
         if isinstance(genres_value, list):

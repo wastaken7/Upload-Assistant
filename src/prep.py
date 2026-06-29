@@ -142,7 +142,9 @@ class Prep:
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
         if meta.tmdb_adult_media:
             return True
-        searchable = ", ".join(part for part in (meta.keywords, meta.combined_genres) if part)
+        keywords_str = ", ".join(meta.keywords)
+        combined_genres_str = ", ".join(meta.combined_genres) if isinstance(meta.combined_genres, list) else str(meta.combined_genres)
+        searchable = ", ".join(part for part in (keywords_str, combined_genres_str) if part)
         return any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", searchable, re.IGNORECASE) for keyword in adult_keywords)
 
     async def get_cat(self, _video: str, meta: Meta) -> Optional[str]:

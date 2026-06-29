@@ -120,7 +120,7 @@ class SP(UNIT3D):
 
         disallowed_keywords = {'xxx', 'erotic', 'porn'}
         disallowed_genres = {'adult', 'erotica'}
-        keywords = [str(k) for k in cast(list[Any], meta.keywords)]
+        keywords = [k.strip() for k in meta.keywords if k.strip()]
         combined_genres_val = meta.combined_genres
         if isinstance(combined_genres_val, str):
             combined_genres = [g.strip() for g in combined_genres_val.split(",") if g.strip()]

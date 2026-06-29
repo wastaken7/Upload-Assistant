@@ -656,8 +656,8 @@ class AZTrackerBase:
         if not genres:
             return tags
 
-        # divides by commas, cleans spaces and normalizes to lowercase
-        phrases = [re.sub(r'\s+', ' ', x.strip().lower()) for x in re.split(r',+', genres) if x.strip()]
+        # cleans spaces and normalizes to lowercase
+        phrases = [re.sub(r'\s+', ' ', x.strip().lower()) for x in genres if x.strip()]
 
         words_to_search = set(phrases)
 

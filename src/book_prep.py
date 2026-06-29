@@ -354,15 +354,12 @@ async def gather_book_prep(
                         existing_keywords = meta.keywords
                         existing_list: list[str] = []
                         if existing_keywords:
-                            if isinstance(existing_keywords, list):
-                                for ek in existing_keywords:
-                                    existing_list.extend([x.strip().lower() for x in ek.split(",") if x.strip()])
-                            elif isinstance(existing_keywords, str):
-                                existing_list.extend([x.strip().lower() for x in existing_keywords.split(",") if x.strip()])
+                            # existing_keywords is guaranteed to be a list of strings
+                            existing_list.extend([x.strip().lower() for x in existing_keywords if x.strip()])
                         for cw in cleaned_words:
                             if cw not in existing_list:
                                 existing_list.append(cw)
-                        meta.keywords = ", ".join(existing_list)
+                        meta.keywords = existing_list
 
                 # 9. Language
                 if not meta.book_language:

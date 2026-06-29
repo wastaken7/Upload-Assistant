@@ -30,7 +30,7 @@ class LDU(UNIT3D):
         self.banned_groups = []
 
     async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        genres = f"{meta.keywords} {meta.combined_genres}"
+        genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
         sound_mixes_value = meta.imdb_info.get("sound_mixes", [])
         sound_mixes = cast(list[Any], sound_mixes_value) if isinstance(sound_mixes_value, list) else []
