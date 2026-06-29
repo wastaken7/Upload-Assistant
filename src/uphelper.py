@@ -188,8 +188,7 @@ class UploadHelper:
                     display_name = tracker_rename
 
             # Show naming change before dupe prompts so user knows what the final name will be
-            if display_name is not None and display_name != "" and display_name != meta.name:
-                console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
+            pass
 
             trumpable_text = None
             if meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", [])):
@@ -606,7 +605,46 @@ class UploadHelper:
                 if kf_confirm != 'y':
                     console.print("[bold red]Aborting...[/bold red]")
                     exit()
-            console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+            different_names = {}
+            for tracker_name in meta.trackers:
+                if tracker_name in ("MANUAL", "USENET"):
+                    continue
+                try:
+                    tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map.get(tracker_name))
+                    if not tracker_class_factory:
+                        continue
+                    tracker_class = tracker_class_factory(config=self.config)
+                    try:
+                        tracker_rename = await tracker_class.get_name(meta)
+                    except Exception:
+                        try:
+                            tracker_rename = await tracker_class.edit_name(meta)
+                        except Exception:
+                            tracker_rename = None
+
+                    display_name = None
+                    if tracker_rename is not None:
+                        if isinstance(tracker_rename, dict) and "name" in tracker_rename:
+                            tracker_rename_dict = cast(dict[str, Any], tracker_rename)
+                            display_name = str(tracker_rename_dict.get("name", ""))
+                        elif isinstance(tracker_rename, str):
+                            display_name = tracker_rename
+
+                    if display_name is not None and display_name != "" and display_name != meta.name:
+                        different_names[tracker_name] = display_name
+                except Exception:
+                    pass
+
+            if different_names:
+                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+                max_t_len = max(len(t) for t in different_names)
+                for t_name, d_name in different_names.items():
+                    prefix = f"{t_name}:".ljust(max_t_len + 1)
+                    console.print(f"{prefix} {d_name}", highlight=False)
+                console.print()
+            else:
+                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+
             confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == "y"
             console.print()
             if confirm:

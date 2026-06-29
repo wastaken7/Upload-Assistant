@@ -356,8 +356,7 @@ class TrackerStatusManager:
                     continue
 
                 console.print(f"\n[bold yellow]Tracker '{tracker_name}' passed all checks.")
-                if display_name is not None and display_name != "" and display_name != meta.name:
-                    console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
+                pass
 
                 try:
                     edit_choice = cli_ui.ask_string("Enter 'y' to upload, or press enter to skip uploading:")
