@@ -1,5 +1,38 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v1.9"
+
+"""
+Changelog for version v1.9 (2026-06-29):
+
+## What's Changed
+* **Features**:
+  * Added support and banned groups list for MidnightScene tracker.
+  * Added qBittorrent API authentication support.
+  * Added automated environment and dependency validation during startup.
+  * Added warning for slow qBittorrent search speeds.
+  * Added write/read torrent metadata support.
+  * Added screenshot support to CRP tracker.
+  * Added aligned tracker naming changes below Base Name in confirmation prompt.
+* **Refactoring & Improvements**:
+  * Parallelized tracker search and pre-checks.
+  * Refactored Meta class and improved type safety.
+  * Centralized duplicate check error handling and TMDB localization prep.
+  * Centralized and refactored genre and keyword handling to use lists instead of strings.
+  * Improved local upload cache checks in `search_existing` for USENET trackers.
+  * Improved console output formatting for tracker checks and upload prompts.
+  * Enhanced meta.tag handling and TMDB None-value checks.
+* **Fixes**:
+  * Fixed Qui Proxy support, .torrent resume, and endpoint priority.
+  * Resolved and suppressed CodeQL / code scanning alerts (including URL substring sanitization).
+  * Fixed signature sizes.
+  * Fixed `UnboundLocalError` for `is_tracker_comment`.
+* **Documentation**:
+  * Updated README and added local documentation copies / wiki pages.
+* **Dependencies**:
+  * Bumped various package dependencies (cryptography, urllib3, pillow, lxml, js-yaml, etc.).
+"""
+
 __version__ = "v1.8"
 
 """
