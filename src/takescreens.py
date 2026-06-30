@@ -216,7 +216,7 @@ async def disc_screenshots(
         meta.frame_info_map = {}
 
         # Create a mapping from time to frame info using preserved indices
-        for (orig_idx, _), info in zip(frame_info_tasks_with_idx, frame_info_results):
+        for (orig_idx, _), info in zip(frame_info_tasks_with_idx, frame_info_results, strict=False):
             meta.frame_info_map[ss_times[orig_idx]] = info
 
         if meta.debug:
@@ -1845,12 +1845,12 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             if use_libplacebo:
                 warm_up = default_config.get('ffmpeg_warmup', False)
                 if warm_up:
-                    meta._libplacebo_warmed = False
+                    meta.libplacebo_warmed = False
                 else:
-                    meta._libplacebo_warmed = True
-                if "_libplacebo_warmed" not in meta:
-                    meta._libplacebo_warmed = False
-                if hdr_tonemap and meta.libplacebo and not meta._libplacebo_warmed:
+                    meta.libplacebo_warmed = True
+                if not meta.libplacebo_warmed:
+                    meta.libplacebo_warmed = False
+                if hdr_tonemap and meta.libplacebo and not meta.libplacebo_warmed:
                     await libplacebo_warmup(path, meta, loglevel)
 
             threads_value = set_ffmpeg_threads()
@@ -2309,7 +2309,7 @@ async def check_libplacebo_compatibility(
 
 
 async def libplacebo_warmup(path: str, meta: Meta, loglevel: str) -> None:
-    if not meta.libplacebo or meta._libplacebo_warmed:
+    if not meta.libplacebo or meta.libplacebo_warmed:
         return
     if not os.path.exists(path):
         return
@@ -2328,7 +2328,7 @@ async def libplacebo_warmup(path: str, meta: Meta, loglevel: str) -> None:
             # Warmup failures are non-fatal; continue
             if loglevel == "verbose" or meta.debug:
                 console.print("[yellow]libplacebo warm-up failed or errored (continuing anyway)[/yellow]")
-        meta._libplacebo_warmed = True
+        meta.libplacebo_warmed = True
     except Exception as e:
         if loglevel == "verbose" or meta.debug:
             console.print(f"[yellow]libplacebo warm-up failed: {e} (continuing)[/yellow]")
