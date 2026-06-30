@@ -74,6 +74,8 @@ class Par2BinaryManager:
                 console.print("[blue]PAR2 binary is up to date[/blue]")
             return str(binary_path)
 
+        console.print("[yellow]Binary 'par2' not found. Attempting to download automatically...[/yellow]")
+
         # Cleanup old files
         if binary_path.exists():
             os.remove(binary_path)

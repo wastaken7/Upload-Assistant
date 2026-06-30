@@ -83,22 +83,18 @@ async def check_binary(binary_name: str, config_path: Optional[str] = None, meta
             if binary_name == "7z":
                 from bin.get_7z import SevenZipBinaryManager
 
-                console.print("[yellow]Binary '7z' not found. Attempting to download automatically...[/yellow]")
                 return await SevenZipBinaryManager.ensure_7z_binary(base_dir, debug)
             elif binary_name == "nyuu":
                 from bin.get_nyuu import NyuuBinaryManager
 
-                console.print("[yellow]Binary 'nyuu' not found. Attempting to download automatically...[/yellow]")
                 return await NyuuBinaryManager.ensure_nyuu_binary(base_dir, debug, path_7z=path_7z)
             elif binary_name == "par2":
                 from bin.get_par2 import Par2BinaryManager
 
-                console.print("[yellow]Binary 'par2' not found. Attempting to download automatically...[/yellow]")
                 return await Par2BinaryManager.ensure_par2_binary(base_dir, debug)
             elif binary_name == "pesto":
                 from bin.get_pesto import PestoBinaryManager
 
-                console.print("[yellow]Binary 'pesto' not found. Attempting to download automatically...[/yellow]")
                 return await PestoBinaryManager.ensure_pesto_binary(base_dir, debug)
         except Exception as e:
             if debug:

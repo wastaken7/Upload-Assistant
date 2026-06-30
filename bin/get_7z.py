@@ -75,6 +75,8 @@ class SevenZipBinaryManager:
                 console.print("[blue]7-Zip binary is up to date[/blue]")
             return str(binary_path)
 
+        console.print("[yellow]Binary '7z' not found. Attempting to download automatically...[/yellow]")
+
         # Cleanup old files
         if binary_path.exists():
             os.remove(binary_path)
