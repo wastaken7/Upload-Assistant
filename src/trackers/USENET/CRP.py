@@ -28,10 +28,16 @@ class CRP:
         self.banned_groups = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
+        release_name = await self.get_name(meta)
+        cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
+        if release_name and os.path.exists(cache_file):
+            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            return [release_name]
+
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
-    async def get_additional_checks(self, meta: Meta = None) -> bool:
+    async def get_additional_checks(self, _meta: Meta) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         api_key = tracker_cfg.get("api_key", "").strip()
         if not api_key:
@@ -300,6 +306,11 @@ class CRP:
 
             response_json = response.json()
             status_dict["status_message"] = "Upload successful"
+
+            cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+            os.makedirs(cache_dir, exist_ok=True)
+            async with aiofiles.open(os.path.join(cache_dir, f"{self.tracker}_upload_ok"), "w", encoding="utf-8") as cache_handle:
+                await cache_handle.write("ok")
 
             # Try to grab release ID from response
             release_id = response_json.get("public_id")

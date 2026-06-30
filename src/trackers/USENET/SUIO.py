@@ -55,10 +55,16 @@ class SUIO:
         self.banned_groups: list[str] = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
+        release_name = await self.get_name(meta)
+        cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
+        if release_name and os.path.exists(cache_file):
+            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            return [release_name]
+
         console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
-    async def get_additional_checks(self, meta: Meta = None) -> bool:
+    async def get_additional_checks(self, _meta: Meta) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         api_key = tracker_cfg.get("api_key", "").strip()
         username = tracker_cfg.get("username", "").strip()
@@ -390,6 +396,12 @@ class SUIO:
                 if username:
                     success_msg = re.sub(re.escape(username), "[redacted]", success_msg, flags=re.IGNORECASE)
             status_dict["status_message"] = success_msg
+
+            cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+            os.makedirs(cache_dir, exist_ok=True)
+            async with aiofiles.open(os.path.join(cache_dir, f"{self.tracker}_upload_ok"), "w", encoding="utf-8") as cache_handle:
+                await cache_handle.write("ok")
+
             # Parse NZB release/post ID from the response text or final URL if present
             try:
                 id_match = re.search(r"ID:\s*([a-zA-Z0-9]+)", response.text, re.IGNORECASE)

@@ -1,5 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
+import os
 from typing import Any
 
 import aiofiles
@@ -24,10 +25,14 @@ class DS:
         self.torrent_url = "https://drunkenslug.com/search/"
         self.banned_groups = []
 
-    async def search_existing(self, _meta: Meta) -> list[Any]:
-        console.print(
-            f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]"
-        )
+    async def search_existing(self, meta: Meta) -> list[Any]:
+        release_name = await self.get_name(meta)
+        cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
+        if release_name and os.path.exists(cache_file):
+            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            return [release_name]
+
+        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
     async def get_name(self, meta: Meta) -> str:
@@ -79,6 +84,12 @@ class DS:
                     clean_result = results[0].replace(f"{nzb_name}: ", "")
                     status_dict["status_message"] = clean_result
                     status_dict["torrent_id"] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
+
+                    cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+                    os.makedirs(cache_dir, exist_ok=True)
+                    async with aiofiles.open(os.path.join(cache_dir, f"{self.tracker}_upload_ok"), "w", encoding="utf-8") as cache_handle:
+                        await cache_handle.write("ok")
+
                     return True
                 except json.JSONDecodeError:
                     status_dict["status_message"] = "data error: Could not decode JSON response."
