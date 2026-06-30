@@ -39,7 +39,7 @@ class BLU(UNIT3D):
 
         if not meta.is_disc:
             container = meta.container.lower()
-            type_name = meta.type.upper()
+            type_name = "" if not meta.type else meta.type.upper()
             allowed = ['mkv']
             if type_name == 'HDTV':
                 allowed.append('ts')
@@ -171,7 +171,7 @@ class BLU(UNIT3D):
             return {'type_id': type_id.get(type, '0')}
         else:
             meta_type = meta.type
-            resolved_id = type_id.get(meta_type, '0')
+            resolved_id = type_id.get(meta_type or "", "0")
             return {'type_id': resolved_id}
 
     async def get_resolution_id(

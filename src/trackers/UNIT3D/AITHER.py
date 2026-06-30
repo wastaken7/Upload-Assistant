@@ -62,7 +62,7 @@ class AITHER(UNIT3D):
         resolution: str = meta.resolution
         video_codec: str = meta.video_codec
         video_encode: str = meta.video_encode
-        name_type: str = meta.type
+        name_type: str = meta.type or ""
         source: str = meta.source or ""
         alt_title = meta.aka if not meta.no_aka else ""
 
@@ -77,7 +77,7 @@ class AITHER(UNIT3D):
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = meta.audio_languages
+        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
             if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):

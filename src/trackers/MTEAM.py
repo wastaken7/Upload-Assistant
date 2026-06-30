@@ -346,10 +346,9 @@ class MTEAM:
             return False
 
         # LGBT Content
-        keywords: str = meta.keywords
-        combined_genres: str = meta.combined_genres
-        combined_text = f"{keywords}, {combined_genres}".lower()
-        combined_list = [item.strip() for item in combined_text.split(",") if item.strip()]
+        keywords_str = ", ".join(meta.keywords)
+        genres = f"{keywords_str} {meta.combined_genres}"
+        combined_list = [item.strip() for item in genres.split(",") if item.strip()]
         lgbt_keywords = ["lgbt", "queer", "lgbtq", "lgbtqia", "transgender", "trans", "gay", "lesbian", "bisexual", "pansexual", "non-binary", "homoerotic"]
         if any(kw in combined_list for kw in lgbt_keywords):
             console.print(

@@ -19,8 +19,8 @@ class DiscInfoManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self._parser = DiscParse(config)
 
-    async def get_disc(self, meta: Meta) -> tuple[Optional[str], str, Any, list[Disc]]:
-        is_disc: Optional[str] = None
+    async def get_disc(self, meta: Meta) -> tuple[str, str, Any, list[Disc]]:
+        is_disc: str = ""
         base_path = str(meta.path)
         videoloc = base_path
         bdinfo: Any = None

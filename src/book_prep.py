@@ -250,7 +250,7 @@ async def gather_book_prep(
                 meta.isdir,
                 meta.uuid,
                 base_dir,
-                is_dvd=meta.is_disc,
+                is_dvd=(meta.is_disc == "DVD"),
                 debug=meta.debug,
             )
             meta.mediainfo = mi

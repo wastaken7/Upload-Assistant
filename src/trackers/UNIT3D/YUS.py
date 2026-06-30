@@ -34,8 +34,6 @@ class YUS(UNIT3D):
             'YIFY', 'YOLAND', 'YTS', 'ZKBL', 'ZmN', 'ZMNT']
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
-
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
@@ -48,7 +46,7 @@ class YUS(UNIT3D):
             else:
                 return False
 
-        return should_continue
+        return True
 
     async def get_category_id(
         self,

@@ -2,7 +2,6 @@
 import re
 from typing import Any, Optional
 
-from src.console import console
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -11,7 +10,7 @@ Config = dict[str, Any]
 
 
 class RF(UNIT3D):
-    supported_categories = ("TV", "MOVIE")
+    supported_categories = ("MOVIE",)
     tracker_urls = ['https://reelflix.xyz', 'https://reelflix.cc']
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='RF')
@@ -27,14 +26,7 @@ class RF(UNIT3D):
         self.banned_groups = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            return False
-        if meta.category == "TV":
-            if not meta.unattended:
-                console.print('[bold red]RF only ALLOWS Movies.')
-            return False
-
-        return True
+        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         rf_name = meta.name

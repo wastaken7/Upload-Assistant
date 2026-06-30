@@ -232,7 +232,7 @@ class TVC:
             parts.append(f"[center]{overview}[/center]\n\n")
 
         # Broadcast info (optional)
-        if 'episode_airdate' in meta:
+        if meta.episode_airdate:
             channel = meta.networks if meta.networks is not None else "N/A"
             formatted_date = self.format_date_ddmmyyyy(meta.episode_airdate)
             parts.append(f"[center][b]Broadcast on:[/b] {channel} on {formatted_date}[/center]\n\n")
@@ -258,7 +258,7 @@ class TVC:
 
     def _get_movie_release_info(self, meta: Meta) -> str:
         """Extract movie release date information."""
-        if 'release_dates' not in meta:
+        if not meta.release_dates:
             return meta.release_date
 
         parts = []
@@ -445,7 +445,7 @@ class TVC:
             "SE": "SWE",
         }
 
-        if 'origin_country_code' in meta:
+        if meta.origin_country_code:
             for code in meta.origin_country_code:
                 if code in country_map:
                     name += f" [{country_map[code]}]"
@@ -541,7 +541,7 @@ class TVC:
         if meta.type == "ENCODE" and ("bluray" in str(meta.path).lower() or "brrip" in str(meta.path).lower() or "bdrip" in str(meta.path).lower()):
             type = "BRRip"
         else:
-            type = meta.type.replace("WEBDL", "WEB-DL")
+            type = str(meta.type).replace("WEBDL", "WEB-DL")
 
         if meta.category == "MOVIE":
             tvc_name = f"{meta.title} ({meta.year}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
@@ -559,7 +559,7 @@ class TVC:
                 season_year = season_first or year
                 tvc_name = f"{meta.title} - Series {meta.season_int} ({season_year}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
             else:
-                if 'episode_airdate' in meta:
+                if meta.episode_airdate:
                     formatted_date = self.format_date_ddmmyyyy(meta.episode_airdate)
                     tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} ({formatted_date}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
                 else:
@@ -841,7 +841,7 @@ class TVC:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         # UHD, Discs, remux and non-1080p HEVC are not allowed on TVC.
-        if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in meta.type) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
+        if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in str(meta.type)) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
             console.print("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
             return False
         return True

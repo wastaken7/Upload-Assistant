@@ -597,7 +597,7 @@ class UploadHelper:
             if ring_the_bell:
                 console.print(ring_the_bell)
 
-            if meta.is_disc is True:
+            if meta.is_disc:
                 meta.keep_folder = False
 
             if meta.keep_folder and meta.isdir:

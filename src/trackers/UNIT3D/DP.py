@@ -140,7 +140,7 @@ class DP(UNIT3D):
         elif reverse:
             return {v: k for k, v in type_id.items()}
 
-        meta_type = meta.type.upper()
+        meta_type = "" if not meta.type else meta.type.upper()
 
         # Book
         if meta.category == "BOOK":

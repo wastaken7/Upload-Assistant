@@ -106,7 +106,6 @@ class SP(UNIT3D):
         return {'name': name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
         resolution = meta.resolution
         if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i']:
             console.print(f'[bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]')
@@ -138,7 +137,7 @@ class SP(UNIT3D):
             else:
                 return False
 
-        return should_continue
+        return True
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {

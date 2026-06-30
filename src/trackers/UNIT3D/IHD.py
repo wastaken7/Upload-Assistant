@@ -167,17 +167,15 @@ class IHD(UNIT3D):
         return {'name': ihd_name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
-
         if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:
             if not meta.unattended or meta.debug:
                 console.print(f'[bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]')
-            should_continue = False
+            return False
 
         if not meta.valid_mi_settings:
             if not meta.unattended or meta.debug:
                 console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
-            should_continue = False
+            return False
 
         if meta.is_disc != "BDMV":
             if not meta.language_checked:
@@ -202,10 +200,7 @@ class IHD(UNIT3D):
             # Require at least one English audio/subtitle track or an original language audio track
             if not (original_language or has_eng_audio or has_eng_subs):
                 if not meta.unattended or meta.debug:
-                    console.print(f'[bold red]{self.tracker} requires at least one English audio or subtitle track or an original language audio track.')
-                should_continue = False
+                    console.print(f"[bold red]{self.tracker} requires at least one English audio or subtitle track or an original language audio track.")
+                return False
 
-        if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            return False
-
-        return should_continue
+        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

@@ -33,13 +33,11 @@ class TIK(UNIT3D):
         self.banned_groups = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
-
         if not meta.is_disc:
             console.print("[red]Only disc-based content allowed at TIK")
             return False
 
-        return should_continue
+        return True
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {

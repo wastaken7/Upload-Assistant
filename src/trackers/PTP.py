@@ -109,10 +109,6 @@ class PTP:
         return str(value).strip().lower() in {"true", "1", "yes"}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category != "MOVIE":
-            console.print(f"[red]{self.tracker}: Only movie uploads are permitted on PTP.[/red]")
-            return False
-
         if meta.tag:
             tag_clean = meta.tag.strip().lower()
             banned_groups_lower = {g.lower() for g in self.banned_groups}
@@ -433,11 +429,11 @@ class PTP:
             if isinstance(item, list):
                 for x in item:
                     if isinstance(x, str) and x.strip():
-                        normalized_check_against.append(x.lower().replace(' ', '').replace('-', ''))
+                        normalized_check_against.extend(x.lower().replace(" ", "").replace("-", ""))
             elif isinstance(item, str) and item.strip():
                 for x in item.split(','):
                     if x.strip():
-                        normalized_check_against.append(x.strip().lower().replace(' ', '').replace('-', ''))
+                        normalized_check_against.extend(x.strip().lower().replace(" ", "").replace("-", ""))
         for each in ptp_tags:
             clean_tag = each.replace('.', '')
             if any(clean_tag in item for item in normalized_check_against):
@@ -1222,7 +1218,7 @@ class PTP:
             if meta.comparison and "comparison_groups" in meta and meta.comparison_groups:
                 desc.write("\n")
 
-                comparison_groups = meta.comparison_groups
+                comparison_groups = meta.comparison_groups if isinstance(meta.comparison_groups, dict) else {}
                 group_keys = sorted(comparison_groups.keys(), key=lambda x: int(x))
                 comparison_names = [comparison_groups[key].get('name', f'Group {key}') for key in group_keys]
                 comparison_header = ', '.join(comparison_names)

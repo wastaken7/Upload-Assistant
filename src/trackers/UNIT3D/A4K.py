@@ -37,7 +37,7 @@ class A4K(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}.get(meta.type, "0")
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}.get(meta.type or "", "0")
         return {'type_id': type_id}
 
     async def get_resolution_id(
@@ -153,7 +153,7 @@ class A4K(UNIT3D):
         a4k_name: str = meta.name
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = meta.audio_languages
+        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
             if meta.is_disc != "BDMV":

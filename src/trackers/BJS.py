@@ -1510,6 +1510,9 @@ class BJS:
         adult_yes = "1"
         adult_no = "2"
 
+        if meta.adult_media:
+            return adult_yes
+
         keywords_str = ", ".join(meta.keywords)
         genres = f"{keywords_str} {meta.combined_genres}"
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]

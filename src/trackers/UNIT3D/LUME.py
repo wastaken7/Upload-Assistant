@@ -33,8 +33,6 @@ class LUME(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
-
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True
         ):
@@ -58,7 +56,4 @@ class LUME(UNIT3D):
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
-            return False
-
-        return should_continue
+        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

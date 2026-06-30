@@ -48,7 +48,7 @@ class CBR(UNIT3D):
         if meta.anime is True and resolved_category == "TV":
             resolved_category = "ANIMES"
 
-        if resolved_category == "BOOK" and (meta.type.upper() in ("CBR", "CBZ") or meta.manga or meta.comic):
+        if resolved_category == "BOOK" and (str(meta.type).upper() in ("CBR", "CBZ") or meta.manga or meta.comic):
             resolved_category = "COMIC_MANGA"
 
         if resolved_category:
@@ -109,7 +109,7 @@ class CBR(UNIT3D):
             else:
                 resolved_id = "46"
         else:
-            resolved_id = type_id.get(resolved_type, "0")
+            resolved_id = type_id.get(str(resolved_type), "0")
 
         return {"type_id": resolved_id}
 
@@ -196,7 +196,7 @@ class CBR(UNIT3D):
                 title = meta.title
                 cbr_name = cbr_name.replace(meta.aka, "").replace(title, aka_clean).strip()
 
-            tag_lower = meta.tag.lower()
+            tag_lower = "" if not meta.tag else meta.tag.lower()
             invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
             if not meta.is_disc:
@@ -233,7 +233,7 @@ class CBR(UNIT3D):
                         else:
                             cbr_name += audio_tag
 
-            if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
+            if not meta.tag or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
                 for invalid_tag in invalid_tags:
                     cbr_name = re.sub(f"-{invalid_tag}", "", cbr_name, flags=re.IGNORECASE)
                 cbr_name = f"{cbr_name}-NoGroup"

@@ -352,11 +352,6 @@ class ANT:
         return description
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category == "TV":
-            if not meta.unattended:
-                console.print('[bold red]ANT only ALLOWS Movies.')
-            return False
-
         if meta.valid_mi is False:
             if not meta.unattended:
                 console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
@@ -380,9 +375,9 @@ class ANT:
             'o': 'json'
         }
         if meta.tmdb:
-            params["tmdb"] = meta.tmdb
+            params["tmdb"] = str(meta.tmdb)
         elif meta.imdb_id is not None and meta.imdb_id != 0:
-            params["imdb"] = meta.imdb
+            params["imdb"] = str(meta.imdb)
 
         headers = {
             "X-API-Key": api_key.strip(),

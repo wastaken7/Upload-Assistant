@@ -34,7 +34,6 @@ class ULCX(UNIT3D):
         ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
         if "concert" in meta.keywords:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 console.print(f'[bold red]Concerts not allowed at {self.tracker}.[/bold red]')
@@ -93,7 +92,7 @@ class ULCX(UNIT3D):
                 f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        return should_continue
+        return True
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {

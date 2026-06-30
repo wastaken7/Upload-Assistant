@@ -124,7 +124,7 @@ class HHD(UNIT3D):
         if meta.category == "GAME":
             resolved_type = "CONSOLE" if meta.console_game else meta.platform.upper()
 
-        return {"type_id": type_id.get(resolved_type, "0")}
+        return {"type_id": type_id.get(str(resolved_type), "0")}
 
     async def get_resolution_id(
         self,

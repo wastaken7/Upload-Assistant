@@ -265,12 +265,8 @@ class GPW:
         return tags
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category != "MOVIE":
-            console.print(f'{self.tracker}: Only feature films, short films, and live performances are permitted on {self.tracker}')
-            return False
-
         media_type = str(meta.type).lower()
-        tag = meta.tag.strip().lower()
+        tag = "" if not meta.tag else meta.tag.strip().lower()
         if media_type == "remux" and tag in ("-hdt", "-frds"):
             console.print(f"{self.tracker}: Remuxes from {meta.tag} are not allowed on {self.tracker}")
             return False

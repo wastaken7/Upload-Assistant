@@ -56,94 +56,94 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
-| Site | Acronym |
-|------|----------|
-| Aither | AITHER |
-| Alpharatio | AR |
-| Amigos-Share | ASC |
-| Anthelion | ANT |
-| AsianCinema | ACM |
-| Aura4K | A4K |
-| AvistaZ | AZ |
-| Beyond-HD | BHD |
-| BitHDTV | BHDTV |
-| Blutopia | BLU |
-| BrasilJapão-Share | BJS |
-| BrasilTracker | BT |
-| CapybaraBR | CBR |
-| Cinematik | TIK |
-| CinemaZ | CZ |
-| DarkPeers | DP |
-| DesiTorrents | DT |
-| DigitalCore | DC |
-| Emuwarez | EMUW |
-| FileList | FL |
-| Friki | FRIKI |
-| FunFile | FF |
-| GreatPosterWall | GPW |
-| hawke-uno | HUNO |
-| HDBits | HDB |
-| HD-Space | HDS |
-| HD-Torrents | HDT |
-| HomieHelpDesk | HHD |
-| ImmortalSeed | IS |
-| InfinityHD | IHD |
-| ItaTorrents | ITT |
-| lajidui | LAJIDUI |
-| LastDigitalUnderground | LDU |
-| Lat-Team | LT |
-| Locadora | LCD |
-| LongPT | LPT |
-| LST | LST |
-| Luminarr | LUME |
-| MidnightScene | MS |
-| MoreThanTV | MTV |
-| M-Team | MTEAM |
-| Nebulance | NBL |
-| OldToonsWorld | OTW |
-| OnlyEncodes+ | OE |
-| PassThePopcorn | PTP |
-| PolishTorrent | PTT |
-| Portugas | PT |
-| PrivateHD | PHD |
-| PT GTK | PTGTK |
-| ptcafe | PTCAFE |
-| PTerClub | PTER |
-| PTFans | PTFANS |
-| PTSKIT | PTS |
-| Racing4Everyone | R4E |
-| RailgunPT | RPT |
-| Rastastugan | RAS |
-| ReelFLiX | RF |
-| RetroFlix | RTF |
-| Samaritano | SAM |
-| seedpool | SP |
-| ShareIsland | SHRI |
-| SkipTheCommerials | STC |
-| SpeedApp | SPD |
-| Swarmazon | SN |
-| The Leach Zone | TLZ |
-| TheOldSchool | TOS |
-| Torrenteros | TTR |
-| TorrentHR | THR |
-| TorrentLeech | TL |
-| ToTheGlory | TTG |
-| TVChaosUK | TVC |
-| ULCX | ULCX |
-| UTOPIA | UTP |
-| YOiNKED | YOINK |
-| YUSCENE | YUS |
-| Zenith | ZNTH |
+| Site | Acronym | Supported Categories |
+|------|---------| -------------------- |
+| Aither | AITHER | MOVIE, TV |
+| Alpharatio | AR | MOVIE, TV |
+| Amigos-Share | ASC | MOVIE, TV, BOOK, GAME |
+| Anthelion | ANT | MOVIE |
+| AsianCinema | ACM | MOVIE, TV |
+| Aura4K | A4K | MOVIE, TV |
+| AvistaZ | AZ | MOVIE, TV |
+| Beyond-HD | BHD | MOVIE, TV |
+| BitHDTV | BHDTV | MOVIE, TV |
+| Blutopia | BLU | MOVIE, TV |
+| BrasilJapão-Share | BJS | MOVIE, TV, BOOK, GAME |
+| BrasilTracker | BT | MOVIE, TV, BOOK, GAME |
+| CapybaraBR | CBR | MOVIE, TV, BOOK, GAME |
+| Cinematik | TIK | MOVIE, TV |
+| CinemaZ | CZ | MOVIE, TV |
+| DarkPeers | DP | MOVIE, TV, BOOK, GAME |
+| DesiTorrents | DT | MOVIE, TV |
+| DigitalCore | DC | MOVIE, TV, BOOK, GAME |
+| Emuwarez | EMUW | MOVIE, TV |
+| FileList | FL | MOVIE, TV |
+| Friki | FRIKI | MOVIE, TV |
+| FunFile | FF | MOVIE, TV |
+| GreatPosterWall | GPW | MOVIE |
+| hawke-uno | HUNO | MOVIE, TV |
+| HDBits | HDB | MOVIE, TV |
+| HD-Space | HDS | MOVIE, TV |
+| HD-Torrents | HDT | MOVIE, TV |
+| HomieHelpDesk | HHD | MOVIE, TV, BOOK, GAME |
+| ImmortalSeed | IS | MOVIE, TV, BOOK |
+| InfinityHD | IHD | MOVIE, TV |
+| ItaTorrents | ITT | MOVIE, TV |
+| lajidui | LAJIDUI | MOVIE, TV |
+| LastDigitalUnderground | LDU | MOVIE, TV, BOOK |
+| Lat-Team | LT | MOVIE, TV, BOOK |
+| Locadora | LCD | MOVIE, TV |
+| LongPT | LPT | MOVIE, TV |
+| LST | LST | MOVIE, TV, BOOK |
+| Luminarr | LUME | MOVIE, TV |
+| MidnightScene | MS | MOVIE, TV |
+| MoreThanTV | MTV | MOVIE, TV |
+| M-Team | MTEAM | MOVIE, TV |
+| Nebulance | NBL | TV |
+| OldToonsWorld | OTW | MOVIE, TV |
+| OnlyEncodes+ | OE | MOVIE, TV |
+| PassThePopcorn | PTP | MOVIE |
+| PolishTorrent | PTT | MOVIE, TV |
+| Portugas | PT | MOVIE, TV |
+| PrivateHD | PHD | MOVIE, TV |
+| PT GTK | PTGTK | MOVIE, TV |
+| ptcafe | PTCAFE | MOVIE, TV |
+| PTerClub | PTER | MOVIE, TV |
+| PTFans | PTFANS | MOVIE, TV |
+| PTSKIT | PTS | MOVIE, TV |
+| Racing4Everyone | R4E | MOVIE, TV |
+| RailgunPT | RPT | MOVIE, TV |
+| Rastastugan | RAS | MOVIE, TV, BOOK, GAME |
+| ReelFLiX | RF | MOVIE |
+| RetroFlix | RTF | MOVIE, TV |
+| Samaritano | SAM | MOVIE, TV, BOOK, GAME |
+| seedpool | SP | MOVIE, TV |
+| ShareIsland | SHRI | MOVIE, TV |
+| SkipTheCommerials | STC | MOVIE, TV |
+| SpeedApp | SPD | MOVIE, TV, BOOK, GAME |
+| Swarmazon | SN | MOVIE, TV |
+| The Leach Zone | TLZ | MOVIE, TV |
+| TheOldSchool | TOS | MOVIE, TV |
+| Torrenteros | TTR | MOVIE, TV |
+| TorrentHR | THR | MOVIE, TV |
+| TorrentLeech | TL | MOVIE, TV, BOOK, GAME |
+| ToTheGlory | TTG | MOVIE, TV |
+| TVChaosUK | TVC | MOVIE, TV |
+| ULCX | ULCX | MOVIE, TV |
+| UTOPIA | UTP | MOVIE, TV |
+| YOiNKED | YOINK | MOVIE, TV |
+| YUSCENE | YUS | MOVIE, TV, BOOK, GAME |
+| Zenith | ZNTH | MOVIE, TV, BOOK, GAME |
 
 </details>
 
 <details>
 <summary><strong>Click to view Supported Usenet Indexers</strong></summary>
 
-| Site | Acronym |
-|------|----------|
-| Curupira | CRP |
-| DrunkenSlug | DS |
+| Site | Acronym | Supported Categories |
+|------|---------| -------------------- |
+| Curupira | CRP | MOVIE, TV, BOOK, GAME |
+| DrunkenSlug | DS | MOVIE, TV, BOOK, GAME |
 
 </details>
 

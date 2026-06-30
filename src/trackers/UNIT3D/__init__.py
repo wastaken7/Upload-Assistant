@@ -6,7 +6,7 @@ import json
 import os
 import platform
 import re
-from typing import Any, Optional, TypeAlias, Union
+from typing import Any, Optional
 
 import aiofiles
 import httpx
@@ -17,8 +17,8 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
-QueryValue: TypeAlias = str | int | float | bool | None
-ParamsList: TypeAlias = list[tuple[str, QueryValue]]
+type QueryValue = str | int | float | bool | None
+type ParamsList = list[tuple[str, QueryValue]]
 
 
 class UNIT3D:
@@ -234,7 +234,7 @@ class UNIT3D:
             return {"type_id": type_id.get(type, "0")}
         else:
             meta_type = meta.type
-            resolved_id = type_id.get(meta_type, "0")
+            resolved_id = type_id.get(meta_type or "", "0")
             return {"type_id": resolved_id}
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
@@ -335,7 +335,7 @@ class UNIT3D:
 
     async def get_internal(self, meta: Meta) -> Any:
         internal = "0"
-        if self.tracker_config.get("internal", False) is True and meta.tag != "" and (meta.tag[1:] in self.tracker_config.get("internal_groups", [])):
+        if self.tracker_config.get("internal", False) is True and meta.tag and (meta.tag[1:] in self.tracker_config.get("internal_groups", [])):
             internal = "1"
 
         return {"internal": internal}
@@ -425,7 +425,7 @@ class UNIT3D:
         specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
         nfo_files = glob.glob(specified_dir_path)
         if not nfo_files and meta.keep_nfo and (meta.keep_folder or meta.isdir):
-            search_dir = os.path.dirname(meta.path)
+            search_dir = os.path.dirname(str(meta.path))
             nfo_files = glob.glob(os.path.join(search_dir, "*.nfo"))
 
         if nfo_files:

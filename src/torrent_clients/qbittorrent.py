@@ -589,7 +589,7 @@ class QbittorrentClientMixin:
         local_path: str,
         remote_path: str,
         client: dict[str, Any],
-        _is_disc: bool,
+        _is_disc: str,
         filelist: list[str],
         meta: Meta,
         tracker: str,

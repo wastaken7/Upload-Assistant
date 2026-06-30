@@ -26,13 +26,8 @@ class RAS(UNIT3D):
         self.banned_groups = ["YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY"]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
-
         nordic_languages = ["danish", "swedish", "norwegian", "icelandic", "finnish", "english"]
-        if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True):
-            return False
-
-        return should_continue
+        return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True)
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {

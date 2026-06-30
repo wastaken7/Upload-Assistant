@@ -432,7 +432,7 @@ async def update_metadata_from_tracker(
         if not bhd_api or not bhd_rss_key:
             console.print("[red]BHD API or RSS key not found. Please check your configuration.[/red]")
             return meta, False
-        use_foldername = meta.is_disc is not None or meta.keep_folder is True or meta.isdir is True
+        use_foldername = bool(meta.is_disc) or meta.keep_folder is True or meta.isdir is True
 
         if meta.bhd:
             imdb, tmdb = cast(

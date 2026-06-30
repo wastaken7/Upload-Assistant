@@ -191,7 +191,7 @@ class Meta:
     imghost: str = ""
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
-    is_disc: str | bool = False
+    is_disc: str = ""
     isbn: str = ""
     isdir: bool = False
     item_args: Optional[list[str]] = None
@@ -482,33 +482,9 @@ class Meta:
         # Override with data or kwargs
         if _data:
             for k, v in _data.items():
-                # Map legacy/invalid keys
-                if k in ('3D', '3d'):
-                    k = 'three_d'
-                elif k == 'is disc':
-                    k = 'is_disc'
                 setattr(self, k, v)
         for k, v in kwargs.items():
-            if k in ('3D', '3d'):
-                k = 'three_d'
-            elif k == 'is disc':
-                k = 'is_disc'
             setattr(self, k, v)
-
-    def __getattribute__(self, name: str) -> Any:
-        # Check if attribute has been mapped
-        if name in ('3D', '3d'):
-            name = 'three_d'
-        elif name == 'is disc':
-            name = 'is_disc'
-        return super().__getattribute__(name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if name in ('3D', '3d'):
-            name = 'three_d'
-        elif name == 'is disc':
-            name = 'is_disc'
-        super().__setattr__(name, value)
 
     def copy(self) -> Meta:
         """Ensure copy returns a Meta instance."""
@@ -527,7 +503,7 @@ class Meta:
         """Convert to a dictionary representing defined fields."""
         res = {}
         for f in fields(self):
-            val = self.__getattribute__(f.name)
+            val = getattr(self, f.name)
             if val is not None:
                 res[f.name] = val
         return res
@@ -544,7 +520,6 @@ class Meta:
         """Return dict-like values view."""
         return self.to_dict().values()
 
-
     def update(self, other: dict[str, Any] | Meta) -> None:
         """Update attributes from a dictionary or another Meta instance."""
         if isinstance(other, Meta):
@@ -553,40 +528,24 @@ class Meta:
                 setattr(self, f.name, val)
         else:
             for k, v in other.items():
-                if k in ('3D', '3d'):
-                    k = 'three_d'
-                elif k == 'is disc':
-                    k = 'is_disc'
                 setattr(self, k, v)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get attribute value by name, returning default if not set or None."""
-        if key in ("3D", "3d"):
-            key = "three_d"
-        elif key == "is disc":
-            key = "is_disc"
         try:
-            val = self.__getattribute__(key)
+            val = getattr(self, key)
             return val if val is not None else default
         except AttributeError:
             return default
 
     def setdefault(self, key: str, default: Any = None) -> Any:
         """Get or set attribute default."""
-        if key in ('3D', '3d'):
-            key = 'three_d'
-        elif key == 'is disc':
-            key = 'is_disc'
         if self.get(key) is None:
             setattr(self, key, default)
-        return self.__getattribute__(key)
+        return getattr(self, key)
 
     def pop(self, key: str, default: Any = None) -> Any:
         """Remove an attribute and return its value (setting to default)."""
-        if key in ('3D', '3d'):
-            key = 'three_d'
-        elif key == 'is disc':
-            key = 'is_disc'
         val = self.get(key, default)
         # Reset to default
         for f in fields(self):
@@ -604,29 +563,17 @@ class Meta:
 
     def __contains__(self, key: str) -> bool:
         """Check if an attribute is set and is not None."""
-        if key in ('3D', '3d'):
-            key = 'three_d'
-        elif key == 'is disc':
-            key = 'is_disc'
-        return hasattr(self, key) and self.__getattribute__(key) is not None
+        return hasattr(self, key) and getattr(self, key) is not None
 
     def __getitem__(self, key: str) -> Any:
         """Bracket read access for backwards compatibility during migration."""
-        if key in ('3D', '3d'):
-            key = 'three_d'
-        elif key == 'is disc':
-            key = 'is_disc'
         try:
-            return self.__getattribute__(key)
+            return getattr(self, key)
         except AttributeError:
             raise KeyError(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Bracket write access for backwards compatibility during migration."""
-        if key in ('3D', '3d'):
-            key = 'three_d'
-        elif key == 'is disc':
-            key = 'is_disc'
         setattr(self, key, value)
 
     def __delitem__(self, key: str) -> None:

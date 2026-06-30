@@ -134,7 +134,7 @@ class NBL:
             console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
-        if meta.is_disc is not None:
+        if meta.is_disc:
             if not meta.unattended:
                 console.print('[bold red]NBL does not allow raw discs')
             return False

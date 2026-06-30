@@ -473,7 +473,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     meta.search_year = ""
 
                 if not meta.edit:
-                    mi = await exportInfo(videopath, bool(meta.isdir), meta.uuid, base_dir, is_dvd=bool(meta.is_disc), debug=meta.debug)
+                    mi = await exportInfo(videopath, bool(meta.isdir), meta.uuid, base_dir, is_dvd=(meta.is_disc == "DVD"), debug=meta.debug)
                     meta.mediainfo = mi
                 else:
                     mi = meta.mediainfo

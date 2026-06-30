@@ -387,13 +387,13 @@ class AZTrackerBase:
             if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-            found_subs_strings = meta.subtitle_languages
+            found_subs_strings = [] if not meta.subtitle_languages else meta.subtitle_languages
             for lang_str in found_subs_strings:
                 target_id = self.lang_map.get(lang_str.lower())
                 if target_id:
                     subtitle_ids.add(target_id)
 
-            found_audio_strings = meta.audio_languages
+            found_audio_strings = [] if not meta.audio_languages else meta.audio_languages
             for lang_str in found_audio_strings:
                 target_id = self.lang_map.get(lang_str.lower())
                 if target_id:
@@ -834,7 +834,7 @@ class AZTrackerBase:
         if meta.has_encode_settings:
             upload_name = upload_name.replace('H.264', 'x264').replace('H.265', 'x265')
 
-        tag_lower = meta.tag.lower()
+        tag_lower = "" if not meta.tag else meta.tag.lower()
         invalid_tags = ['nogrp', 'nogroup', 'unknown', '-unk-']
 
         if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):

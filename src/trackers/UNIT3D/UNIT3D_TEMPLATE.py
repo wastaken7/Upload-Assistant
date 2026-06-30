@@ -84,8 +84,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     # If no checks are necessary, remove this function
     async def get_additional_checks(self, meta: Meta) -> bool:
         meta = meta
-        should_continue = True
-        return should_continue
+        return True
 
     # If the tracker has modq in the api, otherwise remove this function
     # If no additional data is required, remove this function

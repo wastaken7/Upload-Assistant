@@ -527,8 +527,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             archive_password = secrets.token_urlsafe(16)
             if meta.debug:
                 console.print(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
-            else:
-                console.print("[cyan]Generated unique random password for Usenet archive encryption.[/cyan]")
         else:
             console.print("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
         meta.archive_password = archive_password
@@ -557,8 +555,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         archive_name = secrets.token_hex(16)
         if meta.debug:
             console.print(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
-        else:
-            console.print("[cyan]Obfuscating archive filenames for security.[/cyan]")
 
     # NZB filename: prefer meta name (already properly constructed by UA).
     # For directories, fall back to the directory basename only when meta name is absent.
@@ -684,8 +680,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             volume_size = get_dynamic_volume_size(total_size)
             if is_debug:
                 console.print(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
-            else:
-                console.print(f"[cyan]Dynamic volume size chosen: {volume_size.upper()}[/cyan]")
 
         archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
 
@@ -756,8 +750,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         subject = secrets.token_hex(16)
         if is_debug:
             console.print(f"[cyan]Obfuscating post subject: {subject}[/cyan]")
-        else:
-            console.print("[cyan]Obfuscating post subject...[/cyan]")
     else:
         subject = name
 

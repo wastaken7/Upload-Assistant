@@ -38,7 +38,6 @@ class OTW(UNIT3D):
         ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
         combined_genres_value = meta.combined_genres
         # Normalize combined_genres to a list of individual genre strings.
         if isinstance(combined_genres_value, list):
@@ -92,7 +91,7 @@ class OTW(UNIT3D):
             else:
                 return False
 
-        return should_continue
+        return True
 
     async def get_type_id(
         self,

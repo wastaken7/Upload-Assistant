@@ -55,7 +55,6 @@ class STC(UNIT3D):
         return {'type_id': type_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
         if str(meta.category) != "TV":
             if not meta.unattended:
                 console.print(f'[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]')
@@ -73,7 +72,7 @@ class STC(UNIT3D):
             else:
                 return False
 
-        return should_continue
+        return True
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {

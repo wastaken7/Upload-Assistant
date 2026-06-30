@@ -326,7 +326,7 @@ class VideoManager:
                 break
         return res
 
-    async def get_type(self, video: str, _scene: bool, is_disc: Optional[str], meta: Meta) -> str:
+    async def get_type(self, video: str, _scene: bool, is_disc: str, meta: Meta) -> str:
         if meta.manual_type:
             type = cast(str, meta.manual_type)
         else:
@@ -341,7 +341,7 @@ class VideoManager:
                 # type = "ENCODE"
             elif "hdtv" in filename:
                 type = "HDTV"
-            elif is_disc is not None:
+            elif is_disc:
                 type = "DISC"
             elif "dvdrip" in filename:
                 type = "DVDRIP"
