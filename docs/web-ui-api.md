@@ -143,7 +143,7 @@ The following endpoints via a valid web session.
 - Auth: requires web session + CSRF + Origin
 - Query params: n (number of entries, default 50, max 200)
 - Description: returns recent access log entries
-- Response: {"success": true, "entries": [...]} 
+- Response: {"success": true, "entries": [...]}
 
 ### /api/ip_control
 - Methods: GET, POST
@@ -180,8 +180,8 @@ The following endpoints via a valid web session.
 ### /api/config_options
 - Methods: GET
 - Auth: requires web session + CSRF + Origin (disallows bearer/basic auth)
-- Description: returns configuration options derived from example-config.py + user overrides
-- Response: {"success": true, "sections": [...]} 
+- Description: returns configuration options derived from example_config.py + user overrides
+- Response: {"success": true, "sections": [...]}
 
 ### /api/torrent_clients
 - Methods: GET

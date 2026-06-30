@@ -168,7 +168,7 @@ This branch introduces new media categories and automation features not present 
   * Then install the requirements `pip install -r requirements.txt`
 * From the installation directory, run `python3 config-generator.py`
 * OR
-* Copy `data/example-config.py` to `data/config.py`, leaving `data/example-config.py` intact.
+* Copy `data/example_config.py` to `data/config.py`, leaving `data/example_config.py` intact.
 * NOTE: New users who use the webui will have the config file generated automatically.
 * Edit `config.py` to use your information (more detailed information in example config options: [docs/example-config.md](docs/example-config.md))
   * tmdb_api key can be obtained from <https://www.themoviedb.org/settings/api>

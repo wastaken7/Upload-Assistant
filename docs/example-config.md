@@ -1,6 +1,6 @@
-# Upload Assistant `example-config.py` options
+# Upload Assistant `example_config.py` options
 
-This document explains the configuration options found in `data/example-config.py`.
+This document explains the configuration options found in `data/example_config.py`.
 
 Upload Assistant loads configuration from `data/config.py`.
 
@@ -9,7 +9,7 @@ Upload Assistant loads configuration from `data/config.py`.
 - Generate a config interactively:
   - Run `python config-generator.py` from the repo root.
 - Or create your config manually:
-  - Copy `data/example-config.py` to `data/config.py`
+  - Copy `data/example_config.py` to `data/config.py`
   - Edit `data/config.py` with your own values
 
 ## Config file shape
@@ -262,7 +262,7 @@ Implementation notes:
 - If the exmaple-config does not contain the option for a tracker, then the tracker does not support that specific config option.
 
 Some trackers authenticate via cookies instead of an API key.
-If comments in `example-config.py` mention cookies, they are typically expected as a Netscape cookie file in:
+If comments in `example_config.py` mention cookies, they are typically expected as a Netscape cookie file in:
 
 - `data/cookies/<TRACKER>.txt`
 

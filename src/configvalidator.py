@@ -112,7 +112,7 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
     # imgbox and pixhost don't require API keys
 }
 
-# Valid torrent client types (must match example-config.py)
+# Valid torrent client types (must match example_config.py)
 VALID_TORRENT_CLIENTS = ["qbit", "rtorrent", "deluge", "transmission", "watch"]
 
 

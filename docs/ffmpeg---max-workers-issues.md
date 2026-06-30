@@ -23,11 +23,11 @@ There were issues in builds after this date, they may have been resolved since l
 
 ppkhoa says:
 > Another way to do this is adding to the start of PATH environment variable the extracted `ffmpeg<version>/bin` path from the release bundles linked above and UA will use that instead.
-> 
+>
 > Example, in my own environment, added this line in `~/.profile`
-> 
+>
 > ```
 > export PATH="/home/ppkhoa/ffmpeg-master-latest-linux64-gpl/bin:$PATH"
 > ```
 
-Continued issue may be resolved by setting `use_libplacebo` to `False` in config https://github.com/Audionut/Upload-Assistant/blob/b7aea987b147e903115e46121675b91549ad017c/data/example-config.py#L82
+Continued issue may be resolved by setting `use_libplacebo` to `False` in config https://github.com/Audionut/Upload-Assistant/blob/b7aea987b147e903115e46121675b91549ad017c/data/example_config.py#L82

@@ -1305,7 +1305,7 @@ def _python_literal(value: Any) -> str:
 
 
 def _format_config_tree(tree: ast.AST) -> str:
-    """Format an AST tree in the same style as example-config.py"""
+    """Format an AST tree in the same style as example_config.py"""
     lines = []
 
     # Cast to Module to access body attribute
@@ -2426,7 +2426,7 @@ def browse_roots():
 
 @app.route("/api/config_options")
 def config_options():
-    """Return config options based on example-config.py with overrides from config.py"""
+    """Return config options based on example_config.py with overrides from config.py"""
     # Require an authenticated web session; disallow bearer/basic API auth for config access
     if not _is_authenticated():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
@@ -2436,7 +2436,7 @@ def config_options():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
 
     base_dir = Path(__file__).parent.parent
-    example_path = base_dir / "data" / "example-config.py"
+    example_path = base_dir / "data" / "example_config.py"
     config_path = base_dir / "data" / "config.py"
 
     example_config = _load_config_from_file(example_path) or {}
@@ -2562,7 +2562,7 @@ def config_update():
         return jsonify({"success": False, "error": "Invalid path"}), 400
 
     base_dir = Path(__file__).parent.parent
-    example_path = base_dir / "data" / "example-config.py"
+    example_path = base_dir / "data" / "example_config.py"
     config_path = base_dir / "data" / "config.py"
 
     example_config = _load_config_from_file(example_path) or {}
@@ -3301,7 +3301,7 @@ def execute_command():
                                 # Ensure Windows event loop policy when needed
                                 if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
                                     with contextlib.suppress(Exception):
-                                        policy_class = getattr(asyncio, "WindowsProactorEventLoopPolicy")
+                                        policy_class = asyncio.WindowsProactorEventLoopPolicy
                                         asyncio.set_event_loop_policy(policy_class())
                                 if nonlocal_upload is None:
                                     raise RuntimeError("upload.main not available for in-process execution")

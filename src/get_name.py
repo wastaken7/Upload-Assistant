@@ -266,7 +266,7 @@ class NameManager:
         parts = []
 
         if audiobook:
-            parts.extend([author, title, edition, year, lang_display, "AUDIOBOOK"])
+            parts.extend([author, "-", title, edition, year, lang_display, "AUDIOBOOK"])
         elif comic:
             vol_str = f"Vol {volume}" if volume else ""
             no_str = f"No {issue}" if issue else ""
@@ -281,7 +281,7 @@ class NameManager:
             parts.extend([title, year, lang_display, source, ebook_type, "eBOOK"])
         else:
             author_or_publisher = author or publisher
-            parts.extend([author_or_publisher, title, edition, year, lang_display, source, ebook_type, "eBOOK"])
+            parts.extend([author_or_publisher, "-", title, edition, year, lang_display, source, ebook_type, "eBOOK"])
 
         cleaned_parts = [p for p in parts if p]
         base_name = " ".join(cleaned_parts)

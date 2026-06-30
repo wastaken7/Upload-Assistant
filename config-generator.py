@@ -27,11 +27,11 @@ UnexpectedKey = tuple[str, ConfigDict, str]
 
 def read_example_config() -> tuple[Optional[ConfigDict], ConfigComments]:
     """Read the example config file and return its structure and comments"""
-    example_path = Path("data/example-config.py")
+    example_path = Path("data/example_config.py")
     comments: ConfigComments = {}
 
     if not example_path.exists():
-        console.print("[!] Warning: Could not find data/example-config.py", markup=False)
+        console.print("[!] Warning: Could not find data/example_config.py", markup=False)
         console.print("[i] Using built-in default structure instead", markup=False)
         return None, comments
 

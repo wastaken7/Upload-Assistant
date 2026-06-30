@@ -42,7 +42,7 @@ class PTP:
         self.tracker = 'PTP'
         self.source_flag = 'PTP'
         self.api_user = config['TRACKERS']['PTP'].get('ApiUser', '').strip()
-        self.api_key = config['TRACKERS']['PTP'].get('ApiKey', '').strip()
+        self.api_key = config["TRACKERS"]["PTP"].get("api_key", "").strip()
         announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
         if announce_url and announce_url.startswith('http://'):
             console.print("[red]PTP announce URL is using plaintext HTTP.\n")
@@ -142,8 +142,8 @@ class PTP:
         _meta: dict[str, Any],
     ) -> tuple[Optional[int], Optional[int | str], Optional[str]]:
         headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
+            "ApiUser": self.api_user,
+            "api_key": self.api_key,
             "User-Agent": self.user_agent,
         }
         url = 'https://passthepopcorn.me/torrents.php'
@@ -201,11 +201,7 @@ class PTP:
         params = {
             'torrentid': ptp_torrent_id
         }
-        headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
-            'User-Agent': self.user_agent
-        }
+        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = 'https://passthepopcorn.me/torrents.php'
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
@@ -235,11 +231,7 @@ class PTP:
             'id': ptp_torrent_id,
             'action': 'get_description'
         }
-        headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
-            'User-Agent': self.user_agent
-        }
+        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = 'https://passthepopcorn.me/torrents.php'
         console.print(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -287,11 +279,7 @@ class PTP:
         params = {
             'imdb': imdb,
         }
-        headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
-            'User-Agent': self.user_agent
-        }
+        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = 'https://passthepopcorn.me/torrents.php'
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, headers=headers, params=params)
@@ -371,7 +359,7 @@ class PTP:
                 return str(groupID) if groupID is not None else None
         except Exception:
             console.print("[red]An error has occurred trying to find a group ID")
-            console.print("[red]Please check that the site is online and your ApiUser/ApiKey values are correct")
+            console.print("[red]Please check that the site is online and your ApiUser/api_key values are correct")
             return None
 
         return None
@@ -382,11 +370,7 @@ class PTP:
             'action': 'torrent_info',
             'fast': 1
         }
-        headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
-            'User-Agent': self.user_agent
-        }
+        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = "https://passthepopcorn.me/ajax.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, params=params, headers=headers)
@@ -455,11 +439,7 @@ class PTP:
         params = {
             'id': groupID,
         }
-        headers = {
-            'ApiUser': self.api_user,
-            'ApiKey': self.api_key,
-            'User-Agent': self.user_agent
-        }
+        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = 'https://passthepopcorn.me/torrents.php'
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -1690,7 +1670,7 @@ class PTP:
         }
         headers = {
             # 'ApiUser' : self.api_user,
-            # 'ApiKey' : self.api_key,
+            # 'api_key' : self.api_key,
             "User-Agent": self.user_agent
         }
         if meta.debug:

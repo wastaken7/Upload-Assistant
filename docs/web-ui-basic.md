@@ -46,7 +46,7 @@ Notes:
 - Execution can run either in-process (preserving Rich output and interactive prompts) or as a subprocess. The runtime mode can be controlled with the environment variable `UA_WEBUI_USE_SUBPROCESS`.
 
 ### Config editor
-- The "View Config" button opens a config editor served at `/config`. The editor reads options from `data/example-config.py` and applies overrides in `data/config.py`. Users without a config.py file will have a file created from the example-config.py file.
+- The "View Config" button opens a config editor served at `/config`. The editor reads options from `data/example_config.py` and applies overrides in `data/config.py`. Users without a config.py file will have a file created from the example_config.py file.
 - The editor performs type coercion and writes updates back into the config file `data/config.py`. Changes are audited to `data/config_audit.log`.
 - Use the config editor for common changes like adding torrent clients, image hosts, or toggling features.
 

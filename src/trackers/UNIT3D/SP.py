@@ -101,7 +101,6 @@ class SP(UNIT3D):
         base, ext = os.path.splitext(name)
         if ext.lower() in KNOWN_EXTENSIONS:
             name = base.replace(" ", ".")
-        console.print(f"[cyan]Name: {name}")
 
         return {'name': name}
 

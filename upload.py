@@ -107,7 +107,7 @@ def _handle_shutdown_signal(signum: int, _frame: Any) -> None:
 # ── Restore built-in data/ files when a Docker volume mount hides them ──
 # The Dockerfile copies the original data/ tree to defaults/data/ so that
 # volume mounts over /Upload-Assistant/data/ don't lose critical files
-# (__init__.py, version.py, example-config.py, templates/).
+# (__init__.py, version.py, example_config.py, templates/).
 _data_dir = os.path.join(base_dir, "data")
 _defaults_data_dir = os.path.join(base_dir, "defaults", "data")
 
@@ -180,9 +180,9 @@ _is_webui_arg = any(
 )
 # Auto-create config.py from example on first WebUI start
 if _is_webui_arg and not os.path.exists(_config_path):
-    _example_config_path = os.path.join(_data_dir, "example-config.py")
+    _example_config_path = os.path.join(_data_dir, "example_config.py")
     if os.path.exists(_example_config_path):
-        console.print("No config.py found. Creating default config from example-config.py...", markup=False)
+        console.print("No config.py found. Creating default config from example_config.py...", markup=False)
         try:
             shutil.copy2(_example_config_path, _config_path)
             console.print("Default config created successfully!", markup=False)
@@ -227,7 +227,7 @@ def _print_config_error(error_type: str, message: str, lineno: Optional[int] = N
         console.print(f"{_RED}  {message}{_RESET}", markup=False)
     if suggestion:
         console.print(f"{_GREEN}  Suggestion: {suggestion}{_RESET}", markup=False)
-    console.print(f"\n{_RED}Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example-config.py{_RESET}", markup=False)
+    console.print(f"\n{_RED}Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example_config.py{_RESET}", markup=False)
 
 
 config: dict[str, Any]
@@ -1783,7 +1783,7 @@ async def do_the_thing(base_dir: str) -> None:
             for error in config_errors:
                 console.print(f"[red]  ✗ {error}[/red]")
             console.print("[red]\nPlease fix the above errors in your config.py[/red]")
-            console.print("[yellow]Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example-config.py[/yellow]")
+            console.print("[yellow]Reference: https://github.com/Audionut/Upload-Assistant/blob/master/data/example_config.py[/yellow]")
             raise SystemExit(1)
 
         if config_warnings:

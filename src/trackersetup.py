@@ -12,6 +12,7 @@ import aiofiles
 import cli_ui
 import httpx
 
+from data.example_config import config as example_config
 from src.cleanup import cleanup_manager
 from src.console import console
 from src.meta import Meta
@@ -98,6 +99,7 @@ from src.trackers.USENET.DS import DS
 from src.trackers.USENET.SUIO import SUIO
 
 JsonDict = dict[str, Any]
+example_config: dict[str, Any]
 
 class TRACKER_SETUP:
     def __init__(self, config: dict[str, Any]):
@@ -125,9 +127,20 @@ class TRACKER_SETUP:
                 supported_trackers.append(tracker_name)
                 continue
 
+            tracker_config = self.config["TRACKERS"].get(tracker_name, {})
+            example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
+
+            if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
+                console.print(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
+                continue
+
+            if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
+                console.print(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
+                continue
+
             supported_cats = getattr(tracker_class, "supported_categories", None)
             if supported_cats is None:
-                console.print(f"[bold red]Error: Tracker '{tracker_name}' does not have 'supported_categories' defined. Removing from queue.[/bold red]")
+                console.print(f"{tracker_name}: [bold red]Error: Tracker does not have 'supported_categories' defined. Removing from queue.[/bold red]", markup=False)
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
                 continue
@@ -136,7 +149,7 @@ class TRACKER_SETUP:
             if category.upper() in [c.upper() for c in supported_cats]:
                 supported_trackers.append(tracker_name)
             else:
-                console.print(f"[bold red]Alert: Tracker '{tracker_name}' does not support category '{category}'. Removing from queue.[/bold red]")
+                console.print(f"{tracker_name}: [bold red]category '{category}' is not supported. Removing from queue.[/bold red]", markup=False)
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
 

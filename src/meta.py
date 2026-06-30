@@ -12,7 +12,6 @@ class Meta:
     for backward compatibility and helper dictionary methods.
     """
 
-    libplacebo_warmed: Optional[bool] = None
     adult_media: bool = False
     aither_trumpable: Optional[list[Any]] = field(default_factory=list)
     aither: Optional[str] = None
@@ -199,6 +198,7 @@ class Meta:
     language_checked: bool = False
     language: str = ""
     languages: dict[str, list[str]] | list[Any] = field(default_factory=list)
+    libplacebo_warmed: Optional[bool] = None
     libplacebo: bool = False
     limit_queue: int = 0
     linking_failed: bool = False

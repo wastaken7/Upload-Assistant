@@ -505,7 +505,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "announce_url": "https://anthelion.me/announce/customannounceurl",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -534,7 +534,7 @@ config = {
             # anon is not an option when uploading you need to change your privacy settings.
             "username": "",
             "password": "",
-            "announce_url": "http://tracker.alpharatio.cc:2710/PASSKEY/announce",
+            "announce_url": "",
         },
         "ASC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -548,7 +548,7 @@ config = {
             # anon is not an option when uploading to ASC
             # for ASC to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/ASC.txt
-            "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY",
+            "announce_url": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
             # The configurations below override the DEFAULT configuration
@@ -578,7 +578,7 @@ config = {
             "link_dir_name": "",
             # for AZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/AZ.txt
-            "announce_url": "https://tracker.avistaz.to/<PASSKEY>/announce",
+            "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
@@ -612,7 +612,7 @@ config = {
             "use_for_search": False,
             "api_key": "",
             "bhd_rss_key": "",
-            "announce_url": "https://beyond-hd.me/announce/customannounceurl",
+            "announce_url": "",
             # Send uploads to BHD drafts
             "draft_default": False,
             "anon": True,
@@ -641,7 +641,8 @@ config = {
         "BHDTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            "api_key": "found under https://www.bit-hdtv.com/my.php",
+            # found under https://www.bit-hdtv.com/my.php
+            "api_key": "",
             "announce_url": "https://trackerr.bit-hdtv.com/announce",
             # passkey found under https://www.bit-hdtv.com/my.php
             "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
@@ -653,7 +654,7 @@ config = {
             # for BJS to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BJS.txt
             # Two-factor authentication must be enabled in your profile settings; otherwise, your cookies will expire fairly quickly
-            "announce_url": "https://tracker.bj-share.info:2053/<PASSKEY>/announce",
+            "announce_url": "",
             "anon": True,
             # Set to False if during an anonymous upload you want your release group to be hidden
             "show_group_if_anon": True,
@@ -712,7 +713,7 @@ config = {
             "link_dir_name": "",
             # for BT to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BT.txt
-            "announce_url": "https://t.brasiltracker.org/<PASSKEY>/announce",
+            "announce_url": "",
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
@@ -782,7 +783,7 @@ config = {
             "link_dir_name": "",
             # for CZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/CZ.txt
-            "announce_url": "https://tracker.cinemaz.to/<PASSKEY>/announce",
+            "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
@@ -921,7 +922,7 @@ config = {
             "username": "",
             "password": "",
             # You can find your announce URL by downloading any torrent from FunFile, adding it to your client, and then copying the URL from the 'Trackers' tab.
-            "announce_url": "https://tracker.funfile.org:2711/<PASSKEY>/announce",
+            "announce_url": "",
             # Set to True if you want to check whether your upload fulfills corresponding requests. This may slightly slow down the upload process.
             "check_requests": False,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
@@ -991,7 +992,7 @@ config = {
             # If you do this, you must export cookies from https://greatposterwall.com using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # Cookies must be in Netscape format and must be located in data/cookies/GPW.txt
             # You can find your announce URL at https://greatposterwall.com/upload.php
-            "announce_url": "https://tracker.greatposterwall.com/<PASSKEY>/announce",
+            "announce_url": "",
             # Upload with Exclusive flag
             "exclusive": False,
             # The configurations below override the DEFAULT configuration
@@ -1025,7 +1026,7 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/HDB.txt
             "username": "",
             "passkey": "",
-            "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
+            "announce_url": "",
             "img_rehost": True,
         },
         "HDS": {
@@ -1033,7 +1034,7 @@ config = {
             "link_dir_name": "",
             # for HDS to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/HDS.txt
-            "announce_url": "http://hd-space.pw/announce.php?pid=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
@@ -1073,7 +1074,7 @@ config = {
             #   - https://hdts.ru/
             "url": "https://hd-torrents.me/",
             "anon": True,
-            "announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
+            "announce_url": "",
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
             # The configurations below override the DEFAULT configuration
@@ -1130,7 +1131,7 @@ config = {
             "use_for_search": False,
             "api_key": "",
             # You can find your announce URL at https://hawke.uno/upload
-            "announce_url": "https://hawke.uno/announce/<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1160,7 +1161,7 @@ config = {
             # For IPT to work, you need to export cookies from the site using:
             # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # Cookies must be in Netscape format and saved in: data/cookies/IPT.txt
-            "announce_url": "https://ssl.empirehost.me/<PASS_KEY/PID>/announce",
+            "announce_url": "",
             # By default, IPT removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
             # It also does not have the option to set the IMDb during upload.
             # Set this to True to edit the torrent after the upload to force the correct naming and IMDb.
@@ -1221,7 +1222,7 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/IS.txt
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            "announce_url": "https://immortalseed.me/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1279,7 +1280,7 @@ config = {
             "link_dir_name": "",
             # for LAJIDUI to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/LAJIDUI.txt
-            "announce_url": "https://pt.lajidui.top/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1368,7 +1369,7 @@ config = {
             "link_dir_name": "",
             # for LPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/LPT.txt
-            "announce_url": "https://longpt.org/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1549,7 +1550,8 @@ config = {
         "MTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            'api_key': 'get from security page',
+            # get from security page
+            'api_key': '',
             'username': '',
             'password': '',
             'announce_url': "get from https://www.morethantv.me/upload.php",
@@ -1586,7 +1588,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "announce_url": "https://tracker.nebulance.io/insertyourpasskeyhere/announce",
+            "announce_url": "",
         },
         "OE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1674,7 +1676,7 @@ config = {
             "link_dir_name": "",
             # for PHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/PHD.txt
-            "announce_url": "https://tracker.privatehd.to/<PASSKEY>/announce",
+            "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
@@ -1714,7 +1716,7 @@ config = {
             "link_dir_name": "",
             # for PTCAFE to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTCAFE.txt
-            "announce_url": "https://tracker.ptcafe.club/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1753,7 +1755,7 @@ config = {
             "link_dir_name": "",
             # for PTFANS to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTFANS.txt
-            "announce_url": "https://ptfans.cc/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1782,7 +1784,7 @@ config = {
             "link_dir_name": "",
             # for PTGTK to work you need to export cookies from https://pt.gtkpw.xyz using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTGTK.txt
-            "announce_url": "https://t.myaltbox.com/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1813,7 +1815,7 @@ config = {
             "use_for_search": False,
             "add_web_source_to_desc": True,
             "ApiUser": "ptp api user",
-            "ApiKey": 'ptp api key',
+            "api_key": "",
             "username": "",
             "password": "",
             "announce_url": "",
@@ -1824,7 +1826,7 @@ config = {
             "link_dir_name": "",
             # for PTS to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTS.txt
-            "announce_url": "https://ptskit.kqbhek.com/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1882,7 +1884,7 @@ config = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
-            "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1969,7 +1971,7 @@ config = {
             "link_dir_name": "",
             # for RPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/RPT.txt
-            "announce_url": "https://bilibili.download/announce.php?passkey=<PASSKEY>",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1999,8 +2001,8 @@ config = {
             "username": "",
             "password": "",
             # get_it_by_running_/api/ login command from https://retroflix.club/api/doc
-            "api_key": '',
-            "announce_url": "get from upload page",
+            "api_key": "",
+            "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -2094,7 +2096,7 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
-            "announce_url": "https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce",
+            "announce_url": "",
         },
         "SP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -2190,7 +2192,7 @@ config = {
             "username": "",
             "password": "",
             "img_api": "get this from the forum post",
-            "announce_url": "http://www.torrenthr.org/announce.php?passkey=yourpasskeyhere",
+            "announce_url": "",
             "pronfo_api_key": "",
             "pronfo_theme": "pronfo theme code",
             "pronfo_rapi_id": "pronfo remote api id",
@@ -2299,7 +2301,7 @@ config = {
             "use_for_search": False,
             "api_key": "",
             # Mon profil > Réglages > Passkey
-            "announce_url": "https://theoldschool.cc/announce/PasskeyHere",
+            "announce_url": "",
             "anon": True,
             # Upload with Exclusive flag (team of staff only)
             "exclusive": False,
@@ -2333,7 +2335,7 @@ config = {
             "login_question": "",
             "login_answer": "",
             "user_id": "",
-            "announce_url": "https://totheglory.im/announce/",
+            "announce_url": "",
             "anon": True,
         },
         "TTR": {
@@ -2373,7 +2375,7 @@ config = {
             # 2 is listed as max images in rules. Please do not change unless you have permission
             "image_count": 2,
             "api_key": "",
-            "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
+            "announce_url": "",
             "anon": True,
         },
         "ULCX": {
