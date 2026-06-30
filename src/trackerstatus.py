@@ -341,35 +341,44 @@ class TrackerStatusManager:
                 successful_trackers += 1
                 passed_names.append(tracker_name)
             if passed_names:
-                console.print(f"[bold green]Trackers passed all checks: [bold yellow]{', '.join(passed_names)}")
+                console.print(f"[bold blue]{', '.join(passed_names)}[/bold blue]: [bold green]no potential dupes found.[/bold green]")
         else:
-            # Attended mode: prompt sequentially
-            for tracker_name, display_name, _tracker_class in passed_trackers:
-                if tracker_name in ("MANUAL", "USENET"):
-                    tracker_status[tracker_name]["upload"] = True
-                    successful_trackers += 1
-                    continue
+            # Attended mode
+            prompt_trackers = [tracker_name for tracker_name, _display_name, _tracker_class in passed_trackers if tracker_name not in ("MANUAL", "USENET")]
 
-                if meta.get("debug", False):
-                    tracker_status[tracker_name]["upload"] = True
-                    successful_trackers += 1
-                    continue
-
-                console.print(f"\n[bold yellow]Tracker '{tracker_name}' passed all checks.")
-                pass
+            if not meta.get("debug", False) and prompt_trackers:
+                if len(prompt_trackers) == 1:
+                    tracker_name = prompt_trackers[0]
+                    console.print(f"\n[bold blue]{tracker_name}:[/bold blue] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Enter 'y' to upload, or press enter to skip uploading:"
+                else:
+                    console.print(f"\n[bold blue]{', '.join(prompt_trackers)}:[/bold blue] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Enter 'y' to upload to all, or press enter to skip uploading:"
 
                 try:
-                    edit_choice = cli_ui.ask_string("Enter 'y' to upload, or press enter to skip uploading:")
-                    if (edit_choice or "").lower() == "y":
-                        tracker_status[tracker_name]["upload"] = True
-                        successful_trackers += 1
-                    else:
-                        tracker_status[tracker_name]["upload"] = False
+                    edit_choice = cli_ui.ask_string(prompt_msg)
+                    upload_all = (edit_choice or "").lower() == "y"
                 except EOFError:
                     console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
+
+                for tracker_name, _display_name, _tracker_class in passed_trackers:
+                    if tracker_name in ("MANUAL", "USENET"):
+                        tracker_status[tracker_name]["upload"] = True
+                        successful_trackers += 1
+                    else:
+                        if upload_all:
+                            tracker_status[tracker_name]["upload"] = True
+                            successful_trackers += 1
+                        else:
+                            tracker_status[tracker_name]["upload"] = False
+            else:
+                # No prompt required (either empty passed_trackers/prompt_trackers, or in debug mode)
+                for tracker_name, _display_name, _tracker_class in passed_trackers:
+                    tracker_status[tracker_name]["upload"] = True
+                    successful_trackers += 1
 
         if meta.debug:
             console.print("\n[bold]Tracker Processing Summary:[/bold]")

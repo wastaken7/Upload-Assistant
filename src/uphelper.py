@@ -305,7 +305,7 @@ class UploadHelper:
                             console.print()
                             console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
                         else:
-                            console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
+                            console.print(f"[bold blue]{tracker_name}[/bold blue]: Check if these are actually dupes:")
                             console.print()
                             console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
                         if meta.dupe is False:
