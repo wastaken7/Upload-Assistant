@@ -863,15 +863,16 @@ class AZTrackerBase:
                 # Use the season-specific year if found, otherwise fall back to meta year
                 if season_year:
                     year_to_use = season_year
-                upload_name = upload_name.replace(meta.title, f"{meta.title} {year_to_use}", 1)
+                if year_to_use:
+                    upload_name = upload_name.replace(meta.title, f"{meta.title} {year_to_use}", 1)
 
-            if self.tracker == 'PHD':
+            if self.tracker == "PHD" and year_to_use:
                 upload_name = upload_name.replace(
                     str(year_to_use),
                     ''
                 )
 
-            if self.tracker == "AZ" and meta.tv_pack:
+            if self.tracker == "AZ" and meta.tv_pack and year_to_use:
                 upload_name = upload_name.replace(f"{meta.title} {year_to_use} {meta.season}", f"{meta.title} {meta.season} {year_to_use}")
 
         source = meta.source

@@ -195,7 +195,10 @@ async def gather_book_prep(
                         meta.book_language_iso = iso3
                 else:
                     if not meta.get(key) and val:
-                        meta[key] = val
+                        if key == "year":
+                            meta[key] = int(val)
+                        else:
+                            meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)
 
@@ -213,7 +216,10 @@ async def gather_book_prep(
                         meta.book_language_iso = iso3
                 else:
                     if not meta.get(key) and val:
-                        meta[key] = val
+                        if key == "year":
+                            meta[key] = int(val)
+                        else:
+                            meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)
 
@@ -231,7 +237,10 @@ async def gather_book_prep(
                         meta.book_language_iso = iso3
                 else:
                     if not meta.get(key) and val:
-                        meta[key] = val
+                        if key == "year":
+                            meta[key] = int(val)
+                        else:
+                            meta[key] = val
                         if key == "year":
                             meta.search_year = int(val)
 
@@ -342,7 +351,7 @@ async def gather_book_prep(
                 if rec_date and str(rec_date).strip() and not isinstance(rec_date, dict) and not meta.year:
                     match = re.search(r"\b\d{4}\b", str(rec_date))
                     if match:
-                        meta.year = match.group(0)
+                        meta.year = int(match.group(0))
                         meta.search_year = int(match.group(0))
 
                 # 8. Genre -> Keywords
@@ -471,7 +480,10 @@ async def gather_book_prep(
                             is_override = True
 
                         if not is_override:
-                            meta[key] = val
+                            if key == "year":
+                                meta[key] = int(val)
+                            else:
+                                meta[key] = val
                             if key == "year" and "search_year" not in mam_data:
                                 meta.search_year = int(val)
         except Exception as ex:
@@ -511,7 +523,10 @@ async def gather_book_prep(
                             is_override = True
 
                         if not is_override:
-                            meta[key] = val
+                            if key == "year":
+                                meta[key] = int(val)
+                            else:
+                                meta[key] = val
                             if key == "year" and "search_year" not in google_books_data:
                                 meta.search_year = int(val)
         except Exception as ex:
@@ -566,7 +581,10 @@ async def gather_book_prep(
                     is_override = True
 
                 if not is_override:
-                    meta[key] = val
+                    if key == "year":
+                        meta[key] = int(val)
+                    else:
+                        meta[key] = val
                     if key == "year" and "search_year" not in openlibrary_data:
                         meta.search_year = int(val)
 

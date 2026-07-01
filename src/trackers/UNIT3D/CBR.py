@@ -149,7 +149,8 @@ class CBR(UNIT3D):
 
         if category == "BOOK":
             book_title = self.common.portuguese_title_capitalization(meta.title)
-            cbr_name = f"{book_title} - {meta.author} [{meta.year}] [AUDIOBOOK]" if meta.audiobook else f"{book_title} - {meta.author} [{meta.year}]"
+            year_str = str(meta.year) if meta.year is not None else ""
+            cbr_name = f"{book_title} - {meta.author} [{year_str}] [AUDIOBOOK]" if meta.audiobook else f"{book_title} - {meta.author} [{year_str}]"
             book_language_iso = meta.book_language_iso
             if book_language_iso and book_language_iso != "por":
                 cbr_name += f" [{book_language_iso.upper()}]"
@@ -175,16 +176,17 @@ class CBR(UNIT3D):
             if dlc:
                 dlc = f" {dlc}"
 
-            cbr_name = f"{meta.title} {update} {meta.game_version} {meta.year} - {tag} [{game_lang}]{dlc}"
+            year_str = str(meta.year) if meta.year is not None else ""
+            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} [{game_lang}]{dlc}"
 
         elif category in ("MOVIE", "TV"):
             cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
 
             # If it is a Series or Anime, remove the year from the title.
             if meta.category in ["TV", "ANIMES"]:
-                year = meta.year
-                if year and year in cbr_name:
-                    cbr_name = cbr_name.replace(f"({year})", "").replace(year, "").strip()
+                year_str = str(meta.year) if meta.year is not None else ""
+                if year_str and year_str in cbr_name:
+                    cbr_name = cbr_name.replace(f"({year_str})", "").replace(year_str, "").strip()
 
             # Remove the AKA title, unless it is Brazilian
             if meta.original_language != "pt":

@@ -44,7 +44,7 @@ class ZNTH(UNIT3D):
         if category == "BOOK":
             author = meta.author or "".strip()
             title = meta.title or meta.name or "".strip()
-            year = meta.year or "".strip()
+            year = str(meta.year) if meta.year is not None else ""
             format_val = str(meta.type or meta.container or "").strip().upper()
             tag = meta.tag or "".strip().lstrip("-")
 
@@ -153,7 +153,7 @@ class ZNTH(UNIT3D):
             if meta.category == "TV" and meta.episode_title != "":
                 znth_name = znth_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
             imdb_year = str(meta.imdb_info.get("year", ""))
-            year = meta.year
+            year = str(meta.year) if meta.year is not None else ""
             if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
                 znth_name = znth_name.replace(f"{year}", imdb_year, 1)
             return {"name": znth_name}

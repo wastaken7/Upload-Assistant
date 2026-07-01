@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import base64
 import datetime
 import re
@@ -191,7 +190,7 @@ class RTF:
             return False
 
         year_value = meta.year
-        year = int(year_value) if year_value and year_value.isdigit() else None
+        year = int(year_value) if (isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit())) else None
         # Collect all possible years from different sources
         years: list[int] = []
 

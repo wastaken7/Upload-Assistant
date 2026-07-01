@@ -106,7 +106,7 @@ class OTW(UNIT3D):
         elif meta.is_disc and meta.is_disc != "BDMV":
             return {'type_id': '7'}
         if meta_type == "DVDRIP":
-            return {'type_id': '8'}
+            return {"type_id": "8"}
         type_id = {
             'DISC': '1',
             'REMUX': '2',
@@ -139,7 +139,7 @@ class OTW(UNIT3D):
         if str(meta.category) == "TV":
             years: list[int] = []
 
-            tmdb_year = meta.year
+            tmdb_year = str(meta.year) if meta.year is not None else ""
             if tmdb_year and tmdb_year.isdigit():
                 year = tmdb_year
             else:

@@ -678,7 +678,7 @@ class GPW:
             "releasetype": self._get_movie_type(meta),
             "subname": self.get_title(meta),
             "tags": await self.get_tags(meta),
-            "year": meta.year,
+            "year": str(meta.year) if meta.year is not None else "",
         }
 
         # Keep backward-compatible identifiers for sites/APIs that still parse legacy field names.

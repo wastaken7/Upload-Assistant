@@ -1115,7 +1115,7 @@ class ASC:
             "takeupload": "yes",
             "name": await self.get_title(meta),
             "descr": description,
-            "ano": meta.year,
+            "ano": str(meta.year) if meta.year is not None else "",
         }
 
         if meta.category == "BOOK":

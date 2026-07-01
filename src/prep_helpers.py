@@ -270,7 +270,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             if secondary_title:
                 meta.secondary_title = secondary_title
             if extracted_year and not meta.year:
-                meta.year = extracted_year
+                meta.year = int(extracted_year)
             if title:
                 filename = title
                 untouched_filename = search_term
@@ -323,7 +323,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         if secondary_title:
             meta.secondary_title = secondary_title
         if extracted_year and not meta.year:
-            meta.year = extracted_year
+            meta.year = int(extracted_year)
         if title:
             filename = title
             untouched_filename = search_term
@@ -422,7 +422,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             if secondary_title:
                 meta.secondary_title = secondary_title
             if extracted_year and not meta.year:
-                meta.year = extracted_year
+                meta.year = int(extracted_year)
 
             guess_name = (os.path.basename(meta.path).replace("_", "").replace("-", "") if meta.path else "") if meta.isdir else ntpath.basename(video).replace("-", " ")
         except Exception as e:
@@ -1434,7 +1434,7 @@ async def finalize_metadata(
         if not meta.title:
             meta.title = ""
         if not meta.year:
-            meta.year = ""
+            meta.year = None
         if not meta.overview:
             meta.overview = ""
         if not meta.genres:
@@ -1464,7 +1464,7 @@ async def finalize_metadata(
         if not meta.title:
             meta.title = ""
         if not meta.year:
-            meta.year = ""
+            meta.year = None
         if not meta.overview:
             meta.overview = ""
         if not meta.genres:

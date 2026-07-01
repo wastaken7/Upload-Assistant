@@ -583,7 +583,7 @@ class DescriptionBuilder:
         narrator = meta.narrator
         overview = meta.overview
         publisher = meta.publisher
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
 
         use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
 

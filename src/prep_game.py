@@ -122,7 +122,7 @@ def resolve_game_filelist(
     if os.path.isdir(videoloc):
         for root, _, files in os.walk(videoloc):
             for file in files:
-                filelist.append(os.path.abspath(os.path.join(root, file)))
+                filelist.extend(os.path.abspath(os.path.join(root, file)))
         filelist = sorted(filelist)
         if not filelist:
             console.print("[bold red]No game files found!")
@@ -390,7 +390,7 @@ async def gather_game_prep(
     if release_date and not cli_overrides["year"]:
         dt = datetime.datetime.fromtimestamp(release_date, datetime.UTC)
         year_val = dt.year
-        meta.year = str(year_val)
+        meta.year = year_val
         meta.search_year = year_val
         meta.igdb_first_release_date = dt.strftime("%d/%m/%Y")
 

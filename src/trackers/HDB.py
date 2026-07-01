@@ -209,8 +209,10 @@ class HDB:
         hdb_name = hdb_name.replace(meta.aka, "")
         if meta.imdb_info:
             hdb_name = hdb_name.replace(meta.title, meta.imdb_info["aka"])
-            if meta.year != str(meta.imdb_info.get("year", meta.year)) and meta.year.strip() != "":
-                hdb_name = hdb_name.replace(meta.year, str(meta.imdb_info["year"]))
+            meta_year_str = str(meta.year) if meta.year is not None else ""
+            imdb_year_str = str(meta.imdb_info.get("year", meta_year_str))
+            if meta_year_str != imdb_year_str and meta_year_str != "":
+                hdb_name = hdb_name.replace(meta_year_str, imdb_year_str)
         # Remove Dubbed/Dual-Audio from title
         hdb_name = hdb_name.replace('PQ10', 'HDR')
         hdb_name = hdb_name.replace('Dubbed', '').replace('Dual-Audio', '')
@@ -496,7 +498,7 @@ class HDB:
 
         desc_parts: list[str] = []
         # Add This line for all web-dls
-        if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None:
+        if meta.type == "WEBDL" and meta.service_longname and meta.description:
             desc_parts.append(f"[center][quote]This release is sourced from {meta.service_longname}[/quote][/center]")
 
         bbcode = BBCODE()

@@ -124,7 +124,7 @@ class ULCX(UNIT3D):
         imdb_name = meta.imdb_info.get("title", "")
         imdb_year = str(meta.imdb_info.get("year", ""))
         imdb_aka = meta.imdb_info.get("aka", "")
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         aka = meta.aka
         if imdb_name and imdb_name.strip():
             if aka:

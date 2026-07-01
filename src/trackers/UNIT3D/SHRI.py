@@ -106,7 +106,7 @@ class SHRI(UNIT3D):
         year_value: Any = meta.year
         resolution_value: Any = meta.resolution
         source_value: Any = meta.source
-        year = str(year_value)
+        year = str(year_value) if year_value is not None else ""
         resolution = str(resolution_value)
         source = (
             str(cast(Any, source_value[0])) if source_value else ""

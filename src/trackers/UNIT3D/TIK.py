@@ -53,7 +53,7 @@ class TIK(UNIT3D):
         type_value = str(meta.type)
         title = meta.title.replace("AKA", "/").strip()
         alt_title = meta.aka.replace("AKA", "/").strip()
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         resolution = meta.resolution
         season = str(meta.season)
         repack = meta.repack
@@ -299,7 +299,8 @@ class TIK(UNIT3D):
             desc_text.append(f"  Disc Label.........:{bdinfo.get('label', '')}\n")
         imdb_info = cast(dict[str, Any], meta.imdb_info)
         desc_text.append(f"  IMDb...............: [url]{str(imdb_info.get('imdb_url', ''))}{meta.imdb_rating}[/url]\n")
-        desc_text.append(f"  Year...............: {meta.year}\n")
+        year_val = meta.year if meta.year is not None else ""
+        desc_text.append(f"  Year...............: {year_val}\n")
         desc_text.append(f"  Country............: {country_name}\n")
         if meta.is_disc == "BDMV":
             desc_text.append(f"  Runtime............: {bdinfo.get('length', '')} hrs [color=red](double check this is actual runtime)[/color]\n")

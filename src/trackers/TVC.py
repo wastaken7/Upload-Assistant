@@ -544,12 +544,13 @@ class TVC:
             type = str(meta.type).replace("WEBDL", "WEB-DL")
 
         if meta.category == "MOVIE":
-            tvc_name = f"{meta.title} ({meta.year}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
+            year_str_val = str(meta.year) if meta.year is not None else ""
+            tvc_name = f"{meta.title} ({year_str_val}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
         elif meta.category == "TV":
             # Use safe lookups to avoid KeyError if 'search_year' is missing
             search_year = meta.search_year
             # If search_year is empty, fall back to year
-            year = search_year if search_year else meta.year
+            year = search_year if search_year else (meta.year if meta.year is not None else "")
             if meta.no_year:
                 year = ''
             year_str = f" ({year})" if year else ""
@@ -765,8 +766,9 @@ class TVC:
                 meta.networks = meta.networks[0]["name"]
 
             if meta.tmdb is None:
-                meta.setdefault("season_air_first_date", f"{meta.year}-N/A-N/A")
-                meta.setdefault("first_air_date", f"{meta.year}-N/A-N/A")
+                year_str = str(meta.year) if meta.year is not None else ""
+                meta.setdefault("season_air_first_date", f"{year_str}-N/A-N/A")
+                meta.setdefault("first_air_date", f"{year_str}-N/A-N/A")
                 return {}
 
             try:
@@ -831,8 +833,9 @@ class TVC:
                     f"Unable to get episode information, Make sure episode {meta.season}{meta.episode} exists in TMDB.\n"
                     f"https://www.themoviedb.org/tv/{meta.tmdb}/season/{meta.season_int}"
                 )
-                meta.setdefault("season_air_first_date", f"{meta.year}-N/A-N/A")
-                meta.setdefault("first_air_date", f"{meta.year}-N/A-N/A")
+                year_str = str(meta.year) if meta.year is not None else ""
+                meta.setdefault("season_air_first_date", f"{year_str}-N/A-N/A")
+                meta.setdefault("first_air_date", f"{year_str}-N/A-N/A")
 
         else:
             raise ValueError(f"Unsupported category for TVC: {meta.category}")

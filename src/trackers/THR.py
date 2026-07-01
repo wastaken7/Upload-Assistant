@@ -221,10 +221,11 @@ class THR:
 
         desc_parts: list[str] = []
         tag_value = meta.tag
-        tag = "" if tag_value == "" else f" / {tag_value[1:]}"
+        tag = "" if not tag_value else f" / {tag_value[1:]}"
         res = str(meta.source) if str(meta.is_disc) == "DVD" else meta.resolution
         desc_parts.append("[quote=Info]")
-        name_aka = f"{meta.title} {meta.aka} {meta.year}"
+        year_str = str(meta.year) if meta.year is not None else ""
+        name_aka = f"{meta.title} {meta.aka} {year_str}"
         name_aka = unidecode(name_aka)
         # name_aka = re.sub("[^0-9a-zA-Z. '\-\[\]]+", " ", name_aka)
         desc_parts.append(f"Name: {' '.join(name_aka.split())}\n\n")

@@ -940,7 +940,7 @@ class BT:
         data: dict[str, Any] = {
             "submit": "true",
             "auth": BT.secret_token,
-            "year": meta.year,
+            "year": str(meta.year) if meta.year is not None else "",
             "title": original_title,
             "type": await self.get_type(meta),
         }
@@ -1105,7 +1105,7 @@ class BT:
                     "horas": "",
                     "minutos": "",
                     "rating": str(meta.imdb_info.get("rating", "")),
-                    "releasedate": meta.year,
+                    "releasedate": str(meta.year) if meta.year is not None else "",
                     "vote": "",
                 })
 

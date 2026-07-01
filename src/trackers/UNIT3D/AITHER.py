@@ -66,9 +66,9 @@ class AITHER(UNIT3D):
         source: str = meta.source or ""
         alt_title = meta.aka if not meta.no_aka else ""
 
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         if meta.category == "TV":
-            year = meta.year if meta.search_year != "" else ""
+            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
         manual_year_value = str(meta.manual_year)
         if manual_year_value and int(manual_year_value) > 0:
             year = manual_year_value

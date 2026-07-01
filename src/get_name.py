@@ -50,7 +50,7 @@ class NameManager:
         type = str(meta.type).upper()
         title = meta.title
         alt_title = meta.aka
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         manual_year_value = meta.manual_year
         if manual_year_value is not None and manual_year_value > 0:
             year = str(manual_year_value)
@@ -93,7 +93,7 @@ class NameManager:
             edition = edition.replace('Hybrid', '').strip()
 
         if meta.category == "TV":
-            year = meta.year if meta.search_year != "" else ""
+            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
             if meta.manual_date:
                 # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
                 season = ''
@@ -212,7 +212,7 @@ class NameManager:
         author = meta.author.strip()
         publisher = meta.publisher.strip()
         title = meta.title.strip()
-        year = meta.year.strip()
+        year = str(meta.year).strip() if meta.year is not None else ""
 
         # Edition/Issue logic
         edition = str(meta.manual_edition or meta.edition or "").strip()

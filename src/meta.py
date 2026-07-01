@@ -466,7 +466,7 @@ class Meta:
     write_hc_languages: Optional[bool] = None
     write_subtitle_languages: Optional[bool] = None
     xxx: Optional[bool] = None
-    year: str = ""
+    year: int | None = None
     youtube: Optional[str] = ""
 
     def __init__(self, _data: Optional[dict[str, Any]] = None, **kwargs: Any) -> None:

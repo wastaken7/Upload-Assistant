@@ -251,7 +251,7 @@ class AR:
 
         # Combine title and year
         title = meta.title.strip()
-        year = meta.year.strip()
+        year = str(meta.year).strip() if meta.year is not None else ""
         if not title:
             console.print("[red]Title is missing.")
             return dupes
@@ -403,7 +403,7 @@ class AR:
             ar_name = ar_name.replace(' ', ".").replace("'", '').replace(':', '').replace("(", '.').replace(")", '.').replace("[", '.').replace("]", '.').replace("{", '.').replace("}", '.')
             ar_name = re.sub(r'\.{2,}', '.', ar_name)
 
-        tag_lower = meta.tag.lower()
+        tag_lower = "" if not meta.tag else meta.tag.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:

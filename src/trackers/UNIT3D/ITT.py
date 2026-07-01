@@ -88,7 +88,7 @@ class ITT(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         type_name = await self.get_type_name(meta) or ''
         title = meta.title
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         if meta.manual_year or 0 > 0:
             year = str(meta.manual_year)
         resolution = meta.resolution
@@ -114,7 +114,7 @@ class ITT(UNIT3D):
             edition = edition.replace('Hybrid', '').strip()
 
         if meta.category == "TV":
-            year = meta.year if meta.search_year != "" else ""
+            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
             if meta.manual_date:
                 season = ''
                 episode = ''

@@ -47,7 +47,7 @@ class EMUW(UNIT3D):
         if meta.category == "TV" and meta.season_int:
             season = f"S{meta.season_int:02d}"
 
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         resolution = self._map_resolution(meta.resolution)
         video_format = self._map_format(meta)
         video_codec = self._map_codec(meta)
@@ -63,7 +63,7 @@ class EMUW(UNIT3D):
         subs_tag = " SUBS" if self._has_spanish_subs(meta) else ""
 
         # Get tag from meta.tag
-        tag = meta.tag.strip()
+        tag = "" if not meta.tag else meta.tag.strip()
 
         # Remove leading dash if present
         if tag.startswith('-'):

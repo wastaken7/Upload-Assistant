@@ -1483,7 +1483,7 @@ class BJS:
         For TV Shows:
             - The year the episode/season aired.
         """
-        year = meta.year if meta.year is not None else "N/A"
+        year = str(meta.year) if meta.year is not None else "N/A"
         if meta.category == "MOVIE":
             return year
 

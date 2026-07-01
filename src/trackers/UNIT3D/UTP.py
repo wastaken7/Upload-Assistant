@@ -136,7 +136,7 @@ class UTP(UNIT3D):
         # Common components
         title = meta.title
         aka = meta.aka.strip()
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         three_d = meta.three_d
         uhd = meta.uhd
         edition = meta.edition

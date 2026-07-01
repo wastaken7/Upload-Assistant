@@ -218,7 +218,7 @@ class MTEAM:
         tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""
         poster_url = tmdb_poster or str(imdb.get("cover") or "")
         title = meta.title if meta.title is not None else "N/A"
-        year = meta.year if meta.year is not None else "N/A"
+        year = str(meta.year) if meta.year is not None else "N/A"
         rating = imdb.get("rating", "N/A")
 
         writers = imdb.get("writers", [])

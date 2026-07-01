@@ -549,6 +549,17 @@ class Args:
                     meta[key] = str(value).upper()
                 else:
                     meta[key] = None
+            if key == "manual_year":
+                if isinstance(value, list):
+                    value_list = [str(item) for item in value]
+                    if len(value_list) == 1 and value_list[0] != "":
+                        meta[key] = int(value_list[0])
+                    else:
+                        meta[key] = 0
+                elif value not in (None, [], 0, ""):
+                    meta[key] = int(str(value))
+                else:
+                    meta[key] = 0
             if key in ("manual_edition"):
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
@@ -715,7 +726,7 @@ class Args:
 
         manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
-            meta.year = str(manual_year_arg).strip()
+            meta.year = int(manual_year_arg)
             meta.search_year = manual_year_arg
 
         # Detect newspapers in overridden titles
@@ -765,7 +776,7 @@ class Args:
 
         manual_year_arg = meta.manual_year
         if manual_year_arg not in (None, "", 0, "0"):
-            meta.year = str(manual_year_arg).strip()
+            meta.year = int(manual_year_arg)
             meta.search_year = manual_year_arg
 
     def list_to_string(self, list: list[str]) -> str:

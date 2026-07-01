@@ -100,9 +100,9 @@ class FL:
             imdb_aka = str(imdb_info_dict.get('aka', ''))
             if imdb_aka:
                 fl_name = fl_name.replace(title, imdb_aka)
-            meta_year = meta.year.strip()
-            imdb_year = str(imdb_info_dict.get("year", meta.year))
-            if meta_year and meta.year != imdb_info_dict.get("year", meta.year):
+            meta_year = str(meta.year).strip() if meta.year is not None else ""
+            imdb_year = str(imdb_info_dict.get("year", meta_year))
+            if meta_year and meta_year != imdb_year:
                 fl_name = fl_name.replace(meta_year, imdb_year)
         if "DD+" in audio and "DDP" in meta.basename_no_ext:
             fl_name = fl_name.replace('DD+', 'DDP')

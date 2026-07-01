@@ -69,7 +69,7 @@ class NEXUSPHP:
         }
 
         search_name = meta.title
-        year = meta.year
+        year = str(meta.year) if meta.year is not None else ""
         episode = meta.episode
         season = str(meta.season)
         season_episode = f"{season}{episode}" if season or episode else ""
