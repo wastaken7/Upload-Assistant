@@ -522,7 +522,7 @@ class UploadHelper:
         if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
             lines.append(("Episode Title", str(meta.auto_episode_title)))
         if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
-            lines.append(("Episode overview", meta.overview_meta))
+            lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
         lines.append(("Genre", ", ".join(meta.genres)))
         if meta.demographic != "":
             lines.append(("Demographic", meta.demographic))
