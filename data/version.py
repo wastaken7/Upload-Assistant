@@ -1,5 +1,25 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v2.0"
+
+"""
+Changelog for version v2.0 (2026-07-01):
+
+## What's Changed
+* **Features**:
+  * Added validation for `api_key` and `announce_url` before upload.
+* **Fixes & Improvements**:
+  * Improved IMDb usage on ASC tracker.
+  * Improved episode overview display by truncating to 60 characters.
+  * Fixed BT payload data issues.
+  * Updated MediaInfo retrieval condition to check for BDMV disc type.
+  * Standardized year handling across multiple modules to ensure consistent data types.
+  * Updated default version in `ensure_pesto_binary` method to v0.3.34.
+  * Removed redundant metadata injection logic from torrent creation process.
+  * Updated Meta class attributes and improved libplacebo handling.
+  * Refactored Meta and Disc Handling.
+"""
+
 __version__ = "v1.9"
 
 """
