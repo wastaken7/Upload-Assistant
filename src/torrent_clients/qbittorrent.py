@@ -1451,14 +1451,14 @@ class QbittorrentClientMixin:
                             console.print(f"[cyan]Fetching torrent properties via proxy for torrent: {torrent.name}")
                         if qbt_session is None:
                             raise RuntimeError("qbt_session should not be None")
-                        async with qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties", params={"hash": torrent.hash}) as response:
-                            if response.status == 200:
-                                torrent_properties = await response.json()
-                                torrent.comment = torrent_properties.get("comment", "")
-                            else:
-                                if meta.debug:
-                                    console.print(f"[yellow]Failed to get properties for torrent {torrent.name} via proxy: {response.status}")
-                                continue
+                        response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties", params={"hash": torrent.hash})
+                        if response.status_code == 200:
+                            torrent_properties = response.json()
+                            torrent.comment = torrent_properties.get("comment", "")
+                        else:
+                            if meta.debug:
+                                console.print(f"[yellow]Failed to get properties for torrent {torrent.name} via proxy: {response.status_code}")
+                            continue
                     elif not proxy_url:
                         if qbt_client is None:
                             raise RuntimeError("qbt_client should not be None")
