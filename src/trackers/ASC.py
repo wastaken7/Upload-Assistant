@@ -462,8 +462,7 @@ class ASC:
         # Overview
         overview: str = season_tmdb.get("overview", "") or main_tmdb.get("overview", "")
         if not overview:
-            console.print(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-            user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+            user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
             user_input = (user_input_raw or "").strip()
             overview = user_input or "Sinopse não encontrada."
         await append_section('BARRINHA_SINOPSE', overview)
@@ -800,11 +799,13 @@ class ASC:
             search_query = search_name.replace(' ', '+')
             search_url = f'{self.base_url}/torrents-search.php?search={search_query}'
 
-        elif meta.category == "MOVIE":
-            search_url = f"{self.base_url}/busca-filmes.php?search=&imdb={meta.imdb_info['imdbID']}"
+        elif meta.category in ("MOVIE", "TV"):
+            imdb = meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}"
+            if meta.category == "MOVIE":
+                search_url = f"{self.base_url}/busca-filmes.php?search=&imdb={imdb}"
 
-        elif meta.category == "TV":
-            search_url = f"{self.base_url}/busca-series.php?search={meta.season}{meta.episode}&imdb={meta.imdb_info['imdbID']}"
+            else:
+                search_url = f"{self.base_url}/busca-series.php?search={meta.season}{meta.episode}&imdb={imdb}"
 
         else:
             return found_items
@@ -982,7 +983,7 @@ class ASC:
                 return {}
 
         # Primary attempt
-        primary_payload = {"imdb": meta.imdb_info["imdbID"], "layout": self.layout}
+        primary_payload = {"imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}", "layout": self.layout}
         layout_data = await _fetch(primary_payload)
 
         if layout_data:
@@ -1013,7 +1014,9 @@ class ASC:
                 continue
 
             if source == 'Internet Movie Database':
-                parts.append(f"\n[url={meta.imdb_info.get('imdb_url', '')}]{img_tag}[/url]\n[b]{value}[/b]\n")
+                parts.append(
+                    f"\n[url={meta.imdb_info.get('imdb_url', '') or f'https://www.imdb.com/title/{f"tt{str(meta.imdb_id).zfill(7)}"}'}]{img_tag}[/url]\n[b]{value}[/b]\n"
+                )
             elif source == 'TMDb' and meta.tmdb:
                 parts.append(f"[url=https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb}]{img_tag}[/url]\n[b]{value}[/b]\n")
             else:
@@ -1196,7 +1199,7 @@ class ASC:
             "codecvideo": await self.get_video_codec(meta),
             "extencao": await self.get_container(meta),
             "genre": await self.get_tags(meta),
-            "imdb": meta.imdb_info["imdbID"],
+            "imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}",
             "lang": "1" if not meta.original_language else self.language_map.get(meta.original_language.lower(), "11"),
             "largura": resolution["width"],
             "layout": self.layout,
