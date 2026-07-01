@@ -264,7 +264,7 @@ class Args:
             help="Custom description block to insert (path to file OR filename in current working directory). This is added as a section inside the final description and does NOT replace the auto-generated description (MediaInfo, screenshots, etc.)",
         )
         parser.add_argument('-menus', '--disc-menus', dest='path_to_menu_screenshots', nargs=1, required=False, help="Raw Disc only (Blu-ray/DVD). Path to the folder containing screenshots of the disc menus. All image files found in the folder will be used. Files should preferably be in PNG format (due to restrictions on some trackers), but other formats can be used (jpg, jpeg, webp)", type=str, default="")
-        parser.add_argument('-ih', '--imghost', nargs=1, required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens', 'onlyimage', 'dalexni', 'zipline', 'passtheimage', 'seedpool_cdn', 'utppm'])
+        parser.add_argument('-ih', '--imghost', nargs=1, required=False, help="Image Host", choices=['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'lensdump', 'ptscreens', 'onlyimage', 'dalexni', 'zipline', 'passtheimage', 'seedpool_cdn', 'utppm', 'lostimg'])
         parser.add_argument('-siu', '--skip-imagehost-upload', dest='skip_imghost_upload', action='store_true', required=False, help="Skip Uploading to an image host")
         parser.add_argument('-th', '--torrenthash', nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
         parser.add_argument('-nfo', '--nfo', action='store_true', required=False, help="Use .nfo in directory for description")

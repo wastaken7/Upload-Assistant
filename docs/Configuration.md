@@ -13,6 +13,8 @@
       * Notes: 10MB Cap. No signup needed. Recommended.
     * ptpimg
       * Recommended if you have access. API Key can be found via inspect element on the upload page.
+    * lostimg
+      * Notes: JSON response API. API Key can be created/found in Settings.
  
 * Default number of screenshots per upload: `screens` **REQUIRED**
   * Recommended value = 6

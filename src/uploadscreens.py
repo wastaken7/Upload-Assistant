@@ -601,6 +601,58 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Unexpected error with ShareX image host: {str(e)}[/red]")
                 return {'status': 'failed', 'reason': f'Unexpected error: {str(e)}'}
 
+        elif img_host == "lostimg":
+            url = "https://lostimg.cc/api/v1/images"
+            try:
+                lostimg_api_key = config["DEFAULT"].get("lostimg_api")
+                if not lostimg_api_key:
+                    console.print("[red]Lostimg API key not found in config.[/red]")
+                    return {"status": "failed", "reason": "Missing Lostimg API key"}
+
+                headers = {"Authorization": f"Bearer {lostimg_api_key}"}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+                    files = {"file[]": (os.path.basename(image), await img_file.read())}
+                    response = await client.post(url, headers=headers, files=files, timeout=timeout)
+
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        response_data = response.json()
+                    else:
+                        console.print(f"[red]Lostimg did not return JSON. Status: {response.status_code}, Response: {response.text[:200]}[/red]")
+                        return {"status": "failed", "reason": f"Non-JSON response from lostimg: {response.status_code}"}
+
+                    if response.status_code != 200:
+                        error_message = response_data.get("error", "Unknown error")
+                        console.print(f"[yellow]Lostimg failed (status: {response.status_code}): {error_message}[/yellow]")
+                        return {"status": "failed", "reason": f"lostimg upload failed: {error_message}"}
+
+                    img_url = response_data.get("url")
+                    if not img_url:
+                        console.print(f"[yellow]Incomplete URL data from lostimg response: {response_data}[/yellow]")
+                        return {"status": "failed", "reason": "Incomplete URL data from lostimg"}
+
+                    raw_url = img_url
+                    web_url = img_url
+
+                    if meta.debug:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}[/green]")
+
+                    return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url, "local_file_path": image}
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to Lostimg timed out.[/red]")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]Request to Lostimg failed with error: {e}[/red]")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                console.print(f"[red]Invalid JSON response from Lostimg: {e}[/red]")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+            except Exception as e:
+                console.print(f"[red]Unexpected error with Lostimg: {str(e)}[/red]")
+                return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
+
         if img_url and raw_url and web_url:
             return {
                 'status': 'success',

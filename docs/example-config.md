@@ -60,11 +60,12 @@ Important gotchas:
 ### Image host selection (priority list)
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
-- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `ptpimg`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`.
+- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `ptpimg`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
 
 ### Image host credentials
 - `imgbb_api` (str): API key for imgbb.
 - `ptpimg_api` (str): API key for ptpimg.
+- `lostimg_api` (str): API key for lostimg.
 - `lensdump_api` (str): API key for lensdump.
 - `ptscreens_api` (str): API key for ptscreens.
 - `onlyimage_api` (str): API key for onlyimage.

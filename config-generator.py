@@ -411,6 +411,7 @@ def get_img_host(
         "seedpool_cdn": "seedpool_cdn_api",
         "sharex": ["sharex_url", "sharex_api_key"],
         "utppm": "utppm_api",
+        "lostimg": "lostimg_api",
         "imgbox": None,
         "pixhost": None
     }

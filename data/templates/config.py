@@ -30,6 +30,7 @@ config = {
         # image host api keys
         "imgbb_api": "",
         "ptpimg_api": "",
+        "lostimg_api": "",
         "lensdump_api": "",
         "ptscreens_api": "",
         "oeimg_api": "",
@@ -46,7 +47,7 @@ config = {
         "sharex_api_key": "",
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, oeimg, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm
+        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, oeimg, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "imgbb",
         "img_host_2": "imgbox",
 

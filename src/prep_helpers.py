@@ -1220,6 +1220,7 @@ async def finalize_metadata(
                 "ibb.co": "imgbb",
                 "pixhost.to": "pixhost",
                 "imgbox.com": "imgbox",
+                "lostimg.cc": "lostimg",
             }
 
             approved_image_hosts = ["imgbox", "imgbb", "pixhost"]
