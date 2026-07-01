@@ -75,11 +75,6 @@ class HUNO(UNIT3D):
             console.print(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping upload.[/bold red]")
             return False
 
-        # Check if announce URL is configured
-        if not self.announce_url:
-            console.print(f"{self.tracker}: [bold red]Missing announce URL in config.[/bold red]")
-            return False
-
         # Check if x265 or HEVC is used
         if not meta.is_disc and meta.type in ["ENCODE", "DVDRIP", "HDTV"] and ("x265" in meta.video_encode or "HEVC" in meta.video_codec):
             tracks = meta.mediainfo.get("media", {}).get("track", [])

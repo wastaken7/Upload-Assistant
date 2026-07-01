@@ -357,11 +357,6 @@ class ANT:
                 console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
-        api_key = self.tracker_config.get('api_key')
-        if not api_key or not isinstance(api_key, str) or not api_key.strip():
-            console.print(f"[bold red]{self.tracker} API key not configured or invalid.")
-            return False
-
         return True
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:

@@ -116,16 +116,12 @@ class PTP:
                 console.print(f"[red]{self.tracker}: Release group {meta.tag} is banned. Skipping upload.[/red]")
                 return False
 
-        if not self.api_user or not self.api_key:
-            console.print(f"[red]{self.tracker}: API User or API Key is missing in config. Skipping upload.[/red]")
+        if not self.api_user:
+            console.print(f"[red]{self.tracker}: API User is missing in config. Skipping upload.[/red]")
             return False
 
         if not self.username or not self.password:
             console.print(f"[red]{self.tracker}: Username or Password is missing in config. Skipping upload.[/red]")
-            return False
-
-        if not self.announce_url:
-            console.print(f"[red]{self.tracker}: Announce URL is missing. Skipping upload.[/red]")
             return False
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)

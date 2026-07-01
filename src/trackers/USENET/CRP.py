@@ -38,11 +38,6 @@ class CRP:
         return []
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
-        tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        api_key = tracker_cfg.get("api_key", "").strip()
-        if not api_key:
-            console.print(f"{self.tracker}: [red]Skipping due to missing API Key.[/red]")
-            return False
         return True
 
     def get_category_id(self, meta: Meta) -> str:

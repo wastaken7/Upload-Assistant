@@ -66,12 +66,12 @@ class SUIO:
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        api_key = tracker_cfg.get("api_key", "").strip()
         username = tracker_cfg.get("username", "").strip()
-        if not (api_key and username and self.upload_url and self.torrent_url):
-            console.print(f"{self.tracker}: [red]Skipping due to missing Username, API Key, or base_url.[/red]")
+        if not (username and self.upload_url and self.torrent_url):
+            console.print(f"{self.tracker}: [red]Skipping due to missing Username or base_url.[/red]")
             return False
         return True
+
 
     def get_category_id(self, meta: Meta) -> str:
         category = str(meta.category or "").upper()
