@@ -1049,7 +1049,7 @@ class BT:
             await self.load_localized_data(meta)
             has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
             resolution_width, resolution_height = await self.get_resolution(meta)
-            data = {
+            data.update({
                 "audio_c": await self.get_audio_codec(meta),
                 "audio": await self.get_audio(meta),
                 "bitrate": await self.get_bitrate(meta),
@@ -1070,7 +1070,7 @@ class BT:
                 "tags": tags,
                 "video_c": await self.get_video_codec(meta),
                 "youtube": await self.get_trailer(meta),
-            }
+            })
 
             # Common data MOVIE/TV
             if not meta.anime:
@@ -1228,11 +1228,11 @@ class BT:
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
-            torrent_field_name='file_input',
+            torrent_field_name="file_input",
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/upload.php",
-            id_pattern=r'groupid=(\d+)',
-            success_status_code="200, 302, 303",
+            id_pattern=r"groupid=(\d+)",
+            success_text="groupid=",
         )
 
         return is_uploaded

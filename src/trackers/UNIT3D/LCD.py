@@ -85,7 +85,7 @@ class LCD(UNIT3D):
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
         if meta.is_disc == "BDMV":
-            mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=['File size', 'Overall bit rate'])
+            mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"], char_limit=20000)
         else:
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
                 mediainfo = await f.read()
