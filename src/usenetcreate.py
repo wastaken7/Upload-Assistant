@@ -14,6 +14,7 @@ import aiofiles
 import aiofiles.os
 import aiofiles.ospath
 import cli_ui
+from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console
 from src.meta import Meta
@@ -183,42 +184,51 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         vol_bytes = parse_volume_size(volume_size) if volume_size else 0
         expected_volumes = math.ceil(total_size / vol_bytes) if vol_bytes > 0 else 1
 
-        async def monitor_progress():
-            while process.returncode is None:
-                try:
-                    files = os.listdir(usenet_dir)
-                    parts = []
-                    for f in files:
-                        if f.startswith(safe_name):
-                            if f == f"{safe_name}.7z":
-                                parts.append(1)
-                            else:
-                                m = re.search(r"\.7z\.(\d+)$", f)
-                                if m:
-                                    parts.append(int(m.group(1)))
-                    current_part = max(parts) if parts else 0
-                    nonlocal expected_volumes
-                    if current_part > expected_volumes:
-                        expected_volumes = current_part
-                    cli_ui.info_progress(f"Archiving/Splitting with 7z: {current_part}/{expected_volumes}", current_part, expected_volumes)
-                except Exception:
-                    pass
-                await asyncio.sleep(0.5)
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task("Archiving/Splitting with 7z", total=expected_volumes)
 
-        monitor_task = asyncio.create_task(monitor_progress())
-        stdout, stderr = await process.communicate()
-        monitor_task.cancel()
+            async def monitor_progress():
+                while process.returncode is None:
+                    try:
+                        files = os.listdir(usenet_dir)
+                        parts = []
+                        for f in files:
+                            if f.startswith(safe_name):
+                                if f == f"{safe_name}.7z":
+                                    parts.append(1)
+                                else:
+                                    m = re.search(r"\.7z\.(\d+)$", f)
+                                    if m:
+                                        parts.append(int(m.group(1)))
+                        current_part = max(parts) if parts else 0
+                        nonlocal expected_volumes
+                        if current_part > expected_volumes:
+                            expected_volumes = current_part
+                        progress.update(task, completed=current_part, total=expected_volumes)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(0.5)
 
-        if process.returncode != 0:
-            console.print(f"[red]Error running 7z Archiver (exit code {process.returncode}):[/red]")
-            if stdout:
-                console.print(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
-            if stderr:
-                console.print(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
-            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+            monitor_task = asyncio.create_task(monitor_progress())
+            stdout, stderr = await process.communicate()
+            monitor_task.cancel()
 
-        # Finish progress display cleanly
-        cli_ui.info_progress(f"Archiving/Splitting with 7z: {expected_volumes}/{expected_volumes}", expected_volumes, expected_volumes)
+            if process.returncode != 0:
+                console.print(f"[red]Error running 7z Archiver (exit code {process.returncode}):[/red]")
+                if stdout:
+                    console.print(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
+                if stderr:
+                    console.print(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
+                raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+
+            # Finish progress display cleanly
+            progress.update(task, completed=expected_volumes, total=expected_volumes)
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -387,8 +397,10 @@ async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, deb
             cwd=cwd,
         )
 
-        last_percent = 0
         stderr_accum = []
+        check_missing_count = 0
+        check_total = 0
+        check_wait_total = 0
 
         if process.stdout is None or process.stderr is None:
             raise RuntimeError("Process stdout or stderr is None")
@@ -403,42 +415,113 @@ async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, deb
 
         stderr_task = asyncio.create_task(drain_stderr())
 
-        while True:
-            line_bytes = await process.stdout.readline()
-            if not line_bytes:
-                break
-            line = line_bytes.decode(errors="replace").strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-                etype = event.get("type")
-                if etype == "segment_done":
-                    pct = float(event.get("progress_pct", 0))
-                    last_percent = int(pct)
-                    cli_ui.info_progress(f"Posting to Usenet... {pct:.1f}%", last_percent, 100)
-                elif etype == "status":
-                    text = event.get("text", "").strip()
-                    if text and debug:
-                        console.print(f"[cyan]{text}[/cyan]")
-                elif etype == "failed":
-                    desc = event.get("description", "unknown failure")
-                    console.print(f"[red]Pesto segment failed: {desc}[/red]")
-            except json.JSONDecodeError:
-                pass
+        # Pesto pipelines PAR2 computation with posting, so segment_done and
+        # par2_encode_progress events interleave in the same stream. Each phase
+        # gets its own persistent Progress row instead of sharing one
+        # overwritten line, so they don't stomp on each other visually.
+        tasks: dict[str, TaskID] = {}
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            while True:
+                line_bytes = await process.stdout.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode(errors="replace").strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                    etype = event.get("type")
+                    if etype == "segment_done":
+                        pct = float(event.get("progress_pct", 0))
+                        if "upload" not in tasks:
+                            tasks["upload"] = progress.add_task("Posting to Usenet", total=100)
+                        progress.update(tasks["upload"], completed=pct)
+                    elif etype == "status":
+                        text = event.get("text", "").strip()
+                        if text and debug:
+                            console.print(f"[cyan]{text}[/cyan]")
+                    elif etype == "failed":
+                        desc = event.get("description", "unknown failure")
+                        console.print(f"[red]Pesto segment failed: {desc}[/red]")
+                    elif etype == "par2_encode_started":
+                        total = event.get("input_slices", 0)
+                        if "par2_encode" not in tasks:
+                            tasks["par2_encode"] = progress.add_task("Calculating PAR2 parity", total=total or 1)
+                        else:
+                            progress.update(tasks["par2_encode"], total=total or 1, completed=0)
+                    elif etype == "par2_encode_progress":
+                        done = event.get("done", 0)
+                        total = event.get("total", 0) or 1
+                        if "par2_encode" not in tasks:
+                            tasks["par2_encode"] = progress.add_task("Calculating PAR2 parity", total=total)
+                        progress.update(tasks["par2_encode"], total=total, completed=done)
+                    elif etype == "par2_write_started":
+                        total = event.get("total", 0)
+                        if "par2_write" not in tasks:
+                            tasks["par2_write"] = progress.add_task("Writing PAR2 recovery files", total=total or 1)
+                        else:
+                            progress.update(tasks["par2_write"], total=total or 1, completed=0)
+                    elif etype == "par2_slice_written":
+                        if "par2_write" not in tasks:
+                            tasks["par2_write"] = progress.add_task("Writing PAR2 recovery files", total=1)
+                        progress.advance(tasks["par2_write"])
+                    elif etype == "check_started":
+                        check_total = event.get("total", 0)
+                        if "check" not in tasks:
+                            tasks["check"] = progress.add_task("Verifying articles on server", total=check_total or 1)
+                        else:
+                            progress.update(tasks["check"], description="Verifying articles on server", total=check_total or 1, completed=0)
+                    elif etype == "check_waiting":
+                        remaining = event.get("remaining_secs", 0)
+                        if "check" not in tasks:
+                            check_wait_total = remaining
+                        description = f"Waiting {remaining}s before verifying articles..."
+                        if "check" not in tasks:
+                            tasks["check"] = progress.add_task(description, total=check_wait_total or 1)
+                        progress.update(tasks["check"], description=description, completed=max(check_wait_total - remaining, 0))
+                    elif etype == "check_progress":
+                        checked = event.get("checked", 0)
+                        if "check" not in tasks:
+                            tasks["check"] = progress.add_task("Verifying articles on server", total=check_total or checked or 1)
+                        progress.update(tasks["check"], completed=checked)
+                    elif etype == "check_done":
+                        failed = event.get("failed", 0)
+                        check_missing_count = failed
+                        if "check" in tasks and check_total:
+                            progress.update(tasks["check"], completed=check_total)
+                        if failed:
+                            console.print(f"[yellow]Article check: {failed} article(s) missing on server — pesto is reposting them automatically...[/yellow]")
+                        else:
+                            console.print("[green]Article check: all articles verified on server.[/green]")
+                    elif etype == "check_retrying":
+                        attempt = event.get("attempt", 0)
+                        max_attempts = event.get("max_attempts", 0)
+                        delay = event.get("delay_secs", 0)
+                        if debug:
+                            console.print(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
+                except json.JSONDecodeError:
+                    pass
+
+            if "upload" in tasks:
+                progress.update(tasks["upload"], completed=100)
 
         await stderr_task
         await process.wait()
 
         if process.returncode != 0:
+            if check_missing_count:
+                console.print(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
             console.print(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
             stderr_str = "".join(stderr_accum)
             if stderr_str:
                 console.print(f"[red]STDERR:[/red]\n{stderr_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
-
-        if last_percent < 100:
-            cli_ui.info_progress("Posting to Usenet... 100.0%", 100, 100)
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -789,6 +872,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             "--out", nzb_file,
             "--par2", str(par2_percentage),
             "--output-format", "json",
+            # Upload-Assistant submits to trackers itself with full metadata
+            # (title, TMDB id, category, screenshots) right after this call.
+            # Any user-configured pesto post-upload hook (~/.config/pesto/hooks/)
+            # would otherwise fire first and auto-submit the same NZB with
+            # little to no metadata, getting registered before UA's own
+            # submission and causing it to be rejected as a duplicate.
+            "--no-hooks",
         ]
 
         if not usenet_cfg.get("ssl", True):
@@ -803,6 +893,22 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         if archive_password:
             cmd_pesto.extend(["--nzb-password", archive_password])
 
+        # --check: after posting, verify every article is retrievable via STAT.
+        # Missing articles are reposted automatically and reverified; pesto
+        # exits non-zero if any are still missing after that, so we know the
+        # NZB is trustworthy whenever this command succeeds.
+        if usenet_cfg.get("pesto_check", True):
+            cmd_pesto.append("--check")
+            check_delay = usenet_cfg.get("pesto_check_delay")
+            if check_delay:
+                cmd_pesto.extend(["--check-delay", str(check_delay)])
+            check_retries = usenet_cfg.get("pesto_check_retries")
+            if check_retries:
+                cmd_pesto.extend(["--check-retries", str(check_retries)])
+            check_connections = usenet_cfg.get("pesto_check_connections")
+            if check_connections:
+                cmd_pesto.extend(["--check-connections", str(check_connections)])
+
         cmd_pesto.extend(all_upload_files)
 
         if is_debug:
@@ -810,7 +916,19 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
-            await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir, debug=is_debug)
+            try:
+                await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir, debug=is_debug)
+            except Exception:
+                # pesto writes the NZB to --out before it knows the post-check
+                # verification failed, so a failed run can still leave a
+                # well-formed (but incomplete) .nzb behind. is_valid_nzb() only
+                # checks XML structure, so if we don't remove it here, the next
+                # attempt would find it at the top of this function and reuse
+                # it as-is instead of re-uploading the missing articles.
+                with contextlib.suppress(Exception):
+                    if await aiofiles.ospath.exists(nzb_file):
+                        await aiofiles.os.remove(nzb_file)
+                raise
     else:
         # 6b. Upload via nyuu
         cmd_nyuu = [
