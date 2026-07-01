@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
+from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -175,3 +176,21 @@ class MS(UNIT3D):
             val = type_id.get(meta_type, "0")
 
         return {"type_id": val}
+
+    async def get_name(self, meta: Meta):
+        ms_name: str = meta.name
+        name_type: str = meta.type or ""
+        source: str = meta.source or ""
+
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper()
+            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                if meta.year:
+                    ms_name = ms_name.replace(str(meta.year), f"{str(meta.year)} {foreign_lang}", 1)
+            elif meta.is_disc != "BDMV":
+                ms_name = ms_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
+
+        return {"name": ms_name}
