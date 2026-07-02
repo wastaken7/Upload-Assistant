@@ -79,14 +79,14 @@ class ASC:
         return False
 
     async def load_localized_data(self, meta: Meta) -> None:
-        tmdb_data = meta.tmdb_localized_data
-        pt_br_data = tmdb_data.get("pt-BR")
-        if not pt_br_data or not pt_br_data.get("main"):
-            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
+        if meta.category in ("MOVIE", "TV"):
+            ptbr_data = meta.tmdb_localized_data.get("pt-BR")
+            if not ptbr_data or not ptbr_data.get("main"):
+                raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        self.main_tmdb_data = pt_br_data.get("main") or {}
-        self.season_tmdb_data = pt_br_data.get("season") or {}
-        self.episode_tmdb_data = pt_br_data.get("episode") or {}
+            self.main_tmdb_data = ptbr_data["main"]
+            self.episode_tmdb_data = ptbr_data.get("episode") or {}
+            meta.episode_tmdb_data = self.episode_tmdb_data
 
     async def get_container(self, meta: Meta) -> Optional[str]:
         if meta.category == "BOOK":
@@ -1111,6 +1111,7 @@ class ASC:
                 return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         description = await self.build_description(meta)
         upload_type = await self.get_type(meta)
 
@@ -1186,7 +1187,6 @@ class ASC:
 
             return data
 
-        await self.load_localized_data(meta)
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         resolution = await self.get_resolution(meta)

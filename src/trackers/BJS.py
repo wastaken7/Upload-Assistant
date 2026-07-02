@@ -115,14 +115,14 @@ class BJS:
         return False
 
     async def load_localized_data(self, meta: Meta) -> None:
-        data = meta.tmdb_localized_data
-        ptbr_data = data.get("pt-BR")
-        if not ptbr_data or not ptbr_data.get("main"):
-            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
+        if meta.category in ("MOVIE", "TV"):
+            ptbr_data = meta.tmdb_localized_data.get("pt-BR")
+            if not ptbr_data or not ptbr_data.get("main"):
+                raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        self.main_tmdb_data = ptbr_data.get("main") or {}
-        self.episode_tmdb_data = ptbr_data.get("episode") or {}
-        return
+            self.main_tmdb_data = ptbr_data["main"]
+            self.episode_tmdb_data = ptbr_data.get("episode") or {}
+            meta.episode_tmdb_data = self.episode_tmdb_data
 
     def get_container(self, meta: Meta) -> str:
         container: str = meta.container
@@ -576,7 +576,7 @@ class BJS:
         return br_rating or us_rating or ""
 
     async def get_tags(self, meta: Meta) -> str:
-        """Map genres from meta.genres or TMDB to BJS Portuguese tags."""
+        """Map genres from meta.genres or TMDB to Portuguese tags."""
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
@@ -589,7 +589,7 @@ class BJS:
         if meta.category in ("TV", "MOVIE") and not matched_tags:
             genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
             for g in genres_data:
-                name: str = g.get("name", "").lower()
+                name = str(g.get("name", "")).lower()
                 if name.strip():
                     mapped = ENG_TO_PTBR_GENRE_MAP.get(name)
                     if mapped and mapped not in matched_tags:
@@ -1293,6 +1293,7 @@ class BJS:
                 return results
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
@@ -1366,7 +1367,6 @@ class BJS:
                     data["regiao"] = game_region
 
         elif category in ("MOVIE", "TV"):
-            await self.load_localized_data(meta)
             width, height = self.get_resolution(meta)
             hours, minutes = self.get_runtime(meta)
 

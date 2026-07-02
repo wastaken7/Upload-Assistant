@@ -3,7 +3,6 @@ import asyncio
 import os
 import platform
 import re
-import unicodedata
 import zipfile
 from typing import Any, Optional, cast
 
@@ -18,6 +17,7 @@ from langcodes.tag_parser import LanguageTagError
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
@@ -122,15 +122,14 @@ class BT:
         return True
 
     async def load_localized_data(self, meta: Meta) -> None:
-        data = meta.tmdb_localized_data
-        ptbr_data = data.get('pt-BR')
-        if not ptbr_data or not ptbr_data.get("main"):
-            raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
+        if meta.category in ("MOVIE", "TV"):
+            ptbr_data = meta.tmdb_localized_data.get("pt-BR")
+            if not ptbr_data or not ptbr_data.get("main"):
+                raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
 
-        self.main_tmdb_data = ptbr_data.get("main") or {}
-        self.episode_tmdb_data = ptbr_data.get("episode") or {}
-        meta.episode_tmdb_data = self.episode_tmdb_data
-        return
+            self.main_tmdb_data = ptbr_data["main"]
+            self.episode_tmdb_data = ptbr_data.get("episode") or {}
+            meta.episode_tmdb_data = self.episode_tmdb_data
 
     async def get_container(self, meta: Meta) -> str:
         container = meta.container
@@ -626,32 +625,32 @@ class BT:
         return youtube
 
     async def get_tags(self, meta: Meta) -> str:
-        tags = ''
+        """Map genres from meta.genres or TMDB to Portuguese tags."""
+        matched_tags: list[str] = []
 
-        if meta.category in ("BOOK", "GAME"):
-            keywords_list = meta.keywords or meta.genres or []
-            if keywords_list:
-                keyword_list = [k.strip() for k in keywords_list if k.strip()]
-                tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in keyword_list)
-        else:
-            genres = self.main_tmdb_data.get("genres")
-            if isinstance(genres, list):
-                genre_names: list[str] = []
-                genres_list_raw = genres
-                genres_list: list[dict[str, Any]] = [cast(dict[str, Any], genre) for genre in genres_list_raw if isinstance(genre, dict)]
-                for genre in genres_list:
-                    name = genre.get("name")
-                    if isinstance(name, str) and name.strip():
-                        genre_names.append(name)
+        genres_list = meta.genres or meta.keywords or []
+        for genre in genres_list:
+            genre_lower = genre.strip().lower()
+            mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
+            if mapped and mapped not in matched_tags:
+                matched_tags.append(mapped)
 
-                if genre_names:
-                    tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
+        if meta.category in ("TV", "MOVIE") and not matched_tags:
+            genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
+            for g in genres_data:
+                name = str(g.get("name", "")).lower()
+                if name.strip():
+                    mapped = ENG_TO_PTBR_GENRE_MAP.get(name)
+                    if mapped and mapped not in matched_tags:
+                        matched_tags.append(mapped)
 
-            if not tags:
-                tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-                tags = (tags_raw or "").strip()
+        # If we have matched tags, return them
+        if matched_tags:
+            return ", ".join(matched_tags)
 
-        return tags
+        # Final fallback: ask user
+        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        return (tags_raw or "").strip()
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -933,6 +932,7 @@ class BT:
         return 'N/A'
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         description = await self.get_description(meta)
         tags = await self.get_tags(meta)
         original_title, brazilian_title = self.get_titles(meta)
@@ -1045,8 +1045,7 @@ class BT:
                     "desc": html_to_bbcode(meta.overview),
                     "screen[]": await self.get_screens(meta),
                 })
-        else:
-            await self.load_localized_data(meta)
+        elif meta.category in ("MOVIE", "TV"):
             has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
             resolution_width, resolution_height = await self.get_resolution(meta)
             data.update({
@@ -1232,7 +1231,7 @@ class BT:
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/upload.php",
             id_pattern=r"groupid=(\d+)",
-            success_text="groupid=",
+            success_status_code="200, 302, 303",
         )
 
         return is_uploaded

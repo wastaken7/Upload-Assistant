@@ -1006,7 +1006,7 @@ class GPW:
             return "Other"
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
-        await self.load_localized_data(meta)
+        await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         await self.get_groupid(meta)
         remaster_title = self.get_remaster_title(meta)
         codec = self.get_codec(meta)
