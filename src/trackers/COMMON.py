@@ -1539,3 +1539,22 @@ class COMMON:
             console.print(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
             return False
         return True
+
+    def has_bdinfo(self, content: str) -> bool:
+        """
+        Check if the provided content contains BDInfo information.
+        """
+        if not content or not isinstance(content, str):
+            return False
+
+        bdinfo_pattern = [
+            r"DISC INFO:",
+            r"Disc Title:\s*",
+            r"Disc Label:\s*",
+            r"PLAYLIST REPORT:",
+            r"\(\*\)\s*Indicates included stream hidden",
+        ]
+
+        combined_regex = "|".join(bdinfo_pattern)
+
+        return bool(re.search(combined_regex, content, re.IGNORECASE))
