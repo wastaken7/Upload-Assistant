@@ -255,6 +255,31 @@ class CBR(UNIT3D):
             return False
 
         if meta.category in ["MOVIE", "TV"]:
+            upload_type = str(meta.type).lower()
+            upload_source = str(meta.source).lower()
+
+            # Encodes must include the "Encode settings" field in the MediaInfo.
+            if upload_type == "encode" and not meta.has_encode_settings:
+                console.print(f"{self.tracker}: [bold red]'Encode settings' field in the MediaInfo is required for encodes. Skipping upload...[/bold red]")
+                return False
+
+            # Blu-ray remuxes that include encode settings must also include BDInfo.
+            if (
+                upload_type == "remux"
+                and (upload_source == "bluray" or upload_source == "blu-ray")
+                and meta.has_encode_settings
+                and not self.common.has_bdinfo(f"{meta.description}\n{meta.description_link_content}\n{meta.description_file_content}")
+            ):
+                console.print(
+                    f"{self.tracker}: [bold red]"
+                    "BDInfo is required for Blu-ray remuxes that include 'Encode settings' field in the MediaInfo. "
+                    "You can add BDInfo to the description using -df (path/to/file.txt) "
+                    "or -pb (Pastebin link). "
+                    "Skipping upload..."
+                    "[/bold red]"
+                )
+                return False
+
             subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
             if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
                 proceed = await self.common.prompt_user_for_confirmation(
