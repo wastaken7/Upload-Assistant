@@ -632,6 +632,10 @@ class BT:
         for genre in genres_list:
             genre_lower = genre.strip().lower()
             mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
+
+            if not mapped and genre_lower in ENG_TO_PTBR_GENRE_MAP.values():
+                mapped = genre_lower
+
             if mapped and mapped not in matched_tags:
                 matched_tags.append(mapped)
 
@@ -934,7 +938,6 @@ class BT:
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         description = await self.get_description(meta)
-        tags = await self.get_tags(meta)
         original_title, brazilian_title = self.get_titles(meta)
 
         data: dict[str, Any] = {
@@ -967,7 +970,7 @@ class BT:
                 "plataforma_jogo": self.get_game_platform_bt(meta),
                 "sys_jogo": self.get_game_os(meta),
                 "format": self.get_game_format(meta),
-                "tags": tags,
+                "tags": await self.get_tags(meta),
                 "image": cover_url,
                 "sinopse": overview,
                 "especificas": description,
@@ -1018,7 +1021,7 @@ class BT:
                     "diretor": meta.publisher or meta.author,
                     "edicao": edicao_str,
                     "paginas": self.get_book_pages(meta),
-                    "tags": tags,
+                    "tags": await self.get_tags(meta),
                     "desc": html_to_bbcode(meta.overview),
                     "especificas": description,
                     "screen[]": await self.get_screens(meta),
@@ -1041,7 +1044,7 @@ class BT:
                 # eBook
                 data.update({
                     "diretor": meta.author,
-                    "tags": tags,
+                    "tags": await self.get_tags(meta),
                     "desc": html_to_bbcode(meta.overview),
                     "screen[]": await self.get_screens(meta),
                 })
@@ -1066,7 +1069,7 @@ class BT:
                 "screen[]": await self.get_screens(meta),
                 "sinopse": self.main_tmdb_data.get("overview", "Nenhuma sinopse disponível."),
                 "subtitles[]": subtitle_ids,
-                "tags": tags,
+                "tags": await self.get_tags(meta),
                 "video_c": await self.get_video_codec(meta),
                 "youtube": await self.get_trailer(meta),
             })

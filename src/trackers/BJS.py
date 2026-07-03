@@ -583,6 +583,10 @@ class BJS:
         for genre in genres_list:
             genre_lower = genre.strip().lower()
             mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
+
+            if not mapped and genre_lower in ENG_TO_PTBR_GENRE_MAP.values():
+                mapped = genre_lower
+
             if mapped and mapped not in matched_tags:
                 matched_tags.append(mapped)
 
