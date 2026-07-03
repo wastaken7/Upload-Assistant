@@ -199,6 +199,29 @@ class DupeChecker:
             each = entry.get('name', '')
             sized = entry.get('size')  # This may come as a string, such as "1.5 GB"
 
+            # Check dupe size difference tolerance
+            tolerance = meta.dupe_size_difference_tolerance
+            if tolerance is None:
+                tolerance = self.config.get("DEFAULT", {}).get("dupe_size_difference_tolerance")
+
+            if tolerance is not None:
+                try:
+                    tolerance_val = float(tolerance)
+                    upload_size = meta.source_size
+                    dupe_size_raw = entry.get("size")
+                    if upload_size and upload_size > 0 and dupe_size_raw is not None:
+                        from src.uphelper import parse_size_to_bytes
+
+                        dupe_size = parse_size_to_bytes(dupe_size_raw)
+                        if dupe_size and dupe_size > 0:
+                            diff_pct = (abs(dupe_size - upload_size) / upload_size) * 100
+                            if diff_pct >= tolerance_val:
+                                await log_exclusion(f"size difference ({diff_pct:.2f}%) exceeding tolerance ({tolerance_val}%)", each)
+                                return True
+                except Exception as e:
+                    if meta.debug:
+                        console.log(f"[debug] Error in dupe size tolerance check: {e}")
+
             files_value = cast(list[Any], entry.get('files') or [])
             files = [str(file) for file in files_value]
 

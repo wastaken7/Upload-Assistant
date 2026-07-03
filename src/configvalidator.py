@@ -58,6 +58,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "sfx_on_prompt": (bool,),
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
+    "dupe_size_difference_tolerance": (float, int),
     "tracker_pass_checks": (str, int),
     "use_largest_playlist": (bool,),
     "keep_images": (bool,),
@@ -445,9 +446,22 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                 ))
 
     # Validate numeric string values can be parsed
-    numeric_keys = ["screens", "cutoff_screens", "thumbnail_size", "process_limit", "threads",
-                    "multiScreens", "pack_thumb_size", "charLimit", "fileLimit", "processLimit",
-                    "tracker_pass_checks", "mkbrr_threads", "ffmpeg_compression"]
+    numeric_keys = [
+        "screens",
+        "cutoff_screens",
+        "thumbnail_size",
+        "process_limit",
+        "threads",
+        "multiScreens",
+        "pack_thumb_size",
+        "charLimit",
+        "fileLimit",
+        "processLimit",
+        "tracker_pass_checks",
+        "mkbrr_threads",
+        "ffmpeg_compression",
+        "dupe_size_difference_tolerance",
+    ]
     for key in numeric_keys:
         if key in default:
             value = default[key]

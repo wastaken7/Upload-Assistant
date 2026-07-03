@@ -25,6 +25,7 @@ class Meta:
     asian: bool = False
     asin: str = ""
     ask_dupe: bool = False
+    dupe_size_difference_tolerance: float | None = None
     audio_languages: list[str] | None = field(default_factory=list)
     audio_spectrogram_tracks: str | None = None
     audio_spectrogram: bool | None = None

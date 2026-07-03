@@ -164,6 +164,7 @@ const argumentCategories = [
       { label: "--skip-dupe-check", description: "Skip dupe check" },
       { label: "--skip-dupe-asking", description: "Accept any reported dupes without prompting about it" },
       { label: "--double-dupe-check", description: "Run another dupe check right before upload" },
+      { label: "--dupe-size-difference-tolerance", placeholder: "PERCENTAGE", description: "Ignore dupes with size difference >= percentage" },
       { label: "--draft", description: "Send to Draft at supported sites (config)" },
       { label: "--modq", description: "Send to modQ at supported sites (config)" },
       { label: "--freeleech", placeholder: "25%", description: "Mark upload as Freeleech (percentage)" }

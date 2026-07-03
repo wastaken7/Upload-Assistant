@@ -52,6 +52,11 @@ config = {
         # Set true to show size difference between duplicate and the upload in duplicate checks
         "show_dupe_size_diff": True,
 
+        # Ignore duplicates if the size difference between the dupe and our upload is greater than or equal to this percentage
+        # For example: 20 means a 20% or more difference in size (larger or smaller) will exclude the dupe
+        # Set to None/null or remove to disable this feature.
+        "dupe_size_difference_tolerance": None,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,

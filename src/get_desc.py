@@ -1178,6 +1178,8 @@ class DescriptionBuilder:
         return pack_images_data
 
     async def _handle_discs_and_screenshots(self, meta: Meta, approved_image_hosts: list[str], images: list[dict[str, str]], multi_screens: int) -> str:
+        if not images:
+            return ""
         try:
             screenheader = await self.screenshot_header()
         except Exception:

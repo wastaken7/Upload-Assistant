@@ -18,6 +18,7 @@ from typing import Any
 
 import cli_ui
 import torf
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 from torf import Torrent
 
 from src.console import console
@@ -48,13 +49,13 @@ class CustomTorrent(torf.Torrent):
         self._meta = meta
 
         # Extract and store the precalculated piece size
-        self._precalculated_piece_size: int | None = kwargs.pop('piece_size', None)
+        self._precalculated_piece_size: int | None = kwargs.pop("piece_size", None)
         super().__init__(*args, **kwargs)
 
         # Set piece size directly
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
-            self.metainfo['info']['piece length'] = self._precalculated_piece_size
+            self.metainfo["info"]["piece length"] = self._precalculated_piece_size
 
     @property
     def piece_size_min(self) -> int:
@@ -86,12 +87,12 @@ class CustomTorrent(torf.Torrent):
             return
 
         self._piece_size = value
-        self.metainfo['info']['piece length'] = value
+        self.metainfo["info"]["piece length"] = value
 
     def validate_piece_size(self, _meta: Meta | None = None) -> None:
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
-            self.metainfo['info']['piece length'] = self._precalculated_piece_size
+            self.metainfo["info"]["piece length"] = self._precalculated_piece_size
             return
 
 
@@ -119,10 +120,10 @@ class TorrentCreator:
             max_size = 134217728  # 128 MiB default maximum
 
         if meta.debug:
-            console.print(f"Content size: {total_size / (1024*1024):.2f} MiB")
+            console.print(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
             console.print(f"Max size: {max_size}")
 
-        total_size_mib = total_size / (1024*1024)
+        total_size_mib = total_size / (1024 * 1024)
 
         if total_size_mib <= 60:  # <= 60 MiB
             piece_size = 32 * 1024  # 32 KiB
@@ -229,10 +230,10 @@ class TorrentCreator:
                     include = []
                     exclude = []
                 elif meta.keep_folder:
-                    console.print('--keep-folder was specified. Using complete folder for torrent creation.')
+                    console.print("--keep-folder was specified. Using complete folder for torrent creation.")
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
                     if meta.keep_nfo and "BASE" not in output_filename:
-                        console.print('--keep-nfo was specified. Including NFO files in torrent.')
+                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
@@ -243,7 +244,7 @@ class TorrentCreator:
 
                 elif meta.isdir:
                     if meta.keep_nfo and not meta.is_disc and "BASE" not in output_filename:
-                        console.print('--keep-nfo was specified. Including NFO files in torrent.')
+                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
@@ -253,12 +254,13 @@ class TorrentCreator:
                     elif not meta.tv_pack:
                         path_dir = os.fspath(path)
                         os.chdir(path_dir)
-                        globs = [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))] + [
-                            os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))
-                        ] + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                        globs = (
+                            [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))]
+                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))]
+                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                        )
                         no_sample_globs = [
-                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs
-                            if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
                         ]
                         if len(no_sample_globs) == 1 and not is_subs:
                             path = meta.filelist[0]
@@ -307,11 +309,11 @@ class TorrentCreator:
 
                                 cmd.extend(["-l", str(power)])
                                 console.print(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
-                            except (ValueError, TypeError):
+                            except ValueError, TypeError:
                                 console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
                         if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDB", "PTP", "MTV"]):
-                            cmd.extend(['-m', '27'])
+                            cmd.extend(["-m", "27"])
 
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
@@ -335,35 +337,47 @@ class TorrentCreator:
                             pieces_done = 0
                             mkbrr_start_time = time.time()
 
-                            for line in process.stdout:
-                                line = line.strip()
+                            with Progress(
+                                TextColumn("[progress.description]{task.description}"),
+                                BarColumn(),
+                                TaskProgressColumn(),
+                                console=console,
+                                transient=False,
+                            ) as progress:
+                                task = progress.add_task("mkbrr hashing...", total=total_pieces)
 
-                                # Detect hashing progress, speed, and percentage
-                                match = re.search(r"Hashing pieces.*?\[(\d+(?:\.\d+)? (?:G|M)(?:B|iB)/s)\]\s+(\d+)%", line)
-                                if match:
-                                    speed = match.group(1)  # Extract speed (e.g., "1.7 GiB/s")
-                                    pieces_done = int(match.group(2))  # Extract percentage (e.g., "14")
+                                for line in process.stdout:
+                                    line = line.strip()
 
-                                    # Try to extract the ETA directly if it's in the format [elapsed:remaining]
-                                    eta_match = re.search(r'\[(\d+)s:(\d+)s\]', line)
-                                    if eta_match:
-                                        eta_seconds = int(eta_match.group(2))
-                                        eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
-                                    else:
-                                        # Fallback to calculating ETA if not directly available
-                                        elapsed_time = time.time() - mkbrr_start_time
-                                        if pieces_done > 0:
-                                            estimated_total_time = elapsed_time / (pieces_done / 100)
-                                            eta_seconds = int(max(0.0, estimated_total_time - elapsed_time))
+                                    # Detect hashing progress, speed, and percentage
+                                    match = re.search(r"Hashing pieces.*?\[(\d+(?:\.\d+)? (?:G|M)(?:B|iB)/s)\]\s+(\d+)%", line)
+                                    if match:
+                                        speed = match.group(1)  # Extract speed (e.g., "1.7 GiB/s")
+                                        pieces_done = int(match.group(2))  # Extract percentage (e.g., "14")
+
+                                        # Try to extract the ETA directly if it's in the format [elapsed:remaining]
+                                        eta_match = re.search(r"\[(\d+)s:(\d+)s\]", line)
+                                        if eta_match:
+                                            eta_seconds = int(eta_match.group(2))
                                             eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
                                         else:
-                                            eta = "--:--"  # Placeholder if we can't estimate yet
+                                            # Fallback to calculating ETA if not directly available
+                                            elapsed_time = time.time() - mkbrr_start_time
+                                            if pieces_done > 0:
+                                                estimated_total_time = elapsed_time / (pieces_done / 100)
+                                                eta_seconds = int(max(0.0, estimated_total_time - elapsed_time))
+                                                eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
+                                            else:
+                                                eta = "--:--"  # Placeholder if we can't estimate yet
 
-                                    cli_ui.info_progress(f"mkbrr hashing... {speed} | ETA: {eta}", pieces_done, total_pieces)
+                                        progress.update(task, description=f"mkbrr hashing... {speed} | ETA: {eta}", completed=pieces_done)
 
-                                # Detect final output line
-                                if "Wrote" in line and ".torrent" in line and meta.debug:
-                                    console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
+                                    # Detect final output line
+                                    if "Wrote" in line and ".torrent" in line and meta.debug:
+                                        console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
+
+                                # Clean up progress bar at the end
+                                progress.update(task, completed=total_pieces)
 
                             # Wait for the process to finish
                             return process.wait()
@@ -446,8 +460,6 @@ class TorrentCreator:
                 if meta.debug:
                     console.print(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
 
-
-
     @staticmethod
     def torf_cb(torrent: Torrent, _filepath: str, pieces_done: int, pieces_total: int) -> None:
         if pieces_done == 0:
@@ -484,24 +496,24 @@ class TorrentCreator:
         base_torrent = Torrent.read(f"{base_dir}/tmp/{uuid}/BASE.torrent")
         for i in range(1, int(num) + 1):
             new_torrent = base_torrent
-            new_torrent.metainfo['info']['entropy'] = random.randint(1, 999999)  # type: ignore  # nosec B311
+            new_torrent.metainfo["info"]["entropy"] = random.randint(1, 999999)  # type: ignore  # nosec B311
             Torrent.copy(new_torrent).write(f"{base_dir}/tmp/{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
     async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
         if os.path.exists(torrentpath):
             base_torrent = Torrent.read(torrentpath)
-            base_torrent.trackers = ['https://fake.tracker']
+            base_torrent.trackers = ["https://fake.tracker"]
             base_torrent.comment = "Upload-Assistant (fork)"
             base_torrent.created_by = "Upload-Assistant (fork)"
-            info_dict = base_torrent.metainfo['info']
-            valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
+            info_dict = base_torrent.metainfo["info"]
+            valid_keys = ["name", "piece length", "pieces", "private", "source"]
 
             # Add the correct key based on single vs multi file torrent
-            if 'files' in info_dict:
-                valid_keys.append('files')
-            elif 'length' in info_dict:
-                valid_keys.append('length')
+            if "files" in info_dict:
+                valid_keys.append("files")
+            elif "length" in info_dict:
+                valid_keys.append("length")
 
             # Remove everything not in the whitelist
             for each in list(info_dict):
@@ -526,7 +538,7 @@ class TorrentCreator:
                     "isbn",
                 ):
                     base_torrent.metainfo.pop(each, None)  # type: ignore
-            base_torrent.source = 'L4G'
+            base_torrent.source = "L4G"
             base_torrent.private = True
             has_subs = False
             for f in base_torrent.files:
